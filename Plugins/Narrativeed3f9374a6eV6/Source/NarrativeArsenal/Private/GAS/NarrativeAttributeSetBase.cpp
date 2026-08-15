@@ -10,6 +10,7 @@
 #include "NarrativeGameplayTags.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
 #include "AbilitySystemGlobals.h"
+#include "AbilitySystemBlueprintLibrary.h"
 
 
 UNarrativeAttributeSetBase::UNarrativeAttributeSetBase()
@@ -21,24 +22,22 @@ void UNarrativeAttributeSetBase::PreAttributeChange(const FGameplayAttribute& At
 {
 	Super::PreAttributeChange(Attribute, NewValue);
 
-	
-}
-
-void UNarrativeAttributeSetBase::PostAttributeChange(const FGameplayAttribute& Attribute, float OldValue,float NewValue)
-{
-	Super::PostAttributeChange(Attribute, OldValue, NewValue);
-
-	if (INarrativeCharacterOwner* CharOwner = Cast<INarrativeCharacterOwner>(GetOuter()))
+	if (Attribute == GetMaxHealthAttribute())
 	{
-		if (ANarrativeCharacter* Char = CharOwner->GetNarrativeCharacter())
-		{
-			if (Attribute == GetXPAttribute())
-			{
-				Char->OnXPChanged(OldValue, NewValue);
-			}
-		}
+		//AdjustAttributeForMaxChange(Health, MaxHealth, NewValue, GetHealthAttribute());
 	}
-
+	else if (Attribute == GetMaxStaminaAttribute())
+	{
+		//AdjustAttributeForMaxChange(Stamina, MaxStamina, NewValue, GetStaminaAttribute());
+	}
+	else if (Attribute == GetMaxShieldAttribute())
+	{
+		//AdjustAttributeForMaxChange(Shield, MaxShield, NewValue, GetShieldAttribute());
+	}
+	else if (Attribute == GetMaxEchoAttribute())
+	{
+		//AdjustAttributeForMaxChange(Echo, MaxEcho, NewValue, GetEchoAttribute());
+	}
 }
 
 bool UNarrativeAttributeSetBase::PreGameplayEffectExecute(FGameplayEffectModCallbackData& Data)
@@ -68,7 +67,6 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 	Super::PostGameplayEffectExecute(Data);
 
 	FGameplayEffectContextHandle Context = Data.EffectSpec.GetContext();
-	
 	UNarrativeAbilitySystemComponent* SourceASC = Cast<UNarrativeAbilitySystemComponent>(Context.GetOriginalInstigatorAbilitySystemComponent());
 	const FGameplayTagContainer& SourceTags = *Data.EffectSpec.CapturedSourceTags.GetAggregatedTags();
 	FGameplayTagContainer SpecAssetTags;
@@ -138,35 +136,49 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 			HitResult = *Context.GetHitResult();
 		}
 
-		// Store a local copy of the amount of damage done and clear the damage attribute
+		// Store a local copy of the amount of damage done and clear the damage attribute.
+		// DamageDealt is the post-shield overflow (health damage only). TotalIncomingDamage is the
+		// full damage before shield absorption, read directly off the spec so we can notify even on
+		// pure shield hits where DamageDealt == 0.
 		const float DamageDealt = GetDamage();
 		SetDamage(0.f);
 
+		const float TotalIncomingDamage = Data.EffectSpec.GetSetByCallerMagnitude(
+			FNarrativeGameplayTags::Get().SetByCaller_Damage, false, 0.f);
+
 		if (DamageDealt > 0.0f)
 		{
-			// Apply the health change and then clamp it
+			// Energy shield absorption happens up-front in UNarrativeDamageExecCalc, which routes only the
+			// overflow (damage the shield couldn't absorb) into this Damage meta attribute. So here we simply
+			// apply the overflow to Health and clamp it.
 			const float NewHealth = GetHealth() - DamageDealt;
 			SetHealth(FMath::Clamp(NewHealth, 0.0f, GetMaxHealth()));
+		}
 
+		// Notify on every hit that had non-zero incoming damage — including pure shield hits where
+		// DamageDealt == 0. This ensures health bars and aggro systems fire even when shields absorb
+		// the full hit. We pass TotalIncomingDamage so listeners know how hard the hit was.
+		const float NotifyDamage = TotalIncomingDamage > 0.f ? TotalIncomingDamage : DamageDealt;
+		if (NotifyDamage > 0.0f)
+		{
 			if (ANarrativePlayerController* PC = Cast<ANarrativePlayerController>(SourceController))
 			{
-				if(TargetActor != SourceActor)
+				if (TargetActor != SourceActor)
 				{
 					if (!TargetCharacter || TargetCharacter->IsAlive())
 					{
 						if (TargetActor)
 						{
-							PC->NotifyDealtDamage(TargetActor, DamageDealt);
+							PC->NotifyDealtDamage(TargetActor, NotifyDamage);
 						}
 					}
-
 				}
 			}
 
 			if (SourceASC && TargetASC)
 			{
-				TargetASC->DamagedBy(SourceASC, DamageDealt, Data.EffectSpec);
-				SourceASC->DealtDamage(TargetASC, DamageDealt, Data.EffectSpec);
+				TargetASC->DamagedBy(SourceASC, NotifyDamage, Data.EffectSpec);
+				SourceASC->DealtDamage(TargetASC, NotifyDamage, Data.EffectSpec);
 			}
 		}
 	}
@@ -194,6 +206,38 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 		// Handle stamina changes.
 		SetStamina(FMath::Clamp(GetStamina(), 0.0f, GetMaxStamina()));
 	}
+	else if (Data.EvaluatedData.Attribute == GetShieldAttribute())
+	{
+		SetShield(FMath::Clamp(GetShield(), 0.0f, GetMaxShield()));
+
+		// When the exec calc fully absorbs a hit with shields, DamageDealt == 0 so the Damage
+		// meta-attribute block never runs and PostGameplayEffectExecute is only called here.
+		// Fire DealtDamage/DamagedBy so health bars, aggro, and other listeners still trigger.
+		// Data.EvaluatedData.Magnitude is the raw modifier from the exec calc (negative = absorbed).
+		const float ShieldLost = -Data.EvaluatedData.Magnitude;
+		if (ShieldLost > 0.f && SourceASC && TargetASC && SourceASC != TargetASC)
+		{
+			if (ANarrativePlayerController* PC = Cast<ANarrativePlayerController>(SourceController))
+			{
+				if (!TargetCharacter || TargetCharacter->IsAlive())
+				{
+					if (TargetActor)
+					{
+						PC->NotifyDealtDamage(TargetActor, ShieldLost);
+					}
+				}
+			}
+
+			TargetASC->DamagedBy(SourceASC, ShieldLost, Data.EffectSpec);
+			SourceASC->DealtDamage(TargetASC, ShieldLost, Data.EffectSpec);
+		}
+	}
+	else if (Data.EvaluatedData.Attribute == GetEchoAttribute())
+	{
+		// Handle echo changes.
+		SetEcho(FMath::Clamp(GetEcho(), 0.0f, GetMaxEcho()));
+	}
+
 
 	if (GetHealth() <= 0.f)
 	{
@@ -202,6 +246,18 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 		AActor* Causer = EffectContext.GetEffectCauser();
 
 		OnOutOfHealth.Broadcast(Instigator, Causer, Data.EffectSpec, Data.EvaluatedData.Magnitude);
+
+		// Notify the killer's ASC so kill-driven abilities (e.g. the Emperor's Wrath super,
+		// which listens for GameplayEvent.KilledEnemy to extend its duration) can react.
+		if (Instigator && Instigator != GetOwningActor())
+		{
+			FGameplayEventData EventData;
+			EventData.EventTag = FNarrativeGameplayTags::Get().GameplayEvent_KilledEnemy;
+			EventData.Instigator = Instigator;
+			EventData.Target = GetOwningActor();
+
+			UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(Instigator, EventData.EventTag, EventData);
+		}
 	}
 }
 
@@ -212,8 +268,12 @@ void UNarrativeAttributeSetBase::GetLifetimeReplicatedProps(TArray<FLifetimeProp
 	DOREPLIFETIME_CONDITION_NOTIFY(UNarrativeAttributeSetBase, XP, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UNarrativeAttributeSetBase, Health, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UNarrativeAttributeSetBase, MaxHealth, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UNarrativeAttributeSetBase, Shield, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UNarrativeAttributeSetBase, MaxShield, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UNarrativeAttributeSetBase, Stamina, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UNarrativeAttributeSetBase, MaxStamina, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UNarrativeAttributeSetBase, Echo, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UNarrativeAttributeSetBase, MaxEcho, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UNarrativeAttributeSetBase, StaminaRegenRate, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UNarrativeAttributeSetBase, Armor, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UNarrativeAttributeSetBase, AttackRating, COND_None, REPNOTIFY_Always);
@@ -250,6 +310,16 @@ void UNarrativeAttributeSetBase::OnRep_MaxHealth(const FGameplayAttributeData& O
 	GAMEPLAYATTRIBUTE_REPNOTIFY(UNarrativeAttributeSetBase, MaxHealth, OldMaxHealth);
 }
 
+void UNarrativeAttributeSetBase::OnRep_Shield(const FGameplayAttributeData& OldShield)
+{
+	GAMEPLAYATTRIBUTE_REPNOTIFY(UNarrativeAttributeSetBase, Shield, OldShield);
+}
+
+void UNarrativeAttributeSetBase::OnRep_MaxShield(const FGameplayAttributeData& OldMaxShield)
+{
+	GAMEPLAYATTRIBUTE_REPNOTIFY(UNarrativeAttributeSetBase, MaxShield, OldMaxShield);
+}
+
 
 void UNarrativeAttributeSetBase::OnRep_Stamina(const FGameplayAttributeData& OldStamina)
 {
@@ -259,6 +329,16 @@ void UNarrativeAttributeSetBase::OnRep_Stamina(const FGameplayAttributeData& Old
 void UNarrativeAttributeSetBase::OnRep_MaxStamina(const FGameplayAttributeData& OldMaxStamina)
 {
 	GAMEPLAYATTRIBUTE_REPNOTIFY(UNarrativeAttributeSetBase, MaxStamina, OldMaxStamina);
+}
+
+void UNarrativeAttributeSetBase::OnRep_Echo(const FGameplayAttributeData& OldEcho)
+{
+	GAMEPLAYATTRIBUTE_REPNOTIFY(UNarrativeAttributeSetBase, Echo, OldEcho);
+}
+
+void UNarrativeAttributeSetBase::OnRep_MaxEcho(const FGameplayAttributeData& OldMaxEcho)
+{
+	GAMEPLAYATTRIBUTE_REPNOTIFY(UNarrativeAttributeSetBase, MaxEcho, OldMaxEcho);
 }
 
 void UNarrativeAttributeSetBase::OnRep_StaminaRegenRate(const FGameplayAttributeData& OldStaminaRegenRate)

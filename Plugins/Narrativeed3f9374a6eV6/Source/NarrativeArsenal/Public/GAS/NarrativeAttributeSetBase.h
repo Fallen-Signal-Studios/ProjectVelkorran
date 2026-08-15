@@ -32,7 +32,6 @@ public:
 
 	// AttributeSet Overrides
 	virtual void PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue) override;
-	virtual void PostAttributeChange(const FGameplayAttribute& Attribute, float OldValue, float NewValue) override; 
 	virtual bool PreGameplayEffectExecute(FGameplayEffectModCallbackData& Data) override;
 	virtual void PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data) override;
 
@@ -55,6 +54,16 @@ public:
 	FGameplayAttributeData MaxHealth;
 	ATTRIBUTE_ACCESSORS(UNarrativeAttributeSetBase, MaxHealth)
 
+	// Current energy shield, absorbs incoming damage before it reaches Health. Capped by MaxShield.
+	UPROPERTY(BlueprintReadOnly, Category = "Shield", ReplicatedUsing = OnRep_Shield, meta = (NarrativeSaveAttribute))
+	FGameplayAttributeData Shield;
+	ATTRIBUTE_ACCESSORS(UNarrativeAttributeSetBase, Shield)
+
+	// MaxShield is its own attribute since GameplayEffects may modify it
+	UPROPERTY(BlueprintReadOnly, Category = "Shield", ReplicatedUsing = OnRep_MaxShield, meta = (NarrativeSaveAttribute))
+	FGameplayAttributeData MaxShield;
+	ATTRIBUTE_ACCESSORS(UNarrativeAttributeSetBase, MaxShield)
+
 	// Current stamina, used to execute special abilities. Capped by MaxStamina.
 	UPROPERTY(BlueprintReadOnly, Category = "Stamina", ReplicatedUsing = OnRep_Stamina, meta = (NarrativeSaveAttribute))
 	FGameplayAttributeData Stamina;
@@ -64,6 +73,16 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "Stamina", ReplicatedUsing = OnRep_MaxStamina, meta = (NarrativeSaveAttribute))
 	FGameplayAttributeData MaxStamina;
 	ATTRIBUTE_ACCESSORS(UNarrativeAttributeSetBase, MaxStamina)
+
+	// Current Echo, the mana-equivalent resource used to fuel abilities. Capped by MaxEcho.
+	UPROPERTY(BlueprintReadOnly, Category = "Echo", ReplicatedUsing = OnRep_Echo, meta = (NarrativeSaveAttribute))
+	FGameplayAttributeData Echo;
+	ATTRIBUTE_ACCESSORS(UNarrativeAttributeSetBase, Echo)
+
+	// MaxEcho is its own attribute since GameplayEffects may modify it
+	UPROPERTY(BlueprintReadOnly, Category = "Echo", ReplicatedUsing = OnRep_MaxEcho, meta = (NarrativeSaveAttribute))
+	FGameplayAttributeData MaxEcho;
+	ATTRIBUTE_ACCESSORS(UNarrativeAttributeSetBase, MaxEcho)
 
 	// Stamina regen rate will passively increase Stamina every second
 	UPROPERTY(BlueprintReadOnly, Category = "Stamina", ReplicatedUsing = OnRep_StaminaRegenRate, meta = (NarrativeSaveAttribute))
@@ -121,10 +140,22 @@ protected:
 	virtual void OnRep_MaxHealth(const FGameplayAttributeData& OldMaxHealth);
 
 	UFUNCTION()
+	virtual void OnRep_Shield(const FGameplayAttributeData& OldShield);
+
+	UFUNCTION()
+	virtual void OnRep_MaxShield(const FGameplayAttributeData& OldMaxShield);
+
+	UFUNCTION()
 	virtual void OnRep_Stamina(const FGameplayAttributeData& OldStamina);
 
 	UFUNCTION()
 	virtual void OnRep_MaxStamina(const FGameplayAttributeData& OldMaxStamina);
+
+	UFUNCTION()
+	virtual void OnRep_Echo(const FGameplayAttributeData& OldEcho);
+
+	UFUNCTION()
+	virtual void OnRep_MaxEcho(const FGameplayAttributeData& OldMaxEcho);
 
 	UFUNCTION()
 	virtual void OnRep_StaminaRegenRate(const FGameplayAttributeData& OldStaminaRegenRate);
