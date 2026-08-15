@@ -1,0 +1,136 @@
+// Copyright Narrative Tools 2024. 
+
+#pragma once
+
+#include "CoreMinimal.h"
+#include "AIController.h"
+#include <AbilitySystemInterface.h>
+#include "UnrealFramework/NarrativeTeamAgentInterface.h"
+#include <GameplayTagAssetInterface.h>
+#include "UnrealFramework/NarrativeCharacter.h"
+#include "Navigation/PathFollowingComponent.h"
+#include "NarrativeNPCController.generated.h"
+
+struct FPathFollowingResult;
+
+/**
+ * NPC Controller for NPCs spawned by the Narrative NPC subsystem. 
+ */
+UCLASS()
+class NARRATIVEARSENAL_API ANarrativeNPCController : public AAIController, 
+	public IAbilitySystemInterface, public IGameplayTagAssetInterface, public INarrativeTeamAgentInterface, public INarrativeCharacterOwner
+{
+	GENERATED_BODY()
+	
+public:
+
+	friend class UNarrativeAbilitySystemComponent;
+
+	ANarrativeNPCController(const FObjectInitializer& ObjectInitializer);
+
+	//Interfaces 
+	virtual void BeginPlay() override; 
+	virtual void EndPlay(EEndPlayReason::Type EndPlayReason) override; 
+	class UAbilitySystemComponent* GetAbilitySystemComponent() const override;
+	virtual FGameplayTagContainer GetFactions() const override;
+	virtual void GetOwnedGameplayTags(FGameplayTagContainer& TagContainer) const override;
+	virtual bool HasMatchingGameplayTag(FGameplayTag TagToCheck) const override;
+	virtual bool HasAllMatchingGameplayTags(const FGameplayTagContainer& TagContainer) const override;
+	virtual bool HasAnyMatchingGameplayTags(const FGameplayTagContainer& TagContainer) const override;
+	virtual void Destroyed() override;
+	virtual void DisplayDebug(class UCanvas* Canvas, const FDebugDisplayInfo& DebugDisplay, float& YL, float& YPos) override;
+	virtual void SetPawn(APawn* InPawn) override;
+	virtual bool ShouldPostponePathUpdates() const override;
+
+	virtual class ANarrativeCharacter* GetNarrativeCharacter() const override;
+
+	#if ENABLE_VISUAL_LOG
+	virtual void GrabDebugSnapshot(FVisualLogEntry* Snapshot) const override;
+#endif
+
+	//Tells the AI controller it needs to destroy itself and its pawn. 
+	UFUNCTION(BlueprintCallable, BlueprintImplementableEvent, Category = "NarrativeNPCController")
+	void CleanUp(const float RemovePawnDelay);
+
+	UFUNCTION(BlueprintPure, Category = "NarrativeNPCController")
+	class UBehaviorTree* GetCurrentTree();
+
+	void StopBehaviorTree();
+
+	//Grab the NPCs data asset 
+	UFUNCTION(BlueprintPure, Category = "NarrativeNPCController")
+	class UNPCDefinition* GetNPCData() const;
+	
+	//Grab the NPCs name
+	UFUNCTION(BlueprintPure, Category = "NarrativeNPCController")
+	FText GetNPCName() const;
+
+	//Check whether our controlled NPC is alive
+	UFUNCTION(BlueprintPure, Category = "NarrativeNPCController")
+	bool IsAlive() const;
+
+	//Grab the controlled NPC. This will return nullptr if NPC is controlling a car, or some other pawn. Use GetOwnedNPC() for a version that returns the NPC regardless of what GetPawn() is 
+	UFUNCTION(BlueprintPure, Category = "NarrativeNPCController")
+	ANarrativeNPCCharacter* GetControlledNPC() const;
+
+	UFUNCTION(BlueprintPure, Category = "NarrativeNPCController")
+	ANarrativeNPCCharacter* GetOwnedNPC() const;
+
+protected:
+	
+	/**The NPC activity component, stores the behaviour tree and current state and can write that to disk.*/
+	UPROPERTY(BlueprintReadOnly, VisibleAnywhere, Category = "Narrative|Components")
+	TObjectPtr<class UNPCActivityComponent> NPCActivityComponent;
+
+	//NPCs interaction component 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative|Interaction")
+	TObjectPtr<class UNPCInteractionComponent> InteractionComponent;
+
+	//Request an attack token from the target ASC. Return true if we successfully claimed the token and can attack. 
+	UFUNCTION(BlueprintCallable, Category = "Attack Tokens")
+	bool RequestAttackToken(UNarrativeAbilitySystemComponent* TargetToAttack);
+
+	//Give our token back to the current ASC - called automatically by RequestAttackToken if we already have one. 
+	UFUNCTION(BlueprintCallable, Category = "Attack Tokens")
+	bool ReturnToken();
+
+	//Called by our token granted when our granted token was stolen. 
+	void TokenStolen();
+
+	//The current attack token we've claimed 
+	UPROPERTY(BlueprintReadOnly, Category = "Attack Tokens")
+	TObjectPtr<class UNarrativeAbilitySystemComponent> GrantedToken;
+
+	//Gives our NPC controller a chance to react to death.
+	UFUNCTION(BlueprintNativeEvent, Category = "Narrative|NarrativeCharacter")
+	void HandleDeath(AActor* KilledActor, UNarrativeAbilitySystemComponent* KilledActorASC, const bool bIsDead);
+	virtual void HandleDeath_Implementation(AActor* KilledActor, UNarrativeAbilitySystemComponent* KilledActorASC, const bool bIsDead);
+
+protected:
+
+	//Bit of a test. We're going to check if attempting to traverse when our Move fails due to being blocked is a workable solution. 
+	virtual void OnMoveComplete(FAIRequestID RequestID, const FPathFollowingResult& Result);
+
+	FRotator SmoothTargetRotation;
+ 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "NarrativeNPCController")
+	float SmoothFocusInterpSpeed = 30.0f;
+ 
+public:
+
+	virtual void UpdateControlRotation(float DeltaTime, bool bUpdatePawn) override;
+
+public:
+
+	UFUNCTION(BlueprintPure, Category = "Narrative|Getters/Setters")
+	FORCEINLINE class UNPCActivityComponent* GetActivityComponent() const {return NPCActivityComponent; };
+	
+	UFUNCTION(BlueprintPure, Category = "Narrative|Getters/Setters")
+	FORCEINLINE class UNPCInteractionComponent* GetInteractionComponent() const {return InteractionComponent;};
+
+protected:
+
+	//We cache this because GetPawn() won't return our character if we started possessing a car, horse, etc. We'll need the OwnedCharacter. 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative")
+	TObjectPtr<class ANarrativeNPCCharacter> OwnedCharacter; 
+};

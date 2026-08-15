@@ -1,0 +1,41 @@
+// Copyright Narrative Tools 2024. 
+
+#pragma once
+
+#include "CoreMinimal.h"
+#include "GameplayTagContainer.h"
+#include "Engine/DataAsset.h"
+#include "NarrativeArsenal.h"
+#include "NarrativeGameplayTags.h"
+#include "NarrativeAbilityInputMapping.generated.h"
+
+class UGameplayAbility;
+class UInputAction;
+
+USTRUCT()
+struct FAbilityInputMappingData
+{
+	GENERATED_BODY()
+
+	//The input action
+	UPROPERTY(EditAnywhere, Category = "GameplayInputAbilityInfo")
+	TObjectPtr<UInputAction> InputAction;
+
+	//The input tag the action maps
+	UPROPERTY(EditAnywhere, Category = "GameplayInputAbilityInfo", meta=(Categories="Narrative.Input"))
+	FGameplayTag InputTag = FNarrativeGameplayTags::Get().Narrative_Input_None;
+};
+
+/**
+ * Used by Narrative weapons to define which input actions map to which abilities. 
+ */
+UCLASS()
+class NARRATIVEARSENAL_API UNarrativeAbilityInputMapping : public UDataAsset
+{
+	GENERATED_BODY()
+	
+public:
+	UPROPERTY(EditAnywhere, Category = "AbilitySystem")
+	TArray<FAbilityInputMappingData> InputAbilities;
+
+};

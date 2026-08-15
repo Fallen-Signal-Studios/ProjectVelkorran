@@ -1,0 +1,175 @@
+{
+	"FileVersion": 3,
+	"Version": 2,
+	"VersionName": "2.4.2",
+	"FriendlyName": "Narrative Pro",
+	"Description": "Everything you need for a great game in one plugin.",
+	"Category": "Narrative",
+	"CreatedBy": "Narrative Tools, Inc.",
+	"CreatedByURL": "https://www.narrativetools.io/",
+	"DocsURL": "http://docs.narrativetools.io/",
+	"MarketplaceURL": "com.epicgames.launcher://ue/Fab/product/86f8c09a-957c-451a-a4d1-fb1b4a6bbc46",
+	"SupportURL": "",
+	"EngineVersion": "5.7.0",
+	"CanContainContent": true,
+	"Installed": true,
+	"Modules": [
+		{
+			"Name": "NarrativePro",
+			"Type": "Runtime",
+			"LoadingPhase": "PreDefault",
+			"PlatformAllowList": [
+				"Win64",
+				"Android",
+				"Linux"
+			]
+		},
+		{
+			"Name": "NarrativeCommonUI",
+			"Type": "Runtime",
+			"LoadingPhase": "Default",
+			"PlatformAllowList": [
+				"Win64",
+				"Android",
+				"Linux"
+			]
+		},
+		{
+			"Name": "NarrativeQuestEditor",
+			"Type": "UncookedOnly",
+			"LoadingPhase": "PreDefault",
+			"PlatformAllowList": [
+				"Win64",
+				"Android",
+				"Linux"
+			]
+		},
+		{
+			"Name": "NarrativeDialogueEditor",
+			"Type": "UncookedOnly",
+			"LoadingPhase": "PreDefault",
+			"PlatformAllowList": [
+				"Win64",
+				"Android",
+				"Linux"
+			]
+		},
+		{
+			"Name": "NarrativeArsenal",
+			"Type": "Runtime",
+			"LoadingPhase": "Default",
+			"PlatformAllowList": [
+				"Win64",
+				"Android",
+				"Linux"
+			]
+		},
+		{
+			"Name": "NarrativeArsenalEditor",
+			"Type": "UncookedOnly",
+			"LoadingPhase": "PostEngineInit",
+			"PlatformAllowList": [
+				"Win64",
+				"Android",
+				"Linux"
+			]
+		},
+		{
+			"Name": "NarrativeSaveSystem",
+			"Type": "Runtime",
+			"LoadingPhase": "PreDefault",
+			"PlatformAllowList": [
+				"Win64",
+				"Android",
+				"Linux"
+			]
+		},
+		{
+			"Name": "NarrativeArsenalPreEditor",
+			"Type": "Editor",
+			"LoadingPhase": "PreDefault"
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "MotionWarping",
+			"Enabled": true
+		},
+		{
+			"Name": "CommonUI",
+			"Enabled": true
+		},
+		{
+			"Name": "EnhancedInput",
+			"Enabled": true
+		},
+		{
+			"Name": "AnimationWarping",
+			"Enabled": true
+		},
+		{
+			"Name": "AnimToTexture",
+			"Enabled": true
+		},
+		{
+			"Name": "AnimationLocomotionLibrary",
+			"Enabled": true
+		},
+		{
+			"Name": "PoseSearch",
+			"Enabled": true
+		},
+		{
+			"Name": "HairStrands",
+			"Enabled": true
+		},
+		{
+			"Name": "GameplayAbilities",
+			"Enabled": true
+		},
+		{
+			"Name": "GameplayCameras",
+			"Enabled": true
+		},
+		{
+			"Name": "ContextualAnimation",
+			"Enabled": true
+		},
+		{
+			"Name": "HairStrands",
+			"Enabled": true
+		},
+		{
+			"Name": "Chooser",
+			"Enabled": true
+		},
+		{
+			"Name": "Mover",
+			"Enabled": true
+		},
+		{
+			"Name": "NetworkPrediction",
+			"Enabled": true
+		},
+		{
+			"Name": "ChaosVehiclesPlugin",
+			"Enabled": true
+		},
+		{
+			"Name": "MassGameplay",
+			"Enabled": true
+		},
+		{
+			"Name": "MassCrowd",
+			"Enabled": true
+		},
+		{
+			"Name": "MassAI",
+			"Enabled": true
+		},
+		{
+			"Name": "CustomizableSequencerTracks",
+			"Enabled": true
+		}
+	]
+}
