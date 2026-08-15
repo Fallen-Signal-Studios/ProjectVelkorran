@@ -1,18 +1,78 @@
-# Ignore everything by default
-/*
+# Project source and configuration are intentionally tracked.
+# Large Unreal content remains local until Git LFS or another binary
+# versioning solution is available.
 
-# Allow git metadata
-!.gitignore
-!/.gitattributes
-!/.gitmodules
+# Unreal-generated directories (matched at any depth, including plugins)
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+StagedBuilds/
 
-# Allow plugin folder chain
-!/Plugins/
-!/Plugins/Narrativeed3f9374a6eV6/
-!/Plugins/Narrativeed3f9374a6eV6/Source/
-!/Plugins/Narrativeed3f9374a6eV6/NarrativePro.uplugin
+# IDE and generated project files
+.vs/
+.idea/
+.vscode/
+*.sln
+*.suo
+*.user
+*.userprefs
+*.xcodeproj
+*.xcworkspace
+*.code-workspace
+*.VC.db
+*.VC.opendb
+*.opensdf
+*.sdf
 
-# Re‑ignore everything else inside the plugin
-/Plugins/Narrativeed3f9374a6eV6/*
-!/Plugins/Narrativeed3f9374a6eV6/Source/
-!/Plugins/Narrativeed3f9374a6eV6/NarrativePro.uplugin
+# Compiler and linker output
+*.a
+*.app
+*.dll
+*.dylib
+*.exe
+*.exp
+*.gch
+*.ipa
+*.lai
+*.lib
+*.lo
+*.o
+*.obj
+*.pch
+*.pdb
+*.so
+
+# Unreal packaged output
+*.pak
+*.sig
+*.ucas
+*.utoc
+
+# Unreal project and plugin content is binary and intentionally not tracked yet
+Content/
+*.uasset
+*.umap
+
+# Raw source assets that normally belong in LFS
+SourceArt/
+*.blend
+*.exr
+*.fbx
+*.flac
+*.hdr
+*.mov
+*.mp3
+*.mp4
+*.ogg
+*.psd
+*.tga
+*.tif
+*.tiff
+*.wav
+
+# Logs, temporary files, and operating-system metadata
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
