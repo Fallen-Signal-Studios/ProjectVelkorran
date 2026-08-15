@@ -1,114 +1,145 @@
-// Copyright Narrative Tools 2024. 
-
+// Copyright Narrative Tools 2024.
 
 #include "GAS/NarrativeDamageExecCalc.h"
-#include "GAS/NarrativeAbilitySystemComponent.h"
+
+#include "ArsenalStatics.h"
 #include "GAS/NarrativeAttributeSetBase.h"
 #include "NarrativeGameplayTags.h"
-#include "UnrealFramework/NarrativePhysicalMaterial.h"
 #include "Settings/NarrativeCombatDeveloperSettings.h"
-#include "ArsenalStatics.h"
+#include "UnrealFramework/NarrativePhysicalMaterial.h"
 
-struct FDamageStatics
+namespace NarrativeDamage
 {
-	//When dealing damage, we capture AttackDamage, AttackRating (essentially an attack multiplier), and targets armor. 
-	FGameplayEffectAttributeCaptureDefinition AttackDamageDef;
-	FGameplayEffectAttributeCaptureDefinition AttackRatingDef;
-
-	FGameplayEffectAttributeCaptureDefinition ArmorDef;
-
-	FDamageStatics()
+	struct FStatics
 	{
-		AttackDamageDef = FGameplayEffectAttributeCaptureDefinition(UNarrativeAttributeSetBase::GetAttackDamageAttribute(), EGameplayEffectAttributeCaptureSource::Source, true);
-		AttackRatingDef = FGameplayEffectAttributeCaptureDefinition(UNarrativeAttributeSetBase::GetAttackRatingAttribute(), EGameplayEffectAttributeCaptureSource::Source, true);
+		FGameplayEffectAttributeCaptureDefinition AttackDamageDef;
+		FGameplayEffectAttributeCaptureDefinition AttackRatingDef;
+		FGameplayEffectAttributeCaptureDefinition ArmorDef;
 
-		ArmorDef = FGameplayEffectAttributeCaptureDefinition(UNarrativeAttributeSetBase::GetArmorAttribute(), EGameplayEffectAttributeCaptureSource::Target, false);
+		FStatics()
+		{
+			AttackDamageDef = FGameplayEffectAttributeCaptureDefinition(
+				UNarrativeAttributeSetBase::GetAttackDamageAttribute(),
+				EGameplayEffectAttributeCaptureSource::Source,
+				true);
+
+			AttackRatingDef = FGameplayEffectAttributeCaptureDefinition(
+				UNarrativeAttributeSetBase::GetAttackRatingAttribute(),
+				EGameplayEffectAttributeCaptureSource::Source,
+				true);
+
+			ArmorDef = FGameplayEffectAttributeCaptureDefinition(
+				UNarrativeAttributeSetBase::GetArmorAttribute(),
+				EGameplayEffectAttributeCaptureSource::Target,
+				false);
+		}
+	};
+
+	FStatics& Statics()
+	{
+		static FStatics Instance;
+		return Instance;
 	}
-};
-
-static FDamageStatics& DamageStatics()
-{
-	static FDamageStatics Statics;
-	return Statics;
 }
 
 UNarrativeDamageExecCalc::UNarrativeDamageExecCalc()
 {
-	RelevantAttributesToCapture.Add(DamageStatics().AttackDamageDef);
-	RelevantAttributesToCapture.Add(DamageStatics().AttackRatingDef);
-	RelevantAttributesToCapture.Add(DamageStatics().ArmorDef);
+	RelevantAttributesToCapture.Add(NarrativeDamage::Statics().AttackDamageDef);
+	RelevantAttributesToCapture.Add(NarrativeDamage::Statics().AttackRatingDef);
+	RelevantAttributesToCapture.Add(NarrativeDamage::Statics().ArmorDef);
 }
 
-void UNarrativeDamageExecCalc::Execute_Implementation(const FGameplayEffectCustomExecutionParameters& ExecutionParams, OUT FGameplayEffectCustomExecutionOutput& OutExecutionOutput) const
+void UNarrativeDamageExecCalc::Execute_Implementation(
+	const FGameplayEffectCustomExecutionParameters& ExecutionParams,
+	FGameplayEffectCustomExecutionOutput& OutExecutionOutput) const
 {
-	UAbilitySystemComponent* TargetAbilitySystemComponent = ExecutionParams.GetTargetAbilitySystemComponent();
-	UAbilitySystemComponent* SourceAbilitySystemComponent = ExecutionParams.GetSourceAbilitySystemComponent();
+	UAbilitySystemComponent* SourceASC = ExecutionParams.GetSourceAbilitySystemComponent();
+	UAbilitySystemComponent* TargetASC = ExecutionParams.GetTargetAbilitySystemComponent();
 
-	AActor* SourceActor = SourceAbilitySystemComponent ? SourceAbilitySystemComponent->GetAvatarActor() : nullptr;
-	AActor* TargetActor = TargetAbilitySystemComponent ? TargetAbilitySystemComponent->GetAvatarActor() : nullptr;
+	AActor* SourceActor = SourceASC ? SourceASC->GetAvatarActor() : nullptr;
+	AActor* TargetActor = TargetASC ? TargetASC->GetAvatarActor() : nullptr;
 
-	if (SourceActor != TargetActor)
+	if (SourceActor && TargetActor && SourceActor != TargetActor)
 	{
 		if (const UNarrativeCombatDeveloperSettings* CombatSettings = GetDefault<UNarrativeCombatDeveloperSettings>())
 		{
-			//If we're not allowing friendly fire to damage others, we should check whether to early out
-			if (!CombatSettings->bAllowFriendlyFire)
+			if (!CombatSettings->bAllowFriendlyFire
+				&& UArsenalStatics::GetAttitude(SourceActor, TargetActor) == ETeamAttitude::Friendly)
 			{
-				if (UArsenalStatics::GetAttitude(SourceActor, TargetActor) == ETeamAttitude::Friendly)
-				{
-					UE_LOG(LogTemp, Warning, TEXT("%s shot %s but we're cancelling since they are same team!"), *GetNameSafe(SourceActor), *GetNameSafe(TargetActor));
-					return;
-				}
+				return;
 			}
 		}
 	}
 
 	const FGameplayEffectSpec& Spec = ExecutionParams.GetOwningSpec();
-
-	// Gather the tags from the source and target as that can affect which buffs should be used
 	const FGameplayTagContainer* SourceTags = Spec.CapturedSourceTags.GetAggregatedTags();
 	const FGameplayTagContainer* TargetTags = Spec.CapturedTargetTags.GetAggregatedTags();
-
-	const bool bHeavyAttack = SourceTags->HasTag(FNarrativeGameplayTags::Get().Ability_DamageType_Heavy);
 
 	FAggregatorEvaluateParameters EvaluationParameters;
 	EvaluationParameters.SourceTags = SourceTags;
 	EvaluationParameters.TargetTags = TargetTags;
 
-	float Armor = 0.0f;
-	ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().ArmorDef, EvaluationParameters, Armor);
-	Armor = FMath::Max<float>(Armor, 0.0f);
+	float BaseDamage = 0.f;
+	ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(
+		NarrativeDamage::Statics().AttackDamageDef,
+		EvaluationParameters,
+		BaseDamage);
 
-	float Damage = 0.0f;
-	// Capture optional damage value set on the damage GE as a CalculationModifier under the ExecutionCalculation
-	ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().AttackDamageDef, EvaluationParameters, Damage);
+	// Narrative Pro's generic DealDamage path supplies damage through SetByCaller.
+	// When present, it is the base value for this execution rather than an addition
+	// to the captured AttackDamage attribute.
+	const float SetByCallerDamage = Spec.GetSetByCallerMagnitude(
+		FNarrativeGameplayTags::Get().SetByCaller_Damage,
+		false,
+		-1.f);
+
+	if (SetByCallerDamage >= 0.f)
+	{
+		BaseDamage = SetByCallerDamage;
+	}
+
+	BaseDamage = FMath::Max(BaseDamage, 0.f);
+	if (BaseDamage <= KINDA_SMALL_NUMBER)
+	{
+		return;
+	}
 
 	float AttackRating = 0.f;
-	ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(DamageStatics().AttackRatingDef, EvaluationParameters, AttackRating);
-	AttackRating = FMath::Max<float>(AttackRating, 0.f);
+	ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(
+		NarrativeDamage::Statics().AttackRatingDef,
+		EvaluationParameters,
+		AttackRating);
+	AttackRating = FMath::Max(AttackRating, 0.f);
 
-	//Attack rating is basically 20PTS = 120% damage, 130PTS = 230% damage, etc. 
-	const float AttackMultiplier = 1.f + (AttackRating / 100.f);
+	float Armor = 0.f;
+	ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(
+		NarrativeDamage::Statics().ArmorDef,
+		EvaluationParameters,
+		Armor);
+	Armor = FMath::Max(Armor, 0.f);
 
-	//Armor is basically the same but we'll divide by it. So 30PTS defence = FinalDamage (12) / 1.3 = 9.23 points damage 
-	const float DefenceMultiplier = (1.f + Armor / 100.f);
-
-	//Materials like Head can have damage multipliers
-	float MaterialMultiplier = 1.f;
+	float HitZoneMultiplier = 1.f;
 	if (const FHitResult* Hit = Spec.GetContext().GetHitResult())
 	{
-		if (UNarrativePhysicalMaterial* NPM = Cast<UNarrativePhysicalMaterial>(Hit->PhysMaterial.Get()))
+		if (const UNarrativePhysicalMaterial* PhysicalMaterial = Cast<UNarrativePhysicalMaterial>(Hit->PhysMaterial.Get()))
 		{
-			MaterialMultiplier = NPM->DamageMultiplier;
+			HitZoneMultiplier = FMath::Max(PhysicalMaterial->DamageMultiplier, 0.f);
 		}
 	}
 
-	//10 * 120% = 12 / 1.f
-	float FinalDamage = ((Damage * AttackMultiplier) / DefenceMultiplier) * MaterialMultiplier; 
+	const float SourceMultiplier = 1.f + (AttackRating / 100.f);
+	const float MitigationDivisor = 1.f + (Armor / 100.f);
+	const float FinalDamage = FMath::Max(
+		(BaseDamage * SourceMultiplier * HitZoneMultiplier) / MitigationDivisor,
+		0.f);
 
-	if (FinalDamage > 0.f)
+	if (FinalDamage > KINDA_SMALL_NUMBER)
 	{
-		// Set the Target's damage meta attribute
-		OutExecutionOutput.AddOutputModifier(FGameplayModifierEvaluatedData(UNarrativeAttributeSetBase::GetDamageAttribute(), EGameplayModOp::Additive, FinalDamage));
+		// Emit one pre-shield amount. The AttributeSet performs Shield absorption,
+		// Health overflow, break/death transitions, and one damage notification.
+		OutExecutionOutput.AddOutputModifier(FGameplayModifierEvaluatedData(
+			UNarrativeAttributeSetBase::GetDamageAttribute(),
+			EGameplayModOp::Additive,
+			FinalDamage));
 	}
 }

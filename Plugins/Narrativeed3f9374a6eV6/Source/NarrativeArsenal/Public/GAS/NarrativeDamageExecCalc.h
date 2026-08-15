@@ -1,4 +1,4 @@
-// Copyright Narrative Tools 2024. 
+// Copyright Narrative Tools 2024.
 
 #pragma once
 
@@ -7,7 +7,11 @@
 #include "NarrativeDamageExecCalc.generated.h"
 
 /**
- * 
+ * Resolves raw attack power into one final incoming-damage value.
+ *
+ * Shield and Health routing deliberately happens in UNarrativeAttributeSetBase so
+ * each hit produces exactly one authoritative damage notification, including hits
+ * that break Shield and overflow into Health.
  */
 UCLASS()
 class NARRATIVEARSENAL_API UNarrativeDamageExecCalc : public UGameplayEffectExecutionCalculation
@@ -17,5 +21,7 @@ class NARRATIVEARSENAL_API UNarrativeDamageExecCalc : public UGameplayEffectExec
 public:
 	UNarrativeDamageExecCalc();
 
-	virtual void Execute_Implementation(const FGameplayEffectCustomExecutionParameters& ExecutionParams, OUT FGameplayEffectCustomExecutionOutput& OutExecutionOutput) const override;
+	virtual void Execute_Implementation(
+		const FGameplayEffectCustomExecutionParameters& ExecutionParams,
+		FGameplayEffectCustomExecutionOutput& OutExecutionOutput) const override;
 };

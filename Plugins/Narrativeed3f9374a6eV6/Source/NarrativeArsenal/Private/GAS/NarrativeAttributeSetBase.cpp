@@ -1,21 +1,23 @@
-// Copyright Narrative Tools 2024. 
-
+// Copyright Narrative Tools 2024.
 
 #include "GAS/NarrativeAttributeSetBase.h"
-#include "UnrealFramework/NarrativePlayerController.h"
-#include "UnrealFramework/NarrativeCharacter.h"
+
+#include "AbilitySystemBlueprintLibrary.h"
+#include "AbilitySystemGlobals.h"
+#include "GAS/NarrativeAbilitySystemComponent.h"
 #include "GameplayEffect.h"
 #include "GameplayEffectExtension.h"
-#include "Net/UnrealNetwork.h"
 #include "NarrativeGameplayTags.h"
-#include "GAS/NarrativeAbilitySystemComponent.h"
-#include "AbilitySystemGlobals.h"
-#include "AbilitySystemBlueprintLibrary.h"
-
+#include "Net/UnrealNetwork.h"
+#include "UnrealFramework/NarrativeCharacter.h"
+#include "UnrealFramework/NarrativePlayerController.h"
 
 UNarrativeAttributeSetBase::UNarrativeAttributeSetBase()
 {
-
+	// Echo has a fixed campaign scale. Initial reserve is supplied by protagonist
+	// initialization/checkpoint effects, so a new attribute set starts empty.
+	InitMaxEcho(100.f);
+	InitEcho(0.f);
 }
 
 void UNarrativeAttributeSetBase::PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue)
@@ -24,19 +26,79 @@ void UNarrativeAttributeSetBase::PreAttributeChange(const FGameplayAttribute& At
 
 	if (Attribute == GetMaxHealthAttribute())
 	{
-		//AdjustAttributeForMaxChange(Health, MaxHealth, NewValue, GetHealthAttribute());
-	}
-	else if (Attribute == GetMaxStaminaAttribute())
-	{
-		//AdjustAttributeForMaxChange(Stamina, MaxStamina, NewValue, GetStaminaAttribute());
+		NewValue = FMath::Max(NewValue, 0.f);
+		AdjustAttributeForMaxChange(Health, MaxHealth, NewValue, GetHealthAttribute());
 	}
 	else if (Attribute == GetMaxShieldAttribute())
 	{
-		//AdjustAttributeForMaxChange(Shield, MaxShield, NewValue, GetShieldAttribute());
+		NewValue = FMath::Max(NewValue, 0.f);
+		AdjustAttributeForMaxChange(Shield, MaxShield, NewValue, GetShieldAttribute());
+	}
+	else if (Attribute == GetMaxStaminaAttribute())
+	{
+		NewValue = FMath::Max(NewValue, 0.f);
+		AdjustAttributeForMaxChange(Stamina, MaxStamina, NewValue, GetStaminaAttribute());
 	}
 	else if (Attribute == GetMaxEchoAttribute())
 	{
-		//AdjustAttributeForMaxChange(Echo, MaxEcho, NewValue, GetEchoAttribute());
+		NewValue = FMath::Max(NewValue, 0.f);
+
+		// Setting the initial 0..100 range must not grant a full Echo meter.
+		if (GetMaxEcho() > KINDA_SMALL_NUMBER)
+		{
+			AdjustAttributeForMaxChange(Echo, MaxEcho, NewValue, GetEchoAttribute());
+		}
+	}
+	else if (Attribute == GetHealthAttribute())
+	{
+		NewValue = FMath::Clamp(NewValue, 0.f, GetMaxHealth());
+	}
+	else if (Attribute == GetShieldAttribute())
+	{
+		NewValue = FMath::Clamp(NewValue, 0.f, GetMaxShield());
+	}
+	else if (Attribute == GetStaminaAttribute())
+	{
+		NewValue = FMath::Clamp(NewValue, 0.f, GetMaxStamina());
+	}
+	else if (Attribute == GetEchoAttribute())
+	{
+		NewValue = FMath::Clamp(NewValue, 0.f, GetMaxEcho());
+	}
+}
+
+void UNarrativeAttributeSetBase::PostAttributeChange(
+	const FGameplayAttribute& Attribute,
+	float OldValue,
+	float NewValue)
+{
+	Super::PostAttributeChange(Attribute, OldValue, NewValue);
+
+	if (Attribute == GetXPAttribute())
+	{
+		if (INarrativeCharacterOwner* CharacterOwner = Cast<INarrativeCharacterOwner>(GetOuter()))
+		{
+			if (ANarrativeCharacter* Character = CharacterOwner->GetNarrativeCharacter())
+			{
+				Character->OnXPChanged(OldValue, NewValue);
+			}
+		}
+	}
+	else if (Attribute == GetMaxHealthAttribute())
+	{
+		SetHealth(FMath::Clamp(GetHealth(), 0.f, GetMaxHealth()));
+	}
+	else if (Attribute == GetMaxShieldAttribute())
+	{
+		SetShield(FMath::Clamp(GetShield(), 0.f, GetMaxShield()));
+	}
+	else if (Attribute == GetMaxStaminaAttribute())
+	{
+		SetStamina(FMath::Clamp(GetStamina(), 0.f, GetMaxStamina()));
+	}
+	else if (Attribute == GetMaxEchoAttribute())
+	{
+		SetEcho(FMath::Clamp(GetEcho(), 0.f, GetMaxEcho()));
 	}
 }
 
@@ -47,18 +109,14 @@ bool UNarrativeAttributeSetBase::PreGameplayEffectExecute(FGameplayEffectModCall
 		return false;
 	}
 
-	if (Data.EvaluatedData.Attribute == GetDamageAttribute())
+	if (Data.EvaluatedData.Attribute == GetDamageAttribute()
+		&& Data.EvaluatedData.Magnitude > 0.f
+		&& Data.Target.HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_Invulnerable))
 	{
-		if (Data.EvaluatedData.Magnitude > 0.f)
-		{
-			//Return false to throw out the execution if we're invulnerable 
-			if (Data.Target.HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_Invulnerable))
-			{
-				Data.EvaluatedData.Magnitude = 0.f;
-				return false;
-			}
-		}
+		Data.EvaluatedData.Magnitude = 0.f;
+		return false;
 	}
+
 	return true;
 }
 
@@ -66,198 +124,173 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 {
 	Super::PostGameplayEffectExecute(Data);
 
-	FGameplayEffectContextHandle Context = Data.EffectSpec.GetContext();
-	UNarrativeAbilitySystemComponent* SourceASC = Cast<UNarrativeAbilitySystemComponent>(Context.GetOriginalInstigatorAbilitySystemComponent());
-	const FGameplayTagContainer& SourceTags = *Data.EffectSpec.CapturedSourceTags.GetAggregatedTags();
-	FGameplayTagContainer SpecAssetTags;
-	Data.EffectSpec.GetAllAssetTags(SpecAssetTags);
+	const FGameplayEffectContextHandle Context = Data.EffectSpec.GetContext();
+	UNarrativeAbilitySystemComponent* SourceASC = Cast<UNarrativeAbilitySystemComponent>(
+		Context.GetOriginalInstigatorAbilitySystemComponent());
+	UNarrativeAbilitySystemComponent* TargetASC = Cast<UNarrativeAbilitySystemComponent>(&Data.Target);
 
-	// Get the Target actor, which should be our owner
-	AActor* TargetActor = nullptr;
-	AController* TargetController = nullptr;
-	ANarrativeCharacter* TargetCharacter = nullptr;
-	UNarrativeAbilitySystemComponent* TargetASC = nullptr;
+	AActor* TargetActor = Data.Target.AbilityActorInfo.IsValid()
+		? Data.Target.AbilityActorInfo->AvatarActor.Get()
+		: nullptr;
 
-	if (Data.Target.AbilityActorInfo.IsValid() && Data.Target.AbilityActorInfo->AvatarActor.IsValid())
-	{
-		TargetActor = Data.Target.AbilityActorInfo->AvatarActor.Get();
-		TargetCharacter = Cast<ANarrativeCharacter>(TargetActor);
+	AActor* SourceActor = SourceASC && SourceASC->AbilityActorInfo.IsValid()
+		? SourceASC->AbilityActorInfo->AvatarActor.Get()
+		: nullptr;
 
-		if (TargetActor)
-		{
-			TargetASC = Cast<UNarrativeAbilitySystemComponent>(UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(TargetActor));
-		}
-
-
-		//Since the project has AIControllers actor ability info won't have a valid ref, try get from character
-		if (TargetCharacter)
-		{
-			TargetController = TargetCharacter->GetController();
-
-		}
-		else
-		{
-			TargetController = Data.Target.AbilityActorInfo->PlayerController.Get();
-		}
-	}
-
-	// Get the Source actor
-	AActor* SourceActor = nullptr;
 	AController* SourceController = nullptr;
-	ANarrativeCharacter* SourceCharacter = nullptr;
-
-	if (SourceASC && SourceASC->AbilityActorInfo.IsValid() && SourceASC->AbilityActorInfo->AvatarActor.IsValid())
+	if (ANarrativeCharacter* SourceCharacter = Cast<ANarrativeCharacter>(SourceActor))
 	{
-		SourceActor = SourceASC->AbilityActorInfo->AvatarActor.Get();
-		SourceCharacter = Cast<ANarrativeCharacter>(SourceActor);
-
-		if (SourceCharacter)
-		{
-			SourceController = SourceCharacter->GetController();
-		}
-		else
-		{
-			SourceController = SourceASC->AbilityActorInfo->PlayerController.Get();
-		}
-
-		// Set the causer actor d on context if it's set
-		if (Context.GetEffectCauser())
-		{
-			SourceActor = Context.GetEffectCauser();
-		}
+		SourceController = SourceCharacter->GetController();
 	}
+	else if (SourceASC && SourceASC->AbilityActorInfo.IsValid())
+	{
+		SourceController = SourceASC->AbilityActorInfo->PlayerController.Get();
+	}
+
+	if (Context.GetEffectCauser())
+	{
+		SourceActor = Context.GetEffectCauser();
+	}
+
+	const auto NotifyAppliedDamage = [
+		SourceASC,
+		TargetASC,
+		SourceActor,
+		TargetActor,
+		SourceController,
+		&Data](const float AppliedDamage)
+	{
+		if (AppliedDamage <= KINDA_SMALL_NUMBER)
+		{
+			return;
+		}
+
+		if (ANarrativePlayerController* PlayerController = Cast<ANarrativePlayerController>(SourceController))
+		{
+			if (TargetActor && TargetActor != SourceActor)
+			{
+				PlayerController->NotifyDealtDamage(TargetActor, AppliedDamage);
+			}
+		}
+
+		if (SourceASC && TargetASC && SourceASC != TargetASC)
+		{
+			TargetASC->DamagedBy(SourceASC, AppliedDamage, Data.EffectSpec);
+			SourceASC->DealtDamage(TargetASC, AppliedDamage, Data.EffectSpec);
+		}
+	};
 
 	if (Data.EvaluatedData.Attribute == GetDamageAttribute())
 	{
-		// Try to extract a hit result
-		FHitResult HitResult;
-		if (Context.GetHitResult())
-		{
-			HitResult = *Context.GetHitResult();
-		}
-
-		// Store a local copy of the amount of damage done and clear the damage attribute.
-		// DamageDealt is the post-shield overflow (health damage only). TotalIncomingDamage is the
-		// full damage before shield absorption, read directly off the spec so we can notify even on
-		// pure shield hits where DamageDealt == 0.
-		const float DamageDealt = GetDamage();
+		const float IncomingDamage = FMath::Max(GetDamage(), 0.f);
 		SetDamage(0.f);
 
-		const float TotalIncomingDamage = Data.EffectSpec.GetSetByCallerMagnitude(
-			FNarrativeGameplayTags::Get().SetByCaller_Damage, false, 0.f);
-
-		if (DamageDealt > 0.0f)
+		if (IncomingDamage <= KINDA_SMALL_NUMBER)
 		{
-			// Energy shield absorption happens up-front in UNarrativeDamageExecCalc, which routes only the
-			// overflow (damage the shield couldn't absorb) into this Damage meta attribute. So here we simply
-			// apply the overflow to Health and clamp it.
-			const float NewHealth = GetHealth() - DamageDealt;
-			SetHealth(FMath::Clamp(NewHealth, 0.0f, GetMaxHealth()));
+			return;
 		}
 
-		// Notify on every hit that had non-zero incoming damage — including pure shield hits where
-		// DamageDealt == 0. This ensures health bars and aggro systems fire even when shields absorb
-		// the full hit. We pass TotalIncomingDamage so listeners know how hard the hit was.
-		const float NotifyDamage = TotalIncomingDamage > 0.f ? TotalIncomingDamage : DamageDealt;
-		if (NotifyDamage > 0.0f)
-		{
-			if (ANarrativePlayerController* PC = Cast<ANarrativePlayerController>(SourceController))
-			{
-				if (TargetActor != SourceActor)
-				{
-					if (!TargetCharacter || TargetCharacter->IsAlive())
-					{
-						if (TargetActor)
-						{
-							PC->NotifyDealtDamage(TargetActor, NotifyDamage);
-						}
-					}
-				}
-			}
+		const float OldShield = FMath::Max(GetShield(), 0.f);
+		const float OldHealth = FMath::Max(GetHealth(), 0.f);
 
-			if (SourceASC && TargetASC)
+		const float ShieldDamage = FMath::Min(OldShield, IncomingDamage);
+		const float RemainingDamage = FMath::Max(IncomingDamage - ShieldDamage, 0.f);
+		const float HealthDamage = FMath::Min(OldHealth, RemainingDamage);
+
+		if (ShieldDamage > 0.f)
+		{
+			SetShield(FMath::Clamp(OldShield - ShieldDamage, 0.f, GetMaxShield()));
+		}
+
+		if (RemainingDamage > 0.f)
+		{
+			SetHealth(FMath::Clamp(OldHealth - RemainingDamage, 0.f, GetMaxHealth()));
+		}
+
+		const float AppliedDamage = ShieldDamage + HealthDamage;
+		NotifyAppliedDamage(AppliedDamage);
+
+		AActor* Instigator = Context.GetOriginalInstigator();
+		AActor* Causer = Context.GetEffectCauser();
+
+		if (OldShield > 0.f && GetShield() <= 0.f)
+		{
+			OnShieldBroken.Broadcast(Instigator, Causer, Data.EffectSpec, ShieldDamage);
+		}
+
+		if (OldHealth > 0.f && GetHealth() <= 0.f)
+		{
+			OnOutOfHealth.Broadcast(Instigator, Causer, Data.EffectSpec, AppliedDamage);
+
+			if (Instigator && Instigator != GetOwningActor())
 			{
-				TargetASC->DamagedBy(SourceASC, NotifyDamage, Data.EffectSpec);
-				SourceASC->DealtDamage(TargetASC, NotifyDamage, Data.EffectSpec);
+				FGameplayEventData EventData;
+				EventData.EventTag = FNarrativeGameplayTags::Get().GameplayEvent_KilledEnemy;
+				EventData.Instigator = Instigator;
+				EventData.Target = GetOwningActor();
+
+				UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(
+					Instigator,
+					EventData.EventTag,
+					EventData);
 			}
 		}
+
+		return;
 	}
-	else if (Data.EvaluatedData.Attribute == GetHealAttribute()) // Heal metaattribute 
+
+	if (Data.EvaluatedData.Attribute == GetHealAttribute())
 	{
-		const float HealAmount = GetHeal();
-
-		//Binding to attribute changed doesn't give us valid instigator data as GEModData is null, so we do this as a workaround 
-		if (SourceASC && TargetASC)
-		{
-			TargetASC->HealedBy(SourceASC, HealAmount, Data.EffectSpec);
-		}
-
-		SetHealth(FMath::Clamp(GetHealth() + HealAmount, 0.0f, GetMaxHealth()));
+		const float RequestedHeal = FMath::Max(GetHeal(), 0.f);
 		SetHeal(0.f);
+
+		const float OldHealth = GetHealth();
+		SetHealth(FMath::Clamp(OldHealth + RequestedHeal, 0.f, GetMaxHealth()));
+		const float AppliedHeal = GetHealth() - OldHealth;
+
+		if (AppliedHeal > 0.f && SourceASC && TargetASC)
+		{
+			TargetASC->HealedBy(SourceASC, AppliedHeal, Data.EffectSpec);
+		}
+
+		return;
 	}
-	else if (Data.EvaluatedData.Attribute == GetHealthAttribute())
+
+	if (Data.EvaluatedData.Attribute == GetHealthAttribute())
 	{
-		// Handle other health changes.
-		// Health loss should go through Damage.
-		SetHealth(FMath::Clamp(GetHealth(), 0.0f, GetMaxHealth()));
-	}
-	else if (Data.EvaluatedData.Attribute == GetStaminaAttribute())
-	{
-		// Handle stamina changes.
-		SetStamina(FMath::Clamp(GetStamina(), 0.0f, GetMaxStamina()));
+		SetHealth(FMath::Clamp(GetHealth(), 0.f, GetMaxHealth()));
 	}
 	else if (Data.EvaluatedData.Attribute == GetShieldAttribute())
 	{
-		SetShield(FMath::Clamp(GetShield(), 0.0f, GetMaxShield()));
-
-		// When the exec calc fully absorbs a hit with shields, DamageDealt == 0 so the Damage
-		// meta-attribute block never runs and PostGameplayEffectExecute is only called here.
-		// Fire DealtDamage/DamagedBy so health bars, aggro, and other listeners still trigger.
-		// Data.EvaluatedData.Magnitude is the raw modifier from the exec calc (negative = absorbed).
-		const float ShieldLost = -Data.EvaluatedData.Magnitude;
-		if (ShieldLost > 0.f && SourceASC && TargetASC && SourceASC != TargetASC)
-		{
-			if (ANarrativePlayerController* PC = Cast<ANarrativePlayerController>(SourceController))
-			{
-				if (!TargetCharacter || TargetCharacter->IsAlive())
-				{
-					if (TargetActor)
-					{
-						PC->NotifyDealtDamage(TargetActor, ShieldLost);
-					}
-				}
-			}
-
-			TargetASC->DamagedBy(SourceASC, ShieldLost, Data.EffectSpec);
-			SourceASC->DealtDamage(TargetASC, ShieldLost, Data.EffectSpec);
-		}
+		SetShield(FMath::Clamp(GetShield(), 0.f, GetMaxShield()));
+	}
+	else if (Data.EvaluatedData.Attribute == GetStaminaAttribute())
+	{
+		SetStamina(FMath::Clamp(GetStamina(), 0.f, GetMaxStamina()));
 	}
 	else if (Data.EvaluatedData.Attribute == GetEchoAttribute())
 	{
-		// Handle echo changes.
-		SetEcho(FMath::Clamp(GetEcho(), 0.0f, GetMaxEcho()));
+		SetEcho(FMath::Clamp(GetEcho(), 0.f, GetMaxEcho()));
 	}
-
-
-	if (GetHealth() <= 0.f)
+	else if (Data.EvaluatedData.Attribute == GetMaxHealthAttribute())
 	{
-		const FGameplayEffectContextHandle& EffectContext = Data.EffectSpec.GetEffectContext();
-		AActor* Instigator = EffectContext.GetOriginalInstigator();
-		AActor* Causer = EffectContext.GetEffectCauser();
-
-		OnOutOfHealth.Broadcast(Instigator, Causer, Data.EffectSpec, Data.EvaluatedData.Magnitude);
-
-		// Notify the killer's ASC so kill-driven abilities (e.g. the Emperor's Wrath super,
-		// which listens for GameplayEvent.KilledEnemy to extend its duration) can react.
-		if (Instigator && Instigator != GetOwningActor())
-		{
-			FGameplayEventData EventData;
-			EventData.EventTag = FNarrativeGameplayTags::Get().GameplayEvent_KilledEnemy;
-			EventData.Instigator = Instigator;
-			EventData.Target = GetOwningActor();
-
-			UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(Instigator, EventData.EventTag, EventData);
-		}
+		SetMaxHealth(FMath::Max(GetMaxHealth(), 0.f));
+		SetHealth(FMath::Clamp(GetHealth(), 0.f, GetMaxHealth()));
+	}
+	else if (Data.EvaluatedData.Attribute == GetMaxShieldAttribute())
+	{
+		SetMaxShield(FMath::Max(GetMaxShield(), 0.f));
+		SetShield(FMath::Clamp(GetShield(), 0.f, GetMaxShield()));
+	}
+	else if (Data.EvaluatedData.Attribute == GetMaxStaminaAttribute())
+	{
+		SetMaxStamina(FMath::Max(GetMaxStamina(), 0.f));
+		SetStamina(FMath::Clamp(GetStamina(), 0.f, GetMaxStamina()));
+	}
+	else if (Data.EvaluatedData.Attribute == GetMaxEchoAttribute())
+	{
+		SetMaxEcho(FMath::Max(GetMaxEcho(), 0.f));
+		SetEcho(FMath::Clamp(GetEcho(), 0.f, GetMaxEcho()));
 	}
 }
 
@@ -281,18 +314,29 @@ void UNarrativeAttributeSetBase::GetLifetimeReplicatedProps(TArray<FLifetimeProp
 	DOREPLIFETIME_CONDITION_NOTIFY(UNarrativeAttributeSetBase, AttackDamage, COND_None, REPNOTIFY_Always);
 }
 
-void UNarrativeAttributeSetBase::AdjustAttributeForMaxChange(FGameplayAttributeData& AffectedAttribute, const FGameplayAttributeData& MaxAttribute, float NewMaxValue, const FGameplayAttribute& AffectedAttributeProperty)
+void UNarrativeAttributeSetBase::AdjustAttributeForMaxChange(
+	FGameplayAttributeData& AffectedAttribute,
+	const FGameplayAttributeData& MaxAttribute,
+	float NewMaxValue,
+	const FGameplayAttribute& AffectedAttributeProperty)
 {
-	UAbilitySystemComponent* AbilityComp = GetOwningAbilitySystemComponent();
+	UAbilitySystemComponent* AbilityComponent = GetOwningAbilitySystemComponent();
 	const float CurrentMaxValue = MaxAttribute.GetCurrentValue();
-	if (!FMath::IsNearlyEqual(CurrentMaxValue, NewMaxValue) && AbilityComp)
-	{
-		// Change current value to maintain the current Val / Max percent
-		const float CurrentValue = AffectedAttribute.GetCurrentValue();
-		float NewDelta = (CurrentMaxValue > 0.f) ? (CurrentValue * NewMaxValue / CurrentMaxValue) - CurrentValue : NewMaxValue;
 
-		AbilityComp->ApplyModToAttributeUnsafe(AffectedAttributeProperty, EGameplayModOp::Additive, NewDelta);
+	if (FMath::IsNearlyEqual(CurrentMaxValue, NewMaxValue) || !AbilityComponent)
+	{
+		return;
 	}
+
+	const float CurrentValue = AffectedAttribute.GetCurrentValue();
+	const float NewDelta = CurrentMaxValue > 0.f
+		? (CurrentValue * NewMaxValue / CurrentMaxValue) - CurrentValue
+		: NewMaxValue;
+
+	AbilityComponent->ApplyModToAttributeUnsafe(
+		AffectedAttributeProperty,
+		EGameplayModOp::Additive,
+		NewDelta);
 }
 
 void UNarrativeAttributeSetBase::OnRep_XP(const FGameplayAttributeData& OldXP)
@@ -319,7 +363,6 @@ void UNarrativeAttributeSetBase::OnRep_MaxShield(const FGameplayAttributeData& O
 {
 	GAMEPLAYATTRIBUTE_REPNOTIFY(UNarrativeAttributeSetBase, MaxShield, OldMaxShield);
 }
-
 
 void UNarrativeAttributeSetBase::OnRep_Stamina(const FGameplayAttributeData& OldStamina)
 {
@@ -356,17 +399,16 @@ void UNarrativeAttributeSetBase::OnRep_AttackRating(const FGameplayAttributeData
 	GAMEPLAYATTRIBUTE_REPNOTIFY(UNarrativeAttributeSetBase, AttackRating, OldAttackRating);
 }
 
-void UNarrativeAttributeSetBase::OnRep_AttackDamage(const FGameplayAttributeData& OldAttackDamage)
-{
-	GAMEPLAYATTRIBUTE_REPNOTIFY(UNarrativeAttributeSetBase, AttackDamage, OldAttackDamage);
-}
-
 void UNarrativeAttributeSetBase::OnRep_StealthRating(const FGameplayAttributeData& OldStealthRating)
 {
 	GAMEPLAYATTRIBUTE_REPNOTIFY(UNarrativeAttributeSetBase, StealthRating, OldStealthRating);
 }
 
+void UNarrativeAttributeSetBase::OnRep_AttackDamage(const FGameplayAttributeData& OldAttackDamage)
+{
+	GAMEPLAYATTRIBUTE_REPNOTIFY(UNarrativeAttributeSetBase, AttackDamage, OldAttackDamage);
+}
+
 UNarrativeCharacterAttributeSet::UNarrativeCharacterAttributeSet()
 {
-
 }
