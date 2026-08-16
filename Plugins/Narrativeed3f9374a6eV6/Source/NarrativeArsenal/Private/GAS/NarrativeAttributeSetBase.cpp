@@ -277,7 +277,25 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 		}
 
 		const float OldPoise = FMath::Max(GetPoise(), 0.f);
-		SetPoise(FMath::Clamp(OldPoise - IncomingPoiseDamage, 0.f, GetMaxPoise()));
+
+		// Recovering is a hard-control immunity window, not permanent Poise
+		// invulnerability. Hits may still drain Poise, but cannot reduce it to zero
+		// and immediately trigger another break.
+		static const FGameplayTag PoiseRecoveringTag = FGameplayTag::RequestGameplayTag(
+			FName(TEXT("Sov.State.Poise.Recovering")),
+			false);
+		const bool bHasRecoveryImmunity = PoiseRecoveringTag.IsValid()
+			&& Data.Target.HasMatchingGameplayTag(PoiseRecoveringTag);
+		const float RecoveryFloor = bHasRecoveryImmunity
+			? FMath::Min(
+				GetMaxPoise(),
+				FMath::Max(GetMaxPoise() * 0.01f, 1.f))
+			: 0.f;
+
+		SetPoise(FMath::Clamp(
+			OldPoise - IncomingPoiseDamage,
+			RecoveryFloor,
+			GetMaxPoise()));
 		const float AppliedPoiseDamage = FMath::Max(OldPoise - GetPoise(), 0.f);
 
 		if (OldPoise > 0.f && GetPoise() <= 0.f)
