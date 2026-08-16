@@ -396,8 +396,8 @@ void USovEchoComponent::HandleDealtDamage(
 	const float Damage,
 	const FGameplayEffectSpec& EffectSpec)
 {
-	UE_UNUSED(DamagedAbilitySystem);
-	UE_UNUSED(EffectSpec);
+	static_cast<void>(DamagedAbilitySystem);
+	static_cast<void>(EffectSpec);
 
 	if (Damage > KINDA_SMALL_NUMBER)
 	{
@@ -410,8 +410,8 @@ void USovEchoComponent::HandleReceivedDamage(
 	const float Damage,
 	const FGameplayEffectSpec& EffectSpec)
 {
-	UE_UNUSED(DamageSourceAbilitySystem);
-	UE_UNUSED(EffectSpec);
+	static_cast<void>(DamageSourceAbilitySystem);
+	static_cast<void>(EffectSpec);
 
 	if (Damage > KINDA_SMALL_NUMBER)
 	{
