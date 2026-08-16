@@ -26,8 +26,10 @@ DECLARE_MULTICAST_DELEGATE_FourParams(
 /**
  * Core Narrative Pro attributes used by Project Velkorran.
  *
- * Damage is a transient meta attribute. Damage executions write one final incoming
- * amount to Damage, and this set routes that amount through Shield before Health.
+ * Damage and PoiseDamage are transient meta attributes. Damage executions write one
+ * final incoming amount to Damage, and this set routes that amount through Shield
+ * before Health unless the effect carries Sov.Damage.BypassShield. Incoming poise
+ * loss enters through PoiseDamage so break transitions fire exactly once.
  * Echo is a 0..MaxEcho momentum resource. Its protagonist-specific gain, decay, and
  * spending rules live in abilities/effects rather than inside the attribute set.
  */
@@ -79,6 +81,15 @@ public:
 	FGameplayAttributeData MaxStamina;
 	ATTRIBUTE_ACCESSORS(UNarrativeAttributeSetBase, MaxStamina)
 
+	// Interruption resistance. Incoming loss should enter through PoiseDamage.
+	UPROPERTY(BlueprintReadOnly, Category = "Poise", ReplicatedUsing = OnRep_Poise, meta = (NarrativeSaveAttribute))
+	FGameplayAttributeData Poise;
+	ATTRIBUTE_ACCESSORS(UNarrativeAttributeSetBase, Poise)
+
+	UPROPERTY(BlueprintReadOnly, Category = "Poise", ReplicatedUsing = OnRep_MaxPoise, meta = (NarrativeSaveAttribute))
+	FGameplayAttributeData MaxPoise;
+	ATTRIBUTE_ACCESSORS(UNarrativeAttributeSetBase, MaxPoise)
+
 	// Character-specific momentum earned through actions true to the protagonist.
 	UPROPERTY(BlueprintReadOnly, Category = "Echo", ReplicatedUsing = OnRep_Echo, meta = (NarrativeSaveAttribute))
 	FGameplayAttributeData Echo;
@@ -117,11 +128,18 @@ public:
 	FGameplayAttributeData Damage;
 	ATTRIBUTE_ACCESSORS(UNarrativeAttributeSetBase, Damage)
 
+	UPROPERTY(BlueprintReadOnly, Category = "Meta Attributes")
+	FGameplayAttributeData PoiseDamage;
+	ATTRIBUTE_ACCESSORS(UNarrativeAttributeSetBase, PoiseDamage)
+
 	// Fired once when Health crosses from above zero to zero due to a resolved hit.
 	FNarrativeAttributeEvent OnOutOfHealth;
 
 	// Fired once when a resolved hit consumes the final point of Shield.
 	FNarrativeAttributeEvent OnShieldBroken;
+
+	// Fired once when resolved PoiseDamage crosses Poise from above zero to zero.
+	FNarrativeAttributeEvent OnPoiseBroken;
 
 protected:
 	// Maintains the current percentage when a maximum attribute changes.
@@ -151,6 +169,12 @@ protected:
 
 	UFUNCTION()
 	virtual void OnRep_MaxStamina(const FGameplayAttributeData& OldMaxStamina);
+
+	UFUNCTION()
+	virtual void OnRep_Poise(const FGameplayAttributeData& OldPoise);
+
+	UFUNCTION()
+	virtual void OnRep_MaxPoise(const FGameplayAttributeData& OldMaxPoise);
 
 	UFUNCTION()
 	virtual void OnRep_Echo(const FGameplayAttributeData& OldEcho);

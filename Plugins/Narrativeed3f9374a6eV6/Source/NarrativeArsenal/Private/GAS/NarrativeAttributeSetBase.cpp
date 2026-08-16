@@ -7,6 +7,7 @@
 #include "GAS/NarrativeAbilitySystemComponent.h"
 #include "GameplayEffect.h"
 #include "GameplayEffectExtension.h"
+#include "GameplayTagContainer.h"
 #include "NarrativeGameplayTags.h"
 #include "Net/UnrealNetwork.h"
 #include "UnrealFramework/NarrativeCharacter.h"
@@ -39,6 +40,11 @@ void UNarrativeAttributeSetBase::PreAttributeChange(const FGameplayAttribute& At
 		NewValue = FMath::Max(NewValue, 0.f);
 		AdjustAttributeForMaxChange(Stamina, MaxStamina, NewValue, GetStaminaAttribute());
 	}
+	else if (Attribute == GetMaxPoiseAttribute())
+	{
+		NewValue = FMath::Max(NewValue, 0.f);
+		AdjustAttributeForMaxChange(Poise, MaxPoise, NewValue, GetPoiseAttribute());
+	}
 	else if (Attribute == GetMaxEchoAttribute())
 	{
 		NewValue = FMath::Max(NewValue, 0.f);
@@ -60,6 +66,10 @@ void UNarrativeAttributeSetBase::PreAttributeChange(const FGameplayAttribute& At
 	else if (Attribute == GetStaminaAttribute())
 	{
 		NewValue = FMath::Clamp(NewValue, 0.f, GetMaxStamina());
+	}
+	else if (Attribute == GetPoiseAttribute())
+	{
+		NewValue = FMath::Clamp(NewValue, 0.f, GetMaxPoise());
 	}
 	else if (Attribute == GetEchoAttribute())
 	{
@@ -95,6 +105,10 @@ void UNarrativeAttributeSetBase::PostAttributeChange(
 	else if (Attribute == GetMaxStaminaAttribute())
 	{
 		SetStamina(FMath::Clamp(GetStamina(), 0.f, GetMaxStamina()));
+	}
+	else if (Attribute == GetMaxPoiseAttribute())
+	{
+		SetPoise(FMath::Clamp(GetPoise(), 0.f, GetMaxPoise()));
 	}
 	else if (Attribute == GetMaxEchoAttribute())
 	{
@@ -193,8 +207,21 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 		const float OldShield = FMath::Max(GetShield(), 0.f);
 		const float OldHealth = FMath::Max(GetHealth(), 0.f);
 
-		const float ShieldDamage = FMath::Min(OldShield, IncomingDamage);
-		const float RemainingDamage = FMath::Max(IncomingDamage - ShieldDamage, 0.f);
+		FGameplayTagContainer EffectAssetTags;
+		Data.EffectSpec.GetAllAssetTags(EffectAssetTags);
+
+		static const FGameplayTag BypassShieldTag = FGameplayTag::RequestGameplayTag(
+			FName(TEXT("Sov.Damage.BypassShield")),
+			false);
+		const bool bBypassesShield = BypassShieldTag.IsValid()
+			&& EffectAssetTags.HasTagExact(BypassShieldTag);
+
+		const float ShieldDamage = bBypassesShield
+			? 0.f
+			: FMath::Min(OldShield, IncomingDamage);
+		const float RemainingDamage = bBypassesShield
+			? IncomingDamage
+			: FMath::Max(IncomingDamage - ShieldDamage, 0.f);
 		const float HealthDamage = FMath::Min(OldHealth, RemainingDamage);
 
 		if (ShieldDamage > 0.f)
@@ -239,6 +266,32 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 		return;
 	}
 
+	if (Data.EvaluatedData.Attribute == GetPoiseDamageAttribute())
+	{
+		const float IncomingPoiseDamage = FMath::Max(GetPoiseDamage(), 0.f);
+		SetPoiseDamage(0.f);
+
+		if (IncomingPoiseDamage <= KINDA_SMALL_NUMBER)
+		{
+			return;
+		}
+
+		const float OldPoise = FMath::Max(GetPoise(), 0.f);
+		SetPoise(FMath::Clamp(OldPoise - IncomingPoiseDamage, 0.f, GetMaxPoise()));
+		const float AppliedPoiseDamage = FMath::Max(OldPoise - GetPoise(), 0.f);
+
+		if (OldPoise > 0.f && GetPoise() <= 0.f)
+		{
+			OnPoiseBroken.Broadcast(
+				Context.GetOriginalInstigator(),
+				Context.GetEffectCauser(),
+				Data.EffectSpec,
+				AppliedPoiseDamage);
+		}
+
+		return;
+	}
+
 	if (Data.EvaluatedData.Attribute == GetHealAttribute())
 	{
 		const float RequestedHeal = FMath::Max(GetHeal(), 0.f);
@@ -268,6 +321,10 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 	{
 		SetStamina(FMath::Clamp(GetStamina(), 0.f, GetMaxStamina()));
 	}
+	else if (Data.EvaluatedData.Attribute == GetPoiseAttribute())
+	{
+		SetPoise(FMath::Clamp(GetPoise(), 0.f, GetMaxPoise()));
+	}
 	else if (Data.EvaluatedData.Attribute == GetEchoAttribute())
 	{
 		SetEcho(FMath::Clamp(GetEcho(), 0.f, GetMaxEcho()));
@@ -287,6 +344,11 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 		SetMaxStamina(FMath::Max(GetMaxStamina(), 0.f));
 		SetStamina(FMath::Clamp(GetStamina(), 0.f, GetMaxStamina()));
 	}
+	else if (Data.EvaluatedData.Attribute == GetMaxPoiseAttribute())
+	{
+		SetMaxPoise(FMath::Max(GetMaxPoise(), 0.f));
+		SetPoise(FMath::Clamp(GetPoise(), 0.f, GetMaxPoise()));
+	}
 	else if (Data.EvaluatedData.Attribute == GetMaxEchoAttribute())
 	{
 		SetMaxEcho(FMath::Max(GetMaxEcho(), 0.f));
@@ -305,6 +367,8 @@ void UNarrativeAttributeSetBase::GetLifetimeReplicatedProps(TArray<FLifetimeProp
 	DOREPLIFETIME_CONDITION_NOTIFY(UNarrativeAttributeSetBase, MaxShield, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UNarrativeAttributeSetBase, Stamina, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UNarrativeAttributeSetBase, MaxStamina, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UNarrativeAttributeSetBase, Poise, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UNarrativeAttributeSetBase, MaxPoise, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UNarrativeAttributeSetBase, Echo, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UNarrativeAttributeSetBase, MaxEcho, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UNarrativeAttributeSetBase, StaminaRegenRate, COND_None, REPNOTIFY_Always);
@@ -372,6 +436,16 @@ void UNarrativeAttributeSetBase::OnRep_Stamina(const FGameplayAttributeData& Old
 void UNarrativeAttributeSetBase::OnRep_MaxStamina(const FGameplayAttributeData& OldMaxStamina)
 {
 	GAMEPLAYATTRIBUTE_REPNOTIFY(UNarrativeAttributeSetBase, MaxStamina, OldMaxStamina);
+}
+
+void UNarrativeAttributeSetBase::OnRep_Poise(const FGameplayAttributeData& OldPoise)
+{
+	GAMEPLAYATTRIBUTE_REPNOTIFY(UNarrativeAttributeSetBase, Poise, OldPoise);
+}
+
+void UNarrativeAttributeSetBase::OnRep_MaxPoise(const FGameplayAttributeData& OldMaxPoise)
+{
+	GAMEPLAYATTRIBUTE_REPNOTIFY(UNarrativeAttributeSetBase, MaxPoise, OldMaxPoise);
 }
 
 void UNarrativeAttributeSetBase::OnRep_Echo(const FGameplayAttributeData& OldEcho)
