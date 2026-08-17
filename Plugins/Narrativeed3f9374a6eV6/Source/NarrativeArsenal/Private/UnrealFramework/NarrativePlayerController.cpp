@@ -27,6 +27,7 @@
 #include "GameFramework/InputSettings.h"
 #include "Settings/NarrativeInputSettings.h"
 #include "EnhancedInputSubsystems.h"
+#include "InputMappingContext.h"
 #include "Camera/CameraModifier.h"
 #include "UnrealFramework/NarrativeGameMode.h"
 
@@ -667,7 +668,7 @@ void ANarrativePlayerController::RefreshGameplayMappingContext()
 	UEnhancedInputLocalPlayerSubsystem* Subsystem = LocalPlayer
 		? ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(LocalPlayer)
 		: nullptr;
-	if (!Subsystem || !IsValid(DefaultMappingContext))
+	if (!Subsystem || !IsValid(DefaultMappingContext.Get()))
 	{
 		if (bGameplayMappingContextApplied)
 		{
@@ -690,13 +691,13 @@ void ANarrativePlayerController::RefreshGameplayMappingContext()
 	{
 		FModifyContextOptions ModifyOptions;
 		ModifyOptions.bNotifyUserSettings = true;
-		Subsystem->AddMappingContext(DefaultMappingContext, 0, ModifyOptions);
+		Subsystem->AddMappingContext(DefaultMappingContext.Get(), 0, ModifyOptions);
 		bGameplayMappingContextApplied = true;
 	}
 	else if (!bShouldApply && bGameplayMappingContextApplied)
 	{
 		ReleaseHeldAbilityInputs();
-		Subsystem->RemoveMappingContext(DefaultMappingContext);
+		Subsystem->RemoveMappingContext(DefaultMappingContext.Get());
 		bGameplayMappingContextApplied = false;
 	}
 }

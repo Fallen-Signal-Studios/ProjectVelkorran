@@ -290,9 +290,9 @@ void UNarrativeAbilitySystemComponent::SetCharacterReadyEpoch(const int32 NewRea
 	if (GetOwnerRole() >= ROLE_Authority && NewReadyEpoch > CharacterReadyEpoch)
 	{
 		CharacterReadyEpoch = NewReadyEpoch;
-		if (AActor* OwnerActor = GetOwnerActor())
+		if (AActor* ASCOwnerActor = GetOwnerActor())
 		{
-			OwnerActor->ForceNetUpdate();
+			ASCOwnerActor->ForceNetUpdate();
 		}
 	}
 }
