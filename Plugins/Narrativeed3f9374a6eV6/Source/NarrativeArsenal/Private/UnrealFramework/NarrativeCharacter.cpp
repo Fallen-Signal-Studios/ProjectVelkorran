@@ -492,7 +492,12 @@ void ANarrativeCharacter::OnDefinitionSet_Implementation(UCharacterDefinition* N
 	//When our characters definition is set, try loading all the data we need now that we're spawned, such as our appearance, dialogue, and so on. 
 	if (IsValid(NewDefinition))
 	{
-		if (UAbilitySystemComponent* ASC = GetAbilitySystemComponent())
+		if (UNarrativeAbilitySystemComponent* NarrativeASC =
+			Cast<UNarrativeAbilitySystemComponent>(GetAbilitySystemComponent()))
+		{
+			NarrativeASC->SetDefinitionOwnedTags(NewDefinition->DefaultOwnedTags);
+		}
+		else if (UAbilitySystemComponent* ASC = GetAbilitySystemComponent())
 		{
 			ASC->AddLooseGameplayTags(NewDefinition->DefaultOwnedTags);
 		}
@@ -1591,7 +1596,9 @@ void ANarrativeCharacter::AddDefaultAbilities()
 	{
 		if (UAbilityConfiguration* AbilityConfig = CDef->AbilityConfiguration)
 		{
-			GrantAbilities(AbilityConfig->DefaultAbilities);
+			// The PlayerState ASC survives pawn respawn, so use the stable config
+			// asset as the source identity instead of the transient pawn.
+			GrantAbilities(AbilityConfig->DefaultAbilities, AbilityConfig);
 
 			UE_LOG(LogNarrativeAbilities, Verbose, TEXT("Granting %s their default abilities"), *GetHumanReadableName());
 		}
@@ -1632,6 +1639,9 @@ void ANarrativeCharacter::InitializeAttributes()
 				return;
 			}
 
+			// Replace any persistent attribute effect retained by a PlayerState ASC.
+			AbilitySystemComponent->ClearTrackedDefaultAttributesEffect();
+
 			// Can run on Server and Client
 			FGameplayEffectContextHandle EffectContext = AbilitySystemComponent->MakeEffectContext();
 			EffectContext.AddSourceObject(this);
@@ -1639,7 +1649,11 @@ void ANarrativeCharacter::InitializeAttributes()
 			FGameplayEffectSpecHandle NewHandle = AbilitySystemComponent->MakeOutgoingSpec(AbilityConfig->DefaultAttributes, GetCharacterLevel(), EffectContext);
 			if (NewHandle.IsValid())
 			{
-				FActiveGameplayEffectHandle ActiveGEHandle = AbilitySystemComponent->ApplyGameplayEffectSpecToTarget(*NewHandle.Data.Get(), AbilitySystemComponent.Get());
+				const FActiveGameplayEffectHandle ActiveGEHandle =
+					AbilitySystemComponent->ApplyGameplayEffectSpecToTarget(
+						*NewHandle.Data.Get(),
+						AbilitySystemComponent.Get());
+				AbilitySystemComponent->TrackDefaultAttributesEffect(ActiveGEHandle);
 			}
 
 			AbilitySystemComponent->OnDeathStateChanged.AddUniqueDynamic(this, &ANarrativeCharacter::HandleDeath);
@@ -1658,6 +1672,10 @@ void ANarrativeCharacter::AddStartupEffects()
 	{
 		if (UAbilityConfiguration* AbilityConfig = CDef->AbilityConfiguration)
 		{
+			// Respawn deliberately reapplies startup effects. Remove any persistent
+			// handles left on the PlayerState ASC before doing so.
+			AbilitySystemComponent->ClearTrackedStartupEffects();
+
 			FGameplayEffectContextHandle EffectContext = AbilitySystemComponent->MakeEffectContext();
 			EffectContext.AddSourceObject(this);
 
@@ -1666,7 +1684,11 @@ void ANarrativeCharacter::AddStartupEffects()
 				FGameplayEffectSpecHandle NewHandle = AbilitySystemComponent->MakeOutgoingSpec(GameplayEffect, GetCharacterLevel(), EffectContext);
 				if (NewHandle.IsValid())
 				{
-					FActiveGameplayEffectHandle ActiveGEHandle = AbilitySystemComponent->ApplyGameplayEffectSpecToTarget(*NewHandle.Data.Get(), AbilitySystemComponent.Get());
+					const FActiveGameplayEffectHandle ActiveGEHandle =
+						AbilitySystemComponent->ApplyGameplayEffectSpecToTarget(
+							*NewHandle.Data.Get(),
+							AbilitySystemComponent.Get());
+					AbilitySystemComponent->TrackStartupEffect(ActiveGEHandle);
 				}
 			}
 

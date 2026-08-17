@@ -15,6 +15,8 @@
 #include "EnhancedInputComponent.h"
 #include "NarrativePlayerController.generated.h"
 
+class ANarrativePlayerCharacter;
+
 /**When an NPC spawn gets streamed out, it can optionally keep the NPC around by "tethering" it to our player controller.
 That way we can save those NPCs to disk, even though their spawns are no longer streamed in to the world. */
 USTRUCT(BlueprintType)
@@ -153,11 +155,14 @@ protected:
 	virtual void SetCinematicMode(bool bInCinematicMode, bool bHidePlayer, bool bAffectsHUD, bool bAffectsMovement, bool bAffectsTurning) override;
 
 	UFUNCTION()
-	void HandleOwnedCharacterReady(ANarrativePlayerCharacter* ReadyCharacter);
+	void HandleOwnedCharacterReadinessChanged(
+		ANarrativePlayerCharacter* ReadyCharacter,
+		bool bIsReady);
 
 	void RefreshGameplayReadiness();
 	void EnsureGameplayHUDCreated();
 	void RefreshGameplayMappingContext();
+	void ReleaseHeldAbilityInputs();
 	
 	/** Default MappingContext */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
@@ -225,5 +230,6 @@ protected:
 
 	bool bInputBindingsInstalled = false;
 	bool bGameplayMappingContextApplied = false;
+	TSet<FGameplayTag> PressedAbilityInputTags;
 
 };

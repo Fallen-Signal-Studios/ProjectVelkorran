@@ -58,6 +58,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnDeathStateChanged, AActor*, Ki
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnHealedBy, UNarrativeAbilitySystemComponent*, Healer, const float, Amount, const FGameplayEffectSpec&, Spec);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnDamagedBy, UNarrativeAbilitySystemComponent*, DamagerCauserASC, const float, Damage, const FGameplayEffectSpec&, Spec);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnDealtDamage, UNarrativeAbilitySystemComponent*, DamagedASC, const float, Damage, const FGameplayEffectSpec&, Spec);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnNarrativeASCReadyEpochChanged, int32, ReadyEpoch);
 
 /**
  * Custom Ability system component for Narrative pro. Has ISavableComponent for saving attributes.
@@ -101,6 +102,28 @@ public:
 	/** Typed, ordered Sovereign result. Legacy float delegates remain supported. */
 	virtual void DamageResolvedAsTarget(const FSovDamageResult& Result);
 	virtual void DamageResolvedAsSource(const FSovDamageResult& Result);
+
+	/** PlayerState-channel readiness fence for attributes and granted abilities. */
+	void SetCharacterReadyEpoch(int32 NewReadyEpoch);
+
+	/**
+	 * Replaces the definition-owned loose-tag contribution without disturbing
+	 * counts contributed by other systems. The applied set lives on the ASC so
+	 * a PlayerState-backed ASC does not add the same tags again after respawn.
+	 */
+	void SetDefinitionOwnedTags(const FGameplayTagContainer& NewDefinitionTags);
+
+	/** Replace/remove the persistent effects contributed by a character definition. */
+	void ClearTrackedDefaultAttributesEffect();
+	void TrackDefaultAttributesEffect(const FActiveGameplayEffectHandle& EffectHandle);
+	void ClearTrackedStartupEffects();
+	void TrackStartupEffect(const FActiveGameplayEffectHandle& EffectHandle);
+
+	UFUNCTION(BlueprintPure, Category = "Narrative|Readiness")
+	int32 GetCharacterReadyEpoch() const { return CharacterReadyEpoch; }
+
+	UPROPERTY(BlueprintAssignable, Category = "Narrative|Readiness")
+	FOnNarrativeASCReadyEpochChanged OnCharacterReadyEpochChanged;
 	
 	//Get the owning avatar - UE doesn't expose this to BP in base ASC. 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Narrative|GAS")
@@ -212,8 +235,27 @@ protected:
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_bIsDead, Category = "Narrative|GAS")
 	bool bIsDead;
 
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_CharacterReadyEpoch, Category = "Narrative|Readiness")
+	int32 CharacterReadyEpoch = 0;
+
+	UPROPERTY(Transient)
+	FGameplayTagContainer AppliedDefinitionOwnedTags;
+
+	UPROPERTY(Transient)
+	FActiveGameplayEffectHandle TrackedDefaultAttributesEffect;
+
+	UPROPERTY(Transient)
+	TArray<FActiveGameplayEffectHandle> TrackedStartupEffects;
+
 	UFUNCTION()
 	virtual void OnRep_bIsDead(const bool bOldIsDead);
+
+	UFUNCTION()
+	void OnRep_CharacterReadyEpoch();
+
+	/** Contributions owned specifically by replicated death-state convergence. */
+	bool bAppliedDeadStateTag = false;
+	bool bAppliedFatalStateTag = false;
 
 	//We use this to remember attribute -> attribute value 
 	UPROPERTY(SaveGame)

@@ -69,13 +69,35 @@ namespace NarrativeDamage
 			return true;
 		}
 
-		return (EffectTags.HasTagExact(Tags.Damage_Channel_Kinetic) && TargetASC->HasMatchingGameplayTag(Tags.Damage_Immunity_Kinetic))
-			|| (EffectTags.HasTagExact(Tags.Damage_Channel_Edge) && TargetASC->HasMatchingGameplayTag(Tags.Damage_Immunity_Edge))
-			|| (EffectTags.HasTagExact(Tags.Damage_Channel_Thermal) && TargetASC->HasMatchingGameplayTag(Tags.Damage_Immunity_Thermal))
-			|| (EffectTags.HasTagExact(Tags.Damage_Channel_Echo) && TargetASC->HasMatchingGameplayTag(Tags.Damage_Immunity_Echo))
-			|| (EffectTags.HasTagExact(Tags.Damage_Channel_Disruption) && TargetASC->HasMatchingGameplayTag(Tags.Damage_Immunity_Disruption))
-			|| (EffectTags.HasTagExact(Tags.Damage_Channel_Corruption) && TargetASC->HasMatchingGameplayTag(Tags.Damage_Immunity_Corruption))
-			|| (EffectTags.HasTagExact(Tags.Damage_Channel_Environmental) && TargetASC->HasMatchingGameplayTag(Tags.Damage_Immunity_Environmental));
+		// Channels are combinable. Until attacks carry per-channel weights, reject
+		// the transaction only when every declared channel is immune. Conditional
+		// resistance modifiers still evaluate against the full channel container.
+		bool bHasDeclaredChannel = false;
+		bool bAllDeclaredChannelsImmune = true;
+		const auto AccumulateChannelImmunity = [
+			TargetASC,
+			&EffectTags,
+			&bHasDeclaredChannel,
+			&bAllDeclaredChannelsImmune](
+				const FGameplayTag& ChannelTag,
+				const FGameplayTag& ImmunityTag)
+		{
+			if (EffectTags.HasTagExact(ChannelTag))
+			{
+				bHasDeclaredChannel = true;
+				bAllDeclaredChannelsImmune &=
+					TargetASC->HasMatchingGameplayTag(ImmunityTag);
+			}
+		};
+
+		AccumulateChannelImmunity(Tags.Damage_Channel_Kinetic, Tags.Damage_Immunity_Kinetic);
+		AccumulateChannelImmunity(Tags.Damage_Channel_Edge, Tags.Damage_Immunity_Edge);
+		AccumulateChannelImmunity(Tags.Damage_Channel_Thermal, Tags.Damage_Immunity_Thermal);
+		AccumulateChannelImmunity(Tags.Damage_Channel_Echo, Tags.Damage_Immunity_Echo);
+		AccumulateChannelImmunity(Tags.Damage_Channel_Disruption, Tags.Damage_Immunity_Disruption);
+		AccumulateChannelImmunity(Tags.Damage_Channel_Corruption, Tags.Damage_Immunity_Corruption);
+		AccumulateChannelImmunity(Tags.Damage_Channel_Environmental, Tags.Damage_Immunity_Environmental);
+		return bHasDeclaredChannel && bAllDeclaredChannelsImmune;
 	}
 }
 
@@ -101,7 +123,11 @@ void UNarrativeDamageExecCalc::Execute_Implementation(
 	Spec.GetAllAssetTags(EffectTags);
 
 	const FSovGameplayTags& SovTags = FSovGameplayTags::Get();
-	if (TargetASC
+	const bool bFatalPolicy = EffectTags.HasTagExact(SovTags.Damage_Fatal);
+	const bool bAlreadyResolved = bFatalPolicy
+		|| EffectTags.HasTagExact(SovTags.Damage_AlreadyResolved);
+	if (!bFatalPolicy
+		&& TargetASC
 		&& (TargetASC->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_Invulnerable)
 			|| TargetASC->HasMatchingGameplayTag(SovTags.State_Invulnerable)
 			|| TargetASC->HasMatchingGameplayTag(SovTags.State_Damage_Immune)
@@ -110,7 +136,7 @@ void UNarrativeDamageExecCalc::Execute_Implementation(
 		return;
 	}
 
-	if (SourceActor && TargetActor && SourceActor != TargetActor)
+	if (!bFatalPolicy && SourceActor && TargetActor && SourceActor != TargetActor)
 	{
 		const UNarrativeCombatDeveloperSettings* CombatSettings = GetDefault<UNarrativeCombatDeveloperSettings>();
 		const bool bAllowsFriendlyFire = EffectTags.HasTagExact(SovTags.Damage_AllowFriendlyFire)
@@ -218,15 +244,17 @@ void UNarrativeDamageExecCalc::Execute_Implementation(
 		MinimumMultiplier,
 		MaximumMultiplier);
 
-	const float ResolvedDamage = FMath::Max(
-		BaseDamage
+	const float ResolvedDamage = bAlreadyResolved
+		? BaseDamage
+		: FMath::Max(
+			BaseDamage
 			* AbilityScalar
 			* AttackRatingMultiplier
 			* ExplicitSourceModifier
 			* HitZoneMultiplier
 			* DifficultyScalar
 			* MitigationMultiplier,
-		0.f);
+			0.f);
 
 	if (ResolvedDamage > KINDA_SMALL_NUMBER)
 	{

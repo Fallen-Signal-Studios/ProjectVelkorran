@@ -8,6 +8,11 @@ FSovGameplayTags FSovGameplayTags::GameplayTags;
 
 void FSovGameplayTags::InitializeNativeTags()
 {
+	if (GameplayTags.Character_Player_Tarrik.IsValid())
+	{
+		return;
+	}
+
 	GameplayTags.AddAllTags(UGameplayTagsManager::Get());
 }
 
@@ -18,6 +23,7 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 
 	AddTag(State_Invulnerable, "Sov.State.Invulnerable", "Damage immunity shared by explicit invulnerability states.");
 	AddTag(State_Damage_Immune, "Sov.State.Damage.Immune", "Target is immune to ordinary damage execution.");
+	AddTag(State_Fatal, "Sov.State.Fatal", "Health reached zero and normal combat input is disabled.");
 	AddTag(State_Guarding, "Sov.State.Guarding", "A frontal guard plane is active.");
 	AddTag(State_PerfectGuard, "Sov.State.PerfectGuard", "The perfect-defense timing window is active.");
 	AddTag(State_Guard_CounterWindow, "Sov.State.Guard.CounterWindow", "A perfect guard opened a counter opportunity.");
@@ -33,6 +39,8 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 	AddTag(Damage_BypassShield, "Sov.Damage.BypassShield", "All resolved health damage bypasses Shield.");
 	AddTag(Damage_BypassShield_Partial, "Sov.Damage.BypassShield.Partial", "Uses the authored partial Shield bypass ratio.");
 	AddTag(Damage_BypassGuard, "Sov.Damage.BypassGuard", "The hit ignores an active guard plane.");
+	AddTag(Damage_AlreadyResolved, "Sov.Damage.Policy.AlreadyResolved", "The authored magnitude bypasses source stats and mitigation.");
+	AddTag(Damage_Fatal, "Sov.Damage.Policy.Fatal", "Fatal policy bypasses invulnerability, Guard, and Shield.");
 	AddTag(Damage_IgnoreArmor, "Sov.Damage.IgnoreArmor", "The hit bypasses Armor mitigation.");
 	AddTag(Damage_IgnoreResistance, "Sov.Damage.IgnoreResistance", "The hit bypasses channel resistance.");
 	AddTag(Damage_AllowFriendlyFire, "Sov.Damage.AllowFriendlyFire", "The hit may damage a friendly target.");

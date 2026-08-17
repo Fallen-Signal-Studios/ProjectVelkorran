@@ -12,6 +12,10 @@ class ANarrativePlayerCharacter;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
 	FNarrativeCharacterReadySignature,
 	ANarrativePlayerCharacter*, Character);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
+	FNarrativeCharacterReadinessChangedSignature,
+	ANarrativePlayerCharacter*, Character,
+	bool, bIsReady);
 
 /**
  * Base class for a player controlled Narrative Character. 
@@ -48,6 +52,17 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "Narrative|Readiness")
 	FNarrativeCharacterReadySignature OnCharacterReady;
+
+	/** Fires for both the ready transition and any fail-closed invalidation. */
+	UPROPERTY(BlueprintAssignable, Category = "Narrative|Readiness")
+	FNarrativeCharacterReadinessChangedSignature OnCharacterReadinessChanged;
+
+	/**
+	 * Completion hook for projects that replace Narrative's synchronous save
+	 * load with an asynchronous pipeline.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Narrative|Readiness")
+	void NotifyInitialPlayerDataApplied();
 	
 protected:
 
@@ -67,6 +82,7 @@ protected:
 	/** Single idempotent entry point for all legal PlayerState/definition arrival orders. */
 	void TryInitializePlayerCharacter();
 	void TryFinalizeCharacterReadiness();
+	void InvalidateCharacterReadiness();
 
 	/** Project subclasses initialize lifecycle components here before readiness is tested. */
 	virtual void HandleAbilitySystemReady(class UNarrativeAbilitySystemComponent* ReadyAbilitySystem);
@@ -99,14 +115,25 @@ protected:
 	UPROPERTY(Transient)
 	TObjectPtr<class UNarrativeAbilitySystemComponent> InitializedAbilitySystem;
 
+	UPROPERTY(Transient)
+	TObjectPtr<class UNarrativeAbilitySystemComponent> ReadinessBoundAbilitySystem;
+
 	/** Server-complete gate. Clients also require their own local visual/component gates. */
 	UPROPERTY(ReplicatedUsing = OnRep_AuthoritativeCharacterReady)
 	bool bAuthoritativeCharacterReady = false;
 
+	UPROPERTY(ReplicatedUsing = OnRep_AuthoritativeCharacterReady)
+	int32 AuthoritativeReadyEpoch = 0;
+
 	UFUNCTION()
 	void OnRep_AuthoritativeCharacterReady();
 
+	UFUNCTION()
+	void HandleAbilitySystemReadyEpochChanged(int32 ReadyEpoch);
+
 	bool bAuthoritativeGameplayInitialized = false;
+	bool bProjectSystemsInitialized = false;
+	bool bAbilitySystemReadyPublished = false;
 	bool bInitialPlayerDataApplied = false;
 	bool bVisualReadyForGameplay = false;
 	bool bCharacterReady = false;

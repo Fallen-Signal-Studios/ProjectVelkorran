@@ -17,6 +17,7 @@
 #include "ArsenalSettings.h"
 #include "NarrativeLogChannels.h"
 #include "GAS/AbilityConfiguration.h"
+#include "Sovereign/SovGameplayTags.h"
 
 UNarrativeAbilitySystemComponent::UNarrativeAbilitySystemComponent(const FObjectInitializer& ObjectInitializer)
 {
@@ -127,8 +128,9 @@ void UNarrativeAbilitySystemComponent::InitAbilityActorInfo(AActor* InOwnerActor
 
 void UNarrativeAbilitySystemComponent::HandleOutOfHealth(AActor* DamageInstigator, AActor* DamageCauser, const FGameplayEffectSpec& DamageEffectSpec, float DamageMagnitude) 
 {
-	//Health will be zero on beginplay and this will be called, we can use bStartupEffectsApplied to ensure we ignore that call 
-	if (GetOwnerRole() >= ROLE_Authority && bStartupEffectsApplied) 
+	// The AttributeSet only emits this for an actual positive-health to zero
+	// transition in the authoritative damage transaction.
+	if (GetOwnerRole() >= ROLE_Authority) 
 	{
 		if (!IsDead())
 		{
@@ -193,6 +195,7 @@ void UNarrativeAbilitySystemComponent::Debug_Internal(struct FAbilitySystemCompo
 void UNarrativeAbilitySystemComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	DOREPLIFETIME(UNarrativeAbilitySystemComponent, bIsDead);
+	DOREPLIFETIME(UNarrativeAbilitySystemComponent, CharacterReadyEpoch);
 
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 }
@@ -280,6 +283,80 @@ void UNarrativeAbilitySystemComponent::DamageResolvedAsTarget(const FSovDamageRe
 void UNarrativeAbilitySystemComponent::DamageResolvedAsSource(const FSovDamageResult& Result)
 {
 	OnDamageResolvedAsSource.Broadcast(Result);
+}
+
+void UNarrativeAbilitySystemComponent::SetCharacterReadyEpoch(const int32 NewReadyEpoch)
+{
+	if (GetOwnerRole() >= ROLE_Authority && NewReadyEpoch > CharacterReadyEpoch)
+	{
+		CharacterReadyEpoch = NewReadyEpoch;
+		if (AActor* OwnerActor = GetOwnerActor())
+		{
+			OwnerActor->ForceNetUpdate();
+		}
+	}
+}
+
+void UNarrativeAbilitySystemComponent::SetDefinitionOwnedTags(
+	const FGameplayTagContainer& NewDefinitionTags)
+{
+	FGameplayTagContainer TagsToRemove = AppliedDefinitionOwnedTags;
+	TagsToRemove.RemoveTags(NewDefinitionTags);
+	if (!TagsToRemove.IsEmpty())
+	{
+		RemoveLooseGameplayTags(TagsToRemove);
+	}
+
+	FGameplayTagContainer TagsToAdd = NewDefinitionTags;
+	TagsToAdd.RemoveTags(AppliedDefinitionOwnedTags);
+	if (!TagsToAdd.IsEmpty())
+	{
+		AddLooseGameplayTags(TagsToAdd);
+	}
+
+	AppliedDefinitionOwnedTags = NewDefinitionTags;
+}
+
+void UNarrativeAbilitySystemComponent::ClearTrackedDefaultAttributesEffect()
+{
+	if (TrackedDefaultAttributesEffect.IsValid())
+	{
+		RemoveActiveGameplayEffect(TrackedDefaultAttributesEffect);
+		TrackedDefaultAttributesEffect = FActiveGameplayEffectHandle();
+	}
+}
+
+void UNarrativeAbilitySystemComponent::TrackDefaultAttributesEffect(
+	const FActiveGameplayEffectHandle& EffectHandle)
+{
+	TrackedDefaultAttributesEffect = EffectHandle;
+}
+
+void UNarrativeAbilitySystemComponent::ClearTrackedStartupEffects()
+{
+	for (const FActiveGameplayEffectHandle& EffectHandle : TrackedStartupEffects)
+	{
+		if (EffectHandle.IsValid())
+		{
+			RemoveActiveGameplayEffect(EffectHandle);
+		}
+	}
+	TrackedStartupEffects.Reset();
+	bStartupEffectsApplied = false;
+}
+
+void UNarrativeAbilitySystemComponent::TrackStartupEffect(
+	const FActiveGameplayEffectHandle& EffectHandle)
+{
+	if (EffectHandle.IsValid())
+	{
+		TrackedStartupEffects.Add(EffectHandle);
+	}
+}
+
+void UNarrativeAbilitySystemComponent::OnRep_CharacterReadyEpoch()
+{
+	OnCharacterReadyEpochChanged.Broadcast(CharacterReadyEpoch);
 }
 
 void UNarrativeAbilitySystemComponent::AbilityInputTagPressed(const FGameplayTag& InputTag)
@@ -595,6 +672,7 @@ void UNarrativeAbilitySystemComponent::DealDamage(const float Damage)
 				if (FGameplayEffectSpec* Spec = SpecHandle.Data.Get())
 				{
 					Spec->SetSetByCallerMagnitude(FNarrativeGameplayTags::Get().SetByCaller_Damage, Damage);
+					Spec->AddDynamicAssetTag(FSovGameplayTags::Get().Damage_AlreadyResolved);
 					ApplyGameplayEffectSpecToSelf(*Spec);
 				}
 			}
@@ -606,9 +684,27 @@ void UNarrativeAbilitySystemComponent::Instakill()
 {
 	if (!IsDead())
 	{
-		if (const UNarrativeAttributeSetBase* AttributeSet = Cast<UNarrativeAttributeSetBase>(GetAttributeSet(UNarrativeAttributeSetBase::StaticClass())))
+		const UNarrativeAttributeSetBase* AttributeSet =
+			Cast<UNarrativeAttributeSetBase>(
+				GetAttributeSet(UNarrativeAttributeSetBase::StaticClass()));
+		const UArsenalSettings* Settings = GetDefault<UArsenalSettings>();
+		if (AttributeSet && Settings && Settings->DamageGameplayEffect_SetByCaller)
 		{
-			DealDamage(AttributeSet->GetMaxHealth());
+			const float FatalDamage = FMath::Max(AttributeSet->GetHealth(), 0.f);
+			FGameplayEffectSpecHandle SpecHandle = MakeOutgoingSpec(
+				Settings->DamageGameplayEffect_SetByCaller,
+				1.f,
+				MakeEffectContext());
+			if (FGameplayEffectSpec* Spec = SpecHandle.Data.Get())
+			{
+				const FSovGameplayTags& Tags = FSovGameplayTags::Get();
+				Spec->SetSetByCallerMagnitude(
+					FNarrativeGameplayTags::Get().SetByCaller_Damage,
+					FatalDamage);
+				Spec->AddDynamicAssetTag(Tags.Damage_AlreadyResolved);
+				Spec->AddDynamicAssetTag(Tags.Damage_Fatal);
+				ApplyGameplayEffectSpecToSelf(*Spec);
+			}
 		}
 	}
 }
@@ -630,7 +726,7 @@ FActiveGameplayEffectHandle UNarrativeAbilitySystemComponent::AddDynamicTagsGame
 					return FActiveGameplayEffectHandle();
 				}
 
-				Spec->DynamicGrantedTags = TagsToAdd;
+				Spec->DynamicGrantedTags.AppendTags(TagsToAdd);
 
 				return ApplyGameplayEffectSpecToSelf(*Spec);
 			}
@@ -672,24 +768,52 @@ void UNarrativeAbilitySystemComponent::Revive()
 
 void UNarrativeAbilitySystemComponent::OnRep_bIsDead(const bool bOldIsDead)
 {
-	if (bIsDead != bOldIsDead)
-	{
-		OnDeathStateChanged.Broadcast(GetAvatarActor(), this, bIsDead);
-	}
-
 	// Keep the replicated state and loose tag convergent. The previous else-if
 	// removed an already-present tag when a repeated dead-state notify arrived.
 	const FGameplayTag DeadTag = FNarrativeGameplayTags::Get().State_IsDead;
+	const FGameplayTag FatalTag = FSovGameplayTags::Get().State_Fatal;
 	if (bIsDead)
 	{
-		if (!HasMatchingGameplayTag(DeadTag))
+		if (!bAppliedDeadStateTag)
 		{
 			AddLooseGameplayTag(DeadTag);
+			bAppliedDeadStateTag = true;
 		}
+		if (!bAppliedFatalStateTag)
+		{
+			AddLooseGameplayTag(FatalTag);
+			bAppliedFatalStateTag = true;
+		}
+
+		// Preserve the authored Narrative death ability while ending ordinary
+		// active abilities, including stale defensive states.
+		FGameplayTagContainer AbilitiesToKeep;
+		AbilitiesToKeep.AddTag(FNarrativeGameplayTags::Get().Ability_Death);
+		CancelAbilities(nullptr, &AbilitiesToKeep);
 	}
-	else if (HasMatchingGameplayTag(DeadTag))
+	else
 	{
-		RemoveLooseGameplayTag(DeadTag);
+		if (bAppliedDeadStateTag)
+		{
+			RemoveLooseGameplayTag(DeadTag);
+			bAppliedDeadStateTag = false;
+		}
+		if (bAppliedFatalStateTag)
+		{
+			RemoveLooseGameplayTag(FatalTag);
+			bAppliedFatalStateTag = false;
+		}
+
+		// The PlayerState ASC persists through respawn; the death ability must
+		// not remain active against the replacement avatar.
+		FGameplayTagContainer DeathAbilities;
+		DeathAbilities.AddTag(FNarrativeGameplayTags::Get().Ability_Death);
+		CancelAbilities(&DeathAbilities);
+	}
+
+	if (bIsDead != bOldIsDead)
+	{
+		OnDeathStateChanged.Broadcast(GetAvatarActor(), this, bIsDead);
 	}
 }
 

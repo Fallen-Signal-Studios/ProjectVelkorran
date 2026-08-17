@@ -433,25 +433,31 @@ bool AWeaponVisual::SweepForHits(const FVector& Start, const FVector& End, const
 
 		if (GetWorld()->SweepMultiByChannel(OutHits, Start, End, Rot, TraceChannel_NarrativeWeapon, Shape, CQP))
 		{
-			for (const FHitResult& Hit : OutHits)
+			// SweepMulti can return several components on the same actor in one
+			// query. Filter in place so downstream damage sees at most one hit per
+			// actor for the entire attack, including this first sweep.
+			for (int32 HitIndex = 0; HitIndex < OutHits.Num();)
 			{
-				if (AActor* Actor = Hit.GetActor())
+				AActor* Actor = OutHits[HitIndex].GetActor();
+				if (!Actor || CachedHitActors.Contains(Actor))
 				{
-					// The hit ledger is gameplay state, not debug state. Keeping this
-					// outside ENABLE_DRAW_DEBUG prevents repeat hits in Shipping/Test.
-					CachedHitActors.AddUnique(Actor);
+					OutHits.RemoveAt(HitIndex);
+					continue;
+				}
+
+				CachedHitActors.Add(Actor);
 
 #if ENABLE_DRAW_DEBUG
-					if (bShouldDrawDebug && GEngine)
-					{
-						const FString RoleStr = HasAuthority() ? "Server" : "Client";
-						GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Red, FString::Printf(TEXT("%s: melee collider hit %s"), *RoleStr, *GetNameSafe(Actor)));
-					}
-#endif
+				if (bShouldDrawDebug && GEngine)
+				{
+					const FString RoleStr = HasAuthority() ? "Server" : "Client";
+					GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Red, FString::Printf(TEXT("%s: melee collider hit %s"), *RoleStr, *GetNameSafe(Actor)));
 				}
+#endif
+				++HitIndex;
 			}
 
-			return true;
+			return !OutHits.IsEmpty();
 		}
 	}
 

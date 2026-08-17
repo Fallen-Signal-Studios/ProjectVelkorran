@@ -25,6 +25,7 @@ public:
 
 	FGameplayTag State_Invulnerable;
 	FGameplayTag State_Damage_Immune;
+	FGameplayTag State_Fatal;
 	FGameplayTag State_Guarding;
 	FGameplayTag State_PerfectGuard;
 	FGameplayTag State_Guard_CounterWindow;
@@ -40,6 +41,8 @@ public:
 	FGameplayTag Damage_BypassShield;
 	FGameplayTag Damage_BypassShield_Partial;
 	FGameplayTag Damage_BypassGuard;
+	FGameplayTag Damage_AlreadyResolved;
+	FGameplayTag Damage_Fatal;
 	FGameplayTag Damage_IgnoreArmor;
 	FGameplayTag Damage_IgnoreResistance;
 	FGameplayTag Damage_AllowFriendlyFire;

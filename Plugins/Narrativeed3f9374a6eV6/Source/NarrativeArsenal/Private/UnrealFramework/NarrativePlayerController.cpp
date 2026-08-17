@@ -59,6 +59,8 @@ void ANarrativePlayerController::HandleDeath_Implementation(AActor* KilledActor,
 		}
 	}
 
+	RefreshGameplayMappingContext();
+
 }
 
 void ANarrativePlayerController::BeginPlay()
@@ -142,6 +144,10 @@ void ANarrativePlayerController::OnRep_Pawn()
 	{
 		SetOwnedCharacter(OwnedChar);
 	}
+
+	// Vehicle and other non-character possession must also remove the gameplay
+	// mapping context while preserving the cached on-foot character.
+	RefreshGameplayReadiness();
 }
 
 void ANarrativePlayerController::SetupInputComponent()
@@ -166,6 +172,7 @@ void ANarrativePlayerController::SetupInputComponent()
 				{
 					EnhancedInput->BindAction(IA.InputAction, ETriggerEvent::Started, this, &ANarrativePlayerController::AbilityInputPressed, IA.InputTag);
 					EnhancedInput->BindAction(IA.InputAction, ETriggerEvent::Completed, this, &ANarrativePlayerController::AbilityInputReleased, IA.InputTag);
+					EnhancedInput->BindAction(IA.InputAction, ETriggerEvent::Canceled, this, &ANarrativePlayerController::AbilityInputReleased, IA.InputTag);
 				}
 			}
 		}
@@ -591,22 +598,37 @@ void ANarrativePlayerController::SetOwnedCharacter(ANarrativePlayerCharacter* In
 		return;
 	}
 
+	// Release through the old character's ASC before replacing the pointer.
+	// Otherwise a held guard during respawn can be released on the new pawn and
+	// leave the old ability active.
+	if (!PressedAbilityInputTags.IsEmpty())
+	{
+		ReleaseHeldAbilityInputs();
+	}
+
 	if (IsValid(OwnedCharacter))
 	{
-		OwnedCharacter->OnCharacterReady.RemoveDynamic(this, &ThisClass::HandleOwnedCharacterReady);
+		OwnedCharacter->OnCharacterReadinessChanged.RemoveDynamic(
+			this,
+			&ThisClass::HandleOwnedCharacterReadinessChanged);
 	}
 
 	OwnedCharacter = InCharacter;
 	if (IsValid(OwnedCharacter))
 	{
-		OwnedCharacter->OnCharacterReady.AddUniqueDynamic(this, &ThisClass::HandleOwnedCharacterReady);
+		OwnedCharacter->OnCharacterReadinessChanged.AddUniqueDynamic(
+			this,
+			&ThisClass::HandleOwnedCharacterReadinessChanged);
 	}
 
 	RefreshGameplayReadiness();
 }
 
-void ANarrativePlayerController::HandleOwnedCharacterReady(ANarrativePlayerCharacter* ReadyCharacter)
+void ANarrativePlayerController::HandleOwnedCharacterReadinessChanged(
+	ANarrativePlayerCharacter* ReadyCharacter,
+	const bool bIsReady)
 {
+	static_cast<void>(bIsReady);
 	if (ReadyCharacter == OwnedCharacter)
 	{
 		RefreshGameplayReadiness();
@@ -647,6 +669,10 @@ void ANarrativePlayerController::RefreshGameplayMappingContext()
 		: nullptr;
 	if (!Subsystem || !IsValid(DefaultMappingContext))
 	{
+		if (bGameplayMappingContextApplied)
+		{
+			ReleaseHeldAbilityInputs();
+		}
 		bGameplayMappingContextApplied = false;
 		return;
 	}
@@ -656,7 +682,9 @@ void ANarrativePlayerController::RefreshGameplayMappingContext()
 		&& IsValid(OwnedCharacter)
 		&& OwnedCharacter->IsCharacterReady()
 		&& GetPawn() == OwnedCharacter
-		&& !bCinematicMode;
+		&& !bCinematicMode
+		&& !OwnedCharacter->HasMatchingGameplayTag(
+			FNarrativeGameplayTags::Get().State_IsDead);
 
 	if (bShouldApply && !bGameplayMappingContextApplied)
 	{
@@ -667,6 +695,7 @@ void ANarrativePlayerController::RefreshGameplayMappingContext()
 	}
 	else if (!bShouldApply && bGameplayMappingContextApplied)
 	{
+		ReleaseHeldAbilityInputs();
 		Subsystem->RemoveMappingContext(DefaultMappingContext);
 		bGameplayMappingContextApplied = false;
 	}
@@ -820,6 +849,11 @@ void ANarrativePlayerController::OnTetheredNPCDestroyed(AActor* DestroyedActor)
 
 void ANarrativePlayerController::AbilityInputPressed(FGameplayTag InputTag)
 {
+	if (InputTag.IsValid())
+	{
+		PressedAbilityInputTags.Add(InputTag);
+	}
+
 	if (UNarrativeAbilitySystemComponent* ASC = Cast<UNarrativeAbilitySystemComponent>(GetAbilitySystemComponent()))
 	{
 		ASC->AbilityInputTagPressed(InputTag);
@@ -828,8 +862,26 @@ void ANarrativePlayerController::AbilityInputPressed(FGameplayTag InputTag)
 
 void ANarrativePlayerController::AbilityInputReleased(FGameplayTag InputTag)
 {
+	PressedAbilityInputTags.Remove(InputTag);
+
 	if (UNarrativeAbilitySystemComponent* ASC = Cast<UNarrativeAbilitySystemComponent>(GetAbilitySystemComponent()))
 	{
 		ASC->AbilityInputTagReleased(InputTag);
+	}
+}
+
+void ANarrativePlayerController::ReleaseHeldAbilityInputs()
+{
+	UNarrativeAbilitySystemComponent* ASC =
+		Cast<UNarrativeAbilitySystemComponent>(GetAbilitySystemComponent());
+	const TArray<FGameplayTag> HeldTags = PressedAbilityInputTags.Array();
+	PressedAbilityInputTags.Empty();
+
+	if (ASC)
+	{
+		for (const FGameplayTag& InputTag : HeldTags)
+		{
+			ASC->AbilityInputTagReleased(InputTag);
+		}
 	}
 }

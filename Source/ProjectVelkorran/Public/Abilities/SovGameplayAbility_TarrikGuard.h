@@ -8,6 +8,7 @@
 #include "SovGameplayAbility_TarrikGuard.generated.h"
 
 class UAbilityTask_WaitInputRelease;
+class UAbilitySystemComponent;
 class USovGuardComponent;
 
 /** Hold-to-guard GAS entry point for Tarrik's first defense vertical slice. */
@@ -39,6 +40,10 @@ protected:
 	UFUNCTION()
 	void HandleGuardBroken(const FSovDamageResult& Result);
 
+	void BindCancellationTags(UAbilitySystemComponent* AbilitySystem);
+	void UnbindCancellationTags();
+	void HandleCancellationTagChanged(const FGameplayTag CallbackTag, int32 NewCount);
+
 	UFUNCTION(BlueprintImplementableEvent, Category = "Sovereign|Guard", meta = (DisplayName = "Guard Ability Started"))
 	void ReceiveGuardAbilityStarted();
 
@@ -51,4 +56,12 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UAbilityTask_WaitInputRelease> InputReleaseTask;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UAbilitySystemComponent> BoundAbilitySystem;
+
+	FDelegateHandle DeadTagChangedHandle;
+	FDelegateHandle PoiseBrokenTagChangedHandle;
+	FDelegateHandle SequencerTagChangedHandle;
+	bool bGuardStarted = false;
 };

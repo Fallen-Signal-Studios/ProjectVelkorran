@@ -79,6 +79,7 @@ struct NARRATIVEARSENAL_API FSovDamageResult
 	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Damage")
 	bool bShouldRestartShieldRecharge = false;
 
+	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Damage")
 	FGameplayEffectContextHandle EffectContext;
 };
 

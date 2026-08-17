@@ -20,15 +20,18 @@ void UNarrativeGameplayAbility::OnAvatarSet(const FGameplayAbilityActorInfo* Act
 {
 	Super::OnAvatarSet(ActorInfo, Spec);
 
+	// Instanced-per-actor abilities can survive on a PlayerState ASC across a
+	// pawn respawn. Refresh the cached character before activate-on-granted code
+	// runs so weapon, visual, and controller lookups never use the destroyed pawn.
+	if (ANarrativeCharacter* NewCharacterOwner =
+		Cast<ANarrativeCharacter>(ActorInfo->AvatarActor.Get()))
+	{
+		CharacterOwner = NewCharacterOwner;
+	}
+
 	if (bActivateAbilityOnGranted)
 	{
 		ActorInfo->AbilitySystemComponent->TryActivateAbility(Spec.Handle, false);
-	}
-	
-	//Possessing a car etc might try change this post ability activate 
-	if (!CharacterOwner)
-	{
-		CharacterOwner = Cast<ANarrativeCharacter>(ActorInfo->AvatarActor.Get());
 	}
 }
 

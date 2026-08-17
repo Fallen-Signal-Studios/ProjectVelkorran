@@ -131,8 +131,12 @@ bool UNarrativeAttributeSetBase::PreGameplayEffectExecute(FGameplayEffectModCall
 	}
 
 	const FSovGameplayTags& SovTags = FSovGameplayTags::Get();
+	FGameplayTagContainer EffectAssetTags;
+	Data.EffectSpec.GetAllAssetTags(EffectAssetTags);
+	const bool bFatalPolicy = EffectAssetTags.HasTagExact(SovTags.Damage_Fatal);
 	if (Data.EvaluatedData.Attribute == GetDamageAttribute()
 		&& Data.EvaluatedData.Magnitude > 0.f
+		&& !bFatalPolicy
 		&& (Data.Target.HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_Invulnerable)
 			|| Data.Target.HasMatchingGameplayTag(SovTags.State_Invulnerable)
 			|| Data.Target.HasMatchingGameplayTag(SovTags.State_Damage_Immune)))
@@ -169,11 +173,6 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 	else if (SourceASC && SourceASC->AbilityActorInfo.IsValid())
 	{
 		SourceController = SourceASC->AbilityActorInfo->PlayerController.Get();
-	}
-
-	if (Context.GetEffectCauser())
-	{
-		SourceActor = Context.GetEffectCauser();
 	}
 
 	const auto NotifyAppliedDamage = [
@@ -218,11 +217,15 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 		Data.EffectSpec.GetAllAssetTags(EffectAssetTags);
 		const FSovGameplayTags& Tags = FSovGameplayTags::Get();
 		const UNarrativeCombatDeveloperSettings* CombatSettings = GetDefault<UNarrativeCombatDeveloperSettings>();
-		AActor* Instigator = Context.GetOriginalInstigator();
-		AActor* Causer = Context.GetEffectCauser();
+		AActor* DamageInstigator = SourceActor
+			? SourceActor
+			: Context.GetOriginalInstigator();
+		AActor* DamageCauser = Context.GetEffectCauser()
+			? Context.GetEffectCauser()
+			: DamageInstigator;
 
 		FSovDamageResult Result;
-		Result.SourceActor = Instigator ? Instigator : SourceActor;
+		Result.SourceActor = DamageInstigator;
 		Result.TargetActor = TargetActor;
 		Result.BaseDamage = FMath::Max(
 			Data.EffectSpec.GetSetByCallerMagnitude(
@@ -276,9 +279,10 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 			}
 		}
 
-		const auto SendSovEvent = [TargetActor, Instigator, &Context](
+		const auto SendSovEvent = [TargetActor, DamageInstigator, &Context](
 			const FGameplayTag& EventTag,
-			const float Magnitude)
+			const float Magnitude,
+			const FGameplayTagContainer* PayloadTargetTags)
 		{
 			if (!TargetActor || !EventTag.IsValid())
 			{
@@ -287,10 +291,14 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 
 			FGameplayEventData Payload;
 			Payload.EventTag = EventTag;
-			Payload.Instigator = Instigator;
+			Payload.Instigator = DamageInstigator;
 			Payload.Target = TargetActor;
 			Payload.ContextHandle = Context;
 			Payload.EventMagnitude = Magnitude;
+			if (PayloadTargetTags)
+			{
+				Payload.TargetTags = *PayloadTargetTags;
+			}
 			UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(TargetActor, EventTag, Payload);
 		};
 
@@ -301,11 +309,13 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 			-1.f);
 		if (RoutedPoiseDamage < 0.f)
 		{
+			const float DefaultPoiseCoefficient =
+				EffectAssetTags.HasTagExact(Tags.Damage_Poise) ? 1.f : 0.f;
 			const float PoiseCoefficient = FMath::Max(
 				Data.EffectSpec.GetSetByCallerMagnitude(
 					Tags.SetByCaller_Damage_PoiseCoefficient,
 					false,
-					0.f),
+					DefaultPoiseCoefficient),
 				0.f);
 			RoutedPoiseDamage = IncomingDamage * PoiseCoefficient;
 		}
@@ -319,10 +329,11 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 			|| EffectAssetTags.HasTagExact(Tags.Damage_Heavy);
 		const bool bUnblockable = EffectAssetTags.HasTagExact(Tags.Damage_GuardClass_Unblockable)
 			|| EffectAssetTags.HasTagExact(Tags.Damage_Unblockable)
-			|| EffectAssetTags.HasTagExact(Tags.Damage_BypassGuard);
+			|| EffectAssetTags.HasTagExact(Tags.Damage_BypassGuard)
+			|| EffectAssetTags.HasTagExact(Tags.Damage_Fatal);
 
 		bool bInsideGuardArc = false;
-		AActor* DirectionSource = Instigator ? Instigator : SourceActor;
+		AActor* DirectionSource = DamageCauser;
 		if (bIsGuarding && TargetActor && DirectionSource && TargetActor != DirectionSource)
 		{
 			const FVector ToSource = (DirectionSource->GetActorLocation() - TargetActor->GetActorLocation()).GetSafeNormal2D();
@@ -341,7 +352,6 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 			Result.bGuarded = true;
 			RoutedDamage = 0.f;
 			RoutedPoiseDamage = 0.f;
-			SendSovEvent(Tags.Event_Guard_Perfect, IncomingDamage);
 		}
 		else if (bGuardCandidate)
 		{
@@ -360,7 +370,8 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 					DefaultGuardCost),
 				0.f);
 			const float OldStamina = FMath::Max(GetStamina(), 0.f);
-			const bool bCanPayGuardCost = OldStamina + KINDA_SMALL_NUMBER >= RequestedGuardCost;
+			const bool bCanPayGuardCost = RequestedGuardCost <= KINDA_SMALL_NUMBER
+				|| OldStamina - RequestedGuardCost > KINDA_SMALL_NUMBER;
 
 			Result.AppliedStaminaDamage = FMath::Min(OldStamina, RequestedGuardCost);
 			SetStamina(FMath::Clamp(OldStamina - Result.AppliedStaminaDamage, 0.f, GetMaxStamina()));
@@ -374,13 +385,16 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 				RoutedPoiseDamage *= CombatSettings
 					? FMath::Clamp(CombatSettings->GuardPoiseMultiplier, 0.f, 1.f)
 					: 0.25f;
-				SendSovEvent(Tags.Event_Guard_Blocked, IncomingDamage);
+				SendSovEvent(Tags.Event_Guard_Blocked, IncomingDamage, nullptr);
 			}
 			else
 			{
 				Result.bGuardBroken = true;
-				OnGuardBroken.Broadcast(Instigator, Causer, Data.EffectSpec, Result.AppliedStaminaDamage);
-				SendSovEvent(Tags.Event_Guard_Broken, Result.AppliedStaminaDamage);
+				OnGuardBroken.Broadcast(
+					DamageInstigator,
+					DamageCauser,
+					Data.EffectSpec,
+					Result.AppliedStaminaDamage);
 			}
 		}
 
@@ -388,7 +402,8 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 		const float OldHealth = FMath::Max(GetHealth(), 0.f);
 		const float OldPoise = FMath::Max(GetPoise(), 0.f);
 
-		if (EffectAssetTags.HasTagExact(Tags.Damage_BypassShield))
+		const bool bFatalPolicy = EffectAssetTags.HasTagExact(Tags.Damage_Fatal);
+		if (bFatalPolicy || EffectAssetTags.HasTagExact(Tags.Damage_BypassShield))
 		{
 			Result.ShieldBypassRatio = 1.f;
 		}
@@ -412,12 +427,14 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 				false,
 				1.f),
 			0.f);
-		const float HealthCoefficient = FMath::Max(
-			Data.EffectSpec.GetSetByCallerMagnitude(
-				Tags.SetByCaller_Damage_HealthCoefficient,
-				false,
-				1.f),
-			0.f);
+		const float HealthCoefficient = bFatalPolicy
+			? 1.f
+			: FMath::Max(
+				Data.EffectSpec.GetSetByCallerMagnitude(
+					Tags.SetByCaller_Damage_HealthCoefficient,
+					false,
+					1.f),
+				0.f);
 		const float ShieldEligibleBase = RoutedDamage * (1.f - Result.ShieldBypassRatio);
 		Result.RequestedShieldDamage = ShieldEligibleBase * ShieldCoefficient;
 		Result.bShieldWasTargeted = GetMaxShield() > KINDA_SMALL_NUMBER
@@ -425,10 +442,17 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 			&& Result.RequestedShieldDamage > KINDA_SMALL_NUMBER;
 		Result.AppliedShieldDamage = FMath::Min(OldShield, Result.RequestedShieldDamage);
 
-		const float BaseConsumedByShield = ShieldCoefficient > KINDA_SMALL_NUMBER
-			? Result.AppliedShieldDamage / ShieldCoefficient
-			: 0.f;
-		const float OverflowBase = FMath::Max(ShieldEligibleBase - BaseConsumedByShield, 0.f);
+		float OverflowBase = 0.f;
+		if (OldShield <= KINDA_SMALL_NUMBER)
+		{
+			OverflowBase = ShieldEligibleBase;
+		}
+		else if (ShieldCoefficient > KINDA_SMALL_NUMBER
+			&& Result.RequestedShieldDamage > OldShield)
+		{
+			OverflowBase =
+				(Result.RequestedShieldDamage - OldShield) / ShieldCoefficient;
+		}
 		const float RequestedHealthDamage = (
 			(RoutedDamage * Result.ShieldBypassRatio) + OverflowBase) * HealthCoefficient;
 		Result.AppliedHealthDamage = FMath::Min(OldHealth, RequestedHealthDamage);
@@ -437,6 +461,19 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 		{
 			SetShield(FMath::Clamp(OldShield - Result.AppliedShieldDamage, 0.f, GetMaxShield()));
 		}
+		Result.bShouldRestartShieldRecharge = EffectAssetTags.HasTagExact(Tags.Damage_RestartShieldRecharge)
+			|| Result.bShieldWasTargeted;
+		Result.bShieldBroken = OldShield > 0.f && GetShield() <= 0.f;
+		if (Result.bShieldBroken)
+		{
+			OnShieldBroken.Broadcast(
+				DamageInstigator,
+				DamageCauser,
+				Data.EffectSpec,
+				Result.AppliedShieldDamage);
+			SendSovEvent(Tags.Event_Shield_Broken, Result.AppliedShieldDamage, nullptr);
+		}
+
 		if (RequestedHealthDamage > 0.f)
 		{
 			SetHealth(FMath::Clamp(OldHealth - RequestedHealthDamage, 0.f, GetMaxHealth()));
@@ -454,45 +491,43 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 		}
 
 		const float AppliedDamage = Result.AppliedShieldDamage + Result.AppliedHealthDamage;
-		NotifyAppliedDamage(AppliedDamage);
-		Result.bShouldRestartShieldRecharge = EffectAssetTags.HasTagExact(Tags.Damage_RestartShieldRecharge)
-			|| Result.bShieldWasTargeted;
-		Result.bShieldBroken = OldShield > 0.f && GetShield() <= 0.f;
 		Result.bPoiseBroken = OldPoise > 0.f && GetPoise() <= 0.f;
 		Result.bFatal = OldHealth > 0.f && GetHealth() <= 0.f;
 
-		if (Result.bShieldBroken)
-		{
-			OnShieldBroken.Broadcast(Instigator, Causer, Data.EffectSpec, Result.AppliedShieldDamage);
-			SendSovEvent(Tags.Event_Shield_Broken, Result.AppliedShieldDamage);
-		}
 		if (Result.bPoiseBroken)
 		{
-			OnPoiseBroken.Broadcast(Instigator, Causer, Data.EffectSpec, Result.AppliedPoiseDamage);
-			SendSovEvent(Tags.Event_Poise_Broken, Result.AppliedPoiseDamage);
+			OnPoiseBroken.Broadcast(
+				DamageInstigator,
+				DamageCauser,
+				Data.EffectSpec,
+				Result.AppliedPoiseDamage);
+			SendSovEvent(Tags.Event_Poise_Broken, Result.AppliedPoiseDamage, nullptr);
 		}
-		if (!Result.RequestedStatusTags.IsEmpty())
+		if (!Result.RequestedStatusTags.IsEmpty()
+			&& AppliedDamage + Result.AppliedPoiseDamage > KINDA_SMALL_NUMBER)
 		{
 			SendSovEvent(
 				Tags.Event_Status_ApplicationRequested,
-				FMath::Max(Data.EffectSpec.GetSetByCallerMagnitude(Tags.SetByCaller_Status_Magnitude, false, 1.f), 0.f));
+				FMath::Max(Data.EffectSpec.GetSetByCallerMagnitude(Tags.SetByCaller_Status_Magnitude, false, 1.f), 0.f),
+				&Result.RequestedStatusTags);
 		}
 
 		if (Result.bFatal)
 		{
-			OnOutOfHealth.Broadcast(Instigator, Causer, Data.EffectSpec, AppliedDamage);
+			OnOutOfHealth.Broadcast(
+				DamageInstigator,
+				DamageCauser,
+				Data.EffectSpec,
+				AppliedDamage);
 
-			if (Instigator && Instigator != GetOwningActor())
+			if (SourceASC && SourceASC != TargetASC)
 			{
 				FGameplayEventData EventData;
 				EventData.EventTag = FNarrativeGameplayTags::Get().GameplayEvent_KilledEnemy;
-				EventData.Instigator = Instigator;
+				EventData.Instigator = DamageInstigator;
 				EventData.Target = GetOwningActor();
 
-				UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(
-					Instigator,
-					EventData.EventTag,
-					EventData);
+				SourceASC->HandleGameplayEvent(EventData.EventTag, &EventData);
 			}
 		}
 
@@ -504,7 +539,8 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 		{
 			SourceASC->DamageResolvedAsSource(Result);
 		}
-		SendSovEvent(Tags.Event_Damage_Resolved, AppliedDamage);
+		NotifyAppliedDamage(AppliedDamage);
+		SendSovEvent(Tags.Event_Damage_Resolved, AppliedDamage, nullptr);
 
 		return;
 	}

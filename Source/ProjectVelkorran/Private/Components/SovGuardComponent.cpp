@@ -16,7 +16,7 @@
 USovGuardComponent::USovGuardComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
-	SetIsReplicatedByDefault(false);
+	SetIsReplicatedByDefault(true);
 }
 
 void USovGuardComponent::BeginPlay()
@@ -256,7 +256,7 @@ void USovGuardComponent::ClearGuardBrokenState()
 
 void USovGuardComponent::BroadcastPendingGuardBroken()
 {
-	OnGuardBroken.Broadcast(PendingGuardBrokenResult);
+	MulticastGuardBroken(PendingGuardBrokenResult);
 }
 
 void USovGuardComponent::SetOwnedLooseTag(
@@ -312,7 +312,17 @@ void USovGuardComponent::HandleDamageResolvedAsTarget(const FSovDamageResult& Re
 			EchoComponent->AddEcho(PerfectGuardEchoReward, FSovGameplayTags::Get().Echo_Source_PerfectGuard);
 		}
 		OpenCounterWindow();
-		OnPerfectDefense.Broadcast(Result);
+		FGameplayEventData PerfectPayload;
+		PerfectPayload.EventTag = FSovGameplayTags::Get().Event_Guard_Perfect;
+		PerfectPayload.Instigator = Result.SourceActor;
+		PerfectPayload.Target = GetOwner();
+		PerfectPayload.ContextHandle = Result.EffectContext;
+		PerfectPayload.EventMagnitude = Result.ResolvedDamage;
+		UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(
+			GetOwner(),
+			PerfectPayload.EventTag,
+			PerfectPayload);
+		MulticastPerfectDefense(Result);
 	}
 	else if (Result.bGuarded)
 	{
@@ -320,7 +330,7 @@ void USovGuardComponent::HandleDamageResolvedAsTarget(const FSovDamageResult& Re
 		{
 			EchoComponent->RecordCombatActivity(FSovGameplayTags::Get().Echo_Source_GuardPressure);
 		}
-		OnGuardImpact.Broadcast(Result);
+		MulticastGuardImpact(Result);
 	}
 
 	if (Result.bGuardBroken)
@@ -336,6 +346,16 @@ void USovGuardComponent::HandleDamageResolvedAsTarget(const FSovDamageResult& Re
 				FMath::Max(GuardBreakDuration, KINDA_SMALL_NUMBER),
 				false);
 		}
+		FGameplayEventData BrokenPayload;
+		BrokenPayload.EventTag = FSovGameplayTags::Get().Event_Guard_Broken;
+		BrokenPayload.Instigator = Result.SourceActor;
+		BrokenPayload.Target = GetOwner();
+		BrokenPayload.ContextHandle = Result.EffectContext;
+		BrokenPayload.EventMagnitude = Result.AppliedStaminaDamage;
+		UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(
+			GetOwner(),
+			BrokenPayload.EventTag,
+			BrokenPayload);
 		PendingGuardBrokenResult = Result;
 		if (UWorld* World = GetWorld())
 		{
@@ -373,5 +393,29 @@ void USovGuardComponent::HandleDamageResolvedAsSource(const FSovDamageResult& Re
 		GetOwner(),
 		CounterPayload.EventTag,
 		CounterPayload);
+	MulticastCounterLanded(Result);
+}
+
+void USovGuardComponent::MulticastGuardImpact_Implementation(
+	const FSovDamageResult& Result)
+{
+	OnGuardImpact.Broadcast(Result);
+}
+
+void USovGuardComponent::MulticastPerfectDefense_Implementation(
+	const FSovDamageResult& Result)
+{
+	OnPerfectDefense.Broadcast(Result);
+}
+
+void USovGuardComponent::MulticastGuardBroken_Implementation(
+	const FSovDamageResult& Result)
+{
+	OnGuardBroken.Broadcast(Result);
+}
+
+void USovGuardComponent::MulticastCounterLanded_Implementation(
+	const FSovDamageResult& Result)
+{
 	OnCounterLanded.Broadcast(Result);
 }

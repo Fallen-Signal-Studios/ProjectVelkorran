@@ -11,6 +11,7 @@
 #include "GAS/NarrativeAbilitySystemComponent.h"
 #include "GAS/NarrativeAttributeSetBase.h"
 #include "GAS/NarrativeAbilityInputMapping.h"
+#include "GAS/AbilityConfiguration.h"
 #include "NarrativeArsenal.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -32,6 +33,7 @@
 #include "ArsenalSettings.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "NarrativeGameplayTags.h"
+#include "NarrativeLogChannels.h"
 #include "AI/NarrativeCharacterSubsystem.h"
 #include "Character/NarrativeCharacterMovement.h"
 #include "AI/NarrativeNPCController.h"
@@ -106,13 +108,6 @@ void ANarrativePlayerCharacter::OnRep_PlayerState()
 
 void ANarrativePlayerCharacter::TryInitializePlayerCharacter()
 {
-	// PlayerState and PlayerDefinition replicate independently. Either order is
-	// legal, so initialization waits instead of asserting or polling.
-	if (!IsValid(PlayerDefinition))
-	{
-		return;
-	}
-
 	ANarrativePlayerState* PS = GetNarrativePlayerState();
 	if (!IsValid(PS))
 	{
@@ -126,7 +121,7 @@ void ANarrativePlayerCharacter::TryInitializePlayerCharacter()
 		return;
 	}
 
-	const bool bNewASCGeneration = InitializedAbilitySystem != NewASC;
+	const bool bAbilitySystemChanged = InitializedAbilitySystem != NewASC;
 	const bool bNeedsActorInfo = NewASC->GetOwnerActor() != PS || NewASC->GetAvatarActor() != this;
 	AbilitySystemComponent = NewASC;
 	AttributeSetBase = NewAttributeSet;
@@ -136,31 +131,159 @@ void ANarrativePlayerCharacter::TryInitializePlayerCharacter()
 		NewASC->InitAbilityActorInfo(PS, this);
 	}
 
-	if (bNewASCGeneration)
+	if (ReadinessBoundAbilitySystem != NewASC)
+	{
+		if (ReadinessBoundAbilitySystem)
+		{
+			ReadinessBoundAbilitySystem->OnCharacterReadyEpochChanged.RemoveDynamic(
+				this,
+				&ThisClass::HandleAbilitySystemReadyEpochChanged);
+		}
+		ReadinessBoundAbilitySystem = NewASC;
+		ReadinessBoundAbilitySystem->OnCharacterReadyEpochChanged.AddUniqueDynamic(
+			this,
+			&ThisClass::HandleAbilitySystemReadyEpochChanged);
+	}
+
+	if (bAbilitySystemChanged)
 	{
 		InitializedAbilitySystem = NewASC;
-		bCharacterReady = false;
+		InvalidateCharacterReadiness();
+		if (HasAuthority())
+		{
+			bAuthoritativeCharacterReady = false;
+			AuthoritativeReadyEpoch = 0;
+			ForceNetUpdate();
+		}
+		bAuthoritativeGameplayInitialized = false;
+		bProjectSystemsInitialized = false;
+		bAbilitySystemReadyPublished = false;
+		bInitialPlayerDataApplied = false;
+		bVisualReadyForGameplay = false;
 		++CharacterInitializationGeneration;
+
+		// Project components require only a valid actor-info binding. Initialize
+		// them before delayed definition replication or ability OnAvatarSet work.
 		HandleAbilitySystemReady(NewASC);
-		OnASCInitialized.Broadcast();
+		bProjectSystemsInitialized = AreAdditionalCharacterSystemsReady();
+	}
+
+	// Actor info must exist before ability specs can replicate, even when the
+	// independently replicated definition has not arrived yet.
+	if (!IsValid(PlayerDefinition))
+	{
+		return;
+	}
+
+	const bool bDefinitionChanged = InitializedPlayerDefinition != PlayerDefinition;
+	if (!bAbilitySystemChanged
+		&& IsValid(InitializedPlayerDefinition)
+		&& bDefinitionChanged
+		&& bAbilitySystemReadyPublished)
+	{
+		InvalidateCharacterReadiness();
+		if (HasAuthority())
+		{
+			bAuthoritativeCharacterReady = false;
+			AuthoritativeReadyEpoch = 0;
+			ForceNetUpdate();
+		}
+		UE_LOG(
+			LogNarrativeCharacter,
+			Error,
+			TEXT("%s cannot replace PlayerDefinition on a live ASC without an explicit ability/effect migration policy."),
+			*GetNameSafe(this));
+		return;
+	}
+
+	if (bAbilitySystemChanged || bDefinitionChanged)
+	{
+		if (bDefinitionChanged)
+		{
+			const bool bFirstDefinitionForCurrentASC =
+				!IsValid(InitializedPlayerDefinition)
+				&& !bAbilitySystemChanged
+				&& CharacterInitializationGeneration > 0;
+			InitializedPlayerDefinition = PlayerDefinition;
+			InvalidateCharacterReadiness();
+			if (HasAuthority())
+			{
+				bAuthoritativeCharacterReady = false;
+				AuthoritativeReadyEpoch = 0;
+				ForceNetUpdate();
+			}
+			bAuthoritativeGameplayInitialized = false;
+			bAbilitySystemReadyPublished = false;
+			bInitialPlayerDataApplied = false;
+			bVisualReadyForGameplay = false;
+			if (!bFirstDefinitionForCurrentASC && !bAbilitySystemChanged)
+			{
+				++CharacterInitializationGeneration;
+			}
+		}
+
+		// Reapply definition tags and visual loading for every (ASC, definition)
+		// epoch, including a new PlayerState ASC using the same definition.
+		OnDefinitionSet(PlayerDefinition);
+	}
+
+	// Bind project lifecycle systems before startup abilities are granted. An
+	// activate-on-granted ability may consult Echo, Shield, Poise, or Guard.
+	if (!bProjectSystemsInitialized)
+	{
+		HandleAbilitySystemReady(NewASC);
+		bProjectSystemsInitialized = AreAdditionalCharacterSystemsReady();
+		if (!bProjectSystemsInitialized)
+		{
+			return;
+		}
 	}
 
 	if (HasAuthority() && !bAuthoritativeGameplayInitialized)
 	{
 		// This block is deliberately once per pawn. Repeated RepNotifies and
 		// possession callbacks must never reset resources or duplicate abilities.
+		UAbilityConfiguration* AbilityConfiguration =
+			PlayerDefinition->AbilityConfiguration;
+		if (!IsValid(AbilityConfiguration)
+			|| !AbilityConfiguration->DefaultAttributes)
+		{
+			UE_LOG(
+				LogNarrativeCharacter,
+				Error,
+				TEXT("%s cannot become ready: PlayerDefinition has no valid default attribute effect."),
+				*GetNameSafe(this));
+			return;
+		}
+
+		if (bAbilitySystemChanged)
+		{
+			// A PlayerState ASC can retain the old pawn's persistent startup
+			// effects. Force the tracked replacement path for this new avatar.
+			NewASC->ClearTrackedStartupEffects();
+		}
 		InitializeAttributes();
+		AddStartupEffects();
+		if (!NewASC->bStartupEffectsApplied)
+		{
+			return;
+		}
+
+		// Refill only Narrative's baseline respawn resources after all maximum-
+		// modifying definition/startup effects have settled.
 		SetHealth(GetMaxHealth());
 		SetStamina(GetMaxStamina());
-		AddStartupEffects();
 		AddDefaultAbilities();
 		bAuthoritativeGameplayInitialized = true;
 	}
 
-	if (InitializedPlayerDefinition != PlayerDefinition)
+	// Actor info, definition tags, project systems, attributes, startup effects,
+	// and abilities are now stable. Publish the legacy event once per epoch.
+	if (!bAbilitySystemReadyPublished
+		&& (!HasAuthority() || bAuthoritativeGameplayInitialized))
 	{
-		InitializedPlayerDefinition = PlayerDefinition;
-		OnDefinitionSet(PlayerDefinition);
+		bAbilitySystemReadyPublished = true;
+		OnASCInitialized.Broadcast();
 	}
 
 	TryFinalizeCharacterReadiness();
@@ -169,6 +292,16 @@ void ANarrativePlayerCharacter::TryInitializePlayerCharacter()
 void ANarrativePlayerCharacter::HandleAbilitySystemReady(UNarrativeAbilitySystemComponent* ReadyAbilitySystem)
 {
 	static_cast<void>(ReadyAbilitySystem);
+}
+
+void ANarrativePlayerCharacter::InvalidateCharacterReadiness()
+{
+	const bool bWasReady = bCharacterReady;
+	bCharacterReady = false;
+	if (bWasReady)
+	{
+		OnCharacterReadinessChanged.Broadcast(this, false);
+	}
 }
 
 bool ANarrativePlayerCharacter::AreAdditionalCharacterSystemsReady() const
@@ -182,6 +315,9 @@ void ANarrativePlayerCharacter::TryFinalizeCharacterReadiness()
 		|| !IsValid(InitializedAbilitySystem)
 		|| InitializedAbilitySystem->GetAvatarActor() != this
 		|| InitializedPlayerDefinition != PlayerDefinition
+		|| !bProjectSystemsInitialized
+		|| !bAbilitySystemReadyPublished
+		|| !bInitialPlayerDataApplied
 		|| !bVisualReadyForGameplay
 		|| (HasAuthority() && !bAuthoritativeGameplayInitialized)
 		|| !AreAdditionalCharacterSystemsReady())
@@ -191,29 +327,46 @@ void ANarrativePlayerCharacter::TryFinalizeCharacterReadiness()
 
 	if (HasAuthority() && !bAuthoritativeCharacterReady)
 	{
+		AuthoritativeReadyEpoch =
+			InitializedAbilitySystem->GetCharacterReadyEpoch() + 1;
+		InitializedAbilitySystem->SetCharacterReadyEpoch(AuthoritativeReadyEpoch);
 		bAuthoritativeCharacterReady = true;
 		ForceNetUpdate();
 	}
-	if (!bAuthoritativeCharacterReady)
+	if (!bAuthoritativeCharacterReady
+		|| AuthoritativeReadyEpoch <= 0
+		|| InitializedAbilitySystem->GetCharacterReadyEpoch() < AuthoritativeReadyEpoch)
 	{
 		return;
 	}
 
 	bCharacterReady = true;
 	OnCharacterReady.Broadcast(this);
+	OnCharacterReadinessChanged.Broadcast(this, true);
 
-	if (HasAuthority())
-	{
-		FGameplayEventData Payload;
-		Payload.EventTag = FSovGameplayTags::Get().Event_Character_Ready;
-		Payload.Instigator = this;
-		Payload.Target = this;
-		UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(this, Payload.EventTag, Payload);
-	}
+	// Gameplay events are local to a machine. Publish when each machine crosses
+	// its own readiness gate; only authority mutates persistent gameplay state.
+	FGameplayEventData Payload;
+	Payload.EventTag = FSovGameplayTags::Get().Event_Character_Ready;
+	Payload.Instigator = this;
+	Payload.Target = this;
+	UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(this, Payload.EventTag, Payload);
 }
 
 void ANarrativePlayerCharacter::OnRep_AuthoritativeCharacterReady()
 {
+	if (!bAuthoritativeCharacterReady)
+	{
+		InvalidateCharacterReadiness();
+	}
+	TryFinalizeCharacterReadiness();
+}
+
+void ANarrativePlayerCharacter::HandleAbilitySystemReadyEpochChanged(
+	const int32 ReadyEpoch)
+{
+	static_cast<void>(ReadyEpoch);
+	TryInitializePlayerCharacter();
 	TryFinalizeCharacterReadiness();
 }
 
@@ -223,6 +376,7 @@ void ANarrativePlayerCharacter::GetLifetimeReplicatedProps(TArray<FLifetimePrope
 
 	DOREPLIFETIME(ANarrativePlayerCharacter, PlayerDefinition);
 	DOREPLIFETIME(ANarrativePlayerCharacter, bAuthoritativeCharacterReady);
+	DOREPLIFETIME(ANarrativePlayerCharacter, AuthoritativeReadyEpoch);
 }
 
 FGameplayTagContainer ANarrativePlayerCharacter::GetFactions() const
@@ -338,7 +492,10 @@ void ANarrativePlayerCharacter::OnCharacterVisualInitialized()
 {
 	if (!bInitialPlayerDataApplied)
 	{
-		// Save/load and initial equipment are part of readiness, and must run once.
+		// Narrative's current save API is synchronous. If a project replaces it
+		// with async loading, it must call NotifyInitialPlayerDataApplied from the
+		// completion callback instead of marking the stage here.
+		bool bCompletedSynchronously = false;
 		if (UNarrativeSaveSubsystem* SaveSub = GetWorld()->GetSubsystem<UNarrativeSaveSubsystem>())
 		{
 			if (GetNetMode() == NM_Standalone)
@@ -351,12 +508,14 @@ void ANarrativePlayerCharacter::OnCharacterVisualInitialized()
 				{
 					SaveSub->LoadPlayerData();
 				}
+				bCompletedSynchronously = true;
 			}
 			else
 			{
 				if (GetNetMode() == NM_Client)
 				{
 					InitNewCharacter(GetCharacterDefinition());
+					bCompletedSynchronously = true;
 				}
 				else if (GetNetMode() == NM_DedicatedServer || GetNetMode() == NM_ListenServer)
 				{
@@ -364,11 +523,23 @@ void ANarrativePlayerCharacter::OnCharacterVisualInitialized()
 					{
 						InitNewCharacter(GetCharacterDefinition());
 					}
+					bCompletedSynchronously = true;
 				}
 			}
 		}
+		else
+		{
+			UE_LOG(
+				LogNarrativeCharacter,
+				Error,
+				TEXT("%s cannot become ready: NarrativeSaveSubsystem is unavailable."),
+				*GetNameSafe(this));
+		}
 
-		bInitialPlayerDataApplied = true;
+		if (bCompletedSynchronously)
+		{
+			NotifyInitialPlayerDataApplied();
+		}
 	}
 
 	if (!bVisualReadyForGameplay)
@@ -377,6 +548,15 @@ void ANarrativePlayerCharacter::OnCharacterVisualInitialized()
 		bVisualReadyForGameplay = true;
 	}
 	TryFinalizeCharacterReadiness();
+}
+
+void ANarrativePlayerCharacter::NotifyInitialPlayerDataApplied()
+{
+	if (!bInitialPlayerDataApplied)
+	{
+		bInitialPlayerDataApplied = true;
+		TryFinalizeCharacterReadiness();
+	}
 }
 
 UNarrativeSaveWithCreatorData* ANarrativePlayerCharacter::GetCharacterCreatorData() const
@@ -536,8 +716,20 @@ bool ANarrativePlayerCharacter::ShouldCameraFollow3PHeadBoneLocation() const
 
 void ANarrativePlayerCharacter::SetPlayerDefinition(class UPlayerDefinition* PDef)
 {
-	if(PDef)
+	if (PDef && PDef != PlayerDefinition)
 	{
+		if (bAbilitySystemReadyPublished
+			&& IsValid(InitializedPlayerDefinition)
+			&& PDef != InitializedPlayerDefinition)
+		{
+			UE_LOG(
+				LogNarrativeCharacter,
+				Error,
+				TEXT("%s rejected a live PlayerDefinition replacement; define an explicit ability/effect migration policy first."),
+				*GetNameSafe(this));
+			return;
+		}
+
 		PlayerDefinition = PDef;
 		OnRep_PlayerDefinition();
 	}

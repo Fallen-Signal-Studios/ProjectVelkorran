@@ -4,8 +4,8 @@
 
 UNarrativeCombatDeveloperSettings::UNarrativeCombatDeveloperSettings()
 {
-	bEnableDamageNumbers = true;
-	bEnableDamageNumberOnSelf = true;
+	bEnableDamageNumbers = false;
+	bEnableDamageNumberOnSelf = false;
 
 	AvailableAttackTokens.Add(ENarrativeGameplayDifficulty::Easy, 1);
 	AvailableAttackTokens.Add(ENarrativeGameplayDifficulty::Medium, 2);

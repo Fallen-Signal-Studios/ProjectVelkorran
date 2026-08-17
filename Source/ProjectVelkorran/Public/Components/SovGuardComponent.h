@@ -103,6 +103,18 @@ private:
 	void OpenCounterWindow();
 	void SetOwnedLooseTag(const FGameplayTag& Tag, bool bShouldApply, bool& bAppliedFlag);
 
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastGuardImpact(const FSovDamageResult& Result);
+
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastPerfectDefense(const FSovDamageResult& Result);
+
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastGuardBroken(const FSovDamageResult& Result);
+
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastCounterLanded(const FSovDamageResult& Result);
+
 	UFUNCTION()
 	void HandleDamageResolvedAsTarget(const FSovDamageResult& Result);
 
@@ -120,5 +132,6 @@ private:
 	bool bAppliedPerfectDefenseTag = false;
 	bool bAppliedCounterWindowTag = false;
 	bool bAppliedGuardBrokenTag = false;
+	UPROPERTY(Transient)
 	FSovDamageResult PendingGuardBrokenResult;
 };
