@@ -14,6 +14,7 @@ public class ProjectVelkorran : ModuleRules
 				"Core",
 				"CoreUObject",
 				"Engine",
+				"AIModule",
 				"InputCore",
 				"EnhancedInput",
 				"GameplayAbilities",
