@@ -433,22 +433,23 @@ bool AWeaponVisual::SweepForHits(const FVector& Start, const FVector& End, const
 
 		if (GetWorld()->SweepMultiByChannel(OutHits, Start, End, Rot, TraceChannel_NarrativeWeapon, Shape, CQP))
 		{
-#if ENABLE_DRAW_DEBUG
-
-				for (auto& Hit : OutHits)
+			for (const FHitResult& Hit : OutHits)
+			{
+				if (AActor* Actor = Hit.GetActor())
 				{
-					if (AActor* Actor = Hit.GetActor())
-					{
-						CachedHitActors.Add(Actor);
+					// The hit ledger is gameplay state, not debug state. Keeping this
+					// outside ENABLE_DRAW_DEBUG prevents repeat hits in Shipping/Test.
+					CachedHitActors.AddUnique(Actor);
 
-						if (bShouldDrawDebug)
-						{
-							FString RoleStr = HasAuthority() ? "Server" : "Client";
-							GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Red, FString::Printf(TEXT("%s: melee collider hit %s"), *RoleStr, *GetNameSafe(Actor)));
-						}
+#if ENABLE_DRAW_DEBUG
+					if (bShouldDrawDebug && GEngine)
+					{
+						const FString RoleStr = HasAuthority() ? "Server" : "Client";
+						GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Red, FString::Printf(TEXT("%s: melee collider hit %s"), *RoleStr, *GetNameSafe(Actor)));
 					}
-				}
 #endif
+				}
+			}
 
 			return true;
 		}
@@ -472,13 +473,25 @@ void AWeaponVisual::CacheAnimationTransform(
 
 	TArray<FDamageStateData> DamageStateDatas;
 	const auto NotifyEvent = AnimNotifyEventRef.GetNotify();
-	
+	if (!NotifyEvent || !IsValid(CharacterOwner))
+	{
+		return;
+	}
+
 	USkeletalMeshComponent* OwnerMeshComponent = CharacterOwner->GetMesh();
+	if (!IsValid(OwnerMeshComponent))
+	{
+		return;
+	}
 
 	// Prepare socket and bone information along with montage references
 	FTransform SocketTransform;
 	int32 BoneIndex;
-	auto NarrativeChar = Cast<ANarrativeCharacter>(CharacterOwner);
+	ANarrativeCharacter* NarrativeChar = Cast<ANarrativeCharacter>(CharacterOwner);
+	if (!NarrativeChar || !NarrativeChar->GetWeapon())
+	{
+		return;
+	}
 	const FName MeshBoneName = NarrativeChar->GetWeapon()->GetWeaponVisualAttachBone();
 
 	// Fetch the socket info that we will be using
@@ -487,10 +500,10 @@ void AWeaponVisual::CacheAnimationTransform(
 
 	// Get our current montage that is playing
 	UAnimInstance* AnimInstance = OwnerMeshComponent->GetAnimInstance();
-	FAnimMontageInstance* MontageInstance = AnimInstance->GetActiveMontageInstance();
+	FAnimMontageInstance* MontageInstance = AnimInstance ? AnimInstance->GetActiveMontageInstance() : nullptr;
 	const UAnimMontage* AnimMontage = Cast<UAnimMontage>(AnimNotifyEventRef.GetSourceObject());//MontageInstance->Montage;
 
-	if (!AnimMontage || !MontageInstance)
+	if (!AnimMontage || !MontageInstance || AnimMontage->SlotAnimTracks.IsEmpty())
 	{
 		return; 
 	}
@@ -498,16 +511,25 @@ void AWeaponVisual::CacheAnimationTransform(
 	// Gather animation data
 	const FSlotAnimationTrack& AnimTrack = AnimMontage->SlotAnimTracks[0];
 	const FAnimSegment* AnimSegment = AnimTrack.AnimTrack.GetSegmentAtTime(MontageInstance->GetPosition());
+	if (!AnimSegment)
+	{
+		return;
+	}
+
 	const UAnimSequence* CurrentAnimSequence = Cast<UAnimSequence>(AnimSegment->GetAnimReference());
+	if (!CurrentAnimSequence)
+	{
+		return;
+	}
+
 	USkeleton* Skeleton = CurrentAnimSequence->GetSkeleton();
-	
-	if (MeshBoneIndex == INDEX_NONE)
+	if (!Skeleton || MeshBoneIndex == INDEX_NONE)
 	{
 		return;
 	}
 
 	const int32 SkeletonBoneIndex = Skeleton->GetSkeletonBoneIndexFromMeshBoneIndex(OwnerMeshComponent->GetSkeletalMeshAsset(), MeshBoneIndex);
-	if (NotifyEvent && CurrentAnimSequence && Skeleton && SkeletonBoneIndex != INDEX_NONE)
+	if (SkeletonBoneIndex != INDEX_NONE)
 	{
 		// Gather time range of anim notify
 		double StartTime = NotifyEvent->GetTriggerTime() + AnimSegment->AnimStartTime;
@@ -547,7 +569,9 @@ void AWeaponVisual::CacheAnimationTransform(
 		Pose.Init(RequiredBones);
 
 		// start sampling animation and caching data
-		const int32 SampleCount = GetDefault<UNarrativeCombatDeveloperSettings>()->MeleeCombatAnimSampleAmount;//30;
+		const int32 SampleCount = FMath::Max(
+			GetDefault<UNarrativeCombatDeveloperSettings>()->MeleeCombatAnimSampleAmount,
+			2);
 		for (int Index = 0; Index<SampleCount; Index++)
 		{
 			// Determine point in animation based on our sample count so sweeps are evenly distributed

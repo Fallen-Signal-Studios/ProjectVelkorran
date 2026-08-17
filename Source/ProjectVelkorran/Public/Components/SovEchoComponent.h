@@ -174,6 +174,10 @@ protected:
 
 private:
 	void TryInitializeFromOwner();
+
+	UFUNCTION()
+	void HandleOwnerASCInitialized();
+
 	void UninitializeFromAbilitySystem();
 	void SetEchoInternal(float NewEcho);
 	void RefreshThresholdStates(float CurrentEcho, bool bBroadcastChanges);

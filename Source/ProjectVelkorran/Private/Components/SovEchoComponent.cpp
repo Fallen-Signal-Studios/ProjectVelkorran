@@ -8,13 +8,14 @@
 #include "GAS/NarrativeAbilitySystemComponent.h"
 #include "GAS/NarrativeAttributeSetBase.h"
 #include "GameFramework/Actor.h"
+#include "UnrealFramework/NarrativeCharacter.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogSovEcho, Log, All);
 
 USovEchoComponent::USovEchoComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
-	PrimaryComponentTick.bStartWithTickEnabled = true;
+	PrimaryComponentTick.bStartWithTickEnabled = false;
 	PrimaryComponentTick.TickInterval = 0.1f;
 	SetIsReplicatedByDefault(false);
 }
@@ -25,11 +26,19 @@ void USovEchoComponent::BeginPlay()
 
 	LastActivityWorldTime = GetWorldTimeSeconds();
 	LastDecayUpdateWorldTime = LastActivityWorldTime;
+	if (ANarrativeCharacter* NarrativeOwner = Cast<ANarrativeCharacter>(GetOwner()))
+	{
+		NarrativeOwner->OnASCInitialized.AddUniqueDynamic(this, &ThisClass::HandleOwnerASCInitialized);
+	}
 	TryInitializeFromOwner();
 }
 
 void USovEchoComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	if (ANarrativeCharacter* NarrativeOwner = Cast<ANarrativeCharacter>(GetOwner()))
+	{
+		NarrativeOwner->OnASCInitialized.RemoveDynamic(this, &ThisClass::HandleOwnerASCInitialized);
+	}
 	UninitializeFromAbilitySystem();
 	Super::EndPlay(EndPlayReason);
 }
@@ -40,11 +49,6 @@ void USovEchoComponent::TickComponent(
 	FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-
-	if (!IsInitialized())
-	{
-		TryInitializeFromOwner();
-	}
 
 	const float CurrentWorldTime = GetWorldTimeSeconds();
 	if (!CanWriteEcho() || !bEncounterActive || DecayRate <= 0.0f)
@@ -131,6 +135,7 @@ bool USovEchoComponent::InitializeWithAbilitySystem(UAbilitySystemComponent* InA
 	LastActivityWorldTime = CurrentWorldTime;
 	LastDecayUpdateWorldTime = CurrentWorldTime;
 	RefreshThresholdStates(GetEcho(), false);
+	SetComponentTickEnabled(true);
 	return true;
 }
 
@@ -285,15 +290,23 @@ void USovEchoComponent::RecordCombatActivity(const FGameplayTag& ActivityTag)
 
 void USovEchoComponent::TryInitializeFromOwner()
 {
-	if (IsInitialized() || !IsValid(GetOwner()))
+	if (!IsValid(GetOwner()))
 	{
 		return;
 	}
 
 	if (UAbilitySystemComponent* OwnerASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner()))
 	{
-		InitializeWithAbilitySystem(OwnerASC);
+		if (OwnerASC != AbilitySystemComponent)
+		{
+			InitializeWithAbilitySystem(OwnerASC);
+		}
 	}
+}
+
+void USovEchoComponent::HandleOwnerASCInitialized()
+{
+	TryInitializeFromOwner();
 }
 
 void USovEchoComponent::UninitializeFromAbilitySystem()
@@ -303,6 +316,7 @@ void USovEchoComponent::UninitializeFromAbilitySystem()
 		AbilitySystemComponent = nullptr;
 		EchoChangedDelegateHandle.Reset();
 		MaxEchoChangedDelegateHandle.Reset();
+		SetComponentTickEnabled(false);
 		return;
 	}
 
@@ -329,6 +343,7 @@ void USovEchoComponent::UninitializeFromAbilitySystem()
 	AbilitySystemComponent = nullptr;
 	EchoChangedDelegateHandle.Reset();
 	MaxEchoChangedDelegateHandle.Reset();
+	SetComponentTickEnabled(false);
 }
 
 void USovEchoComponent::SetEchoInternal(const float NewEcho)

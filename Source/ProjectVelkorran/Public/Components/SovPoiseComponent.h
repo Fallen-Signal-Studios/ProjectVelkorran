@@ -41,7 +41,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSovPoiseRecoveredSignature);
  * transient PoiseDamage meta attribute. This component observes replicated
  * Poise changes, owns regeneration and break-recovery timing on the server,
  * publishes semantic state tags, and exposes Blueprint-facing events.
- * It never ticks; world timers drive initialization and lifecycle updates.
+ * It never ticks; world timers drive lifecycle updates.
  */
 UCLASS(ClassGroup = (Sovereign), BlueprintType, meta = (BlueprintSpawnableComponent))
 class PROJECTVELKORRAN_API USovPoiseComponent : public UActorComponent
@@ -53,7 +53,8 @@ public:
 
 	/**
 	 * Binds to an ASC that owns UNarrativeAttributeSetBase. BeginPlay resolves the
-	 * owner's ASC automatically and retries by timer when Narrative initializes it later.
+	 * owner's ASC once as a compatibility fallback. Narrative readiness supplies
+	 * it explicitly without polling.
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Sovereign|Poise")
 	bool InitializeWithAbilitySystem(UAbilitySystemComponent* InAbilitySystemComponent);
@@ -146,7 +147,10 @@ protected:
 
 private:
 	void TryInitializeFromOwner();
-	void ScheduleInitializationRetry();
+
+	UFUNCTION()
+	void HandleOwnerASCInitialized();
+
 	void UninitializeFromAbilitySystem();
 	void ClearLifecycleTimers();
 
@@ -189,7 +193,6 @@ private:
 	FDelegateHandle BrokenTagChangedDelegateHandle;
 	FDelegateHandle RecoveringTagChangedDelegateHandle;
 
-	FTimerHandle InitializationRetryTimerHandle;
 	FTimerHandle RegenerationDelayTimerHandle;
 	FTimerHandle RegenerationTimerHandle;
 	FTimerHandle BrokenFallbackTimerHandle;

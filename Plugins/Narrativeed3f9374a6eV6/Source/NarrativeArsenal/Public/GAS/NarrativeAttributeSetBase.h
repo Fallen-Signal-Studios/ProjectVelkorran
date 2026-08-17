@@ -27,9 +27,9 @@ DECLARE_MULTICAST_DELEGATE_FourParams(
  * Core Narrative Pro attributes used by Project Velkorran.
  *
  * Damage and PoiseDamage are transient meta attributes. Damage executions write one
- * final incoming amount to Damage, and this set routes that amount through Shield
- * before Health unless the effect carries Sov.Damage.BypassShield. Incoming poise
- * loss enters through PoiseDamage so break transitions fire exactly once.
+ * final incoming amount to Damage, and this set resolves Guard, partial/full
+ * Shield bypass, Shield/Health coefficients, Poise, breaks, death, and typed
+ * telemetry in one transaction. Standalone poise loss may enter PoiseDamage.
  * Echo is a 0..MaxEcho momentum resource. Its protagonist-specific gain, decay, and
  * spending rules live in abilities/effects rather than inside the attribute set.
  */
@@ -111,6 +111,11 @@ public:
 	FGameplayAttributeData Armor;
 	ATTRIBUTE_ACCESSORS(UNarrativeAttributeSetBase, Armor)
 
+	/** Generic channel resistance percentage. Conditional GAS modifiers can key off incoming channel tags. */
+	UPROPERTY(BlueprintReadOnly, Category = "Combat", ReplicatedUsing = OnRep_DamageResistance)
+	FGameplayAttributeData DamageResistance;
+	ATTRIBUTE_ACCESSORS(UNarrativeAttributeSetBase, DamageResistance)
+
 	UPROPERTY(BlueprintReadOnly, Category = "Combat", ReplicatedUsing = OnRep_AttackDamage)
 	FGameplayAttributeData AttackDamage;
 	ATTRIBUTE_ACCESSORS(UNarrativeAttributeSetBase, AttackDamage)
@@ -140,6 +145,9 @@ public:
 
 	// Fired once when resolved PoiseDamage crosses Poise from above zero to zero.
 	FNarrativeAttributeEvent OnPoiseBroken;
+
+	// Fired when a guarding character cannot pay the authored impact cost.
+	FNarrativeAttributeEvent OnGuardBroken;
 
 protected:
 	// Maintains the current percentage when a maximum attribute changes.
@@ -187,6 +195,9 @@ protected:
 
 	UFUNCTION()
 	virtual void OnRep_Armor(const FGameplayAttributeData& OldArmor);
+
+	UFUNCTION()
+	virtual void OnRep_DamageResistance(const FGameplayAttributeData& OldDamageResistance);
 
 	UFUNCTION()
 	virtual void OnRep_AttackRating(const FGameplayAttributeData& OldAttackRating);

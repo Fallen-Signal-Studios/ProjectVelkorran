@@ -3,6 +3,7 @@
 #include "NarrativeArsenal.h"
 #include "NarrativeGameplayTags.h"
 #include "Navigation/NavigatorGameplayTags.h"
+#include "Sovereign/SovGameplayTags.h"
 #include "GameplayTagsManager.h"
 #include "AI/Activities/NPCActivityComponent.h"
 #include "Vehicles/Mass/MassVehicle.h"
@@ -30,8 +31,9 @@ void FNarrativeArsenalModule::StartupModule()
 	GameplayDebuggerModule.NotifyCategoriesChanged();
 #endif
 
-	FNarrativeGameplayTags::Get().InitializeNativeTags();
-	FNavigatorGameplayTags::Get().InitializeNativeTags();
+	FNarrativeGameplayTags::InitializeNativeTags();
+	FNavigatorGameplayTags::InitializeNativeTags();
+	FSovGameplayTags::InitializeNativeTags();
 	UGameplayTagsManager::Get().DoneAddingNativeTags(); 
 	
 }

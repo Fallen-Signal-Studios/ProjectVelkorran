@@ -105,16 +105,16 @@ public:
 	UPROPERTY(EditDefaultsOnly, config, BlueprintReadOnly, Category = "Narrative Pro|Sounds")
 	TSoftObjectPtr<UTaggedMusicSet> DefaultMusicSet;
 	
-	// Gameplay effect used to apply damage.  Uses SetByCaller for the damage magnitude.
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative Pro|GAS")
+	// Gameplay effect used to apply healing. Uses SetByCaller for the magnitude.
+	UPROPERTY(EditAnywhere, config, BlueprintReadOnly, Category = "Narrative Pro|GAS")
 	TSubclassOf<UGameplayEffect> HealGameplayEffect_SetByCaller;
 
 	// Gameplay effect used to apply damage.  Uses SetByCaller for the damage magnitude.
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative Pro|GAS")
+	UPROPERTY(EditAnywhere, config, BlueprintReadOnly, Category = "Narrative Pro|GAS")
 	TSubclassOf<UGameplayEffect> DamageGameplayEffect_SetByCaller;
 
 	// Gameplay effect used to add and remove dynamic tags.
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative Pro|GAS")
+	UPROPERTY(EditAnywhere, config, BlueprintReadOnly, Category = "Narrative Pro|GAS")
 	TSubclassOf<UGameplayEffect> DynamicTagGameplayEffect;
 
 	//** Define a nice display name for any gameplay tags that need it here.   */

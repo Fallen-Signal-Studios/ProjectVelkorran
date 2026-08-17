@@ -7,6 +7,12 @@
 #include "NarrativeCharacter.h"
 #include "NarrativePlayerCharacter.generated.h"
 
+class ANarrativePlayerCharacter;
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
+	FNarrativeCharacterReadySignature,
+	ANarrativePlayerCharacter*, Character);
+
 /**
  * Base class for a player controlled Narrative Character. 
  */
@@ -32,6 +38,16 @@ public:
 	class ANarrativePlayerState* GetNarrativePlayerState() const;
 
 	virtual AController* GetOwningController() const override;
+
+	/** True after ASC, attributes, abilities, definition, visual/save load, and project extensions are ready. */
+	UFUNCTION(BlueprintPure, Category = "Narrative|Readiness")
+	bool IsCharacterReady() const { return bCharacterReady; }
+
+	UFUNCTION(BlueprintPure, Category = "Narrative|Readiness")
+	int32 GetCharacterInitializationGeneration() const { return CharacterInitializationGeneration; }
+
+	UPROPERTY(BlueprintAssignable, Category = "Narrative|Readiness")
+	FNarrativeCharacterReadySignature OnCharacterReady;
 	
 protected:
 
@@ -47,6 +63,14 @@ protected:
 	virtual void AddFaction(const FGameplayTag& Faction) override;
 	virtual void RemoveFaction(const FGameplayTag& Faction) override;
 	virtual class UAbilitySystemComponent* GetAbilitySystemComponent() const override;
+
+	/** Single idempotent entry point for all legal PlayerState/definition arrival orders. */
+	void TryInitializePlayerCharacter();
+	void TryFinalizeCharacterReadiness();
+
+	/** Project subclasses initialize lifecycle components here before readiness is tested. */
+	virtual void HandleAbilitySystemReady(class UNarrativeAbilitySystemComponent* ReadyAbilitySystem);
+	virtual bool AreAdditionalCharacterSystemsReady() const;
 
 	//Server uses this to set when client has informed its ready. For client this is if we've sent the notify RPC off. 
 	UPROPERTY(BlueprintReadOnly, Category = "Debug")
@@ -68,6 +92,25 @@ protected:
 	/** The player definition for this character */
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_PlayerDefinition, Category = NarrativeCharacter, meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<class UPlayerDefinition> PlayerDefinition;
+
+	UPROPERTY(Transient)
+	TObjectPtr<class UPlayerDefinition> InitializedPlayerDefinition;
+
+	UPROPERTY(Transient)
+	TObjectPtr<class UNarrativeAbilitySystemComponent> InitializedAbilitySystem;
+
+	/** Server-complete gate. Clients also require their own local visual/component gates. */
+	UPROPERTY(ReplicatedUsing = OnRep_AuthoritativeCharacterReady)
+	bool bAuthoritativeCharacterReady = false;
+
+	UFUNCTION()
+	void OnRep_AuthoritativeCharacterReady();
+
+	bool bAuthoritativeGameplayInitialized = false;
+	bool bInitialPlayerDataApplied = false;
+	bool bVisualReadyForGameplay = false;
+	bool bCharacterReady = false;
+	int32 CharacterInitializationGeneration = 0;
 
 protected:
 

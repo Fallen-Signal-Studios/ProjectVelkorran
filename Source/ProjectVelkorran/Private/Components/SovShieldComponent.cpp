@@ -5,17 +5,16 @@
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
 #include "Engine/World.h"
+#include "GAS/NarrativeAbilitySystemComponent.h"
 #include "GAS/NarrativeAttributeSetBase.h"
+#include "GAS/SovCombatTypes.h"
 #include "GameFramework/Actor.h"
 #include "GameplayEffectTypes.h"
 #include "TimerManager.h"
+#include "Sovereign/SovGameplayTags.h"
+#include "UnrealFramework/NarrativeCharacter.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogSovShield, Log, All);
-
-namespace
-{
-	constexpr float InitializationRetryInterval = 0.1f;
-}
 
 USovShieldComponent::USovShieldComponent()
 {
@@ -27,15 +26,21 @@ void USovShieldComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
-	TryInitializeFromOwner();
-	if (!IsInitialized())
+	// Compatibility fallback for non-Narrative owners. The deterministic player
+	// readiness path explicitly supplies the ASC and never polls.
+	if (ANarrativeCharacter* NarrativeOwner = Cast<ANarrativeCharacter>(GetOwner()))
 	{
-		ScheduleInitializationRetry();
+		NarrativeOwner->OnASCInitialized.AddUniqueDynamic(this, &ThisClass::HandleOwnerASCInitialized);
 	}
+	TryInitializeFromOwner();
 }
 
 void USovShieldComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	if (ANarrativeCharacter* NarrativeOwner = Cast<ANarrativeCharacter>(GetOwner()))
+	{
+		NarrativeOwner->OnASCInitialized.RemoveDynamic(this, &ThisClass::HandleOwnerASCInitialized);
+	}
 	ClearLifecycleTimers();
 	UninitializeFromAbilitySystem();
 	Super::EndPlay(EndPlayReason);
@@ -73,12 +78,8 @@ bool USovShieldComponent::InitializeWithAbilitySystem(UAbilitySystemComponent* I
 	AbilitySystemComponent = InAbilitySystemComponent;
 	bWarnedMissingAttributeSet = false;
 
-	ShieldBrokenTag = FGameplayTag::RequestGameplayTag(
-		FName(TEXT("Sov.State.Shield.Broken")),
-		false);
-	RechargeBlockedTag = FGameplayTag::RequestGameplayTag(
-		FName(TEXT("Sov.State.Shield.RechargeBlocked")),
-		false);
+	ShieldBrokenTag = FSovGameplayTags::Get().State_Shield_Broken;
+	RechargeBlockedTag = FSovGameplayTags::Get().State_Shield_RechargeBlocked;
 
 	ShieldChangedDelegateHandle = AbilitySystemComponent
 		->GetGameplayAttributeValueChangeDelegate(UNarrativeAttributeSetBase::GetShieldAttribute())
@@ -97,16 +98,16 @@ bool USovShieldComponent::InitializeWithAbilitySystem(UAbilitySystemComponent* I
 			.AddUObject(this, &ThisClass::HandleRechargeBlockedTagChanged);
 	}
 
+	if (UNarrativeAbilitySystemComponent* NarrativeASC = Cast<UNarrativeAbilitySystemComponent>(AbilitySystemComponent))
+	{
+		NarrativeASC->OnDamageResolvedAsTarget.AddUniqueDynamic(this, &ThisClass::HandleDamageResolved);
+	}
+
 	bHasRecordedShieldDamage = false;
 	bRechargeDelayElapsed = true;
 	LastShieldDamageWorldTime = GetWorldTimeSeconds();
 	LastRechargeUpdateWorldTime = LastShieldDamageWorldTime;
 	RefreshShieldBrokenState(GetShield(), false);
-
-	if (UWorld* World = GetWorld())
-	{
-		World->GetTimerManager().ClearTimer(InitializationRetryTimerHandle);
-	}
 
 	TryStartRecharge();
 	return true;
@@ -164,29 +165,23 @@ float USovShieldComponent::GetSecondsUntilRecharge() const
 
 void USovShieldComponent::TryInitializeFromOwner()
 {
-	if (IsInitialized() || !IsValid(GetOwner()))
+	if (!IsValid(GetOwner()))
 	{
 		return;
 	}
 
 	if (UAbilitySystemComponent* OwnerASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner()))
 	{
-		InitializeWithAbilitySystem(OwnerASC);
+		if (OwnerASC != AbilitySystemComponent)
+		{
+			InitializeWithAbilitySystem(OwnerASC);
+		}
 	}
 }
 
-void USovShieldComponent::ScheduleInitializationRetry()
+void USovShieldComponent::HandleOwnerASCInitialized()
 {
-	if (UWorld* World = GetWorld())
-	{
-		World->GetTimerManager().SetTimer(
-			InitializationRetryTimerHandle,
-			this,
-			&ThisClass::TryInitializeFromOwner,
-			InitializationRetryInterval,
-			true,
-			InitializationRetryInterval);
-	}
+	TryInitializeFromOwner();
 }
 
 void USovShieldComponent::UninitializeFromAbilitySystem()
@@ -236,6 +231,11 @@ void USovShieldComponent::UninitializeFromAbilitySystem()
 			.Remove(RechargeBlockedTagChangedDelegateHandle);
 	}
 
+	if (UNarrativeAbilitySystemComponent* NarrativeASC = Cast<UNarrativeAbilitySystemComponent>(AbilitySystemComponent))
+	{
+		NarrativeASC->OnDamageResolvedAsTarget.RemoveDynamic(this, &ThisClass::HandleDamageResolved);
+	}
+
 	RemoveShieldBrokenTag();
 
 	AbilitySystemComponent = nullptr;
@@ -254,7 +254,6 @@ void USovShieldComponent::ClearLifecycleTimers()
 	if (UWorld* World = GetWorld())
 	{
 		FTimerManager& TimerManager = World->GetTimerManager();
-		TimerManager.ClearTimer(InitializationRetryTimerHandle);
 		TimerManager.ClearTimer(RechargeDelayTimerHandle);
 		TimerManager.ClearTimer(RechargeTimerHandle);
 	}
@@ -323,6 +322,19 @@ void USovShieldComponent::HandleRechargeBlockedTagChanged(
 	else
 	{
 		TryStartRecharge();
+	}
+}
+
+void USovShieldComponent::HandleDamageResolved(const FSovDamageResult& Result)
+{
+	// Actual Shield decreases are already observed by the attribute delegate.
+	// This path covers hits against an already-depleted Shield and explicit
+	// recharge-reset packets, which otherwise have no attribute transition.
+	if (CanWriteShield()
+		&& Result.bShouldRestartShieldRecharge
+		&& Result.AppliedShieldDamage <= KINDA_SMALL_NUMBER)
+	{
+		RecordShieldDamage();
 	}
 }
 

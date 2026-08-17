@@ -1,0 +1,105 @@
+// Copyright Fallen Signal Studios. All Rights Reserved.
+
+#pragma once
+
+#include "CoreMinimal.h"
+#include "GameplayTagContainer.h"
+
+class UGameplayTagsManager;
+
+/**
+ * Native gameplay tags that form Sovereign Call's C++ contracts.
+ *
+ * These live in the frozen NarrativeArsenal fork so Narrative damage,
+ * attributes, and the ProjectVelkorran game module can share one registrar
+ * without introducing a circular module dependency.
+ */
+struct NARRATIVEARSENAL_API FSovGameplayTags
+{
+public:
+	static const FSovGameplayTags& Get() { return GameplayTags; }
+	static void InitializeNativeTags();
+
+	FGameplayTag Character_Player_Tarrik;
+	FGameplayTag Character_Player_Selene;
+
+	FGameplayTag State_Invulnerable;
+	FGameplayTag State_Damage_Immune;
+	FGameplayTag State_Guarding;
+	FGameplayTag State_PerfectGuard;
+	FGameplayTag State_Guard_CounterWindow;
+	FGameplayTag State_Guard_Broken;
+	FGameplayTag State_Shield_Broken;
+	FGameplayTag State_Shield_RechargeBlocked;
+	FGameplayTag State_Poise_Pressured;
+	FGameplayTag State_Poise_Broken;
+	FGameplayTag State_Poise_Recovering;
+	FGameplayTag State_Poise_RegenBlocked;
+	FGameplayTag State_Poise_SuperArmor;
+
+	FGameplayTag Damage_BypassShield;
+	FGameplayTag Damage_BypassShield_Partial;
+	FGameplayTag Damage_BypassGuard;
+	FGameplayTag Damage_IgnoreArmor;
+	FGameplayTag Damage_IgnoreResistance;
+	FGameplayTag Damage_AllowFriendlyFire;
+	FGameplayTag Damage_RestartShieldRecharge;
+	FGameplayTag Damage_Heavy;
+	FGameplayTag Damage_Unblockable;
+	FGameplayTag Damage_GuardClass_Standard;
+	FGameplayTag Damage_GuardClass_Heavy;
+	FGameplayTag Damage_GuardClass_Unblockable;
+	FGameplayTag Damage_Source_GuardCounter;
+	FGameplayTag Damage_Poise;
+	FGameplayTag Damage_Channel_Kinetic;
+	FGameplayTag Damage_Channel_Edge;
+	FGameplayTag Damage_Channel_Thermal;
+	FGameplayTag Damage_Channel_Echo;
+	FGameplayTag Damage_Channel_Disruption;
+	FGameplayTag Damage_Channel_Corruption;
+	FGameplayTag Damage_Channel_Environmental;
+	FGameplayTag Damage_Immunity_All;
+	FGameplayTag Damage_Immunity_Kinetic;
+	FGameplayTag Damage_Immunity_Edge;
+	FGameplayTag Damage_Immunity_Thermal;
+	FGameplayTag Damage_Immunity_Echo;
+	FGameplayTag Damage_Immunity_Disruption;
+	FGameplayTag Damage_Immunity_Corruption;
+	FGameplayTag Damage_Immunity_Environmental;
+	FGameplayTag Status_Apply;
+
+	FGameplayTag SetByCaller_Damage_AbilityScalar;
+	FGameplayTag SetByCaller_Damage_SourceModifier;
+	FGameplayTag SetByCaller_Damage_HitZoneModifier;
+	FGameplayTag SetByCaller_Damage_DifficultyScalar;
+	FGameplayTag SetByCaller_Damage_MitigationMultiplier;
+	FGameplayTag SetByCaller_Damage_ShieldBypassRatio;
+	FGameplayTag SetByCaller_Damage_ShieldCoefficient;
+	FGameplayTag SetByCaller_Damage_HealthCoefficient;
+	FGameplayTag SetByCaller_Damage_PoiseDamage;
+	FGameplayTag SetByCaller_Damage_PoiseCoefficient;
+	FGameplayTag SetByCaller_Damage_GuardStaminaDamage;
+	FGameplayTag SetByCaller_Status_Magnitude;
+
+	FGameplayTag Event_Character_Ready;
+	FGameplayTag Event_Damage_Resolved;
+	FGameplayTag Event_Shield_Broken;
+	FGameplayTag Event_Poise_Broken;
+	FGameplayTag Event_Guard_Blocked;
+	FGameplayTag Event_Guard_Perfect;
+	FGameplayTag Event_Guard_Broken;
+	FGameplayTag Event_Guard_CounterWindowOpened;
+	FGameplayTag Event_Guard_CounterConsumed;
+	FGameplayTag Event_Echo_Gained_PerfectGuard;
+	FGameplayTag Event_Status_ApplicationRequested;
+
+	FGameplayTag Echo_Source_PerfectGuard;
+	FGameplayTag Echo_Source_GuardPressure;
+	FGameplayTag Echo_Source_GuardCounter;
+
+private:
+	void AddAllTags(UGameplayTagsManager& Manager);
+	static void AddTag(FGameplayTag& OutTag, const ANSICHAR* TagName, const ANSICHAR* TagComment);
+
+	static FSovGameplayTags GameplayTags;
+};

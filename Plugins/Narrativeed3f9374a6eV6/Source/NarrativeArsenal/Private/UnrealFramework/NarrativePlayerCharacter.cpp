@@ -2,12 +2,14 @@
 
 
 #include "UnrealFramework/NarrativePlayerCharacter.h"
+#include "AbilitySystemBlueprintLibrary.h"
 #include "UnrealFramework/NarrativePlayerController.h"
 #include "UnrealFramework/NarrativePlayerState.h"
 #include "UnrealFramework/NarrativeCharacter.h"
 #include "UnrealFramework/NarrativeAnimInstance.h"
 #include "Interaction/PlayerInteractionComponent.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
+#include "GAS/NarrativeAttributeSetBase.h"
 #include "GAS/NarrativeAbilityInputMapping.h"
 #include "NarrativeArsenal.h"
 #include "GameFramework/SpringArmComponent.h"
@@ -35,6 +37,7 @@
 #include "AI/NarrativeNPCController.h"
 #include "GameFramework/InputSettings.h"
 #include "Settings/NarrativeInputSettings.h"
+#include "Sovereign/SovGameplayTags.h"
 #include "Weapons/WeaponVisual.h"
 
 #define LOCTEXT_NAMESPACE "NarrativePlayerCharacter"
@@ -53,13 +56,7 @@ void ANarrativePlayerCharacter::Tick(float DeltaTime)
 void ANarrativePlayerCharacter::BeginPlay()
 {
 	Super::BeginPlay();
-
-	FString RoleStr = HasAuthority() ? "Server" : "Client";
-	FString LocalStr = IsLocallyControlled() ? "Local" : "Remote";
-	UE_LOG(LogTemp, Warning, TEXT("%s %s OnRep_Player state being manually called for %s..."), *LocalStr, *RoleStr, *GetCharacterName().ToString());
-	
-	// Already could be set, OnRep won't fire so call manually
-	OnRep_PlayerState();
+	TryInitializePlayerCharacter();
 }
 
 void ANarrativePlayerCharacter::PossessedBy(AController* NewController)
@@ -71,43 +68,7 @@ void ANarrativePlayerCharacter::PossessedBy(AController* NewController)
 		CachedController = PlayerC;
 	}
 
-	//In a networked game, client asks for this when its player state has repped and it is ready to receieve updates. 
-	//Somewhat crude way of ensuring we don't re-init multiple times when hopping between characters
-	if (HasAuthority() && !IsValid(AbilitySystemComponent))
-	{
-		if (ANarrativePlayerState* PS = GetNarrativePlayerState())
-		{
-			// Set the ASC on the Server. Clients do this in OnRep_PlayerState()
-			AbilitySystemComponent = Cast<UNarrativeAbilitySystemComponent>(PS->GetAbilitySystemComponent());
-
-			// AI won't have PlayerControllers so we can init again here just to be sure. No harm in initing twice for heroes that have PlayerControllers.
-			PS->GetAbilitySystemComponent()->InitAbilityActorInfo(PS, this);
-
-			// Set the AttributeSetBase for convenience attribute functions
-			AttributeSetBase = PS->GetAttributeSetBase();
-
-			// If we handle players disconnecting and rejoining in the future, we'll have to change this so that possession from rejoining doesn't reset attributes.
-			// For now assume possession = spawn/respawn.
-			InitializeAttributes();
-
-			// Set Health/Mana/Stamina to their max. This is only necessary for *Respawn*.
-			SetHealth(GetMaxHealth());
-			SetStamina(GetMaxStamina());
-
-			// End respawn specific things
-			AddStartupEffects();
-			AddDefaultAbilities();
-			
-			//Need to call this here as OnDefinitionSet requires valid Pstate since it runs init code 
-			if (PlayerDefinition)
-			{
-				OnDefinitionSet(PlayerDefinition);
-				//AbilitySystemComponent->AddLooseGameplayTags(PlayerDefinition->DefaultOwnedTags);
-			}
-			
-			OnASCInitialized.Broadcast();
-		}
-	}
+	TryInitializePlayerCharacter();
 }
 
 void ANarrativePlayerCharacter::OnRep_Controller()
@@ -119,6 +80,7 @@ void ANarrativePlayerCharacter::OnRep_Controller()
 	{
 		CachedController = PlayerC;
 	}
+	TryInitializePlayerCharacter();
 }
 
 class UAbilitySystemComponent* ANarrativePlayerCharacter::GetAbilitySystemComponent() const
@@ -139,40 +101,120 @@ class UAbilitySystemComponent* ANarrativePlayerCharacter::GetAbilitySystemCompon
 void ANarrativePlayerCharacter::OnRep_PlayerState()
 {
 	Super::OnRep_PlayerState();
-	
-	if (!IsValid(AbilitySystemComponent) && !HasAuthority())
+	TryInitializePlayerCharacter();
+}
+
+void ANarrativePlayerCharacter::TryInitializePlayerCharacter()
+{
+	// PlayerState and PlayerDefinition replicate independently. Either order is
+	// legal, so initialization waits instead of asserting or polling.
+	if (!IsValid(PlayerDefinition))
 	{
-		check(IsValid(PlayerDefinition));
-
-		if (ANarrativePlayerState* PS = GetNarrativePlayerState())
-		{
-			AbilitySystemComponent = Cast<UNarrativeAbilitySystemComponent>(PS->GetAbilitySystemComponent());
-			
-			// Set the ASC for clients. Server does this in PossessedBy.
-			if (IsValid(AbilitySystemComponent))
-			{
-				// Init ASC Actor Info for clients. Server will init its ASC when it possesses a new Actor.
-				AbilitySystemComponent->InitAbilityActorInfo(PS, this);
-
-				// Set the AttributeSetBase for convenience attribute functions
-				AttributeSetBase = PS->GetAttributeSetBase();
-				
-				//Clients used to do this - removing as server wants to apply these. 
-				//InitializeAttributes();
-				//SetHealth(GetMaxHealth());
-
-				//Need to call this here as OnDefinitionSet requires valid Pstate.
-				if (PlayerDefinition)
-				{
-					//... Plus do any local loading we need. 
-					OnDefinitionSet(PlayerDefinition);
-					//AbilitySystemComponent->AddLooseGameplayTags(PlayerDefinition->DefaultOwnedTags);
-				}
-
-				OnASCInitialized.Broadcast();
-			}
-		}
+		return;
 	}
+
+	ANarrativePlayerState* PS = GetNarrativePlayerState();
+	if (!IsValid(PS))
+	{
+		return;
+	}
+
+	UNarrativeAbilitySystemComponent* NewASC = Cast<UNarrativeAbilitySystemComponent>(PS->GetAbilitySystemComponent());
+	UNarrativeAttributeSetBase* NewAttributeSet = PS->GetAttributeSetBase();
+	if (!IsValid(NewASC) || !IsValid(NewAttributeSet))
+	{
+		return;
+	}
+
+	const bool bNewASCGeneration = InitializedAbilitySystem != NewASC;
+	const bool bNeedsActorInfo = NewASC->GetOwnerActor() != PS || NewASC->GetAvatarActor() != this;
+	AbilitySystemComponent = NewASC;
+	AttributeSetBase = NewAttributeSet;
+
+	if (bNeedsActorInfo)
+	{
+		NewASC->InitAbilityActorInfo(PS, this);
+	}
+
+	if (bNewASCGeneration)
+	{
+		InitializedAbilitySystem = NewASC;
+		bCharacterReady = false;
+		++CharacterInitializationGeneration;
+		HandleAbilitySystemReady(NewASC);
+		OnASCInitialized.Broadcast();
+	}
+
+	if (HasAuthority() && !bAuthoritativeGameplayInitialized)
+	{
+		// This block is deliberately once per pawn. Repeated RepNotifies and
+		// possession callbacks must never reset resources or duplicate abilities.
+		InitializeAttributes();
+		SetHealth(GetMaxHealth());
+		SetStamina(GetMaxStamina());
+		AddStartupEffects();
+		AddDefaultAbilities();
+		bAuthoritativeGameplayInitialized = true;
+	}
+
+	if (InitializedPlayerDefinition != PlayerDefinition)
+	{
+		InitializedPlayerDefinition = PlayerDefinition;
+		OnDefinitionSet(PlayerDefinition);
+	}
+
+	TryFinalizeCharacterReadiness();
+}
+
+void ANarrativePlayerCharacter::HandleAbilitySystemReady(UNarrativeAbilitySystemComponent* ReadyAbilitySystem)
+{
+	static_cast<void>(ReadyAbilitySystem);
+}
+
+bool ANarrativePlayerCharacter::AreAdditionalCharacterSystemsReady() const
+{
+	return true;
+}
+
+void ANarrativePlayerCharacter::TryFinalizeCharacterReadiness()
+{
+	if (bCharacterReady
+		|| !IsValid(InitializedAbilitySystem)
+		|| InitializedAbilitySystem->GetAvatarActor() != this
+		|| InitializedPlayerDefinition != PlayerDefinition
+		|| !bVisualReadyForGameplay
+		|| (HasAuthority() && !bAuthoritativeGameplayInitialized)
+		|| !AreAdditionalCharacterSystemsReady())
+	{
+		return;
+	}
+
+	if (HasAuthority() && !bAuthoritativeCharacterReady)
+	{
+		bAuthoritativeCharacterReady = true;
+		ForceNetUpdate();
+	}
+	if (!bAuthoritativeCharacterReady)
+	{
+		return;
+	}
+
+	bCharacterReady = true;
+	OnCharacterReady.Broadcast(this);
+
+	if (HasAuthority())
+	{
+		FGameplayEventData Payload;
+		Payload.EventTag = FSovGameplayTags::Get().Event_Character_Ready;
+		Payload.Instigator = this;
+		Payload.Target = this;
+		UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(this, Payload.EventTag, Payload);
+	}
+}
+
+void ANarrativePlayerCharacter::OnRep_AuthoritativeCharacterReady()
+{
+	TryFinalizeCharacterReadiness();
 }
 
 void ANarrativePlayerCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -180,6 +222,7 @@ void ANarrativePlayerCharacter::GetLifetimeReplicatedProps(TArray<FLifetimePrope
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(ANarrativePlayerCharacter, PlayerDefinition);
+	DOREPLIFETIME(ANarrativePlayerCharacter, bAuthoritativeCharacterReady);
 }
 
 FGameplayTagContainer ANarrativePlayerCharacter::GetFactions() const
@@ -293,43 +336,47 @@ TSubclassOf<class ANarrativeCharacterVisual> ANarrativePlayerCharacter::GetChara
 
 void ANarrativePlayerCharacter::OnCharacterVisualInitialized()
 {
-	//Here is where we load, since granting items generally wants a character visual that is fully ready to go and have items 
-	if (UNarrativeSaveSubsystem* SaveSub = GetWorld()->GetSubsystem<UNarrativeSaveSubsystem>())
+	if (!bInitialPlayerDataApplied)
 	{
-		if (GetNetMode() == NM_Standalone)
+		// Save/load and initial equipment are part of readiness, and must run once.
+		if (UNarrativeSaveSubsystem* SaveSub = GetWorld()->GetSubsystem<UNarrativeSaveSubsystem>())
 		{
-			if (SaveSub->IsNewGame())
+			if (GetNetMode() == NM_Standalone)
 			{
-				InitNewCharacter(GetCharacterDefinition());
-			}
-			else
-			{
-				SaveSub->LoadPlayerData();
-			}
-		}
-		else
-		{
-			if (GetNetMode() == NM_Client)
-			{
-				//Let clients init for now but should probably phase that out - generally server should grant us items and init etc.
-				//Client also doesnt know if they have a player only save that needs loaded. 
-				InitNewCharacter(GetCharacterDefinition());
-			}
-			else if (GetNetMode() == NM_DedicatedServer || GetNetMode() == NM_ListenServer)
-			{
-				ANarrativePlayerController* PC = GetPlayerController();
-				
-				//Load from a player save if the server has one, otherwise just init a new character. 
-				if (!SaveSub->LoadPlayerOnlySave(PC))
+				if (SaveSub->IsNewGame())
 				{
 					InitNewCharacter(GetCharacterDefinition());
 				}
+				else
+				{
+					SaveSub->LoadPlayerData();
+				}
+			}
+			else
+			{
+				if (GetNetMode() == NM_Client)
+				{
+					InitNewCharacter(GetCharacterDefinition());
+				}
+				else if (GetNetMode() == NM_DedicatedServer || GetNetMode() == NM_ListenServer)
+				{
+					if (!SaveSub->LoadPlayerOnlySave(GetPlayerController()))
+					{
+						InitNewCharacter(GetCharacterDefinition());
+					}
+				}
 			}
 		}
-		
+
+		bInitialPlayerDataApplied = true;
 	}
 
-	Super::OnCharacterVisualInitialized();
+	if (!bVisualReadyForGameplay)
+	{
+		Super::OnCharacterVisualInitialized();
+		bVisualReadyForGameplay = true;
+	}
+	TryFinalizeCharacterReadiness();
 }
 
 UNarrativeSaveWithCreatorData* ANarrativePlayerCharacter::GetCharacterCreatorData() const
@@ -450,7 +497,6 @@ class UCharacterDefinition* ANarrativePlayerCharacter::GetCharacterDefinition() 
 
 void ANarrativePlayerCharacter::OnRep_PlayerDefinition()
 {
-
 	if (PlayerDefinition)
 	{
 		//tell the character subsystem to add the char now that we know its chardef is set 
@@ -459,51 +505,8 @@ void ANarrativePlayerCharacter::OnRep_PlayerDefinition()
 			NPCSubsystem->RegisterCharacter(this);
 		}
 	}
-	
-	if (PlayerDefinition && IsValid(GetPlayerState()))
-	{
-		//In a networked game, client asks for this when its player state has repped and it is ready to receieve updates. 
-		//Somewhat crude way of ensuring we don't re-init multiple times when hopping between characters
-		if (HasAuthority() && !IsValid(AbilitySystemComponent))
-		{
-			if (ANarrativePlayerState* PS = GetNarrativePlayerState())
-			{
-				// Set the ASC on the Server. Clients do this in OnRep_PlayerState()
-				AbilitySystemComponent = Cast<UNarrativeAbilitySystemComponent>(PS->GetAbilitySystemComponent());
-				
-				// AI won't have PlayerControllers so we can init again here just to be sure. No harm in initing twice for heroes that have PlayerControllers.
-				PS->GetAbilitySystemComponent()->InitAbilityActorInfo(PS, this);
 
-				// Set the AttributeSetBase for convenience attribute functions
-				AttributeSetBase = PS->GetAttributeSetBase();
-
-				FString RoleStr = HasAuthority() ? "Server" : "Client";
-				FString LocalStr = IsLocallyControlled() ? "Local" : "Remote";
-				UE_LOG(LogTemp, Warning, TEXT("%s %s ASC INIT to %s INSIDE OnRep_PlayerDefinition %s"), *LocalStr, *RoleStr, *GetNameSafe(AbilitySystemComponent), *GetCharacterName().ToString());
-				
-				// If we handle players disconnecting and rejoining in the future, we'll have to change this so that possession from rejoining doesn't reset attributes.
-				// For now assume possession = spawn/respawn.
-				InitializeAttributes();
-
-				// Set Health/Mana/Stamina to their max. This is only necessary for *Respawn*.
-				/*SetHealth(GetMaxHealth());
-				SetStamina(GetMaxStamina());*/
-
-				// End respawn specific things
-				AddStartupEffects();
-				AddDefaultAbilities();
-
-				//Need to call this here as OnDefinitionSet requires valid Pstate since it runs init code 
-				if (PlayerDefinition)
-				{
-					OnDefinitionSet(PlayerDefinition);
-				}
-			}
-		}
-
-
-		//OnDefinitionSet(PlayerDefinition);
-	}
+	TryInitializePlayerCharacter();
 }
 
 bool ANarrativePlayerCharacter::IsCameraInsideHead() const
@@ -536,6 +539,6 @@ void ANarrativePlayerCharacter::SetPlayerDefinition(class UPlayerDefinition* PDe
 	if(PDef)
 	{
 		PlayerDefinition = PDef;
-		//OnRep_PlayerDefinition();
+		OnRep_PlayerDefinition();
 	}
 }

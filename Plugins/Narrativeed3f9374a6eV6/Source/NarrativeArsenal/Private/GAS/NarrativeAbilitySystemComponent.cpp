@@ -104,9 +104,12 @@ void UNarrativeAbilitySystemComponent::InitAbilityActorInfo(AActor* InOwnerActor
 
 	FGameplayAbilityActorInfo* ActorInfo = AbilityActorInfo.Get();
 
-	if (UNarrativeAnimInstance* AnimInstance = Cast<UNarrativeAnimInstance>(ActorInfo->GetAnimInstance()))
+	if (ActorInfo)
 	{
-		AnimInstance->BindASC();
+		if (UNarrativeAnimInstance* AnimInstance = Cast<UNarrativeAnimInstance>(ActorInfo->GetAnimInstance()))
+		{
+			AnimInstance->BindASC();
+		}
 	}
 
 	//TODO binding this is annoying because attribute set is const and so HandleOutOfHealth() needs to be const too - will come back to this, have higher priorites atm 
@@ -116,6 +119,7 @@ void UNarrativeAbilitySystemComponent::InitAbilityActorInfo(AActor* InOwnerActor
 		We know assigning a delegate is safe because its in our custom attribute set and we're not touching any underlying GAS stuff so we can remove the const. */
 		if (UNarrativeAttributeSetBase* MutableAttributeSet = const_cast<UNarrativeAttributeSetBase*>(AttributeSet))
 		{
+			MutableAttributeSet->OnOutOfHealth.RemoveAll(this);
 			MutableAttributeSet->OnOutOfHealth.AddUObject(this, &UNarrativeAbilitySystemComponent::HandleOutOfHealth);
 		}
 	}
@@ -266,6 +270,16 @@ void UNarrativeAbilitySystemComponent::DealtDamage(UNarrativeAbilitySystemCompon
 	{
 		OnDealtDamage.Broadcast(DamagedTarget, Damage, Spec);
 	}
+}
+
+void UNarrativeAbilitySystemComponent::DamageResolvedAsTarget(const FSovDamageResult& Result)
+{
+	OnDamageResolvedAsTarget.Broadcast(Result);
+}
+
+void UNarrativeAbilitySystemComponent::DamageResolvedAsSource(const FSovDamageResult& Result)
+{
+	OnDamageResolvedAsSource.Broadcast(Result);
 }
 
 void UNarrativeAbilitySystemComponent::AbilityInputTagPressed(const FGameplayTag& InputTag)
@@ -663,16 +677,20 @@ void UNarrativeAbilitySystemComponent::OnRep_bIsDead(const bool bOldIsDead)
 		OnDeathStateChanged.Broadcast(GetAvatarActor(), this, bIsDead);
 	}
 
-	//Add a dead tag for abilities, effects etc. 
-	if (bIsDead && !HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_IsDead))
+	// Keep the replicated state and loose tag convergent. The previous else-if
+	// removed an already-present tag when a repeated dead-state notify arrived.
+	const FGameplayTag DeadTag = FNarrativeGameplayTags::Get().State_IsDead;
+	if (bIsDead)
 	{
-		AddLooseGameplayTag(FNarrativeGameplayTags::Get().State_IsDead);
+		if (!HasMatchingGameplayTag(DeadTag))
+		{
+			AddLooseGameplayTag(DeadTag);
+		}
 	}
-	else if(HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_IsDead))
+	else if (HasMatchingGameplayTag(DeadTag))
 	{
-		RemoveLooseGameplayTag(FNarrativeGameplayTags::Get().State_IsDead);
+		RemoveLooseGameplayTag(DeadTag);
 	}
-
 }
 
 void UNarrativeAbilitySystemComponent::Load_Implementation()

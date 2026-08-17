@@ -5,11 +5,14 @@
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemGlobals.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
+#include "GAS/SovCombatTypes.h"
 #include "GameplayEffect.h"
 #include "GameplayEffectExtension.h"
 #include "GameplayTagContainer.h"
 #include "NarrativeGameplayTags.h"
 #include "Net/UnrealNetwork.h"
+#include "Settings/NarrativeCombatDeveloperSettings.h"
+#include "Sovereign/SovGameplayTags.h"
 #include "UnrealFramework/NarrativeCharacter.h"
 #include "UnrealFramework/NarrativePlayerController.h"
 
@@ -75,6 +78,10 @@ void UNarrativeAttributeSetBase::PreAttributeChange(const FGameplayAttribute& At
 	{
 		NewValue = FMath::Clamp(NewValue, 0.f, GetMaxEcho());
 	}
+	else if (Attribute == GetDamageResistanceAttribute())
+	{
+		NewValue = FMath::Clamp(NewValue, -100.f, 95.f);
+	}
 }
 
 void UNarrativeAttributeSetBase::PostAttributeChange(
@@ -123,9 +130,12 @@ bool UNarrativeAttributeSetBase::PreGameplayEffectExecute(FGameplayEffectModCall
 		return false;
 	}
 
+	const FSovGameplayTags& SovTags = FSovGameplayTags::Get();
 	if (Data.EvaluatedData.Attribute == GetDamageAttribute()
 		&& Data.EvaluatedData.Magnitude > 0.f
-		&& Data.Target.HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_Invulnerable))
+		&& (Data.Target.HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_Invulnerable)
+			|| Data.Target.HasMatchingGameplayTag(SovTags.State_Invulnerable)
+			|| Data.Target.HasMatchingGameplayTag(SovTags.State_Damage_Immune)))
 	{
 		Data.EvaluatedData.Magnitude = 0.f;
 		return false;
@@ -204,48 +214,271 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 			return;
 		}
 
-		const float OldShield = FMath::Max(GetShield(), 0.f);
-		const float OldHealth = FMath::Max(GetHealth(), 0.f);
-
 		FGameplayTagContainer EffectAssetTags;
 		Data.EffectSpec.GetAllAssetTags(EffectAssetTags);
-
-		static const FGameplayTag BypassShieldTag = FGameplayTag::RequestGameplayTag(
-			FName(TEXT("Sov.Damage.BypassShield")),
-			false);
-		const bool bBypassesShield = BypassShieldTag.IsValid()
-			&& EffectAssetTags.HasTagExact(BypassShieldTag);
-
-		const float ShieldDamage = bBypassesShield
-			? 0.f
-			: FMath::Min(OldShield, IncomingDamage);
-		const float RemainingDamage = bBypassesShield
-			? IncomingDamage
-			: FMath::Max(IncomingDamage - ShieldDamage, 0.f);
-		const float HealthDamage = FMath::Min(OldHealth, RemainingDamage);
-
-		if (ShieldDamage > 0.f)
-		{
-			SetShield(FMath::Clamp(OldShield - ShieldDamage, 0.f, GetMaxShield()));
-		}
-
-		if (RemainingDamage > 0.f)
-		{
-			SetHealth(FMath::Clamp(OldHealth - RemainingDamage, 0.f, GetMaxHealth()));
-		}
-
-		const float AppliedDamage = ShieldDamage + HealthDamage;
-		NotifyAppliedDamage(AppliedDamage);
-
+		const FSovGameplayTags& Tags = FSovGameplayTags::Get();
+		const UNarrativeCombatDeveloperSettings* CombatSettings = GetDefault<UNarrativeCombatDeveloperSettings>();
 		AActor* Instigator = Context.GetOriginalInstigator();
 		AActor* Causer = Context.GetEffectCauser();
 
-		if (OldShield > 0.f && GetShield() <= 0.f)
+		FSovDamageResult Result;
+		Result.SourceActor = Instigator ? Instigator : SourceActor;
+		Result.TargetActor = TargetActor;
+		Result.BaseDamage = FMath::Max(
+			Data.EffectSpec.GetSetByCallerMagnitude(
+				FNarrativeGameplayTags::Get().SetByCaller_Damage,
+				false,
+				IncomingDamage),
+			0.f);
+		Result.ResolvedDamage = IncomingDamage;
+		Result.EffectContext = Context;
+		if (const FHitResult* Hit = Context.GetHitResult())
 		{
-			OnShieldBroken.Broadcast(Instigator, Causer, Data.EffectSpec, ShieldDamage);
+			Result.HitZone = Hit->BoneName;
 		}
 
-		if (OldHealth > 0.f && GetHealth() <= 0.f)
+		const FGameplayTag DamageChannels[] = {
+			Tags.Damage_Channel_Kinetic,
+			Tags.Damage_Channel_Edge,
+			Tags.Damage_Channel_Thermal,
+			Tags.Damage_Channel_Echo,
+			Tags.Damage_Channel_Disruption,
+			Tags.Damage_Channel_Corruption,
+			Tags.Damage_Channel_Environmental};
+		for (const FGameplayTag& Tag : DamageChannels)
+		{
+			if (EffectAssetTags.HasTagExact(Tag))
+			{
+				Result.DamageChannels.AddTag(Tag);
+			}
+		}
+
+		const FGameplayTag AttackClassifications[] = {
+			Tags.Damage_GuardClass_Standard,
+			Tags.Damage_GuardClass_Heavy,
+			Tags.Damage_GuardClass_Unblockable,
+			Tags.Damage_Source_GuardCounter,
+			Tags.Damage_Heavy,
+			Tags.Damage_Unblockable};
+		for (const FGameplayTag& Tag : AttackClassifications)
+		{
+			if (EffectAssetTags.HasTagExact(Tag))
+			{
+				Result.AttackClassifications.AddTag(Tag);
+			}
+		}
+
+		for (const FGameplayTag& Tag : EffectAssetTags)
+		{
+			if (Tag != Tags.Status_Apply && Tag.MatchesTag(Tags.Status_Apply))
+			{
+				Result.RequestedStatusTags.AddTag(Tag);
+			}
+		}
+
+		const auto SendSovEvent = [TargetActor, Instigator, &Context](
+			const FGameplayTag& EventTag,
+			const float Magnitude)
+		{
+			if (!TargetActor || !EventTag.IsValid())
+			{
+				return;
+			}
+
+			FGameplayEventData Payload;
+			Payload.EventTag = EventTag;
+			Payload.Instigator = Instigator;
+			Payload.Target = TargetActor;
+			Payload.ContextHandle = Context;
+			Payload.EventMagnitude = Magnitude;
+			UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(TargetActor, EventTag, Payload);
+		};
+
+		float RoutedDamage = IncomingDamage;
+		float RoutedPoiseDamage = Data.EffectSpec.GetSetByCallerMagnitude(
+			Tags.SetByCaller_Damage_PoiseDamage,
+			false,
+			-1.f);
+		if (RoutedPoiseDamage < 0.f)
+		{
+			const float PoiseCoefficient = FMath::Max(
+				Data.EffectSpec.GetSetByCallerMagnitude(
+					Tags.SetByCaller_Damage_PoiseCoefficient,
+					false,
+					0.f),
+				0.f);
+			RoutedPoiseDamage = IncomingDamage * PoiseCoefficient;
+		}
+
+		// Guard is an action state, evaluated after mathematical mitigation and
+		// before Shield/Health routing. Heavy attacks demand perfect timing;
+		// unblockable or bypass-tagged attacks ignore the plane.
+		const bool bIsGuarding = Data.Target.HasMatchingGameplayTag(Tags.State_Guarding);
+		const bool bPerfectWindow = Data.Target.HasMatchingGameplayTag(Tags.State_PerfectGuard);
+		const bool bHeavyAttack = EffectAssetTags.HasTagExact(Tags.Damage_GuardClass_Heavy)
+			|| EffectAssetTags.HasTagExact(Tags.Damage_Heavy);
+		const bool bUnblockable = EffectAssetTags.HasTagExact(Tags.Damage_GuardClass_Unblockable)
+			|| EffectAssetTags.HasTagExact(Tags.Damage_Unblockable)
+			|| EffectAssetTags.HasTagExact(Tags.Damage_BypassGuard);
+
+		bool bInsideGuardArc = false;
+		AActor* DirectionSource = Instigator ? Instigator : SourceActor;
+		if (bIsGuarding && TargetActor && DirectionSource && TargetActor != DirectionSource)
+		{
+			const FVector ToSource = (DirectionSource->GetActorLocation() - TargetActor->GetActorLocation()).GetSafeNormal2D();
+			const FVector GuardForward = TargetActor->GetActorForwardVector().GetSafeNormal2D();
+			const float HalfAngle = CombatSettings
+				? FMath::Clamp(CombatSettings->GuardHalfAngleDegrees, 0.f, 180.f)
+				: 70.f;
+			bInsideGuardArc = ToSource.IsNearlyZero()
+				|| FVector::DotProduct(GuardForward, ToSource) >= FMath::Cos(FMath::DegreesToRadians(HalfAngle));
+		}
+
+		const bool bGuardCandidate = bIsGuarding && bInsideGuardArc && !bUnblockable;
+		Result.bPerfectDefense = bGuardCandidate && bPerfectWindow;
+		if (Result.bPerfectDefense)
+		{
+			Result.bGuarded = true;
+			RoutedDamage = 0.f;
+			RoutedPoiseDamage = 0.f;
+			SendSovEvent(Tags.Event_Guard_Perfect, IncomingDamage);
+		}
+		else if (bGuardCandidate)
+		{
+			const float MinimumGuardCost = CombatSettings ? FMath::Max(CombatSettings->MinimumGuardStaminaDamage, 0.f) : 8.f;
+			const float MaximumGuardCost = CombatSettings
+				? FMath::Max(CombatSettings->MaximumGuardStaminaDamage, MinimumGuardCost)
+				: 20.f;
+			const float DefaultGuardCost = FMath::Clamp(
+				IncomingDamage * (CombatSettings ? FMath::Max(CombatSettings->GuardStaminaDamageScalar, 0.f) : 0.5f),
+				MinimumGuardCost,
+				MaximumGuardCost);
+			const float RequestedGuardCost = FMath::Max(
+				Data.EffectSpec.GetSetByCallerMagnitude(
+					Tags.SetByCaller_Damage_GuardStaminaDamage,
+					false,
+					DefaultGuardCost),
+				0.f);
+			const float OldStamina = FMath::Max(GetStamina(), 0.f);
+			const bool bCanPayGuardCost = OldStamina + KINDA_SMALL_NUMBER >= RequestedGuardCost;
+
+			Result.AppliedStaminaDamage = FMath::Min(OldStamina, RequestedGuardCost);
+			SetStamina(FMath::Clamp(OldStamina - Result.AppliedStaminaDamage, 0.f, GetMaxStamina()));
+
+			if (!bHeavyAttack && bCanPayGuardCost)
+			{
+				Result.bGuarded = true;
+				RoutedDamage *= CombatSettings
+					? FMath::Clamp(CombatSettings->GuardDamageMultiplier, 0.f, 1.f)
+					: 0.25f;
+				RoutedPoiseDamage *= CombatSettings
+					? FMath::Clamp(CombatSettings->GuardPoiseMultiplier, 0.f, 1.f)
+					: 0.25f;
+				SendSovEvent(Tags.Event_Guard_Blocked, IncomingDamage);
+			}
+			else
+			{
+				Result.bGuardBroken = true;
+				OnGuardBroken.Broadcast(Instigator, Causer, Data.EffectSpec, Result.AppliedStaminaDamage);
+				SendSovEvent(Tags.Event_Guard_Broken, Result.AppliedStaminaDamage);
+			}
+		}
+
+		const float OldShield = FMath::Max(GetShield(), 0.f);
+		const float OldHealth = FMath::Max(GetHealth(), 0.f);
+		const float OldPoise = FMath::Max(GetPoise(), 0.f);
+
+		if (EffectAssetTags.HasTagExact(Tags.Damage_BypassShield))
+		{
+			Result.ShieldBypassRatio = 1.f;
+		}
+		else if (EffectAssetTags.HasTagExact(Tags.Damage_BypassShield_Partial))
+		{
+			const float DefaultPartialBypass = CombatSettings
+				? FMath::Clamp(CombatSettings->DefaultPartialShieldBypassRatio, 0.f, 1.f)
+				: 0.5f;
+			Result.ShieldBypassRatio = FMath::Clamp(
+				Data.EffectSpec.GetSetByCallerMagnitude(
+					Tags.SetByCaller_Damage_ShieldBypassRatio,
+					false,
+					DefaultPartialBypass),
+				0.f,
+				1.f);
+		}
+
+		const float ShieldCoefficient = FMath::Max(
+			Data.EffectSpec.GetSetByCallerMagnitude(
+				Tags.SetByCaller_Damage_ShieldCoefficient,
+				false,
+				1.f),
+			0.f);
+		const float HealthCoefficient = FMath::Max(
+			Data.EffectSpec.GetSetByCallerMagnitude(
+				Tags.SetByCaller_Damage_HealthCoefficient,
+				false,
+				1.f),
+			0.f);
+		const float ShieldEligibleBase = RoutedDamage * (1.f - Result.ShieldBypassRatio);
+		Result.RequestedShieldDamage = ShieldEligibleBase * ShieldCoefficient;
+		Result.bShieldWasTargeted = GetMaxShield() > KINDA_SMALL_NUMBER
+			&& Result.ShieldBypassRatio < 1.f
+			&& Result.RequestedShieldDamage > KINDA_SMALL_NUMBER;
+		Result.AppliedShieldDamage = FMath::Min(OldShield, Result.RequestedShieldDamage);
+
+		const float BaseConsumedByShield = ShieldCoefficient > KINDA_SMALL_NUMBER
+			? Result.AppliedShieldDamage / ShieldCoefficient
+			: 0.f;
+		const float OverflowBase = FMath::Max(ShieldEligibleBase - BaseConsumedByShield, 0.f);
+		const float RequestedHealthDamage = (
+			(RoutedDamage * Result.ShieldBypassRatio) + OverflowBase) * HealthCoefficient;
+		Result.AppliedHealthDamage = FMath::Min(OldHealth, RequestedHealthDamage);
+
+		if (Result.AppliedShieldDamage > 0.f)
+		{
+			SetShield(FMath::Clamp(OldShield - Result.AppliedShieldDamage, 0.f, GetMaxShield()));
+		}
+		if (RequestedHealthDamage > 0.f)
+		{
+			SetHealth(FMath::Clamp(OldHealth - RequestedHealthDamage, 0.f, GetMaxHealth()));
+		}
+
+		if (RoutedPoiseDamage > KINDA_SMALL_NUMBER && OldPoise > 0.f)
+		{
+			const bool bPoiseCannotBreak = Data.Target.HasMatchingGameplayTag(Tags.State_Poise_Recovering)
+				|| Data.Target.HasMatchingGameplayTag(Tags.State_Poise_SuperArmor);
+			const float PoiseFloor = bPoiseCannotBreak
+				? FMath::Min(GetMaxPoise(), FMath::Max(GetMaxPoise() * 0.01f, 1.f))
+				: 0.f;
+			SetPoise(FMath::Clamp(OldPoise - RoutedPoiseDamage, PoiseFloor, GetMaxPoise()));
+			Result.AppliedPoiseDamage = FMath::Max(OldPoise - GetPoise(), 0.f);
+		}
+
+		const float AppliedDamage = Result.AppliedShieldDamage + Result.AppliedHealthDamage;
+		NotifyAppliedDamage(AppliedDamage);
+		Result.bShouldRestartShieldRecharge = EffectAssetTags.HasTagExact(Tags.Damage_RestartShieldRecharge)
+			|| Result.bShieldWasTargeted;
+		Result.bShieldBroken = OldShield > 0.f && GetShield() <= 0.f;
+		Result.bPoiseBroken = OldPoise > 0.f && GetPoise() <= 0.f;
+		Result.bFatal = OldHealth > 0.f && GetHealth() <= 0.f;
+
+		if (Result.bShieldBroken)
+		{
+			OnShieldBroken.Broadcast(Instigator, Causer, Data.EffectSpec, Result.AppliedShieldDamage);
+			SendSovEvent(Tags.Event_Shield_Broken, Result.AppliedShieldDamage);
+		}
+		if (Result.bPoiseBroken)
+		{
+			OnPoiseBroken.Broadcast(Instigator, Causer, Data.EffectSpec, Result.AppliedPoiseDamage);
+			SendSovEvent(Tags.Event_Poise_Broken, Result.AppliedPoiseDamage);
+		}
+		if (!Result.RequestedStatusTags.IsEmpty())
+		{
+			SendSovEvent(
+				Tags.Event_Status_ApplicationRequested,
+				FMath::Max(Data.EffectSpec.GetSetByCallerMagnitude(Tags.SetByCaller_Status_Magnitude, false, 1.f), 0.f));
+		}
+
+		if (Result.bFatal)
 		{
 			OnOutOfHealth.Broadcast(Instigator, Causer, Data.EffectSpec, AppliedDamage);
 
@@ -262,6 +495,16 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 					EventData);
 			}
 		}
+
+		if (TargetASC)
+		{
+			TargetASC->DamageResolvedAsTarget(Result);
+		}
+		if (SourceASC && SourceASC != TargetASC)
+		{
+			SourceASC->DamageResolvedAsSource(Result);
+		}
+		SendSovEvent(Tags.Event_Damage_Resolved, AppliedDamage);
 
 		return;
 	}
@@ -281,11 +524,9 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 		// Recovering is a hard-control immunity window, not permanent Poise
 		// invulnerability. Hits may still drain Poise, but cannot reduce it to zero
 		// and immediately trigger another break.
-		static const FGameplayTag PoiseRecoveringTag = FGameplayTag::RequestGameplayTag(
-			FName(TEXT("Sov.State.Poise.Recovering")),
-			false);
-		const bool bHasRecoveryImmunity = PoiseRecoveringTag.IsValid()
-			&& Data.Target.HasMatchingGameplayTag(PoiseRecoveringTag);
+		const FSovGameplayTags& Tags = FSovGameplayTags::Get();
+		const bool bHasRecoveryImmunity = Data.Target.HasMatchingGameplayTag(Tags.State_Poise_Recovering)
+			|| Data.Target.HasMatchingGameplayTag(Tags.State_Poise_SuperArmor);
 		const float RecoveryFloor = bHasRecoveryImmunity
 			? FMath::Min(
 				GetMaxPoise(),
@@ -347,6 +588,10 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 	{
 		SetEcho(FMath::Clamp(GetEcho(), 0.f, GetMaxEcho()));
 	}
+	else if (Data.EvaluatedData.Attribute == GetDamageResistanceAttribute())
+	{
+		SetDamageResistance(FMath::Clamp(GetDamageResistance(), -100.f, 95.f));
+	}
 	else if (Data.EvaluatedData.Attribute == GetMaxHealthAttribute())
 	{
 		SetMaxHealth(FMath::Max(GetMaxHealth(), 0.f));
@@ -391,6 +636,7 @@ void UNarrativeAttributeSetBase::GetLifetimeReplicatedProps(TArray<FLifetimeProp
 	DOREPLIFETIME_CONDITION_NOTIFY(UNarrativeAttributeSetBase, MaxEcho, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UNarrativeAttributeSetBase, StaminaRegenRate, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UNarrativeAttributeSetBase, Armor, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UNarrativeAttributeSetBase, DamageResistance, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UNarrativeAttributeSetBase, AttackRating, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UNarrativeAttributeSetBase, StealthRating, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UNarrativeAttributeSetBase, AttackDamage, COND_None, REPNOTIFY_Always);
@@ -484,6 +730,11 @@ void UNarrativeAttributeSetBase::OnRep_StaminaRegenRate(const FGameplayAttribute
 void UNarrativeAttributeSetBase::OnRep_Armor(const FGameplayAttributeData& OldArmor)
 {
 	GAMEPLAYATTRIBUTE_REPNOTIFY(UNarrativeAttributeSetBase, Armor, OldArmor);
+}
+
+void UNarrativeAttributeSetBase::OnRep_DamageResistance(const FGameplayAttributeData& OldDamageResistance)
+{
+	GAMEPLAYATTRIBUTE_REPNOTIFY(UNarrativeAttributeSetBase, DamageResistance, OldDamageResistance);
 }
 
 void UNarrativeAttributeSetBase::OnRep_AttackRating(const FGameplayAttributeData& OldAttackRating)

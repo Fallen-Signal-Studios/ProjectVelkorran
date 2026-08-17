@@ -151,6 +151,13 @@ protected:
 	virtual void OnRep_Pawn() override;
 	virtual void SetupInputComponent() override;
 	virtual void SetCinematicMode(bool bInCinematicMode, bool bHidePlayer, bool bAffectsHUD, bool bAffectsMovement, bool bAffectsTurning) override;
+
+	UFUNCTION()
+	void HandleOwnedCharacterReady(ANarrativePlayerCharacter* ReadyCharacter);
+
+	void RefreshGameplayReadiness();
+	void EnsureGameplayHUDCreated();
+	void RefreshGameplayMappingContext();
 	
 	/** Default MappingContext */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
@@ -215,5 +222,8 @@ protected:
 	//We cache this because GetPawn() won't return our character if we started possessing a car, horse, etc. 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative")
 	TObjectPtr<class ANarrativePlayerCharacter> OwnedCharacter;
+
+	bool bInputBindingsInstalled = false;
+	bool bGameplayMappingContextApplied = false;
 
 };

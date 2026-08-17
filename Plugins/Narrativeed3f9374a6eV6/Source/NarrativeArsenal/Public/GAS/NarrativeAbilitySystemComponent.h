@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "AbilitySystemComponent.h"
 #include "NarrativeSavableComponent.h"
+#include "GAS/SovCombatTypes.h"
 #include "../../../../Plugins/Runtime/GameplayAbilities/Source/GameplayAbilities/Public/Abilities/GameplayAbilityTargetTypes.h"
 #include "NarrativeAbilitySystemComponent.generated.h"
 
@@ -96,6 +97,10 @@ public:
 
 	//Workaround for attribute changed GEData not containing a valid instigator - we need the instigator so bots know when they receive damage. 
 	virtual void DealtDamage(UNarrativeAbilitySystemComponent* DamagedTarget, const float Damage, const FGameplayEffectSpec& Spec);
+
+	/** Typed, ordered Sovereign result. Legacy float delegates remain supported. */
+	virtual void DamageResolvedAsTarget(const FSovDamageResult& Result);
+	virtual void DamageResolvedAsSource(const FSovDamageResult& Result);
 	
 	//Get the owning avatar - UE doesn't expose this to BP in base ASC. 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Narrative|GAS")
@@ -173,6 +178,12 @@ public:
 	//Any ASC owner wishing to do something OnDamagedby should bind to this - it fires on server and all clients when the ASC is damaged
 	UPROPERTY(BlueprintAssignable, Category = "Narrative|GAS")
 	FOnDamagedBy OnDamagedBy;
+
+	UPROPERTY(BlueprintAssignable, Category = "Sovereign|Damage")
+	FSovDamageResolvedSignature OnDamageResolvedAsTarget;
+
+	UPROPERTY(BlueprintAssignable, Category = "Sovereign|Damage")
+	FSovDamageResolvedSignature OnDamageResolvedAsSource;
 
 	//Use this in rare cases when you want to deal damage without using your own gameplay effect. Typically if we take fall damage, fall out of world etc. 
 	UFUNCTION(BlueprintCallable, Category = "Narrative|GAS")

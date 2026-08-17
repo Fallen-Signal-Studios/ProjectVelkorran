@@ -3,9 +3,11 @@
 #include "GAS/NarrativeDamageExecCalc.h"
 
 #include "ArsenalStatics.h"
+#include "AbilitySystemComponent.h"
 #include "GAS/NarrativeAttributeSetBase.h"
 #include "NarrativeGameplayTags.h"
 #include "Settings/NarrativeCombatDeveloperSettings.h"
+#include "Sovereign/SovGameplayTags.h"
 #include "UnrealFramework/NarrativePhysicalMaterial.h"
 
 namespace NarrativeDamage
@@ -15,6 +17,7 @@ namespace NarrativeDamage
 		FGameplayEffectAttributeCaptureDefinition AttackDamageDef;
 		FGameplayEffectAttributeCaptureDefinition AttackRatingDef;
 		FGameplayEffectAttributeCaptureDefinition ArmorDef;
+		FGameplayEffectAttributeCaptureDefinition DamageResistanceDef;
 
 		FStatics()
 		{
@@ -22,14 +25,16 @@ namespace NarrativeDamage
 				UNarrativeAttributeSetBase::GetAttackDamageAttribute(),
 				EGameplayEffectAttributeCaptureSource::Source,
 				true);
-
 			AttackRatingDef = FGameplayEffectAttributeCaptureDefinition(
 				UNarrativeAttributeSetBase::GetAttackRatingAttribute(),
 				EGameplayEffectAttributeCaptureSource::Source,
 				true);
-
 			ArmorDef = FGameplayEffectAttributeCaptureDefinition(
 				UNarrativeAttributeSetBase::GetArmorAttribute(),
+				EGameplayEffectAttributeCaptureSource::Target,
+				false);
+			DamageResistanceDef = FGameplayEffectAttributeCaptureDefinition(
+				UNarrativeAttributeSetBase::GetDamageResistanceAttribute(),
 				EGameplayEffectAttributeCaptureSource::Target,
 				false);
 		}
@@ -40,6 +45,38 @@ namespace NarrativeDamage
 		static FStatics Instance;
 		return Instance;
 	}
+
+	float GetSetByCallerOrDefault(
+		const FGameplayEffectSpec& Spec,
+		const FGameplayTag& Tag,
+		const float DefaultValue)
+	{
+		return Spec.GetSetByCallerMagnitude(Tag, false, DefaultValue);
+	}
+
+	bool IsImmuneToChannels(
+		const UAbilitySystemComponent* TargetASC,
+		const FGameplayTagContainer& EffectTags)
+	{
+		if (!TargetASC)
+		{
+			return false;
+		}
+
+		const FSovGameplayTags& Tags = FSovGameplayTags::Get();
+		if (TargetASC->HasMatchingGameplayTag(Tags.Damage_Immunity_All))
+		{
+			return true;
+		}
+
+		return (EffectTags.HasTagExact(Tags.Damage_Channel_Kinetic) && TargetASC->HasMatchingGameplayTag(Tags.Damage_Immunity_Kinetic))
+			|| (EffectTags.HasTagExact(Tags.Damage_Channel_Edge) && TargetASC->HasMatchingGameplayTag(Tags.Damage_Immunity_Edge))
+			|| (EffectTags.HasTagExact(Tags.Damage_Channel_Thermal) && TargetASC->HasMatchingGameplayTag(Tags.Damage_Immunity_Thermal))
+			|| (EffectTags.HasTagExact(Tags.Damage_Channel_Echo) && TargetASC->HasMatchingGameplayTag(Tags.Damage_Immunity_Echo))
+			|| (EffectTags.HasTagExact(Tags.Damage_Channel_Disruption) && TargetASC->HasMatchingGameplayTag(Tags.Damage_Immunity_Disruption))
+			|| (EffectTags.HasTagExact(Tags.Damage_Channel_Corruption) && TargetASC->HasMatchingGameplayTag(Tags.Damage_Immunity_Corruption))
+			|| (EffectTags.HasTagExact(Tags.Damage_Channel_Environmental) && TargetASC->HasMatchingGameplayTag(Tags.Damage_Immunity_Environmental));
+	}
 }
 
 UNarrativeDamageExecCalc::UNarrativeDamageExecCalc()
@@ -47,6 +84,7 @@ UNarrativeDamageExecCalc::UNarrativeDamageExecCalc()
 	RelevantAttributesToCapture.Add(NarrativeDamage::Statics().AttackDamageDef);
 	RelevantAttributesToCapture.Add(NarrativeDamage::Statics().AttackRatingDef);
 	RelevantAttributesToCapture.Add(NarrativeDamage::Statics().ArmorDef);
+	RelevantAttributesToCapture.Add(NarrativeDamage::Statics().DamageResistanceDef);
 }
 
 void UNarrativeDamageExecCalc::Execute_Implementation(
@@ -55,29 +93,45 @@ void UNarrativeDamageExecCalc::Execute_Implementation(
 {
 	UAbilitySystemComponent* SourceASC = ExecutionParams.GetSourceAbilitySystemComponent();
 	UAbilitySystemComponent* TargetASC = ExecutionParams.GetTargetAbilitySystemComponent();
-
 	AActor* SourceActor = SourceASC ? SourceASC->GetAvatarActor() : nullptr;
 	AActor* TargetActor = TargetASC ? TargetASC->GetAvatarActor() : nullptr;
 
+	const FGameplayEffectSpec& Spec = ExecutionParams.GetOwningSpec();
+	FGameplayTagContainer EffectTags;
+	Spec.GetAllAssetTags(EffectTags);
+
+	const FSovGameplayTags& SovTags = FSovGameplayTags::Get();
+	if (TargetASC
+		&& (TargetASC->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_Invulnerable)
+			|| TargetASC->HasMatchingGameplayTag(SovTags.State_Invulnerable)
+			|| TargetASC->HasMatchingGameplayTag(SovTags.State_Damage_Immune)
+			|| NarrativeDamage::IsImmuneToChannels(TargetASC, EffectTags)))
+	{
+		return;
+	}
+
 	if (SourceActor && TargetActor && SourceActor != TargetActor)
 	{
-		if (const UNarrativeCombatDeveloperSettings* CombatSettings = GetDefault<UNarrativeCombatDeveloperSettings>())
+		const UNarrativeCombatDeveloperSettings* CombatSettings = GetDefault<UNarrativeCombatDeveloperSettings>();
+		const bool bAllowsFriendlyFire = EffectTags.HasTagExact(SovTags.Damage_AllowFriendlyFire)
+			|| (CombatSettings && CombatSettings->bAllowFriendlyFire);
+		if (!bAllowsFriendlyFire
+			&& UArsenalStatics::GetAttitude(SourceActor, TargetActor) == ETeamAttitude::Friendly)
 		{
-			if (!CombatSettings->bAllowFriendlyFire
-				&& UArsenalStatics::GetAttitude(SourceActor, TargetActor) == ETeamAttitude::Friendly)
-			{
-				return;
-			}
+			return;
 		}
 	}
 
-	const FGameplayEffectSpec& Spec = ExecutionParams.GetOwningSpec();
-	const FGameplayTagContainer* SourceTags = Spec.CapturedSourceTags.GetAggregatedTags();
-	const FGameplayTagContainer* TargetTags = Spec.CapturedTargetTags.GetAggregatedTags();
+	FGameplayTagContainer EvaluationSourceTags;
+	if (const FGameplayTagContainer* CapturedSourceTags = Spec.CapturedSourceTags.GetAggregatedTags())
+	{
+		EvaluationSourceTags.AppendTags(*CapturedSourceTags);
+	}
+	EvaluationSourceTags.AppendTags(EffectTags);
 
 	FAggregatorEvaluateParameters EvaluationParameters;
-	EvaluationParameters.SourceTags = SourceTags;
-	EvaluationParameters.TargetTags = TargetTags;
+	EvaluationParameters.SourceTags = &EvaluationSourceTags;
+	EvaluationParameters.TargetTags = Spec.CapturedTargetTags.GetAggregatedTags();
 
 	float BaseDamage = 0.f;
 	ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(
@@ -85,17 +139,13 @@ void UNarrativeDamageExecCalc::Execute_Implementation(
 		EvaluationParameters,
 		BaseDamage);
 
-	// Narrative Pro's generic DealDamage path supplies damage through SetByCaller.
-	// When present, it is the base value for this execution rather than an addition
-	// to the captured AttackDamage attribute.
-	const float SetByCallerDamage = Spec.GetSetByCallerMagnitude(
+	const float AuthoredBaseDamage = Spec.GetSetByCallerMagnitude(
 		FNarrativeGameplayTags::Get().SetByCaller_Damage,
 		false,
 		-1.f);
-
-	if (SetByCallerDamage >= 0.f)
+	if (AuthoredBaseDamage >= 0.f)
 	{
-		BaseDamage = SetByCallerDamage;
+		BaseDamage = AuthoredBaseDamage;
 	}
 
 	BaseDamage = FMath::Max(BaseDamage, 0.f);
@@ -109,14 +159,18 @@ void UNarrativeDamageExecCalc::Execute_Implementation(
 		NarrativeDamage::Statics().AttackRatingDef,
 		EvaluationParameters,
 		AttackRating);
-	AttackRating = FMath::Max(AttackRating, 0.f);
 
 	float Armor = 0.f;
 	ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(
 		NarrativeDamage::Statics().ArmorDef,
 		EvaluationParameters,
 		Armor);
-	Armor = FMath::Max(Armor, 0.f);
+
+	float Resistance = 0.f;
+	ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(
+		NarrativeDamage::Statics().DamageResistanceDef,
+		EvaluationParameters,
+		Resistance);
 
 	float HitZoneMultiplier = 1.f;
 	if (const FHitResult* Hit = Spec.GetContext().GetHitResult())
@@ -126,20 +180,61 @@ void UNarrativeDamageExecCalc::Execute_Implementation(
 			HitZoneMultiplier = FMath::Max(PhysicalMaterial->DamageMultiplier, 0.f);
 		}
 	}
-
-	const float SourceMultiplier = 1.f + (AttackRating / 100.f);
-	const float MitigationDivisor = 1.f + (Armor / 100.f);
-	const float FinalDamage = FMath::Max(
-		(BaseDamage * SourceMultiplier * HitZoneMultiplier) / MitigationDivisor,
+	HitZoneMultiplier = FMath::Max(
+		NarrativeDamage::GetSetByCallerOrDefault(
+			Spec,
+			SovTags.SetByCaller_Damage_HitZoneModifier,
+			HitZoneMultiplier),
 		0.f);
 
-	if (FinalDamage > KINDA_SMALL_NUMBER)
+	const float AbilityScalar = FMath::Max(
+		NarrativeDamage::GetSetByCallerOrDefault(Spec, SovTags.SetByCaller_Damage_AbilityScalar, 1.f),
+		0.f);
+	const float AttackRatingMultiplier = 1.f + (FMath::Max(AttackRating, 0.f) / 100.f);
+	const float ExplicitSourceModifier = FMath::Max(
+		NarrativeDamage::GetSetByCallerOrDefault(Spec, SovTags.SetByCaller_Damage_SourceModifier, 1.f),
+		0.f);
+	const float DifficultyScalar = FMath::Max(
+		NarrativeDamage::GetSetByCallerOrDefault(Spec, SovTags.SetByCaller_Damage_DifficultyScalar, 1.f),
+		0.f);
+
+	const float ArmorMultiplier = EffectTags.HasTagExact(SovTags.Damage_IgnoreArmor)
+		? 1.f
+		: 1.f / (1.f + (FMath::Max(Armor, 0.f) / 100.f));
+	const float ResistanceMultiplier = EffectTags.HasTagExact(SovTags.Damage_IgnoreResistance)
+		? 1.f
+		: 1.f - (FMath::Clamp(Resistance, -100.f, 95.f) / 100.f);
+	const float AuthoredMitigationMultiplier = FMath::Max(
+		NarrativeDamage::GetSetByCallerOrDefault(Spec, SovTags.SetByCaller_Damage_MitigationMultiplier, 1.f),
+		0.f);
+
+	const UNarrativeCombatDeveloperSettings* CombatSettings = GetDefault<UNarrativeCombatDeveloperSettings>();
+	const float MinimumMultiplier = CombatSettings ? FMath::Max(CombatSettings->MinimumDamageMultiplier, 0.f) : 0.f;
+	const float MaximumMultiplier = CombatSettings
+		? FMath::Max(CombatSettings->MaximumDamageMultiplier, MinimumMultiplier)
+		: TNumericLimits<float>::Max();
+	const float MitigationMultiplier = FMath::Clamp(
+		ArmorMultiplier * ResistanceMultiplier * AuthoredMitigationMultiplier,
+		MinimumMultiplier,
+		MaximumMultiplier);
+
+	const float ResolvedDamage = FMath::Max(
+		BaseDamage
+			* AbilityScalar
+			* AttackRatingMultiplier
+			* ExplicitSourceModifier
+			* HitZoneMultiplier
+			* DifficultyScalar
+			* MitigationMultiplier,
+		0.f);
+
+	if (ResolvedDamage > KINDA_SMALL_NUMBER)
 	{
-		// Emit one pre-shield amount. The AttributeSet performs Shield absorption,
-		// Health overflow, break/death transitions, and one damage notification.
+		// One pre-routing packet preserves deterministic guard, Shield, Health,
+		// Poise, break, death, and telemetry ordering in the AttributeSet.
 		OutExecutionOutput.AddOutputModifier(FGameplayModifierEvaluatedData(
 			UNarrativeAttributeSetBase::GetDamageAttribute(),
 			EGameplayModOp::Additive,
-			FinalDamage));
+			ResolvedDamage));
 	}
 }

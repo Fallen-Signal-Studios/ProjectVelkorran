@@ -19,8 +19,6 @@ void FNarrativeGameplayTags::InitializeNativeTags()
 
 	GameplayTags.AddAllTags(Manager);
 
-	// Notify manager that we are done adding native tags.
-	Manager.DoneAddingNativeTags();
 }
 
 void FNarrativeGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
@@ -42,7 +40,7 @@ void FNarrativeGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 
 	AddTag(Ability_WeaponFire, "Abilities.Attacks.WeaponFire", "Weapon firing ability tag.");
 	AddTag(Ability_MeleeAttack, "Abilities.Attacks.MeleeAttack", "Melee attack ability tag.");
-	AddTag(Ability_MeleeAttack, "Abilities.Attacks.MagicAttack", "Magic attack ability tag.");
+	AddTag(Ability_MagicAttack, "Abilities.Attacks.MagicAttack", "Magic attack ability tag.");
 	AddTag(Ability_Death, "Abilities.Death", "Death ability tag.");
 	AddTag(Ability_Aim, "Abilities.Aim", "Aim ability tag.");
 	AddTag(Ability_Reload, "Abilities.Reload", "Reload ability tag.");

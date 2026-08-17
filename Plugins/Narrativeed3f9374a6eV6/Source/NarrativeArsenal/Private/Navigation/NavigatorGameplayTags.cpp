@@ -11,14 +11,12 @@ void FNavigatorGameplayTags::InitializeNativeTags()
 
 	GameplayTags.AddAllTags(Manager);
 
-	// Notify manager that we are done adding native tags.
-	Manager.DoneAddingNativeTags();
 }
 
 void FNavigatorGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 {
 	AddTag(MapLayer_Default, "Navigator.MapLayer.Default", "Default map layer for Narrative Navigator.");
-	AddTag(MapLayer_Default, "Navigator.MapLayer.Interior", "Use this layer for building interiors.");
+	AddTag(MapLayer_Interior, "Navigator.MapLayer.Interior", "Use this layer for building interiors.");
 
 	AddTag(NavigatorTypes_Compass, "Navigator.NavigatorTypes.Compass", "The compass Navigator.");
 	AddTag(NavigatorTypes_Screenspace, "Navigator.NavigatorTypes.ScreenSpace", "The screen space Navigator.");

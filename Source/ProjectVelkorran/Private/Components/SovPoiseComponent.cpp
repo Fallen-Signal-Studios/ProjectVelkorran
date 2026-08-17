@@ -9,13 +9,10 @@
 #include "GameFramework/Actor.h"
 #include "GameplayEffectTypes.h"
 #include "TimerManager.h"
+#include "Sovereign/SovGameplayTags.h"
+#include "UnrealFramework/NarrativeCharacter.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogSovPoise, Log, All);
-
-namespace
-{
-	constexpr float InitializationRetryInterval = 0.1f;
-}
 
 USovPoiseComponent::USovPoiseComponent()
 {
@@ -27,15 +24,19 @@ void USovPoiseComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
-	TryInitializeFromOwner();
-	if (!IsInitialized())
+	if (ANarrativeCharacter* NarrativeOwner = Cast<ANarrativeCharacter>(GetOwner()))
 	{
-		ScheduleInitializationRetry();
+		NarrativeOwner->OnASCInitialized.AddUniqueDynamic(this, &ThisClass::HandleOwnerASCInitialized);
 	}
+	TryInitializeFromOwner();
 }
 
 void USovPoiseComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	if (ANarrativeCharacter* NarrativeOwner = Cast<ANarrativeCharacter>(GetOwner()))
+	{
+		NarrativeOwner->OnASCInitialized.RemoveDynamic(this, &ThisClass::HandleOwnerASCInitialized);
+	}
 	ClearLifecycleTimers();
 	UninitializeFromAbilitySystem();
 	Super::EndPlay(EndPlayReason);
@@ -73,18 +74,11 @@ bool USovPoiseComponent::InitializeWithAbilitySystem(UAbilitySystemComponent* In
 	AbilitySystemComponent = InAbilitySystemComponent;
 	bWarnedMissingAttributeSet = false;
 
-	PressuredTag = FGameplayTag::RequestGameplayTag(
-		FName(TEXT("Sov.State.Poise.Pressured")),
-		false);
-	BrokenTag = FGameplayTag::RequestGameplayTag(
-		FName(TEXT("Sov.State.Poise.Broken")),
-		false);
-	RecoveringTag = FGameplayTag::RequestGameplayTag(
-		FName(TEXT("Sov.State.Poise.Recovering")),
-		false);
-	RegenerationBlockedTag = FGameplayTag::RequestGameplayTag(
-		FName(TEXT("Sov.State.Poise.RegenBlocked")),
-		false);
+	const FSovGameplayTags& Tags = FSovGameplayTags::Get();
+	PressuredTag = Tags.State_Poise_Pressured;
+	BrokenTag = Tags.State_Poise_Broken;
+	RecoveringTag = Tags.State_Poise_Recovering;
+	RegenerationBlockedTag = Tags.State_Poise_RegenBlocked;
 
 	PoiseChangedDelegateHandle = AbilitySystemComponent
 		->GetGameplayAttributeValueChangeDelegate(UNarrativeAttributeSetBase::GetPoiseAttribute())
@@ -127,11 +121,6 @@ bool USovPoiseComponent::InitializeWithAbilitySystem(UAbilitySystemComponent* In
 	LastRegenerationUpdateWorldTime = LastPoiseDamageWorldTime;
 	PoiseState = ESovPoiseState::Stable;
 	RefreshPoiseState(false);
-
-	if (UWorld* World = GetWorld())
-	{
-		World->GetTimerManager().ClearTimer(InitializationRetryTimerHandle);
-	}
 
 	TryStartRegeneration();
 	return true;
@@ -222,29 +211,23 @@ bool USovPoiseComponent::RecoverFromPoiseBreak()
 
 void USovPoiseComponent::TryInitializeFromOwner()
 {
-	if (IsInitialized() || !IsValid(GetOwner()))
+	if (!IsValid(GetOwner()))
 	{
 		return;
 	}
 
 	if (UAbilitySystemComponent* OwnerASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner()))
 	{
-		InitializeWithAbilitySystem(OwnerASC);
+		if (OwnerASC != AbilitySystemComponent)
+		{
+			InitializeWithAbilitySystem(OwnerASC);
+		}
 	}
 }
 
-void USovPoiseComponent::ScheduleInitializationRetry()
+void USovPoiseComponent::HandleOwnerASCInitialized()
 {
-	if (UWorld* World = GetWorld())
-	{
-		World->GetTimerManager().SetTimer(
-			InitializationRetryTimerHandle,
-			this,
-			&ThisClass::TryInitializeFromOwner,
-			InitializationRetryInterval,
-			true,
-			InitializationRetryInterval);
-	}
+	TryInitializeFromOwner();
 }
 
 void USovPoiseComponent::UninitializeFromAbilitySystem()
@@ -343,7 +326,6 @@ void USovPoiseComponent::ClearLifecycleTimers()
 	if (UWorld* World = GetWorld())
 	{
 		FTimerManager& TimerManager = World->GetTimerManager();
-		TimerManager.ClearTimer(InitializationRetryTimerHandle);
 		TimerManager.ClearTimer(RegenerationDelayTimerHandle);
 		TimerManager.ClearTimer(RegenerationTimerHandle);
 		TimerManager.ClearTimer(BrokenFallbackTimerHandle);

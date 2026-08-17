@@ -83,32 +83,20 @@ void ANarrativePlayerController::OnPossess(APawn* InPawn)
 
 	if (ANarrativePlayerState* PS = GetPlayerState<ANarrativePlayerState>())
 	{
-		// Init ASC with PS (Owner) and our new Pawn (AvatarActor)
 		if (UNarrativeAbilitySystemComponent* NASC = Cast<UNarrativeAbilitySystemComponent>(PS->GetAbilitySystemComponent()))
 		{
-			/**Avoid changing the ability actor info if we get into a vehicle etc - ability info should always
-			* reference our NarrativeCharacter. If we ever wanted a game where vehicles or other mounts had complex
-			* abilities 
-			*/
-			if (InPawn == OwnedCharacter)
-			{
-				NASC->InitAbilityActorInfo(PS, InPawn);
-				NASC->OnDeathStateChanged.AddUniqueDynamic(this, &ThisClass::HandleDeath);
-			}
+			NASC->OnDeathStateChanged.AddUniqueDynamic(this, &ThisClass::HandleDeath);
 		}
 	}
 
-	if (IsLocalPlayerController() && !IsValid(GameplayHUD))
-	{
-		GameplayHUD = CreateWidget<UNarrativeGameplayHUD>(this, GameplayHUDClass);
-		GameplayHUD->AddToViewport();
-	}
+	RefreshGameplayReadiness();
 
 }
 
 void ANarrativePlayerController::OnUnPossess()
 {
 	Super::OnUnPossess();
+	RefreshGameplayMappingContext();
 
 	//UE by default wants to set our view target to our player controller on unpossess, but GameplayCameraSystem requires that it is set to our player
 }
@@ -131,7 +119,7 @@ void ANarrativePlayerController::OnRep_PlayerState()
 	//We cache this because GetPawn() can change if we get into cars etc.
 	if (ANarrativePlayerCharacter* OwnedChar = Cast<ANarrativePlayerCharacter>(GetPawn()))
 	{
-		SetOwnedCharacter(OwnedCharacter);
+		SetOwnedCharacter(OwnedChar);
 	}
 
 	if (ANarrativePlayerState* PS = GetPlayerState<ANarrativePlayerState>())
@@ -143,11 +131,7 @@ void ANarrativePlayerController::OnRep_PlayerState()
 		}
 	}
 
-	if (IsLocalPlayerController() && !IsValid(GameplayHUD) && IsValid(GameplayHUDClass))
-	{
-		GameplayHUD = CreateWidget<UNarrativeGameplayHUD>(this, GameplayHUDClass);
-		GameplayHUD->AddToViewport();
-	}
+	RefreshGameplayReadiness();
 }
 
 void ANarrativePlayerController::OnRep_Pawn()
@@ -166,25 +150,11 @@ void ANarrativePlayerController::SetupInputComponent()
 	
 	if (UEnhancedInputComponent* EnhancedInput = Cast<UEnhancedInputComponent>(InputComponent))
 	{
-		if (ULocalPlayer* LocalPlayer = GetLocalPlayer())
-		{
-			if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
-			{
-				FModifyContextOptions ModifyOptions = FModifyContextOptions();
-				ModifyOptions.bNotifyUserSettings = true; 
-
-				Subsystem->AddMappingContext(DefaultMappingContext, 0, ModifyOptions);
-			}
-		}
-		else
-		{
-			const FString RoleStr = HasAuthority() ? "Server" : "Client";
-			const FString LocalStr = IsLocalPlayerController() ? "Local" : "Remote";
-			UE_LOG(LogTemp, Warning, TEXT("%s %s FAILED SETUP on PlayerController. Local Player null. "), *LocalStr, *RoleStr);
-		}
-		
 		//Looking
-		EnhancedInput->BindAction(LookAction, ETriggerEvent::Triggered, this, &ANarrativePlayerController::Look);
+		if (IsValid(LookAction))
+		{
+			EnhancedInput->BindAction(LookAction, ETriggerEvent::Triggered, this, &ANarrativePlayerController::Look);
+		}
 
 		//Abilities will have all been granted, but we need to bind them to input! We bind them in PC
 		//so we can activate abilities regardless of our controlled pawn. 
@@ -199,7 +169,11 @@ void ANarrativePlayerController::SetupInputComponent()
 				}
 			}
 		}
+
+		bInputBindingsInstalled = true;
 	}
+
+	RefreshGameplayReadiness();
 }
 
 void ANarrativePlayerController::SetCinematicMode(bool bInCinematicMode, bool bHidePlayer, bool bAffectsHUD, bool bAffectsMovement, bool bAffectsTurning)
@@ -247,6 +221,8 @@ void ANarrativePlayerController::SetCinematicMode(bool bInCinematicMode, bool bH
 	{
 		EnableInput(this);
 	}
+
+	RefreshGameplayMappingContext();
 
 	// Default UE implementation doesn't hide any actors attached to our pawn, when possessing vehicle/mount this results in floating player. Fix that. 
 	if (APawn* OurPawn = GetPawn())
@@ -609,9 +585,90 @@ void ANarrativePlayerController::NotifyDealtDamage_Implementation(AActor* Damage
 
 void ANarrativePlayerController::SetOwnedCharacter(ANarrativePlayerCharacter* InCharacter)
 {
-	if (InCharacter)
+	if (OwnedCharacter == InCharacter)
 	{
-		OwnedCharacter = InCharacter;
+		RefreshGameplayReadiness();
+		return;
+	}
+
+	if (IsValid(OwnedCharacter))
+	{
+		OwnedCharacter->OnCharacterReady.RemoveDynamic(this, &ThisClass::HandleOwnedCharacterReady);
+	}
+
+	OwnedCharacter = InCharacter;
+	if (IsValid(OwnedCharacter))
+	{
+		OwnedCharacter->OnCharacterReady.AddUniqueDynamic(this, &ThisClass::HandleOwnedCharacterReady);
+	}
+
+	RefreshGameplayReadiness();
+}
+
+void ANarrativePlayerController::HandleOwnedCharacterReady(ANarrativePlayerCharacter* ReadyCharacter)
+{
+	if (ReadyCharacter == OwnedCharacter)
+	{
+		RefreshGameplayReadiness();
+	}
+}
+
+void ANarrativePlayerController::RefreshGameplayReadiness()
+{
+	if (!IsLocalPlayerController() || !IsValid(OwnedCharacter) || !OwnedCharacter->IsCharacterReady())
+	{
+		RefreshGameplayMappingContext();
+		return;
+	}
+
+	EnsureGameplayHUDCreated();
+	RefreshGameplayMappingContext();
+}
+
+void ANarrativePlayerController::EnsureGameplayHUDCreated()
+{
+	if (!IsLocalPlayerController() || IsValid(GameplayHUD) || !IsValid(GameplayHUDClass))
+	{
+		return;
+	}
+
+	GameplayHUD = CreateWidget<UNarrativeGameplayHUD>(this, GameplayHUDClass);
+	if (IsValid(GameplayHUD))
+	{
+		GameplayHUD->AddToViewport();
+	}
+}
+
+void ANarrativePlayerController::RefreshGameplayMappingContext()
+{
+	ULocalPlayer* LocalPlayer = GetLocalPlayer();
+	UEnhancedInputLocalPlayerSubsystem* Subsystem = LocalPlayer
+		? ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(LocalPlayer)
+		: nullptr;
+	if (!Subsystem || !IsValid(DefaultMappingContext))
+	{
+		bGameplayMappingContextApplied = false;
+		return;
+	}
+
+	const bool bShouldApply = IsLocalPlayerController()
+		&& bInputBindingsInstalled
+		&& IsValid(OwnedCharacter)
+		&& OwnedCharacter->IsCharacterReady()
+		&& GetPawn() == OwnedCharacter
+		&& !bCinematicMode;
+
+	if (bShouldApply && !bGameplayMappingContextApplied)
+	{
+		FModifyContextOptions ModifyOptions;
+		ModifyOptions.bNotifyUserSettings = true;
+		Subsystem->AddMappingContext(DefaultMappingContext, 0, ModifyOptions);
+		bGameplayMappingContextApplied = true;
+	}
+	else if (!bShouldApply && bGameplayMappingContextApplied)
+	{
+		Subsystem->RemoveMappingContext(DefaultMappingContext);
+		bGameplayMappingContextApplied = false;
 	}
 }
 

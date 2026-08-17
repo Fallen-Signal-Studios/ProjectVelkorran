@@ -1,13 +1,10 @@
-// Copyright Narrative Tools 2024. 
-
+// Copyright Narrative Tools 2024.
 
 #include "Settings/NarrativeCombatDeveloperSettings.h"
 
-#define LOCTEXT_NAMESPACE
-
 UNarrativeCombatDeveloperSettings::UNarrativeCombatDeveloperSettings()
 {
-	bEnableDamageNumbers = true; 
+	bEnableDamageNumbers = true;
 	bEnableDamageNumberOnSelf = true;
 
 	AvailableAttackTokens.Add(ENarrativeGameplayDifficulty::Easy, 1);
@@ -20,32 +17,39 @@ UNarrativeCombatDeveloperSettings::UNarrativeCombatDeveloperSettings()
 	NPCAttackFrequencies.Add(ENarrativeGameplayDifficulty::Hard, 1.7f);
 	NPCAttackFrequencies.Add(ENarrativeGameplayDifficulty::Insane, 1.f);
 
-
 	StealTokenProximity = 0.4f;
 	TokenStealableAgeSeconds = 10.f;
 	NotifyTeammatesToFightRange = 3500.f;
 	MeleeCombatAnimSampleAmount = 30;
-	bAllowFriendlyFire = false; 
+	bAllowFriendlyFire = false;
+
+	MinimumDamageMultiplier = 0.05f;
+	MaximumDamageMultiplier = 3.0f;
+	DefaultPartialShieldBypassRatio = 0.5f;
+	GuardHalfAngleDegrees = 70.0f;
+	GuardDamageMultiplier = 0.25f;
+	GuardPoiseMultiplier = 0.25f;
+	GuardStaminaDamageScalar = 0.5f;
+	MinimumGuardStaminaDamage = 8.0f;
+	MaximumGuardStaminaDamage = 20.0f;
 }
 
-int32 UNarrativeCombatDeveloperSettings::GetAttackTokensForDifficulty(ENarrativeGameplayDifficulty Difficulty) const
+int32 UNarrativeCombatDeveloperSettings::GetAttackTokensForDifficulty(const ENarrativeGameplayDifficulty Difficulty) const
 {
-	if (AvailableAttackTokens.Contains(Difficulty))
+	if (const int32* Tokens = AvailableAttackTokens.Find(Difficulty))
 	{
-		return AvailableAttackTokens[Difficulty];
+		return *Tokens;
 	}
 
 	return INT_MAX;
 }
 
-float UNarrativeCombatDeveloperSettings::GetAttackFrequencyForDifficulty(ENarrativeGameplayDifficulty Difficulty) const
+float UNarrativeCombatDeveloperSettings::GetAttackFrequencyForDifficulty(const ENarrativeGameplayDifficulty Difficulty) const
 {
-	if (NPCAttackFrequencies.Contains(Difficulty))
+	if (const float* Frequency = NPCAttackFrequencies.Find(Difficulty))
 	{
-		return NPCAttackFrequencies[Difficulty];
+		return *Frequency;
 	}
 
 	return 1.f;
 }
-
-#undef LOCTEXT_NAMESPACE

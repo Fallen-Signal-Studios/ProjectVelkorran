@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "GAS/SovCombatTypes.h"
 #include "GameplayTagContainer.h"
 #include "TimerManager.h"
 #include "SovShieldComponent.generated.h"
@@ -25,7 +26,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSovShieldBrokenSignature);
  * UNarrativeAttributeSetBase remains authoritative storage and damage routing.
  * This component observes replicated Shield changes, owns the server recharge
  * schedule, and exposes a Blueprint-facing shield-break event. It never ticks:
- * one-shot and repeating world timers drive initialization and regeneration.
+ * one-shot and repeating world timers drive recharge timing.
  */
 UCLASS(ClassGroup = (Sovereign), BlueprintType, meta = (BlueprintSpawnableComponent))
 class PROJECTVELKORRAN_API USovShieldComponent : public UActorComponent
@@ -37,7 +38,8 @@ public:
 
 	/**
 	 * Binds to an ASC that owns UNarrativeAttributeSetBase. BeginPlay resolves the
-	 * owner's ASC automatically and retries by timer when Narrative initializes it later.
+	 * owner's ASC once as a compatibility fallback. Narrative character readiness
+	 * supplies it explicitly, without polling.
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Sovereign|Shield")
 	bool InitializeWithAbilitySystem(UAbilitySystemComponent* InAbilitySystemComponent);
@@ -88,13 +90,19 @@ protected:
 
 private:
 	void TryInitializeFromOwner();
-	void ScheduleInitializationRetry();
+
+	UFUNCTION()
+	void HandleOwnerASCInitialized();
+
 	void UninitializeFromAbilitySystem();
 	void ClearLifecycleTimers();
 
 	void HandleShieldAttributeChanged(const FOnAttributeChangeData& ChangeData);
 	void HandleMaxShieldAttributeChanged(const FOnAttributeChangeData& ChangeData);
 	void HandleRechargeBlockedTagChanged(const FGameplayTag CallbackTag, int32 NewCount);
+
+	UFUNCTION()
+	void HandleDamageResolved(const FSovDamageResult& Result);
 
 	void RecordShieldDamage();
 	void ScheduleRechargeDelay(float DelaySeconds);
@@ -117,7 +125,6 @@ private:
 	FDelegateHandle MaxShieldChangedDelegateHandle;
 	FDelegateHandle RechargeBlockedTagChangedDelegateHandle;
 
-	FTimerHandle InitializationRetryTimerHandle;
 	FTimerHandle RechargeDelayTimerHandle;
 	FTimerHandle RechargeTimerHandle;
 

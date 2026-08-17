@@ -26,6 +26,7 @@ public:
 public:
 
 	FGameplayTag MapLayer_Default;
+	FGameplayTag MapLayer_Interior;
 
 	FGameplayTag NavigatorTypes_Compass;
 	FGameplayTag NavigatorTypes_Screenspace;
