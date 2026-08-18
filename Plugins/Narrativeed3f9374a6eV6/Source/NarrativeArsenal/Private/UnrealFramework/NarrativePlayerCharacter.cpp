@@ -269,10 +269,13 @@ void ANarrativePlayerCharacter::TryInitializePlayerCharacter()
 			return;
 		}
 
-		// Refill only Narrative's baseline respawn resources after all maximum-
-		// modifying definition/startup effects have settled.
+		// Refill spawn-reset survivability resources after all maximum-modifying
+		// definition/startup effects have settled. Echo remains authored by
+		// definition/checkpoint effects and is intentionally not refilled here.
 		SetHealth(GetMaxHealth());
+		AttributeSetBase->SetShield(AttributeSetBase->GetMaxShield());
 		SetStamina(GetMaxStamina());
+		AttributeSetBase->SetPoise(AttributeSetBase->GetMaxPoise());
 		AddDefaultAbilities();
 		bAuthoritativeGameplayInitialized = true;
 	}
