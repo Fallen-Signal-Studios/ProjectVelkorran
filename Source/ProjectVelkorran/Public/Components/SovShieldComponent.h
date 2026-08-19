@@ -11,11 +11,27 @@
 
 class UAbilitySystemComponent;
 class UMaterialInstanceDynamic;
+class UMaterialInterface;
 class UMeshComponent;
 class UNiagaraSystem;
 class ANarrativeCharacter;
 class ANarrativeCharacterVisual;
 struct FOnAttributeChangeData;
+
+/** One mesh temporarily owned by the character's shield overlay. */
+USTRUCT()
+struct PROJECTVELKORRAN_API FSovShieldOverlayBinding
+{
+	GENERATED_BODY()
+
+	/** Weak because Narrative can replace the entire CharacterVisual at runtime. */
+	UPROPERTY(Transient)
+	TWeakObjectPtr<UMeshComponent> MeshComponent;
+
+	/** Restored when the shield overlay releases this mesh. */
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInterface> PreviousOverlayMaterial;
+};
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(
 	FSovShieldChangedSignature,
@@ -79,11 +95,17 @@ public:
 	float GetShieldVisualScalar() const { return CurrentShieldVisualScalar; }
 
 	/**
-	 * Re-scan the owner, Narrative character visual, and attached visual actors
-	 * for material slots that expose ShieldScalarParameterName.
+	 * Re-scan the owner and Narrative's runtime CharacterVisual. When a Shield
+	 * Overlay Material is assigned, it is applied to every discovered character
+	 * mesh. Otherwise, legacy material slots exposing ShieldScalarParameterName
+	 * are discovered and driven in place.
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Sovereign|Shield|Presentation")
 	void RefreshShieldVisuals();
+
+	/** Explicitly applies the configured shield overlay to a custom runtime mesh. */
+	UFUNCTION(BlueprintCallable, Category = "Sovereign|Shield|Presentation")
+	bool RegisterShieldOverlayTarget(UMeshComponent* MeshComponent);
 
 	/** Explicit registration path for runtime-spawned meshes or custom visuals. */
 	UFUNCTION(BlueprintCallable, Category = "Sovereign|Shield|Presentation")
@@ -120,7 +142,32 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Sovereign|Shield|Presentation")
 	FName ShieldScalarParameterName = TEXT("ShieldIntensity");
 
-	/** Automatically find matching materials on the pawn and Narrative visual actors. */
+	/**
+	 * Material rendered over Narrative's runtime-built character meshes. The
+	 * component creates one per-character MID and drives ShieldScalarParameterName.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Sovereign|Shield|Presentation")
+	TObjectPtr<UMaterialInterface> ShieldOverlayMaterial;
+
+	/** Automatically apply ShieldOverlayMaterial after Narrative builds its appearance. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Sovereign|Shield|Presentation")
+	bool bAutoApplyShieldOverlayMaterial = true;
+
+	/**
+	 * Unreal provides one global overlay channel per mesh. When enabled, the
+	 * shield temporarily replaces an existing overlay and restores it afterward.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Sovereign|Shield|Presentation")
+	bool bOverrideExistingOverlayMaterials = true;
+
+	/** Hide the overlay at zero Shield; it is restored automatically on recharge. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Sovereign|Shield|Presentation")
+	bool bHideShieldOverlayWhenBroken = true;
+
+	/**
+	 * Legacy fallback used only when ShieldOverlayMaterial is unassigned. Finds
+	 * already-applied materials that expose ShieldScalarParameterName.
+	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Sovereign|Shield|Presentation")
 	bool bAutoDiscoverShieldMaterials = true;
 
@@ -182,6 +229,12 @@ private:
 	void BindCharacterVisual(ANarrativeCharacterVisual* NewCharacterVisual);
 	void ScheduleShieldVisualRefresh();
 	void HandleDeferredShieldVisualRefresh();
+	bool PrepareShieldOverlayMaterial();
+	bool ShouldDisplayShieldOverlay() const;
+	void ReconcileShieldOverlayVisibility();
+	void DiscoverShieldOverlayTargets();
+	void PruneShieldOverlayBindings();
+	void ClearShieldOverlayTargets();
 	void PruneShieldMaterialInstances();
 	void UpdateShieldVisualScalar();
 	void DiscoverShieldMaterialTargets();
@@ -196,6 +249,16 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<ANarrativeCharacterVisual> BoundCharacterVisual;
+
+	/** Shared by all of this character's runtime appearance meshes. */
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> ShieldOverlayMaterialInstance;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInterface> AppliedShieldOverlayMaterial;
+
+	UPROPERTY(Transient)
+	TArray<FSovShieldOverlayBinding> ShieldOverlayBindings;
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UMaterialInstanceDynamic>> ShieldMaterialInstances;
@@ -218,6 +281,8 @@ private:
 	bool bShieldBroken = false;
 	bool bAppliedShieldBrokenTag = false;
 	bool bWarnedMissingAttributeSet = false;
+	bool bWarnedInvalidShieldOverlayMaterial = false;
 	bool bShieldVisualRefreshPending = false;
+	FName AppliedShieldScalarParameterName;
 	float CurrentShieldVisualScalar = 0.0f;
 };

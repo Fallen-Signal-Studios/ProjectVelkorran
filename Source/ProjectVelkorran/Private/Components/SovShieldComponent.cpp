@@ -6,6 +6,8 @@
 #include "AbilitySystemComponent.h"
 #include "Character/NarrativeCharacterVisual.h"
 #include "Components/MeshComponent.h"
+#include "Components/SkinnedMeshComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Engine/World.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
 #include "GAS/NarrativeAttributeSetBase.h"
@@ -56,6 +58,9 @@ void USovShieldComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 			&ThisClass::HandleCharacterVisualInitialized);
 	}
 	BindCharacterVisual(nullptr);
+	ClearShieldOverlayTargets();
+	ShieldOverlayMaterialInstance = nullptr;
+	AppliedShieldOverlayMaterial = nullptr;
 	ShieldMaterialInstances.Reset();
 	ClearLifecycleTimers();
 	UninitializeFromAbilitySystem();
@@ -185,18 +190,99 @@ void USovShieldComponent::RefreshShieldVisuals()
 	if (const UWorld* World = GetWorld();
 		World && World->GetNetMode() == NM_DedicatedServer)
 	{
+		ClearShieldOverlayTargets();
+		ShieldOverlayMaterialInstance = nullptr;
 		ShieldMaterialInstances.Reset();
 		return;
 	}
 
 	PruneShieldMaterialInstances();
+	PruneShieldOverlayBindings();
 
-	if (bAutoDiscoverShieldMaterials)
+	if (IsValid(ShieldOverlayMaterial))
 	{
-		DiscoverShieldMaterialTargets();
+		if (PrepareShieldOverlayMaterial()
+			&& ShouldDisplayShieldOverlay())
+		{
+			if (bAutoApplyShieldOverlayMaterial)
+			{
+				DiscoverShieldOverlayTargets();
+			}
+		}
+		else
+		{
+			ClearShieldOverlayTargets();
+		}
+	}
+	else
+	{
+		PrepareShieldOverlayMaterial();
+		if (bAutoDiscoverShieldMaterials)
+		{
+			DiscoverShieldMaterialTargets();
+		}
 	}
 
 	UpdateShieldVisualScalar();
+}
+
+bool USovShieldComponent::RegisterShieldOverlayTarget(UMeshComponent* MeshComponent)
+{
+	if (!IsValid(MeshComponent)
+		|| (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer)
+		|| !ShouldDisplayShieldOverlay()
+		|| !PrepareShieldOverlayMaterial()
+		|| !IsValid(ShieldOverlayMaterialInstance))
+	{
+		return false;
+	}
+
+	FSovShieldOverlayBinding* ExistingBinding = ShieldOverlayBindings.FindByPredicate(
+		[MeshComponent](const FSovShieldOverlayBinding& Binding)
+		{
+			return Binding.MeshComponent.Get() == MeshComponent;
+		});
+
+	UMaterialInterface* CurrentOverlayMaterial = MeshComponent->GetOverlayMaterial();
+	if (ExistingBinding)
+	{
+		if (CurrentOverlayMaterial == ShieldOverlayMaterialInstance.Get())
+		{
+			return true;
+		}
+
+		// Another system took the overlay after us. It becomes the material we
+		// restore when the Shield releases this mesh.
+		ExistingBinding->PreviousOverlayMaterial = CurrentOverlayMaterial;
+	}
+	else
+	{
+		if (IsValid(CurrentOverlayMaterial)
+			&& CurrentOverlayMaterial != ShieldOverlayMaterialInstance.Get()
+			&& !bOverrideExistingOverlayMaterials)
+		{
+			return false;
+		}
+
+		FSovShieldOverlayBinding& NewBinding = ShieldOverlayBindings.AddDefaulted_GetRef();
+		NewBinding.MeshComponent = MeshComponent;
+		NewBinding.PreviousOverlayMaterial = CurrentOverlayMaterial;
+	}
+
+	if (IsValid(CurrentOverlayMaterial)
+		&& CurrentOverlayMaterial != ShieldOverlayMaterialInstance.Get()
+		&& !bOverrideExistingOverlayMaterials)
+	{
+		ShieldOverlayBindings.RemoveAll(
+			[MeshComponent](const FSovShieldOverlayBinding& Binding)
+			{
+				return Binding.MeshComponent.Get() == MeshComponent;
+			});
+		return false;
+	}
+
+	MeshComponent->SetOverlayMaterial(ShieldOverlayMaterialInstance.Get());
+	return MeshComponent->GetOverlayMaterial() == ShieldOverlayMaterialInstance.Get();
 }
 
 bool USovShieldComponent::RegisterShieldMaterialTarget(
@@ -634,6 +720,10 @@ void USovShieldComponent::BindCharacterVisual(
 			&ThisClass::HandleBaseAppearanceApplied);
 	}
 
+	// ChangeAppearance can destroy and replace the entire runtime visual actor.
+	// Release its meshes before rebinding so any prior overlays are restored.
+	ClearShieldOverlayTargets();
+
 	BoundCharacterVisual = NewCharacterVisual;
 	if (IsValid(BoundCharacterVisual))
 	{
@@ -668,6 +758,167 @@ void USovShieldComponent::HandleDeferredShieldVisualRefresh()
 {
 	bShieldVisualRefreshPending = false;
 	RefreshShieldVisuals();
+}
+
+bool USovShieldComponent::PrepareShieldOverlayMaterial()
+{
+	const bool bConfigurationChanged =
+		AppliedShieldOverlayMaterial.Get() != ShieldOverlayMaterial.Get()
+		|| AppliedShieldScalarParameterName != ShieldScalarParameterName;
+	if (bConfigurationChanged)
+	{
+		ClearShieldOverlayTargets();
+		ShieldOverlayMaterialInstance = nullptr;
+		AppliedShieldOverlayMaterial = ShieldOverlayMaterial;
+		AppliedShieldScalarParameterName = ShieldScalarParameterName;
+		bWarnedInvalidShieldOverlayMaterial = false;
+	}
+
+	if (!IsValid(ShieldOverlayMaterial))
+	{
+		ClearShieldOverlayTargets();
+		ShieldOverlayMaterialInstance = nullptr;
+		return false;
+	}
+
+	if (!MaterialExposesShieldScalar(ShieldOverlayMaterial.Get()))
+	{
+		ClearShieldOverlayTargets();
+		ShieldOverlayMaterialInstance = nullptr;
+		if (!bWarnedInvalidShieldOverlayMaterial)
+		{
+			UE_LOG(
+				LogSovShield,
+				Warning,
+				TEXT("%s cannot apply Shield Overlay Material %s: it does not expose scalar parameter %s."),
+				*GetNameSafe(GetOwner()),
+				*GetNameSafe(ShieldOverlayMaterial.Get()),
+				*ShieldScalarParameterName.ToString());
+			bWarnedInvalidShieldOverlayMaterial = true;
+		}
+		return false;
+	}
+
+	if (!IsValid(ShieldOverlayMaterialInstance))
+	{
+		ShieldOverlayMaterialInstance = UMaterialInstanceDynamic::Create(
+			ShieldOverlayMaterial.Get(),
+			this);
+	}
+
+	if (IsValid(ShieldOverlayMaterialInstance))
+	{
+		ShieldOverlayMaterialInstance->SetScalarParameterValue(
+			ShieldScalarParameterName,
+			CurrentShieldVisualScalar);
+		return true;
+	}
+
+	return false;
+}
+
+bool USovShieldComponent::ShouldDisplayShieldOverlay() const
+{
+	const float CurrentMaxShield = GetMaxShield();
+	if (CurrentMaxShield <= KINDA_SMALL_NUMBER)
+	{
+		return false;
+	}
+
+	return !bHideShieldOverlayWhenBroken
+		|| GetShield() > KINDA_SMALL_NUMBER;
+}
+
+void USovShieldComponent::ReconcileShieldOverlayVisibility()
+{
+	const int32 PreviousBindingCount = ShieldOverlayBindings.Num();
+	PruneShieldOverlayBindings();
+	const bool bNeedsDiscovery = ShieldOverlayBindings.IsEmpty()
+		|| ShieldOverlayBindings.Num() != PreviousBindingCount;
+
+	if (!IsValid(ShieldOverlayMaterial)
+		|| !ShouldDisplayShieldOverlay())
+	{
+		ClearShieldOverlayTargets();
+		return;
+	}
+
+	if (PrepareShieldOverlayMaterial()
+		&& bAutoApplyShieldOverlayMaterial
+		&& bNeedsDiscovery)
+	{
+		DiscoverShieldOverlayTargets();
+	}
+}
+
+void USovShieldComponent::DiscoverShieldOverlayTargets()
+{
+	if (!IsValid(GetOwner())
+		|| !IsValid(ShieldOverlayMaterialInstance)
+		|| !ShouldDisplayShieldOverlay())
+	{
+		return;
+	}
+
+	TArray<AActor*> PresentationActors;
+	PresentationActors.Add(GetOwner());
+	if (IsValid(BoundCharacterVisual))
+	{
+		PresentationActors.AddUnique(BoundCharacterVisual);
+	}
+
+	for (AActor* PresentationActor : PresentationActors)
+	{
+		if (!IsValid(PresentationActor))
+		{
+			continue;
+		}
+
+		TInlineComponentArray<UMeshComponent*> MeshComponents;
+		PresentationActor->GetComponents(MeshComponents);
+		for (UMeshComponent* MeshComponent : MeshComponents)
+		{
+			// Narrative's Appearance Asset uses skeletal and static meshes. Limit
+			// discovery to those component types so hair/groom and attached weapon
+			// presentation are not accidentally coated.
+			if (IsValid(MeshComponent)
+				&& (MeshComponent->IsA<USkinnedMeshComponent>()
+					|| MeshComponent->IsA<UStaticMeshComponent>()))
+			{
+				RegisterShieldOverlayTarget(MeshComponent);
+			}
+		}
+	}
+}
+
+void USovShieldComponent::PruneShieldOverlayBindings()
+{
+	ShieldOverlayBindings.RemoveAll(
+		[this](const FSovShieldOverlayBinding& Binding)
+		{
+			UMeshComponent* MeshComponent = Binding.MeshComponent.Get();
+			return !IsValid(MeshComponent)
+				|| !IsValid(ShieldOverlayMaterialInstance)
+				|| MeshComponent->GetOverlayMaterial()
+					!= ShieldOverlayMaterialInstance.Get();
+		});
+}
+
+void USovShieldComponent::ClearShieldOverlayTargets()
+{
+	for (const FSovShieldOverlayBinding& Binding : ShieldOverlayBindings)
+	{
+		UMeshComponent* MeshComponent = Binding.MeshComponent.Get();
+		if (IsValid(MeshComponent)
+			&& IsValid(ShieldOverlayMaterialInstance)
+			&& MeshComponent->GetOverlayMaterial()
+				== ShieldOverlayMaterialInstance.Get())
+		{
+			MeshComponent->SetOverlayMaterial(Binding.PreviousOverlayMaterial.Get());
+		}
+	}
+
+	ShieldOverlayBindings.Reset();
 }
 
 void USovShieldComponent::PruneShieldMaterialInstances()
@@ -738,6 +989,15 @@ void USovShieldComponent::UpdateShieldVisualScalar()
 			CurrentShieldVisualScalar);
 	}
 
+	if (IsValid(ShieldOverlayMaterialInstance))
+	{
+		ShieldOverlayMaterialInstance->SetScalarParameterValue(
+			ShieldScalarParameterName,
+			CurrentShieldVisualScalar);
+	}
+
+	ReconcileShieldOverlayVisibility();
+
 	if (!FMath::IsNearlyEqual(PreviousScalar, CurrentShieldVisualScalar))
 	{
 		OnShieldVisualScalarChanged.Broadcast(CurrentShieldVisualScalar);
@@ -756,29 +1016,6 @@ void USovShieldComponent::DiscoverShieldMaterialTargets()
 	if (IsValid(BoundCharacterVisual))
 	{
 		PresentationActors.AddUnique(BoundCharacterVisual);
-	}
-
-	TArray<AActor*> AttachedActors;
-	GetOwner()->GetAttachedActors(AttachedActors, true, true);
-	for (AActor* AttachedActor : AttachedActors)
-	{
-		if (IsValid(AttachedActor))
-		{
-			PresentationActors.AddUnique(AttachedActor);
-		}
-	}
-
-	if (IsValid(BoundCharacterVisual))
-	{
-		AttachedActors.Reset();
-		BoundCharacterVisual->GetAttachedActors(AttachedActors, true, true);
-		for (AActor* AttachedActor : AttachedActors)
-		{
-			if (IsValid(AttachedActor))
-			{
-				PresentationActors.AddUnique(AttachedActor);
-			}
-		}
 	}
 
 	for (AActor* PresentationActor : PresentationActors)
