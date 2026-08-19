@@ -53,6 +53,7 @@ public:
 	FGameplayTag Damage_GuardClass_Heavy;
 	FGameplayTag Damage_GuardClass_Unblockable;
 	FGameplayTag Damage_Source_GuardCounter;
+	FGameplayTag Damage_Result_Guarded;
 	FGameplayTag Damage_Poise;
 	FGameplayTag Damage_Channel_Kinetic;
 	FGameplayTag Damage_Channel_Edge;

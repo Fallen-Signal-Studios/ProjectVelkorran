@@ -180,8 +180,9 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 		TargetASC,
 		SourceActor,
 		TargetActor,
-		SourceController,
-		&Data](const float AppliedDamage)
+		SourceController](
+			const float AppliedDamage,
+			const FGameplayEffectSpec& NotificationSpec)
 	{
 		if (AppliedDamage <= KINDA_SMALL_NUMBER)
 		{
@@ -198,8 +199,8 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 
 		if (SourceASC && TargetASC && SourceASC != TargetASC)
 		{
-			TargetASC->DamagedBy(SourceASC, AppliedDamage, Data.EffectSpec);
-			SourceASC->DealtDamage(TargetASC, AppliedDamage, Data.EffectSpec);
+			TargetASC->DamagedBy(SourceASC, AppliedDamage, NotificationSpec);
+			SourceASC->DealtDamage(TargetASC, AppliedDamage, NotificationSpec);
 		}
 	};
 
@@ -539,7 +540,19 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 		{
 			SourceASC->DamageResolvedAsSource(Result);
 		}
-		NotifyAppliedDamage(AppliedDamage);
+		if (Result.bGuarded)
+		{
+			// Preserve Narrative's legacy damage notification while giving its
+			// presentation graph an exact, per-hit way to suppress a normal flinch.
+			// The authored damage spec is immutable here, so tag a callback-local copy.
+			FGameplayEffectSpec GuardedNotificationSpec(Data.EffectSpec);
+			GuardedNotificationSpec.AddDynamicAssetTag(Tags.Damage_Result_Guarded);
+			NotifyAppliedDamage(AppliedDamage, GuardedNotificationSpec);
+		}
+		else
+		{
+			NotifyAppliedDamage(AppliedDamage, Data.EffectSpec);
+		}
 		SendSovEvent(Tags.Event_Damage_Resolved, AppliedDamage, nullptr);
 
 		return;

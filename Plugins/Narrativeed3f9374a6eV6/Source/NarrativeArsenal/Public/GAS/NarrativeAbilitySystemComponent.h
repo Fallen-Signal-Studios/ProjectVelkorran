@@ -103,6 +103,12 @@ public:
 	virtual void DamageResolvedAsTarget(const FSovDamageResult& Result);
 	virtual void DamageResolvedAsSource(const FSovDamageResult& Result);
 
+	/** Blueprint bridge for inspecting the raw spec supplied by legacy damage delegates. */
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Damage", meta = (DisplayName = "Gameplay Effect Spec Has Asset Tag"))
+	static bool GameplayEffectSpecHasAssetTag(
+		const FGameplayEffectSpec& Spec,
+		FGameplayTag AssetTag);
+
 	/** PlayerState-channel readiness fence for attributes and granted abilities. */
 	void SetCharacterReadyEpoch(int32 NewReadyEpoch);
 

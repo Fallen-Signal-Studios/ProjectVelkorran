@@ -30,6 +30,8 @@ This pass turns the isolated Narrative Pro copy into the first Sovereign Call co
 8. Tag the counterattack damage spec with `Sov.Damage.Source.GuardCounter`. Echo is awarded only when that tagged counter applies Shield or Health damage during an open counter window.
 9. Bind guard component events to Tarrik's guard enter/loop/exit, impact, perfect-defense, break, and counter presentation.
    Guard result presentation is multicast by the component. Drive simulated-proxy guard enter/exit animation from the replicated guarding/perfect-defense state tags or Gameplay Cues.
+   Add `Narrative.Anim.AnimSets.Flinch.Block` to the active weapon overlay's `Tagged Anim Sets`. The Guard component executes Narrative's `GameplayCue.TakeDamage.Blocked` for `Result.bGuarded`; that cue remains responsible for resolving the active linked layer's paired 3P/1P block montage.
+   In Narrative's existing `OnDamagedBy` flinch graph, pass its raw Spec and `Sov.Damage.Result.Guarded` into `Gameplay Effect Spec Has Asset Tag`; skip the normal directional flinch when that returns true. This tag exists only on the callback copy for that resolved hit, so rear, unblockable, failed-heavy, and later hits remain unaffected.
 10. Apply requested `Sov.Status.*` tags with project Gameplay Effects from the typed damage-result/event hook. This source pass publishes validated status requests but cannot author the binary effect assets.
 
 ## Damage authoring defaults

@@ -285,6 +285,20 @@ void UNarrativeAbilitySystemComponent::DamageResolvedAsSource(const FSovDamageRe
 	OnDamageResolvedAsSource.Broadcast(Result);
 }
 
+bool UNarrativeAbilitySystemComponent::GameplayEffectSpecHasAssetTag(
+	const FGameplayEffectSpec& Spec,
+	const FGameplayTag AssetTag)
+{
+	if (!AssetTag.IsValid())
+	{
+		return false;
+	}
+
+	FGameplayTagContainer AssetTags;
+	Spec.GetAllAssetTags(AssetTags);
+	return AssetTags.HasTagExact(AssetTag);
+}
+
 void UNarrativeAbilitySystemComponent::SetCharacterReadyEpoch(const int32 NewReadyEpoch)
 {
 	if (GetOwnerRole() >= ROLE_Authority && NewReadyEpoch > CharacterReadyEpoch)

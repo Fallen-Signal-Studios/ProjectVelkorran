@@ -51,6 +51,7 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 	AddTag(Damage_GuardClass_Heavy, "Sov.Damage.GuardClass.Heavy", "Heavy attacks require perfect defense, evade, or interruption.");
 	AddTag(Damage_GuardClass_Unblockable, "Sov.Damage.GuardClass.Unblockable", "The hit cannot be guarded.");
 	AddTag(Damage_Source_GuardCounter, "Sov.Damage.Source.GuardCounter", "Damage dealt by Tarrik's active guard-counter branch.");
+	AddTag(Damage_Result_Guarded, "Sov.Damage.Result.Guarded", "Callback-local result tag for a hit successfully intercepted by Guard.");
 	AddTag(Damage_Poise, "Sov.Damage.Poise", "The hit carries explicit Poise pressure.");
 	AddTag(Damage_Channel_Kinetic, "Sov.Damage.Channel.Kinetic", "Projectile, impact, or blunt-force damage.");
 	AddTag(Damage_Channel_Edge, "Sov.Damage.Channel.Edge", "Blade or cutting-field damage.");

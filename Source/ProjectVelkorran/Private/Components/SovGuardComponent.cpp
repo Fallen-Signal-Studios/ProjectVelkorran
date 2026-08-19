@@ -17,11 +17,20 @@ USovGuardComponent::USovGuardComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
 	SetIsReplicatedByDefault(true);
+	GuardImpactGameplayCueTag = FGameplayTag::RequestGameplayTag(
+		FName(TEXT("GameplayCue.TakeDamage.Blocked")),
+		false);
 }
 
 void USovGuardComponent::BeginPlay()
 {
 	Super::BeginPlay();
+	if (!GuardImpactGameplayCueTag.IsValid())
+	{
+		GuardImpactGameplayCueTag = FGameplayTag::RequestGameplayTag(
+			FName(TEXT("GameplayCue.TakeDamage.Blocked")),
+			false);
+	}
 	if (ANarrativeCharacter* NarrativeOwner = Cast<ANarrativeCharacter>(GetOwner()))
 	{
 		NarrativeOwner->OnASCInitialized.AddUniqueDynamic(this, &ThisClass::HandleOwnerASCInitialized);
@@ -305,6 +314,10 @@ void USovGuardComponent::HandleDamageResolvedAsTarget(const FSovDamageResult& Re
 	}
 
 	USovEchoComponent* EchoComponent = GetOwner()->FindComponentByClass<USovEchoComponent>();
+	if (Result.bGuarded)
+	{
+		ExecuteGuardImpactGameplayCue(Result);
+	}
 	if (Result.bPerfectDefense)
 	{
 		if (EchoComponent)
@@ -394,6 +407,29 @@ void USovGuardComponent::HandleDamageResolvedAsSource(const FSovDamageResult& Re
 		CounterPayload.EventTag,
 		CounterPayload);
 	MulticastCounterLanded(Result);
+}
+
+void USovGuardComponent::ExecuteGuardImpactGameplayCue(const FSovDamageResult& Result) const
+{
+	if (!bExecuteGuardImpactGameplayCue
+		|| !IsValid(AbilitySystemComponent)
+		|| !GetOwner()
+		|| !GetOwner()->HasAuthority()
+		|| !GuardImpactGameplayCueTag.IsValid())
+	{
+		return;
+	}
+
+	FGameplayCueParameters CueParameters;
+	CueParameters.EffectContext = Result.EffectContext;
+	CueParameters.RawMagnitude = Result.ResolvedDamage;
+	CueParameters.Instigator = Result.SourceActor;
+	CueParameters.EffectCauser = Result.EffectContext.GetEffectCauser()
+		? Result.EffectContext.GetEffectCauser()
+		: Result.SourceActor;
+	CueParameters.AggregatedSourceTags = Result.AttackClassifications;
+	CueParameters.AggregatedSourceTags.AppendTags(Result.DamageChannels);
+	AbilitySystemComponent->ExecuteGameplayCue(GuardImpactGameplayCueTag, CueParameters);
 }
 
 void USovGuardComponent::MulticastGuardImpact_Implementation(

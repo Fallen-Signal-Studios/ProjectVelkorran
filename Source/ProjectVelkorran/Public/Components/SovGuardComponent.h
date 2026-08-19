@@ -89,6 +89,14 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Guard|Tuning", meta = (ClampMin = "0.0"))
 	float GuardCounterEchoReward = 10.f;
 
+	/** Narrative's blocked-hit cue resolves the active weapon layer's block AnimSet. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Guard|Presentation", meta = (Categories = "GameplayCue"))
+	FGameplayTag GuardImpactGameplayCueTag;
+
+	/** Execute the blocked-hit cue for every authoritative successful guard. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Guard|Presentation")
+	bool bExecuteGuardImpactGameplayCue = true;
+
 private:
 	void TryInitializeFromOwner();
 
@@ -102,6 +110,7 @@ private:
 	void BroadcastPendingGuardBroken();
 	void OpenCounterWindow();
 	void SetOwnedLooseTag(const FGameplayTag& Tag, bool bShouldApply, bool& bAppliedFlag);
+	void ExecuteGuardImpactGameplayCue(const FSovDamageResult& Result) const;
 
 	UFUNCTION(NetMulticast, Unreliable)
 	void MulticastGuardImpact(const FSovDamageResult& Result);
