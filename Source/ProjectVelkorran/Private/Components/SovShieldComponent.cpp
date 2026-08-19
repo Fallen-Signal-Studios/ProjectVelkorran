@@ -4,12 +4,18 @@
 
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
+#include "Character/NarrativeCharacterVisual.h"
+#include "Components/MeshComponent.h"
 #include "Engine/World.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
 #include "GAS/NarrativeAttributeSetBase.h"
 #include "GAS/SovCombatTypes.h"
 #include "GameFramework/Actor.h"
 #include "GameplayEffectTypes.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraSystem.h"
 #include "TimerManager.h"
 #include "Sovereign/SovGameplayTags.h"
 #include "UnrealFramework/NarrativeCharacter.h"
@@ -31,7 +37,12 @@ void USovShieldComponent::BeginPlay()
 	if (ANarrativeCharacter* NarrativeOwner = Cast<ANarrativeCharacter>(GetOwner()))
 	{
 		NarrativeOwner->OnASCInitialized.AddUniqueDynamic(this, &ThisClass::HandleOwnerASCInitialized);
+		NarrativeOwner->CharacterVisualInitialized.AddUniqueDynamic(
+			this,
+			&ThisClass::HandleCharacterVisualInitialized);
+		BindCharacterVisual(NarrativeOwner->GetCharacterVisual());
 	}
+	RefreshShieldVisuals();
 	TryInitializeFromOwner();
 }
 
@@ -40,7 +51,12 @@ void USovShieldComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	if (ANarrativeCharacter* NarrativeOwner = Cast<ANarrativeCharacter>(GetOwner()))
 	{
 		NarrativeOwner->OnASCInitialized.RemoveDynamic(this, &ThisClass::HandleOwnerASCInitialized);
+		NarrativeOwner->CharacterVisualInitialized.RemoveDynamic(
+			this,
+			&ThisClass::HandleCharacterVisualInitialized);
 	}
+	BindCharacterVisual(nullptr);
+	ShieldMaterialInstances.Reset();
 	ClearLifecycleTimers();
 	UninitializeFromAbilitySystem();
 	Super::EndPlay(EndPlayReason);
@@ -108,6 +124,7 @@ bool USovShieldComponent::InitializeWithAbilitySystem(UAbilitySystemComponent* I
 	LastShieldDamageWorldTime = GetWorldTimeSeconds();
 	LastRechargeUpdateWorldTime = LastShieldDamageWorldTime;
 	RefreshShieldBrokenState(GetShield(), false);
+	RefreshShieldVisuals();
 
 	TryStartRecharge();
 	return true;
@@ -163,6 +180,63 @@ float USovShieldComponent::GetSecondsUntilRecharge() const
 		0.0f);
 }
 
+void USovShieldComponent::RefreshShieldVisuals()
+{
+	if (const UWorld* World = GetWorld();
+		World && World->GetNetMode() == NM_DedicatedServer)
+	{
+		ShieldMaterialInstances.Reset();
+		return;
+	}
+
+	PruneShieldMaterialInstances();
+
+	if (bAutoDiscoverShieldMaterials)
+	{
+		DiscoverShieldMaterialTargets();
+	}
+
+	UpdateShieldVisualScalar();
+}
+
+bool USovShieldComponent::RegisterShieldMaterialTarget(
+	UMeshComponent* MeshComponent,
+	const int32 MaterialIndex)
+{
+	if (!IsValid(MeshComponent)
+		|| (GetWorld() && GetWorld()->GetNetMode() == NM_DedicatedServer)
+		|| MaterialIndex < 0
+		|| MaterialIndex >= MeshComponent->GetNumMaterials())
+	{
+		return false;
+	}
+
+	UMaterialInterface* SourceMaterial = MeshComponent->GetMaterial(MaterialIndex);
+	if (!MaterialExposesShieldScalar(SourceMaterial))
+	{
+		return false;
+	}
+
+	UMaterialInstanceDynamic* DynamicMaterial = Cast<UMaterialInstanceDynamic>(SourceMaterial);
+	if (!DynamicMaterial || DynamicMaterial->GetOuter() != MeshComponent)
+	{
+		DynamicMaterial = MeshComponent->CreateDynamicMaterialInstance(
+			MaterialIndex,
+			SourceMaterial);
+	}
+
+	if (!IsValid(DynamicMaterial))
+	{
+		return false;
+	}
+
+	ShieldMaterialInstances.AddUnique(DynamicMaterial);
+	DynamicMaterial->SetScalarParameterValue(
+		ShieldScalarParameterName,
+		CurrentShieldVisualScalar);
+	return true;
+}
+
 void USovShieldComponent::TryInitializeFromOwner()
 {
 	if (!IsValid(GetOwner()))
@@ -182,6 +256,24 @@ void USovShieldComponent::TryInitializeFromOwner()
 void USovShieldComponent::HandleOwnerASCInitialized()
 {
 	TryInitializeFromOwner();
+}
+
+void USovShieldComponent::HandleCharacterVisualInitialized(ANarrativeCharacter* Character)
+{
+	if (Character != GetOwner())
+	{
+		return;
+	}
+
+	BindCharacterVisual(Character->GetCharacterVisual());
+	ScheduleShieldVisualRefresh();
+}
+
+void USovShieldComponent::HandleBaseAppearanceApplied()
+{
+	// Narrative invokes this delegate before its BlueprintNativeEvent hook. Defer
+	// so a Blueprint material replacement cannot immediately invalidate our MIDs.
+	ScheduleShieldVisualRefresh();
 }
 
 void USovShieldComponent::UninitializeFromAbilitySystem()
@@ -205,6 +297,7 @@ void USovShieldComponent::UninitializeFromAbilitySystem()
 		bAppliedShieldBrokenTag = false;
 		bHasRecordedShieldDamage = false;
 		bRechargeDelayElapsed = false;
+		UpdateShieldVisualScalar();
 		return;
 	}
 
@@ -247,6 +340,7 @@ void USovShieldComponent::UninitializeFromAbilitySystem()
 	bShieldBroken = false;
 	bHasRecordedShieldDamage = false;
 	bRechargeDelayElapsed = false;
+	UpdateShieldVisualScalar();
 }
 
 void USovShieldComponent::ClearLifecycleTimers()
@@ -256,7 +350,9 @@ void USovShieldComponent::ClearLifecycleTimers()
 		FTimerManager& TimerManager = World->GetTimerManager();
 		TimerManager.ClearTimer(RechargeDelayTimerHandle);
 		TimerManager.ClearTimer(RechargeTimerHandle);
+		TimerManager.ClearTimer(ShieldVisualRefreshTimerHandle);
 	}
+	bShieldVisualRefreshPending = false;
 }
 
 void USovShieldComponent::HandleShieldAttributeChanged(const FOnAttributeChangeData& ChangeData)
@@ -269,6 +365,7 @@ void USovShieldComponent::HandleShieldAttributeChanged(const FOnAttributeChangeD
 		RecordShieldDamage();
 	}
 
+	UpdateShieldVisualScalar();
 	RefreshShieldBrokenState(NewShield, true);
 	OnShieldChanged.Broadcast(OldShield, NewShield, GetMaxShield());
 
@@ -293,6 +390,7 @@ void USovShieldComponent::HandleMaxShieldAttributeChanged(const FOnAttributeChan
 	const float CurrentMaxShield = FMath::Max(ChangeData.NewValue, 0.0f);
 
 	RefreshShieldBrokenState(CurrentShield, false);
+	UpdateShieldVisualScalar();
 	OnShieldChanged.Broadcast(CurrentShield, CurrentShield, CurrentMaxShield);
 
 	if (!CanWriteShield() || CurrentShield + KINDA_SMALL_NUMBER >= CurrentMaxShield)
@@ -511,6 +609,7 @@ void USovShieldComponent::RefreshShieldBrokenState(
 		ApplyShieldBrokenTag();
 		if (bBroadcastBreak)
 		{
+			SpawnShieldBreakSystem();
 			OnShieldBroken.Broadcast();
 		}
 	}
@@ -518,6 +617,237 @@ void USovShieldComponent::RefreshShieldBrokenState(
 	{
 		RemoveShieldBrokenTag();
 	}
+}
+
+void USovShieldComponent::BindCharacterVisual(
+	ANarrativeCharacterVisual* NewCharacterVisual)
+{
+	if (BoundCharacterVisual == NewCharacterVisual)
+	{
+		return;
+	}
+
+	if (IsValid(BoundCharacterVisual))
+	{
+		BoundCharacterVisual->OnBaseAppearanceApplied.RemoveDynamic(
+			this,
+			&ThisClass::HandleBaseAppearanceApplied);
+	}
+
+	BoundCharacterVisual = NewCharacterVisual;
+	if (IsValid(BoundCharacterVisual))
+	{
+		BoundCharacterVisual->OnBaseAppearanceApplied.AddUniqueDynamic(
+			this,
+			&ThisClass::HandleBaseAppearanceApplied);
+	}
+}
+
+void USovShieldComponent::ScheduleShieldVisualRefresh()
+{
+	if (bShieldVisualRefreshPending)
+	{
+		return;
+	}
+
+	if (UWorld* World = GetWorld())
+	{
+		bShieldVisualRefreshPending = true;
+		ShieldVisualRefreshTimerHandle = World->GetTimerManager().SetTimerForNextTick(
+			FTimerDelegate::CreateUObject(
+				this,
+				&ThisClass::HandleDeferredShieldVisualRefresh));
+	}
+	else
+	{
+		RefreshShieldVisuals();
+	}
+}
+
+void USovShieldComponent::HandleDeferredShieldVisualRefresh()
+{
+	bShieldVisualRefreshPending = false;
+	RefreshShieldVisuals();
+}
+
+void USovShieldComponent::PruneShieldMaterialInstances()
+{
+	ShieldMaterialInstances.RemoveAll(
+		[](const TObjectPtr<UMaterialInstanceDynamic>& MaterialInstance)
+		{
+			if (!IsValid(MaterialInstance))
+			{
+				return true;
+			}
+
+			const UMeshComponent* OwningMesh =
+				Cast<UMeshComponent>(MaterialInstance->GetOuter());
+			if (!IsValid(OwningMesh))
+			{
+				return true;
+			}
+
+			for (int32 MaterialIndex = 0;
+				MaterialIndex < OwningMesh->GetNumMaterials();
+				++MaterialIndex)
+			{
+				if (OwningMesh->GetMaterial(MaterialIndex) == MaterialInstance.Get())
+				{
+					return false;
+				}
+			}
+
+			return true;
+		});
+}
+
+void USovShieldComponent::UpdateShieldVisualScalar()
+{
+	const float PreviousScalar = CurrentShieldVisualScalar;
+	const float CurrentMaxShield = GetMaxShield();
+	const float CurrentShield = GetShield();
+
+	if (CurrentMaxShield <= KINDA_SMALL_NUMBER)
+	{
+		CurrentShieldVisualScalar = FullShieldScalar;
+	}
+	else if (CurrentShield <= KINDA_SMALL_NUMBER)
+	{
+		CurrentShieldVisualScalar = BrokenShieldScalar;
+	}
+	else
+	{
+		const float Depletion = 1.0f - FMath::Clamp(
+			CurrentShield / CurrentMaxShield,
+			0.0f,
+			1.0f);
+		const float ResponseAlpha = FMath::Pow(
+			Depletion,
+			FMath::Max(ShieldScalarResponseExponent, 0.01f));
+		CurrentShieldVisualScalar = FMath::Lerp(
+			FullShieldScalar,
+			NearBreakShieldScalar,
+			ResponseAlpha);
+	}
+
+	PruneShieldMaterialInstances();
+	for (UMaterialInstanceDynamic* MaterialInstance : ShieldMaterialInstances)
+	{
+		MaterialInstance->SetScalarParameterValue(
+			ShieldScalarParameterName,
+			CurrentShieldVisualScalar);
+	}
+
+	if (!FMath::IsNearlyEqual(PreviousScalar, CurrentShieldVisualScalar))
+	{
+		OnShieldVisualScalarChanged.Broadcast(CurrentShieldVisualScalar);
+	}
+}
+
+void USovShieldComponent::DiscoverShieldMaterialTargets()
+{
+	if (!IsValid(GetOwner()) || ShieldScalarParameterName.IsNone())
+	{
+		return;
+	}
+
+	TArray<AActor*> PresentationActors;
+	PresentationActors.Add(GetOwner());
+	if (IsValid(BoundCharacterVisual))
+	{
+		PresentationActors.AddUnique(BoundCharacterVisual);
+	}
+
+	TArray<AActor*> AttachedActors;
+	GetOwner()->GetAttachedActors(AttachedActors, true, true);
+	for (AActor* AttachedActor : AttachedActors)
+	{
+		if (IsValid(AttachedActor))
+		{
+			PresentationActors.AddUnique(AttachedActor);
+		}
+	}
+
+	if (IsValid(BoundCharacterVisual))
+	{
+		AttachedActors.Reset();
+		BoundCharacterVisual->GetAttachedActors(AttachedActors, true, true);
+		for (AActor* AttachedActor : AttachedActors)
+		{
+			if (IsValid(AttachedActor))
+			{
+				PresentationActors.AddUnique(AttachedActor);
+			}
+		}
+	}
+
+	for (AActor* PresentationActor : PresentationActors)
+	{
+		if (!IsValid(PresentationActor))
+		{
+			continue;
+		}
+
+		TInlineComponentArray<UMeshComponent*> MeshComponents;
+		PresentationActor->GetComponents(MeshComponents);
+		for (UMeshComponent* MeshComponent : MeshComponents)
+		{
+			if (!IsValid(MeshComponent))
+			{
+				continue;
+			}
+
+			for (int32 MaterialIndex = 0;
+				MaterialIndex < MeshComponent->GetNumMaterials();
+				++MaterialIndex)
+			{
+				RegisterShieldMaterialTarget(MeshComponent, MaterialIndex);
+			}
+		}
+	}
+}
+
+void USovShieldComponent::SpawnShieldBreakSystem() const
+{
+	UWorld* World = GetWorld();
+	if (!IsValid(ShieldBreakSystem)
+		|| !IsValid(GetOwner())
+		|| !IsValid(World)
+		|| World->GetNetMode() == NM_DedicatedServer)
+	{
+		return;
+	}
+
+	const FTransform SpawnTransform = ShieldBreakRelativeTransform
+		* GetOwner()->GetActorTransform();
+	UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+		World,
+		ShieldBreakSystem,
+		SpawnTransform.GetLocation(),
+		SpawnTransform.Rotator(),
+		SpawnTransform.GetScale3D(),
+		true,
+		true,
+		ENCPoolMethod::AutoRelease,
+		true);
+}
+
+bool USovShieldComponent::MaterialExposesShieldScalar(
+	const UMaterialInterface* Material) const
+{
+	if (!IsValid(Material) || ShieldScalarParameterName.IsNone())
+	{
+		return false;
+	}
+
+	TArray<FMaterialParameterInfo> ParameterInfos;
+	TArray<FGuid> ParameterIds;
+	Material->GetAllScalarParameterInfo(ParameterInfos, ParameterIds);
+	return ParameterInfos.ContainsByPredicate(
+		[this](const FMaterialParameterInfo& ParameterInfo)
+		{
+			return ParameterInfo.Name == ShieldScalarParameterName;
+		});
 }
 
 void USovShieldComponent::ApplyShieldBrokenTag()

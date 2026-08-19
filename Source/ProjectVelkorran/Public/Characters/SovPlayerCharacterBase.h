@@ -22,6 +22,9 @@ public:
 	class USovShieldComponent* GetShieldComponent() const { return ShieldComponent; }
 
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Components")
+	class USovHealthRechargeComponent* GetHealthRechargeComponent() const { return HealthRechargeComponent; }
+
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Components")
 	class USovPoiseComponent* GetPoiseComponent() const { return PoiseComponent; }
 
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Components")
@@ -36,6 +39,10 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sovereign|Components")
 	TObjectPtr<class USovShieldComponent> ShieldComponent;
+
+	/** Player-only delayed Health recharge. NPC bases do not construct this component. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sovereign|Components")
+	TObjectPtr<class USovHealthRechargeComponent> HealthRechargeComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sovereign|Components")
 	TObjectPtr<class USovPoiseComponent> PoiseComponent;

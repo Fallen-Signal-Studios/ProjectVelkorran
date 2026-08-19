@@ -4,6 +4,7 @@
 
 #include "Components/SovEchoComponent.h"
 #include "Components/SovGuardComponent.h"
+#include "Components/SovHealthRechargeComponent.h"
 #include "Components/SovPoiseComponent.h"
 #include "Components/SovShieldComponent.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
@@ -13,6 +14,8 @@ ASovPlayerCharacterBase::ASovPlayerCharacterBase(const FObjectInitializer& Objec
 {
 	EchoComponent = CreateDefaultSubobject<USovEchoComponent>(TEXT("SovEchoComponent"));
 	ShieldComponent = CreateDefaultSubobject<USovShieldComponent>(TEXT("SovShieldComponent"));
+	HealthRechargeComponent = CreateDefaultSubobject<USovHealthRechargeComponent>(
+		TEXT("SovHealthRechargeComponent"));
 	PoiseComponent = CreateDefaultSubobject<USovPoiseComponent>(TEXT("SovPoiseComponent"));
 	GuardComponent = CreateDefaultSubobject<USovGuardComponent>(TEXT("SovGuardComponent"));
 }
@@ -30,6 +33,10 @@ void ASovPlayerCharacterBase::HandleAbilitySystemReady(
 	{
 		ShieldComponent->InitializeWithAbilitySystem(ReadyAbilitySystem);
 	}
+	if (HealthRechargeComponent)
+	{
+		HealthRechargeComponent->InitializeWithAbilitySystem(ReadyAbilitySystem);
+	}
 	if (PoiseComponent)
 	{
 		PoiseComponent->InitializeWithAbilitySystem(ReadyAbilitySystem);
@@ -45,6 +52,7 @@ bool ASovPlayerCharacterBase::AreAdditionalCharacterSystemsReady() const
 	return Super::AreAdditionalCharacterSystemsReady()
 		&& IsValid(EchoComponent) && EchoComponent->IsInitialized()
 		&& IsValid(ShieldComponent) && ShieldComponent->IsInitialized()
+		&& IsValid(HealthRechargeComponent) && HealthRechargeComponent->IsInitialized()
 		&& IsValid(PoiseComponent) && PoiseComponent->IsInitialized()
 		&& IsValid(GuardComponent) && GuardComponent->IsInitialized();
 }

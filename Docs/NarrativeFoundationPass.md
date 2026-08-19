@@ -8,7 +8,7 @@ This pass turns the isolated Narrative Pro copy into the first Sovereign Call co
 - `UNarrativeAttributeSetBase` owns the ordered authoritative transaction: guard, partial/full Shield bypass, Shield, Health, Poise, break, death, and typed result publication.
 - `FSovGameplayTags` in `NarrativeArsenal` is the only C++ registrar for `Sov.*` contracts. This location avoids a circular dependency from the plugin back to the game module.
 - `ANarrativePlayerCharacter` owns ASC initialization and publishes readiness once per `(ASC, definition)` epoch. A replicated ASC epoch fences PlayerState data against pawn-channel readiness, and the controller creates HUD and activates gameplay mapping contexts only after the local ready transition.
-- `ASovPlayerCharacterBase` owns Echo, Shield, Poise, and Guard components and includes them in its readiness predicate.
+- `ASovPlayerCharacterBase` owns Echo, Shield, player-only Health recharge, Poise, and Guard components and includes them in its readiness predicate.
 - Definition tags, default abilities, and persistent definition effects are tracked with stable ASC-owned identities so a PlayerState-backed ASC cannot accumulate duplicates across respawns.
 - Direct writes to the `Damage` meta attribute are outside the project contract. Damage must use the configured execution Gameplay Effect; Narrative's self-damage helpers tag already-resolved/fatal policy explicitly.
 - Zero Health converges both Narrative's death tag and `Sov.State.Fatal`, cancels ordinary active abilities, and removes gameplay input until revive.
@@ -17,7 +17,7 @@ This pass turns the isolated Narrative Pro copy into the first Sovereign Call co
 ## Required local content setup
 
 1. Reparent the current `SovePlayerCharacterBase` Blueprint to `ASovPlayerCharacterBase`.
-2. Remove the Blueprint-added Echo, Shield, and Poise components after reparenting. Their native counterparts, plus Guard, are inherited from C++.
+2. Remove the Blueprint-added Echo, Shield, and Poise components after reparenting. Their native counterparts, plus Guard and player-only Health recharge, are inherited from C++.
 3. Confirm the configured damage Gameplay Effect still uses `UNarrativeDamageExecCalc`. The fallback Narrative asset path remains in `DefaultEngine.ini`; a project-owned Gameplay Effect can replace it through `UArsenalSettings` without another source edit.
 4. Create a Blueprint child of `USovGameplayAbility_TarrikGuard` for Tarrik's animation and presentation hooks.
 5. Grant that ability through Velkorran's existing weapon/ability configuration. It uses the existing `Narrative.Input.AltAttack` slot.
@@ -32,7 +32,9 @@ This pass turns the isolated Narrative Pro copy into the first Sovereign Call co
    Guard result presentation is multicast by the component. Drive simulated-proxy guard enter/exit animation from the replicated guarding/perfect-defense state tags or Gameplay Cues.
    Add `Narrative.Anim.AnimSets.Flinch.Block` to the active weapon overlay's `Tagged Anim Sets`. The Guard component executes Narrative's `GameplayCue.TakeDamage.Blocked` for `Result.bGuarded`; that cue remains responsible for resolving the active linked layer's paired 3P/1P block montage.
    In Narrative's existing `OnDamagedBy` flinch graph, pass its raw Spec and `Sov.Damage.Result.Guarded` into `Gameplay Effect Spec Has Asset Tag`; skip the normal directional flinch when that returns true. This tag exists only on the callback copy for that resolved hit, so rear, unblockable, failed-heavy, and later hits remain unaffected.
-10. Apply requested `Sov.Status.*` tags with project Gameplay Effects from the typed damage-result/event hook. This source pass publishes validated status requests but cannot author the binary effect assets.
+10. On the inherited Shield component, set `Shield Scalar Parameter Name` to the scalar authored in shield-reactive materials (default `ShieldIntensity`) and assign a per-character `Shield Break System` Niagara asset. Materials on the pawn, Narrative modular character visual, and attached visual actors are discovered automatically when they expose that scalar. Call `Refresh Shield Visuals` after a custom runtime equipment/material swap that occurs after Narrative's normal appearance initialization.
+11. Tune the inherited Health Recharge component as needed. Defaults are a five-second no-hit delay and ten percent of MaxHealth per second. Any applied Shield, Health, Poise, or guard-Stamina damage restarts the delay; perfect defenses and fully rejected hits do not. The component exists only on the player base and cannot revive a dead player. This current player-only rule supersedes the older TDD statement that Health never regenerates naturally.
+12. Apply requested `Sov.Status.*` tags with project Gameplay Effects from the typed damage-result/event hook. This source pass publishes validated status requests but cannot author the binary effect assets.
 
 ## Damage authoring defaults
 
@@ -66,6 +68,10 @@ Mixed channel tags are supported for routing and immunity, but the current damag
 - guard Stamina equality, exhaustion, and break cleanup
 - full and partial Shield bypass with coefficients below, equal to, and above `1.0`
 - hits against an already-broken Shield restart its three-second delay
+- Shield material scalar is independent per character, rises toward break, and recovers with Shield
+- Shield-break Niagara fires once per above-zero-to-zero transition on each rendering client
+- player Health recharge waits five seconds after the latest applied hit, restarts on a new hit, and never runs while dead
+- NPC Health does not recharge unless a separate component is deliberately added
 - Poise recovery/super-armor floors and one break transition
 - perfect guard grants `12` Echo once
 - a landed, tagged guard counter grants `10` Echo once and consumes its window
