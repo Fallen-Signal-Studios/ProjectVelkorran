@@ -22,6 +22,77 @@ USovGameplayAbility_TarrikGuard::USovGameplayAbility_TarrikGuard()
 	ActivationBlockedTags.AddTag(FSovGameplayTags::Get().State_Poise_Broken);
 }
 
+void USovGameplayAbility_TarrikGuard::OnAvatarSet(
+	const FGameplayAbilityActorInfo* ActorInfo,
+	const FGameplayAbilitySpec& Spec)
+{
+	Super::OnAvatarSet(ActorInfo, Spec);
+
+	AActor* Avatar = ActorInfo ? ActorInfo->AvatarActor.Get() : nullptr;
+	BindGuardComponent(
+		Avatar ? Avatar->FindComponentByClass<USovGuardComponent>() : nullptr);
+}
+
+void USovGameplayAbility_TarrikGuard::OnRemoveAbility(
+	const FGameplayAbilityActorInfo* ActorInfo,
+	const FGameplayAbilitySpec& Spec)
+{
+	UnbindGuardComponent();
+	Super::OnRemoveAbility(ActorInfo, Spec);
+}
+
+void USovGameplayAbility_TarrikGuard::BindGuardComponent(
+	USovGuardComponent* NewGuardComponent)
+{
+	if (GuardComponent != NewGuardComponent)
+	{
+		UnbindGuardComponent();
+		GuardComponent = NewGuardComponent;
+	}
+
+	if (IsValid(GuardComponent))
+	{
+		GuardComponent->OnGuardImpact.AddUniqueDynamic(
+			this,
+			&ThisClass::HandleGuardImpact);
+		GuardComponent->OnPerfectDefense.AddUniqueDynamic(
+			this,
+			&ThisClass::HandlePerfectDefense);
+		GuardComponent->OnGuardBroken.AddUniqueDynamic(
+			this,
+			&ThisClass::HandleGuardBroken);
+		GuardComponent->OnCounterLanded.AddUniqueDynamic(
+			this,
+			&ThisClass::HandleCounterLanded);
+	}
+}
+
+void USovGameplayAbility_TarrikGuard::UnbindGuardComponent()
+{
+	if (IsValid(GuardComponent))
+	{
+		GuardComponent->OnGuardImpact.RemoveDynamic(
+			this,
+			&ThisClass::HandleGuardImpact);
+		GuardComponent->OnPerfectDefense.RemoveDynamic(
+			this,
+			&ThisClass::HandlePerfectDefense);
+		GuardComponent->OnGuardBroken.RemoveDynamic(
+			this,
+			&ThisClass::HandleGuardBroken);
+		GuardComponent->OnCounterLanded.RemoveDynamic(
+			this,
+			&ThisClass::HandleCounterLanded);
+	}
+
+	GuardComponent = nullptr;
+}
+
+bool USovGameplayAbility_TarrikGuard::ShouldRunLocalPresentation() const
+{
+	return CurrentActorInfo && CurrentActorInfo->IsLocallyControlled();
+}
+
 void USovGameplayAbility_TarrikGuard::ActivateAbility(
 	const FGameplayAbilitySpecHandle Handle,
 	const FGameplayAbilityActorInfo* ActorInfo,
@@ -37,7 +108,8 @@ void USovGameplayAbility_TarrikGuard::ActivateAbility(
 	}
 
 	AActor* Avatar = ActorInfo->AvatarActor.Get();
-	GuardComponent = Avatar ? Avatar->FindComponentByClass<USovGuardComponent>() : nullptr;
+	BindGuardComponent(
+		Avatar ? Avatar->FindComponentByClass<USovGuardComponent>() : nullptr);
 	if (!IsValid(GuardComponent) || !GuardComponent->BeginGuard())
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
@@ -45,7 +117,6 @@ void USovGameplayAbility_TarrikGuard::ActivateAbility(
 	}
 
 	bGuardStarted = true;
-	GuardComponent->OnGuardBroken.AddUniqueDynamic(this, &ThisClass::HandleGuardBroken);
 	BindCancellationTags(ActorInfo->AbilitySystemComponent.Get());
 	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
 	{
@@ -75,17 +146,12 @@ void USovGameplayAbility_TarrikGuard::EndAbility(
 	const bool bWasCancelled)
 {
 	UnbindCancellationTags();
-	if (IsValid(GuardComponent))
+	if (IsValid(GuardComponent) && bGuardStarted)
 	{
-		GuardComponent->OnGuardBroken.RemoveDynamic(this, &ThisClass::HandleGuardBroken);
-		if (bGuardStarted)
-		{
-			GuardComponent->EndGuard();
-		}
+		GuardComponent->EndGuard();
 	}
 
 	InputReleaseTask = nullptr;
-	GuardComponent = nullptr;
 	const bool bWasGuardStarted = bGuardStarted;
 	bGuardStarted = false;
 	if (bWasGuardStarted)
@@ -104,12 +170,44 @@ void USovGameplayAbility_TarrikGuard::HandleInputReleased(const float TimeHeld)
 	}
 }
 
-void USovGameplayAbility_TarrikGuard::HandleGuardBroken(const FSovDamageResult& Result)
+void USovGameplayAbility_TarrikGuard::HandleGuardImpact(
+	const FSovDamageResult& Result)
 {
-	static_cast<void>(Result);
+	if (ShouldRunLocalPresentation())
+	{
+		ReceiveGuardImpact(Result);
+	}
+}
+
+void USovGameplayAbility_TarrikGuard::HandlePerfectDefense(
+	const FSovDamageResult& Result)
+{
+	if (ShouldRunLocalPresentation())
+	{
+		ReceivePerfectDefense(Result);
+	}
+}
+
+void USovGameplayAbility_TarrikGuard::HandleGuardBroken(
+	const FSovDamageResult& Result)
+{
+	if (ShouldRunLocalPresentation())
+	{
+		ReceiveGuardBroken(Result);
+	}
+
 	if (IsActive())
 	{
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+	}
+}
+
+void USovGameplayAbility_TarrikGuard::HandleCounterLanded(
+	const FSovDamageResult& Result)
+{
+	if (ShouldRunLocalPresentation())
+	{
+		ReceiveCounterLanded(Result);
 	}
 }
 

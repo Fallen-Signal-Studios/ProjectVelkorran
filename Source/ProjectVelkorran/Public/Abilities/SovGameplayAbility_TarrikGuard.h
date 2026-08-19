@@ -21,6 +21,14 @@ public:
 	USovGameplayAbility_TarrikGuard();
 
 protected:
+	virtual void OnAvatarSet(
+		const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayAbilitySpec& Spec) override;
+
+	virtual void OnRemoveAbility(
+		const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayAbilitySpec& Spec) override;
+
 	virtual void ActivateAbility(
 		const FGameplayAbilitySpecHandle Handle,
 		const FGameplayAbilityActorInfo* ActorInfo,
@@ -38,7 +46,20 @@ protected:
 	void HandleInputReleased(float TimeHeld);
 
 	UFUNCTION()
+	void HandleGuardImpact(const FSovDamageResult& Result);
+
+	UFUNCTION()
+	void HandlePerfectDefense(const FSovDamageResult& Result);
+
+	UFUNCTION()
 	void HandleGuardBroken(const FSovDamageResult& Result);
+
+	UFUNCTION()
+	void HandleCounterLanded(const FSovDamageResult& Result);
+
+	void BindGuardComponent(USovGuardComponent* NewGuardComponent);
+	void UnbindGuardComponent();
+	bool ShouldRunLocalPresentation() const;
 
 	void BindCancellationTags(UAbilitySystemComponent* AbilitySystem);
 	void UnbindCancellationTags();
@@ -49,6 +70,18 @@ protected:
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "Sovereign|Guard", meta = (DisplayName = "Guard Ability Ended"))
 	void ReceiveGuardAbilityEnded(bool bWasCancelled);
+
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCosmetic, Category = "Sovereign|Guard|Presentation", meta = (DisplayName = "Guard Impact"))
+	void ReceiveGuardImpact(const FSovDamageResult& Result);
+
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCosmetic, Category = "Sovereign|Guard|Presentation", meta = (DisplayName = "Perfect Defense"))
+	void ReceivePerfectDefense(const FSovDamageResult& Result);
+
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCosmetic, Category = "Sovereign|Guard|Presentation", meta = (DisplayName = "Guard Broken"))
+	void ReceiveGuardBroken(const FSovDamageResult& Result);
+
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCosmetic, Category = "Sovereign|Guard|Presentation", meta = (DisplayName = "Counter Landed"))
+	void ReceiveCounterLanded(const FSovDamageResult& Result);
 
 private:
 	UPROPERTY(Transient)
