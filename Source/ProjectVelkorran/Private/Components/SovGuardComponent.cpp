@@ -426,7 +426,7 @@ void USovGuardComponent::ExecuteGuardImpactGameplayCue(const FSovDamageResult& R
 	CueParameters.Instigator = Result.SourceActor;
 	CueParameters.EffectCauser = Result.EffectContext.GetEffectCauser()
 		? Result.EffectContext.GetEffectCauser()
-		: Result.SourceActor;
+		: Result.SourceActor.Get();
 	CueParameters.AggregatedSourceTags = Result.AttackClassifications;
 	CueParameters.AggregatedSourceTags.AppendTags(Result.DamageChannels);
 	AbilitySystemComponent->ExecuteGameplayCue(GuardImpactGameplayCueTag, CueParameters);
