@@ -16,8 +16,10 @@ USovGameplayAbility_TarrikGuard::USovGameplayAbility_TarrikGuard()
 	InputTag = FNarrativeGameplayTags::Get().Narrative_Input_AltAttack;
 
 	ActivationBlockedTags.AddTag(FNarrativeGameplayTags::Get().State_IsDead);
+	ActivationBlockedTags.AddTag(FNarrativeGameplayTags::Get().State_Busy);
 	ActivationBlockedTags.AddTag(FNarrativeGameplayTags::Get().State_SequencerControlled);
 	ActivationBlockedTags.AddTag(FSovGameplayTags::Get().State_Fatal);
+	ActivationBlockedTags.AddTag(FSovGameplayTags::Get().State_EchoAbility_Active);
 	ActivationBlockedTags.AddTag(FSovGameplayTags::Get().State_Guard_Broken);
 	ActivationBlockedTags.AddTag(FSovGameplayTags::Get().State_Poise_Broken);
 }

@@ -23,9 +23,22 @@ public:
 	FGameplayTag Character_Player_Tarrik;
 	FGameplayTag Character_Player_Selene;
 
+	FGameplayTag Ability_ActivateFail_Echo;
+	FGameplayTag Ability_Echo_Tarrik_CinderSlam;
+	FGameplayTag Ability_Echo_Tarrik_VelkorransHunger;
+	FGameplayTag Ability_Echo_Tarrik_CinderStickyGrenade;
+	FGameplayTag Ability_Echo_Tarrik_CinderJudgement;
+	FGameplayTag Ability_Echo_Tarrik_CinderlineRequiem;
+	FGameplayTag AnimSet_Ability_Tarrik_CinderSlam;
+	FGameplayTag AnimSet_Ability_Tarrik_VelkorransHunger;
+	FGameplayTag AnimSet_Ability_Tarrik_CinderStickyGrenade;
+	FGameplayTag AnimSet_Ability_Tarrik_CinderJudgement;
+	FGameplayTag AnimSet_Ability_Tarrik_CinderlineRequiem;
+
 	FGameplayTag State_Invulnerable;
 	FGameplayTag State_Damage_Immune;
 	FGameplayTag State_Fatal;
+	FGameplayTag State_EchoAbility_Active;
 	FGameplayTag State_Guarding;
 	FGameplayTag State_PerfectGuard;
 	FGameplayTag State_Guard_CounterWindow;
@@ -71,6 +84,7 @@ public:
 	FGameplayTag Damage_Immunity_Corruption;
 	FGameplayTag Damage_Immunity_Environmental;
 	FGameplayTag Status_Apply;
+	FGameplayTag Status_Apply_Burn;
 
 	FGameplayTag SetByCaller_Damage_AbilityScalar;
 	FGameplayTag SetByCaller_Damage_SourceModifier;

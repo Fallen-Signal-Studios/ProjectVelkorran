@@ -21,9 +21,22 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 	AddTag(Character_Player_Tarrik, "Sov.Character.Player.Tarrik", "Tarrik Walcur player character.");
 	AddTag(Character_Player_Selene, "Sov.Character.Player.Selene", "Selene Veyne player character.");
 
+	AddTag(Ability_ActivateFail_Echo, "Sov.Ability.ActivateFail.Echo", "Ability activation failed its Echo threshold or spend check.");
+	AddTag(Ability_Echo_Tarrik_CinderSlam, "Sov.Ability.Echo.Tarrik.CinderSlam", "Tarrik's sword-exclusive Cinder Slam Echo ability.");
+	AddTag(Ability_Echo_Tarrik_VelkorransHunger, "Sov.Ability.Echo.Tarrik.VelkorransHunger", "Tarrik's sword-exclusive Velkorran's Hunger Echo ability.");
+	AddTag(Ability_Echo_Tarrik_CinderStickyGrenade, "Sov.Ability.Echo.Tarrik.CinderStickyGrenade", "Tarrik's shared Cinder Sticky Grenade Echo ability.");
+	AddTag(Ability_Echo_Tarrik_CinderJudgement, "Sov.Ability.Echo.Tarrik.CinderJudgement", "Tarrik's Cinderline-exclusive Cinder Judgement Echo ability.");
+	AddTag(Ability_Echo_Tarrik_CinderlineRequiem, "Sov.Ability.Echo.Tarrik.CinderlineRequiem", "Tarrik's Cinderline-exclusive signature Echo ability.");
+	AddTag(AnimSet_Ability_Tarrik_CinderSlam, "Narrative.Anim.AnimSets.Ability.Tarrik.CinderSlam", "Weapon-layer animation set for Cinder Slam.");
+	AddTag(AnimSet_Ability_Tarrik_VelkorransHunger, "Narrative.Anim.AnimSets.Ability.Tarrik.VelkorransHunger", "Weapon-layer animation set for Velkorran's Hunger.");
+	AddTag(AnimSet_Ability_Tarrik_CinderStickyGrenade, "Narrative.Anim.AnimSets.Ability.Tarrik.CinderStickyGrenade", "Weapon-layer animation set for Cinder Sticky Grenade.");
+	AddTag(AnimSet_Ability_Tarrik_CinderJudgement, "Narrative.Anim.AnimSets.Ability.Tarrik.CinderJudgement", "Weapon-layer animation set for Cinder Judgement.");
+	AddTag(AnimSet_Ability_Tarrik_CinderlineRequiem, "Narrative.Anim.AnimSets.Ability.Tarrik.CinderlineRequiem", "Weapon-layer animation set for Cinderline Requiem.");
+
 	AddTag(State_Invulnerable, "Sov.State.Invulnerable", "Damage immunity shared by explicit invulnerability states.");
 	AddTag(State_Damage_Immune, "Sov.State.Damage.Immune", "Target is immune to ordinary damage execution.");
 	AddTag(State_Fatal, "Sov.State.Fatal", "Health reached zero and normal combat input is disabled.");
+	AddTag(State_EchoAbility_Active, "Sov.State.EchoAbility.Active", "A committed Echo ability currently owns Tarrik's Echo-action lane.");
 	AddTag(State_Guarding, "Sov.State.Guarding", "A frontal guard plane is active.");
 	AddTag(State_PerfectGuard, "Sov.State.PerfectGuard", "The perfect-defense timing window is active.");
 	AddTag(State_Guard_CounterWindow, "Sov.State.Guard.CounterWindow", "A perfect guard opened a counter opportunity.");
@@ -69,6 +82,7 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 	AddTag(Damage_Immunity_Corruption, "Sov.Damage.Immunity.Corruption", "Target ignores Corruption damage.");
 	AddTag(Damage_Immunity_Environmental, "Sov.Damage.Immunity.Environmental", "Target ignores Environmental damage.");
 	AddTag(Status_Apply, "Sov.Status.Apply", "Parent tag for requested status applications carried by damage specs.");
+	AddTag(Status_Apply_Burn, "Sov.Status.Apply.Burn", "A resolved hit requests the project-owned Burn status.");
 
 	AddTag(SetByCaller_Damage_AbilityScalar, "Sov.SetByCaller.Damage.AbilityScalar", "Ability-specific damage scalar.");
 	AddTag(SetByCaller_Damage_SourceModifier, "Sov.SetByCaller.Damage.SourceModifier", "Authored source damage multiplier.");
