@@ -103,6 +103,7 @@ public:
 	FGameplayTag Status_Apply_Freeze;
 	FGameplayTag Status_Apply_DeviceDisabled;
 	FGameplayTag Status_Immunity;
+	FGameplayTag Status_Immunity_Burn;
 	FGameplayTag Status_Immunity_Freeze;
 	FGameplayTag Status_Immunity_DeviceDisable;
 

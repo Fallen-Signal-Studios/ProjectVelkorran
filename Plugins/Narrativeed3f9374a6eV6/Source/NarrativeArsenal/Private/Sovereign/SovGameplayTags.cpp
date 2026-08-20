@@ -10,6 +10,7 @@ void FSovGameplayTags::InitializeNativeTags()
 {
 	if (GameplayTags.Character_Player_Tarrik.IsValid()
 		&& GameplayTags.Ability_Echo_Selene_StillpointGrenade.IsValid()
+		&& GameplayTags.Status_Immunity_Burn.IsValid()
 		&& GameplayTags.Status_Immunity_DeviceDisable.IsValid())
 	{
 		return;
@@ -103,6 +104,7 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 	AddTag(Status_Apply_Freeze, "Sov.Status.Apply.Freeze", "A resolved hit requests the project-owned hard-Freeze status.");
 	AddTag(Status_Apply_DeviceDisabled, "Sov.Status.Apply.DeviceDisabled", "A resolved hit requests a device-disable status on eligible targets.");
 	AddTag(Status_Immunity, "Sov.Status.Immunity", "Parent tag for project-owned status immunities.");
+	AddTag(Status_Immunity_Burn, "Sov.Status.Immunity.Burn", "The target rejects project-owned Burn effects.");
 	AddTag(Status_Immunity_Freeze, "Sov.Status.Immunity.Freeze", "The target rejects hard Freeze and should receive its authored fallback.");
 	AddTag(Status_Immunity_DeviceDisable, "Sov.Status.Immunity.DeviceDisable", "The target rejects device-disable effects.");
 

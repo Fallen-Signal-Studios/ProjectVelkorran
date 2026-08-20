@@ -32,6 +32,7 @@ The shared `USovGameplayAbility_EchoBase`, reached through Tarrik's compatibilit
 - common death, guard, guard-break, Poise-break, busy, interaction, sequencer, and ragdoll activation blocks, with active cancellation when terminal/interrupt states arrive during the cast;
 - fail-closed `AllowedWeaponClasses` validation against the currently wielded item;
 - display text, weapon family, animation-set key, and payload asset/tuning slots;
+- fail-closed native payload validation, so an incomplete child cannot commit or spend Echo;
 - `Echo Ability Started`, `Echo Ability Authority Committed`, `Echo Ability Local Presentation`, and `Echo Ability Ended` Blueprint hooks;
 - `Get Authority Aim Target Data` for server-owned hitscan validation;
 - a five-second stuck-ability failsafe, adjustable per child;
@@ -63,13 +64,15 @@ Each parent exposes a native animation key:
 - `Narrative.Anim.AnimSets.Ability.Tarrik.CinderJudgement`
 - `Narrative.Anim.AnimSets.Ability.Tarrik.CinderlineRequiem`
 
+These keys are intentionally `VisibleDefaultsOnly`: they are stable ability identities, not montage asset slots. Do not recreate or edit the tag in the child. Read it with `Get Echo Ability Anim Set Tag`.
+
 Add the matching `UNarrativeAnimSet` to the active weapon linked layer's `Tagged Anim Sets`. Resolve it with `Get Anim Set` and `Search Linked Layers = true`, then play its paired 1P/3P montages through the same Narrative flow used by attacks.
 
 In `Echo Ability Started`:
 
 1. start the cast montage and its wait task;
 2. use a montage notify/gameplay event for the release frame;
-3. arm the authority release task from `Echo Ability Authority Committed`, then execute target, projectile, and damage payload only from that authoritative path;
+3. use `Echo Ability Authority Committed` as the server authorization/arming signal, then invoke the payload's authority-only release function at the release frame;
 4. call `Finish Echo Ability(false)` on completed/blend-out and `Finish Echo Ability(true)` on interruption.
 
 Use `Echo Ability Local Presentation` only for owning-player camera, rumble, audio accents, and cosmetic hit-stop. Do not apply damage, spawn replicated actors, or change global time dilation there.
@@ -78,11 +81,18 @@ Use `Echo Ability Local Presentation` only for owning-player camera, rumble, aud
 
 ### Cinder Sticky Grenade
 
-- Server-spawn one replicated grenade from the configured `GrenadeClass`.
+- Create `BP_CinderStickyGrenadeProjectile` from `ASovCinderStickyGrenadeProjectile`. Assign its inherited `Grenade Mesh`, tune the projectile-movement component if needed, and implement `Cinder Grenade Launched`, `Cinder Grenade Stuck`, and `Cinder Grenade Detonated` for Niagara, audio, and decals. Native code hides the mesh on detonation; those events are cosmetic and native code owns all gameplay.
+- In `GA_Tarrik_CinderStickyGrenade`, assign that Blueprint to `GrenadeClass`, then assign `ExplosionDamageEffectClass` and `BurnEffectClass`. The ability now fails its cost check before spending Echo if any required class or positive tuning value is missing.
+- The explosion GE must be `Instant`, use `UNarrativeDamageExecCalc`, and must not directly modify Health, Shield, Poise, or the Damage meta attribute. Native code supplies `SetByCaller.Damage`, radial falloff, Poise pressure, Kinetic + Thermal channels, Standard guard class, and the grenade as effect causer.
+- The Burn GE must be Duration/Periodic and route its ticks through `UNarrativeDamageExecCalc`. Native code supplies `SetByCaller.Damage`, `SetByCaller.Duration`, Thermal, and Bypass Guard. Burn is applied only after the explosion actually reduces Shield, Health, or Poise, and is rejected by either exact `Sov.Status.Immunity` or `Sov.Status.Immunity.Burn`, so immunity and perfect defense do not receive a detached status effect.
+- In the GA child, resolve and play the tagged Narrative anim set from `Echo Ability Started`. At the authoritative throw-frame notify, build a transform from Tarrik's grenade/hand socket and call `Release Cinder Sticky Grenade(SpawnTransform, InitialVelocity)`. A zero velocity uses `DefaultGrenadeLaunchSpeed`; explicit velocity is clamped by `MaximumGrenadeLaunchSpeed`.
+- The release function is not a client-to-server RPC. The montage/release notify must run on the server ability instance as well as the predicting owner. Native authority and once-per-activation guards ensure that only the server creates one gameplay grenade.
+- For a first smoke test, call the release from `Echo Ability Authority Committed` with a server-built hand/forward transform. Once that works, move it to the server's release-frame path. If your dedicated-server mesh does not evaluate animation notifies, start a server timer from `Echo Ability Authority Committed` using the montage's authored release offset; never depend on an owner-only AnimBP notify for gameplay.
+- End the ability from montage completed/blend-out and cancel it on interruption. Successful release does not end the ability automatically, and the replicated grenade safely outlives the ability instance.
+- Native behavior starts the fuse at launch, sticks once to a hit component/bone, damages unique hostile ASCs in radius, optionally requires line of sight, replicates stuck/detonated presentation state, and cleans itself up after detonation.
 - Do not use Narrative's stock `Spawn Projectile` task for this Local Predicted ability: its replicated-projectile policy can spawn an unreconciled client copy as well as the authoritative copy. Spawn on authority and use prediction only for the throw presentation.
-- Ignore the owner during launch, attach to the hit component/bone, run the fuse on authority, then apply the configured radial effect once.
-- Copy the configured effects, fuse, radius, source ASC/context, and ability tag into exposed-on-spawn projectile data. The projectile must never retain the Gameplay Ability instance.
-- Recommended channels: Kinetic + Thermal. Add `Sov.Status.Apply.Burn` and `Sov.SetByCaller.Status.Magnitude` if the explosion requests Burn.
+
+The other Tarrik parents also validate their declared payload assets now. They remain Blueprint-authored payload contracts until their own native vertical slices are implemented; an incomplete child will no longer consume Echo and do nothing.
 
 ### Velkorran's Hunger
 
