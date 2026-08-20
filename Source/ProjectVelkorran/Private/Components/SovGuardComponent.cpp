@@ -10,6 +10,7 @@
 #include "GAS/NarrativeAbilitySystemComponent.h"
 #include "GAS/NarrativeAttributeSetBase.h"
 #include "GameFramework/Actor.h"
+#include "Settings/NarrativeCombatDeveloperSettings.h"
 #include "Sovereign/SovGameplayTags.h"
 #include "UnrealFramework/NarrativeCharacter.h"
 
@@ -78,13 +79,26 @@ bool USovGuardComponent::IsInitialized() const
 
 bool USovGuardComponent::BeginGuard()
 {
-	if (!IsInitialized()
-		|| AbilitySystemComponent->HasMatchingGameplayTag(FSovGameplayTags::Get().State_Guard_Broken))
+	if (!IsInitialized())
 	{
 		return false;
 	}
 
 	const FSovGameplayTags& Tags = FSovGameplayTags::Get();
+	const UNarrativeCombatDeveloperSettings* CombatSettings =
+		GetDefault<UNarrativeCombatDeveloperSettings>();
+	const float MinimumStartStamina = CombatSettings
+		? FMath::Max(CombatSettings->MinimumGuardStartStamina, 0.f)
+		: 8.f;
+	const float CurrentStamina = AbilitySystemComponent->GetNumericAttribute(
+		UNarrativeAttributeSetBase::GetStaminaAttribute());
+	if (AbilitySystemComponent->HasMatchingGameplayTag(Tags.State_Guarding)
+		|| AbilitySystemComponent->HasMatchingGameplayTag(Tags.State_Guard_Broken)
+		|| CurrentStamina + KINDA_SMALL_NUMBER < MinimumStartStamina)
+	{
+		return false;
+	}
+
 	SetOwnedLooseTag(Tags.State_Guarding, true, bAppliedGuardingTag);
 	SetOwnedLooseTag(Tags.State_PerfectGuard, true, bAppliedPerfectDefenseTag);
 
@@ -199,6 +213,11 @@ void USovGuardComponent::UninitializeFromAbilitySystem()
 
 void USovGuardComponent::ClosePerfectDefenseWindow()
 {
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(PerfectDefenseTimerHandle);
+	}
+
 	SetOwnedLooseTag(
 		FSovGameplayTags::Get().State_PerfectGuard,
 		false,
@@ -249,6 +268,11 @@ void USovGuardComponent::OpenCounterWindow()
 
 void USovGuardComponent::CloseCounterWindow()
 {
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(CounterWindowTimerHandle);
+	}
+
 	SetOwnedLooseTag(
 		FSovGameplayTags::Get().State_Guard_CounterWindow,
 		false,
@@ -320,11 +344,17 @@ void USovGuardComponent::HandleDamageResolvedAsTarget(const FSovDamageResult& Re
 	}
 	if (Result.bPerfectDefense)
 	{
+		// A timing window can reward exactly one intercepted hit. Closing it
+		// synchronously prevents a multi-hit packet from farming perfect rewards.
+		ClosePerfectDefenseWindow();
 		if (EchoComponent)
 		{
 			EchoComponent->AddEcho(PerfectGuardEchoReward, FSovGameplayTags::Get().Echo_Source_PerfectGuard);
 		}
-		OpenCounterWindow();
+		if (!Result.bGuardBroken)
+		{
+			OpenCounterWindow();
+		}
 		FGameplayEventData PerfectPayload;
 		PerfectPayload.EventTag = FSovGameplayTags::Get().Event_Guard_Perfect;
 		PerfectPayload.Instigator = Result.SourceActor;
@@ -348,6 +378,7 @@ void USovGuardComponent::HandleDamageResolvedAsTarget(const FSovDamageResult& Re
 
 	if (Result.bGuardBroken)
 	{
+		CloseCounterWindow();
 		EndGuard();
 		SetOwnedLooseTag(FSovGameplayTags::Get().State_Guard_Broken, true, bAppliedGuardBrokenTag);
 		if (UWorld* World = GetWorld())
@@ -441,6 +472,9 @@ void USovGuardComponent::MulticastGuardImpact_Implementation(
 void USovGuardComponent::MulticastPerfectDefense_Implementation(
 	const FSovDamageResult& Result)
 {
+	// Remove the predicted timing tag immediately on the owning client. The
+	// local timer remains a fallback if this cosmetic multicast is dropped.
+	ClosePerfectDefenseWindow();
 	OnPerfectDefense.Broadcast(Result);
 }
 

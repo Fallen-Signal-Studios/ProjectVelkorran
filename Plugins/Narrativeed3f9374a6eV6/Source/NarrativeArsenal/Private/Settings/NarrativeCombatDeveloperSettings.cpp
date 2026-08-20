@@ -29,6 +29,8 @@ UNarrativeCombatDeveloperSettings::UNarrativeCombatDeveloperSettings()
 	GuardHalfAngleDegrees = 70.0f;
 	GuardDamageMultiplier = 0.25f;
 	GuardPoiseMultiplier = 0.25f;
+	MinimumGuardStartStamina = 8.0f;
+	PerfectGuardStaminaDamage = 5.0f;
 	GuardStaminaDamageScalar = 0.5f;
 	MinimumGuardStaminaDamage = 8.0f;
 	MaximumGuardStaminaDamage = 20.0f;

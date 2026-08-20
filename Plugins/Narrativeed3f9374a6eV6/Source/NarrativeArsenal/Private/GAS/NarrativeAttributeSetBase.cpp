@@ -347,12 +347,27 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 		}
 
 		const bool bGuardCandidate = bIsGuarding && bInsideGuardArc && !bUnblockable;
-		Result.bPerfectDefense = bGuardCandidate && bPerfectWindow;
+		const float OldStamina = FMath::Max(GetStamina(), 0.f);
+		Result.bPerfectDefense = bGuardCandidate
+			&& bPerfectWindow
+			&& OldStamina > KINDA_SMALL_NUMBER;
 		if (Result.bPerfectDefense)
 		{
+			const float PerfectGuardCost = CombatSettings
+				? FMath::Max(CombatSettings->PerfectGuardStaminaDamage, 0.f)
+				: 5.f;
+			Result.AppliedStaminaDamage = FMath::Min(OldStamina, PerfectGuardCost);
+			SetStamina(FMath::Clamp(
+				OldStamina - Result.AppliedStaminaDamage,
+				0.f,
+				GetMaxStamina()));
+
 			Result.bGuarded = true;
 			RoutedDamage = 0.f;
 			RoutedPoiseDamage = 0.f;
+			// The timing remains successful, but spending the last Stamina ends
+			// Guard through the normal replicated broken-state pipeline.
+			Result.bGuardBroken = GetStamina() <= KINDA_SMALL_NUMBER;
 		}
 		else if (bGuardCandidate)
 		{
@@ -370,7 +385,6 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 					false,
 					DefaultGuardCost),
 				0.f);
-			const float OldStamina = FMath::Max(GetStamina(), 0.f);
 			const bool bCanPayGuardCost = RequestedGuardCost <= KINDA_SMALL_NUMBER
 				|| OldStamina - RequestedGuardCost > KINDA_SMALL_NUMBER;
 
@@ -391,12 +405,16 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 			else
 			{
 				Result.bGuardBroken = true;
-				OnGuardBroken.Broadcast(
-					DamageInstigator,
-					DamageCauser,
-					Data.EffectSpec,
-					Result.AppliedStaminaDamage);
 			}
+		}
+
+		if (Result.bGuardBroken)
+		{
+			OnGuardBroken.Broadcast(
+				DamageInstigator,
+				DamageCauser,
+				Data.EffectSpec,
+				Result.AppliedStaminaDamage);
 		}
 
 		const float OldShield = FMath::Max(GetShield(), 0.f);

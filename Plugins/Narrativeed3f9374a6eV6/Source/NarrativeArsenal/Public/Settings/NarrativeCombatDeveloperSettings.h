@@ -66,6 +66,14 @@ public:
 	UPROPERTY(EditAnywhere, config, BlueprintReadOnly, Category = "Combat|Guard", meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float GuardPoiseMultiplier;
 
+	/** Minimum current Stamina required to enter Guard. This is a threshold, not an activation cost. */
+	UPROPERTY(EditAnywhere, config, BlueprintReadOnly, Category = "Combat|Guard", meta = (ClampMin = "0.0"))
+	float MinimumGuardStartStamina;
+
+	/** Fixed Stamina paid by a successful perfect defense. */
+	UPROPERTY(EditAnywhere, config, BlueprintReadOnly, Category = "Combat|Guard", meta = (ClampMin = "0.0"))
+	float PerfectGuardStaminaDamage;
+
 	/** Converts resolved damage into guard Stamina impact before clamping. */
 	UPROPERTY(EditAnywhere, config, BlueprintReadOnly, Category = "Combat|Guard", meta = (ClampMin = "0.0"))
 	float GuardStaminaDamageScalar;
