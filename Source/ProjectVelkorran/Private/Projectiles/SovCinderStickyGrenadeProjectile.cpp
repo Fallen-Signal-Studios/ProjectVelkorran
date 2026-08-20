@@ -17,6 +17,8 @@
 #include "NarrativeArsenal.h"
 #include "NarrativeGameplayTags.h"
 #include "Net/UnrealNetwork.h"
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraSystem.h"
 #include "Sovereign/SovGameplayTags.h"
 #include "UnrealFramework/NarrativeTeamAgentInterface.h"
 
@@ -65,6 +67,7 @@ void ASovCinderStickyGrenadeProjectile::InitializeGrenade(
 	const FGameplayTag& InAbilityIdentityTag,
 	const float InEffectLevel,
 	const FVector& InInitialVelocity,
+	const float InGravityScale,
 	const float InFuseDuration,
 	const float InExplosionRadius,
 	const float InExplosionDamage,
@@ -84,6 +87,7 @@ void ASovCinderStickyGrenadeProjectile::InitializeGrenade(
 	AbilityIdentityTag = InAbilityIdentityTag;
 	EffectLevel = FMath::Max(InEffectLevel, 1.0f);
 	ReplicatedInitialVelocity = InInitialVelocity;
+	ReplicatedGravityScale = FMath::Max(InGravityScale, 0.0f);
 	FuseDuration = FMath::Max(InFuseDuration, 0.0f);
 	ExplosionRadius = FMath::Max(InExplosionRadius, 0.0f);
 	ExplosionDamage = FMath::Max(InExplosionDamage, 0.0f);
@@ -216,6 +220,7 @@ void ASovCinderStickyGrenadeProjectile::StartProjectileMovement()
 		return;
 	}
 
+	ProjectileMovement->ProjectileGravityScale = ReplicatedGravityScale;
 	ProjectileMovement->Velocity = ReplicatedInitialVelocity;
 	ProjectileMovement->Activate(true);
 }
@@ -512,6 +517,22 @@ void ASovCinderStickyGrenadeProjectile::PlayDetonationPresentation()
 	{
 		GrenadeMesh->SetVisibility(false, true);
 	}
+	UWorld* World = GetWorld();
+	if (IsValid(World)
+		&& World->GetNetMode() != NM_DedicatedServer
+		&& IsValid(ExplosionNiagaraSystem))
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+			World,
+			ExplosionNiagaraSystem,
+			DetonationLocation,
+			FRotator::ZeroRotator,
+			ExplosionNiagaraScale,
+			true,
+			true,
+			ENCPoolMethod::AutoRelease,
+			true);
+	}
 	ReceiveGrenadeDetonated(DetonationLocation, StuckNormal);
 }
 
@@ -527,4 +548,5 @@ void ASovCinderStickyGrenadeProjectile::GetLifetimeReplicatedProps(
 	DOREPLIFETIME(ASovCinderStickyGrenadeProjectile, DetonationLocation);
 	DOREPLIFETIME(ASovCinderStickyGrenadeProjectile, bHasDetonated);
 	DOREPLIFETIME(ASovCinderStickyGrenadeProjectile, ReplicatedInitialVelocity);
+	DOREPLIFETIME(ASovCinderStickyGrenadeProjectile, ReplicatedGravityScale);
 }

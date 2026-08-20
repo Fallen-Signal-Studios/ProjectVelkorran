@@ -10,6 +10,7 @@
 
 class UAbilitySystemComponent;
 class UGameplayEffect;
+class UNiagaraSystem;
 class UPrimitiveComponent;
 class UProjectileMovementComponent;
 class USphereComponent;
@@ -44,6 +45,7 @@ public:
 		const FGameplayTag& InAbilityIdentityTag,
 		float InEffectLevel,
 		const FVector& InInitialVelocity,
+		float InGravityScale,
 		float InFuseDuration,
 		float InExplosionRadius,
 		float InExplosionDamage,
@@ -75,6 +77,14 @@ protected:
 	/** Time retained after detonation so replicated cosmetic state reaches clients. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Presentation", meta = (ClampMin = "0.1", Units = "s"))
 	float DetonationCleanupDelay = 0.5f;
+
+	/** Optional one-shot Niagara system spawned automatically at detonation. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Presentation")
+	TObjectPtr<UNiagaraSystem> ExplosionNiagaraSystem;
+
+	/** World scale used when spawning the configured explosion system. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Presentation")
+	FVector ExplosionNiagaraScale = FVector::OneVector;
 
 	UFUNCTION(BlueprintImplementableEvent, BlueprintCosmetic, Category = "Sovereign|Echo Ability|Presentation", meta = (DisplayName = "Cinder Grenade Launched"))
 	void ReceiveGrenadeLaunched();
@@ -134,6 +144,10 @@ private:
 	/** Lets simulated proxies run a cosmetic arc between movement corrections. */
 	UPROPERTY(ReplicatedUsing = OnRep_InitialVelocity)
 	FVector_NetQuantize10 ReplicatedInitialVelocity = FVector::ZeroVector;
+
+	/** Keeps simulated-proxy interpolation on the same ballistic arc as authority. */
+	UPROPERTY(Replicated)
+	float ReplicatedGravityScale = 1.0f;
 
 	UPROPERTY(Transient)
 	TSubclassOf<UGameplayEffect> ExplosionDamageEffectClass;

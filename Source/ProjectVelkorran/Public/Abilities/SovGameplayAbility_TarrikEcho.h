@@ -93,9 +93,17 @@ public:
 	USovGameplayAbility_TarrikCinderStickyGrenade();
 
 	/**
-	 * Releases exactly one authoritative grenade for this paid activation.
-	 * Call this from the throw montage's release-frame notify on both execution
-	 * paths; the native authority gate makes the predicting-client call a no-op.
+	 * Resolves Tarrik's throw socket, traces the server-owned aim, calculates a
+	 * ballistic launch velocity, and releases one authoritative grenade.
+	 * This is the normal Blueprint release-frame entry point.
+	 */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Echo Ability|Payload")
+	ASovCinderStickyGrenadeProjectile* ReleaseCinderStickyGrenadeFromAim();
+
+	/**
+	 * Advanced release path for callers that need to supply a custom server-
+	 * validated transform and velocity. Most Blueprint children should call
+	 * ReleaseCinderStickyGrenadeFromAim instead.
 	 */
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Echo Ability|Payload")
 	ASovCinderStickyGrenadeProjectile* ReleaseCinderStickyGrenade(
@@ -146,9 +154,33 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload", meta = (ClampMin = "0.0", Units = "s"))
 	float BurnDuration = 4.0f;
 
-	/** Used when the release notify supplies a zero velocity. */
+	/** Character-mesh socket used as the authoritative release location. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Launch")
+	FName GrenadeThrowSocketName = TEXT("hand_r");
+
+	/** Local-space spawn offset used when the configured socket cannot be found. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Launch", meta = (Units = "cm"))
+	FVector GrenadeFallbackSpawnOffset = FVector(45.0f, 20.0f, 65.0f);
+
+	/** Distance of the authoritative camera/control-rotation aim trace. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Launch", meta = (ClampMin = "0.0", Units = "cm"))
+	float GrenadeAimTraceDistance = 2500.0f;
+
+	/** Fixed speed used by the native ballistic solver and zero-velocity fallback. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Launch", meta = (ClampMin = "0.0", Units = "cm/s"))
 	float DefaultGrenadeLaunchSpeed = 1600.0f;
+
+	/** Selects the higher of the two valid ballistic solutions when available. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Launch")
+	bool bUseHighGrenadeThrowArc = false;
+
+	/** Used only when the fixed-speed ballistic target is physically unreachable. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Launch", meta = (ClampMin = "-89.0", ClampMax = "89.0", Units = "deg"))
+	float GrenadeFallbackThrowPitch = 35.0f;
+
+	/** Multiplier applied to world gravity by both the solver and projectile. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Launch", meta = (ClampMin = "0.0"))
+	float GrenadeGravityScale = 1.0f;
 
 	/** Server clamp for authored launch velocity. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Launch", meta = (ClampMin = "0.0", Units = "cm/s"))

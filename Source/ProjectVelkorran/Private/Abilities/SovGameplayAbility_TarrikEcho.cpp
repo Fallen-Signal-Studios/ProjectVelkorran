@@ -3,8 +3,11 @@
 #include "Abilities/SovGameplayAbility_TarrikEcho.h"
 
 #include "Abilities/GameplayAbility.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
 #include "Effects/SovGameplayEffect_CinderGrenade.h"
+#include "GameFramework/Character.h"
+#include "GameFramework/Controller.h"
 #include "GameFramework/Pawn.h"
 #include "GameplayEffect.h"
 #include "Kismet/GameplayStatics.h"
@@ -14,6 +17,75 @@
 #include "Weapons/NarrativeProjectile.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogSovTarrikEchoAbility, Log, All);
+
+namespace
+{
+	bool CalculateBallisticLaunchVelocity(
+		const FVector& Start,
+		const FVector& Target,
+		const float LaunchSpeed,
+		const float GravityZ,
+		const bool bUseHighArc,
+		FVector& OutVelocity)
+	{
+		OutVelocity = FVector::ZeroVector;
+		if (Start.ContainsNaN()
+			|| Target.ContainsNaN()
+			|| !FMath::IsFinite(LaunchSpeed)
+			|| !FMath::IsFinite(GravityZ)
+			|| LaunchSpeed <= KINDA_SMALL_NUMBER)
+		{
+			return false;
+		}
+
+		const FVector Delta = Target - Start;
+		if (Delta.IsNearlyZero())
+		{
+			return false;
+		}
+
+		const float GravityMagnitude = FMath::Abs(GravityZ);
+		if (GravityMagnitude <= KINDA_SMALL_NUMBER)
+		{
+			OutVelocity = Delta.GetSafeNormal() * LaunchSpeed;
+			return true;
+		}
+
+		const FVector HorizontalDelta(Delta.X, Delta.Y, 0.0f);
+		const float HorizontalDistance = HorizontalDelta.Size();
+		const double SpeedSquared = static_cast<double>(LaunchSpeed) * LaunchSpeed;
+		if (HorizontalDistance <= KINDA_SMALL_NUMBER)
+		{
+			const double MaximumRise = SpeedSquared / (2.0 * GravityMagnitude);
+			if (Delta.Z > MaximumRise)
+			{
+				return false;
+			}
+			OutVelocity = FVector::UpVector * FMath::Sign(Delta.Z) * LaunchSpeed;
+			return !OutVelocity.IsNearlyZero();
+		}
+
+		const double HorizontalDistanceSquared =
+			static_cast<double>(HorizontalDistance) * HorizontalDistance;
+		const double Discriminant = (SpeedSquared * SpeedSquared)
+			- (GravityMagnitude
+				* ((GravityMagnitude * HorizontalDistanceSquared)
+					+ (2.0 * Delta.Z * SpeedSquared)));
+		if (Discriminant < 0.0)
+		{
+			return false;
+		}
+
+		const double Root = FMath::Sqrt(Discriminant);
+		const double Tangent = (SpeedSquared + (bUseHighArc ? Root : -Root))
+			/ (GravityMagnitude * HorizontalDistance);
+		const double Cosine = 1.0 / FMath::Sqrt(1.0 + (Tangent * Tangent));
+		const double Sine = Tangent * Cosine;
+		OutVelocity = (HorizontalDelta.GetSafeNormal() * LaunchSpeed * Cosine)
+			+ (FVector::UpVector * LaunchSpeed * Sine);
+		return !OutVelocity.ContainsNaN() && !OutVelocity.IsNearlyZero();
+	}
+}
 
 USovGameplayAbility_TarrikEchoBase::USovGameplayAbility_TarrikEchoBase()
 {
@@ -120,9 +192,95 @@ bool USovGameplayAbility_TarrikCinderStickyGrenade::HasRequiredPayloadConfigurat
 		&& MinimumExplosionDamageFraction <= 1.0f
 		&& BurnDamagePerTick > KINDA_SMALL_NUMBER
 		&& BurnDuration > KINDA_SMALL_NUMBER
+		&& !GrenadeFallbackSpawnOffset.ContainsNaN()
+		&& GrenadeAimTraceDistance > KINDA_SMALL_NUMBER
 		&& DefaultGrenadeLaunchSpeed > KINDA_SMALL_NUMBER
+		&& FMath::IsFinite(GrenadeFallbackThrowPitch)
+		&& GrenadeFallbackThrowPitch >= -89.0f
+		&& GrenadeFallbackThrowPitch <= 89.0f
+		&& FMath::IsFinite(GrenadeGravityScale)
+		&& GrenadeGravityScale >= 0.0f
 		&& MaximumGrenadeLaunchSpeed + KINDA_SMALL_NUMBER >= DefaultGrenadeLaunchSpeed
 		&& MaximumGrenadeSpawnDistance > KINDA_SMALL_NUMBER;
+}
+
+ASovCinderStickyGrenadeProjectile*
+USovGameplayAbility_TarrikCinderStickyGrenade::ReleaseCinderStickyGrenadeFromAim()
+{
+	if (!IsActive()
+		|| !CurrentActorInfo
+		|| !CurrentActorInfo->IsNetAuthority()
+		|| bGrenadeReleaseAttempted)
+	{
+		return nullptr;
+	}
+
+	AActor* Avatar = CurrentActorInfo->AvatarActor.Get();
+	UWorld* World = GetWorld();
+	if (!HasRequiredPayloadConfiguration() || !IsValid(Avatar) || !IsValid(World))
+	{
+		bGrenadeReleaseAttempted = true;
+		UE_LOG(
+			LogSovTarrikEchoAbility,
+			Error,
+			TEXT("Cinder Sticky Grenade could not resolve its authoritative throw context."));
+		FinishEchoAbility(true);
+		return nullptr;
+	}
+
+	FVector AimStart = Avatar->GetActorLocation();
+	FRotator AimRotation = Avatar->GetActorRotation();
+	Avatar->GetActorEyesViewPoint(AimStart, AimRotation);
+	if (AController* Controller = GetOwningController())
+	{
+		AimRotation = Controller->GetControlRotation();
+	}
+
+	const FVector AimEnd = AimStart
+		+ (AimRotation.Vector() * GrenadeAimTraceDistance);
+	const TArray<FHitResult> AimHits = PerformTraceMulti(AimStart, AimEnd, 0.0f);
+	const FHitResult* BlockingAimHit = AimHits.FindByPredicate(
+		[](const FHitResult& Hit)
+		{
+			return Hit.bBlockingHit;
+		});
+	const FVector AimTarget = BlockingAimHit ? BlockingAimHit->ImpactPoint : AimEnd;
+
+	FVector SpawnLocation = Avatar->GetActorTransform().TransformPositionNoScale(
+		GrenadeFallbackSpawnOffset);
+	if (const ACharacter* Character = Cast<ACharacter>(Avatar))
+	{
+		const USkeletalMeshComponent* CharacterMesh = Character->GetMesh();
+		if (IsValid(CharacterMesh)
+			&& !GrenadeThrowSocketName.IsNone()
+			&& CharacterMesh->DoesSocketExist(GrenadeThrowSocketName))
+		{
+			SpawnLocation = CharacterMesh->GetSocketLocation(GrenadeThrowSocketName);
+		}
+	}
+
+	FVector InitialVelocity;
+	const float GravityZ = World->GetGravityZ() * GrenadeGravityScale;
+	if (!CalculateBallisticLaunchVelocity(
+			SpawnLocation,
+			AimTarget,
+			DefaultGrenadeLaunchSpeed,
+			GravityZ,
+			bUseHighGrenadeThrowArc,
+			InitialVelocity))
+	{
+		const FRotator FallbackRotation(
+			FMath::Clamp(GrenadeFallbackThrowPitch, -89.0f, 89.0f),
+			AimRotation.Yaw,
+			0.0f);
+		InitialVelocity = FallbackRotation.Vector() * DefaultGrenadeLaunchSpeed;
+	}
+
+	const FTransform SpawnTransform(
+		InitialVelocity.ToOrientationQuat(),
+		SpawnLocation,
+		FVector::OneVector);
+	return ReleaseCinderStickyGrenade(SpawnTransform, InitialVelocity);
 }
 
 ASovCinderStickyGrenadeProjectile*
@@ -211,6 +369,7 @@ USovGameplayAbility_TarrikCinderStickyGrenade::ReleaseCinderStickyGrenade(
 		EchoSpendTag,
 		static_cast<float>(GetAbilityLevel()),
 		InitialVelocity,
+		GrenadeGravityScale,
 		FuseDuration,
 		ExplosionRadius,
 		ExplosionDamage,
