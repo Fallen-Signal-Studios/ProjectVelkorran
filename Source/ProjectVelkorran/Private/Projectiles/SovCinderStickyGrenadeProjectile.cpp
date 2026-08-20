@@ -4,7 +4,6 @@
 
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
-#include "ArsenalStatics.h"
 #include "CollisionQueryParams.h"
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -19,6 +18,7 @@
 #include "NarrativeGameplayTags.h"
 #include "Net/UnrealNetwork.h"
 #include "Sovereign/SovGameplayTags.h"
+#include "UnrealFramework/NarrativeTeamAgentInterface.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogSovCinderStickyGrenade, Log, All);
 
@@ -268,6 +268,13 @@ void ASovCinderStickyGrenadeProjectile::ApplyExplosion()
 		FCollisionShape::MakeSphere(ExplosionRadius),
 		QueryParams);
 
+	const INarrativeTeamAgentInterface* SourceTeam =
+		Cast<const INarrativeTeamAgentInterface>(SourceActor);
+	if (!SourceTeam)
+	{
+		return;
+	}
+
 	TSet<UAbilitySystemComponent*> UniqueTargets;
 	for (const FOverlapResult& Overlap : Overlaps)
 	{
@@ -280,7 +287,7 @@ void ASovCinderStickyGrenadeProjectile::ApplyExplosion()
 			|| UniqueTargets.Contains(TargetASC)
 			|| !TargetASC->GetSet<UNarrativeAttributeSetBase>()
 			|| !IsTargetAlive(TargetASC)
-			|| UArsenalStatics::GetAttitude(SourceActor, TargetActor) != ETeamAttitude::Hostile
+			|| SourceTeam->GetTeamAttitudeTowards(*TargetActor) != ETeamAttitude::Hostile
 			|| (bRequiresLineOfSight && !HasExplosionLineOfSight(TargetActor)))
 		{
 			continue;

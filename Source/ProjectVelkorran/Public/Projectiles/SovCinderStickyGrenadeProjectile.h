@@ -15,7 +15,7 @@ class UProjectileMovementComponent;
 class USphereComponent;
 class UStaticMeshComponent;
 struct FGameplayEffectContextHandle;
-struct FLifetimeProperty;
+class FLifetimeProperty;
 
 /**
  * Server-authoritative gameplay projectile for Tarrik's Cinder Sticky Grenade.
