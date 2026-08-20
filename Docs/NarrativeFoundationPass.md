@@ -13,6 +13,7 @@ This pass turns the isolated Narrative Pro copy into the first Sovereign Call co
 - Direct writes to the `Damage` meta attribute are outside the project contract. Damage must use the configured execution Gameplay Effect; Narrative's self-damage helpers tag already-resolved/fatal policy explicitly.
 - Zero Health converges both Narrative's death tag and `Sov.State.Fatal`, cancels ordinary active abilities, and removes gameplay input until revive.
 - Damage numbers are disabled by default per the TDD; the existing developer setting remains the accessibility/gameplay toggle.
+- `USovGameplayAbility_EchoBase` owns the shared predicted/server-authoritative Echo transaction; protagonist adapters preserve Tarrik and Selene identity and weapon-context contracts without duplicating GAS lifecycle code.
 
 ## Required local content setup
 
@@ -37,6 +38,7 @@ This pass turns the isolated Narrative Pro copy into the first Sovereign Call co
 11. Tune the inherited Health Recharge component as needed. Defaults are a five-second no-hit delay and ten percent of MaxHealth per second. Any applied Shield, Health, Poise, or guard-Stamina damage restarts the delay, so the new `5`-Stamina perfect-defense payment counts as an intercepted hit; fully rejected hits do not. The component exists only on the player base and cannot revive a dead player. This current player-only rule supersedes the older TDD statement that Health never regenerates naturally.
 12. Apply requested `Sov.Status.*` tags with project Gameplay Effects from the typed damage-result/event hook. This source pass publishes validated status requests but cannot author the binary effect assets.
 13. Build Tarrik's weapon-context Echo kit from the five native Blueprint parents and grant them through the three existing ability slots as described in [`TarrikEchoAbilities.md`](TarrikEchoAbilities.md). Echo threshold checks and authoritative spending are native; montages, projectile classes, damage/Burn/ward effects, and cues remain authored content.
+14. Build Selene's control-focused Echo kit from the five native Blueprint parents described in [`SeleneEchoAbilities.md`](SeleneEchoAbilities.md). Grant `Sov.Character.Player.Selene` through her Player Definition, author the exact weapon allowlists, and apply Freeze/Chill/Disruption effects only from authority. Tarrik's definition must likewise grant `Sov.Character.Player.Tarrik` after the shared-base extraction.
 
 ## Damage authoring defaults
 

@@ -22,7 +22,7 @@ Create these Blueprint children:
 - `GA_Tarrik_CinderJudgement` from `USovGameplayAbility_TarrikCinderJudgement`
 - `GA_Tarrik_CinderlineRequiem` from `USovGameplayAbility_TarrikCinderlineRequiem`
 
-The native base provides:
+The shared `USovGameplayAbility_EchoBase`, reached through Tarrik's compatibility parent, provides:
 
 - Local Predicted GAS activation;
 - server-owned termination, so a client cannot clear the committed Busy/Echo-action state before authority finishes or cancels the payload;
@@ -42,6 +42,8 @@ Do not author a second Echo Cost Gameplay Effect on these abilities. A normal GA
 Do not implement the generic `Event ActivateAbility` in these children. The native parent owns activation and commits Echo before it calls the custom hooks. Use `Echo Ability Started` for the predicted/authority montage and task setup, and use `Echo Ability Authority Committed` as the only authorization point for server gameplay. Do not execute the same payload from both hooks.
 
 ## Granting
+
+Add `Sov.Character.Player.Tarrik` to Tarrik's Player Definition/default owned tags. During migration the common base permits an avatar with no player-identity tag, preserving existing content; once any `Sov.Character.Player` identity is present, the Tarrik adapter rejects Selene and other mismatches.
 
 Grant the Sticky Grenade once through Tarrik's default `UAbilityConfiguration`. Do not add it to both weapon assets or dual-wield/source-object variants can create duplicate specs.
 

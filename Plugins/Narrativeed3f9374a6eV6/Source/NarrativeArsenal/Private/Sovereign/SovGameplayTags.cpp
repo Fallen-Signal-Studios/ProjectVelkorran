@@ -8,7 +8,9 @@ FSovGameplayTags FSovGameplayTags::GameplayTags;
 
 void FSovGameplayTags::InitializeNativeTags()
 {
-	if (GameplayTags.Character_Player_Tarrik.IsValid())
+	if (GameplayTags.Character_Player_Tarrik.IsValid()
+		&& GameplayTags.Ability_Echo_Selene_StillpointGrenade.IsValid()
+		&& GameplayTags.Status_Immunity_DeviceDisable.IsValid())
 	{
 		return;
 	}
@@ -18,6 +20,7 @@ void FSovGameplayTags::InitializeNativeTags()
 
 void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 {
+	AddTag(Character_Player, "Sov.Character.Player", "Parent identity tag for playable Sovereign characters.");
 	AddTag(Character_Player_Tarrik, "Sov.Character.Player.Tarrik", "Tarrik Walcur player character.");
 	AddTag(Character_Player_Selene, "Sov.Character.Player.Selene", "Selene Veyne player character.");
 
@@ -27,16 +30,26 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 	AddTag(Ability_Echo_Tarrik_CinderStickyGrenade, "Sov.Ability.Echo.Tarrik.CinderStickyGrenade", "Tarrik's shared Cinder Sticky Grenade Echo ability.");
 	AddTag(Ability_Echo_Tarrik_CinderJudgement, "Sov.Ability.Echo.Tarrik.CinderJudgement", "Tarrik's Cinderline-exclusive Cinder Judgement Echo ability.");
 	AddTag(Ability_Echo_Tarrik_CinderlineRequiem, "Sov.Ability.Echo.Tarrik.CinderlineRequiem", "Tarrik's Cinderline-exclusive signature Echo ability.");
+	AddTag(Ability_Echo_Selene_StillpointGrenade, "Sov.Ability.Echo.Selene.StillpointGrenade", "Selene's universal Stillpoint Grenade Echo ability.");
+	AddTag(Ability_Echo_Selene_Dispatch, "Sov.Ability.Echo.Selene.Dispatch", "Selene's Verity throw-and-recall signature Echo ability.");
+	AddTag(Ability_Echo_Selene_StaccatoZero, "Sov.Ability.Echo.Selene.StaccatoZero", "Selene's Staccato precision Echo ability.");
+	AddTag(Ability_Echo_Selene_AxiomNullPulse, "Sov.Ability.Echo.Selene.AxiomNullPulse", "Selene's Axiom shield-disruption Echo ability.");
+	AddTag(Ability_Echo_Selene_VeritysWake, "Sov.Ability.Echo.Selene.VeritysWake", "Selene's Verity frost-wave Echo ability.");
 	AddTag(AnimSet_Ability_Tarrik_CinderSlam, "Narrative.Anim.AnimSets.Ability.Tarrik.CinderSlam", "Weapon-layer animation set for Cinder Slam.");
 	AddTag(AnimSet_Ability_Tarrik_VelkorransHunger, "Narrative.Anim.AnimSets.Ability.Tarrik.VelkorransHunger", "Weapon-layer animation set for Velkorran's Hunger.");
 	AddTag(AnimSet_Ability_Tarrik_CinderStickyGrenade, "Narrative.Anim.AnimSets.Ability.Tarrik.CinderStickyGrenade", "Weapon-layer animation set for Cinder Sticky Grenade.");
 	AddTag(AnimSet_Ability_Tarrik_CinderJudgement, "Narrative.Anim.AnimSets.Ability.Tarrik.CinderJudgement", "Weapon-layer animation set for Cinder Judgement.");
 	AddTag(AnimSet_Ability_Tarrik_CinderlineRequiem, "Narrative.Anim.AnimSets.Ability.Tarrik.CinderlineRequiem", "Weapon-layer animation set for Cinderline Requiem.");
+	AddTag(AnimSet_Ability_Selene_StillpointGrenade, "Narrative.Anim.AnimSets.Ability.Selene.StillpointGrenade", "Weapon-layer animation set for Stillpoint Grenade.");
+	AddTag(AnimSet_Ability_Selene_Dispatch, "Narrative.Anim.AnimSets.Ability.Selene.Dispatch", "Weapon-layer animation set for Dispatch.");
+	AddTag(AnimSet_Ability_Selene_StaccatoZero, "Narrative.Anim.AnimSets.Ability.Selene.StaccatoZero", "Weapon-layer animation set for Staccato Zero.");
+	AddTag(AnimSet_Ability_Selene_AxiomNullPulse, "Narrative.Anim.AnimSets.Ability.Selene.AxiomNullPulse", "Weapon-layer animation set for Axiom Null Pulse.");
+	AddTag(AnimSet_Ability_Selene_VeritysWake, "Narrative.Anim.AnimSets.Ability.Selene.VeritysWake", "Weapon-layer animation set for Verity's Wake.");
 
 	AddTag(State_Invulnerable, "Sov.State.Invulnerable", "Damage immunity shared by explicit invulnerability states.");
 	AddTag(State_Damage_Immune, "Sov.State.Damage.Immune", "Target is immune to ordinary damage execution.");
 	AddTag(State_Fatal, "Sov.State.Fatal", "Health reached zero and normal combat input is disabled.");
-	AddTag(State_EchoAbility_Active, "Sov.State.EchoAbility.Active", "A committed Echo ability currently owns Tarrik's Echo-action lane.");
+	AddTag(State_EchoAbility_Active, "Sov.State.EchoAbility.Active", "A committed character Echo ability currently owns the Echo-action lane.");
 	AddTag(State_Guarding, "Sov.State.Guarding", "A frontal guard plane is active.");
 	AddTag(State_PerfectGuard, "Sov.State.PerfectGuard", "The perfect-defense timing window is active.");
 	AddTag(State_Guard_CounterWindow, "Sov.State.Guard.CounterWindow", "A perfect guard opened a counter opportunity.");
@@ -48,6 +61,9 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 	AddTag(State_Poise_Recovering, "Sov.State.Poise.Recovering", "Post-break re-break protection is active.");
 	AddTag(State_Poise_RegenBlocked, "Sov.State.Poise.RegenBlocked", "Poise regeneration is paused.");
 	AddTag(State_Poise_SuperArmor, "Sov.State.Poise.SuperArmor", "Poise cannot break during an authored super-armor window.");
+	AddTag(State_Status_Chilled, "Sov.State.Status.Chilled", "Movement and control resistance are reduced by cryothermal pressure.");
+	AddTag(State_Status_Frozen, "Sov.State.Status.Frozen", "The target is held by an authored hard-Freeze effect.");
+	AddTag(State_Status_DeviceDisabled, "Sov.State.Status.DeviceDisabled", "Eligible combat systems are disabled by Disruption.");
 
 	AddTag(Damage_BypassShield, "Sov.Damage.BypassShield", "All resolved health damage bypasses Shield.");
 	AddTag(Damage_BypassShield_Partial, "Sov.Damage.BypassShield.Partial", "Uses the authored partial Shield bypass ratio.");
@@ -83,6 +99,12 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 	AddTag(Damage_Immunity_Environmental, "Sov.Damage.Immunity.Environmental", "Target ignores Environmental damage.");
 	AddTag(Status_Apply, "Sov.Status.Apply", "Parent tag for requested status applications carried by damage specs.");
 	AddTag(Status_Apply_Burn, "Sov.Status.Apply.Burn", "A resolved hit requests the project-owned Burn status.");
+	AddTag(Status_Apply_Chill, "Sov.Status.Apply.Chill", "A resolved hit requests the project-owned Chill status.");
+	AddTag(Status_Apply_Freeze, "Sov.Status.Apply.Freeze", "A resolved hit requests the project-owned hard-Freeze status.");
+	AddTag(Status_Apply_DeviceDisabled, "Sov.Status.Apply.DeviceDisabled", "A resolved hit requests a device-disable status on eligible targets.");
+	AddTag(Status_Immunity, "Sov.Status.Immunity", "Parent tag for project-owned status immunities.");
+	AddTag(Status_Immunity_Freeze, "Sov.Status.Immunity.Freeze", "The target rejects hard Freeze and should receive its authored fallback.");
+	AddTag(Status_Immunity_DeviceDisable, "Sov.Status.Immunity.DeviceDisable", "The target rejects device-disable effects.");
 
 	AddTag(SetByCaller_Damage_AbilityScalar, "Sov.SetByCaller.Damage.AbilityScalar", "Ability-specific damage scalar.");
 	AddTag(SetByCaller_Damage_SourceModifier, "Sov.SetByCaller.Damage.SourceModifier", "Authored source damage multiplier.");

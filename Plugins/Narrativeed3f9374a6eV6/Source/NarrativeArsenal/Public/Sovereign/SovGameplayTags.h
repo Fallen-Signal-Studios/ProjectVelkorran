@@ -20,6 +20,7 @@ public:
 	static const FSovGameplayTags& Get() { return GameplayTags; }
 	static void InitializeNativeTags();
 
+	FGameplayTag Character_Player;
 	FGameplayTag Character_Player_Tarrik;
 	FGameplayTag Character_Player_Selene;
 
@@ -29,11 +30,21 @@ public:
 	FGameplayTag Ability_Echo_Tarrik_CinderStickyGrenade;
 	FGameplayTag Ability_Echo_Tarrik_CinderJudgement;
 	FGameplayTag Ability_Echo_Tarrik_CinderlineRequiem;
+	FGameplayTag Ability_Echo_Selene_StillpointGrenade;
+	FGameplayTag Ability_Echo_Selene_Dispatch;
+	FGameplayTag Ability_Echo_Selene_StaccatoZero;
+	FGameplayTag Ability_Echo_Selene_AxiomNullPulse;
+	FGameplayTag Ability_Echo_Selene_VeritysWake;
 	FGameplayTag AnimSet_Ability_Tarrik_CinderSlam;
 	FGameplayTag AnimSet_Ability_Tarrik_VelkorransHunger;
 	FGameplayTag AnimSet_Ability_Tarrik_CinderStickyGrenade;
 	FGameplayTag AnimSet_Ability_Tarrik_CinderJudgement;
 	FGameplayTag AnimSet_Ability_Tarrik_CinderlineRequiem;
+	FGameplayTag AnimSet_Ability_Selene_StillpointGrenade;
+	FGameplayTag AnimSet_Ability_Selene_Dispatch;
+	FGameplayTag AnimSet_Ability_Selene_StaccatoZero;
+	FGameplayTag AnimSet_Ability_Selene_AxiomNullPulse;
+	FGameplayTag AnimSet_Ability_Selene_VeritysWake;
 
 	FGameplayTag State_Invulnerable;
 	FGameplayTag State_Damage_Immune;
@@ -50,6 +61,9 @@ public:
 	FGameplayTag State_Poise_Recovering;
 	FGameplayTag State_Poise_RegenBlocked;
 	FGameplayTag State_Poise_SuperArmor;
+	FGameplayTag State_Status_Chilled;
+	FGameplayTag State_Status_Frozen;
+	FGameplayTag State_Status_DeviceDisabled;
 
 	FGameplayTag Damage_BypassShield;
 	FGameplayTag Damage_BypassShield_Partial;
@@ -85,6 +99,12 @@ public:
 	FGameplayTag Damage_Immunity_Environmental;
 	FGameplayTag Status_Apply;
 	FGameplayTag Status_Apply_Burn;
+	FGameplayTag Status_Apply_Chill;
+	FGameplayTag Status_Apply_Freeze;
+	FGameplayTag Status_Apply_DeviceDisabled;
+	FGameplayTag Status_Immunity;
+	FGameplayTag Status_Immunity_Freeze;
+	FGameplayTag Status_Immunity_DeviceDisable;
 
 	FGameplayTag SetByCaller_Damage_AbilityScalar;
 	FGameplayTag SetByCaller_Damage_SourceModifier;
