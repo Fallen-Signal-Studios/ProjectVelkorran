@@ -2,8 +2,10 @@
 
 #include "Abilities/SovGameplayAbility_SeleneEcho.h"
 
+#include "GameplayEffect.h"
 #include "NarrativeGameplayTags.h"
 #include "Sovereign/SovGameplayTags.h"
+#include "Weapons/NarrativeProjectile.h"
 
 USovGameplayAbility_SeleneEchoBase::USovGameplayAbility_SeleneEchoBase()
 {
