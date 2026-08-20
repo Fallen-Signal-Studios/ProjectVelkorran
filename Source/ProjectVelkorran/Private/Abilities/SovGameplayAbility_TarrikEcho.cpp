@@ -4,6 +4,7 @@
 
 #include "Abilities/GameplayAbility.h"
 #include "Engine/World.h"
+#include "Effects/SovGameplayEffect_CinderGrenade.h"
 #include "GameFramework/Pawn.h"
 #include "GameplayEffect.h"
 #include "Kismet/GameplayStatics.h"
@@ -74,6 +75,10 @@ bool USovGameplayAbility_TarrikVelkorransHunger::HasRequiredPayloadConfiguration
 USovGameplayAbility_TarrikCinderStickyGrenade::USovGameplayAbility_TarrikCinderStickyGrenade()
 {
 	const FSovGameplayTags& Tags = FSovGameplayTags::Get();
+	GrenadeClass = ASovCinderStickyGrenadeProjectile::StaticClass();
+	ExplosionDamageEffectClass =
+		USovGameplayEffect_CinderGrenadeExplosionDamage::StaticClass();
+	BurnEffectClass = USovGameplayEffect_CinderGrenadeBurn::StaticClass();
 	MinimumEchoRequired = 35.0f;
 	EchoCost = 35.0f;
 	EchoSpendTag = Tags.Ability_Echo_Tarrik_CinderStickyGrenade;
