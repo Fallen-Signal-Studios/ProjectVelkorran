@@ -39,20 +39,101 @@ USovGameplayAbility_EchoBase::USovGameplayAbility_EchoBase()
 	ActivationOwnedTags.AddTag(SovTags.State_EchoAbility_Active);
 }
 
+bool USovGameplayAbility_EchoBase::CanActivateAbility(
+	const FGameplayAbilitySpecHandle Handle,
+	const FGameplayAbilityActorInfo* ActorInfo,
+	const FGameplayTagContainer* SourceTags,
+	const FGameplayTagContainer* TargetTags,
+	FGameplayTagContainer* OptionalRelevantTags) const
+{
+	LastActivationFailureReason.Reset();
+	FGameplayTagContainer LocalRelevantTags;
+	FGameplayTagContainer* RelevantTags = OptionalRelevantTags
+		? OptionalRelevantTags
+		: &LocalRelevantTags;
+	const bool bCanActivate = Super::CanActivateAbility(
+		Handle,
+		ActorInfo,
+		SourceTags,
+		TargetTags,
+		RelevantTags);
+	if (bCanActivate || !ActorInfo
+		|| (!ActorInfo->IsLocallyControlled() && !ActorInfo->IsNetAuthority()))
+	{
+		return bCanActivate;
+	}
+
+	FGameplayTagContainer OwnedTags;
+	if (const UAbilitySystemComponent* AbilitySystem =
+		ActorInfo->AbilitySystemComponent.Get())
+	{
+		AbilitySystem->GetOwnedGameplayTags(OwnedTags);
+	}
+
+	const USovEchoComponent* EchoComponent = ResolveEchoComponent(ActorInfo);
+	const float CurrentEcho = IsValid(EchoComponent) && EchoComponent->IsInitialized()
+		? EchoComponent->GetEcho()
+		: 0.0f;
+	const float MaximumEcho = IsValid(EchoComponent) && EchoComponent->IsInitialized()
+		? EchoComponent->GetMaxEcho()
+		: 0.0f;
+	const FString FailureReason = LastActivationFailureReason.IsEmpty()
+		? TEXT("a GAS activation, tag, cooldown, or networking gate failed")
+		: LastActivationFailureReason;
+
+	UE_LOG(
+		LogSovEchoAbility,
+		Warning,
+		TEXT("%s rejected Echo ability %s on input %s: %s. Echo %.2f/%.2f, threshold %.2f, cost %.2f. FailureTags=[%s] OwnedTags=[%s]"),
+		*GetNameSafe(ActorInfo->AvatarActor.Get()),
+		*GetNameSafe(this),
+		*InputTag.ToString(),
+		*FailureReason,
+		CurrentEcho,
+		MaximumEcho,
+		GetMinimumEchoRequired(),
+		GetEchoCost(),
+		*RelevantTags->ToStringSimple(),
+		*OwnedTags.ToStringSimple());
+
+	return false;
+}
+
 bool USovGameplayAbility_EchoBase::CheckCost(
 	const FGameplayAbilitySpecHandle Handle,
 	const FGameplayAbilityActorInfo* ActorInfo,
 	FGameplayTagContainer* OptionalRelevantTags) const
 {
+	LastActivationFailureReason.Reset();
 	if (!Super::CheckCost(Handle, ActorInfo, OptionalRelevantTags))
 	{
+		LastActivationFailureReason = TEXT("the inherited GAS cost check failed");
 		return false;
 	}
 
-	if (!HasRequiredPayloadConfiguration()
-		|| !MeetsCharacterRequirement(ActorInfo)
-		|| !MeetsWeaponRequirement(Handle, ActorInfo))
+	if (!HasRequiredPayloadConfiguration())
 	{
+		LastActivationFailureReason = TEXT("required payload configuration is incomplete");
+		if (OptionalRelevantTags)
+		{
+			OptionalRelevantTags->AddTag(
+				FNarrativeGameplayTags::Get().Ability_ActivateFail_TagsBlocked);
+		}
+		return false;
+	}
+	if (!MeetsCharacterRequirement(ActorInfo))
+	{
+		LastActivationFailureReason = TEXT("the avatar does not satisfy the character identity requirement");
+		if (OptionalRelevantTags)
+		{
+			OptionalRelevantTags->AddTag(
+				FNarrativeGameplayTags::Get().Ability_ActivateFail_TagsMissing);
+		}
+		return false;
+	}
+	if (!MeetsWeaponRequirement(Handle, ActorInfo))
+	{
+		LastActivationFailureReason = TEXT("the currently wielded or granting weapon is not allowed");
 		if (OptionalRelevantTags)
 		{
 			OptionalRelevantTags->AddTag(
@@ -61,14 +142,38 @@ bool USovGameplayAbility_EchoBase::CheckCost(
 		return false;
 	}
 
-	const USovEchoComponent* EchoComponent = ResolveEchoComponent(ActorInfo);
+	USovEchoComponent* EchoComponent = ResolveEchoComponent(ActorInfo);
 	const float RequiredEcho = GetMinimumEchoRequired();
 	const float Cost = GetEchoCost();
-	if (!IsValid(EchoComponent)
-		|| !EchoComponent->IsInitialized()
-		|| EchoComponent->GetEcho() + KINDA_SMALL_NUMBER < RequiredEcho
-		|| !EchoComponent->CanAffordEcho(Cost))
+	if (!IsValid(EchoComponent))
 	{
+		LastActivationFailureReason = TEXT("the avatar has no Sovereign Echo component");
+		AddEchoFailureTags(OptionalRelevantTags);
+		return false;
+	}
+	if (!EchoComponent->IsInitialized())
+	{
+		LastActivationFailureReason = TEXT("the Sovereign Echo component could not bind to the current ASC");
+		AddEchoFailureTags(OptionalRelevantTags);
+		return false;
+	}
+
+	const float CurrentEcho = EchoComponent->GetEcho();
+	if (CurrentEcho + KINDA_SMALL_NUMBER < RequiredEcho)
+	{
+		LastActivationFailureReason = FString::Printf(
+			TEXT("current Echo %.2f is below the %.2f activation threshold"),
+			CurrentEcho,
+			RequiredEcho);
+		AddEchoFailureTags(OptionalRelevantTags);
+		return false;
+	}
+	if (!EchoComponent->CanAffordEcho(Cost))
+	{
+		LastActivationFailureReason = FString::Printf(
+			TEXT("current Echo %.2f cannot pay the %.2f activation cost"),
+			CurrentEcho,
+			Cost);
 		AddEchoFailureTags(OptionalRelevantTags);
 		return false;
 	}
@@ -281,7 +386,18 @@ USovEchoComponent* USovGameplayAbility_EchoBase::ResolveEchoComponent(
 	const FGameplayAbilityActorInfo* ActorInfo) const
 {
 	AActor* Avatar = ActorInfo ? ActorInfo->AvatarActor.Get() : nullptr;
-	return Avatar ? Avatar->FindComponentByClass<USovEchoComponent>() : nullptr;
+	USovEchoComponent* EchoComponent = Avatar
+		? Avatar->FindComponentByClass<USovEchoComponent>()
+		: nullptr;
+	if (IsValid(EchoComponent) && ActorInfo)
+	{
+		// The ASC lives on Narrative's PlayerState and may be replaced across
+		// possession/respawn. Rebinding here makes cost checks resilient to a
+		// missed or delayed character-readiness callback on either network side.
+		EchoComponent->InitializeWithAbilitySystem(
+			ActorInfo->AbilitySystemComponent.Get());
+	}
+	return EchoComponent;
 }
 
 bool USovGameplayAbility_EchoBase::MeetsWeaponRequirement(

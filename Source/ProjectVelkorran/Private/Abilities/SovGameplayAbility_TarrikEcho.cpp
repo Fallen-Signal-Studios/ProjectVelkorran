@@ -160,6 +160,10 @@ USovGameplayAbility_TarrikCinderStickyGrenade::USovGameplayAbility_TarrikCinderS
 	AbilityAnimSetTag = Tags.AnimSet_Ability_Tarrik_CinderStickyGrenade;
 	InputTag = FNarrativeGameplayTags::Get().Narrative_Input_Ability1;
 	WeaponFamily = ESovTarrikEchoWeaponFamily::Universal;
+	// The grenade is granted once by Tarrik's character configuration and works
+	// with either loadout. It must not become unusable when a Blueprint compile,
+	// reparent, or weapon-asset migration clears AllowedWeaponClasses.
+	bRequiresAllowedWeapon = false;
 	WeaponGatePolicy = ESovEchoWeaponGatePolicy::AnyAllowedWielded;
 	AbilityDisplayName = NSLOCTEXT("SovTarrikEcho", "CinderStickyGrenadeName", "Cinder Sticky Grenade");
 	AbilityDescription = NSLOCTEXT(
@@ -181,9 +185,9 @@ void USovGameplayAbility_TarrikCinderStickyGrenade::ActivateAbility(
 
 bool USovGameplayAbility_TarrikCinderStickyGrenade::HasRequiredPayloadConfiguration() const
 {
-	return GrenadeClass.Get()
-		&& ExplosionDamageEffectClass.Get()
-		&& BurnEffectClass.Get()
+	return ResolveGrenadeClass().Get()
+		&& ResolveExplosionDamageEffectClass().Get()
+		&& ResolveBurnEffectClass().Get()
 		&& FuseDuration > KINDA_SMALL_NUMBER
 		&& ExplosionRadius > KINDA_SMALL_NUMBER
 		&& ExplosionDamage > KINDA_SMALL_NUMBER
@@ -202,6 +206,45 @@ bool USovGameplayAbility_TarrikCinderStickyGrenade::HasRequiredPayloadConfigurat
 		&& GrenadeGravityScale >= 0.0f
 		&& MaximumGrenadeLaunchSpeed + KINDA_SMALL_NUMBER >= DefaultGrenadeLaunchSpeed
 		&& MaximumGrenadeSpawnDistance > KINDA_SMALL_NUMBER;
+}
+
+bool USovGameplayAbility_TarrikCinderStickyGrenade::MeetsWeaponRequirement(
+	const FGameplayAbilitySpecHandle Handle,
+	const FGameplayAbilityActorInfo* ActorInfo) const
+{
+	static_cast<void>(Handle);
+	static_cast<void>(ActorInfo);
+	return true;
+}
+
+TSubclassOf<ASovCinderStickyGrenadeProjectile>
+USovGameplayAbility_TarrikCinderStickyGrenade::ResolveGrenadeClass() const
+{
+	if (GrenadeClass.Get())
+	{
+		return GrenadeClass;
+	}
+	return ASovCinderStickyGrenadeProjectile::StaticClass();
+}
+
+TSubclassOf<UGameplayEffect>
+USovGameplayAbility_TarrikCinderStickyGrenade::ResolveExplosionDamageEffectClass() const
+{
+	if (ExplosionDamageEffectClass.Get())
+	{
+		return ExplosionDamageEffectClass;
+	}
+	return USovGameplayEffect_CinderGrenadeExplosionDamage::StaticClass();
+}
+
+TSubclassOf<UGameplayEffect>
+USovGameplayAbility_TarrikCinderStickyGrenade::ResolveBurnEffectClass() const
+{
+	if (BurnEffectClass.Get())
+	{
+		return BurnEffectClass;
+	}
+	return USovGameplayEffect_CinderGrenadeBurn::StaticClass();
 }
 
 ASovCinderStickyGrenadeProjectile*
@@ -339,7 +382,7 @@ USovGameplayAbility_TarrikCinderStickyGrenade::ReleaseCinderStickyGrenade(
 
 	ASovCinderStickyGrenadeProjectile* Grenade =
 		World->SpawnActorDeferred<ASovCinderStickyGrenadeProjectile>(
-			GrenadeClass,
+			ResolveGrenadeClass(),
 			ServerSpawnTransform,
 			Avatar,
 			Cast<APawn>(Avatar),
@@ -364,8 +407,8 @@ USovGameplayAbility_TarrikCinderStickyGrenade::ReleaseCinderStickyGrenade(
 		CurrentActorInfo->AbilitySystemComponent.Get(),
 		Avatar,
 		DamageSourceObject,
-		ExplosionDamageEffectClass,
-		BurnEffectClass,
+		ResolveExplosionDamageEffectClass(),
+		ResolveBurnEffectClass(),
 		EchoSpendTag,
 		static_cast<float>(GetAbilityLevel()),
 		InitialVelocity,

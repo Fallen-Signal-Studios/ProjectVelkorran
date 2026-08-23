@@ -118,6 +118,9 @@ protected:
 		const FGameplayEventData* TriggerEventData) override;
 
 	virtual bool HasRequiredPayloadConfiguration() const override;
+	virtual bool MeetsWeaponRequirement(
+		const FGameplayAbilitySpecHandle Handle,
+		const FGameplayAbilityActorInfo* ActorInfo) const override;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload")
 	TSubclassOf<ASovCinderStickyGrenadeProjectile> GrenadeClass;
@@ -195,6 +198,9 @@ protected:
 	bool bExplosionRequiresLineOfSight = true;
 
 private:
+	TSubclassOf<ASovCinderStickyGrenadeProjectile> ResolveGrenadeClass() const;
+	TSubclassOf<UGameplayEffect> ResolveExplosionDamageEffectClass() const;
+	TSubclassOf<UGameplayEffect> ResolveBurnEffectClass() const;
 	bool bGrenadeReleaseAttempted = false;
 };
 

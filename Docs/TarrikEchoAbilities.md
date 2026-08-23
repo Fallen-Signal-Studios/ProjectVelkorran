@@ -30,7 +30,7 @@ The shared `USovGameplayAbility_EchoBase`, reached through Tarrik's compatibilit
 - authority-only, atomic Echo spending through `USovEchoComponent`;
 - one active Echo action at a time, with Narrative's Busy state owned for the committed cast so ordinary combat cannot stomp its montage;
 - common death, guard, guard-break, Poise-break, busy, interaction, sequencer, and ragdoll activation blocks, with active cancellation when terminal/interrupt states arrive during the cast;
-- fail-closed `AllowedWeaponClasses` validation against the currently wielded item;
+- fail-closed `AllowedWeaponClasses` validation for weapon-specific abilities, with the character-granted Sticky Grenade exempt as a universal action;
 - display text, weapon family, animation-set key, and payload asset/tuning slots;
 - fail-closed native payload validation, so an incomplete child cannot commit or spend Echo;
 - `Echo Ability Started`, `Echo Ability Authority Committed`, `Echo Ability Local Presentation`, and `Echo Ability Ended` Blueprint hooks;
@@ -46,9 +46,9 @@ Do not implement the generic `Event ActivateAbility` in these children. The nati
 
 Add `Sov.Character.Player.Tarrik` to Tarrik's Player Definition/default owned tags. During migration the common base permits an avatar with no player-identity tag, preserving existing content; once any `Sov.Character.Player` identity is present, the Tarrik adapter rejects Selene and other mismatches.
 
-Grant the Sticky Grenade once through Tarrik's default `UAbilityConfiguration`. Do not add it to both weapon assets or dual-wield/source-object variants can create duplicate specs.
+Grant the Sticky Grenade once through Tarrik's default `UAbilityConfiguration`. Do not add it to both weapon assets or dual-wield/source-object variants can create duplicate specs. It is character-granted and works with either Tarrik weapon, so it deliberately ignores `AllowedWeaponClasses`.
 
-Add the sword pair to Velkorran's `WeaponAbilities` and the rifle pair to Cinderline's `WeaponAbilities`. Set each sword Blueprint child's `AllowedWeaponClasses` array to the Velkorran item class and each rifle child's array to the Cinderline item class. Set Sticky Grenade's array to both weapon classes. These abilities intentionally fail closed when that array is empty.
+Add the sword pair to Velkorran's `WeaponAbilities` and the rifle pair to Cinderline's `WeaponAbilities`. Set each sword Blueprint child's `AllowedWeaponClasses` array to the Velkorran item class and each rifle child's array to the Cinderline item class. Those weapon-specific abilities intentionally fail closed when that array is empty.
 
 Narrative activates every granted spec whose input tag matches. Never grant both weapon-context variants of Ability2 or Ability3 at the same time.
 
@@ -81,9 +81,9 @@ Use `Echo Ability Local Presentation` only for owning-player camera, rumble, aud
 
 ### Cinder Sticky Grenade
 
-- Native defaults now provide `Sovereign Cinder Grenade Explosion Damage` and `Sovereign Cinder Grenade Burn`, and the native projectile is a functional fallback. Existing GA Blueprint children that serialized the old empty values may need each class field reset to its inherited default once. Blueprint subclasses remain optional if you want effect-specific Gameplay Cues or data-only tuning.
+- Native defaults provide `Sovereign Cinder Grenade Explosion Damage`, `Sovereign Cinder Grenade Burn`, and a functional native projectile fallback. Existing GA Blueprint children that serialized the old empty values now resolve those native classes automatically. Blueprint subclasses remain optional if you want effect-specific Gameplay Cues, a visible projectile mesh, or data-only tuning.
 - Create `BP_CinderStickyGrenadeProjectile` from `ASovCinderStickyGrenadeProjectile`. Assign its inherited `Grenade Mesh` and `Explosion Niagara System`; `Explosion Niagara Scale` is available for per-projectile sizing. The native actor spawns that system once at the replicated detonation location on every non-dedicated-server instance. `Cinder Grenade Launched`, `Cinder Grenade Stuck`, and `Cinder Grenade Detonated` remain available for audio, decals, and additional presentation; do not spawn the same explosion system again from the event. Native code hides the mesh on detonation and owns all gameplay.
-- In `GA_Tarrik_CinderStickyGrenade`, assign that Blueprint to `GrenadeClass`. Leave the two effect fields on their inherited native defaults, or replace them with Blueprint children of the matching native GameplayEffect classes. The ability fails its cost check before spending Echo if any required class or positive tuning value is missing.
+- In `GA_Tarrik_CinderStickyGrenade`, assign that Blueprint to `GrenadeClass`. Leave the two effect fields on their inherited native defaults, or replace them with Blueprint children of the matching native GameplayEffect classes. Empty class fields fall back to the native implementations; invalid non-positive tuning still fails before Echo is spent.
 - The explosion GE must be `Instant`, use `UNarrativeDamageExecCalc`, and must not directly modify Health, Shield, Poise, or the Damage meta attribute. Native code supplies `SetByCaller.Damage`, radial falloff, Poise pressure, Kinetic + Thermal channels, Standard guard class, and the grenade as effect causer.
 - The native Burn GE uses `SetByCaller.Duration`, ticks once per second without an immediate application tick, and refreshes instead of stacking when Tarrik reapplies it. Each tick routes through `UNarrativeDamageExecCalc`; the projectile supplies `SetByCaller.Damage`, Thermal, and Bypass Guard. Burn is applied only after the explosion actually reduces Shield, Health, or Poise, and is rejected by either exact `Sov.Status.Immunity` or `Sov.Status.Immunity.Burn`, so immunity and perfect defense do not receive a detached status effect.
 - In the GA child, resolve and play the tagged Narrative anim set from `Echo Ability Started`. At the authoritative throw-frame notify, call `Release Cinder Sticky Grenade From Aim`. The native ability resolves `GrenadeThrowSocketName` (falling back to `GrenadeFallbackSpawnOffset`), traces the server controller's aim, solves a fixed-speed ballistic arc, and applies the same `GrenadeGravityScale` to the projectile. `Release Cinder Sticky Grenade(SpawnTransform, InitialVelocity)` remains available only for unusual server-validated custom throws.

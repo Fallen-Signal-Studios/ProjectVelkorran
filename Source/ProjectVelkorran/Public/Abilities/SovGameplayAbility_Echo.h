@@ -35,6 +35,13 @@ class PROJECTVELKORRAN_API USovGameplayAbility_EchoBase : public UNarrativeComba
 public:
 	USovGameplayAbility_EchoBase();
 
+	virtual bool CanActivateAbility(
+		const FGameplayAbilitySpecHandle Handle,
+		const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayTagContainer* SourceTags = nullptr,
+		const FGameplayTagContainer* TargetTags = nullptr,
+		FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
+
 	virtual bool CheckCost(
 		const FGameplayAbilitySpecHandle Handle,
 		const FGameplayAbilityActorInfo* ActorInfo,
@@ -95,6 +102,11 @@ protected:
 	/** Concrete native parents fail closed when required payload assets are empty. */
 	virtual bool HasRequiredPayloadConfiguration() const { return true; }
 
+	/** Concrete abilities may override the shared authored-weapon policy. */
+	virtual bool MeetsWeaponRequirement(
+		const FGameplayAbilitySpecHandle Handle,
+		const FGameplayAbilityActorInfo* ActorInfo) const;
+
 	/** Runs after GAS commit on the predicting owner and authority. */
 	UFUNCTION(BlueprintImplementableEvent, Category = "Sovereign|Echo Ability", meta = (DisplayName = "Echo Ability Started"))
 	void ReceiveEchoAbilityStarted(bool bIsAuthoritative);
@@ -154,9 +166,6 @@ protected:
 
 private:
 	USovEchoComponent* ResolveEchoComponent(const FGameplayAbilityActorInfo* ActorInfo) const;
-	bool MeetsWeaponRequirement(
-		const FGameplayAbilitySpecHandle Handle,
-		const FGameplayAbilityActorInfo* ActorInfo) const;
 	bool MeetsCharacterRequirement(const FGameplayAbilityActorInfo* ActorInfo) const;
 	void AddEchoFailureTags(FGameplayTagContainer* OptionalRelevantTags) const;
 	void BindCancellationTags(UAbilitySystemComponent* AbilitySystem);
@@ -173,4 +182,5 @@ private:
 	bool bEchoAbilityStarted = false;
 	mutable bool bAuthorityEchoSpendAttempted = false;
 	mutable bool bAuthorityEchoSpendSucceeded = false;
+	mutable FString LastActivationFailureReason;
 };
