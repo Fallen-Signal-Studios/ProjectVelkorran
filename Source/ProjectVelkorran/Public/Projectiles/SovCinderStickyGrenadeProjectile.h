@@ -13,6 +13,7 @@ class UGameplayEffect;
 class UNiagaraSystem;
 class UPrimitiveComponent;
 class UProjectileMovementComponent;
+class URadialForceComponent;
 class USphereComponent;
 class UStaticMeshComponent;
 struct FGameplayEffectContextHandle;
@@ -74,6 +75,29 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Components")
 	TObjectPtr<UProjectileMovementComponent> ProjectileMovement;
 
+	/**
+	 * One-shot physics blast fired by the authoritative detonation. Select this
+	 * component in a projectile Blueprint to tune strength, falloff, mass
+	 * handling, and the physics object types that should be affected.
+	 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Components")
+	TObjectPtr<URadialForceComponent> ExplosionRadialForce;
+
+	/** Enables the radial physics impulse without changing GAS damage. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Physics")
+	bool bApplyExplosionPhysicsImpulse = true;
+
+	/** Multiplies the configured gameplay explosion radius for the physics blast. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Physics", meta = (EditCondition = "bApplyExplosionPhysicsImpulse", ClampMin = "0.0"))
+	float ExplosionPhysicsRadiusScale = 1.0f;
+
+	/**
+	 * Moves the radial-force origin below the grenade so nearby bodies receive
+	 * an upward component instead of being driven flat along the ground.
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Physics", meta = (EditCondition = "bApplyExplosionPhysicsImpulse", ClampMin = "0.0", Units = "cm"))
+	float ExplosionPhysicsUpwardBias = 75.0f;
+
 	/** Time retained after detonation so replicated cosmetic state reaches clients. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Presentation", meta = (ClampMin = "0.1", Units = "s"))
 	float DetonationCleanupDelay = 0.5f;
@@ -116,6 +140,7 @@ private:
 	void StartProjectileMovement();
 	void DeactivateProjectile();
 	void Detonate();
+	void ApplyExplosionPhysicsImpulse();
 	void ApplyExplosion();
 	void ApplyBurn(UAbilitySystemComponent* TargetAbilitySystem, const FGameplayEffectContextHandle& Context);
 	bool IsTargetAlive(const UAbilitySystemComponent* TargetAbilitySystem) const;

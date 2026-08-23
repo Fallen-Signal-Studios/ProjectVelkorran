@@ -19,6 +19,7 @@
 #include "Net/UnrealNetwork.h"
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraSystem.h"
+#include "PhysicsEngine/RadialForceComponent.h"
 #include "Sovereign/SovGameplayTags.h"
 #include "UnrealFramework/NarrativeTeamAgentInterface.h"
 
@@ -56,6 +57,16 @@ ASovCinderStickyGrenadeProjectile::ASovCinderStickyGrenadeProjectile()
 	ProjectileMovement->bSweepCollision = true;
 	ProjectileMovement->bShouldBounce = false;
 	ProjectileMovement->ProjectileGravityScale = 1.0f;
+
+	ExplosionRadialForce = CreateDefaultSubobject<URadialForceComponent>(TEXT("ExplosionRadialForce"));
+	ExplosionRadialForce->SetupAttachment(CollisionSphere);
+	ExplosionRadialForce->Radius = 350.0f;
+	ExplosionRadialForce->Falloff = RIF_Linear;
+	ExplosionRadialForce->ForceStrength = 0.0f;
+	ExplosionRadialForce->ImpulseStrength = 1800.0f;
+	ExplosionRadialForce->bImpulseVelChange = true;
+	ExplosionRadialForce->bIgnoreOwningActor = true;
+	ExplosionRadialForce->bAutoActivate = false;
 }
 
 void ASovCinderStickyGrenadeProjectile::InitializeGrenade(
@@ -236,9 +247,35 @@ void ASovCinderStickyGrenadeProjectile::Detonate()
 	DetonationLocation = GetActorLocation();
 	DeactivateProjectile();
 	ApplyExplosion();
+	ApplyExplosionPhysicsImpulse();
 	PlayDetonationPresentation();
 	ForceNetUpdate();
 	SetLifeSpan(FMath::Max(DetonationCleanupDelay, 0.1f));
+}
+
+void ASovCinderStickyGrenadeProjectile::ApplyExplosionPhysicsImpulse()
+{
+	if (!HasAuthority()
+		|| !bApplyExplosionPhysicsImpulse
+		|| !IsValid(ExplosionRadialForce))
+	{
+		return;
+	}
+
+	const float PhysicsRadius = ExplosionRadius * FMath::Max(ExplosionPhysicsRadiusScale, 0.0f);
+	if (PhysicsRadius <= KINDA_SMALL_NUMBER
+		|| ExplosionRadialForce->ImpulseStrength <= KINDA_SMALL_NUMBER)
+	{
+		return;
+	}
+
+	// A slightly lowered origin turns part of the outward impulse upward. This
+	// keeps floor-bound ragdolls and props from only skidding across the ground.
+	const FVector ImpulseOrigin = DetonationLocation
+		- (FVector::UpVector * FMath::Max(ExplosionPhysicsUpwardBias, 0.0f));
+	ExplosionRadialForce->SetWorldLocation(ImpulseOrigin);
+	ExplosionRadialForce->Radius = PhysicsRadius;
+	ExplosionRadialForce->FireImpulse();
 }
 
 void ASovCinderStickyGrenadeProjectile::ApplyExplosion()
