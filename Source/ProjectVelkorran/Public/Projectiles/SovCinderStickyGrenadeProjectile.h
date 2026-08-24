@@ -10,6 +10,7 @@
 
 class UAbilitySystemComponent;
 class UGameplayEffect;
+class UMaterialInterface;
 class UNiagaraSystem;
 class UPrimitiveComponent;
 class UProjectileMovementComponent;
@@ -110,6 +111,30 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Presentation")
 	FVector ExplosionNiagaraScale = FVector::OneVector;
 
+	/** Optional scorch/debris decal projected onto the nearest world surface. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Presentation|Decal")
+	TObjectPtr<UMaterialInterface> ExplosionDecalMaterial;
+
+	/** Decal projection depth, width, and height. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Presentation|Decal", meta = (EditCondition = "ExplosionDecalMaterial != nullptr", ClampMin = "0.0", Units = "cm"))
+	FVector ExplosionDecalSize = FVector(16.0f, 175.0f, 175.0f);
+
+	/** Maximum distance searched for the nearest ground, wall, or other world surface. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Presentation|Decal", meta = (EditCondition = "ExplosionDecalMaterial != nullptr", ClampMin = "0.0", Units = "cm"))
+	float ExplosionDecalSurfaceSearchDistance = 250.0f;
+
+	/** Small separation from the hit surface to prevent depth fighting. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Presentation|Decal", meta = (EditCondition = "ExplosionDecalMaterial != nullptr", ClampMin = "0.0", Units = "cm"))
+	float ExplosionDecalSurfaceOffset = 1.0f;
+
+	/** Time the decal remains fully visible before fading begins. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Presentation|Decal", meta = (EditCondition = "ExplosionDecalMaterial != nullptr", ClampMin = "0.0", Units = "s"))
+	float ExplosionDecalVisibleDuration = 5.0f;
+
+	/** Fade-out duration after the fully visible period. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Presentation|Decal", meta = (EditCondition = "ExplosionDecalMaterial != nullptr", ClampMin = "0.0", Units = "s"))
+	float ExplosionDecalFadeDuration = 1.0f;
+
 	UFUNCTION(BlueprintImplementableEvent, BlueprintCosmetic, Category = "Sovereign|Echo Ability|Presentation", meta = (DisplayName = "Cinder Grenade Launched"))
 	void ReceiveGrenadeLaunched();
 
@@ -145,6 +170,8 @@ private:
 	void ApplyBurn(UAbilitySystemComponent* TargetAbilitySystem, const FGameplayEffectContextHandle& Context);
 	bool IsTargetAlive(const UAbilitySystemComponent* TargetAbilitySystem) const;
 	bool HasExplosionLineOfSight(AActor* TargetActor) const;
+	bool FindExplosionDecalSurface(FHitResult& OutSurfaceHit) const;
+	void SpawnExplosionDecal();
 	void PlayStuckPresentation();
 	void PlayDetonationPresentation();
 

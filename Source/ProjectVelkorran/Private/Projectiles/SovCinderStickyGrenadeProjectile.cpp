@@ -5,6 +5,7 @@
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
 #include "CollisionQueryParams.h"
+#include "Components/DecalComponent.h"
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/OverlapResult.h"
@@ -14,6 +15,8 @@
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "GameplayEffect.h"
 #include "GameplayEffectTypes.h"
+#include "Kismet/GameplayStatics.h"
+#include "Materials/MaterialInterface.h"
 #include "NarrativeArsenal.h"
 #include "NarrativeGameplayTags.h"
 #include "Net/UnrealNetwork.h"
@@ -507,6 +510,133 @@ bool ASovCinderStickyGrenadeProjectile::HasExplosionLineOfSight(AActor* TargetAc
 		|| (IsValid(BlockingActor) && TargetActor->IsOwnedBy(BlockingActor));
 }
 
+bool ASovCinderStickyGrenadeProjectile::FindExplosionDecalSurface(
+	FHitResult& OutSurfaceHit) const
+{
+	UWorld* World = GetWorld();
+	if (!IsValid(World) || ExplosionDecalSurfaceSearchDistance <= KINDA_SMALL_NUMBER)
+	{
+		return false;
+	}
+
+	FCollisionObjectQueryParams ObjectQuery;
+	ObjectQuery.AddObjectTypesToQuery(ECC_WorldStatic);
+	ObjectQuery.AddObjectTypesToQuery(ECC_WorldDynamic);
+
+	FCollisionQueryParams QueryParams(
+		SCENE_QUERY_STAT(SovCinderStickyGrenadeDecalSurface),
+		false,
+		this);
+	QueryParams.AddIgnoredActor(this);
+	QueryParams.AddIgnoredActor(SourceAvatar.Get());
+	if (IsValid(StuckActor)
+		&& UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(StuckActor))
+	{
+		// A sticky hit on a character should still leave its mark on the nearby
+		// environment instead of attaching a world decal to the victim's gear.
+		QueryParams.AddIgnoredActor(StuckActor);
+	}
+
+	TArray<FVector, TInlineAllocator<12>> SearchDirections;
+	if (bIsStuck && !FVector(StuckNormal).IsNearlyZero())
+	{
+		// Usually finds the exact ground or wall the grenade struck first.
+		SearchDirections.Add(-FVector(StuckNormal).GetSafeNormal());
+	}
+	SearchDirections.Add(FVector::DownVector);
+	SearchDirections.Add(FVector::UpVector);
+	for (int32 DirectionIndex = 0; DirectionIndex < 8; ++DirectionIndex)
+	{
+		const float AngleRadians = (PI * 2.0f * static_cast<float>(DirectionIndex)) / 8.0f;
+		SearchDirections.Add(FVector(FMath::Cos(AngleRadians), FMath::Sin(AngleRadians), 0.0f));
+	}
+
+	bool bFoundSurface = false;
+	float NearestDistance = TNumericLimits<float>::Max();
+	for (const FVector& SearchDirection : SearchDirections)
+	{
+		FHitResult CandidateHit;
+		const FVector TraceEnd = DetonationLocation
+			+ (SearchDirection.GetSafeNormal() * ExplosionDecalSurfaceSearchDistance);
+		if (!World->LineTraceSingleByObjectType(
+				CandidateHit,
+				DetonationLocation,
+				TraceEnd,
+				ObjectQuery,
+				QueryParams)
+			|| !CandidateHit.bBlockingHit
+			|| CandidateHit.ImpactNormal.IsNearlyZero()
+			|| CandidateHit.Distance >= NearestDistance)
+		{
+			continue;
+		}
+
+		NearestDistance = CandidateHit.Distance;
+		OutSurfaceHit = CandidateHit;
+		bFoundSurface = true;
+	}
+
+	return bFoundSurface;
+}
+
+void ASovCinderStickyGrenadeProjectile::SpawnExplosionDecal()
+{
+	UWorld* World = GetWorld();
+	if (!IsValid(World)
+		|| World->GetNetMode() == NM_DedicatedServer
+		|| !IsValid(ExplosionDecalMaterial))
+	{
+		return;
+	}
+
+	FHitResult SurfaceHit;
+	if (!FindExplosionDecalSurface(SurfaceHit))
+	{
+		return;
+	}
+
+	const FVector SurfaceNormal = SurfaceHit.ImpactNormal.GetSafeNormal();
+	const FVector DecalLocation = SurfaceHit.ImpactPoint
+		+ (SurfaceNormal * FMath::Max(ExplosionDecalSurfaceOffset, 0.0f));
+	const FVector DecalSize(
+		FMath::Max(ExplosionDecalSize.X, 1.0f),
+		FMath::Max(ExplosionDecalSize.Y, 1.0f),
+		FMath::Max(ExplosionDecalSize.Z, 1.0f));
+	const float VisibleDuration = FMath::Max(ExplosionDecalVisibleDuration, 0.0f);
+	const float FadeDuration = FMath::Max(ExplosionDecalFadeDuration, 0.0f);
+	const float TotalLifetime = FMath::Max(VisibleDuration + FadeDuration, 0.1f);
+	const FRotator DecalRotation = SurfaceNormal.Rotation();
+
+	UDecalComponent* SpawnedDecal = nullptr;
+	if (USceneComponent* HitComponent = SurfaceHit.GetComponent())
+	{
+		SpawnedDecal = UGameplayStatics::SpawnDecalAttached(
+			ExplosionDecalMaterial,
+			DecalSize,
+			HitComponent,
+			SurfaceHit.BoneName,
+			DecalLocation,
+			DecalRotation,
+			EAttachLocation::KeepWorldPosition,
+			TotalLifetime);
+	}
+	else
+	{
+		SpawnedDecal = UGameplayStatics::SpawnDecalAtLocation(
+			World,
+			ExplosionDecalMaterial,
+			DecalSize,
+			DecalLocation,
+			DecalRotation,
+			TotalLifetime);
+	}
+
+	if (IsValid(SpawnedDecal) && FadeDuration > KINDA_SMALL_NUMBER)
+	{
+		SpawnedDecal->SetFadeOut(VisibleDuration, FadeDuration, false);
+	}
+}
+
 void ASovCinderStickyGrenadeProjectile::OnRep_IsStuck()
 {
 	if (bIsStuck)
@@ -570,6 +700,7 @@ void ASovCinderStickyGrenadeProjectile::PlayDetonationPresentation()
 			ENCPoolMethod::AutoRelease,
 			true);
 	}
+	SpawnExplosionDecal();
 	ReceiveGrenadeDetonated(DetonationLocation, StuckNormal);
 }
 
