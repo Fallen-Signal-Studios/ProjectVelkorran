@@ -93,12 +93,12 @@ protected:
 	UFUNCTION(BlueprintImplementableEvent, BlueprintCosmetic, Category = "Sovereign|Echo Ability|Presentation", meta = (DisplayName = "Hunger Projectile Impacted"))
 	void ReceiveHungerProjectileImpacted(
 		AActor* HitActor,
-		FVector ResolvedLocation,
-		FVector ResolvedNormal,
+		FVector ImpactLocation,
+		FVector ImpactSurfaceNormal,
 		bool bDamagedTarget);
 
 	UFUNCTION(BlueprintImplementableEvent, BlueprintCosmetic, Category = "Sovereign|Echo Ability|Presentation", meta = (DisplayName = "Hunger Projectile Dissipated"))
-	void ReceiveHungerProjectileDissipated(FVector ResolvedLocation);
+	void ReceiveHungerProjectileDissipated(FVector DissipationLocation);
 
 private:
 	UFUNCTION()
@@ -129,10 +129,10 @@ private:
 	void ExpireProjectile();
 	void ResolveImpact(
 		AActor* HitActor,
-		const FVector& ResolvedLocation,
-		const FVector& ResolvedNormal,
+		const FVector& InResolvedLocation,
+		const FVector& InResolvedNormal,
 		bool bDamagedTarget,
-		bool bExpired);
+		bool bInExpired);
 	bool ApplyDirectHit(UAbilitySystemComponent* TargetAbilitySystem, const FVector& HitLocation);
 	void ApplyBurn(UAbilitySystemComponent* TargetAbilitySystem, const FGameplayEffectContextHandle& Context);
 	bool IsHostileTarget(const UAbilitySystemComponent* TargetAbilitySystem) const;

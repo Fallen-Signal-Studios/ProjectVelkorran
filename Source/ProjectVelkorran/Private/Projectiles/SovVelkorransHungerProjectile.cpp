@@ -30,8 +30,8 @@ ASovVelkorransHungerProjectile::ASovVelkorransHungerProjectile()
 	PrimaryActorTick.bCanEverTick = false;
 	bReplicates = true;
 	SetReplicateMovement(true);
-	NetUpdateFrequency = 30.0f;
-	MinNetUpdateFrequency = 10.0f;
+	SetNetUpdateFrequency(30.0f);
+	SetMinNetUpdateFrequency(10.0f);
 
 	CollisionSphere = CreateDefaultSubobject<USphereComponent>(TEXT("CollisionSphere"));
 	SetRootComponent(CollisionSphere);
@@ -234,9 +234,11 @@ void ASovVelkorransHungerProjectile::HandleProjectileOverlap(
 	}
 
 	const FVector HitLocation = bFromSweep
-		? SweepResult.ImpactPoint
+		? FVector(SweepResult.ImpactPoint)
 		: OtherActor->GetActorLocation();
-	FVector HitNormal = bFromSweep ? SweepResult.ImpactNormal : FVector::ZeroVector;
+	FVector HitNormal = bFromSweep
+		? FVector(SweepResult.ImpactNormal)
+		: FVector::ZeroVector;
 	if (HitNormal.IsNearlyZero())
 	{
 		HitNormal = -FVector(ReplicatedInitialVelocity).GetSafeNormal();
@@ -280,10 +282,11 @@ void ASovVelkorransHungerProjectile::HandleProjectileHit(
 	UAbilitySystemComponent* TargetASC = IsValid(OtherActor)
 		? UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(OtherActor)
 		: nullptr;
+	const FVector HitLocation(Hit.ImpactPoint);
 	const bool bDamagedTarget = IsHostileTarget(TargetASC)
-		&& ApplyDirectHit(TargetASC, Hit.ImpactPoint);
+		&& ApplyDirectHit(TargetASC, HitLocation);
 
-	FVector HitNormal = Hit.ImpactNormal.GetSafeNormal();
+	FVector HitNormal = FVector(Hit.ImpactNormal).GetSafeNormal();
 	if (HitNormal.IsNearlyZero())
 	{
 		HitNormal = -FVector(ReplicatedInitialVelocity).GetSafeNormal();
@@ -292,7 +295,7 @@ void ASovVelkorransHungerProjectile::HandleProjectileHit(
 	{
 		HitNormal = FVector::UpVector;
 	}
-	ResolveImpact(OtherActor, Hit.ImpactPoint, HitNormal, bDamagedTarget, false);
+	ResolveImpact(OtherActor, HitLocation, HitNormal, bDamagedTarget, false);
 }
 
 bool ASovVelkorransHungerProjectile::ApplyDirectHit(

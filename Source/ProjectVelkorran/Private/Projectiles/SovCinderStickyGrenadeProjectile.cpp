@@ -33,8 +33,8 @@ ASovCinderStickyGrenadeProjectile::ASovCinderStickyGrenadeProjectile()
 	PrimaryActorTick.bCanEverTick = false;
 	bReplicates = true;
 	SetReplicateMovement(true);
-	NetUpdateFrequency = 30.0f;
-	MinNetUpdateFrequency = 10.0f;
+	SetNetUpdateFrequency(30.0f);
+	SetMinNetUpdateFrequency(10.0f);
 
 	CollisionSphere = CreateDefaultSubobject<USphereComponent>(TEXT("CollisionSphere"));
 	SetRootComponent(CollisionSphere);
