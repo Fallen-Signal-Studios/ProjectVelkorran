@@ -7,8 +7,8 @@
 #include "SovGameplayAbility_TarrikEcho.generated.h"
 
 class UGameplayEffect;
-class ANarrativeProjectile;
 class ASovCinderStickyGrenadeProjectile;
+class ASovVelkorransHungerProjectile;
 
 /** Weapon context used to organize Tarrik's Echo loadout in UI and content. */
 UENUM(BlueprintType)
@@ -70,17 +70,98 @@ class PROJECTVELKORRAN_API USovGameplayAbility_TarrikVelkorransHunger : public U
 public:
 	USovGameplayAbility_TarrikVelkorransHunger();
 
+	/**
+	 * Resolves the active Velkorran visual, traces the server-owned aim, and
+	 * releases one authoritative blade-wave projectile. This is the normal
+	 * Blueprint release-frame entry point.
+	 */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Echo Ability|Payload")
+	ASovVelkorransHungerProjectile* ReleaseVelkorransHungerFromAim();
+
+	/**
+	 * Advanced release path for callers with a custom server-validated spawn
+	 * transform and velocity. Most children should use the aim-driven helper.
+	 */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Echo Ability|Payload")
+	ASovVelkorransHungerProjectile* ReleaseVelkorransHunger(
+		const FTransform& SpawnTransform,
+		FVector InitialVelocity);
+
 protected:
+	virtual void ActivateAbility(
+		const FGameplayAbilitySpecHandle Handle,
+		const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayAbilityActivationInfo ActivationInfo,
+		const FGameplayEventData* TriggerEventData) override;
+
 	virtual bool HasRequiredPayloadConfiguration() const override;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload")
-	TSubclassOf<ANarrativeProjectile> ProjectileClass;
+	TSubclassOf<ASovVelkorransHungerProjectile> ProjectileClass;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload")
 	TSubclassOf<UGameplayEffect> DirectDamageEffectClass;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload")
 	TSubclassOf<UGameplayEffect> BurnEffectClass;
+
+	/** SetByCaller direct damage routed through UNarrativeDamageExecCalc. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload", meta = (ClampMin = "0.0"))
+	float DirectDamage = 65.0f;
+
+	/** Explicit Poise pressure applied by the blade-wave impact. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload", meta = (ClampMin = "0.0"))
+	float DirectPoiseDamage = 30.0f;
+
+	/** SetByCaller damage supplied to each tick of the shared Cinder Burn. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload", meta = (ClampMin = "0.0"))
+	float BurnDamagePerTick = 5.0f;
+
+	/** SetByCaller duration supplied to the shared Cinder Burn. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload", meta = (ClampMin = "0.0", Units = "s"))
+	float BurnDuration = 4.0f;
+
+	/** Socket on Velkorran's active weapon visual used for the release location. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Launch")
+	FName HungerReleaseSocketName = TEXT("HungerRelease");
+
+	/** Avatar-local fallback used when Velkorran's visual or socket is unavailable. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Launch", meta = (Units = "cm"))
+	FVector HungerFallbackSpawnOffset = FVector(95.0f, 20.0f, 75.0f);
+
+	/** Distance of the authoritative camera/control-rotation aim trace. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Launch", meta = (ClampMin = "0.0", Units = "cm"))
+	float HungerAimTraceDistance = 5000.0f;
+
+	/** Native blade-wave travel speed. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Launch", meta = (ClampMin = "0.0", Units = "cm/s"))
+	float HungerProjectileSpeed = 4200.0f;
+
+	/** Gravity multiplier copied to the projectile; zero produces a straight wave. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Launch", meta = (ClampMin = "0.0"))
+	float HungerProjectileGravityScale = 0.0f;
+
+	/** Server clamp for custom launch velocities. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Launch", meta = (ClampMin = "0.0", Units = "cm/s"))
+	float MaximumHungerProjectileSpeed = 6000.0f;
+
+	/** Authoritative collision radius of the traveling blade wave. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Launch", meta = (ClampMin = "1.0", Units = "cm"))
+	float HungerProjectileCollisionRadius = 35.0f;
+
+	/** Maximum flight time before the wave dissipates harmlessly. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Launch", meta = (ClampMin = "0.1", Units = "s"))
+	float HungerProjectileFlightDuration = 1.25f;
+
+	/** Rejects a custom release transform that is not near Tarrik. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Launch", meta = (ClampMin = "0.0", Units = "cm"))
+	float MaximumHungerSpawnDistance = 600.0f;
+
+private:
+	TSubclassOf<ASovVelkorransHungerProjectile> ResolveHungerProjectileClass() const;
+	TSubclassOf<UGameplayEffect> ResolveHungerDamageEffectClass() const;
+	TSubclassOf<UGameplayEffect> ResolveHungerBurnEffectClass() const;
+	bool bHungerReleaseAttempted = false;
 };
 
 /** Universal utility: a thrown Cinder charge that sticks, fuses, and explodes. */

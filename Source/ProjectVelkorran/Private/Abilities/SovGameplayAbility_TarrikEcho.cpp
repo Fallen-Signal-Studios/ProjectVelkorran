@@ -6,6 +6,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
 #include "Effects/SovGameplayEffect_CinderGrenade.h"
+#include "Effects/SovGameplayEffect_VelkorransHunger.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/Pawn.h"
@@ -13,8 +14,10 @@
 #include "Kismet/GameplayStatics.h"
 #include "NarrativeGameplayTags.h"
 #include "Projectiles/SovCinderStickyGrenadeProjectile.h"
+#include "Projectiles/SovVelkorransHungerProjectile.h"
 #include "Sovereign/SovGameplayTags.h"
-#include "Weapons/NarrativeProjectile.h"
+#include "UnrealFramework/NarrativeCharacter.h"
+#include "Weapons/WeaponVisual.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogSovTarrikEchoAbility, Log, All);
 
@@ -121,6 +124,12 @@ bool USovGameplayAbility_TarrikCinderSlam::HasRequiredPayloadConfiguration() con
 USovGameplayAbility_TarrikVelkorransHunger::USovGameplayAbility_TarrikVelkorransHunger()
 {
 	const FSovGameplayTags& Tags = FSovGameplayTags::Get();
+	ProjectileClass = ASovVelkorransHungerProjectile::StaticClass();
+	DirectDamageEffectClass =
+		USovGameplayEffect_VelkorransHungerDamage::StaticClass();
+	// Reuse the existing native Burn definition so Cinder Grenade and Hunger
+	// refresh the same source-owned status instead of stacking parallel Burns.
+	BurnEffectClass = USovGameplayEffect_CinderGrenadeBurn::StaticClass();
 	MinimumEchoRequired = 50.0f;
 	EchoCost = 50.0f;
 	EchoSpendTag = Tags.Ability_Echo_Tarrik_VelkorransHunger;
@@ -137,11 +146,271 @@ USovGameplayAbility_TarrikVelkorransHunger::USovGameplayAbility_TarrikVelkorrans
 		"Sling an inferno from Velkorran's edge, dealing direct projectile damage and applying Burn.");
 }
 
+void USovGameplayAbility_TarrikVelkorransHunger::ActivateAbility(
+	const FGameplayAbilitySpecHandle Handle,
+	const FGameplayAbilityActorInfo* ActorInfo,
+	const FGameplayAbilityActivationInfo ActivationInfo,
+	const FGameplayEventData* TriggerEventData)
+{
+	// Super synchronously enters the Blueprint hooks, so reset before it runs.
+	bHungerReleaseAttempted = false;
+	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
+}
+
 bool USovGameplayAbility_TarrikVelkorransHunger::HasRequiredPayloadConfiguration() const
 {
-	return ProjectileClass.Get()
-		&& DirectDamageEffectClass.Get()
-		&& BurnEffectClass.Get();
+	return ResolveHungerProjectileClass().Get()
+		&& ResolveHungerDamageEffectClass().Get()
+		&& ResolveHungerBurnEffectClass().Get()
+		&& DirectDamage > KINDA_SMALL_NUMBER
+		&& DirectPoiseDamage >= 0.0f
+		&& BurnDamagePerTick > KINDA_SMALL_NUMBER
+		&& BurnDuration > KINDA_SMALL_NUMBER
+		&& !HungerFallbackSpawnOffset.ContainsNaN()
+		&& HungerAimTraceDistance > KINDA_SMALL_NUMBER
+		&& HungerProjectileSpeed > KINDA_SMALL_NUMBER
+		&& FMath::IsFinite(HungerProjectileGravityScale)
+		&& HungerProjectileGravityScale >= 0.0f
+		&& MaximumHungerProjectileSpeed + KINDA_SMALL_NUMBER >= HungerProjectileSpeed
+		&& HungerProjectileCollisionRadius >= 1.0f
+		&& HungerProjectileFlightDuration >= 0.1f
+		&& MaximumHungerSpawnDistance > KINDA_SMALL_NUMBER;
+}
+
+TSubclassOf<ASovVelkorransHungerProjectile>
+USovGameplayAbility_TarrikVelkorransHunger::ResolveHungerProjectileClass() const
+{
+	if (ProjectileClass.Get())
+	{
+		return ProjectileClass;
+	}
+	return ASovVelkorransHungerProjectile::StaticClass();
+}
+
+TSubclassOf<UGameplayEffect>
+USovGameplayAbility_TarrikVelkorransHunger::ResolveHungerDamageEffectClass() const
+{
+	if (DirectDamageEffectClass.Get())
+	{
+		return DirectDamageEffectClass;
+	}
+	return USovGameplayEffect_VelkorransHungerDamage::StaticClass();
+}
+
+TSubclassOf<UGameplayEffect>
+USovGameplayAbility_TarrikVelkorransHunger::ResolveHungerBurnEffectClass() const
+{
+	if (BurnEffectClass.Get())
+	{
+		return BurnEffectClass;
+	}
+	return USovGameplayEffect_CinderGrenadeBurn::StaticClass();
+}
+
+ASovVelkorransHungerProjectile*
+USovGameplayAbility_TarrikVelkorransHunger::ReleaseVelkorransHungerFromAim()
+{
+	if (!IsActive()
+		|| !CurrentActorInfo
+		|| !CurrentActorInfo->IsNetAuthority()
+		|| bHungerReleaseAttempted)
+	{
+		return nullptr;
+	}
+
+	AActor* Avatar = CurrentActorInfo->AvatarActor.Get();
+	UWorld* World = GetWorld();
+	if (!HasRequiredPayloadConfiguration() || !IsValid(Avatar) || !IsValid(World))
+	{
+		bHungerReleaseAttempted = true;
+		UE_LOG(
+			LogSovTarrikEchoAbility,
+			Error,
+			TEXT("Velkorran's Hunger could not resolve its authoritative release context."));
+		FinishEchoAbility(true);
+		return nullptr;
+	}
+
+	FVector AimStart = Avatar->GetActorLocation();
+	FRotator AimRotation = Avatar->GetActorRotation();
+	Avatar->GetActorEyesViewPoint(AimStart, AimRotation);
+	if (AController* Controller = GetOwningController())
+	{
+		AimRotation = Controller->GetControlRotation();
+	}
+
+	const FVector AimEnd = AimStart
+		+ (AimRotation.Vector() * HungerAimTraceDistance);
+	const TArray<FHitResult> AimHits = PerformTraceMulti(AimStart, AimEnd, 0.0f);
+	const FHitResult* BlockingAimHit = AimHits.FindByPredicate(
+		[](const FHitResult& Hit)
+		{
+			return Hit.bBlockingHit;
+		});
+	const FVector AimTarget = BlockingAimHit ? BlockingAimHit->ImpactPoint : AimEnd;
+
+	FTransform SpawnTransform = FTransform::Identity;
+	bool bResolvedWeaponSocket = false;
+	if (ANarrativeCharacter* NarrativeCharacter = Cast<ANarrativeCharacter>(Avatar))
+	{
+		if (AWeaponVisual* WeaponVisual =
+			NarrativeCharacter->GetWieldedWeaponVisual(true))
+		{
+			USkeletalMeshComponent* WeaponMesh = WeaponVisual->WeaponMesh;
+			if (!IsValid(WeaponMesh))
+			{
+				WeaponMesh = WeaponVisual->GetRelevantWeaponMesh();
+			}
+			if (IsValid(WeaponMesh))
+			{
+				if (!HungerReleaseSocketName.IsNone()
+					&& WeaponMesh->DoesSocketExist(HungerReleaseSocketName))
+				{
+					SpawnTransform = WeaponMesh->GetSocketTransform(
+						HungerReleaseSocketName,
+						RTS_World);
+					bResolvedWeaponSocket = true;
+				}
+			}
+		}
+	}
+
+	if (!bResolvedWeaponSocket)
+	{
+		SpawnTransform.SetLocation(
+			Avatar->GetActorTransform().TransformPositionNoScale(
+				HungerFallbackSpawnOffset));
+	}
+
+	FVector LaunchDirection = (AimTarget - SpawnTransform.GetLocation()).GetSafeNormal();
+	if (LaunchDirection.IsNearlyZero())
+	{
+		LaunchDirection = AimRotation.Vector().GetSafeNormal();
+	}
+	SpawnTransform.SetRotation(LaunchDirection.ToOrientationQuat());
+	SpawnTransform.SetScale3D(FVector::OneVector);
+	const FVector InitialVelocity = LaunchDirection * HungerProjectileSpeed;
+	return ReleaseVelkorransHunger(SpawnTransform, InitialVelocity);
+}
+
+ASovVelkorransHungerProjectile*
+USovGameplayAbility_TarrikVelkorransHunger::ReleaseVelkorransHunger(
+	const FTransform& SpawnTransform,
+	FVector InitialVelocity)
+{
+	if (!IsActive()
+		|| !CurrentActorInfo
+		|| !CurrentActorInfo->IsNetAuthority()
+		|| bHungerReleaseAttempted)
+	{
+		return nullptr;
+	}
+
+	bHungerReleaseAttempted = true;
+	AActor* Avatar = CurrentActorInfo->AvatarActor.Get();
+	UWorld* World = GetWorld();
+	if (!HasRequiredPayloadConfiguration()
+		|| !IsValid(Avatar)
+		|| !IsValid(World)
+		|| SpawnTransform.ContainsNaN()
+		|| InitialVelocity.ContainsNaN())
+	{
+		UE_LOG(
+			LogSovTarrikEchoAbility,
+			Error,
+			TEXT("%s could not release Velkorran's Hunger because its server payload or launch data was invalid."),
+			*GetNameSafe(Avatar));
+		FinishEchoAbility(true);
+		return nullptr;
+	}
+
+	if (FVector::DistSquared(Avatar->GetActorLocation(), SpawnTransform.GetLocation())
+		> FMath::Square(MaximumHungerSpawnDistance))
+	{
+		UE_LOG(
+			LogSovTarrikEchoAbility,
+			Warning,
+			TEXT("%s rejected a Velkorran's Hunger release %.1f cm from its avatar."),
+			*GetNameSafe(Avatar),
+			FVector::Distance(Avatar->GetActorLocation(), SpawnTransform.GetLocation()));
+		FinishEchoAbility(true);
+		return nullptr;
+	}
+
+	FTransform ServerSpawnTransform = SpawnTransform;
+	ServerSpawnTransform.NormalizeRotation();
+	ServerSpawnTransform.SetScale3D(FVector::OneVector);
+	if (InitialVelocity.IsNearlyZero())
+	{
+		InitialVelocity = ServerSpawnTransform.GetRotation().GetForwardVector()
+			* HungerProjectileSpeed;
+	}
+	InitialVelocity = InitialVelocity.GetClampedToMaxSize(
+		MaximumHungerProjectileSpeed);
+	if (InitialVelocity.IsNearlyZero())
+	{
+		UE_LOG(
+			LogSovTarrikEchoAbility,
+			Error,
+			TEXT("%s produced a zero launch velocity for Velkorran's Hunger."),
+			*GetNameSafe(Avatar));
+		FinishEchoAbility(true);
+		return nullptr;
+	}
+
+	ASovVelkorransHungerProjectile* HungerProjectile =
+		World->SpawnActorDeferred<ASovVelkorransHungerProjectile>(
+			ResolveHungerProjectileClass(),
+			ServerSpawnTransform,
+			Avatar,
+			Cast<APawn>(Avatar),
+			ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+	if (!IsValid(HungerProjectile))
+	{
+		UE_LOG(
+			LogSovTarrikEchoAbility,
+			Error,
+			TEXT("%s failed to spawn the configured Velkorran's Hunger projectile class."),
+			*GetNameSafe(Avatar));
+		FinishEchoAbility(true);
+		return nullptr;
+	}
+
+	UObject* DamageSourceObject = GetCurrentSourceObject();
+	if (IsValid(DamageSourceObject) && DamageSourceObject->IsA<UGameplayAbility>())
+	{
+		DamageSourceObject = nullptr;
+	}
+	HungerProjectile->InitializeHungerProjectile(
+		CurrentActorInfo->AbilitySystemComponent.Get(),
+		Avatar,
+		DamageSourceObject,
+		ResolveHungerDamageEffectClass(),
+		ResolveHungerBurnEffectClass(),
+		EchoSpendTag,
+		static_cast<float>(GetAbilityLevel()),
+		InitialVelocity,
+		HungerProjectileGravityScale,
+		HungerProjectileCollisionRadius,
+		HungerProjectileFlightDuration,
+		DirectDamage,
+		DirectPoiseDamage,
+		BurnDamagePerTick,
+		BurnDuration);
+	UGameplayStatics::FinishSpawningActor(HungerProjectile, ServerSpawnTransform);
+
+	if (!IsValid(HungerProjectile) || HungerProjectile->IsActorBeingDestroyed())
+	{
+		UE_LOG(
+			LogSovTarrikEchoAbility,
+			Error,
+			TEXT("%s created a Velkorran's Hunger projectile that failed authoritative initialization."),
+			*GetNameSafe(Avatar));
+		FinishEchoAbility(true);
+		return nullptr;
+	}
+
+	return HungerProjectile;
 }
 
 USovGameplayAbility_TarrikCinderStickyGrenade::USovGameplayAbility_TarrikCinderStickyGrenade()
