@@ -154,6 +154,11 @@ void USovDismembermentComponent::GetLifetimeReplicatedProps(
 	DOREPLIFETIME(USovDismembermentComponent, SeveredRegionMask);
 }
 
+bool USovDismembermentComponent::IsInitialized() const
+{
+	return IsValid(AbilitySystemComponent.Get());
+}
+
 void USovDismembermentComponent::InitializeWithAbilitySystem(
 	UNarrativeAbilitySystemComponent* InAbilitySystemComponent)
 {

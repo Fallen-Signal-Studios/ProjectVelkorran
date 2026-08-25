@@ -42,7 +42,7 @@ public:
 	void InitializeWithAbilitySystem(UNarrativeAbilitySystemComponent* InAbilitySystemComponent);
 
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Dismemberment")
-	bool IsInitialized() const { return IsValid(AbilitySystemComponent); }
+	bool IsInitialized() const;
 
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Dismemberment")
 	bool IsRegionSevered(ESovDismembermentRegion Region) const;
