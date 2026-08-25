@@ -475,6 +475,7 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 		const float RequestedHealthDamage = (
 			(RoutedDamage * Result.ShieldBypassRatio) + OverflowBase) * HealthCoefficient;
 		Result.AppliedHealthDamage = FMath::Min(OldHealth, RequestedHealthDamage);
+		Result.HealthOverkillDamage = FMath::Max(RequestedHealthDamage - OldHealth, 0.f);
 
 		if (Result.AppliedShieldDamage > 0.f)
 		{

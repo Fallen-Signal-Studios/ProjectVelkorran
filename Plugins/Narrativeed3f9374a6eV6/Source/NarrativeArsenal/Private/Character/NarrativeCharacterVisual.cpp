@@ -18,6 +18,7 @@
 #include "Weapons/WeaponVisual.h"
 #include "UnrealFramework/NarrativeAnimInstance.h"
 #include "Components/EquipmentComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Subsystems/NarrativeSaveSubsystem.h"
 #include "UnrealFramework/NarrativePlayerCharacter.h"
 #include "UnrealFramework/NarrativePlayerController.h"
@@ -757,6 +758,16 @@ void ANarrativeCharacterVisual::GetHeadMeshes(TArray<class UMeshComponent*>& Out
 	OutHeadMeshes.Add(GetSkeletalMeshComponent(FNarrativeGameplayTags::Get().Equipment_Slot_Mesh_Moustache));
 	OutHeadMeshes.Add(GetSkeletalMeshComponent(FNarrativeGameplayTags::Get().Equipment_Slot_Mesh_Fuzz));
 	OutHeadMeshes.Add(GetSkeletalMeshComponent(FNarrativeGameplayTags::Get().Equipment_Slot_Mesh_Hair));
+
+	// Some appearance assets author helmets or facial pieces as static meshes.
+	OutHeadMeshes.Add(GetStaticMeshComponent(FNarrativeGameplayTags::Get().Equipment_Slot_Face));
+	OutHeadMeshes.Add(GetStaticMeshComponent(FNarrativeGameplayTags::Get().Equipment_Slot_Helmet));
+	OutHeadMeshes.Add(GetStaticMeshComponent(FNarrativeGameplayTags::Get().Equipment_Slot_Mesh_Beard));
+	OutHeadMeshes.Add(GetStaticMeshComponent(FNarrativeGameplayTags::Get().Equipment_Slot_Mesh_Eyebrows));
+	OutHeadMeshes.Add(GetStaticMeshComponent(FNarrativeGameplayTags::Get().Equipment_Slot_Mesh_Eyelashes));
+	OutHeadMeshes.Add(GetStaticMeshComponent(FNarrativeGameplayTags::Get().Equipment_Slot_Mesh_Moustache));
+	OutHeadMeshes.Add(GetStaticMeshComponent(FNarrativeGameplayTags::Get().Equipment_Slot_Mesh_Fuzz));
+	OutHeadMeshes.Add(GetStaticMeshComponent(FNarrativeGameplayTags::Get().Equipment_Slot_Mesh_Hair));
 }
 
 class ANarrativeCharacter* ANarrativeCharacterVisual::GetOwnerCharacter() 
@@ -1130,6 +1141,8 @@ void ANarrativeCharacterVisual::ResetMeshToBaseAppearance(FGameplayTag Slot)
 			SMComp->SetStaticMesh(nullptr);
 		}
 	}
+
+	OnAppearancePartChanged.Broadcast(Slot);
 }
 
 void ANarrativeCharacterVisual::OnBaseMeshesReady()
@@ -1410,6 +1423,8 @@ void ANarrativeCharacterVisual::OnMeshAppearanceReady(FGameplayTag Slot, FCharac
 			}
 		}
 	}
+
+	OnAppearancePartChanged.Broadcast(Slot);
 }
 
 void ANarrativeCharacterVisual::OnGroomAppearanceReady(FGameplayTag Slot, FCharacterCreatorAttribute_Groom GroomData)
@@ -1477,6 +1492,8 @@ void ANarrativeCharacterVisual::OnGroomAppearanceReady(FGameplayTag Slot, FChara
 			}
 		}
 	}
+
+	OnAppearancePartChanged.Broadcast(Slot);
 }
 
 void ANarrativeCharacterVisual::OnWeaponVisualClassReady(class UWeaponItem* WeaponItem)

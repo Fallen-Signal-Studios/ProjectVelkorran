@@ -46,6 +46,10 @@ struct NARRATIVEARSENAL_API FSovDamageResult
 	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Damage")
 	float AppliedHealthDamage = 0.f;
 
+	/** Requested Health damage beyond the target's remaining Health. */
+	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Damage")
+	float HealthOverkillDamage = 0.f;
+
 	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Damage")
 	float AppliedPoiseDamage = 0.f;
 

@@ -15,6 +15,7 @@
 #include "NarrativeCharacterVisual.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FCharacterAppearanceEvent);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FCharacterAppearancePartEvent, FGameplayTag, AppearanceSlot);
 
 
 /**Seperates the appearance behavior out from NarrativeCharacter. Also handles asyncronously loading the assets before they are applied to the character. */
@@ -97,6 +98,10 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "Character Visual")
 	FCharacterAppearanceEvent OnBaseAppearanceApplied;
+
+	/** Fired whenever a modular mesh or groom slot finishes applying or changing. */
+	UPROPERTY(BlueprintAssignable, Category = "Character Visual")
+	FCharacterAppearancePartEvent OnAppearancePartChanged;
 
 	//Called after base meshes are set
 	UFUNCTION(BlueprintNativeEvent, Category = "Character Visual")
