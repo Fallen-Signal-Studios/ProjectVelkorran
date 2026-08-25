@@ -62,7 +62,7 @@ An empty required-channel container means the rule accepts any damage channel. G
 
 ## Narrative appearance behavior
 
-The component applies every severed branch to Narrative's hidden leader mesh, visible modular skeletal meshes, and local first-person meshes. It also listens for:
+The component applies every severed branch to Narrative's hidden leader mesh and local first-person leader mesh. Leader-pose body and armor pieces inherit that transform from their leader; independently animated modular meshes are updated directly. This avoids corrupting follower skinning while keeping every presentation layer synchronized. It also listens for:
 
 - A replacement `NarrativeCharacterVisual`
 - Base appearance completion

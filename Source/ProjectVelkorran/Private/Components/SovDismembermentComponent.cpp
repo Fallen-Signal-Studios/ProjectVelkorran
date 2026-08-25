@@ -739,14 +739,29 @@ void USovDismembermentComponent::ApplyRegionVisualState(
 
 	if (!Definition.BoneToHide.IsNone())
 	{
+		USkeletalMeshComponent* PrimaryMesh = ResolvePrimaryMesh();
 		TArray<USkeletalMeshComponent*> Meshes;
 		GatherPresentationMeshes(Meshes);
 		for (USkeletalMeshComponent* Mesh : Meshes)
 		{
+			// Narrative's modular body and armor meshes normally follow the main
+			// character mesh through Leader Pose. Hiding the bone directly on a
+			// follower gives it a second, incomplete visibility transform and can
+			// stretch weighted vertices toward component origin. Followers inherit
+			// the collapsed bone transform from their leader, so only independently
+			// posed meshes should be modified here.
+			if (Mesh->LeaderPoseComponent.IsValid())
+			{
+				continue;
+			}
+
 			if (Mesh->GetBoneIndex(Definition.BoneToHide) != INDEX_NONE)
 			{
-				Mesh->HideBoneByName(Definition.BoneToHide, PhysicsBodyOperation);
-				if (bDisablePhysicsBodies)
+				const bool bIsPrimaryMesh = Mesh == PrimaryMesh;
+				Mesh->HideBoneByName(
+					Definition.BoneToHide,
+					bIsPrimaryMesh ? PhysicsBodyOperation : PBO_None);
+				if (bDisablePhysicsBodies && bIsPrimaryMesh)
 				{
 					SovDismemberment::DisablePhysicsBodiesBelowBone(
 						Mesh,
