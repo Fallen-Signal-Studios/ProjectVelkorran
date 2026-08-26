@@ -56,7 +56,8 @@ Each region defines:
 - `Detached Limb Class`: a Blueprint derived from `SovDetachedLimbActor`.
 - `Stump Actor Class`: a local cosmetic actor containing cap geometry and wound materials.
 - `Stump Niagara Slots`: stateful Niagara effects attached to the region's stump bone or an optional per-slot bone/socket override.
-- `Sever System` and `Blood Decal Material`: Niagara and Deferred Decal gore presentation.
+- `Sever System`: a transient Niagara event attached to the surviving stump by default. `Attach Sever System To Stump` can be disabled for a world-space impact effect, and `Sever System Spawn Offset` corrects its placement.
+- `Blood Decal Material`: Deferred Decal gore presentation.
 - `Blood Decal Surface Search Distance`: how far the cosmetic searches for nearby ground, walls, ceilings, or movable world geometry instead of projecting onto Narrative's decal-disabled modular meshes.
 
 The blood material must use the Deferred Decal domain. Multiply opacity by `Decal Lifetime Opacity` if the authored fade duration should be visible instead of ending with a pop.
@@ -69,7 +70,7 @@ The stump actor is spawned at the sever transform before the bone is hidden, the
 
 ## Stump Niagara slots
 
-Use `Sever System` for the transient burst that plays when the hit first severs the limb. Use `Stump Niagara Slots` for effects that belong to the persistent wound, such as a looping blood mist, embers, smoke, or leaking energy. Each region can contain multiple independently authored slots:
+Use `Sever System` for the transient burst that plays when the hit first severs the limb. Its emitter origin follows the configured stump bone through animation and ragdoll, but the event is not replayed for late joiners or save loads. Use `Stump Niagara Slots` for effects that belong to the persistent wound, such as a looping blood mist, embers, smoke, or leaking energy. Each region can contain multiple independently authored slots:
 
 - `Slot Name`: editor-facing label for the array element.
 - `Niagara System`: the effect to spawn.
@@ -78,6 +79,8 @@ Use `Sever System` for the transient burst that plays when the hit first severs 
 - `Auto Destroy`: enable for a finite effect; leave disabled for a persistent looping effect.
 
 Stump effects spawn once per region on each local game instance and attach with their world cut transform preserved. They are reconstructed from the permanent sever mask for late joiners and save loads, but Narrative appearance refreshes do not duplicate them. A missing override falls back to the region stump bone; a missing region stump bone leaves the effect attached to the driver mesh at the resolved sever position.
+
+Attachment moves the Niagara component and its emitter origin. World-space particles that have already been emitted remain in the world, which is normally correct for blood droplets. Enable `Local Space` inside the Niagara emitter only when every existing particle should stay locked to the moving stump.
 
 ## Detached limb Blueprints
 
@@ -135,7 +138,7 @@ Before shipping a new character profile, verify:
 
 1. A fatal Edge hit with a valid bone hides the correct branch, creates one stump and one detached limb, attaches every configured stump Niagara slot, and leaves no stretched leader-pose geometry.
 2. Guarded and Perfect Defense hits never sever. Shield-only hits sever only when an authored custom rule explicitly permits them.
-3. A listen server and remote client each play one cosmetic event. The server must not terminate the same body twice.
+3. A listen server and remote client each play one cosmetic event. The transient Sever System emitter follows the stump through ragdoll, and the server must not terminate the same body twice.
 4. Equipping or asynchronously replacing armor after a sever keeps the branch and configured rigid slots hidden.
 5. A late-joining client reconstructs hidden branches and stumps from the replicated mask without replaying old transient blood or limb cosmetics.
 6. Saving and loading a savable NPC restores the permanent sever mask.

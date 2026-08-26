@@ -155,8 +155,17 @@ struct PROJECTVELKORRAN_API FSovDismembermentRegionDefinition
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stump", meta = (TitleProperty = "SlotName"))
 	TArray<FSovDismembermentStumpNiagaraSlot> StumpNiagaraSlots;
 
+	/** Transient effect played once when the sever first occurs. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Gore")
 	TObjectPtr<UNiagaraSystem> SeverSystem = nullptr;
+
+	/** Keeps the Niagara emitter origin on the surviving stump during animation and ragdoll. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Gore")
+	bool bAttachSeverSystemToStump = true;
+
+	/** Applied to the sever transform when attached, or the impact transform when world-space. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Gore")
+	FTransform SeverSystemSpawnOffset = FTransform::Identity;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Gore")
 	TObjectPtr<UMaterialInterface> BloodDecalMaterial = nullptr;

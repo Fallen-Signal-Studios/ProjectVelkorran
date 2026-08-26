@@ -1279,18 +1279,52 @@ void USovDismembermentComponent::PlaySeverCosmetics(
 			SafeNormal = FVector::UpVector;
 		}
 
-		if (IsValid(Definition.SeverSystem))
+		if (IsValid(Definition.SeverSystem.Get()))
 		{
-			UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-				World,
-				Definition.SeverSystem,
-				ImpactLocation,
-				SafeNormal.Rotation(),
-				FVector::OneVector,
-				true,
-				true,
-				ENCPoolMethod::AutoRelease,
-				true);
+			USkeletalMeshComponent* PrimaryMesh = ResolvePrimaryMesh();
+			if (Definition.bAttachSeverSystemToStump && IsValid(PrimaryMesh))
+			{
+				const bool bHasStumpAttachPoint =
+					!Definition.StumpAttachBone.IsNone()
+					&& (PrimaryMesh->GetBoneIndex(Definition.StumpAttachBone)
+							!= INDEX_NONE
+						|| PrimaryMesh->DoesSocketExist(
+							Definition.StumpAttachBone));
+				const FTransform SpawnTransform =
+					Definition.SeverSystemSpawnOffset * SeverTransform;
+				UNiagaraFunctionLibrary::SpawnSystemAttached(
+					Definition.SeverSystem.Get(),
+					PrimaryMesh,
+					bHasStumpAttachPoint
+						? Definition.StumpAttachBone
+						: NAME_None,
+					SpawnTransform.GetLocation(),
+					SpawnTransform.Rotator(),
+					SpawnTransform.GetScale3D(),
+					EAttachLocation::KeepWorldPosition,
+					true,
+					ENCPoolMethod::AutoRelease,
+					true,
+					true);
+			}
+			else
+			{
+				const FTransform ImpactTransform(
+					SafeNormal.Rotation(),
+					ImpactLocation);
+				const FTransform SpawnTransform =
+					Definition.SeverSystemSpawnOffset * ImpactTransform;
+				UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+					World,
+					Definition.SeverSystem.Get(),
+					SpawnTransform.GetLocation(),
+					SpawnTransform.Rotator(),
+					SpawnTransform.GetScale3D(),
+					true,
+					true,
+					ENCPoolMethod::AutoRelease,
+					true);
+			}
 		}
 
 		if (IsValid(Definition.BloodDecalMaterial))
@@ -1470,6 +1504,17 @@ void USovDismembermentComponent::ValidateConfiguration()
 				*GetNameSafe(GetOwner()),
 				static_cast<int32>(Definition.Region),
 				*Definition.StumpAttachBone.ToString());
+		}
+		else if (Definition.StumpAttachBone.IsNone()
+			&& Definition.bAttachSeverSystemToStump
+			&& IsValid(Definition.SeverSystem.Get()))
+		{
+			UE_LOG(
+				LogSovDismemberment,
+				Warning,
+				TEXT("%s region %d attaches its Sever System but has no Stump Attach Bone. The effect will follow the driver mesh root."),
+				*GetNameSafe(GetOwner()),
+				static_cast<int32>(Definition.Region));
 		}
 		if (Definition.HitBoneRoots.IsEmpty())
 		{
