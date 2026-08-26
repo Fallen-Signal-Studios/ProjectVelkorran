@@ -3,8 +3,10 @@
 #include "Components/SovDismembermentComponent.h"
 
 #include "Character/NarrativeCharacterVisual.h"
+#include "CollisionQueryParams.h"
 #include "Components/DecalComponent.h"
 #include "Components/MeshComponent.h"
+#include "Components/SceneComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Dismemberment/SovDetachedLimbActor.h"
@@ -19,6 +21,8 @@
 #include "Sovereign/SovGameplayTags.h"
 #include "TimerManager.h"
 #include "UnrealFramework/NarrativeCharacter.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogSovDismemberment, Log, All);
 
 namespace SovDismemberment
 {
@@ -98,6 +102,7 @@ USovDismembermentComponent::USovDismembermentComponent()
 void USovDismembermentComponent::BeginPlay()
 {
 	Super::BeginPlay();
+	ValidateConfiguration();
 
 	if (ANarrativeCharacter* Character = Cast<ANarrativeCharacter>(GetOwner()))
 	{
@@ -121,6 +126,7 @@ void USovDismembermentComponent::EndPlay(const EEndPlayReason::Type EndPlayReaso
 		World->GetTimerManager().ClearTimer(VisualRefreshTimerHandle);
 	}
 	bVisualRefreshScheduled = false;
+	VisualRefreshRetryCount = 0;
 
 	if (ANarrativeCharacter* Character = Cast<ANarrativeCharacter>(GetOwner()))
 	{
@@ -154,6 +160,24 @@ void USovDismembermentComponent::GetLifetimeReplicatedProps(
 	DOREPLIFETIME(USovDismembermentComponent, SeveredRegionMask);
 }
 
+void USovDismembermentComponent::PrepareForSave_Implementation()
+{
+	// SeveredRegionMask is a SaveGame property, so Narrative's component
+	// serializer captures the authoritative state without a parallel payload.
+}
+
+void USovDismembermentComponent::Load_Implementation()
+{
+	OnDismembermentStateChanged.Broadcast(SeveredRegionMask);
+	ScheduleVisualRefresh();
+
+	if (AActor* Owner = GetOwner(); IsValid(Owner) && Owner->HasAuthority())
+	{
+		Owner->FlushNetDormancy();
+		Owner->ForceNetUpdate();
+	}
+}
+
 bool USovDismembermentComponent::IsInitialized() const
 {
 	return IsValid(AbilitySystemComponent.Get());
@@ -172,6 +196,9 @@ void USovDismembermentComponent::InitializeWithAbilitySystem(
 		AbilitySystemComponent->OnDamageResolvedAsTarget.RemoveDynamic(
 			this,
 			&ThisClass::HandleDamageResolved);
+		AbilitySystemComponent->OnDeathStateChanged.RemoveDynamic(
+			this,
+			&ThisClass::HandleDeathStateChanged);
 	}
 
 	AbilitySystemComponent = InAbilitySystemComponent;
@@ -180,6 +207,9 @@ void USovDismembermentComponent::InitializeWithAbilitySystem(
 		AbilitySystemComponent->OnDamageResolvedAsTarget.AddUniqueDynamic(
 			this,
 			&ThisClass::HandleDamageResolved);
+		AbilitySystemComponent->OnDeathStateChanged.AddUniqueDynamic(
+			this,
+			&ThisClass::HandleDeathStateChanged);
 	}
 }
 
@@ -194,6 +224,42 @@ void USovDismembermentComponent::TryInitializeFromOwner()
 void USovDismembermentComponent::HandleAbilitySystemInitialized()
 {
 	TryInitializeFromOwner();
+}
+
+void USovDismembermentComponent::HandleDeathStateChanged(
+	AActor* KilledActor,
+	UNarrativeAbilitySystemComponent* KilledActorASC,
+	const bool bIsDead)
+{
+	static_cast<void>(bIsDead);
+	if (KilledActor == GetOwner() || KilledActorASC == AbilitySystemComponent.Get())
+	{
+		int32 CollisionRegionsToReapply = 0;
+		int32 ProcessedRegionMask = 0;
+		for (const FSovDismembermentRegionDefinition& Definition :
+			GetActiveRegionDefinitions())
+		{
+			const int32 RegionBit = GetRegionBit(Definition.Region);
+			if (RegionBit == 0 || (ProcessedRegionMask & RegionBit) != 0)
+			{
+				continue;
+			}
+			ProcessedRegionMask |= RegionBit;
+
+			if (Definition.PhysicsBodyOperation
+				== ESovDismembermentPhysicsBodyOperation::Disable)
+			{
+				CollisionRegionsToReapply |= RegionBit;
+			}
+		}
+		AppliedPhysicsRegionMask &= ~CollisionRegionsToReapply;
+
+		// Narrative enters or exits ragdoll synchronously from this same death
+		// notification and changes mesh-wide collision. A next-tick pass makes
+		// permanent bone visibility and per-body collision win regardless of
+		// delegate binding order. Terminated bodies are never terminated twice.
+		ScheduleVisualRefresh();
+	}
 }
 
 void USovDismembermentComponent::HandleCharacterVisualInitialized(
@@ -238,6 +304,9 @@ void USovDismembermentComponent::BindCharacterVisual(
 
 void USovDismembermentComponent::HandleBaseAppearanceApplied()
 {
+	// Narrative can replace the hidden driver mesh and recreate its physics
+	// state when a complete appearance is applied.
+	AppliedPhysicsRegionMask = 0;
 	ScheduleVisualRefresh();
 }
 
@@ -250,6 +319,7 @@ void USovDismembermentComponent::HandleAppearancePartChanged(
 
 void USovDismembermentComponent::ScheduleVisualRefresh()
 {
+	VisualRefreshRetryCount = 0;
 	if (bVisualRefreshScheduled)
 	{
 		return;
@@ -269,23 +339,74 @@ void USovDismembermentComponent::ScheduleVisualRefresh()
 	}
 }
 
+void USovDismembermentComponent::ScheduleVisualRefreshRetry()
+{
+	constexpr int32 MaxVisualRefreshRetries = 50;
+	if (bVisualRefreshScheduled
+		|| VisualRefreshRetryCount >= MaxVisualRefreshRetries)
+	{
+		return;
+	}
+
+	if (UWorld* World = GetWorld())
+	{
+		++VisualRefreshRetryCount;
+		bVisualRefreshScheduled = true;
+		World->GetTimerManager().SetTimer(
+			VisualRefreshTimerHandle,
+			FTimerDelegate::CreateUObject(
+				this,
+				&ThisClass::HandleDeferredVisualRefresh),
+			0.1f,
+			false);
+	}
+}
+
 void USovDismembermentComponent::HandleDeferredVisualRefresh()
 {
 	bVisualRefreshScheduled = false;
 	RefreshDismembermentVisuals();
+
+	ANarrativeCharacterVisual* CharacterVisual = BoundCharacterVisual.Get();
+	if (SeveredRegionMask != 0
+		&& (!IsValid(CharacterVisual) || !CharacterVisual->bBaseAppearanceLoaded))
+	{
+		// Replicated actor references can resolve after component BeginPlay. Keep
+		// a short bounded recovery window so late joiners still receive permanent
+		// slot hides even in Narrative's rare already-loaded visual ordering case.
+		ScheduleVisualRefreshRetry();
+	}
 }
 
 void USovDismembermentComponent::RefreshDismembermentVisuals()
 {
+	if (USkeletalMeshComponent* PrimaryMesh = ResolvePrimaryMesh())
+	{
+		USkeletalMesh* CurrentMeshAsset = PrimaryMesh->GetSkeletalMeshAsset();
+		UPhysicsAsset* CurrentPhysicsAsset = PrimaryMesh->GetPhysicsAsset();
+		if (LastPrimaryMeshAsset != CurrentMeshAsset
+			|| LastPrimaryPhysicsAsset != CurrentPhysicsAsset)
+		{
+			AppliedPhysicsRegionMask = 0;
+			LastPrimaryMeshAsset = CurrentMeshAsset;
+			LastPrimaryPhysicsAsset = CurrentPhysicsAsset;
+		}
+	}
+
 	if (ANarrativeCharacter* Character = Cast<ANarrativeCharacter>(GetOwner()))
 	{
 		BindCharacterVisual(Character->GetCharacterVisual());
 	}
 
+	int32 ProcessedRegionMask = 0;
 	for (const FSovDismembermentRegionDefinition& Definition : GetActiveRegionDefinitions())
 	{
-		if (IsRegionSevered(Definition.Region))
+		const int32 RegionBit = GetRegionBit(Definition.Region);
+		if (RegionBit != 0
+			&& (ProcessedRegionMask & RegionBit) == 0
+			&& IsRegionSevered(Definition.Region))
 		{
+			ProcessedRegionMask |= RegionBit;
 			const FTransform SeverTransform = ResolveSeverTransform(Definition);
 			ApplyRegionVisualState(Definition, SeverTransform);
 		}
@@ -465,6 +586,21 @@ bool USovDismembermentComponent::CommitSever(
 		return false;
 	}
 
+	USkeletalMeshComponent* PrimaryMesh = ResolvePrimaryMesh();
+	if (!IsValid(PrimaryMesh)
+		|| Definition.BoneToHide.IsNone()
+		|| PrimaryMesh->GetBoneIndex(Definition.BoneToHide) == INDEX_NONE)
+	{
+		UE_LOG(
+			LogSovDismemberment,
+			Warning,
+			TEXT("Refusing to sever region %d on %s because bone '%s' is not present on the Narrative driver mesh."),
+			static_cast<int32>(Definition.Region),
+			*GetNameSafe(GetOwner()),
+			*Definition.BoneToHide.ToString());
+		return false;
+	}
+
 	const FTransform SeverTransform = ResolveSeverTransform(Definition);
 	const bool bUseSeverLocation = ImpactLocation.ContainsNaN()
 		|| ImpactLocation.IsNearlyZero();
@@ -478,8 +614,8 @@ bool USovDismembermentComponent::CommitSever(
 		SafeImpactNormal = FVector::UpVector;
 	}
 
+	GetOwner()->FlushNetDormancy();
 	SeveredRegionMask |= GetRegionBit(Definition.Region);
-	ApplyRegionVisualState(Definition, SeverTransform);
 	OnDismembermentStateChanged.Broadcast(SeveredRegionMask);
 	GetOwner()->ForceNetUpdate();
 
@@ -616,8 +752,16 @@ USovDismembermentComponent::FindRegionDefinitionForBone(
 
 	const FSovDismembermentRegionDefinition* BestDefinition = nullptr;
 	int32 BestDistance = MAX_int32;
+	int32 ProcessedRegionMask = 0;
 	for (const FSovDismembermentRegionDefinition& Definition : GetActiveRegionDefinitions())
 	{
+		const int32 RegionBit = GetRegionBit(Definition.Region);
+		if (RegionBit == 0 || (ProcessedRegionMask & RegionBit) != 0)
+		{
+			continue;
+		}
+		ProcessedRegionMask |= RegionBit;
+
 		for (const FName RootBone : Definition.HitBoneRoots)
 		{
 			const int32 Distance = GetBoneDistance(RootBone);
@@ -723,23 +867,43 @@ void USovDismembermentComponent::ApplyRegionVisualState(
 	const FSovDismembermentRegionDefinition& Definition,
 	const FTransform& SeverTransform)
 {
-	EPhysBodyOp PhysicsBodyOperation = PBO_None;
-	bool bDisablePhysicsBodies = false;
-	switch (Definition.PhysicsBodyOperation)
+	USkeletalMeshComponent* PrimaryMesh = ResolvePrimaryMesh();
+	if (IsValid(PrimaryMesh))
 	{
-	case ESovDismembermentPhysicsBodyOperation::Disable:
-		bDisablePhysicsBodies = true;
-		break;
-	case ESovDismembermentPhysicsBodyOperation::Terminate:
-		PhysicsBodyOperation = PBO_Term;
-		break;
-	default:
-		break;
+		USkeletalMesh* CurrentMeshAsset = PrimaryMesh->GetSkeletalMeshAsset();
+		UPhysicsAsset* CurrentPhysicsAsset = PrimaryMesh->GetPhysicsAsset();
+		if (LastPrimaryMeshAsset != CurrentMeshAsset
+			|| LastPrimaryPhysicsAsset != CurrentPhysicsAsset)
+		{
+			AppliedPhysicsRegionMask = 0;
+			LastPrimaryMeshAsset = CurrentMeshAsset;
+			LastPrimaryPhysicsAsset = CurrentPhysicsAsset;
+		}
 	}
 
+	const int32 RegionBit = GetRegionBit(Definition.Region);
+	const bool bShouldApplyPhysics = RegionBit != 0
+		&& (AppliedPhysicsRegionMask & RegionBit) == 0;
+	EPhysBodyOp PhysicsBodyOperation = PBO_None;
+	bool bDisablePhysicsBodies = false;
+	if (bShouldApplyPhysics)
+	{
+		switch (Definition.PhysicsBodyOperation)
+		{
+		case ESovDismembermentPhysicsBodyOperation::Disable:
+			bDisablePhysicsBodies = true;
+			break;
+		case ESovDismembermentPhysicsBodyOperation::Terminate:
+			PhysicsBodyOperation = PBO_Term;
+			break;
+		default:
+			break;
+		}
+	}
+
+	bool bAppliedPhysics = false;
 	if (!Definition.BoneToHide.IsNone())
 	{
-		USkeletalMeshComponent* PrimaryMesh = ResolvePrimaryMesh();
 		TArray<USkeletalMeshComponent*> Meshes;
 		GatherPresentationMeshes(Meshes);
 		for (USkeletalMeshComponent* Mesh : Meshes)
@@ -767,8 +931,19 @@ void USovDismembermentComponent::ApplyRegionVisualState(
 						Mesh,
 						Definition.BoneToHide);
 				}
+				if (bIsPrimaryMesh
+					&& bShouldApplyPhysics
+					&& Definition.PhysicsBodyOperation
+						!= ESovDismembermentPhysicsBodyOperation::None)
+				{
+					bAppliedPhysics = true;
+				}
 			}
 		}
+	}
+	if (bAppliedPhysics)
+	{
+		AppliedPhysicsRegionMask |= RegionBit;
 	}
 
 	ANarrativeCharacterVisual* CharacterVisual = BoundCharacterVisual.Get();
@@ -860,6 +1035,83 @@ void USovDismembermentComponent::EnsureStumpActor(
 	SpawnedStumpActors.Add(Definition.Region, StumpActor);
 }
 
+bool USovDismembermentComponent::FindBloodDecalSurface(
+	const FSovDismembermentRegionDefinition& Definition,
+	const FVector& Origin,
+	const FVector& PreferredDirection,
+	FHitResult& OutSurfaceHit) const
+{
+	UWorld* World = GetWorld();
+	const float SearchDistance = FMath::Max(
+		Definition.BloodDecalSurfaceSearchDistance,
+		0.f);
+	if (!IsValid(World) || SearchDistance <= KINDA_SMALL_NUMBER)
+	{
+		return false;
+	}
+
+	FCollisionObjectQueryParams ObjectQuery;
+	ObjectQuery.AddObjectTypesToQuery(ECC_WorldStatic);
+	ObjectQuery.AddObjectTypesToQuery(ECC_WorldDynamic);
+
+	FCollisionQueryParams QueryParams(
+		SCENE_QUERY_STAT(SovDismembermentBloodDecalSurface),
+		false,
+		GetOwner());
+	QueryParams.AddIgnoredActor(GetOwner());
+	for (const TPair<ESovDismembermentRegion, TObjectPtr<AActor>>& Pair : SpawnedStumpActors)
+	{
+		if (IsValid(Pair.Value.Get()))
+		{
+			QueryParams.AddIgnoredActor(Pair.Value.Get());
+		}
+	}
+
+	TArray<FVector, TInlineAllocator<12>> SearchDirections;
+	if (!PreferredDirection.IsNearlyZero())
+	{
+		const FVector PreferredNormal = PreferredDirection.GetSafeNormal();
+		SearchDirections.Add(PreferredNormal);
+		SearchDirections.Add(-PreferredNormal);
+	}
+	SearchDirections.Add(FVector::DownVector);
+	SearchDirections.Add(FVector::UpVector);
+	for (int32 DirectionIndex = 0; DirectionIndex < 8; ++DirectionIndex)
+	{
+		const float AngleRadians =
+			(PI * 2.f * static_cast<float>(DirectionIndex)) / 8.f;
+		SearchDirections.Add(FVector(
+			FMath::Cos(AngleRadians),
+			FMath::Sin(AngleRadians),
+			0.f));
+	}
+
+	bool bFoundSurface = false;
+	float NearestDistance = TNumericLimits<float>::Max();
+	for (const FVector& SearchDirection : SearchDirections)
+	{
+		FHitResult CandidateHit;
+		if (!World->LineTraceSingleByObjectType(
+				CandidateHit,
+				Origin,
+				Origin + (SearchDirection * SearchDistance),
+				ObjectQuery,
+				QueryParams)
+			|| !CandidateHit.bBlockingHit
+			|| CandidateHit.ImpactNormal.IsNearlyZero()
+			|| CandidateHit.Distance >= NearestDistance)
+		{
+			continue;
+		}
+
+		NearestDistance = CandidateHit.Distance;
+		OutSurfaceHit = CandidateHit;
+		bFoundSurface = true;
+	}
+
+	return bFoundSurface;
+}
+
 void USovDismembermentComponent::PlaySeverCosmetics(
 	const FSovDismembermentRegionDefinition& Definition,
 	const FName HitBone,
@@ -894,27 +1146,69 @@ void USovDismembermentComponent::PlaySeverCosmetics(
 
 		if (IsValid(Definition.BloodDecalMaterial))
 		{
-			FRandomStream RandomStream(CosmeticSeed);
-			FRotator DecalRotation = SafeNormal.Rotation();
-			DecalRotation.Roll = RandomStream.FRandRange(-180.f, 180.f);
-			if (UDecalComponent* Decal = UGameplayStatics::SpawnDecalAtLocation(
-				World,
-				Definition.BloodDecalMaterial,
-				Definition.BloodDecalSize,
-				ImpactLocation + (SafeNormal * 1.5f),
-				DecalRotation,
-				Definition.BloodDecalLifeSeconds))
+			FHitResult SurfaceHit;
+			const FVector PreferredDirection = DetachedLimbImpulse.IsNearlyZero()
+				? -SafeNormal
+				: DetachedLimbImpulse.GetSafeNormal();
+			if (FindBloodDecalSurface(
+					Definition,
+					ImpactLocation,
+					PreferredDirection,
+					SurfaceHit))
 			{
-				const float FadeSeconds = FMath::Clamp(
-					Definition.BloodDecalFadeSeconds,
-					0.f,
-					Definition.BloodDecalLifeSeconds);
-				if (FadeSeconds > KINDA_SMALL_NUMBER)
+				FRandomStream RandomStream(CosmeticSeed);
+				const FVector SurfaceNormal = SurfaceHit.ImpactNormal.GetSafeNormal();
+				FRotator DecalRotation = SurfaceNormal.Rotation();
+				DecalRotation.Roll = RandomStream.FRandRange(-180.f, 180.f);
+				const FVector DecalSize(
+					FMath::Max(Definition.BloodDecalSize.X, 1.f),
+					FMath::Max(Definition.BloodDecalSize.Y, 1.f),
+					FMath::Max(Definition.BloodDecalSize.Z, 1.f));
+				const float DecalLifetime = FMath::Max(
+					Definition.BloodDecalLifeSeconds,
+					0.1f);
+				const FVector DecalLocation = SurfaceHit.ImpactPoint
+					+ (SurfaceNormal * FMath::Max(
+						Definition.BloodDecalSurfaceOffset,
+						0.f));
+
+				UDecalComponent* Decal = nullptr;
+				if (USceneComponent* HitComponent = SurfaceHit.GetComponent())
 				{
-					Decal->SetFadeOut(
-						FMath::Max(Definition.BloodDecalLifeSeconds - FadeSeconds, 0.f),
-						FadeSeconds,
-						false);
+					Decal = UGameplayStatics::SpawnDecalAttached(
+						Definition.BloodDecalMaterial,
+						DecalSize,
+						HitComponent,
+						SurfaceHit.BoneName,
+						DecalLocation,
+						DecalRotation,
+						EAttachLocation::KeepWorldPosition,
+						DecalLifetime);
+				}
+				else
+				{
+					Decal = UGameplayStatics::SpawnDecalAtLocation(
+						World,
+						Definition.BloodDecalMaterial,
+						DecalSize,
+						DecalLocation,
+						DecalRotation,
+						DecalLifetime);
+				}
+
+				if (IsValid(Decal))
+				{
+					const float FadeSeconds = FMath::Clamp(
+						Definition.BloodDecalFadeSeconds,
+						0.f,
+						DecalLifetime);
+					if (FadeSeconds > KINDA_SMALL_NUMBER)
+					{
+						Decal->SetFadeOut(
+							FMath::Max(DecalLifetime - FadeSeconds, 0.f),
+							FadeSeconds,
+							false);
+					}
 				}
 			}
 		}
@@ -944,6 +1238,124 @@ void USovDismembermentComponent::PlaySeverCosmetics(
 	}
 
 	OnLimbSevered.Broadcast(Definition.Region, HitBone, SeverTransform.GetLocation());
+}
+
+void USovDismembermentComponent::ValidateConfiguration()
+{
+	if (!bDismembermentEnabled)
+	{
+		return;
+	}
+
+	const TArray<FSovDismembermentRegionDefinition>& Regions =
+		GetActiveRegionDefinitions();
+	if (Regions.IsEmpty())
+	{
+		UE_LOG(
+			LogSovDismemberment,
+			Warning,
+			TEXT("%s has dismemberment enabled but no region definitions."),
+			*GetNameSafe(GetOwner()));
+		return;
+	}
+
+	int32 SeenRegionMask = 0;
+	TSet<FName> SeenHitBoneRoots;
+	bool bHasTerminateRegion = false;
+	for (const FSovDismembermentRegionDefinition& Definition : Regions)
+	{
+		const int32 RegionBit = GetRegionBit(Definition.Region);
+		if (RegionBit == 0)
+		{
+			UE_LOG(
+				LogSovDismemberment,
+				Warning,
+				TEXT("%s has a dismemberment definition with an invalid region."),
+				*GetNameSafe(GetOwner()));
+			continue;
+		}
+		if ((SeenRegionMask & RegionBit) != 0)
+		{
+			UE_LOG(
+				LogSovDismemberment,
+				Warning,
+				TEXT("%s defines dismemberment region %d more than once. Only the first definition is used."),
+				*GetNameSafe(GetOwner()),
+				static_cast<int32>(Definition.Region));
+			continue;
+		}
+		SeenRegionMask |= RegionBit;
+
+		if (Definition.BoneToHide.IsNone())
+		{
+			UE_LOG(
+				LogSovDismemberment,
+				Warning,
+				TEXT("%s region %d has no Bone To Hide and cannot sever."),
+				*GetNameSafe(GetOwner()),
+				static_cast<int32>(Definition.Region));
+		}
+		if (Definition.HitBoneRoots.IsEmpty())
+		{
+			UE_LOG(
+				LogSovDismemberment,
+				Warning,
+				TEXT("%s region %d has no Hit Bone Roots and cannot resolve damage hits."),
+				*GetNameSafe(GetOwner()),
+				static_cast<int32>(Definition.Region));
+		}
+		for (const FName HitBoneRoot : Definition.HitBoneRoots)
+		{
+			if (HitBoneRoot.IsNone())
+			{
+				UE_LOG(
+					LogSovDismemberment,
+					Warning,
+					TEXT("%s region %d contains an empty Hit Bone Root."),
+					*GetNameSafe(GetOwner()),
+					static_cast<int32>(Definition.Region));
+			}
+			else if (SeenHitBoneRoots.Contains(HitBoneRoot))
+			{
+				UE_LOG(
+					LogSovDismemberment,
+					Warning,
+					TEXT("%s maps hit bone root '%s' more than once. The closest first definition wins."),
+					*GetNameSafe(GetOwner()),
+					*HitBoneRoot.ToString());
+			}
+			else
+			{
+				SeenHitBoneRoots.Add(HitBoneRoot);
+			}
+		}
+
+		bHasTerminateRegion |= Definition.PhysicsBodyOperation
+			== ESovDismembermentPhysicsBodyOperation::Terminate;
+	}
+
+	if (MaximumDetachedLimbImpulse < MinimumDetachedLimbImpulse)
+	{
+		UE_LOG(
+			LogSovDismemberment,
+			Warning,
+			TEXT("%s has a maximum detached-limb impulse below its minimum. Runtime clamping will use the minimum."),
+			*GetNameSafe(GetOwner()));
+	}
+
+	const bool bAllowsNonFatalSevers = GetActiveRules().ContainsByPredicate(
+		[](const FSovDismembermentRule& Rule)
+		{
+			return !Rule.bRequireFatalHit;
+		});
+	if (bHasTerminateRegion && bAllowsNonFatalSevers)
+	{
+		UE_LOG(
+			LogSovDismemberment,
+			Warning,
+			TEXT("%s allows non-fatal severing while at least one region permanently terminates physics bodies. Narrative Revive will preserve that dismemberment by design."),
+			*GetNameSafe(GetOwner()));
+	}
 }
 
 int32 USovDismembermentComponent::GetRegionBit(

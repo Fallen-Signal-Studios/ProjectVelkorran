@@ -6,11 +6,14 @@
 #include "Components/ActorComponent.h"
 #include "Dismemberment/SovDismembermentTypes.h"
 #include "GAS/SovCombatTypes.h"
+#include "NarrativeSavableComponent.h"
 #include "SovDismembermentComponent.generated.h"
 
 class ANarrativeCharacter;
 class ANarrativeCharacterVisual;
 class UNarrativeAbilitySystemComponent;
+class UPhysicsAsset;
+class USkeletalMesh;
 class USkeletalMeshComponent;
 class USovDismembermentProfile;
 
@@ -29,7 +32,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
  * Add this component to any Narrative NPC or character Blueprint that can be severed.
  */
 UCLASS(ClassGroup = (Sovereign), BlueprintType, Blueprintable, meta = (BlueprintSpawnableComponent))
-class PROJECTVELKORRAN_API USovDismembermentComponent : public UActorComponent
+class PROJECTVELKORRAN_API USovDismembermentComponent : public UActorComponent, public INarrativeSavableComponent
 {
 	GENERATED_BODY()
 
@@ -37,6 +40,8 @@ public:
 	USovDismembermentComponent();
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual void PrepareForSave_Implementation() override;
+	virtual void Load_Implementation() override;
 
 	UFUNCTION(BlueprintCallable, Category = "Sovereign|Dismemberment")
 	void InitializeWithAbilitySystem(UNarrativeAbilitySystemComponent* InAbilitySystemComponent);
@@ -103,7 +108,8 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dismemberment|Impulse", meta = (ClampMin = "0.0"))
 	float MaximumDetachedLimbImpulse = 6000.f;
 
-	UPROPERTY(ReplicatedUsing = OnRep_SeveredRegionMask, BlueprintReadOnly, Category = "Dismemberment|State")
+	/** Permanent for this actor, replicated to late joiners and serialized by Narrative Save. */
+	UPROPERTY(ReplicatedUsing = OnRep_SeveredRegionMask, SaveGame, BlueprintReadOnly, Category = "Dismemberment|State")
 	int32 SeveredRegionMask = 0;
 
 private:
@@ -112,6 +118,12 @@ private:
 
 	UFUNCTION()
 	void HandleAbilitySystemInitialized();
+
+	UFUNCTION()
+	void HandleDeathStateChanged(
+		AActor* KilledActor,
+		UNarrativeAbilitySystemComponent* KilledActorASC,
+		const bool bIsDead);
 
 	UFUNCTION()
 	void HandleCharacterVisualInitialized(ANarrativeCharacter* Character);
@@ -139,6 +151,7 @@ private:
 	void TryInitializeFromOwner();
 	void BindCharacterVisual(ANarrativeCharacterVisual* NewCharacterVisual);
 	void ScheduleVisualRefresh();
+	void ScheduleVisualRefreshRetry();
 	void HandleDeferredVisualRefresh();
 
 	bool TrySeverFromDamageResult(const FSovDamageResult& Result);
@@ -165,6 +178,11 @@ private:
 	void EnsureStumpActor(
 		const FSovDismembermentRegionDefinition& Definition,
 		const FTransform& SeverTransform);
+	bool FindBloodDecalSurface(
+		const FSovDismembermentRegionDefinition& Definition,
+		const FVector& Origin,
+		const FVector& PreferredDirection,
+		FHitResult& OutSurfaceHit) const;
 	void PlaySeverCosmetics(
 		const FSovDismembermentRegionDefinition& Definition,
 		FName HitBone,
@@ -176,6 +194,7 @@ private:
 
 	static int32 GetRegionBit(ESovDismembermentRegion Region);
 	static bool IsValidRegion(ESovDismembermentRegion Region);
+	void ValidateConfiguration();
 
 	UPROPERTY(Transient)
 	TObjectPtr<UNarrativeAbilitySystemComponent> AbilitySystemComponent = nullptr;
@@ -186,7 +205,15 @@ private:
 	UPROPERTY(Transient)
 	TMap<ESovDismembermentRegion, TObjectPtr<AActor>> SpawnedStumpActors;
 
+	UPROPERTY(Transient)
+	TObjectPtr<USkeletalMesh> LastPrimaryMeshAsset = nullptr;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UPhysicsAsset> LastPrimaryPhysicsAsset = nullptr;
+
 	FTimerHandle VisualRefreshTimerHandle;
 	bool bVisualRefreshScheduled = false;
+	int32 VisualRefreshRetryCount = 0;
+	int32 AppliedPhysicsRegionMask = 0;
 	int32 CosmeticEventCounter = 0;
 };

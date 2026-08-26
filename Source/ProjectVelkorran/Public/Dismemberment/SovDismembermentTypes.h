@@ -134,6 +134,14 @@ struct PROJECTVELKORRAN_API FSovDismembermentRegionDefinition
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Gore")
 	FVector BloodDecalSize = FVector(4.f, 24.f, 24.f);
 
+	/** Radius used to find nearby world geometry for a blood decal. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Gore", meta = (ClampMin = "0.0", Units = "cm"))
+	float BloodDecalSurfaceSearchDistance = 250.f;
+
+	/** Prevents z-fighting after the decal is placed on the resolved surface. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Gore", meta = (ClampMin = "0.0", Units = "cm"))
+	float BloodDecalSurfaceOffset = 1.f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Gore", meta = (ClampMin = "0.0"))
 	float BloodDecalLifeSeconds = 10.f;
 
