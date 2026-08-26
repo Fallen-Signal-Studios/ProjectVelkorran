@@ -2,6 +2,7 @@
 
 #include "Components/SovDismembermentComponent.h"
 
+#include "Animation/SovDismembermentCopyPoseAnimInstance.h"
 #include "Character/NarrativeCharacterVisual.h"
 #include "CollisionQueryParams.h"
 #include "Components/DecalComponent.h"
@@ -27,6 +28,84 @@ DEFINE_LOG_CATEGORY_STATIC(LogSovDismemberment, Log, All);
 
 namespace SovDismemberment
 {
+	bool ConvertLeaderPoseFollowerToCopyPose(
+		USkeletalMeshComponent* Mesh,
+		USkeletalMeshComponent* PrimaryMesh)
+	{
+		if (!IsValid(Mesh) || Mesh == PrimaryMesh)
+		{
+			return IsValid(Mesh);
+		}
+
+		USkeletalMeshComponent* SourceMesh = Cast<USkeletalMeshComponent>(
+			Mesh->LeaderPoseComponent.Get());
+		if (USovDismembermentCopyPoseAnimInstance* ExistingCopyPoseInstance =
+			Cast<USovDismembermentCopyPoseAnimInstance>(Mesh->GetAnimInstance()))
+		{
+			// Narrative can reapply Leader Pose when a clothing or appearance slot
+			// changes. Reclaim the independent buffer before restoring hidden bones.
+			if (IsValid(SourceMesh))
+			{
+				USkeletalMeshComponent* PreviousSourceMesh =
+					ExistingCopyPoseInstance->GetSourceMeshComponent();
+				if (IsValid(PreviousSourceMesh)
+					&& PreviousSourceMesh != SourceMesh)
+				{
+					Mesh->RemoveTickPrerequisiteComponent(PreviousSourceMesh);
+				}
+
+				Mesh->SetLeaderPoseComponent(nullptr, true);
+				// SetAnimInstanceClass deliberately reinitializes the instance. Do not
+				// retain the old UObject pointer across this call.
+				Mesh->SetAnimInstanceClass(
+					USovDismembermentCopyPoseAnimInstance::StaticClass());
+				ExistingCopyPoseInstance =
+					Cast<USovDismembermentCopyPoseAnimInstance>(
+						Mesh->GetAnimInstance());
+				if (!IsValid(ExistingCopyPoseInstance))
+				{
+					Mesh->SetLeaderPoseComponent(SourceMesh, true);
+					return false;
+				}
+
+				ExistingCopyPoseInstance->SetSourceMeshComponent(SourceMesh);
+				Mesh->AddTickPrerequisiteComponent(SourceMesh);
+			}
+			else if (!IsValid(ExistingCopyPoseInstance->GetSourceMeshComponent()))
+			{
+				if (IsValid(PrimaryMesh) && PrimaryMesh != Mesh)
+				{
+					ExistingCopyPoseInstance->SetSourceMeshComponent(PrimaryMesh);
+					Mesh->AddTickPrerequisiteComponent(PrimaryMesh);
+				}
+			}
+			return IsValid(ExistingCopyPoseInstance->GetSourceMeshComponent());
+		}
+
+		if (!IsValid(SourceMesh) || SourceMesh == Mesh)
+		{
+			return !Mesh->LeaderPoseComponent.IsValid();
+		}
+
+		UClass* PreviousAnimClass = Mesh->GetAnimClass();
+		Mesh->SetLeaderPoseComponent(nullptr, true);
+		Mesh->SetAnimInstanceClass(
+			USovDismembermentCopyPoseAnimInstance::StaticClass());
+
+		USovDismembermentCopyPoseAnimInstance* CopyPoseInstance =
+			Cast<USovDismembermentCopyPoseAnimInstance>(Mesh->GetAnimInstance());
+		if (!IsValid(CopyPoseInstance))
+		{
+			Mesh->SetAnimInstanceClass(PreviousAnimClass);
+			Mesh->SetLeaderPoseComponent(SourceMesh, true);
+			return false;
+		}
+
+		CopyPoseInstance->SetSourceMeshComponent(SourceMesh);
+		Mesh->AddTickPrerequisiteComponent(SourceMesh);
+		return true;
+	}
+
 	void DisablePhysicsBodiesBelowBone(
 		USkeletalMeshComponent* Mesh,
 		const FName RootBone)
@@ -956,8 +1035,8 @@ void USovDismembermentComponent::ApplyRegionVisualState(
 	const int32 RegionBit = GetRegionBit(Definition.Region);
 	const bool bShouldApplyPhysics = RegionBit != 0
 		&& (AppliedPhysicsRegionMask & RegionBit) == 0;
-	EPhysBodyOp PhysicsBodyOperation = PBO_None;
 	bool bDisablePhysicsBodies = false;
+	bool bTerminatePhysicsBodies = false;
 	if (bShouldApplyPhysics)
 	{
 		switch (Definition.PhysicsBodyOperation)
@@ -966,7 +1045,7 @@ void USovDismembermentComponent::ApplyRegionVisualState(
 			bDisablePhysicsBodies = true;
 			break;
 		case ESovDismembermentPhysicsBodyOperation::Terminate:
-			PhysicsBodyOperation = PBO_Term;
+			bTerminatePhysicsBodies = true;
 			break;
 		default:
 			break;
@@ -978,38 +1057,77 @@ void USovDismembermentComponent::ApplyRegionVisualState(
 	{
 		TArray<USkeletalMeshComponent*> Meshes;
 		GatherPresentationMeshes(Meshes);
+
+		// Leader Pose followers do not own a bone transform buffer. Convert every
+		// affected follower before changing any bone visibility on its driver.
+		// This keeps the source pose intact for the native Copy Pose instances and
+		// prevents the zero-scale hide transform from leaking through Leader Pose.
+		TSet<USkeletalMeshComponent*> MeshesReadyForBoneHide;
+		TSet<USkeletalMeshComponent*> CopyPoseSourceMeshes;
 		for (USkeletalMeshComponent* Mesh : Meshes)
 		{
-			// Narrative's modular body and armor meshes normally follow the main
-			// character mesh through Leader Pose. Hiding the bone directly on a
-			// follower gives it a second, incomplete visibility transform and can
-			// stretch weighted vertices toward component origin. Followers inherit
-			// the collapsed bone transform from their leader, so only independently
-			// posed meshes should be modified here.
-			if (Mesh->LeaderPoseComponent.IsValid())
+			if (Mesh->GetBoneIndex(Definition.BoneToHide) == INDEX_NONE)
 			{
 				continue;
 			}
 
-			if (Mesh->GetBoneIndex(Definition.BoneToHide) != INDEX_NONE)
+			const bool bIsPrimaryMesh = Mesh == PrimaryMesh;
+			if (!bIsPrimaryMesh
+				&& !SovDismemberment::ConvertLeaderPoseFollowerToCopyPose(
+					Mesh,
+					PrimaryMesh))
 			{
-				const bool bIsPrimaryMesh = Mesh == PrimaryMesh;
-				Mesh->HideBoneByName(
-					Definition.BoneToHide,
-					bIsPrimaryMesh ? PhysicsBodyOperation : PBO_None);
-				if (bDisablePhysicsBodies && bIsPrimaryMesh)
+				UE_LOG(
+					LogSovDismemberment,
+					Warning,
+					TEXT("Could not give Narrative presentation mesh %s an independent pose while hiding bone '%s'. Configure a Presentation Slot fallback for this mesh."),
+					*GetNameSafe(Mesh),
+					*Definition.BoneToHide.ToString());
+				continue;
+			}
+
+			MeshesReadyForBoneHide.Add(Mesh);
+			if (const USovDismembermentCopyPoseAnimInstance* CopyPoseInstance =
+				Cast<USovDismembermentCopyPoseAnimInstance>(
+					Mesh->GetAnimInstance()))
+			{
+				if (USkeletalMeshComponent* SourceMesh =
+					CopyPoseInstance->GetSourceMeshComponent())
 				{
-					SovDismemberment::DisablePhysicsBodiesBelowBone(
-						Mesh,
-						Definition.BoneToHide);
+					CopyPoseSourceMeshes.Add(SourceMesh);
 				}
-				if (bIsPrimaryMesh
-					&& bShouldApplyPhysics
-					&& Definition.PhysicsBodyOperation
-						!= ESovDismembermentPhysicsBodyOperation::None)
-				{
-					bAppliedPhysics = true;
-				}
+			}
+		}
+
+		for (USkeletalMeshComponent* Mesh : MeshesReadyForBoneHide)
+		{
+			const bool bIsPrimaryMesh = Mesh == PrimaryMesh;
+			// Narrative disables bVisible on its pose-only drivers. Read that literal
+			// flag so a temporarily hidden actor does not suppress a real sever mask.
+			const bool bPreserveInvisiblePoseDriver =
+				CopyPoseSourceMeshes.Contains(Mesh)
+				&& !Mesh->GetVisibleFlag();
+			if (!bPreserveInvisiblePoseDriver)
+			{
+				Mesh->HideBoneByName(Definition.BoneToHide, PBO_None);
+			}
+
+			if (bIsPrimaryMesh && bDisablePhysicsBodies)
+			{
+				SovDismemberment::DisablePhysicsBodiesBelowBone(
+					Mesh,
+					Definition.BoneToHide);
+			}
+			else if (bIsPrimaryMesh && bTerminatePhysicsBodies)
+			{
+				Mesh->TermBodiesBelow(Definition.BoneToHide);
+			}
+			if (bIsPrimaryMesh
+				&& bShouldApplyPhysics
+				&& Definition.PhysicsBodyOperation
+					!= ESovDismembermentPhysicsBodyOperation::None)
+			{
+				bAppliedPhysics = true;
 			}
 		}
 	}

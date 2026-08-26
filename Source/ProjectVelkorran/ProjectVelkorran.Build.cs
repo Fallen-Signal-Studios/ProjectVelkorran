@@ -25,5 +25,7 @@ public class ProjectVelkorran : ModuleRules
 				"NarrativeSaveSystem"
 			}
 		);
+
+		PrivateDependencyModuleNames.Add("AnimGraphRuntime");
 	}
 }

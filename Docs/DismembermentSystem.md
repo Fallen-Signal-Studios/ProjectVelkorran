@@ -5,7 +5,7 @@ Project Velkorran now supports server-authoritative, bone-defined dismemberment 
 ## First setup
 
 1. Reparent an enemy Blueprint to `SovNPCCharacterBase`, or add `SovDismembermentComponent` directly to an existing Narrative character Blueprint.
-2. Leave `Use SK Mannequin Bone Map` enabled. No dismemberment profile is required for the standard Epic mannequin skeleton.
+2. Leave `Use SK Mannequin Bone Map` enabled. No dismemberment profile or Copy Pose Animation Blueprint is required for the standard Epic mannequin skeleton.
 3. Create and assign a `SovDismembermentProfile` only when the character needs custom detached limbs, stumps, Niagara effects, decals, rules, or explicit mapping overrides.
 4. Ensure damaging Gameplay Effects include `Sov.Damage.Channel.Edge` and carry a valid `FHitResult` in their effect context. Narrative already copies `HitResult.BoneName` into the resolved damage packet.
 
@@ -104,13 +104,17 @@ An empty required-channel container means the rule accepts any damage channel. G
 
 ## Narrative appearance behavior
 
-The component applies every severed branch to Narrative's hidden leader mesh and local first-person leader mesh. Leader-pose body and armor pieces inherit that transform from their leader; independently animated modular meshes are updated directly. This avoids corrupting follower skinning while keeping every presentation layer synchronized. It also listens for:
+The component keeps Narrative's hidden driver mesh as the authoritative animation and physics source. It converts affected followers before changing visibility and leaves an invisible driver pose unmasked, while still disabling or terminating the severed physics bodies on that driver. When a visible modular body or armor mesh is still using Leader Pose, the first sever converts that individual follower to the system's lightweight native Copy Pose instance. Copy Pose gives the presentation mesh its own bone transform and visibility buffer, so the matching SK Mannequin branch can be hidden without stretching the follower back toward the component origin. No project Animation Blueprint asset is required, and unaffected characters and components retain Narrative's cheaper Leader Pose path.
+
+Skinned modular meshes containing the configured `Bone To Hide` are masked automatically. `Presentation Slots To Hide` remains the fallback for static meshes, rigid armor, or presentation assets that do not contain the sever bone and therefore cannot be cut by the skeletal branch. `Hide Head Presentation` continues to handle Narrative's separate face, helmet, facial hair, groom, and other head components.
+
+The component also listens for:
 
 - A replacement `NarrativeCharacterVisual`
 - Base appearance completion
 - Every later asynchronous modular mesh change
 
-The replicated state is therefore reapplied after clothing swaps, armor changes, appearance replacement, Narrative death/ragdoll transitions, save loading, and late joining. This state belongs to the real character component, not the transient appearance actor. The server applies each new sever once through the same multicast path used by clients, avoiding a second irreversible `PBO_Term` pass on listen servers.
+The replicated state is therefore reapplied after clothing swaps, armor changes, appearance replacement, Narrative death/ragdoll transitions, save loading, and late joining. If Narrative restores Leader Pose while replacing an affected slot, the refresh converts that replacement back to Copy Pose before restoring its sever mask. This state belongs to the real character component, not the transient appearance actor. The server applies each new sever once through the same multicast path used by clients, avoiding a second irreversible physics-termination pass on listen servers.
 
 ## Narrative Save and revive behavior
 
@@ -136,10 +140,10 @@ The initial scope intentionally uses authored sever points. It does not perform 
 
 Before shipping a new character profile, verify:
 
-1. A fatal Edge hit with a valid bone hides the correct branch, creates one stump and one detached limb, attaches every configured stump Niagara slot, and leaves no stretched leader-pose geometry.
+1. A fatal Edge hit with a valid bone keeps the hidden driver pose intact, hides the correct branch on all compatible visible modular meshes, converts affected Leader Pose followers to Copy Pose, creates one stump and one detached limb, attaches every configured stump Niagara slot, and leaves no stretched presentation geometry.
 2. Guarded and Perfect Defense hits never sever. Shield-only hits sever only when an authored custom rule explicitly permits them.
 3. A listen server and remote client each play one cosmetic event. The transient Sever System emitter follows the stump through ragdoll, and the server must not terminate the same body twice.
-4. Equipping or asynchronously replacing armor after a sever keeps the branch and configured rigid slots hidden.
+4. Equipping or asynchronously replacing armor after a sever converts compatible replacement followers to Copy Pose, restores the branch mask, and keeps configured rigid slots hidden.
 5. A late-joining client reconstructs hidden branches and stumps from the replicated mask without replaying old transient blood or limb cosmetics.
 6. Saving and loading a savable NPC restores the permanent sever mask.
 7. Narrative death, ragdoll, and revive transitions preserve the sever. `Disable Collision` regions remain disabled after Narrative's mesh-wide collision changes.
