@@ -12,6 +12,7 @@
 class ANarrativeCharacter;
 class ANarrativeCharacterVisual;
 class UNarrativeAbilitySystemComponent;
+class UNiagaraComponent;
 class UPhysicsAsset;
 class USkeletalMesh;
 class USkeletalMeshComponent;
@@ -178,6 +179,9 @@ private:
 	void EnsureStumpActor(
 		const FSovDismembermentRegionDefinition& Definition,
 		const FTransform& SeverTransform);
+	void EnsureStumpNiagaraEffects(
+		const FSovDismembermentRegionDefinition& Definition,
+		const FTransform& SeverTransform);
 	bool FindBloodDecalSurface(
 		const FSovDismembermentRegionDefinition& Definition,
 		const FVector& Origin,
@@ -206,6 +210,9 @@ private:
 	TMap<ESovDismembermentRegion, TObjectPtr<AActor>> SpawnedStumpActors;
 
 	UPROPERTY(Transient)
+	TArray<TObjectPtr<UNiagaraComponent>> SpawnedStumpNiagaraComponents;
+
+	UPROPERTY(Transient)
 	TObjectPtr<USkeletalMesh> LastPrimaryMeshAsset = nullptr;
 
 	UPROPERTY(Transient)
@@ -215,5 +222,6 @@ private:
 	bool bVisualRefreshScheduled = false;
 	int32 VisualRefreshRetryCount = 0;
 	int32 AppliedPhysicsRegionMask = 0;
+	int32 SpawnedStumpNiagaraRegionMask = 0;
 	int32 CosmeticEventCounter = 0;
 };

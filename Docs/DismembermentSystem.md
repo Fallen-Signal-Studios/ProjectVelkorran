@@ -30,6 +30,7 @@ Each region defines:
 - `Presentation Slots To Hide`: rigid Narrative armor pieces that cannot collapse with a skeletal branch.
 - `Detached Limb Class`: a Blueprint derived from `SovDetachedLimbActor`.
 - `Stump Actor Class`: a local cosmetic actor containing cap geometry and wound materials.
+- `Stump Niagara Slots`: stateful Niagara effects attached to the region's stump bone or an optional per-slot bone/socket override.
 - `Sever System` and `Blood Decal Material`: Niagara and Deferred Decal gore presentation.
 - `Blood Decal Surface Search Distance`: how far the cosmetic searches for nearby ground, walls, ceilings, or movable world geometry instead of projecting onto Narrative's decal-disabled modular meshes.
 
@@ -40,6 +41,18 @@ The blood material must use the Deferred Decal domain. Multiply opacity by `Deca
 For decapitation, enable `Hide Head Presentation`. Narrative will hide the face, helmet, facial meshes, all grooms, and supported static head pieces.
 
 The stump actor is spawned at the sever transform before the bone is hidden, then attached to the surviving parent with `Keep World Transform`. This lets an authored cap stay aligned during animation and ragdoll. Use the region spawn offsets to correct an asset whose pivot does not match the skeleton.
+
+## Stump Niagara slots
+
+Use `Sever System` for the transient burst that plays when the hit first severs the limb. Use `Stump Niagara Slots` for effects that belong to the persistent wound, such as a looping blood mist, embers, smoke, or leaking energy. Each region can contain multiple independently authored slots:
+
+- `Slot Name`: editor-facing label for the array element.
+- `Niagara System`: the effect to spawn.
+- `Attach Bone Override`: optional bone or socket; empty uses the region's `Stump Attach Bone`.
+- `Spawn Offset`: an offset from the exact sever transform before attachment.
+- `Auto Destroy`: enable for a finite effect; leave disabled for a persistent looping effect.
+
+Stump effects spawn once per region on each local game instance and attach with their world cut transform preserved. They are reconstructed from the permanent sever mask for late joiners and save loads, but Narrative appearance refreshes do not duplicate them. A missing override falls back to the region stump bone; a missing region stump bone leaves the effect attached to the driver mesh at the resolved sever position.
 
 ## Detached limb Blueprints
 
@@ -79,7 +92,7 @@ Dismemberment is intentionally permanent for the lifetime and save record of tha
 
 ## Runtime validation
 
-At startup the component warns about duplicate or invalid regions, empty bone mappings, duplicate hit roots, inverted impulse limits, and non-fatal rules paired with permanent physics termination. A sever is rejected instead of committing replicated state when its configured hide bone does not exist on Narrative's driver mesh.
+At startup the component warns about duplicate or invalid regions, empty bone mappings, duplicate hit roots, empty stump Niagara slots, inverted impulse limits, and non-fatal rules paired with permanent physics termination. A sever is rejected instead of committing replicated state when its configured hide bone does not exist on Narrative's driver mesh.
 
 ## Blueprint hooks
 
@@ -95,10 +108,11 @@ The initial scope intentionally uses authored sever points. It does not perform 
 
 Before shipping a new character profile, verify:
 
-1. A fatal Edge hit with a valid bone hides the correct branch, creates one stump and one detached limb, and leaves no stretched leader-pose geometry.
+1. A fatal Edge hit with a valid bone hides the correct branch, creates one stump and one detached limb, attaches every configured stump Niagara slot, and leaves no stretched leader-pose geometry.
 2. Guarded and Perfect Defense hits never sever. Shield-only hits sever only when an authored custom rule explicitly permits them.
 3. A listen server and remote client each play one cosmetic event. The server must not terminate the same body twice.
 4. Equipping or asynchronously replacing armor after a sever keeps the branch and configured rigid slots hidden.
 5. A late-joining client reconstructs hidden branches and stumps from the replicated mask without replaying old transient blood or limb cosmetics.
 6. Saving and loading a savable NPC restores the permanent sever mask.
 7. Narrative death, ragdoll, and revive transitions preserve the sever. `Disable Collision` regions remain disabled after Narrative's mesh-wide collision changes.
+8. Stump Niagara effects follow the configured stump bone during animation and ragdoll, and outfit or appearance refreshes do not create duplicates.

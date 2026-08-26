@@ -16,6 +16,7 @@
 #include "GameFramework/Pawn.h"
 #include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
+#include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "PhysicsEngine/BodyInstance.h"
 #include "Sovereign/SovGameplayTags.h"
@@ -149,6 +150,18 @@ void USovDismembermentComponent::EndPlay(const EEndPlayReason::Type EndPlayReaso
 		}
 	}
 	SpawnedStumpActors.Reset();
+
+	for (const TObjectPtr<UNiagaraComponent>& NiagaraComponentPtr
+		: SpawnedStumpNiagaraComponents)
+	{
+		if (UNiagaraComponent* NiagaraComponent = NiagaraComponentPtr.Get();
+			IsValid(NiagaraComponent))
+		{
+			NiagaraComponent->DestroyComponent();
+		}
+	}
+	SpawnedStumpNiagaraComponents.Reset();
+	SpawnedStumpNiagaraRegionMask = 0;
 
 	Super::EndPlay(EndPlayReason);
 }
@@ -984,6 +997,7 @@ void USovDismembermentComponent::ApplyRegionVisualState(
 	}
 
 	EnsureStumpActor(Definition, SeverTransform);
+	EnsureStumpNiagaraEffects(Definition, SeverTransform);
 }
 
 void USovDismembermentComponent::EnsureStumpActor(
@@ -1033,6 +1047,82 @@ void USovDismembermentComponent::EnsureStumpActor(
 	}
 
 	SpawnedStumpActors.Add(Definition.Region, StumpActor);
+}
+
+void USovDismembermentComponent::EnsureStumpNiagaraEffects(
+	const FSovDismembermentRegionDefinition& Definition,
+	const FTransform& SeverTransform)
+{
+	UWorld* World = GetWorld();
+	const int32 RegionBit = GetRegionBit(Definition.Region);
+	if (RegionBit == 0
+		|| (SpawnedStumpNiagaraRegionMask & RegionBit) != 0
+		|| !IsValid(World)
+		|| World->GetNetMode() == NM_DedicatedServer
+		|| Definition.StumpNiagaraSlots.IsEmpty())
+	{
+		return;
+	}
+
+	USkeletalMeshComponent* PrimaryMesh = ResolvePrimaryMesh();
+	if (!IsValid(PrimaryMesh))
+	{
+		return;
+	}
+
+	bool bSpawnedAnyEffect = false;
+	for (const FSovDismembermentStumpNiagaraSlot& Slot : Definition.StumpNiagaraSlots)
+	{
+		if (!IsValid(Slot.NiagaraSystem.Get()))
+		{
+			continue;
+		}
+
+		FName AttachPoint = Slot.AttachBoneOverride.IsNone()
+			? Definition.StumpAttachBone
+			: Slot.AttachBoneOverride;
+		const auto HasAttachPoint = [PrimaryMesh](const FName Candidate)
+		{
+			return !Candidate.IsNone()
+				&& (PrimaryMesh->GetBoneIndex(Candidate) != INDEX_NONE
+					|| PrimaryMesh->DoesSocketExist(Candidate));
+		};
+		if (!HasAttachPoint(AttachPoint)
+			&& AttachPoint != Definition.StumpAttachBone
+			&& HasAttachPoint(Definition.StumpAttachBone))
+		{
+			AttachPoint = Definition.StumpAttachBone;
+		}
+		if (!HasAttachPoint(AttachPoint))
+		{
+			AttachPoint = NAME_None;
+		}
+
+		const FTransform SpawnTransform = Slot.SpawnOffset * SeverTransform;
+		UNiagaraComponent* SpawnedComponent =
+			UNiagaraFunctionLibrary::SpawnSystemAttached(
+				Slot.NiagaraSystem.Get(),
+				PrimaryMesh,
+				AttachPoint,
+				SpawnTransform.GetLocation(),
+				SpawnTransform.Rotator(),
+				SpawnTransform.GetScale3D(),
+				EAttachLocation::KeepWorldPosition,
+				Slot.bAutoDestroy,
+				ENCPoolMethod::None,
+				true,
+				false);
+		if (IsValid(SpawnedComponent))
+		{
+			SpawnedStumpNiagaraComponents.Add(SpawnedComponent);
+			bSpawnedAnyEffect = true;
+		}
+	}
+
+	if (bSpawnedAnyEffect)
+	{
+		SpawnedStumpNiagaraRegionMask |= RegionBit;
+	}
 }
 
 bool USovDismembermentComponent::FindBloodDecalSurface(
@@ -1327,6 +1417,25 @@ void USovDismembermentComponent::ValidateConfiguration()
 			else
 			{
 				SeenHitBoneRoots.Add(HitBoneRoot);
+			}
+		}
+
+		for (int32 SlotIndex = 0;
+			SlotIndex < Definition.StumpNiagaraSlots.Num();
+			++SlotIndex)
+		{
+			const FSovDismembermentStumpNiagaraSlot& Slot =
+				Definition.StumpNiagaraSlots[SlotIndex];
+			if (!IsValid(Slot.NiagaraSystem.Get()))
+			{
+				UE_LOG(
+					LogSovDismemberment,
+					Warning,
+					TEXT("%s region %d stump Niagara slot %d ('%s') has no system and will be ignored."),
+					*GetNameSafe(GetOwner()),
+					static_cast<int32>(Definition.Region),
+					SlotIndex,
+					*Slot.SlotName.ToString());
 			}
 		}
 

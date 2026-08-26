@@ -11,6 +11,32 @@ class ASovDetachedLimbActor;
 class UMaterialInterface;
 class UNiagaraSystem;
 
+/** One stateful Niagara effect attached to a severed region's surviving stump bone. */
+USTRUCT(BlueprintType)
+struct PROJECTVELKORRAN_API FSovDismembermentStumpNiagaraSlot
+{
+	GENERATED_BODY()
+
+	/** Editor-facing label such as BloodSpray, Embers, or Smoke. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stump Niagara")
+	FName SlotName = NAME_None;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stump Niagara")
+	TObjectPtr<UNiagaraSystem> NiagaraSystem = nullptr;
+
+	/** Empty uses the region's Stump Attach Bone. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stump Niagara")
+	FName AttachBoneOverride = NAME_None;
+
+	/** Applied at the sever transform before the effect is attached to the surviving bone. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stump Niagara")
+	FTransform SpawnOffset = FTransform::Identity;
+
+	/** Enable for finite systems. Leave disabled for persistent looping stump effects. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stump Niagara")
+	bool bAutoDestroy = false;
+};
+
 /** Stable replicated regions. Values are bit positions in the severed-region mask. */
 UENUM(BlueprintType)
 enum class ESovDismembermentRegion : uint8
@@ -124,6 +150,10 @@ struct PROJECTVELKORRAN_API FSovDismembermentRegionDefinition
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stump")
 	FTransform StumpSpawnOffset = FTransform::Identity;
+
+	/** Stateful effects reconstructed from the sever mask and attached to the stump. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stump", meta = (TitleProperty = "SlotName"))
+	TArray<FSovDismembermentStumpNiagaraSlot> StumpNiagaraSlots;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Gore")
 	TObjectPtr<UNiagaraSystem> SeverSystem = nullptr;
