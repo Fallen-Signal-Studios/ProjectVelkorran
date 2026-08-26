@@ -16,6 +16,7 @@
 #include "GAS/NarrativeAbilitySystemComponent.h"
 #include "GameFramework/Pawn.h"
 #include "Kismet/GameplayStatics.h"
+#include "Materials/MaterialInterface.h"
 #include "Net/UnrealNetwork.h"
 #include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
@@ -165,8 +166,10 @@ void USovDismembermentComponent::EndPlay(const EEndPlayReason::Type EndPlayReaso
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(VisualRefreshTimerHandle);
+		World->GetTimerManager().ClearTimer(DeathBloodPuddleTimerHandle);
 	}
 	bVisualRefreshScheduled = false;
+	bDeathBloodPuddlePending = false;
 	VisualRefreshRetryCount = 0;
 
 	if (ANarrativeCharacter* Character = Cast<ANarrativeCharacter>(GetOwner()))
@@ -223,6 +226,11 @@ void USovDismembermentComponent::Load_Implementation()
 {
 	OnDismembermentStateChanged.Broadcast(SeveredRegionMask);
 	ScheduleVisualRefresh();
+	if (IsValid(AbilitySystemComponent.Get())
+		&& AbilitySystemComponent->IsDead())
+	{
+		ScheduleDeathBloodPuddle();
+	}
 
 	if (AActor* Owner = GetOwner(); IsValid(Owner) && Owner->HasAuthority())
 	{
@@ -244,6 +252,9 @@ void USovDismembermentComponent::InitializeWithAbilitySystem(
 		return;
 	}
 
+	CancelPendingDeathBloodPuddle();
+	bDeathBloodPuddleSpawnedForCurrentDeath = false;
+
 	if (IsValid(AbilitySystemComponent))
 	{
 		AbilitySystemComponent->OnDamageResolvedAsTarget.RemoveDynamic(
@@ -263,6 +274,17 @@ void USovDismembermentComponent::InitializeWithAbilitySystem(
 		AbilitySystemComponent->OnDeathStateChanged.AddUniqueDynamic(
 			this,
 			&ThisClass::HandleDeathStateChanged);
+
+		// Covers components initialized after a dead state has already replicated.
+		if (AbilitySystemComponent->IsDead())
+		{
+			ScheduleDeathBloodPuddle();
+		}
+		else
+		{
+			CancelPendingDeathBloodPuddle();
+			bDeathBloodPuddleSpawnedForCurrentDeath = false;
+		}
 	}
 }
 
@@ -375,9 +397,18 @@ void USovDismembermentComponent::HandleDeathStateChanged(
 	UNarrativeAbilitySystemComponent* KilledActorASC,
 	const bool bIsDead)
 {
-	static_cast<void>(bIsDead);
 	if (KilledActor == GetOwner() || KilledActorASC == AbilitySystemComponent.Get())
 	{
+		if (bIsDead)
+		{
+			ScheduleDeathBloodPuddle();
+		}
+		else
+		{
+			CancelPendingDeathBloodPuddle();
+			bDeathBloodPuddleSpawnedForCurrentDeath = false;
+		}
+
 		int32 CollisionRegionsToReapply = 0;
 		int32 ProcessedRegionMask = 0;
 		for (const FSovDismembermentRegionDefinition& Definition :
@@ -403,6 +434,296 @@ void USovDismembermentComponent::HandleDeathStateChanged(
 		// permanent bone visibility and per-body collision win regardless of
 		// delegate binding order. Terminated bodies are never terminated twice.
 		ScheduleVisualRefresh();
+	}
+}
+
+void USovDismembermentComponent::ScheduleDeathBloodPuddle()
+{
+	UWorld* World = GetWorld();
+	if (!bSpawnDeathBloodPuddleOnDeath
+		|| !IsValid(DeathBloodPuddleMaterial.Get())
+		|| !IsValid(World)
+		|| World->GetNetMode() == NM_DedicatedServer
+		|| bDeathBloodPuddlePending
+		|| bDeathBloodPuddleSpawnedForCurrentDeath)
+	{
+		return;
+	}
+
+	bDeathBloodPuddlePending = true;
+	DeathBloodPuddleDeathWorldTime = World->GetTimeSeconds();
+	DeathBloodPuddleSettleStartWorldTime = -1.f;
+	World->GetTimerManager().SetTimer(
+		DeathBloodPuddleTimerHandle,
+		this,
+		&ThisClass::TrySpawnDeathBloodPuddle,
+		FMath::Max(DeathBloodPuddleSpawnDelaySeconds, 0.01f),
+		false);
+}
+
+void USovDismembermentComponent::ScheduleDeathBloodPuddleRetry()
+{
+	if (UWorld* World = GetWorld(); IsValid(World))
+	{
+		bDeathBloodPuddlePending = true;
+		World->GetTimerManager().SetTimer(
+			DeathBloodPuddleTimerHandle,
+			this,
+			&ThisClass::TrySpawnDeathBloodPuddle,
+			FMath::Max(DeathBloodPuddleRetryIntervalSeconds, 0.01f),
+			false);
+	}
+}
+
+void USovDismembermentComponent::CancelPendingDeathBloodPuddle()
+{
+	if (UWorld* World = GetWorld(); IsValid(World))
+	{
+		World->GetTimerManager().ClearTimer(DeathBloodPuddleTimerHandle);
+	}
+	bDeathBloodPuddlePending = false;
+	DeathBloodPuddleSettleStartWorldTime = -1.f;
+}
+
+bool USovDismembermentComponent::FindDeathBloodPuddleSurface(
+	const FVector& AnchorLocation,
+	FHitResult& OutSurfaceHit) const
+{
+	UWorld* World = GetWorld();
+	const float TraceDistance = FMath::Max(
+		DeathBloodPuddleFloorTraceDistance,
+		0.f);
+	if (!IsValid(World) || TraceDistance <= KINDA_SMALL_NUMBER)
+	{
+		return false;
+	}
+
+	FCollisionObjectQueryParams ObjectQuery;
+	ObjectQuery.AddObjectTypesToQuery(ECC_WorldStatic);
+	ObjectQuery.AddObjectTypesToQuery(ECC_WorldDynamic);
+
+	FCollisionQueryParams QueryParams(
+		SCENE_QUERY_STAT(SovDismembermentDeathBloodPuddleSurface),
+		false,
+		GetOwner());
+	QueryParams.AddIgnoredActor(GetOwner());
+	if (IsValid(BoundCharacterVisual.Get()))
+	{
+		QueryParams.AddIgnoredActor(BoundCharacterVisual.Get());
+	}
+	if (AActor* Owner = GetOwner(); IsValid(Owner))
+	{
+		TArray<AActor*> AttachedActors;
+		Owner->GetAttachedActors(AttachedActors, true, true);
+		for (AActor* AttachedActor : AttachedActors)
+		{
+			if (IsValid(AttachedActor))
+			{
+				QueryParams.AddIgnoredActor(AttachedActor);
+			}
+		}
+
+		TArray<AActor*> ChildActors;
+		Owner->GetAllChildActors(ChildActors, true);
+		for (AActor* ChildActor : ChildActors)
+		{
+			if (IsValid(ChildActor))
+			{
+				QueryParams.AddIgnoredActor(ChildActor);
+			}
+		}
+	}
+	for (const TPair<ESovDismembermentRegion, TObjectPtr<AActor>>& Pair :
+		SpawnedStumpActors)
+	{
+		if (IsValid(Pair.Value.Get()))
+		{
+			QueryParams.AddIgnoredActor(Pair.Value.Get());
+		}
+	}
+
+	constexpr float TraceStartHeight = 25.f;
+	const FVector TraceStart = AnchorLocation
+		+ (FVector::UpVector * TraceStartHeight);
+	const FVector TraceEnd = AnchorLocation
+		- (FVector::UpVector * TraceDistance);
+	return World->LineTraceSingleByObjectType(
+		OutSurfaceHit,
+		TraceStart,
+		TraceEnd,
+		ObjectQuery,
+		QueryParams)
+		&& OutSurfaceHit.bBlockingHit
+		&& OutSurfaceHit.ImpactNormal.GetSafeNormal().Z
+			>= FMath::Clamp(DeathBloodPuddleMinimumFloorNormalZ, 0.f, 1.f);
+}
+
+void USovDismembermentComponent::TrySpawnDeathBloodPuddle()
+{
+	bDeathBloodPuddlePending = false;
+
+	UWorld* World = GetWorld();
+	AActor* Owner = GetOwner();
+	if (!bSpawnDeathBloodPuddleOnDeath
+		|| !IsValid(DeathBloodPuddleMaterial.Get())
+		|| !IsValid(World)
+		|| !IsValid(Owner)
+		|| World->GetNetMode() == NM_DedicatedServer
+		|| bDeathBloodPuddleSpawnedForCurrentDeath
+		|| !IsValid(AbilitySystemComponent.Get())
+		|| !AbilitySystemComponent->IsDead())
+	{
+		return;
+	}
+
+	USkeletalMeshComponent* PrimaryMesh = ResolvePrimaryMesh();
+	FVector AnchorLocation = Owner->GetActorLocation();
+	FVector AnchorVelocity = FVector::ZeroVector;
+	FVector AnchorAngularVelocity = FVector::ZeroVector;
+	if (IsValid(PrimaryMesh))
+	{
+		const bool bHasAnchorBone = !DeathBloodPuddleAnchorBone.IsNone()
+			&& PrimaryMesh->GetBoneIndex(DeathBloodPuddleAnchorBone) != INDEX_NONE;
+		AnchorLocation = bHasAnchorBone
+			? PrimaryMesh->GetBoneLocation(
+				DeathBloodPuddleAnchorBone,
+				EBoneSpaces::WorldSpace)
+			: PrimaryMesh->Bounds.Origin;
+		AnchorVelocity = PrimaryMesh->GetPhysicsLinearVelocity(
+			bHasAnchorBone ? DeathBloodPuddleAnchorBone : NAME_None);
+		AnchorAngularVelocity = PrimaryMesh->GetPhysicsAngularVelocityInDegrees(
+			bHasAnchorBone ? DeathBloodPuddleAnchorBone : NAME_None);
+	}
+
+	const float ElapsedSeconds = FMath::Max(
+		World->GetTimeSeconds() - DeathBloodPuddleDeathWorldTime,
+		0.f);
+	const bool bCanRetry = ElapsedSeconds
+		< FMath::Max(DeathBloodPuddleMaximumSettleWaitSeconds, 0.f);
+	const bool bAnchorIsMoving =
+		AnchorVelocity.SizeSquared()
+			> FMath::Square(FMath::Max(
+				DeathBloodPuddleMaximumSettleSpeed,
+				0.f))
+		|| AnchorAngularVelocity.SizeSquared()
+			> FMath::Square(FMath::Max(
+				DeathBloodPuddleMaximumSettleAngularSpeed,
+				0.f));
+	if (bCanRetry && bAnchorIsMoving)
+	{
+		DeathBloodPuddleSettleStartWorldTime = -1.f;
+		ScheduleDeathBloodPuddleRetry();
+		return;
+	}
+
+	const float SettleDwellSeconds = FMath::Max(
+		DeathBloodPuddleSettleDwellSeconds,
+		0.f);
+	if (bCanRetry && SettleDwellSeconds > KINDA_SMALL_NUMBER)
+	{
+		if (DeathBloodPuddleSettleStartWorldTime < 0.f)
+		{
+			DeathBloodPuddleSettleStartWorldTime = World->GetTimeSeconds();
+			ScheduleDeathBloodPuddleRetry();
+			return;
+		}
+		if (World->GetTimeSeconds() - DeathBloodPuddleSettleStartWorldTime
+			< SettleDwellSeconds)
+		{
+			ScheduleDeathBloodPuddleRetry();
+			return;
+		}
+	}
+
+	FHitResult SurfaceHit;
+	if (!FindDeathBloodPuddleSurface(AnchorLocation, SurfaceHit))
+	{
+		if (bCanRetry)
+		{
+			ScheduleDeathBloodPuddleRetry();
+		}
+		return;
+	}
+
+	const FVector SurfaceNormal = SurfaceHit.ImpactNormal.GetSafeNormal();
+	FRotator DecalRotation = SurfaceNormal.Rotation();
+	const uint32 CosmeticSeed = HashCombineFast(
+		GetTypeHash(Owner->GetFName()),
+		GetTypeHash(FMath::RoundToInt(DeathBloodPuddleDeathWorldTime * 10.f)));
+	FRandomStream RandomStream(static_cast<int32>(CosmeticSeed));
+	DecalRotation.Roll = RandomStream.FRandRange(-180.f, 180.f);
+
+	const FVector DecalSize(
+		FMath::Max(DeathBloodPuddleSize.X, 1.f),
+		FMath::Max(DeathBloodPuddleSize.Y, 1.f),
+		FMath::Max(DeathBloodPuddleSize.Z, 1.f));
+	const FVector DecalLocation = SurfaceHit.ImpactPoint
+		+ (SurfaceNormal * FMath::Max(
+			DeathBloodPuddleSurfaceOffset,
+			0.f));
+	const float DecalLifetime = FMath::Max(
+		DeathBloodPuddleLifeSeconds,
+		0.f);
+
+	UDecalComponent* Decal = nullptr;
+	if (USceneComponent* HitComponent = SurfaceHit.GetComponent();
+		IsValid(HitComponent))
+	{
+		Decal = UGameplayStatics::SpawnDecalAttached(
+			DeathBloodPuddleMaterial.Get(),
+			DecalSize,
+			HitComponent,
+			SurfaceHit.BoneName,
+			DecalLocation,
+			DecalRotation,
+			EAttachLocation::KeepWorldPosition,
+			DecalLifetime);
+	}
+	else
+	{
+		Decal = UGameplayStatics::SpawnDecalAtLocation(
+			World,
+			DeathBloodPuddleMaterial.Get(),
+			DecalSize,
+			DecalLocation,
+			DecalRotation,
+			DecalLifetime);
+	}
+
+	if (!IsValid(Decal))
+	{
+		if (bCanRetry)
+		{
+			ScheduleDeathBloodPuddleRetry();
+		}
+		return;
+	}
+
+	bDeathBloodPuddleSpawnedForCurrentDeath = true;
+	const float FadeInSeconds = DecalLifetime > KINDA_SMALL_NUMBER
+		? FMath::Clamp(
+			DeathBloodPuddleFadeInSeconds,
+			0.f,
+			DecalLifetime)
+		: FMath::Max(DeathBloodPuddleFadeInSeconds, 0.f);
+	if (FadeInSeconds > KINDA_SMALL_NUMBER)
+	{
+		Decal->SetFadeIn(0.f, FadeInSeconds);
+	}
+
+	if (DecalLifetime > KINDA_SMALL_NUMBER)
+	{
+		const float FadeOutSeconds = FMath::Clamp(
+			DeathBloodPuddleFadeOutSeconds,
+			0.f,
+			FMath::Max(DecalLifetime - FadeInSeconds, 0.f));
+		if (FadeOutSeconds > KINDA_SMALL_NUMBER)
+		{
+			Decal->SetFadeOut(
+				FMath::Max(DecalLifetime - FadeOutSeconds, 0.f),
+				FadeOutSeconds,
+				false);
+		}
 	}
 }
 

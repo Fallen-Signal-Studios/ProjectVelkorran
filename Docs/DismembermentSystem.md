@@ -62,6 +62,16 @@ Each region defines:
 
 The blood material must use the Deferred Decal domain. Multiply opacity by `Decal Lifetime Opacity` if the authored fade duration should be visible instead of ending with a pop.
 
+## Death blood puddle
+
+`SovDismembermentComponent` can also place one cosmetic blood puddle whenever Narrative transitions its owner into the dead state. Assign `Death Blood Puddle Material` on the component to enable the presentation. The material must use the Deferred Decal domain and multiply its opacity by `Decal Lifetime Opacity`; Unreal's decal fade-in and fade-out both drive that node.
+
+The component waits for Narrative to enter ragdoll, samples the configured anchor bone (`pelvis` by default), and requires its linear and angular movement to remain below the authored thresholds for a short dwell before placement. It then traces downward to World Static or World Dynamic geometry, ignores the corpse plus attached and child equipment actors, rejects wall-like surfaces, aligns the decal to the floor, and attaches it with `Keep World Position` so elevators and other moving surfaces carry it. If the ragdoll is airborne, moving, or no floor is available, the component retries until `Death Blood Puddle Maximum Settle Wait Seconds` expires.
+
+The material, anchor bone, projection size, initial delay, linear and angular settling thresholds, settle dwell, retry interval, floor-trace distance, minimum floor normal, surface offset, fade-in, lifetime, and fade-out are all editable under `Dismemberment | Death Blood Puddle`. A lifetime of zero keeps the decal indefinitely. For finite lifetimes, fade-out is automatically shortened when necessary so it cannot overlap fade-in. Reviving before placement cancels the pending puddle; reviving after placement leaves the environmental blood behind and permits a fresh puddle on a later death.
+
+Narrative broadcasts death state on the server and all clients, while its ragdoll poses are local cosmetics. Puddles therefore spawn locally beneath the corpse position each player actually sees, are suppressed on dedicated servers, do not require additional replication, and are created only once per death transition. Late joiners receive Narrative's replicated dead state and construct the same presentation beneath their local corpse.
+
 `Disable Collision` keeps branch bodies allocated but turns off their collision. `Terminate Permanently` removes them and is the default for this lethal-only first slice. Physics operations are applied once per local mesh physics state, even if Narrative emits several asynchronous appearance callbacks. A complete base-appearance replacement clears that local guard so the operation is applied to the replacement physics asset.
 
 For decapitation, enable `Hide Head Presentation`. Narrative will hide the face, helmet, facial meshes, all grooms, and supported static head pieces.
@@ -149,3 +159,4 @@ Before shipping a new character profile, verify:
 7. Narrative death, ragdoll, and revive transitions preserve the sever. `Disable Collision` regions remain disabled after Narrative's mesh-wide collision changes.
 8. Stump Niagara effects follow the configured stump bone during animation and ragdoll, and outfit or appearance refreshes do not create duplicates.
 9. Hits on upper arms, forearms, hands/fingers, thighs, calves, feet/toes, neck, and head resolve to the closest matching SK Mannequin region on both sides.
+10. A configured death puddle waits for the local corpse to settle, fades in beneath the pelvis, follows moving floor geometry, does not duplicate during appearance callbacks, and is cancelled if the character revives before placement.

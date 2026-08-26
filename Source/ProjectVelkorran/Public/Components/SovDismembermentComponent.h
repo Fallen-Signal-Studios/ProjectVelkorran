@@ -11,6 +11,7 @@
 
 class ANarrativeCharacter;
 class ANarrativeCharacterVisual;
+class UMaterialInterface;
 class UNarrativeAbilitySystemComponent;
 class UNiagaraComponent;
 class UPhysicsAsset;
@@ -116,6 +117,67 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dismemberment|Impulse", meta = (ClampMin = "0.0"))
 	float MaximumDetachedLimbImpulse = 6000.f;
 
+	/** Enables one local cosmetic puddle for each transition into Narrative's dead state. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dismemberment|Death Blood Puddle")
+	bool bSpawnDeathBloodPuddleOnDeath = true;
+
+	/** Deferred Decal material whose opacity uses Decal Lifetime Opacity. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dismemberment|Death Blood Puddle")
+	TObjectPtr<UMaterialInterface> DeathBloodPuddleMaterial = nullptr;
+
+	/** Ragdoll bone used to locate the body. Missing bones fall back to the mesh bounds. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dismemberment|Death Blood Puddle")
+	FName DeathBloodPuddleAnchorBone = FName(TEXT("pelvis"));
+
+	/** Decal projection depth, width, and length in centimeters. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dismemberment|Death Blood Puddle")
+	FVector DeathBloodPuddleSize = FVector(8.f, 70.f, 50.f);
+
+	/** Lets Narrative enter ragdoll before the first floor-placement attempt. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dismemberment|Death Blood Puddle", meta = (ClampMin = "0.0", Units = "s"))
+	float DeathBloodPuddleSpawnDelaySeconds = 0.65f;
+
+	/** Maximum time to wait for a moving ragdoll or temporarily missing floor. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dismemberment|Death Blood Puddle", meta = (ClampMin = "0.0", Units = "s"))
+	float DeathBloodPuddleMaximumSettleWaitSeconds = 3.f;
+
+	/** Ragdolls moving faster than this are sampled again until the maximum wait expires. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dismemberment|Death Blood Puddle", meta = (ClampMin = "0.0", Units = "cm/s"))
+	float DeathBloodPuddleMaximumSettleSpeed = 120.f;
+
+	/** Ragdolls rotating faster than this are sampled again until the maximum wait expires. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dismemberment|Death Blood Puddle", meta = (ClampMin = "0.0", Units = "deg/s"))
+	float DeathBloodPuddleMaximumSettleAngularSpeed = 90.f;
+
+	/** Time the anchor must remain below both movement thresholds before placement. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dismemberment|Death Blood Puddle", meta = (ClampMin = "0.0", Units = "s"))
+	float DeathBloodPuddleSettleDwellSeconds = 0.35f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dismemberment|Death Blood Puddle", meta = (ClampMin = "0.01", Units = "s"))
+	float DeathBloodPuddleRetryIntervalSeconds = 0.2f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dismemberment|Death Blood Puddle", meta = (ClampMin = "0.0", Units = "cm"))
+	float DeathBloodPuddleFloorTraceDistance = 250.f;
+
+	/** Minimum upward-facing surface normal accepted as a floor. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dismemberment|Death Blood Puddle", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float DeathBloodPuddleMinimumFloorNormalZ = 0.55f;
+
+	/** Prevents z-fighting after the puddle is placed on the floor. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dismemberment|Death Blood Puddle", meta = (ClampMin = "0.0", Units = "cm"))
+	float DeathBloodPuddleSurfaceOffset = 1.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dismemberment|Death Blood Puddle", meta = (ClampMin = "0.0", Units = "s"))
+	float DeathBloodPuddleFadeInSeconds = 2.f;
+
+	/** Zero keeps the puddle until its level or attached surface removes it. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dismemberment|Death Blood Puddle", meta = (ClampMin = "0.0", Units = "s"))
+	float DeathBloodPuddleLifeSeconds = 30.f;
+
+	/** Applied at the end of a nonzero lifetime. Zero disables fade-out. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dismemberment|Death Blood Puddle", meta = (ClampMin = "0.0", Units = "s"))
+	float DeathBloodPuddleFadeOutSeconds = 5.f;
+
 	/** Permanent for this actor, replicated to late joiners and serialized by Narrative Save. */
 	UPROPERTY(ReplicatedUsing = OnRep_SeveredRegionMask, SaveGame, BlueprintReadOnly, Category = "Dismemberment|State")
 	int32 SeveredRegionMask = 0;
@@ -162,6 +224,13 @@ private:
 	void ScheduleVisualRefresh();
 	void ScheduleVisualRefreshRetry();
 	void HandleDeferredVisualRefresh();
+	void ScheduleDeathBloodPuddle();
+	void ScheduleDeathBloodPuddleRetry();
+	void CancelPendingDeathBloodPuddle();
+	void TrySpawnDeathBloodPuddle();
+	bool FindDeathBloodPuddleSurface(
+		const FVector& AnchorLocation,
+		FHitResult& OutSurfaceHit) const;
 
 	bool TrySeverFromDamageResult(const FSovDamageResult& Result);
 	bool DoesDamageMeetAnyRule(const FSovDamageResult& Result) const;
@@ -230,7 +299,12 @@ private:
 	TObjectPtr<UPhysicsAsset> LastPrimaryPhysicsAsset = nullptr;
 
 	FTimerHandle VisualRefreshTimerHandle;
+	FTimerHandle DeathBloodPuddleTimerHandle;
 	bool bVisualRefreshScheduled = false;
+	bool bDeathBloodPuddlePending = false;
+	bool bDeathBloodPuddleSpawnedForCurrentDeath = false;
+	float DeathBloodPuddleDeathWorldTime = 0.f;
+	float DeathBloodPuddleSettleStartWorldTime = -1.f;
 	int32 VisualRefreshRetryCount = 0;
 	int32 AppliedPhysicsRegionMask = 0;
 	int32 SpawnedStumpNiagaraRegionMask = 0;
