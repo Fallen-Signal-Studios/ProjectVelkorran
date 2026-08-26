@@ -86,7 +86,14 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dismemberment|Configuration")
 	TObjectPtr<USovDismembermentProfile> DismembermentProfile = nullptr;
 
-	/** Epic human defaults are supplied by C++; edit these when no profile is assigned. */
+	/**
+	 * Fills missing or invalid standard region mappings from Epic's SK_Mannequin
+	 * hierarchy at runtime. Authored cosmetic settings are preserved.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dismemberment|Configuration", meta = (DisplayName = "Use SK Mannequin Bone Map"))
+	bool bUseSKMannequinBoneMap = true;
+
+	/** Full SK_Mannequin defaults are supplied by C++; edit these when no profile is assigned. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dismemberment|Configuration", meta = (TitleProperty = "Region"))
 	TArray<FSovDismembermentRegionDefinition> FallbackRegions;
 
@@ -150,6 +157,7 @@ private:
 		int32 CosmeticSeed);
 
 	void TryInitializeFromOwner();
+	void RebuildRuntimeRegionDefinitions();
 	void BindCharacterVisual(ANarrativeCharacterVisual* NewCharacterVisual);
 	void ScheduleVisualRefresh();
 	void ScheduleVisualRefreshRetry();
@@ -208,6 +216,9 @@ private:
 
 	UPROPERTY(Transient)
 	TMap<ESovDismembermentRegion, TObjectPtr<AActor>> SpawnedStumpActors;
+
+	UPROPERTY(Transient)
+	TArray<FSovDismembermentRegionDefinition> RuntimeRegionDefinitions;
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UNiagaraComponent>> SpawnedStumpNiagaraComponents;

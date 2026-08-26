@@ -57,52 +57,13 @@ USovDismembermentComponent::USovDismembermentComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
 	SetIsReplicatedByDefault(true);
-
-	const auto AddEpicHumanRegion = [this](
-		const ESovDismembermentRegion Region,
-		const FName BoneToHide,
-		const FName StumpAttachBone,
-		const bool bHideHeadPresentation)
-	{
-		FSovDismembermentRegionDefinition Definition;
-		Definition.Region = Region;
-		Definition.HitBoneRoots.Add(BoneToHide);
-		Definition.BoneToHide = BoneToHide;
-		Definition.StumpAttachBone = StumpAttachBone;
-		Definition.bHideHeadPresentation = bHideHeadPresentation;
-		FallbackRegions.Add(MoveTemp(Definition));
-	};
-
-	AddEpicHumanRegion(
-		ESovDismembermentRegion::Head,
-		TEXT("head"),
-		TEXT("neck_01"),
-		true);
-	AddEpicHumanRegion(
-		ESovDismembermentRegion::LeftForearm,
-		TEXT("lowerarm_l"),
-		TEXT("upperarm_l"),
-		false);
-	AddEpicHumanRegion(
-		ESovDismembermentRegion::RightForearm,
-		TEXT("lowerarm_r"),
-		TEXT("upperarm_r"),
-		false);
-	AddEpicHumanRegion(
-		ESovDismembermentRegion::LeftLowerLeg,
-		TEXT("calf_l"),
-		TEXT("thigh_l"),
-		false);
-	AddEpicHumanRegion(
-		ESovDismembermentRegion::RightLowerLeg,
-		TEXT("calf_r"),
-		TEXT("thigh_r"),
-		false);
+	USovDismembermentProfile::BuildSKMannequinRegionDefinitions(FallbackRegions);
 }
 
 void USovDismembermentComponent::BeginPlay()
 {
 	Super::BeginPlay();
+	RebuildRuntimeRegionDefinitions();
 	ValidateConfiguration();
 
 	if (ANarrativeCharacter* Character = Cast<ANarrativeCharacter>(GetOwner()))
@@ -231,6 +192,97 @@ void USovDismembermentComponent::TryInitializeFromOwner()
 	if (ANarrativeCharacter* Character = Cast<ANarrativeCharacter>(GetOwner()))
 	{
 		InitializeWithAbilitySystem(Character->GetNarrativeAbilitySystemComponent());
+	}
+}
+
+void USovDismembermentComponent::RebuildRuntimeRegionDefinitions()
+{
+	const TArray<FSovDismembermentRegionDefinition>& AuthoredRegions =
+		IsValid(DismembermentProfile.Get())
+			&& !DismembermentProfile->Regions.IsEmpty()
+		? DismembermentProfile->Regions
+		: FallbackRegions;
+	RuntimeRegionDefinitions = AuthoredRegions;
+
+	if (!bUseSKMannequinBoneMap)
+	{
+		return;
+	}
+
+	TArray<FSovDismembermentRegionDefinition> MannequinRegions;
+	USovDismembermentProfile::BuildSKMannequinRegionDefinitions(
+		MannequinRegions);
+
+	USkeletalMeshComponent* PrimaryMesh = ResolvePrimaryMesh();
+	const bool bCanValidateBones = IsValid(PrimaryMesh)
+		&& PrimaryMesh->GetSkeletalMeshAsset() != nullptr;
+	const auto HasBone = [PrimaryMesh, bCanValidateBones](const FName BoneName)
+	{
+		return !BoneName.IsNone()
+			&& (!bCanValidateBones
+				|| PrimaryMesh->GetBoneIndex(BoneName) != INDEX_NONE);
+	};
+	const auto HasBoneOrSocket =
+		[PrimaryMesh, bCanValidateBones](const FName AttachPoint)
+	{
+		return !AttachPoint.IsNone()
+			&& (!bCanValidateBones
+				|| PrimaryMesh->GetBoneIndex(AttachPoint) != INDEX_NONE
+				|| PrimaryMesh->DoesSocketExist(AttachPoint));
+	};
+
+	for (FSovDismembermentRegionDefinition& Definition :
+		RuntimeRegionDefinitions)
+	{
+		const FSovDismembermentRegionDefinition* MannequinDefinition =
+			MannequinRegions.FindByPredicate(
+				[&Definition](
+					const FSovDismembermentRegionDefinition& Candidate)
+				{
+					return Candidate.Region == Definition.Region;
+				});
+		if (MannequinDefinition == nullptr)
+		{
+			continue;
+		}
+
+		Definition.HitBoneRoots.RemoveAll(
+			[&HasBone](const FName HitBoneRoot)
+			{
+				return !HasBone(HitBoneRoot);
+			});
+		for (const FName MannequinHitBoneRoot :
+			MannequinDefinition->HitBoneRoots)
+		{
+			Definition.HitBoneRoots.AddUnique(MannequinHitBoneRoot);
+		}
+
+		if (!HasBone(Definition.BoneToHide))
+		{
+			Definition.BoneToHide = MannequinDefinition->BoneToHide;
+		}
+		if (!HasBoneOrSocket(Definition.StumpAttachBone))
+		{
+			Definition.StumpAttachBone =
+				MannequinDefinition->StumpAttachBone;
+		}
+		Definition.bHideHeadPresentation |=
+			MannequinDefinition->bHideHeadPresentation;
+	}
+
+	for (const FSovDismembermentRegionDefinition& MannequinDefinition :
+		MannequinRegions)
+	{
+		const bool bAlreadyDefined = RuntimeRegionDefinitions.ContainsByPredicate(
+			[&MannequinDefinition](
+				const FSovDismembermentRegionDefinition& Definition)
+			{
+				return Definition.Region == MannequinDefinition.Region;
+			});
+		if (!bAlreadyDefined)
+		{
+			RuntimeRegionDefinitions.Add(MannequinDefinition);
+		}
 	}
 }
 
@@ -393,6 +445,8 @@ void USovDismembermentComponent::HandleDeferredVisualRefresh()
 
 void USovDismembermentComponent::RefreshDismembermentVisuals()
 {
+	RebuildRuntimeRegionDefinitions();
+
 	if (USkeletalMeshComponent* PrimaryMesh = ResolvePrimaryMesh())
 	{
 		USkeletalMesh* CurrentMeshAsset = PrimaryMesh->GetSkeletalMeshAsset();
@@ -706,6 +760,11 @@ void USovDismembermentComponent::GetSeveredRegions(
 const TArray<FSovDismembermentRegionDefinition>&
 USovDismembermentComponent::GetActiveRegionDefinitions() const
 {
+	if (!RuntimeRegionDefinitions.IsEmpty())
+	{
+		return RuntimeRegionDefinitions;
+	}
+
 	return IsValid(DismembermentProfile) && !DismembermentProfile->Regions.IsEmpty()
 		? DismembermentProfile->Regions
 		: FallbackRegions;
@@ -1352,6 +1411,9 @@ void USovDismembermentComponent::ValidateConfiguration()
 	int32 SeenRegionMask = 0;
 	TSet<FName> SeenHitBoneRoots;
 	bool bHasTerminateRegion = false;
+	const USkeletalMeshComponent* ValidationMesh = ResolvePrimaryMesh();
+	const bool bCanValidateBones = IsValid(ValidationMesh)
+		&& ValidationMesh->GetSkeletalMeshAsset() != nullptr;
 	for (const FSovDismembermentRegionDefinition& Definition : Regions)
 	{
 		const int32 RegionBit = GetRegionBit(Definition.Region);
@@ -1385,6 +1447,30 @@ void USovDismembermentComponent::ValidateConfiguration()
 				*GetNameSafe(GetOwner()),
 				static_cast<int32>(Definition.Region));
 		}
+		else if (bCanValidateBones
+			&& ValidationMesh->GetBoneIndex(Definition.BoneToHide) == INDEX_NONE)
+		{
+			UE_LOG(
+				LogSovDismemberment,
+				Warning,
+				TEXT("%s region %d Bone To Hide '%s' is not present on the driver mesh."),
+				*GetNameSafe(GetOwner()),
+				static_cast<int32>(Definition.Region),
+				*Definition.BoneToHide.ToString());
+		}
+		if (!Definition.StumpAttachBone.IsNone()
+			&& bCanValidateBones
+			&& ValidationMesh->GetBoneIndex(Definition.StumpAttachBone) == INDEX_NONE
+			&& !ValidationMesh->DoesSocketExist(Definition.StumpAttachBone))
+		{
+			UE_LOG(
+				LogSovDismemberment,
+				Warning,
+				TEXT("%s region %d Stump Attach Bone '%s' is not present on the driver mesh."),
+				*GetNameSafe(GetOwner()),
+				static_cast<int32>(Definition.Region),
+				*Definition.StumpAttachBone.ToString());
+		}
 		if (Definition.HitBoneRoots.IsEmpty())
 		{
 			UE_LOG(
@@ -1405,18 +1491,33 @@ void USovDismembermentComponent::ValidateConfiguration()
 					*GetNameSafe(GetOwner()),
 					static_cast<int32>(Definition.Region));
 			}
-			else if (SeenHitBoneRoots.Contains(HitBoneRoot))
-			{
-				UE_LOG(
-					LogSovDismemberment,
-					Warning,
-					TEXT("%s maps hit bone root '%s' more than once. The closest first definition wins."),
-					*GetNameSafe(GetOwner()),
-					*HitBoneRoot.ToString());
-			}
 			else
 			{
-				SeenHitBoneRoots.Add(HitBoneRoot);
+				if (bCanValidateBones
+					&& ValidationMesh->GetBoneIndex(HitBoneRoot) == INDEX_NONE)
+				{
+					UE_LOG(
+						LogSovDismemberment,
+						Warning,
+						TEXT("%s region %d Hit Bone Root '%s' is not present on the driver mesh."),
+						*GetNameSafe(GetOwner()),
+						static_cast<int32>(Definition.Region),
+						*HitBoneRoot.ToString());
+				}
+
+				if (SeenHitBoneRoots.Contains(HitBoneRoot))
+				{
+					UE_LOG(
+						LogSovDismemberment,
+						Warning,
+						TEXT("%s maps hit bone root '%s' more than once. The closest first definition wins."),
+						*GetNameSafe(GetOwner()),
+						*HitBoneRoot.ToString());
+				}
+				else
+				{
+					SeenHitBoneRoots.Add(HitBoneRoot);
+				}
 			}
 		}
 

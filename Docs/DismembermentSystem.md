@@ -5,10 +5,9 @@ Project Velkorran now supports server-authoritative, bone-defined dismemberment 
 ## First setup
 
 1. Reparent an enemy Blueprint to `SovNPCCharacterBase`, or add `SovDismembermentComponent` directly to an existing Narrative character Blueprint.
-2. The component includes working Epic-human mappings for `head`, `lowerarm_l`, `lowerarm_r`, `calf_l`, and `calf_r`.
-3. Create a `SovDismembermentProfile` Data Asset when a character uses different bone names or needs its own art.
-4. Assign that profile on the component.
-5. Ensure damaging Gameplay Effects include `Sov.Damage.Channel.Edge` and carry a valid `FHitResult` in their effect context. Narrative already copies `HitResult.BoneName` into the resolved damage packet.
+2. Leave `Use SK Mannequin Bone Map` enabled. No dismemberment profile is required for the standard Epic mannequin skeleton.
+3. Create and assign a `SovDismembermentProfile` only when the character needs custom detached limbs, stumps, Niagara effects, decals, rules, or explicit mapping overrides.
+4. Ensure damaging Gameplay Effects include `Sov.Damage.Channel.Edge` and carry a valid `FHitResult` in their effect context. Narrative already copies `HitResult.BoneName` into the resolved damage packet.
 
 Without custom rules, the safe fallback policy requires all of the following:
 
@@ -18,6 +17,32 @@ Without custom rules, the safe fallback policy requires all of the following:
 - No successful Guard or Perfect Defense
 
 The thresholds are editable on the component.
+
+## SK Mannequin bone map
+
+`Use SK Mannequin Bone Map` is enabled by default and supplies all standard biped sever regions. It also repairs missing or invalid core bone fields in an existing profile and adds any standard regions that the profile omitted. Region-specific art and gameplay settings are copied from the profile unchanged.
+
+New `SovDismembermentProfile` assets start with the complete map already populated. For an existing profile, use its `Apply SK Mannequin Bone Map` editor button to write the canonical mapping into the asset while preserving its authored cosmetic payloads and sever rules. The component's runtime auto-fill still protects older assets that have not been updated manually.
+
+| Region | Hit bone root | Hidden branch | Surviving stump bone |
+| --- | --- | --- | --- |
+| Head | `head`, `neck_01` | `head` | `neck_01` |
+| Left upper arm | `upperarm_l`, `clavicle_l` | `upperarm_l` | `clavicle_l` |
+| Right upper arm | `upperarm_r`, `clavicle_r` | `upperarm_r` | `clavicle_r` |
+| Left forearm | `lowerarm_l` | `lowerarm_l` | `upperarm_l` |
+| Right forearm | `lowerarm_r` | `lowerarm_r` | `upperarm_r` |
+| Left hand | `hand_l` | `hand_l` | `lowerarm_l` |
+| Right hand | `hand_r` | `hand_r` | `lowerarm_r` |
+| Left upper leg | `thigh_l` | `thigh_l` | `pelvis` |
+| Right upper leg | `thigh_r` | `thigh_r` | `pelvis` |
+| Left lower leg | `calf_l` | `calf_l` | `thigh_l` |
+| Right lower leg | `calf_r` | `calf_r` | `thigh_r` |
+| Left foot | `foot_l` | `foot_l` | `calf_l` |
+| Right foot | `foot_r` | `foot_r` | `calf_r` |
+
+Finger, toe, twist, and other child-bone hits present on the driver skeleton resolve through its hierarchy to the closest configured region. For example, a finger hit resolves to the hand instead of the forearm, while a calf twist-bone hit resolves to the lower leg.
+
+Disable `Use SK Mannequin Bone Map` only for a genuinely different skeleton whose regions are fully authored in its profile or in `Fallback Regions`. `Custom A` and `Custom B` are never auto-filled.
 
 ## Authoring a profile
 
@@ -92,7 +117,7 @@ Dismemberment is intentionally permanent for the lifetime and save record of tha
 
 ## Runtime validation
 
-At startup the component warns about duplicate or invalid regions, empty bone mappings, duplicate hit roots, empty stump Niagara slots, inverted impulse limits, and non-fatal rules paired with permanent physics termination. A sever is rejected instead of committing replicated state when its configured hide bone does not exist on Narrative's driver mesh.
+At startup the component warns about duplicate or invalid regions, bones or stump sockets missing from the driver mesh, empty bone mappings, duplicate hit roots, empty stump Niagara slots, inverted impulse limits, and non-fatal rules paired with permanent physics termination. A sever is rejected instead of committing replicated state when its configured hide bone does not exist on Narrative's driver mesh.
 
 ## Blueprint hooks
 
@@ -116,3 +141,4 @@ Before shipping a new character profile, verify:
 6. Saving and loading a savable NPC restores the permanent sever mask.
 7. Narrative death, ragdoll, and revive transitions preserve the sever. `Disable Collision` regions remain disabled after Narrative's mesh-wide collision changes.
 8. Stump Niagara effects follow the configured stump bone during animation and ragdoll, and outfit or appearance refreshes do not create duplicates.
+9. Hits on upper arms, forearms, hands/fingers, thighs, calves, feet/toes, neck, and head resolve to the closest matching SK Mannequin region on both sides.
