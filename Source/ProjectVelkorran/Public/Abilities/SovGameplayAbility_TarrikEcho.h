@@ -8,6 +8,7 @@
 
 class UGameplayEffect;
 class ASovCinderStickyGrenadeProjectile;
+class ASovCinderJudgementPresentation;
 class ASovVelkorransHungerProjectile;
 
 /** Weapon context used to organize Tarrik's Echo loadout in UI and content. */
@@ -294,12 +295,42 @@ class PROJECTVELKORRAN_API USovGameplayAbility_TarrikCinderJudgement : public US
 public:
 	USovGameplayAbility_TarrikCinderJudgement();
 
+	/**
+	 * Resolves Cinderline's muzzle and performs one authority-owned two-stage
+	 * trace. The direct hit and controlled blast are both applied exactly once.
+	 * A Blueprint release event may call this before the native fallback timer.
+	 */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Echo Ability|Cinder Judgement")
+	bool ReleaseCinderJudgementFromAim();
+
 protected:
+	virtual void ActivateAbility(
+		const FGameplayAbilitySpecHandle Handle,
+		const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayAbilityActivationInfo ActivationInfo,
+		const FGameplayEventData* TriggerEventData) override;
+
+	virtual void EndAbility(
+		const FGameplayAbilitySpecHandle Handle,
+		const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayAbilityActivationInfo ActivationInfo,
+		bool bReplicateEndAbility,
+		bool bWasCancelled) override;
+
 	virtual bool HasRequiredPayloadConfiguration() const override;
 
+	/**
+	 * Impact-origin actor and replicated cosmetic packet. A native fallback is
+	 * always used when this slot is empty or its authored class cannot spawn.
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Cinder Judgement|Presentation")
+	TSubclassOf<ASovCinderJudgementPresentation> PresentationClass;
+
+	/** Must derive from the native Judgement damage shell; invalid classes fall back safely. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload")
 	TSubclassOf<UGameplayEffect> DirectDamageEffectClass;
 
+	/** Must derive from the native Judgement damage shell; invalid classes fall back safely. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload")
 	TSubclassOf<UGameplayEffect> ExplosionDamageEffectClass;
 
@@ -307,7 +338,129 @@ protected:
 	float MaximumRange = 10000.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload", meta = (ClampMin = "0.0", Units = "cm"))
-	float ExplosionRadius = 300.0f;
+	float ExplosionRadius = 325.0f;
+
+	/** Base impact damage before attack rating, mitigation, and hit-zone scaling. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Cinder Judgement|Direct Damage", meta = (ClampMin = "0.0"))
+	float DirectDamage = 60.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Cinder Judgement|Direct Damage", meta = (ClampMin = "0.0"))
+	float DirectPoiseDamage = 30.0f;
+
+	/** Multiplier applied only while damage is absorbed by Shield. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Cinder Judgement|Direct Damage", meta = (ClampMin = "0.0"))
+	float DirectShieldCoefficient = 1.5f;
+
+	/** Center damage of the controlled blast. A surviving direct target can receive both packets. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Cinder Judgement|Explosion", meta = (ClampMin = "0.0"))
+	float ExplosionDamage = 45.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Cinder Judgement|Explosion", meta = (ClampMin = "0.0"))
+	float ExplosionPoiseDamage = 25.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Cinder Judgement|Explosion", meta = (ClampMin = "0.0"))
+	float ExplosionShieldCoefficient = 1.25f;
+
+	/** Damage and Poise fraction retained at the outer edge of the blast. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Cinder Judgement|Explosion", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float MinimumExplosionDamageFraction = 0.35f;
+
+	/** Prevents radial damage through blocking world geometry. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Cinder Judgement|Explosion")
+	bool bExplosionRequiresLineOfSight = true;
+
+	/** When false, an unobstructed maximum-range shot dissipates without a blast. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Cinder Judgement|Explosion")
+	bool bExplodeAtMaximumRange = false;
+
+	/** Optional impulse applied to simulated props and ragdolls by the blast. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Cinder Judgement|Explosion|Physics")
+	bool bApplyExplosionPhysicsImpulse = true;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Cinder Judgement|Explosion|Physics", meta = (EditCondition = "bApplyExplosionPhysicsImpulse", ClampMin = "0.0", Units = "cm/s"))
+	float ExplosionPhysicsImpulseStrength = 1600.0f;
+
+	/** Lowers the impulse origin so nearby bodies receive a useful upward component. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Cinder Judgement|Explosion|Physics", meta = (EditCondition = "bApplyExplosionPhysicsImpulse", ClampMin = "0.0", Units = "cm"))
+	float ExplosionPhysicsUpwardBias = 35.0f;
+
+	/** Socket on Cinderline's active weapon visual used as the trace origin. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Cinder Judgement|Targeting")
+	FName MuzzleSocketName = TEXT("Muzzle");
+
+	/** Avatar-local fallback used while the weapon visual is unavailable. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Cinder Judgement|Targeting", meta = (Units = "cm"))
+	FVector FallbackMuzzleOffset = FVector(95.0f, 15.0f, 70.0f);
+
+	/** Rejects a broken weapon-visual socket transform far from Tarrik. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Cinder Judgement|Targeting", meta = (ClampMin = "0.0", Units = "cm"))
+	float MaximumMuzzleDistance = 500.0f;
+
+	/** Optional sphere radius for the authority-owned muzzle trace. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Cinder Judgement|Targeting", meta = (ClampMin = "0.0", Units = "cm"))
+	float TraceRadius = 0.0f;
+
+	/** Native release timing keeps dedicated-server gameplay independent of an Anim Notify. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Cinder Judgement|Timing")
+	bool bAutoReleasePayload = true;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Cinder Judgement|Timing", meta = (EditCondition = "bAutoReleasePayload", ClampMin = "0.0", Units = "s"))
+	float PayloadReleaseDelay = 0.28f;
+
+	/** Busy-state recovery after the shot has been resolved. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Cinder Judgement|Timing", meta = (ClampMin = "0.0", Units = "s"))
+	float PostReleaseRecovery = 0.45f;
+
+private:
+	UFUNCTION()
+	void HandleAutomaticJudgementRelease();
+
+	UFUNCTION()
+	void HandleJudgementRecoveryFinished();
+
+	TSubclassOf<UGameplayEffect> ResolveJudgementDirectEffectClass() const;
+	TSubclassOf<UGameplayEffect> ResolveJudgementExplosionEffectClass() const;
+	FTransform ResolveJudgementMuzzleTransform() const;
+	FVector ResolveJudgementAuthorityAimPoint();
+	bool ApplyJudgementDamage(
+		class UAbilitySystemComponent* TargetAbilitySystem,
+		const FGameplayEffectContextHandle& Context,
+		TSubclassOf<UGameplayEffect> EffectClass,
+		float Damage,
+		float PoiseDamage,
+		float ShieldCoefficient,
+		float SourceModifier) const;
+	int32 ApplyJudgementExplosion(
+		const FVector& Origin,
+		const FVector& SurfaceNormal,
+		AActor* DirectHitActor,
+		AActor* ExplosionDamageCauser) const;
+	bool HasJudgementExplosionLineOfSight(
+		const FVector& Origin,
+		class UAbilitySystemComponent* TargetAbilitySystem,
+		AActor* DirectHitActor) const;
+	void ApplyJudgementPhysicsImpulse(
+		const FVector& Origin,
+		const FVector& SurfaceNormal) const;
+	bool HasJudgementPhysicsLineOfSight(
+		const FVector& Origin,
+		class UPrimitiveComponent* TargetComponent) const;
+	ASovCinderJudgementPresentation* SpawnDeferredJudgementPresentation(
+		const FVector& TraceStart,
+		const FVector& TraceEnd) const;
+	void FinishJudgementPresentation(
+		ASovCinderJudgementPresentation* Presentation,
+		const FVector& TraceStart,
+		const FVector& TraceEnd,
+		const FHitResult* Hit,
+		bool bBlastTriggered,
+		bool bDirectDamageResolved,
+		int32 RadialTargetsResolved) const;
+	void BeginJudgementRecovery();
+
+	FTimerHandle JudgementReleaseTimerHandle;
+	FTimerHandle JudgementRecoveryTimerHandle;
+	bool bJudgementReleaseAttempted = false;
 };
 
 /** Cinderline signature: a penetrating shot followed by a chained burning line. */

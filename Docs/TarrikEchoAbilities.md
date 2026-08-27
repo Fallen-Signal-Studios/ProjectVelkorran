@@ -77,6 +77,8 @@ In `Echo Ability Started`:
 
 Use `Echo Ability Local Presentation` only for owning-player camera, rumble, audio accents, and cosmetic hit-stop. Do not apply damage, spawn replicated actors, or change global time dilation there.
 
+`Cinder Judgement` is the exception to the notify requirement for gameplay. Its authority instance automatically releases after `Payload Release Delay` and finishes after `Post Release Recovery`, so an empty Event Graph works on a dedicated server after the Blueprint class has Cinderline in `AllowedWeaponClasses`. A server-side authored release event may call `Release Cinder Judgement From Aim` earlier; the native timer and manual call share the same exactly-once gate. Keep the timer enabled unless the replacement release path is proven to execute on authority.
+
 ## Payload contracts
 
 ### Cinder Sticky Grenade
@@ -95,7 +97,7 @@ Use `Echo Ability Local Presentation` only for owning-player camera, rumble, aud
 - Native behavior starts the fuse at launch, sticks once to a hit component/bone, damages unique hostile ASCs in radius, optionally requires line of sight, replicates stuck/detonated presentation state, and cleans itself up after detonation.
 - Do not use Narrative's stock `Spawn Projectile` task for this Local Predicted ability: its replicated-projectile policy can spawn an unreconciled client copy as well as the authoritative copy. Spawn on authority and use prediction only for the throw presentation.
 
-The grenade and Velkorran's Hunger now own complete native gameplay payloads. Cinder Slam, Cinder Judgement, and Cinderline Requiem remain Blueprint-authored payload contracts until their native vertical slices are implemented; incomplete children fail activation before Echo is spent.
+The grenade, Velkorran's Hunger, and Cinder Judgement now own complete native gameplay payloads. Cinder Slam and Cinderline Requiem remain Blueprint-authored payload contracts until their native vertical slices are implemented; incomplete children fail activation before Echo is spent.
 
 ### Velkorran's Hunger
 
@@ -119,9 +121,18 @@ The grenade and Velkorran's Hunger now own complete native gameplay payloads. Ci
 
 ### Cinder Judgement
 
-- Perform an authority-validated Cinderline trace or server-owned very-fast projectile.
-- Apply direct impact damage once and a separate radial explosion at the confirmed impact point.
-- Recommended channels: Kinetic + Thermal, elevated Shield coefficient, and meaningful Poise pressure.
+- Native defaults provide `Sovereign Cinder Judgement Damage` for both stages and a functional `ASovCinderJudgementPresentation` fallback. Legacy GA children that serialized empty effect fields resolve the native damage class automatically. Any replacement effect must be a Blueprint child of that native damage shell; an unrelated or malformed effect class is rejected in favor of the safe fallback.
+- The authority performs an eye/control-rotation aim trace, then re-traces from Cinderline's muzzle. This preserves camera aiming while preventing a third-person camera from firing through nearby cover. Client target data is never trusted.
+- The direct stage deals 60 base damage, 30 Poise, and uses a 1.5 Shield coefficient. It retains the full authoritative `FHitResult`, bone, and physical material.
+- The separate 325 cm blast deals 45 base damage and 25 Poise at center, falls linearly to 35% at the edge, and uses a 1.25 Shield coefficient. Its context deliberately has no direct-hit result, so a headshot multiplier is not applied to the explosion.
+- Both stages are Standard Guard-class Kinetic + Thermal damage. A surviving primary target receives both stages. Burn is intentionally not applied; Sticky Grenade and Hunger own Tarrik's Burn space.
+- The blast deduplicates Narrative ASCs, resolves runtime CharacterVisual/attachment ownership, excludes non-hostiles and dead targets, requires line of sight for non-primary targets, and routes all damage through `UNarrativeDamageExecCalc`.
+- Native authority timing releases at 0.28 seconds and ends after 0.45 seconds of recovery. Tune those fields to the montage. The base three-second watchdog still cancels any authored path that never releases or finishes.
+- Create `BP_CinderJudgementPresentation` from `ASovCinderJudgementPresentation`, then assign it to the GA's `Presentation Class`. The native class is gameplay-safe with no art, while the Blueprint child exposes slots for muzzle Niagara, beam endpoint/length parameters, direct impact, radial explosion and radius parameter, miss dissipation, fire/impact/explosion/dissipation audio with volume and pitch tuning, camera shakes, and a searched scorch decal.
+- Set the Cinderline weapon mesh socket used by the GA's `Muzzle Socket Name` (default `Muzzle`). If the socket or runtime weapon visual is unavailable, the authority uses `Fallback Muzzle Offset` on Tarrik.
+- The presentation actor is an immutable, short-lived replicated packet. It emits each one-shot once, suppresses stale late delivery, and is also used as the blast Effect Causer so Guard direction comes from the detonation point. Do not duplicate the central explosion as a Gameplay Cue on the radial effect, because that would play once per damaged target.
+- Simulated props and ragdolls receive the optional native radial impulse, using the same line-of-sight policy as gameplay damage. Character reactions remain owned by Poise/Guard outcomes; the ability never unconditionally launches living targets.
+- Remove legacy Blueprint traces, damage application, radial loops, and central explosion multicasts from `GA_Tarrik_CinderJudgement` before enabling the native path, or the shot will resolve twice.
 
 ### Cinderline Requiem
 
