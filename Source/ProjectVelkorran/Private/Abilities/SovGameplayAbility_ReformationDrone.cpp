@@ -1229,9 +1229,12 @@ USovGameplayAbility_ReformationDroneRocketLauncher::LaunchRocket(
 TSubclassOf<ASovReformationDroneRocketProjectile>
 USovGameplayAbility_ReformationDroneRocketLauncher::ResolveRocketClass() const
 {
-	return RocketClass.Get()
-		? RocketClass
-		: ASovReformationDroneRocketProjectile::StaticClass();
+	if (RocketClass.Get())
+	{
+		return RocketClass;
+	}
+
+	return ASovReformationDroneRocketProjectile::StaticClass();
 }
 
 AActor* USovGameplayAbility_ReformationDroneRocketLauncher::

@@ -9,7 +9,7 @@
 #include "SovReformationDroneRocketProjectile.generated.h"
 
 class AActor;
-struct FLifetimeProperty;
+class FLifetimeProperty;
 class UAbilitySystemComponent;
 class UAudioComponent;
 class UCameraShakeBase;

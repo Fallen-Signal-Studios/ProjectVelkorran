@@ -13,7 +13,7 @@ class UMaterialInterface;
 class UNiagaraSystem;
 class USceneComponent;
 class USoundBase;
-struct FLifetimeProperty;
+class FLifetimeProperty;
 
 /**
  * Short-lived replicated presentation packet for one authoritative drone shot.
