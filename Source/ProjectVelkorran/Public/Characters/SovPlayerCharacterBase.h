@@ -19,6 +19,12 @@ public:
 	class USovEchoComponent* GetEchoComponent() const { return EchoComponent; }
 
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Components")
+	class USovTarrikEchoGenerationComponent* GetTarrikEchoGenerationComponent() const
+	{
+		return TarrikEchoGenerationComponent;
+	}
+
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Components")
 	class USovShieldComponent* GetShieldComponent() const { return ShieldComponent; }
 
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Components")
@@ -33,9 +39,14 @@ public:
 protected:
 	virtual void HandleAbilitySystemReady(UNarrativeAbilitySystemComponent* ReadyAbilitySystem) override;
 	virtual bool AreAdditionalCharacterSystemsReady() const override;
+	virtual void OnRep_WieldState(const FWeaponWieldState& OldWieldState) override;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sovereign|Components")
 	TObjectPtr<class USovEchoComponent> EchoComponent;
+
+	/** Tarrik's Cinderline performance loop. It remains inert on explicitly non-Tarrik players. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sovereign|Components")
+	TObjectPtr<class USovTarrikEchoGenerationComponent> TarrikEchoGenerationComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sovereign|Components")
 	TObjectPtr<class USovShieldComponent> ShieldComponent;

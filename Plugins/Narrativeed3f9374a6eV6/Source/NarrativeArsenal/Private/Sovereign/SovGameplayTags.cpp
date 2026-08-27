@@ -9,6 +9,7 @@ FSovGameplayTags FSovGameplayTags::GameplayTags;
 void FSovGameplayTags::InitializeNativeTags()
 {
 	if (GameplayTags.Character_Player_Tarrik.IsValid()
+		&& GameplayTags.Ability_Weapon_Cinderline_PrimaryFire.IsValid()
 		&& GameplayTags.Ability_NPC_ReformationDrone_Gunfire.IsValid()
 		&& GameplayTags.Ability_NPC_ReformationDrone_RocketLauncher.IsValid()
 		&& GameplayTags.Ability_Echo_Selene_StillpointGrenade.IsValid()
@@ -26,8 +27,11 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 	AddTag(Character_Player, "Sov.Character.Player", "Parent identity tag for playable Sovereign characters.");
 	AddTag(Character_Player_Tarrik, "Sov.Character.Player.Tarrik", "Tarrik Walcur player character.");
 	AddTag(Character_Player_Selene, "Sov.Character.Player.Selene", "Selene Veyne player character.");
+	AddTag(Character_Enemy_Boss, "Sov.Character.Enemy.Boss", "Boss identity tag used by reduced-reward combat loops.");
 
 	AddTag(Ability_ActivateFail_Echo, "Sov.Ability.ActivateFail.Echo", "Ability activation failed its Echo threshold or spend check.");
+	AddTag(Ability_Echo, "Sov.Ability.Echo", "Parent classification for every Echo-spending ability.");
+	AddTag(Ability_Weapon_Cinderline_PrimaryFire, "Sov.Ability.Weapon.Cinderline.PrimaryFire", "Ordinary Cinderline primary-fire classification used by Tarrik's Echo cadence loop.");
 	AddTag(Ability_NPC_ReformationDrone_Gunfire, "Sov.Ability.NPC.ReformationDrone.Gunfire", "Standard gunfire attack used by Reformation drones.");
 	AddTag(Ability_NPC_ReformationDrone_RocketLauncher, "Sov.Ability.NPC.ReformationDrone.RocketLauncher", "Rocket launcher attack used by Reformation drones.");
 	AddTag(Ability_Echo_Tarrik_CinderSlam, "Sov.Ability.Echo.Tarrik.CinderSlam", "Tarrik's sword-exclusive Cinder Slam Echo ability.");
@@ -140,6 +144,8 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 	AddTag(Echo_Source_PerfectGuard, "Sov.Echo.Source.PerfectGuard", "Echo source for Tarrik perfect guard.");
 	AddTag(Echo_Source_GuardPressure, "Sov.Echo.Source.GuardPressure", "Combat activity caused by intentional guard pressure.");
 	AddTag(Echo_Source_GuardCounter, "Sov.Echo.Source.GuardCounter", "Echo source for a landed Tarrik guard counter.");
+	AddTag(Echo_Source_CinderlineCadence, "Sov.Echo.Source.CinderlineCadence", "Echo source for completing Tarrik's Cinderline firing cadence.");
+	AddTag(Echo_Source_CinderlinePrecisionKill, "Sov.Echo.Source.CinderlinePrecisionKill", "Echo source for a Cinderline precision kill.");
 }
 
 void FSovGameplayTags::AddTag(FGameplayTag& OutTag, const ANSICHAR* TagName, const ANSICHAR* TagComment)

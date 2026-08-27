@@ -23,8 +23,11 @@ public:
 	FGameplayTag Character_Player;
 	FGameplayTag Character_Player_Tarrik;
 	FGameplayTag Character_Player_Selene;
+	FGameplayTag Character_Enemy_Boss;
 
 	FGameplayTag Ability_ActivateFail_Echo;
+	FGameplayTag Ability_Echo;
+	FGameplayTag Ability_Weapon_Cinderline_PrimaryFire;
 	FGameplayTag Ability_NPC_ReformationDrone_Gunfire;
 	FGameplayTag Ability_NPC_ReformationDrone_RocketLauncher;
 	FGameplayTag Ability_Echo_Tarrik_CinderSlam;
@@ -137,6 +140,8 @@ public:
 	FGameplayTag Echo_Source_PerfectGuard;
 	FGameplayTag Echo_Source_GuardPressure;
 	FGameplayTag Echo_Source_GuardCounter;
+	FGameplayTag Echo_Source_CinderlineCadence;
+	FGameplayTag Echo_Source_CinderlinePrecisionKill;
 
 private:
 	void AddAllTags(UGameplayTagsManager& Manager);

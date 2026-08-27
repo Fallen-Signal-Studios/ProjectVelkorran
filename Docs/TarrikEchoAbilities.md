@@ -54,6 +54,56 @@ Narrative activates every granted spec whose input tag matches. Never grant both
 
 The native Tarrik Guard parent now blocks while Narrative Busy or an Echo ability is active. Echo abilities already block while Guarding, so the two committed lanes cannot enter simultaneously and fight over their montages/state.
 
+## Cinderline Echo generation
+
+`ASovPlayerCharacterBase` now owns a replicated `USovTarrikEchoGenerationComponent`. Tarrik's Blueprint should derive from that player base. Do not add a second generator in the Blueprint Components panel: duplicates are rejected at runtime so one hit cannot award twice. The generator listens to Narrative's post-resolution `OnDealtDamage` callback on authority and awards through the existing Echo component; it never writes the GAS Echo attribute directly.
+
+The default **Cinderline Cadence** loop is:
+
+| Confirmed primary-fire result | Cadence / Echo |
+|---|---:|
+| Ordinary damaging hit | +1 Cadence |
+| Precision damaging hit | +2 Cadence |
+| Reach 6 Cadence | +4 Echo, then reset |
+| Fatal precision hit | +3 Echo independently |
+
+Unfinished Cadence expires 1.5 seconds after the most recent qualifying hit. This is a confirmed-hit streak with a maximum inter-hit gap, not a beat detector or an authored minimum/ideal burst interval. Ordinary Cadence payouts are limited to one per second with no reward backlog. A completed sequence waits out the short payout cooldown instead of being deleted by the unfinished-sequence timer. Bosses tagged `Sov.Character.Enemy.Boss` contribute and pay at 75% strength by default; the component weights every accepted point so building on a boss and finishing on a grunt cannot bypass that reduction.
+
+Shield damage counts. Misses, zero-damage immunity, attacks into the air, friendly targets, successful Guard interception, Burn ticks, grenades, explosions, Judgement, Requiem, other weapons, and all `Sov.Ability.Echo` abilities do not count. The sequence clears on timeout, unwielding its source Cinderline instance, a damage callback from another ranged weapon, death/fatal state, Echo-action start, ASC replacement, or reaching full Echo. At full Echo the loop pauses and discards partial Cadence; the TDD's future Overflow resource is outside this component's current scope.
+
+### Primary-fire setup
+
+On the ordinary Cinderline fire Gameplay Ability, add this native tag to **Asset Tags**:
+
+`Sov.Ability.Weapon.Cinderline.PrimaryFire`
+
+This is the preferred stable identity. The component also recognizes Narrative's stock Attack-input ranged `Ability.WeaponFire` path when the source weapon instance grants Cinder Judgement or Cinderline Requiem, so an already-complete Cinderline loadout normally works without a second weapon field. As an explicit content fallback, add the Cinderline item Blueprint class to the inherited component's `Allowed Cinderline Weapon Classes` array on Tarrik's character Blueprint.
+
+The damage Gameplay Effect must be `Instant`, and the fire ability must preserve its normal GAS context. A qualifying spec needs both:
+
+- Cinderline as `SourceObject` (Narrative supplies this for a weapon-granted ability spec); and
+- the originating Narrative Gameplay Ability plus the authoritative blocking `FHitResult`, including the hit bone and component.
+
+Do not apply the primary-fire marker to Cinder Judgement, Requiem, Burn, or a shared damage effect used by another weapon. Putting it on the ordinary fire ability is safest because `Context.GetAbility()` retains that exact classification while the damage shell can remain reusable.
+
+The generator trusts Narrative's already-applied authoritative damage result; it does not re-trace the bullet. Any custom primary-fire ability that accepts client target data must still validate or re-trace origin, direction, range, target, bone, and physical material on authority before applying its damage effect.
+
+### Precision and presentation
+
+`head` is the default SK Mannequin precision root. Exact `head` hits and child bones on a skinned hit component qualify; Narrative physical materials with a damage multiplier of at least 1.01 also qualify by default. Add creature-specific roots to `Precision Bone Names`, or disable the physical-material fallback if bone mapping should be authoritative.
+
+The component exposes Blueprint presentation hooks without granting cosmetic authority:
+
+- `On Cinderline Hit Confirmed`: current progress, threshold, precision flag, hit bone, and boss-reduction flag;
+- `On Cinderline Cadence Changed`: replicated owner-only progress for the HUD;
+- `On Cinderline Echo Awarded`: actual Echo received, new total, cadence/precision-kill source, and boss-reduction flag;
+- normalized and integer Cadence getters; and
+- `Reset Cinderline Cadence` for an authority-owned encounter or weapon-flow reset.
+
+Use those hooks for reticle ticks, rising pitch, Cinderline emissive pulses, hit Niagara, payout flashes, rumble, and precision-kill accents. They are owning-client cosmetic notifications; damage, Echo, and cadence eligibility remain server-owned.
+
+For a smoke test, start below maximum Echo, wield Cinderline, and land each qualifying hit within 1.5 seconds of the previous one. Six body hits award 4 Echo; three precision hits do the same; a fatal precision hit also awards 3 Echo. Confirm separately that Shield damage advances Cadence, while Guard, a friendly, a miss, a Burn tick, and Cinder Judgement do not. A boss should pay 3 Echo for six body points and 2.25 Echo for a precision kill at the default multiplier. Repeat on a listen server and owning client: the owner-only HUD hooks should fire, and authority should award each payout only once.
+
 ## Animation flow
 
 Each parent exposes a native animation key:
