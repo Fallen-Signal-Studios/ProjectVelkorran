@@ -9,6 +9,8 @@ FSovGameplayTags FSovGameplayTags::GameplayTags;
 void FSovGameplayTags::InitializeNativeTags()
 {
 	if (GameplayTags.Character_Player_Tarrik.IsValid()
+		&& GameplayTags.Ability_NPC_ReformationDrone_Gunfire.IsValid()
+		&& GameplayTags.Ability_NPC_ReformationDrone_RocketLauncher.IsValid()
 		&& GameplayTags.Ability_Echo_Selene_StillpointGrenade.IsValid()
 		&& GameplayTags.Status_Immunity_Burn.IsValid()
 		&& GameplayTags.Status_Immunity_DeviceDisable.IsValid())
@@ -26,6 +28,8 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 	AddTag(Character_Player_Selene, "Sov.Character.Player.Selene", "Selene Veyne player character.");
 
 	AddTag(Ability_ActivateFail_Echo, "Sov.Ability.ActivateFail.Echo", "Ability activation failed its Echo threshold or spend check.");
+	AddTag(Ability_NPC_ReformationDrone_Gunfire, "Sov.Ability.NPC.ReformationDrone.Gunfire", "Standard gunfire attack used by Reformation drones.");
+	AddTag(Ability_NPC_ReformationDrone_RocketLauncher, "Sov.Ability.NPC.ReformationDrone.RocketLauncher", "Rocket launcher attack used by Reformation drones.");
 	AddTag(Ability_Echo_Tarrik_CinderSlam, "Sov.Ability.Echo.Tarrik.CinderSlam", "Tarrik's sword-exclusive Cinder Slam Echo ability.");
 	AddTag(Ability_Echo_Tarrik_VelkorransHunger, "Sov.Ability.Echo.Tarrik.VelkorransHunger", "Tarrik's sword-exclusive Velkorran's Hunger Echo ability.");
 	AddTag(Ability_Echo_Tarrik_CinderStickyGrenade, "Sov.Ability.Echo.Tarrik.CinderStickyGrenade", "Tarrik's shared Cinder Sticky Grenade Echo ability.");

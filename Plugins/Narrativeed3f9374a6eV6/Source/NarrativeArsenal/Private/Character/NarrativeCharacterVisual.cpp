@@ -484,6 +484,14 @@ void ANarrativeCharacterVisual::InitializeFromCharacterAndAttributes_Implementat
 
 			BaseCharacterMesh->SetAnimInstanceClass(Attributes.BaseMeshAnimBP);
 
+			// FGameplayAbilityActorInfo caches the avatar AnimInstance. Narrative can
+			// replace that instance while applying an appearance, so refresh the ASC
+			// before any ability tries to play a replicated montage on the new ABP.
+			if (UAbilitySystemComponent* ASC = NarrativeCharacter->GetAbilitySystemComponent())
+			{
+				ASC->RefreshAbilityActorInfo();
+			}
+
 			if (Attributes.UnarmedAnimLayer)
 			{
 				BaseCharacterMesh->LinkAnimClassLayers(Attributes.UnarmedAnimLayer);
@@ -1576,13 +1584,26 @@ void ANarrativeCharacterVisual::BaseAppearanceApplied_Implementation()
 
 void ANarrativeCharacterVisual::SetAnimBPOverride(TSubclassOf<class UAnimInstance> NewAnimBP)
 {
-	if (IsValid(NewAnimBP))
+	if (USkeletalMeshComponent* MainMesh = GetMainMesh())
 	{
-		GetMainMesh()->SetAnimInstanceClass(NewAnimBP);
-	}
-	else
-	{
-		GetMainMesh()->SetAnimInstanceClass(AppearanceAttributeSet.BaseMeshAnimBP);
+		if (IsValid(NewAnimBP))
+		{
+			MainMesh->SetAnimInstanceClass(NewAnimBP);
+		}
+		else
+		{
+			MainMesh->SetAnimInstanceClass(AppearanceAttributeSet.BaseMeshAnimBP);
+		}
+
+		// Runtime AnimBP overrides recreate the AnimInstance. Keep GAS montage
+		// replication pointed at the replacement instead of the destroyed instance.
+		if (ANarrativeCharacter* NarrativeCharacter = OwnerCharacter.Get())
+		{
+			if (UAbilitySystemComponent* ASC = NarrativeCharacter->GetAbilitySystemComponent())
+			{
+				ASC->RefreshAbilityActorInfo();
+			}
+		}
 	}
 }
 
