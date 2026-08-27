@@ -21,6 +21,7 @@ public class ProjectVelkorran : ModuleRules
 				"GameplayTags",
 				"GameplayTasks",
 				"Niagara",
+				"PhysicsCore",
 				"NarrativeArsenal",
 				"NarrativeSaveSystem"
 			}
