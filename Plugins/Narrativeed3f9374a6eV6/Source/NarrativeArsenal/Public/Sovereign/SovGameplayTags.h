@@ -30,6 +30,7 @@ public:
 	FGameplayTag Ability_Weapon_Cinderline_PrimaryFire;
 	FGameplayTag Ability_NPC_ReformationDrone_Gunfire;
 	FGameplayTag Ability_NPC_ReformationDrone_RocketLauncher;
+	FGameplayTag Ability_NPC_ReformationDrone_SelfDestruct;
 	FGameplayTag Ability_Echo_Tarrik_CinderSlam;
 	FGameplayTag Ability_Echo_Tarrik_VelkorransHunger;
 	FGameplayTag Ability_Echo_Tarrik_CinderStickyGrenade;

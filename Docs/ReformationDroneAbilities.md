@@ -1,11 +1,12 @@
 # Reformation Drone Weapon Abilities
 
-The Reformation drone weapon package provides two server-authoritative Narrative/GAS attacks:
+The Reformation drone package provides three server-authoritative Narrative/GAS attacks:
 
 - `USovGameplayAbility_ReformationDroneGunfire`: a configurable hitscan burst on `Narrative.Input.Attack`.
 - `USovGameplayAbility_ReformationDroneRocketLauncher`: a replicated radial-damage rocket on `Narrative.Input.AltAttack`.
+- `USovGameplayAbility_ReformationDroneSelfDestruct`: an AI-driven pursuit, warning fuse, radial blast, and Narrative-native self death on `Narrative.Input.Attack`.
 
-Both abilities are intended to be granted by the drone's Narrative **Ability Configuration**. They are integral NPC attacks, not weapon-item abilities, and do not require ammo or an equipped `UWeaponItem`.
+All three abilities are intended to be granted by the drone's Narrative **Ability Configuration**. They are integral NPC attacks, not weapon-item abilities, and do not require ammo or an equipped `UWeaponItem`.
 
 ## One-time editor setup
 
@@ -19,19 +20,22 @@ Create these Blueprint children:
 | `BP_ReformationDrone_GunshotPresentation` | `Reformation Drone Gunshot Presentation` | Muzzle flash, tracer, impacts, audio, decals, and camera shakes |
 | `GA_ReformationDrone_RocketLauncher` | `Reformation Drone: Rocket Launcher` | Explosion, launch, homing, timing, montage, and muzzle configuration |
 | `BP_ReformationDrone_Rocket` | `Reformation Drone Rocket Projectile` | Rocket mesh, trail, flight audio, explosion presentation, decal, and physics impulse |
+| `GA_ReformationDrone_SelfDestruct` | `Reformation Drone: Self Destruct` | Pursuit, warning duration, blast damage/falloff, LOS, and AI movement tuning |
+| `BP_ReformationDrone_SelfDestructPresentation` | `Reformation Drone Self Destruct Presentation` | Runtime material charge, travel/warning audio and Niagara, explosion art, decal, shake, and impulse |
 
 Set the gun ability's **Gunshot Presentation Class** to the presentation Blueprint. Set the rocket ability's **Rocket Class** to the rocket Blueprint. The native presentation and projectile classes are valid art-free defaults. Gun gameplay also remains functional if its optional presentation class is deliberately cleared.
 
 The shared native **Damage Effect Class** is also Blueprintable. A child may add Gameplay Cues or project metadata, but should retain the instant Narrative damage execution and leave damage magnitude to the ability/projectile SetByCaller payload.
 
-Add both Gameplay Ability Blueprints to the drone's Narrative **Ability Configuration → Default Abilities**. Do not put them in a weapon item's granted ability array. The native defaults already use:
+Add the appropriate Gameplay Ability Blueprints to each drone's Narrative **Ability Configuration → Default Abilities**. Do not put them in a weapon item's granted ability array. The native defaults already use:
 
 | Ability | Input tag | Identity tag |
 |---|---|---|
 | Gunfire | `Narrative.Input.Attack` | `Sov.Ability.NPC.ReformationDrone.Gunfire` |
 | Rocket launcher | `Narrative.Input.AltAttack` | `Sov.Ability.NPC.ReformationDrone.RocketLauncher` |
+| Self destruct | `Narrative.Input.Attack` | `Sov.Ability.NPC.ReformationDrone.SelfDestruct` |
 
-Remove inherited placeholder abilities that also use `Narrative.Input.Attack` or `Narrative.Input.AltAttack`. Narrative's input lookup does not provide a useful override guarantee when multiple active specs claim the same slot.
+The explosive drone should receive **Self Destruct as its only Attack ability**. Do not also grant Gunfire or an inherited placeholder on `Narrative.Input.Attack`; Narrative's input lookup does not provide a useful override guarantee when multiple active specs claim the same slot. The gun/rocket drone may continue using Gunfire plus Rocket Launcher.
 
 Narrative's normal AI attack query can use their authored bot frequency/range values. A custom StateTree can also activate the same input-tagged specs explicitly. Make sure the drone is on a team that regards the player as hostile; friendly and neutral actors block shots but are not damaged.
 
@@ -61,10 +65,11 @@ Gameplay release never depends on an animation notify:
 
 - Gunfire defaults to a short native payload delay, then owns its burst with authority timers.
 - The rocket defaults to a longer native payload delay aligned to a launcher wind-up.
+- Self Destruct uses native pursuit and fuse timers; it does not require a montage or animation notify.
 - Tune **Payload Release Delay** to the visual fire frame.
 - Keep **Auto Release Payload** enabled for normal use.
 
-For an exceptional server-authored sequence, disable automatic release and call `Fire Gun Burst From Aim` or `Launch Rocket From Aim` from the Gameplay Ability Blueprint. Do not call those functions from a cosmetic AnimBP notify; simulated-client notifies are not gameplay authority.
+For an exceptional server-authored sequence, disable automatic release and call `Fire Gun Burst From Aim`, `Launch Rocket From Aim`, or `Start Self Destruct Run` from the Gameplay Ability Blueprint. Do not call those functions from a cosmetic AnimBP notify; simulated-client notifies are not gameplay authority.
 
 Cosmetic montage notifies are still appropriate for local charge glows, servo sounds, barrel movement, or warning lights. Keep only damage, tracing, and projectile release on the native authority path.
 
@@ -99,27 +104,50 @@ The server owns projectile collision, optional homing, expiry, and radial gamepl
 
 The checked-in collision configuration now registers Narrative's channel 6 as the `NarrativeProjectile` object channel. Ordinary characters, world geometry, physics bodies, and other projectiles block it; overlap/sensor profiles ignore it. This registration also corrects the existing Velkorran's Hunger projectile path. Preserve that channel assignment if collision settings are later regenerated in Project Settings.
 
+## Explosive drone setup and presentation
+
+Set `GA_ReformationDrone_SelfDestruct`'s **Presentation Class** to `BP_ReformationDrone_SelfDestructPresentation`. The native presentation class is an art-free fallback, so pursuit, damage, and self death remain functional before assets are assigned.
+
+The ability first uses the AIController focus actor. If focus is missing, it performs one authority-only nearest-hostile-player fallback within **Target Acquisition Range**. **Only Acquire Player Controlled Targets** defaults on, so an explosive drone does not kamikaze an allied summon or a third faction by accident; disable it for encounters that deliberately target other hostile NPCs. It sends one `MoveToActor` request that follows the moving target, monitors range on a lightweight timer, stops at **Detonation Trigger Radius**, and then runs the native **Detonation Warning Duration**. A lost/dead target or failed move cancels before arming. Once armed, target loss does not cancel the blast, but death, Poise break, Freeze, or Device Disable can still interrupt the fuse. A pursuit timeout can either arm in place or cancel through **Detonate When Pursuit Times Out**.
+
+The drone must have an AIController and a compatible NavMovement/CharacterMovement component. Leave **Use Pathfinding** enabled for a ground drone on Recast NavMesh. Disable it for an authored flying/direct-movement setup whose path-following component supports direct movement. The ability retains its path-following request ID and aborts only that request, so ending the attack cannot cancel an unrelated Narrative move. The StateTree/Behavior Tree should still treat `State.Weapon.IsFiring` as an exclusive attack lane and avoid issuing a competing move; if another task replaces the pursuit or starts moving during the fuse, Self Destruct safely cancels without aborting the new task. A failed move request logs a focused setup warning and causes no damage or self death.
+
+Configure these presentation slots on the presentation Blueprint:
+
+- **Material:** `SelfDestructCharge` parameter name, pursuit value/pulse, warning ramp/pulse, and inactive reset value
+- **Travel:** attached Niagara, relative transform, spatial looping travel sound, volume, and pitch
+- **Warning:** attached Niagara plus the non-looping detonation-indication sound
+- **Explosion:** world-space Niagara, `User.ExplosionRadius` float, true explosion sound, camera shake, fading surface decal, and radial-force component
+- Blueprint cosmetic events for pursuit, warning, detonation, and cancellation
+
+Add the scalar parameter named `SelfDestructCharge` to every material that should respond. The presentation creates/reuses dynamic material instances on both the authoritative drone actor and Narrative's runtime `CharacterVisual`, including static modules, and rescans while active so asynchronously loaded appearance pieces receive the current synchronized value. Cancellation resets only this scalar; it does not replace materials or disturb other dynamic parameters.
+
+The travel sound asset should loop and use spatial attenuation. The detonation indication and true explosion sounds should be non-looping. Travel/warning Niagara generally works best in local space; explosion Niagara should normally simulate in world space. Warning progress is derived from the replicated phase timestamp and GameState server clock rather than per-frame replication. The presentation freezes at the blast location and outlives the drone long enough for explosion audio and effects to finish.
+
+Gameplay order is fixed: immutable detonation state is prepared first so it survives any synchronous callback, unique living hostile ASCs receive the Kinetic + Thermal Heavy blast through `UNarrativeDamageExecCalc`, presentation and physics finalize at that location, then the drone receives a separate fatal self-hit. This preserves Narrative damage credit, Guard/Shield/Health/Poise routing, death, loot, ragdoll, and replication. Ordinary guard is punished by the Heavy classification; a perfect guard, evade, interruption, or cover during the readable warning remains valid counterplay.
+
 ## Default gameplay tuning
 
-| Setting | Gunfire | Rocket launcher |
-|---|---:|---:|
-| Base damage | 12 per shot | 55 at center |
-| Poise pressure | 4 per shot | 35 at center |
-| Burst | 3 shots, 0.1 s apart | 1 rocket |
-| Maximum range | 5,000 cm | 6,000 cm AI attack range; 8,000 cm aim trace |
-| Ability cooldown | 0.75 s | 4.0 s |
-| Bot attack frequency | 0.9 s | 5.0 s |
-| Explosion radius | — | 450 cm |
-| Minimum damage at radius edge | — | 30% |
-| Rocket speed | — | 2,600 cm/s |
-| Flight limit | — | 5.0 s |
+| Setting | Gunfire | Rocket launcher | Self destruct |
+|---|---:|---:|---:|
+| Base damage | 12 per shot | 55 at center | 80 at center |
+| Poise pressure | 4 per shot | 35 at center | 50 at center |
+| Burst | 3 shots, 0.1 s apart | 1 rocket | 1 blast |
+| Maximum range | 5,000 cm | 6,000 cm AI attack range; 8,000 cm aim trace | 4,000 cm acquisition |
+| Ability cooldown | 0.75 s | 4.0 s | 0.5 s (normally dies) |
+| Bot attack frequency | 0.9 s | 5.0 s | 10.0 s |
+| Explosion radius | — | 450 cm | 425 cm |
+| Minimum damage at radius edge | — | 30% | 30% |
+| Pursuit/fuse | — | — | 8.0 s / 0.85 s |
+| Rocket speed | — | 2,600 cm/s | — |
+| Flight limit | — | 5.0 s | — |
 
 These are native-safe starting values, not balance locks. Override them on the ability Blueprints.
 
 ## Verification checklist
 
-1. Start with a fresh PIE or Standalone session after granting the two abilities.
-2. Confirm both specs appear in `showdebug abilitysystem` on the drone.
+1. Start with a fresh PIE or Standalone session after granting the intended abilities.
+2. Confirm the expected specs appear in `showdebug abilitysystem` on the drone, with only one spec claiming each input.
 3. Confirm the drone and player have hostile Narrative team attitudes.
 4. Test gunfire with an empty presentation Blueprint first: Health/Shield/Poise should resolve even without art.
 5. Confirm a wall stops both a tracer and its damage.
@@ -128,5 +156,9 @@ These are native-safe starting values, not balance locks. Override them on the a
 8. Run a two-player listen-server test: each client should see one gun presentation per shot and one rocket impact, with no duplicate audio or decals.
 9. Test dedicated server plus clients if available; dedicated authority should run gameplay without constructing cosmetic systems.
 10. Swap or rebuild the Narrative appearance, then fire again and verify both montages still play on the current drone AnimInstance.
+11. For the explosive variant, verify pursuit, trigger radius, the full warning window, wall LOS, falloff, one damage application per ASC, and normal Narrative death/loot/ragdoll.
+12. Interrupt Self Destruct during pursuit and warning with death, Poise break, Freeze, and Device Disable. Movement, loop audio, warning FX, and the material scalar should stop/reset without a blast.
+13. On a listen server with two observers, verify each client hears one warning and one true explosion, including when the drone dies immediately after detonation. Join or become relevant mid-pursuit/mid-warning and verify current loop/scalar reconstruction without duplicate one-shots.
+14. Swap or asynchronously load the explosive drone's Narrative appearance during pursuit; every newly visible runtime mesh should inherit the current `SelfDestructCharge` value.
 
 If activation never begins, first check that the abilities are in the NPC Ability Configuration, the drone has been fully initialized by Narrative, no firing/death/ragdoll/Poise-break/Freeze/device-disable tag is active, and the StateTree is requesting the matching Attack or Alt Attack input.

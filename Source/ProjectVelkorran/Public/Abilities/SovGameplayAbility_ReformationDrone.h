@@ -3,12 +3,14 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "AITypes.h"
 #include "GAS/NarrativeCombatAbility.h"
 #include "TimerManager.h"
 #include "SovGameplayAbility_ReformationDrone.generated.h"
 
 class ASovReformationDroneGunshotPresentation;
 class ASovReformationDroneRocketProjectile;
+class ASovReformationDroneSelfDestructPresentation;
 class UAbilitySystemComponent;
 class UAbilityTask_PlayMontageAndWait;
 class UAnimMontage;
@@ -337,4 +339,150 @@ private:
 	AActor* ResolveHomingTarget() const;
 	bool bRocketReleaseAttempted = false;
 	int32 NextMuzzleIndex = 0;
+};
+
+/**
+ * Server-authoritative suicide run for the explosive Reformation drone.
+ *
+ * The ability owns AI movement while active, transitions into a readable fuse
+ * at close range, applies one deduplicated hostile radial payload, then kills
+ * its own avatar through Narrative's fatal damage path so normal death, loot,
+ * ragdoll, save, and replication behavior remain intact.
+ */
+UCLASS(Blueprintable, meta = (DisplayName = "Reformation Drone: Self Destruct"))
+class PROJECTVELKORRAN_API USovGameplayAbility_ReformationDroneSelfDestruct : public USovGameplayAbility_ReformationDroneWeaponBase
+{
+	GENERATED_BODY()
+
+public:
+	USovGameplayAbility_ReformationDroneSelfDestruct();
+
+	/** Starts the pursuit immediately; safe to call from an authored authority event. */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Reformation Drone|Self Destruct")
+	void StartSelfDestructRun();
+
+protected:
+	virtual void ActivateAbility(
+		const FGameplayAbilitySpecHandle Handle,
+		const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayAbilityActivationInfo ActivationInfo,
+		const FGameplayEventData* TriggerEventData) override;
+
+	virtual void EndAbility(
+		const FGameplayAbilitySpecHandle Handle,
+		const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayAbilityActivationInfo ActivationInfo,
+		bool bReplicateEndAbility,
+		bool bWasCancelled) override;
+
+	virtual bool HasRequiredPayloadConfiguration() const override;
+	virtual void ExecuteAutomaticPayload() override;
+	virtual float GetAttackDamage_Implementation() const override;
+
+	/** Optional Blueprint child carrying all material, audio, Niagara, decal, and shake art. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Reformation Drone|Self Destruct|Presentation")
+	TSubclassOf<ASovReformationDroneSelfDestructPresentation> PresentationClass;
+
+	/** AI focus is preferred; nearest living hostile is the one-time fallback. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Reformation Drone|Self Destruct|Targeting", meta = (ClampMin = "0.0", Units = "cm"))
+	float TargetAcquisitionRange = 4000.0f;
+
+	/** Keeps the explosive variant focused on players even when other factions fight nearby. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Reformation Drone|Self Destruct|Targeting")
+	bool bOnlyAcquirePlayerControlledTargets = true;
+
+	/** Center-to-center distance at which movement stops and the warning begins. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Reformation Drone|Self Destruct|Targeting", meta = (ClampMin = "1.0", Units = "cm"))
+	float DetonationTriggerRadius = 200.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Reformation Drone|Self Destruct|Movement", meta = (ClampMin = "0.0", Units = "cm"))
+	float MoveAcceptanceRadius = 75.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Reformation Drone|Self Destruct|Movement")
+	bool bUsePathfinding = true;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Reformation Drone|Self Destruct|Movement")
+	bool bAllowPartialPath = true;
+
+	/** Authority-only validation cadence; MoveToActor itself tracks the moving target. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Reformation Drone|Self Destruct|Movement", meta = (ClampMin = "0.02", Units = "s"))
+	float PursuitUpdateInterval = 0.1f;
+
+	/** Minimum delay before retrying an unexpectedly idle move request. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Reformation Drone|Self Destruct|Movement", meta = (ClampMin = "0.1", Units = "s"))
+	float MoveRetryInterval = 0.5f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Reformation Drone|Self Destruct|Movement", meta = (ClampMin = "0.1", Units = "s"))
+	float MaximumPursuitDuration = 8.0f;
+
+	/** Fail-safe behavior for a target that remains valid but cannot be reached in time. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Reformation Drone|Self Destruct|Movement")
+	bool bDetonateWhenPursuitTimesOut = true;
+
+	/** Counterplay window between stopping and applying the true blast. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Reformation Drone|Self Destruct|Warning", meta = (ClampMin = "0.05", Units = "s"))
+	float DetonationWarningDuration = 0.85f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Reformation Drone|Self Destruct|Damage", meta = (ClampMin = "1.0", Units = "cm"))
+	float ExplosionRadius = 425.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Reformation Drone|Self Destruct|Damage", meta = (ClampMin = "0.0"))
+	float ExplosionDamage = 80.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Reformation Drone|Self Destruct|Damage", meta = (ClampMin = "0.0"))
+	float ExplosionPoiseDamage = 50.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Reformation Drone|Self Destruct|Damage", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float MinimumExplosionDamageFraction = 0.3f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Reformation Drone|Self Destruct|Damage")
+	bool bExplosionRequiresLineOfSight = true;
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "Sovereign|Reformation Drone|Self Destruct", meta = (DisplayName = "Self Destruct Pursuit Acquired"))
+	void ReceivePursuitAcquired(AActor* AcquiredTarget);
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "Sovereign|Reformation Drone|Self Destruct", meta = (DisplayName = "Self Destruct Warning Began"))
+	void ReceiveDetonationWarningBegan(float WarningDuration);
+
+private:
+	UFUNCTION()
+	void UpdatePursuit();
+
+	UFUNCTION()
+	void HandleDetonationWarningExpired();
+
+	AActor* ResolvePursuitTarget() const;
+	bool RequestPursuitMove(AActor* TargetActor);
+	void EnterDetonationWarning();
+	void CommitDetonation();
+	void AbortOwnedPursuitMove();
+	bool ApplyExplosionDamage(const FVector& ExplosionLocation) const;
+	bool HasExplosionLineOfSight(
+		AActor* InSourceActor,
+		AActor* TargetActor,
+		UAbilitySystemComponent* TargetAbilitySystem,
+		const FVector& ExplosionLocation) const;
+	bool ApplyFatalSelfDamage(
+		UAbilitySystemComponent* InSourceAbilitySystem,
+		AActor* InSourceActor,
+		float InEffectLevel,
+		const FVector& ExplosionLocation) const;
+	ASovReformationDroneSelfDestructPresentation* SpawnPresentation(
+		AActor* SourceDrone) const;
+	TSubclassOf<ASovReformationDroneSelfDestructPresentation>
+		ResolvePresentationClass() const;
+
+	UPROPERTY(Transient)
+	TObjectPtr<ASovReformationDroneSelfDestructPresentation> ActivePresentation;
+
+	TWeakObjectPtr<AActor> PursuitTarget;
+	FTimerHandle PursuitUpdateTimerHandle;
+	FTimerHandle DetonationWarningTimerHandle;
+	FAIRequestID OwnedPursuitMoveRequestId = FAIRequestID::InvalidRequest;
+	double PursuitStartTime = 0.0;
+	double LastMoveRequestTime = 0.0;
+	bool bPursuitStarted = false;
+	bool bWarningStarted = false;
+	bool bDetonationCommitted = false;
+	bool bEndingSelfDestructAbility = false;
 };
