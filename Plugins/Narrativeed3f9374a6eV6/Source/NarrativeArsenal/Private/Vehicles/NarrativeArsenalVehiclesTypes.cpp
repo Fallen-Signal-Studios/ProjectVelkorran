@@ -1,6 +1,6 @@
 ﻿// Copyright Narrative Tools 2025.
 
-#include "NarrativeArsenalVehicleTypes.h"
+#include "Vehicles/NarrativeArsenalVehicleTypes.h"
 #include "Math/Float16.h"
 
 FVehicleInstanceCustomData::FVehicleInstanceCustomData( const struct FPackedVehicleInstanceCustomData& PackedCustomData)

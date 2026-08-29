@@ -3,6 +3,7 @@
 #include "Dismemberment/SovDetachedLimbActor.h"
 
 #include "Components/SkeletalMeshComponent.h"
+#include "PhysicsEngine/PhysicsAsset.h"
 
 ASovDetachedLimbActor::ASovDetachedLimbActor()
 {
