@@ -16,7 +16,7 @@
  * which is guaranteed to have everything rep in 1 go rather than piecemeal which gets a bit hacky. 
  */
 USTRUCT(BlueprintType)
-struct FWeaponVisualAttachState
+struct NARRATIVEARSENAL_API FWeaponVisualAttachState
 {
 	GENERATED_BODY()
 
