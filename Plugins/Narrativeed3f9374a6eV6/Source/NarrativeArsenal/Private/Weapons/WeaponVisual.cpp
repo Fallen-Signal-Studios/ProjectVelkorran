@@ -257,6 +257,33 @@ void AWeaponVisual::OnHolstered()
 	BPHandleHolster();
 }
 
+bool AWeaponVisual::HandleAttachmentRequest_Implementation(
+	const FGameplayTag& EquipSlot,
+	const FGameplayTag& TargetWieldSlot)
+{
+	return false;
+}
+
+bool AWeaponVisual::CommitDeferredAttachment(
+	const FGameplayTag& EquipSlot,
+	const FGameplayTag& TargetWieldSlot)
+{
+	if (!HasAuthority()
+		|| !VisualOwner
+		|| !WeaponOwner
+		|| VisualOwner->GetWeaponVisual(EquipSlot) != this
+		|| AttachState.EquippedSlot != EquipSlot
+		|| AttachState.WeaponOwner != WeaponOwner)
+	{
+		return false;
+	}
+
+	return VisualOwner->CommitWeaponVisualAttachment(
+		WeaponOwner,
+		EquipSlot,
+		TargetWieldSlot);
+}
+
 void AWeaponVisual::HandleAttachedToOwner_Implementation()
 {
 	
@@ -820,30 +847,48 @@ void AWeaponVisual::OnRep_AttachState()
 
 					//Weapon has repped, lets attach it. This could be cleaned up somewhat, we do call this more than required to be safe though that may lead
 					//to unexpected behavior for people overriding virtual funcs. 
-					CharVisual->AttachWeaponVisual(AttachState.WeaponOwner, AttachState.EquippedSlot, AttachState.WieldedSlot);
+					// This is an authoritative replicated socket commit, not a new
+					// semantic draw/stow request. Bypass the transforming-visual hook
+					// so packet reordering during a reversal cannot consume the commit.
+					const bool bNeedsInitialPresentationRepair =
+						!bAttachedSuccesfully;
+					const bool bAttachmentCommitted =
+						CharVisual->CommitWeaponVisualAttachment(
+							AttachState.WeaponOwner,
+							AttachState.EquippedSlot,
+							AttachState.WieldedSlot);
 
-					//Ask our wields to re-apply since the anims may have failed due to weaponvisuals not existing yet. TODO we are spamming this func more than needed
-					CharOwner->OnRep_WieldState(CharOwner->GetWeaponWieldState());
-
-					//Allow BP/Children to do any init now that we're nicely attached.
-					if (!bAttachedSuccesfully)
+					if (bAttachmentCommitted)
 					{
-						HandleAttachedToOwner();
-
-						//Any attachments may have also failed to attach due to rep order - add now if so. 
-						TArray<UWeaponAttachmentItem*> Attachments;
-						AttachState.WeaponOwner->WeaponAttachments.GenerateValueArray(Attachments);
-					
-						for (auto& Attachment : Attachments)
+						//The visual can arrive after the wield state. Re-apply only
+						//presentation here; routing through OnRep_WieldState would
+						//remove/regrant abilities and replay item-side callbacks.
+						if (bNeedsInitialPresentationRepair)
 						{
-							//Any attachment without a mesh comp has failed due to missing weapon visual.  
-							if (Attachment && Attachment->WeaponAttachmentSlot.IsValid() && !AttachmentMeshComps.Contains(Attachment->WeaponAttachmentSlot))
-							{
-								AttachState.WeaponOwner->AddAttachmentVisual(Attachment);
-							}
+							CharVisual->HandleUpdateWields(
+								FWeaponWieldState(),
+								CharOwner->GetWeaponWieldState());
 						}
-					
-						bAttachedSuccesfully = true; 
+
+						//Allow BP/Children to initialize only after the socket handoff.
+						if (!bAttachedSuccesfully)
+						{
+							HandleAttachedToOwner();
+
+							//Attachments may also have arrived before the visual.
+							TArray<UWeaponAttachmentItem*> Attachments;
+							AttachState.WeaponOwner->WeaponAttachments.GenerateValueArray(Attachments);
+
+							for (auto& Attachment : Attachments)
+							{
+								//Any attachment without a mesh component needs repair.
+								if (Attachment && Attachment->WeaponAttachmentSlot.IsValid() && !AttachmentMeshComps.Contains(Attachment->WeaponAttachmentSlot))
+								{
+									AttachState.WeaponOwner->AddAttachmentVisual(Attachment);
+								}
+							}
+							bAttachedSuccesfully = true;
+						}
 					}
 
 				}

@@ -1,5 +1,7 @@
 # Narrative foundation pass
 
+For mechanically transforming weapon visuals such as Selene's Verity, see [TransformingWeaponVisuals.md](TransformingWeaponVisuals.md).
+
 This pass turns the isolated Narrative Pro copy into the first Sovereign Call combat foundation while preserving existing Narrative asset references.
 
 ## Source contract

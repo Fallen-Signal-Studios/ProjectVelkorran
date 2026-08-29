@@ -132,17 +132,76 @@ void ANarrativeCharacterVisual::HandleUpdateWields_Implementation(const FWeaponW
 	{
 		if (UEquipmentComponent* EquipComp = OwnedChar->GetEquipmentComponent())
 		{
-			check(NewWieldState.EquipWeapons.Num() == NewWieldState.WieldSlots.Num());
+			const bool bNewStateArraysValid = ensureMsgf(
+				NewWieldState.EquipSlots.Num()
+					== NewWieldState.WieldSlots.Num()
+					&& NewWieldState.EquipWeapons.Num()
+						== NewWieldState.WieldSlots.Num(),
+				TEXT("New wield state parallel arrays are out of sync."));
+			const bool bOldStateArraysValid = ensureMsgf(
+				OldWieldState.EquipSlots.Num()
+					== OldWieldState.WieldSlots.Num()
+					&& OldWieldState.EquipWeapons.Num()
+						== OldWieldState.WieldSlots.Num(),
+				TEXT("Old wield state parallel arrays are out of sync."));
+			if (!bNewStateArraysValid || !bOldStateArraysValid)
+			{
+				return;
+			}
 
 			FString RoleStr = HasAuthority() ? "Server" : "Client";
+			auto HasMatchingEntry = [](
+				const FWeaponWieldState& SourceState,
+				const int32 SourceIndex,
+				const FWeaponWieldState& OtherState)
+			{
+				if (!SourceState.EquipWeapons.IsValidIndex(SourceIndex)
+					|| SourceIndex < 0
+					|| SourceIndex >= SourceState.EquipSlots.Num()
+					|| SourceIndex >= SourceState.WieldSlots.Num())
+				{
+					return false;
+				}
+
+				const FGameplayTag SourceEquipSlot =
+					SourceState.EquipSlots.GetByIndex(SourceIndex);
+				for (int32 OtherIndex = 0;
+					OtherIndex < OtherState.EquipSlots.Num();
+					++OtherIndex)
+				{
+					if (OtherState.EquipSlots.GetByIndex(OtherIndex)
+							== SourceEquipSlot
+						&& OtherState.WieldSlots.Num() > OtherIndex
+						&& OtherState.EquipWeapons.IsValidIndex(OtherIndex))
+					{
+						return OtherState.WieldSlots.GetByIndex(OtherIndex)
+								== SourceState.WieldSlots.GetByIndex(SourceIndex)
+							&& OtherState.EquipWeapons[OtherIndex]
+								== SourceState.EquipWeapons[SourceIndex];
+					}
+				}
+
+				return false;
+			};
+
+			//Install the requested weapon layer before a transforming visual starts
+			//its draw montage. Stow keeps the current layer until the deferred
+			//physical holster commit below.
+			if (NewWieldState.EquipWeapons.IsValidIndex(0))
+			{
+				ApplyWieldAnimationLayers(NewWieldState);
+			}
 			
 			//Put away the old weapons. 
 			if (!OldWieldState.EquipSlots.IsEmpty() && !OldWieldState.WieldSlots.IsEmpty())
 			{
-				checkf(OldWieldState.EquipWeapons.Num() == OldWieldState.WieldSlots.Num(), TEXT("Number of wield slots doesn't match number of equip slots, something has gone wrong. "));
-
 				for (int32 i = 0; i <= OldWieldState.EquipSlots.Num() - 1; ++i)
 				{
+					if (HasMatchingEntry(OldWieldState, i, NewWieldState))
+					{
+						continue;
+					}
+
 					const FGameplayTag EquipSlot = OldWieldState.EquipSlots.GetByIndex(i);
 					const FGameplayTag WieldSlot = OldWieldState.WieldSlots.GetByIndex(i);
 
@@ -162,6 +221,11 @@ void ANarrativeCharacterVisual::HandleUpdateWields_Implementation(const FWeaponW
 				//Attach the new weapons to our character.
 				for (int32 i = 0; i <= NewWieldState.EquipSlots.Num() - 1; ++i)
 				{
+					if (HasMatchingEntry(NewWieldState, i, OldWieldState))
+					{
+						continue;
+					}
+
 					const FGameplayTag EquipSlot = NewWieldState.EquipSlots.GetByIndex(i);
 					const FGameplayTag WieldSlot = NewWieldState.WieldSlots.GetByIndex(i);
 					
@@ -178,69 +242,24 @@ void ANarrativeCharacterVisual::HandleUpdateWields_Implementation(const FWeaponW
 					}
 				}
 
-				//Finally, set our ABP. We only need to ask 1 weapon for the overlay, since dual wielded weapons need to agree on using same layer
-				// and as such will return same ABP anyways. 
-				const bool bDualWielding = NewWieldState.EquipWeapons.Num() > 1;
-				
-				if (UWeaponItem* FirstWeapon = NewWieldState.EquipWeapons[0])
-				{
-					if (AWeaponVisual* WeaponVisual = GetWeaponVisual(NewWieldState.EquipSlots.GetByIndex(0)))//FirstWeapon->CurrentSlot))
-					{
-						if (USkeletalMeshComponent* LocalMesh = GetOrCreateMeshComponent(FNarrativeGameplayTags::Get().Equipment_Slot_Character_LocalMesh))
-						{
-							if (UNarrativeAnimInstance* MeshInstance = Cast<UNarrativeAnimInstance>(LocalMesh->GetAnimInstance()))
-							{
-								MeshInstance->ApplyOverlayLayer(WeaponVisual->GetWeaponOverlayLayer(true));
-								//MeshInstance->LinkAnimClassLayers(WeaponVisual->GetWeaponOverlayLayer(true));
-							}
-						}
-
-						if (USkeletalMeshComponent* MainMesh = GetMainMesh())
-						{
-							if (UNarrativeAnimInstance* MeshInstance = Cast<UNarrativeAnimInstance>(MainMesh->GetAnimInstance()))
-							{
-								MeshInstance->ApplyOverlayLayer(WeaponVisual->GetWeaponOverlayLayer(false));
-								//MeshInstance->LinkAnimClassLayers(WeaponVisual->GetWeaponOverlayLayer(false));
-								//MeshInstance->LinkAnimClassLayers(WeaponAnimLayer);
-							}
-						}
-					}
-					else
-					{
-						UE_LOG(LogNarrativeCharacterVisual, Warning, TEXT("%s: Failed to find a weapon visual with slot %s. Overlay will not be applied."), *RoleStr, *FirstWeapon->CurrentSlot.ToString());
-					}
-				}
 			}
-			else //No new wielded weapons means we're going unarmed. Set our overlay back to unarmed - if no unarmed layer this will still clear out our overlay. 
+			else
 			{
-				if (USkeletalMeshComponent* MainMesh = GetMainMesh())
+				bool bWaitingForDeferredHolster = false;
+				for (int32 i = 0; i < OldWieldState.EquipSlots.Num(); ++i)
 				{
-					if (UNarrativeAnimInstance* MeshInstance = Cast<UNarrativeAnimInstance>(MainMesh->GetAnimInstance()))
+					if (AWeaponVisual* OldVisual =
+						GetWeaponVisual(OldWieldState.EquipSlots.GetByIndex(i)))
 					{
-						if (IsValid(AppearanceAttributeSet.UnarmedAnimLayer))
-						{
-							MeshInstance->ApplyOverlayLayer(AppearanceAttributeSet.UnarmedAnimLayer);
-						}
-						else
-						{
-							MeshInstance->RemoveOverlayLayer();
-						}
+						bWaitingForDeferredHolster |=
+							OldVisual->bHasAppliedAttachment
+							&& OldVisual->AppliedWieldSlot.IsValid();
 					}
 				}
 
-				if (USkeletalMeshComponent* LocalMesh = GetOrCreateMeshComponent(FNarrativeGameplayTags::Get().Equipment_Slot_Character_LocalMesh))
+				if (!bWaitingForDeferredHolster)
 				{
-					if (UNarrativeAnimInstance* MeshInstance = Cast<UNarrativeAnimInstance>(LocalMesh->GetAnimInstance()))
-					{
-						if (IsValid(AppearanceAttributeSet.UnarmedAnimLayer))
-						{
-							MeshInstance->LinkAnimClassLayers(AppearanceAttributeSet.UnarmedAnimLayer);
-						}
-						else
-						{
-							MeshInstance->RemoveOverlayLayer();
-						}
-					}
+					ApplyWieldAnimationLayers(NewWieldState);
 				}
 			}
 		}
@@ -253,6 +272,89 @@ void ANarrativeCharacterVisual::HandleUpdateWields_Implementation(const FWeaponW
 	}
 
 
+}
+
+void ANarrativeCharacterVisual::ApplyWieldAnimationLayers(
+	const FWeaponWieldState& WieldStateToApply)
+{
+	if (WieldStateToApply.EquipWeapons.IsValidIndex(0)
+		&& WieldStateToApply.EquipSlots.Num() > 0)
+	{
+		if (UWeaponItem* FirstWeapon = WieldStateToApply.EquipWeapons[0])
+		{
+			if (AWeaponVisual* WeaponVisual =
+				GetWeaponVisual(WieldStateToApply.EquipSlots.GetByIndex(0)))
+			{
+				if (USkeletalMeshComponent* LocalMesh =
+					GetOrCreateMeshComponent(
+						FNarrativeGameplayTags::Get()
+							.Equipment_Slot_Character_LocalMesh))
+				{
+					if (UNarrativeAnimInstance* MeshInstance =
+						Cast<UNarrativeAnimInstance>(LocalMesh->GetAnimInstance()))
+					{
+						MeshInstance->ApplyOverlayLayer(
+							WeaponVisual->GetWeaponOverlayLayer(true));
+					}
+				}
+
+				if (USkeletalMeshComponent* MainMesh = GetMainMesh())
+				{
+					if (UNarrativeAnimInstance* MeshInstance =
+						Cast<UNarrativeAnimInstance>(MainMesh->GetAnimInstance()))
+					{
+						MeshInstance->ApplyOverlayLayer(
+							WeaponVisual->GetWeaponOverlayLayer(false));
+					}
+				}
+			}
+			else
+			{
+				UE_LOG(
+					LogNarrativeCharacterVisual,
+					Warning,
+					TEXT("Failed to find a weapon visual with slot %s. Overlay will not be applied."),
+					*FirstWeapon->CurrentSlot.ToString());
+			}
+		}
+		return;
+	}
+
+	//No wielded weapon means unarmed. Preserve Narrative's existing layer path.
+	if (USkeletalMeshComponent* MainMesh = GetMainMesh())
+	{
+		if (UNarrativeAnimInstance* MeshInstance =
+			Cast<UNarrativeAnimInstance>(MainMesh->GetAnimInstance()))
+		{
+			if (IsValid(AppearanceAttributeSet.UnarmedAnimLayer))
+			{
+				MeshInstance->ApplyOverlayLayer(
+					AppearanceAttributeSet.UnarmedAnimLayer);
+			}
+			else
+			{
+				MeshInstance->RemoveOverlayLayer();
+			}
+		}
+	}
+
+	if (USkeletalMeshComponent* LocalMesh = GetOrCreateMeshComponent(
+		FNarrativeGameplayTags::Get().Equipment_Slot_Character_LocalMesh))
+	{
+		if (UNarrativeAnimInstance* MeshInstance =
+			Cast<UNarrativeAnimInstance>(LocalMesh->GetAnimInstance()))
+		{
+			if (IsValid(AppearanceAttributeSet.UnarmedAnimLayer))
+			{
+				MeshInstance->LinkAnimClassLayers(
+					AppearanceAttributeSet.UnarmedAnimLayer);
+			}
+			else
+			{
+				MeshInstance->RemoveOverlayLayer();
+			}
+		}
+	}
 }
 
 void ANarrativeCharacterVisual::HandleWieldWeapon_Implementation(class UWeaponItem* Weapon)
@@ -840,6 +942,26 @@ bool ANarrativeCharacterVisual::AddWeaponVisual(class UWeaponItem* WeaponItem)
 
 void ANarrativeCharacterVisual::AttachWeaponVisual(class UWeaponItem* WeaponItem, const FGameplayTag& EquipSlot, const FGameplayTag& WieldSlot)
 {
+	if (!WeaponItem)
+	{
+		return;
+	}
+
+	if (AWeaponVisual* WeaponVisual = GetWeaponVisual(EquipSlot))
+	{
+		//AttachState.WieldedSlot represents the physical, committed socket. A
+		//different requested slot may be staged by a transforming visual.
+		if (WeaponVisual->HandleAttachmentRequest(EquipSlot, WieldSlot))
+		{
+			return;
+		}
+	}
+
+	CommitWeaponVisualAttachment(WeaponItem, EquipSlot, WieldSlot);
+}
+
+bool ANarrativeCharacterVisual::CommitWeaponVisualAttachment(class UWeaponItem* WeaponItem, const FGameplayTag& EquipSlot, const FGameplayTag& WieldSlot)
+{
 	if (WeaponItem)
 	{
 		//check(WeaponItem->EquippedSlot.IsValid());
@@ -864,11 +986,10 @@ void ANarrativeCharacterVisual::AttachWeaponVisual(class UWeaponItem* WeaponItem
 
 			UE_LOG(LogNarrativeNet, Warning, TEXT("%s %s Attached weapon %s. EquipSlot %s, WieldSlot %s"), *LocalStr, *RoleStr, *GetNameSafe(this), *EquipSlot.ToString(), *WieldSlot.ToString());
 
-			//if (HasAuthority())
-			{
-				WeaponVisual->AttachState.WieldedSlot = WieldSlot;
-			}
-			
+			const bool bAttachmentChanged =
+				!WeaponVisual->bHasAppliedAttachment
+				|| WeaponVisual->AppliedWieldSlot != WieldSlot;
+
 			USkeletalMeshComponent* ComponentToUse = nullptr;
 
 			//If the socket exists on the body, try that - metahumans often define one of these so weapon attaches properly - only for holsters though, weapon_r
@@ -898,12 +1019,35 @@ void ANarrativeCharacterVisual::AttachWeaponVisual(class UWeaponItem* WeaponItem
 				//FString RoleStr = HasAuthority() ? "Server" : "Client";
 				//UE_LOG(LogNarrativeNet, Warning, TEXT("%s: attaching %s to %s with socket %s"), *RoleStr, *GetNameSafe(WeaponVisual->WeaponMesh), *GetNameSafe(ComponentToUse), *AttachSocket.ToString());
 
-				WeaponVisual->WeaponMesh->AttachToComponent(ComponentToUse, FAttachmentTransformRules::KeepRelativeTransform, AttachSocket);
+				if (!WeaponVisual->WeaponMesh->AttachToComponent(
+					ComponentToUse,
+					FAttachmentTransformRules::KeepRelativeTransform,
+					AttachSocket))
+				{
+					UE_LOG(
+						LogNarrativeCharacterVisual,
+						Warning,
+						TEXT("ANarrativeCharacterVisual::CommitWeaponVisualAttachment failed to attach %s to socket %s."),
+						*GetNameSafe(WeaponVisual),
+						*AttachSocket.ToString());
+					return false;
+				}
 				WeaponVisual->WeaponMesh->SetRelativeTransform(AttachOffset);
 			}
 			else
 			{
 				UE_LOG(LogNarrativeCharacterVisual, Warning, TEXT("ANarrativeCharacterVisual::AttachWeaponVisual could not find a suitable mesh to attach your weapon to, as socket %s didn't exist."), *AttachSocket.ToString());
+				return false;
+			}
+
+			//Only authority mutates the replicated committed attachment state,
+			//and only after the required third-person attachment succeeded.
+			if (WeaponVisual->HasAuthority()
+				&& WeaponVisual->AttachState.WieldedSlot != WieldSlot)
+			{
+				WeaponVisual->AttachState.WieldedSlot = WieldSlot;
+				WeaponVisual->FlushNetDormancy();
+				WeaponVisual->ForceNetUpdate();
 			}
 
 			//Next attach the local weapon to the local mesh.
@@ -932,17 +1076,63 @@ void ANarrativeCharacterVisual::AttachWeaponVisual(class UWeaponItem* WeaponItem
 				}
 			}
 
-			//TODO this function gets called more than we may expect, leading to this getting called multiple times which may not be desired. 
-			if (!WieldSlot.IsValid())
+			WeaponVisual->AppliedWieldSlot = WieldSlot;
+			WeaponVisual->bHasAppliedAttachment = true;
+			if (ANarrativeCharacter* OwnedChar = GetOwnerCharacter())
+			{
+				if (OwnedChar->IsLocallyControlled())
+				{
+					WeaponVisual->HandlePerspectiveUpdate(
+						OwnedChar->IsCameraInsideHead());
+				}
+			}
+
+			//Repeated replication/application calls may still repair the attachment,
+			//but should not replay wield/holster presentation events.
+			if (bAttachmentChanged && !WieldSlot.IsValid())
 			{
 				WeaponVisual->OnHolstered();
 			}
-			else
+			else if (bAttachmentChanged)
 			{
 				WeaponVisual->OnWielded();
 			}
+
+			// A staged stow deliberately retains the weapon overlay while its
+			// character montage is playing. Switch to the unarmed layer only once
+			// the physical holster handoff has actually completed.
+			if (!WieldSlot.IsValid())
+			{
+				if (ANarrativeCharacter* OwnedChar = GetOwnerCharacter())
+				{
+					const FWeaponWieldState& CurrentWieldState =
+						OwnedChar->GetWeaponWieldState();
+					bool bAnotherWeaponIsStillPhysicallyWielded = false;
+					for (const auto& Pair : SpawnedWeaponVisuals)
+					{
+						const AWeaponVisual* OtherVisual = Pair.Value.Get();
+						if (OtherVisual != WeaponVisual
+							&& IsValid(OtherVisual)
+							&& OtherVisual->bHasAppliedAttachment
+							&& OtherVisual->AppliedWieldSlot.IsValid())
+						{
+							bAnotherWeaponIsStillPhysicallyWielded = true;
+							break;
+						}
+					}
+					if (CurrentWieldState.EquipWeapons.IsEmpty()
+						&& !bAnotherWeaponIsStillPhysicallyWielded)
+					{
+						ApplyWieldAnimationLayers(CurrentWieldState);
+					}
+				}
+			}
+
+			return true;
 		}
 	}
+
+	return false;
 }
 
 void ANarrativeCharacterVisual::RemoveWeaponVisual(const FGameplayTag& WeaponSlot)
@@ -1551,7 +1741,10 @@ void ANarrativeCharacterVisual::OnWeaponVisualClassReady(class UWeaponItem* Weap
 		}
 
 		//If our character has saved wields, we're waiting for weapon visuals to load. Check if they are ready. Not multiplayer atm. 
-		if (GetNetMode() == NM_Standalone && OwnerCharacter && !OwnerCharacter->SavedWieldState.EquipSlots.IsEmpty())
+			if (GetNetMode() == NM_Standalone
+				&& OwnerCharacter
+				&& !bHasRestoredSavedWieldState
+				&& !OwnerCharacter->SavedWieldState.EquipSlots.IsEmpty())
 		{
 			bool bReadyToRestoreWields = true;
 
@@ -1564,10 +1757,42 @@ void ANarrativeCharacterVisual::OnWeaponVisualClassReady(class UWeaponItem* Weap
 				}  
 			}
 
-			if (bReadyToRestoreWields)
-			{
-				OwnerCharacter->SetWieldState(OwnerCharacter->SavedWieldState);
-			}
+				if (bReadyToRestoreWields)
+				{
+					bHasRestoredSavedWieldState = true;
+					const FWeaponWieldState CurrentWieldState =
+						OwnerCharacter->GetWeaponWieldState();
+					bool bCurrentStateIsComplete =
+						CurrentWieldState.EquipSlots.Num()
+							== CurrentWieldState.WieldSlots.Num()
+						&& CurrentWieldState.EquipWeapons.Num()
+							== CurrentWieldState.WieldSlots.Num();
+					for (const TObjectPtr<UWeaponItem>& CurrentWeapon
+						: CurrentWieldState.EquipWeapons)
+					{
+						bCurrentStateIsComplete &= IsValid(CurrentWeapon.Get());
+					}
+
+					if (bCurrentStateIsComplete
+						&& CurrentWieldState.EquipSlots
+							== OwnerCharacter->SavedWieldState.EquipSlots
+						&& CurrentWieldState.WieldSlots
+							== OwnerCharacter->SavedWieldState.WieldSlots
+						&& CurrentWieldState.EquipWeapons
+							== OwnerCharacter->SavedWieldState.EquipWeapons)
+					{
+						// Appearance reconstruction only needs presentation repair.
+						// Do not unwind/regrant the same weapon abilities again.
+						HandleUpdateWields(
+							FWeaponWieldState(),
+							CurrentWieldState);
+					}
+					else
+					{
+						OwnerCharacter->SetWieldState(
+							OwnerCharacter->SavedWieldState);
+					}
+				}
 		}
 
 	}

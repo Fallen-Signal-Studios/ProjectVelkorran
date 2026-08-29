@@ -40,6 +40,8 @@ static TAutoConsoleVariable<bool> CVarDrawTracesDebug(
 UNarrativeCombatAbility::UNarrativeCombatAbility()
 {
 	bRequiresAmmo = true;
+	ActivationBlockedTags.AddTag(
+		FNarrativeGameplayTags::Get().State_Weapon_Equipping);
 
 	DefaultBotAttackFrequency = 1.f; 
 	DefaultBotAttackRange = 10000.f; 

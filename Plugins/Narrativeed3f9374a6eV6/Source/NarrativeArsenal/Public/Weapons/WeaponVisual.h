@@ -151,6 +151,20 @@ public:
 	//Called when weapon is holstered.
 	virtual void OnHolstered();
 
+	/**
+	 * Gives specialized weapon visuals a chance to stage a physical attachment
+	 * change. Returning true means the visual owns the request and will call
+	 * CommitDeferredAttachment when its authoritative handoff is reached.
+	 * Ordinary weapon visuals return false and retain Narrative's immediate path.
+	 */
+	UFUNCTION(BlueprintNativeEvent, Category = "Attachments")
+	bool HandleAttachmentRequest(
+		const FGameplayTag& EquipSlot,
+		const FGameplayTag& TargetWieldSlot);
+	virtual bool HandleAttachmentRequest_Implementation(
+		const FGameplayTag& EquipSlot,
+		const FGameplayTag& TargetWieldSlot);
+
 	//Called when weapon is wielded. 
 	UFUNCTION(BlueprintImplementableEvent, Category = "Attachments")
 	void BPHandleWield();
@@ -223,6 +237,16 @@ public:
 	TArray<USkeletalMeshComponent*> GetWeaponMeshes() const;
 
 protected: 
+
+	/** Commit a previously deferred socket handoff without re-entering the request hook. */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Attachments", meta = (BlueprintProtected = "true"))
+	bool CommitDeferredAttachment(
+		const FGameplayTag& EquipSlot,
+		const FGameplayTag& TargetWieldSlot);
+
+	/** Last physical attachment applied on this machine. Used to suppress duplicate callbacks. */
+	FGameplayTag AppliedWieldSlot;
+	bool bHasAppliedAttachment = false;
 
 	UFUNCTION()
 	virtual void UpdateWeaponAttachment();

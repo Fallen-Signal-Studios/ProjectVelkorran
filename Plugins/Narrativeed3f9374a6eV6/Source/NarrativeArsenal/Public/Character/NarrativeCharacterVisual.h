@@ -221,6 +221,15 @@ protected:
 	UFUNCTION(BlueprintCallable, Category = "Character Visual")
 	void AttachWeaponVisual(class UWeaponItem* WeaponItem, const FGameplayTag& EquipSlot, const FGameplayTag& WieldSlot);
 
+	/** Low-level socket handoff. This deliberately bypasses weapon transition requests. */
+	bool CommitWeaponVisualAttachment(class UWeaponItem* WeaponItem, const FGameplayTag& EquipSlot, const FGameplayTag& WieldSlot);
+
+	/** Applies only character animation layers, without replaying equipment or attachment state. */
+	void ApplyWieldAnimationLayers(const FWeaponWieldState& WieldState);
+
+	/** Prevents each asynchronously loaded weapon visual from replaying the same saved wield restore. */
+	bool bHasRestoredSavedWieldState = false;
+
 	UFUNCTION(BlueprintCallable, Category = "Character Visual")
 	void RemoveWeaponVisual(UPARAM(meta = (Categories = "Narrative.Equipment.Slot.Weapon"))const FGameplayTag& WeaponSlot);
 
