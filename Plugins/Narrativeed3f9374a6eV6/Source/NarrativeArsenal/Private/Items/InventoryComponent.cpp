@@ -712,24 +712,32 @@ int32 UNarrativeInventoryComponent::GetSpaceForItem(TSubclassOf<class UNarrative
 	//Figure out how many of a given item we can add 
 	if (const UNarrativeItem* ItemCDO = GetDefault<UNarrativeItem>(ItemClass))
 	{
+		const int32 MaxStackSize = ItemCDO->bStackable ? ItemCDO->MaxStackSize : 1;
+		int32 ExistingStackSpace = 0;
 
-		if (Items.Num() >= GetCapacity())
+		// Existing stacks can still accept items when every inventory slot is in
+		// use. Sum all matching stack room before deciding capacity is exhausted.
+		for (const UNarrativeItem* ExistingItem : FindItemsOfClass(ItemClass))
+		{
+			if (IsValid(ExistingItem))
+			{
+				ExistingStackSpace += FMath::Max(ExistingItem->GetStackSpace(), 0);
+			}
+		}
+
+		const int32 EmptySlots = FMath::Max(GetCapacity() - Items.Num(), 0);
+		const int32 CapacitySpace = ExistingStackSpace + (EmptySlots * MaxStackSize);
+		if (CapacitySpace <= 0)
 		{
 			NoSpaceReason = LOCTEXT("NoSpaceReason_CapacitySpace", "You don't have any inventory slots left for this item.");
 			return 0;
 		}
 
-		const int32 MaxStackSize = ItemCDO->bStackable ? ItemCDO->MaxStackSize : 1;
-		int32 ExistingStackSize = 0;
-
-		//Check if we already have the item or not
-		if (UNarrativeItem* ExistingItem = FindItemByClassExact(TSoftClassPtr<UNarrativeItem>(ItemClass)))
-		{
-			ExistingStackSize = ExistingItem->GetQuantity();
-		}
-		
-		const int32 WeightSpace = FMath::IsNearlyZero(ItemCDO->Weight) ? INT_MAX : FMath::FloorToInt((WeightCapacity - GetCurrentWeight()) / ItemCDO->Weight);
-		const int32 CapacitySpace = ((Capacity - Items.Num()) * MaxStackSize) + (MaxStackSize - ExistingStackSize);
+		const int32 WeightSpace = FMath::IsNearlyZero(ItemCDO->Weight)
+			? INT_MAX
+			: FMath::Max(
+				FMath::FloorToInt((WeightCapacity - GetCurrentWeight()) / ItemCDO->Weight),
+				0);
 
 		if (WeightSpace < CapacitySpace)
 		{
@@ -739,11 +747,6 @@ int32 UNarrativeInventoryComponent::GetSpaceForItem(TSubclassOf<class UNarrative
 			}
 
 			return WeightSpace;
-		}
-
-		if (CapacitySpace <= 0)
-		{
-			NoSpaceReason = LOCTEXT("NoSpaceReason_CapacitySpace", "You don't have any inventory slots left for this item.");
 		}
 
 		return CapacitySpace;
