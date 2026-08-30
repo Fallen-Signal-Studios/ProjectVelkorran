@@ -2,6 +2,7 @@
 
 #include "Characters/SovNPCCharacterBase.h"
 
+#include "Components/SovCombatSustainDropComponent.h"
 #include "Components/SovDismembermentComponent.h"
 
 ASovNPCCharacterBase::ASovNPCCharacterBase(const FObjectInitializer& ObjectInitializer)
@@ -9,4 +10,6 @@ ASovNPCCharacterBase::ASovNPCCharacterBase(const FObjectInitializer& ObjectIniti
 {
 	DismembermentComponent = CreateDefaultSubobject<USovDismembermentComponent>(
 		TEXT("SovDismembermentComponent"));
+	CombatSustainDropComponent = CreateDefaultSubobject<USovCombatSustainDropComponent>(
+		TEXT("SovCombatSustainDropComponent"));
 }
