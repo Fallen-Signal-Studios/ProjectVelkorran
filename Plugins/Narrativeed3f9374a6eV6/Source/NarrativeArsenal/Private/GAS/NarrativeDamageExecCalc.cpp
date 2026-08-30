@@ -4,7 +4,10 @@
 
 #include "ArsenalStatics.h"
 #include "AbilitySystemComponent.h"
+#include "GAS/NarrativeGameplayAbility.h"
 #include "GAS/NarrativeAttributeSetBase.h"
+#include "GameplayEffect.h"
+#include "Items/RangedWeaponItem.h"
 #include "NarrativeGameplayTags.h"
 #include "Settings/NarrativeCombatDeveloperSettings.h"
 #include "Sovereign/SovGameplayTags.h"
@@ -52,6 +55,86 @@ namespace NarrativeDamage
 		const float DefaultValue)
 	{
 		return Spec.GetSetByCallerMagnitude(Tag, false, DefaultValue);
+	}
+
+	const URangedWeaponItem* GetVariationWeaponForOrdinaryPrimaryFire(
+		const FGameplayEffectSpec& Spec,
+		const FGameplayTagContainer& EffectTags)
+	{
+		// Periodic damage, authored payloads, and non-hit transactions should never
+		// inherit a weapon's primary-fire variation policy.
+		if (!Spec.Def
+			|| Spec.Def->DurationPolicy != EGameplayEffectDurationType::Instant)
+		{
+			return nullptr;
+		}
+
+		const FGameplayEffectContextHandle& Context = Spec.GetContext();
+		const FHitResult* HitResult = Context.GetHitResult();
+		if (!HitResult || !HitResult->bBlockingHit)
+		{
+			return nullptr;
+		}
+
+		const URangedWeaponItem* SourceWeapon = Cast<URangedWeaponItem>(Context.GetSourceObject());
+		if (!IsValid(SourceWeapon) || !SourceWeapon->HasDamageVariation())
+		{
+			return nullptr;
+		}
+
+		const FSovGameplayTags& SovTags = FSovGameplayTags::Get();
+		if (EffectTags.HasTag(SovTags.Ability_Echo))
+		{
+			return nullptr;
+		}
+
+		const UNarrativeGameplayAbility* SourceAbility =
+			Cast<UNarrativeGameplayAbility>(Context.GetAbility());
+		if (!IsValid(SourceAbility))
+		{
+			return nullptr;
+		}
+
+		FGameplayTagContainer AbilityTags;
+		AbilityTags.AppendTags(SourceAbility->GetAssetTags());
+		if (AbilityTags.HasTag(SovTags.Ability_Echo))
+		{
+			return nullptr;
+		}
+
+		const FNarrativeGameplayTags& NarrativeTags = FNarrativeGameplayTags::Get();
+		const bool bExplicitCinderlinePrimary =
+			AbilityTags.HasTagExact(SovTags.Ability_Weapon_Cinderline_PrimaryFire)
+			|| EffectTags.HasTagExact(SovTags.Ability_Weapon_Cinderline_PrimaryFire);
+		const bool bGenericNarrativePrimary =
+			SourceAbility->InputTag == NarrativeTags.Narrative_Input_Attack
+			&& AbilityTags.HasTagExact(NarrativeTags.Ability_WeaponFire)
+			&& AbilityTags.HasTagExact(NarrativeTags.Ability_DamageType_Ranged);
+		return bExplicitCinderlinePrimary || bGenericNarrativePrimary
+			? SourceWeapon
+			: nullptr;
+	}
+
+	float GetDeterministicHitDistance(
+		const FHitResult& HitResult,
+		const AActor* SourceActor)
+	{
+		if (HitResult.Distance > KINDA_SMALL_NUMBER)
+		{
+			return HitResult.Distance;
+		}
+
+		const FVector ImpactPoint = HitResult.ImpactPoint.IsNearlyZero()
+			? HitResult.Location
+			: HitResult.ImpactPoint;
+		if (!HitResult.TraceStart.Equals(ImpactPoint))
+		{
+			return FVector::Distance(HitResult.TraceStart, ImpactPoint);
+		}
+
+		return SourceActor
+			? FVector::Distance(SourceActor->GetActorLocation(), ImpactPoint)
+			: 0.f;
 	}
 
 	bool IsImmuneToChannels(
@@ -172,6 +255,26 @@ void UNarrativeDamageExecCalc::Execute_Implementation(
 	if (AuthoredBaseDamage >= 0.f)
 	{
 		BaseDamage = AuthoredBaseDamage;
+	}
+	else if (!bAlreadyResolved)
+	{
+		// Variation replaces only the source weapon's fixed contribution, preserving
+		// any other captured AttackDamage modifiers. Explicit SetByCaller damage is
+		// deliberately excluded so Echo attacks, explosions, and authored specials
+		// remain stable.
+		if (const URangedWeaponItem* VariationWeapon =
+			NarrativeDamage::GetVariationWeaponForOrdinaryPrimaryFire(Spec, EffectTags))
+		{
+			if (const FHitResult* HitResult = Spec.GetContext().GetHitResult())
+			{
+				const float FixedWeaponDamage = VariationWeapon->GetAttackDamage();
+				const float VariedWeaponDamage = VariationWeapon->ResolveAttackDamageForDistance(
+					NarrativeDamage::GetDeterministicHitDistance(*HitResult, SourceActor));
+				BaseDamage = FMath::Max(
+					BaseDamage - FixedWeaponDamage + VariedWeaponDamage,
+					0.f);
+			}
+		}
 	}
 
 	BaseDamage = FMath::Max(BaseDamage, 0.f);

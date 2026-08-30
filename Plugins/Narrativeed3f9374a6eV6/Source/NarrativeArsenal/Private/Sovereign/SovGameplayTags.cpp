@@ -15,7 +15,8 @@ void FSovGameplayTags::InitializeNativeTags()
 		&& GameplayTags.Ability_NPC_ReformationDrone_SelfDestruct.IsValid()
 		&& GameplayTags.Ability_Echo_Selene_StillpointGrenade.IsValid()
 		&& GameplayTags.Status_Immunity_Burn.IsValid()
-		&& GameplayTags.Status_Immunity_DeviceDisable.IsValid())
+		&& GameplayTags.Status_Immunity_DeviceDisable.IsValid()
+		&& GameplayTags.Echo_Source_CombatSustainPickup.IsValid())
 	{
 		return;
 	}
@@ -148,6 +149,7 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 	AddTag(Echo_Source_GuardCounter, "Sov.Echo.Source.GuardCounter", "Echo source for a landed Tarrik guard counter.");
 	AddTag(Echo_Source_CinderlineCadence, "Sov.Echo.Source.CinderlineCadence", "Echo source for completing Tarrik's Cinderline firing cadence.");
 	AddTag(Echo_Source_CinderlinePrecisionKill, "Sov.Echo.Source.CinderlinePrecisionKill", "Echo source for a Cinderline precision kill.");
+	AddTag(Echo_Source_CombatSustainPickup, "Sov.Echo.Source.CombatSustainPickup", "Echo source for collecting a transient combat-sustain mote.");
 }
 
 void FSovGameplayTags::AddTag(FGameplayTag& OutTag, const ANSICHAR* TagName, const ANSICHAR* TagComment)

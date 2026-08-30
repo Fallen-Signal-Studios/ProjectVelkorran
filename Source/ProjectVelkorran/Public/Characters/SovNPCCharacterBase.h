@@ -6,7 +6,7 @@
 #include "UnrealFramework/NarrativeNPCCharacter.h"
 #include "SovNPCCharacterBase.generated.h"
 
-/** Project-owned NPC base with server-authoritative dismemberment available by default. */
+/** Project-owned NPC base with authoritative combat extensions available by default. */
 UCLASS(Blueprintable)
 class PROJECTVELKORRAN_API ASovNPCCharacterBase : public ANarrativeNPCCharacter
 {
@@ -21,7 +21,16 @@ public:
 		return DismembermentComponent;
 	}
 
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Components")
+	class USovCombatSustainDropComponent* GetCombatSustainDropComponent() const
+	{
+		return CombatSustainDropComponent;
+	}
+
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sovereign|Components")
 	TObjectPtr<class USovDismembermentComponent> DismembermentComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sovereign|Components")
+	TObjectPtr<class USovCombatSustainDropComponent> CombatSustainDropComponent;
 };

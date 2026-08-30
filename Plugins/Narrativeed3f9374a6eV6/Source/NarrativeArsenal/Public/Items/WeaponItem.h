@@ -60,6 +60,21 @@ enum class EWeaponHandRule : uint8
 	WHR_Either UMETA(DisplayName = "Dual Wieldable")
 };
 
+/**
+ * Optional policy for resolving a weapon's ordinary primary-fire damage.
+ *
+ * Fixed preserves Narrative's existing behavior. Distance Based is deterministic:
+ * it deals the authored maximum at close range and linearly reaches the authored
+ * minimum at long range. Hit-zone, ability, difficulty, and mitigation modifiers
+ * are still applied later by the damage execution.
+ */
+UENUM(BlueprintType)
+enum class EWeaponDamageVariationMode : uint8
+{
+	Fixed UMETA(DisplayName = "Fixed"),
+	DistanceBased UMETA(DisplayName = "Distance Based")
+};
+
 //Used to track the state of our weapons magazine, if the weapon uses ammo. 
 USTRUCT(BlueprintType)
 struct FWeaponClipState
@@ -222,6 +237,30 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item - Weapon | Attack Settings")
 	float AttackDamage;
 
+	/**
+	 * Optional deterministic variation for ordinary ranged primary fire. Fixed is
+	 * the backwards-compatible default. Damage effects which explicitly author a
+	 * SetByCaller.Damage magnitude, including Echo abilities, do not use this policy.
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item - Weapon | Attack Settings | Damage Variation")
+	EWeaponDamageVariationMode DamageVariationMode;
+
+	/** Damage dealt at or beyond DamageVariationFarDistance, before hit-zone modifiers. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item - Weapon | Attack Settings | Damage Variation", meta = (EditCondition = "DamageVariationMode == EWeaponDamageVariationMode::DistanceBased", EditConditionHides, ClampMin = "0.0"))
+	float MinimumAttackDamage;
+
+	/** Damage dealt at or inside DamageVariationNearDistance, before hit-zone modifiers. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item - Weapon | Attack Settings | Damage Variation", meta = (EditCondition = "DamageVariationMode == EWeaponDamageVariationMode::DistanceBased", EditConditionHides, ClampMin = "0.0"))
+	float MaximumAttackDamage;
+
+	/** Distance in centimetres at or inside which MaximumAttackDamage is dealt. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item - Weapon | Attack Settings | Damage Variation", meta = (EditCondition = "DamageVariationMode == EWeaponDamageVariationMode::DistanceBased", EditConditionHides, ClampMin = "0.0", Units = "cm"))
+	float DamageVariationNearDistance;
+
+	/** Distance in centimetres at or beyond which MinimumAttackDamage is dealt. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item - Weapon | Attack Settings | Damage Variation", meta = (EditCondition = "DamageVariationMode == EWeaponDamageVariationMode::DistanceBased", EditConditionHides, ClampMin = "0.0", Units = "cm"))
+	float DamageVariationFarDistance;
+
 	/** How much should base damage be multiplied for a heavy attack. It is up the combat ability whether it wants/needs this value, some weapons may not have heavy attacks. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item - Weapon | Attack Settings")
 	float HeavyAttackDamageMultiplier;
@@ -295,6 +334,21 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Weapon")
 	FText GetWeaponDisplayName(const bool bShowAttachments, const bool bShowAmmo) const;
 	virtual FText GetWeaponDisplayName_Implementation(const bool bShowAttachments, const bool bShowAmmo) const;
+
+	/** Return this weapon's fixed authored damage before any optional variation. */
+	UFUNCTION(BlueprintPure, Category = "Weapon|Damage")
+	float GetAttackDamage() const { return FMath::Max(AttackDamage, 0.f); }
+
+	/** True when this weapon has opted into a non-fixed primary-fire damage policy. */
+	UFUNCTION(BlueprintPure, Category = "Weapon|Damage")
+	bool HasDamageVariation() const { return DamageVariationMode != EWeaponDamageVariationMode::Fixed; }
+
+	/**
+	 * Resolve this weapon's pre-hit-zone primary-fire damage for a trace distance.
+	 * This function is deterministic and returns AttackDamage while variation is disabled.
+	 */
+	UFUNCTION(BlueprintPure, Category = "Weapon|Damage")
+	float ResolveAttackDamageForDistance(const float Distance) const;
 
 	//Update the ammo in our clip. Doesn't play FX or anything, if you need that use GA_Reload ability. 
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Ammo")

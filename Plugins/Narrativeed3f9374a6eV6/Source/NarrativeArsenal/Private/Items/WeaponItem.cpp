@@ -33,9 +33,17 @@ UWeaponItem::UWeaponItem()
 	bPawnOrientsRotationToMovement = true;
 	bAllowManualReload = true;  
 
-	Stats.Add(FNarrativeItemStat(LOCTEXT("DamageStatDisplayText", "Base Damage"), ItemStat_Damage, LOCTEXT("DamageStatDisplayTooltip", "The base damage this weapon deals.")));
+	Stats.Add(FNarrativeItemStat(
+		LOCTEXT("DamageStatDisplayText", "Base Damage"),
+		ItemStat_Damage,
+		LOCTEXT("DamageStatDisplayTooltip", "The damage this weapon deals before hit-zone and other combat modifiers.")));
 
 	AttackDamage = 10.f;
+	DamageVariationMode = EWeaponDamageVariationMode::Fixed;
+	MinimumAttackDamage = AttackDamage;
+	MaximumAttackDamage = AttackDamage;
+	DamageVariationNearDistance = 0.f;
+	DamageVariationFarDistance = 10000.f;
 	HeavyAttackDamageMultiplier = 1.6f;
 
 	bBotsConsumeAmmo = false; 
@@ -50,17 +58,64 @@ FString UWeaponItem::GetStringVariable_Implementation(const FString& VariableNam
 {
 	if (VariableName == ItemStat_Damage)
 	{
-		if (AttackDamage > 0.f)
+		if (HasDamageVariation())
+		{
+			const float MinimumDamage = FMath::Max(
+				FMath::Min(MinimumAttackDamage, MaximumAttackDamage),
+				0.f);
+			const float MaximumDamage = FMath::Max(
+				FMath::Max(MinimumAttackDamage, MaximumAttackDamage),
+				0.f);
+			if (MaximumDamage > 0.f)
+			{
+				return FString::Printf(
+					TEXT("%s-%s"),
+					*FString::SanitizeFloat(MinimumDamage),
+					*FString::SanitizeFloat(MaximumDamage));
+			}
+		}
+		else if (AttackDamage > 0.f)
 		{
 			return FString::SanitizeFloat(AttackDamage);
 		}
-		else
-		{
-			return FString();
-		}
+
+		return FString();
 	}
 
 	return Super::GetStringVariable_Implementation(VariableName);
+}
+
+float UWeaponItem::ResolveAttackDamageForDistance(const float Distance) const
+{
+	const float FixedDamage = FMath::Max(AttackDamage, 0.f);
+	if (DamageVariationMode != EWeaponDamageVariationMode::DistanceBased)
+	{
+		return FixedDamage;
+	}
+
+	const float MinimumDamage = FMath::Max(
+		FMath::Min(MinimumAttackDamage, MaximumAttackDamage),
+		0.f);
+	const float MaximumDamage = FMath::Max(
+		FMath::Max(MinimumAttackDamage, MaximumAttackDamage),
+		0.f);
+	const float NearDistance = FMath::Max(
+		FMath::Min(DamageVariationNearDistance, DamageVariationFarDistance),
+		0.f);
+	const float FarDistance = FMath::Max(
+		FMath::Max(DamageVariationNearDistance, DamageVariationFarDistance),
+		NearDistance);
+
+	if (FMath::IsNearlyEqual(NearDistance, FarDistance))
+	{
+		return Distance <= NearDistance ? MaximumDamage : MinimumDamage;
+	}
+
+	const float DistanceAlpha = FMath::GetRangePct(
+		NearDistance,
+		FarDistance,
+		FMath::Max(Distance, 0.f));
+	return FMath::Lerp(MaximumDamage, MinimumDamage, FMath::Clamp(DistanceAlpha, 0.f, 1.f));
 }
 
 void UWeaponItem::AddedToInventory(class UNarrativeInventoryComponent* Inventory, const bool bFromLoad)
