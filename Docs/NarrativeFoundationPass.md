@@ -1,6 +1,6 @@
 # Narrative foundation pass
 
-For mechanically transforming weapon visuals such as Selene's Verity, see [TransformingWeaponVisuals.md](TransformingWeaponVisuals.md).
+For mechanically transforming weapon visuals such as Selene's Verity, see [TransformingWeaponVisuals.md](TransformingWeaponVisuals.md). For automatic kill rewards and Cinderline's ammunition/damage content setup, see [CombatSustainAndCinderlineDamage.md](CombatSustainAndCinderlineDamage.md).
 
 This pass turns the isolated Narrative Pro copy into the first Sovereign Call combat foundation while preserving existing Narrative asset references.
 
@@ -41,6 +41,7 @@ This pass turns the isolated Narrative Pro copy into the first Sovereign Call co
 12. Apply requested `Sov.Status.*` tags with project Gameplay Effects from the typed damage-result/event hook. This source pass publishes validated status requests but cannot author the binary effect assets.
 13. Build Tarrik's weapon-context Echo kit from the five native Blueprint parents and grant them through the three existing ability slots as described in [`TarrikEchoAbilities.md`](TarrikEchoAbilities.md). Echo threshold checks and authoritative spending are native. Cinder Sticky Grenade and Velkorran's Hunger also own native authoritative projectiles, damage effects, and Burn application; their Blueprint children supply meshes, animation, Niagara, audio, and tuning. Cinder Slam, Cinder Judgement, and Cinderline Requiem still require authored or future native payloads.
 14. Build Selene's control-focused Echo kit from the five native Blueprint parents described in [`SeleneEchoAbilities.md`](SeleneEchoAbilities.md). Grant `Sov.Character.Player.Selene` through her Player Definition, author the exact weapon allowlists, and apply Freeze/Chill/Disruption effects only from authority. Tarrik's definition must likewise grant `Sov.Character.Player.Tarrik` after the shared-base extraction.
+15. Configure Cinderline's magazine/reserve, deterministic distance damage, transient pickup Blueprint children, and per-archetype NPC drop settings as described in [`CombatSustainAndCinderlineDamage.md`](CombatSustainAndCinderlineDamage.md). Combat Sustain is an explicit narrow exception to the no-loot-drop rule; do not route it through Narrative loot tables or saveable interactable pickups.
 
 ## Damage authoring defaults
 
