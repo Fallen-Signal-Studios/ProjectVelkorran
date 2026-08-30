@@ -143,6 +143,7 @@ public:
 	FGameplayTag Echo_Source_GuardCounter;
 	FGameplayTag Echo_Source_CinderlineCadence;
 	FGameplayTag Echo_Source_CinderlinePrecisionKill;
+	FGameplayTag Echo_Source_CombatSustainPickup;
 
 private:
 	void AddAllTags(UGameplayTagsManager& Manager);
