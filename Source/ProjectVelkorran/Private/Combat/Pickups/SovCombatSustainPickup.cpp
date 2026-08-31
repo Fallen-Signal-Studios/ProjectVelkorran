@@ -147,7 +147,7 @@ void ASovCombatSustainPickup::HandlePickupOverlap(
 			? CollectingPlayer->GetNarrativeAbilitySystemComponent()
 			: nullptr;
 	if (!IsValid(CollectingPlayer)
-		|| !CollectingPlayer->IsPlayerControlled()
+		|| CollectingPlayer->GetPlayerController() == nullptr
 		|| !IsValid(PlayerAbilitySystem)
 		|| PlayerAbilitySystem->IsDead()
 		|| !TryGrantTo(CollectingPlayer))
