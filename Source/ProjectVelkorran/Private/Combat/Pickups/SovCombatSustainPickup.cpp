@@ -21,12 +21,27 @@ ASovCombatSustainPickup::ASovCombatSustainPickup()
 	PrimaryActorTick.bStartWithTickEnabled = true;
 
 	bReplicates = true;
-	SetReplicateMovement(false);
+	SetReplicateMovement(true);
 	SetNetUpdateFrequency(10.0f);
 	SetMinNetUpdateFrequency(2.0f);
 
+	GroundCollisionSphere =
+		CreateDefaultSubobject<USphereComponent>(TEXT("GroundCollisionSphere"));
+	SetRootComponent(GroundCollisionSphere);
+	GroundCollisionSphere->InitSphereRadius(GroundCollisionRadius);
+	GroundCollisionSphere->SetCollisionObjectType(ECC_PhysicsBody);
+	GroundCollisionSphere->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	GroundCollisionSphere->SetCollisionResponseToAllChannels(ECR_Ignore);
+	GroundCollisionSphere->SetCollisionResponseToChannel(ECC_WorldStatic, ECR_Block);
+	GroundCollisionSphere->SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Block);
+	GroundCollisionSphere->SetGenerateOverlapEvents(false);
+	GroundCollisionSphere->SetCanEverAffectNavigation(false);
+	GroundCollisionSphere->SetEnableGravity(true);
+	GroundCollisionSphere->SetLinearDamping(GroundLinearDamping);
+	GroundCollisionSphere->SetAngularDamping(GroundAngularDamping);
+
 	PickupSphere = CreateDefaultSubobject<USphereComponent>(TEXT("PickupSphere"));
-	SetRootComponent(PickupSphere);
+	PickupSphere->SetupAttachment(GroundCollisionSphere);
 	PickupSphere->InitSphereRadius(PickupRadius);
 	PickupSphere->SetCollisionObjectType(ECC_WorldDynamic);
 	PickupSphere->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
@@ -39,7 +54,7 @@ ASovCombatSustainPickup::ASovCombatSustainPickup()
 		&ThisClass::HandlePickupOverlap);
 
 	VisualRoot = CreateDefaultSubobject<USceneComponent>(TEXT("VisualRoot"));
-	VisualRoot->SetupAttachment(PickupSphere);
+	VisualRoot->SetupAttachment(GroundCollisionSphere);
 
 	PickupMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PickupMesh"));
 	PickupMesh->SetupAttachment(VisualRoot);
@@ -63,14 +78,22 @@ void ASovCombatSustainPickup::BeginPlay()
 {
 	Super::BeginPlay();
 
+	GroundCollisionSphere->SetSphereRadius(
+		FMath::Max(GroundCollisionRadius, 1.0f));
+	GroundCollisionSphere->SetLinearDamping(
+		FMath::Max(GroundLinearDamping, 0.0f));
+	GroundCollisionSphere->SetAngularDamping(
+		FMath::Max(GroundAngularDamping, 0.0f));
+	GroundCollisionSphere->SetEnableGravity(true);
+	GroundCollisionSphere->SetSimulatePhysics(true);
+	GroundCollisionSphere->WakeAllRigidBodies();
+
 	PickupSphere->SetSphereRadius(FMath::Max(PickupRadius, 1.0f));
-	InitialVisualRelativeLocation = VisualRoot->GetRelativeLocation();
 	SetActorTickEnabled(
 		GetNetMode() != NM_DedicatedServer
-		&& (HoverAmplitude > KINDA_SMALL_NUMBER
-			|| FMath::Abs(RotationRateDegrees) > KINDA_SMALL_NUMBER));
+		&& FMath::Abs(RotationRateDegrees) > KINDA_SMALL_NUMBER);
 
-	if (HasAuthority())
+	if (HasAuthority() && !bClaimed)
 	{
 		SetLifeSpan(FMath::Max(PickupLifetimeSeconds, 0.1f));
 	}
@@ -88,15 +111,6 @@ void ASovCombatSustainPickup::Tick(const float DeltaSeconds)
 	if (bClaimed || !IsValid(VisualRoot))
 	{
 		return;
-	}
-
-	if (HoverAmplitude > KINDA_SMALL_NUMBER)
-	{
-		const float HoverRadians =
-			GetGameTimeSinceCreation() * HoverFrequency * 2.0f * UE_PI;
-		const float HoverOffset = FMath::Sin(HoverRadians) * HoverAmplitude;
-		VisualRoot->SetRelativeLocation(
-			InitialVisualRelativeLocation + FVector(0.0f, 0.0f, HoverOffset));
 	}
 
 	if (FMath::Abs(RotationRateDegrees) > KINDA_SMALL_NUMBER)
@@ -208,6 +222,11 @@ void ASovCombatSustainPickup::DisableIdlePresentation()
 	if (IsValid(PickupSphere))
 	{
 		PickupSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
+	if (IsValid(GroundCollisionSphere))
+	{
+		GroundCollisionSphere->SetSimulatePhysics(false);
+		GroundCollisionSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	}
 	if (IsValid(PickupMesh))
 	{

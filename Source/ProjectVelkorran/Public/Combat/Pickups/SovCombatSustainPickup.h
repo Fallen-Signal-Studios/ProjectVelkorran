@@ -70,6 +70,10 @@ protected:
 
 	void DisableIdlePresentation();
 
+	/** Small physics body that lets the pickup fall and settle without making the collection trigger block pawns. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sovereign|Combat Sustain|Components")
+	TObjectPtr<USphereComponent> GroundCollisionSphere;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sovereign|Combat Sustain|Components")
 	TObjectPtr<USphereComponent> PickupSphere;
 
@@ -91,6 +95,16 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Combat Sustain|Collision", meta = (ClampMin = "1.0", Units = "cm"))
 	float PickupRadius = 70.0f;
 
+	/** Radius of the physics body that rests on the floor. Match this to the visible pickup's footprint. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Combat Sustain|Collision", meta = (ClampMin = "1.0", Units = "cm"))
+	float GroundCollisionRadius = 12.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Combat Sustain|Physics", meta = (ClampMin = "0.0"))
+	float GroundLinearDamping = 3.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Combat Sustain|Physics", meta = (ClampMin = "0.0"))
+	float GroundAngularDamping = 5.0f;
+
 	/** Server destroys an unclaimed pickup after this many seconds. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Combat Sustain|Lifetime", meta = (ClampMin = "0.1", Units = "s"))
 	float PickupLifetimeSeconds = 20.0f;
@@ -98,12 +112,6 @@ protected:
 	/** Brief replication window after collection presentation is sent. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Combat Sustain|Lifetime", meta = (ClampMin = "0.05", Units = "s"))
 	float CollectionCleanupDelay = 0.35f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Combat Sustain|Presentation|Idle", meta = (ClampMin = "0.0", Units = "cm"))
-	float HoverAmplitude = 6.0f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Combat Sustain|Presentation|Idle", meta = (ClampMin = "0.0", Units = "Hz"))
-	float HoverFrequency = 1.25f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Combat Sustain|Presentation|Idle", meta = (Units = "deg/s"))
 	float RotationRateDegrees = 60.0f;
@@ -126,7 +134,4 @@ protected:
 	/** Replication-backed one-shot claim prevents two overlapping pawns collecting it. */
 	UPROPERTY(ReplicatedUsing = OnRep_Claimed, VisibleInstanceOnly, BlueprintReadOnly, Category = "Sovereign|Combat Sustain")
 	bool bClaimed = false;
-
-private:
-	FVector InitialVisualRelativeLocation = FVector::ZeroVector;
 };
