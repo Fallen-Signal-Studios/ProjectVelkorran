@@ -41,6 +41,14 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Identity")
 	virtual FGameplayTag GetProtagonistIdentityTag() const;
 
+	/**
+	 * Called by the PreCMCTick component immediately before Character Movement updates.
+	 * Blueprint subclasses can override this to update movement and rotation in the required tick order.
+	 * Subclasses without an override safely use the generated no-op implementation.
+	 */
+	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "Sovereign|Movement", meta = (DisplayName = "Sov Pre CMC Tick"))
+	void SovPreCMCTick();
+
 protected:
 	virtual void HandleAbilitySystemReady(UNarrativeAbilitySystemComponent* ReadyAbilitySystem) override;
 	virtual bool AreAdditionalCharacterSystemsReady() const override;
