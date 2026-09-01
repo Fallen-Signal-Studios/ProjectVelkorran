@@ -84,6 +84,18 @@ public:
 	UPROPERTY(EditAnywhere, config, BlueprintReadOnly, Category = "Combat|Guard", meta = (ClampMin = "0.0"))
 	float MaximumGuardStaminaDamage;
 
+	/** Half-angle of Selene's precision Deflection plane. Deflection has no sustained mitigation branch. */
+	UPROPERTY(EditAnywhere, config, BlueprintReadOnly, Category = "Combat|Deflection", meta = (ClampMin = "0.0", ClampMax = "180.0", ForceUnits = "Degrees"))
+	float DeflectionHalfAngleDegrees;
+
+	/** Stamina paid by a successful standard Deflection. */
+	UPROPERTY(EditAnywhere, config, BlueprintReadOnly, Category = "Combat|Deflection", meta = (ClampMin = "0.0"))
+	float DeflectionStaminaDamage;
+
+	/** Stamina paid by a successful Deflection against a heavy attack. */
+	UPROPERTY(EditAnywhere, config, BlueprintReadOnly, Category = "Combat|Deflection", meta = (ClampMin = "0.0"))
+	float HeavyDeflectionStaminaDamage;
+
 	int32 GetAttackTokensForDifficulty(ENarrativeGameplayDifficulty Difficulty) const;
 
 	UFUNCTION(BlueprintPure, Category = "Attack Frequency")

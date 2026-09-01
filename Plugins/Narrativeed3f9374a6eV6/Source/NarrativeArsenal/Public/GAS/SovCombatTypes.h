@@ -7,11 +7,24 @@
 #include "GameplayTagContainer.h"
 #include "SovCombatTypes.generated.h"
 
+/** The action-state defense that intercepted a Sovereign damage transaction. */
+UENUM(BlueprintType)
+enum class ESovDefenseKind : uint8
+{
+	None UMETA(DisplayName = "None"),
+	Guard UMETA(DisplayName = "Guard"),
+	Deflection UMETA(DisplayName = "Deflection")
+};
+
 /** One authoritative, ordered result for a Sovereign damage transaction. */
 USTRUCT(BlueprintType)
 struct NARRATIVEARSENAL_API FSovDamageResult
 {
 	GENERATED_BODY()
+
+	/** Unique identity for this resolved application, even when an Effect Context is reused. */
+	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Damage")
+	FGuid TransactionId;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Damage")
 	TObjectPtr<AActor> SourceActor = nullptr;
@@ -59,11 +72,25 @@ struct NARRATIVEARSENAL_API FSovDamageResult
 	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Damage")
 	float ShieldBypassRatio = 0.f;
 
+	/** Exact defense policy that intercepted the hit. None means no defense action succeeded. */
+	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Damage")
+	ESovDefenseKind DefenseKind = ESovDefenseKind::None;
+
+	/** Legacy Guard compatibility flag. Deflection deliberately leaves this false. */
 	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Damage")
 	bool bGuarded = false;
 
+	/** Blueprint convenience mirror for DefenseKind == Deflection. */
+	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Damage")
+	bool bDeflected = false;
+
+	/** True for a correctly timed Guard or Deflection. Consult DefenseKind for the action. */
 	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Damage")
 	bool bPerfectDefense = false;
+
+	/** Stable source-policy mirror used to prevent Echo-spend damage from refunding Echo. */
+	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Damage")
+	bool bFromEchoAbility = false;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Damage")
 	bool bGuardBroken = false;

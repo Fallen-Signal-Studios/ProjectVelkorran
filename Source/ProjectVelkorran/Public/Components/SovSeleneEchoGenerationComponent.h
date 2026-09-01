@@ -1,0 +1,115 @@
+// Copyright Fallen Signal Studios. All Rights Reserved.
+
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Components/ActorComponent.h"
+#include "GAS/SovCombatTypes.h"
+#include "GameplayTagContainer.h"
+#include "SovSeleneEchoGenerationComponent.generated.h"
+
+class UNarrativeAbilitySystemComponent;
+class USovDeflectionComponent;
+class USovEchoComponent;
+
+UENUM(BlueprintType)
+enum class ESovSeleneEchoAwardType : uint8
+{
+	PerfectDeflection UMETA(DisplayName = "Perfect Deflection"),
+	WeakPointBreak UMETA(DisplayName = "Weak Point Break")
+};
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(
+	FSovSeleneEchoAwardedSignature,
+	float, AwardedEcho,
+	float, NewEcho,
+	ESovSeleneEchoAwardType, AwardType,
+	FName, WeakPointId,
+	AActor*, OtherActor);
+
+/**
+ * Selene-only precision Echo rules.
+ *
+ * The component consumes typed authoritative results. It never infers a body
+ * shot as precision, never grants for Tarrik, and can consume each target-owned
+ * weak-point break transaction only once.
+ */
+UCLASS(ClassGroup = (Sovereign), BlueprintType, meta = (BlueprintSpawnableComponent))
+class PROJECTVELKORRAN_API USovSeleneEchoGenerationComponent : public UActorComponent
+{
+	GENERATED_BODY()
+
+public:
+	USovSeleneEchoGenerationComponent();
+
+	UFUNCTION(BlueprintCallable, Category = "Sovereign|Echo|Selene")
+	bool InitializeWithAbilitySystem(
+		UNarrativeAbilitySystemComponent* InAbilitySystemComponent);
+
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Echo|Selene")
+	bool IsInitialized() const;
+
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Echo|Selene")
+	float GetPerfectDeflectionEchoReward() const
+	{
+		return FMath::Max(PerfectDeflectionEchoReward, 0.0f);
+	}
+
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Echo|Selene")
+	float GetWeakPointBreakEchoReward() const
+	{
+		return FMath::Max(WeakPointBreakEchoReward, 0.0f);
+	}
+
+	UPROPERTY(BlueprintAssignable, Category = "Sovereign|Echo|Selene|Presentation")
+	FSovSeleneEchoAwardedSignature OnSeleneEchoAwarded;
+
+protected:
+	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo|Selene|Tuning", meta = (ClampMin = "0.0"))
+	float PerfectDeflectionEchoReward = 10.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo|Selene|Tuning", meta = (ClampMin = "0.0"))
+	float WeakPointBreakEchoReward = 8.0f;
+
+private:
+	void TryInitializeFromOwner();
+	void UninitializeFromAbilitySystem();
+	bool CanGenerateSeleneEcho() const;
+	bool IsEchoAbilityDamage(const FSovDamageResult& DamageResult) const;
+	bool IsHostileWeakPointTarget(const AActor* TargetActor) const;
+	void AwardEcho(
+		float RequestedEcho,
+		const FGameplayTag& SourceTag,
+		ESovSeleneEchoAwardType AwardType,
+		FName WeakPointId,
+		AActor* OtherActor);
+
+	UFUNCTION()
+	void HandleOwnerASCInitialized();
+
+	UFUNCTION()
+	void HandlePerfectDeflection(const FSovDamageResult& DamageResult);
+
+	UFUNCTION()
+	void HandleDamageResolvedAsSource(const FSovDamageResult& DamageResult);
+
+	UFUNCTION(Client, Unreliable)
+	void ClientNotifySeleneEchoAwarded(
+		float AwardedEcho,
+		float NewEcho,
+		ESovSeleneEchoAwardType AwardType,
+		FName WeakPointId,
+		AActor* OtherActor);
+
+	UPROPERTY(Transient)
+	TObjectPtr<UNarrativeAbilitySystemComponent> AbilitySystemComponent;
+
+	UPROPERTY(Transient)
+	TObjectPtr<USovEchoComponent> EchoComponent;
+
+	UPROPERTY(Transient)
+	TObjectPtr<USovDeflectionComponent> DeflectionComponent;
+};

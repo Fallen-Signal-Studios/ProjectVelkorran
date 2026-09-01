@@ -12,6 +12,16 @@ All three abilities are intended to be granted by the drone's Narrative **Abilit
 
 Close the editor and perform a full `ProjectVelkorranEditor` build after pulling the implementation. The change adds reflected native classes and native Gameplay Tags; Live Coding is not suitable for the first load.
 
+### Drone pawn base and death safety
+
+Reparent the mechanical gun, rocket, and explosive drone character Blueprints to `ASovDroneNPCBase`. It remains inside `ASovNPCCharacterBase`, so Narrative initialization, the ASC, teams, death, loot, and the project combat-sustain drop component continue to work. It replaces the inherited humanoid dismemberment implementation with a disabled drone-safe subobject and never enters the mannequin ragdoll path. Do not add a second Dismemberment or combat-sustain component in the Blueprint.
+
+The capsule is still the grounded navigation/authority proxy; only the skeletal mesh receives the optional hover sine offset. Tune hover amplitude/frequency on the inherited component defaults, and do not raise the actor/capsule or convert CharacterMovement to flying merely to obtain the visual hover. On death, the base stops AI and movement, disables mesh collision, and can retain a query-only capsule for Narrative interaction without blocking pawns. Narrative revive/recycle restores collision and movement and restarts the AI brain.
+
+`Enable Death Explosion On Death` defaults off. Keep it off on the Self Destruct variant unless an encounter has a separately approved ordinary-death blast. Native Self Destruct explicitly suppresses the base death explosion before its fatal self-hit and also detects a committed detonation as a fallback; do not add a Blueprint `OnDeath`, `AnyDamage`, or montage-notify explosion that can produce a second payload. If an ordinary drone variant opts in, assign the Narrative damage effect and presentation assets, verify hostile-team and wall-LOS filtering, and test that each ASC receives exactly one radial hit. Self Destruct must still produce one warning, one blast, one fatal self-hit, and no second death explosion on listen and dedicated servers.
+
+To make a drone a valid Selene precision target, add one `USovWeakPointComponent` to its Blueprint and author zones against real drone bones or physical materials. The drone base does not create a weak point automatically.
+
 Create these Blueprint children:
 
 | Suggested asset | Native parent | Purpose |

@@ -34,6 +34,9 @@ UNarrativeCombatDeveloperSettings::UNarrativeCombatDeveloperSettings()
 	GuardStaminaDamageScalar = 0.5f;
 	MinimumGuardStaminaDamage = 8.0f;
 	MaximumGuardStaminaDamage = 20.0f;
+	DeflectionHalfAngleDegrees = 65.0f;
+	DeflectionStaminaDamage = 8.0f;
+	HeavyDeflectionStaminaDamage = 18.0f;
 }
 
 int32 UNarrativeCombatDeveloperSettings::GetAttackTokensForDifficulty(const ENarrativeGameplayDifficulty Difficulty) const

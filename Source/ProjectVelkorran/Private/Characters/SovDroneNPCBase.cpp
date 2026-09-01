@@ -12,17 +12,30 @@
 #include "Effects/SovGameplayEffect_ReformationDroneWeapons.h"
 #include "Engine/OverlapResult.h"
 #include "Engine/World.h"
-#include "GameFramework/CharacterMovementComponent.h"
+#include "EngineUtils.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
+#include "GAS/NarrativeAttributeSetBase.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "GameplayEffect.h"
 #include "GameplayEffectTypes.h"
 #include "Kismet/GameplayStatics.h"
 #include "NarrativeGameplayTags.h"
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraSystem.h"
+#include "Presentation/SovReformationDroneSelfDestructPresentation.h"
+#include "Sovereign/SovGameplayTags.h"
+#include "UnrealFramework/NarrativeTeamAgentInterface.h"
+
+USovDroneDismembermentComponent::USovDroneDismembermentComponent()
+{
+	bDismembermentEnabled = false;
+	bUseSKMannequinBoneMap = false;
+	bSpawnDeathBloodPuddleOnDeath = false;
+}
 
 ASovDroneNPCBase::ASovDroneNPCBase(const FObjectInitializer& ObjectInitializer)
-	: Super(ObjectInitializer)
+	: Super(ObjectInitializer.SetDefaultSubobjectClass<
+		USovDroneDismembermentComponent>(TEXT("SovDismembermentComponent")))
 {
 	PrimaryActorTick.bCanEverTick = true;
 	DeathExplosionDamageEffectClass =
@@ -71,23 +84,55 @@ void ASovDroneNPCBase::Tick(const float DeltaSeconds)
 	MeshComponent->SetRelativeLocation(HoverLocation);
 }
 
+void ASovDroneNPCBase::SuppressNextDeathExplosion()
+{
+	if (HasAuthority() && !bDeathExplosionTriggered)
+	{
+		bSuppressNextDeathExplosion = true;
+	}
+}
+
+void ASovDroneNPCBase::ClearDeathExplosionSuppression()
+{
+	if (HasAuthority() && !bDeathExplosionTriggered)
+	{
+		bSuppressNextDeathExplosion = false;
+	}
+}
+
 void ASovDroneNPCBase::HandleDeath_Implementation(
 	AActor* KilledActor,
 	UNarrativeAbilitySystemComponent* KilledActorASC,
 	const bool bIsDead)
 {
+	// The committed presentation is authoritative and survives the ability's
+	// synchronous cancellation during Narrative death. Sample it before the base
+	// implementation hides owned presentation actors.
+	const bool bNativeSelfDestructCommitted =
+		bIsDead && HasAuthority() && HasCommittedNativeSelfDestruct();
+
 	Super::HandleDeath_Implementation(KilledActor, KilledActorASC, bIsDead);
 
 	if (bIsDead)
 	{
-		if (HasAuthority() && !bDeathExplosionTriggered)
+		if (HasAuthority()
+			&& bEnableDeathExplosionOnDeath
+			&& !bSuppressNextDeathExplosion
+			&& !bNativeSelfDestructCommitted
+			&& !bDeathExplosionTriggered)
 		{
 			TriggerDeathExplosion();
+		}
+		else
+		{
+			// This is also the dead-state latch used to stop cosmetic hover.
+			bDeathExplosionTriggered = true;
 		}
 	}
 	else
 	{
 		bDeathExplosionTriggered = false;
+		bSuppressNextDeathExplosion = false;
 		ApplyDeathShutdownState(false);
 	}
 }
@@ -145,13 +190,16 @@ void ASovDroneNPCBase::TriggerDeathExplosion()
 		TSet<UAbilitySystemComponent*> UniqueTargets;
 		for (const FOverlapResult& Overlap : Overlaps)
 		{
-			AActor* TargetActor = Overlap.GetActor();
 			UAbilitySystemComponent* TargetASC =
-				UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(TargetActor);
-			if (!IsValid(TargetActor)
-				|| !IsValid(TargetASC)
+				UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(
+					Overlap.GetActor());
+			AActor* TargetActor = IsValid(TargetASC)
+				? TargetASC->GetAvatarActor()
+				: nullptr;
+			if (!IsValid(TargetASC)
 				|| TargetASC == SourceASC
-				|| UniqueTargets.Contains(TargetASC))
+				|| UniqueTargets.Contains(TargetASC)
+				|| !IsLivingHostileTarget(TargetASC, TargetActor))
 			{
 				continue;
 			}
@@ -163,13 +211,23 @@ void ASovDroneNPCBase::TriggerDeathExplosion()
 				this);
 			VisibilityQuery.AddIgnoredActor(this);
 			FHitResult BlockingHit;
-			if (World->LineTraceSingleByChannel(
+			const bool bFoundBlockingHit = World->LineTraceSingleByChannel(
 					BlockingHit,
 					ExplosionLocation,
 					TargetLocation,
 					DeathExplosionDamagePreventionChannel.GetValue(),
-					VisibilityQuery)
-				&& BlockingHit.GetActor() != TargetActor)
+					VisibilityQuery);
+			AActor* BlockingActor = BlockingHit.GetActor();
+			UAbilitySystemComponent* BlockingASC = IsValid(BlockingActor)
+				? UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(
+					BlockingActor)
+				: nullptr;
+			if (bFoundBlockingHit
+				&& BlockingActor != TargetActor
+				&& (!IsValid(BlockingActor)
+					|| (!BlockingActor->IsOwnedBy(TargetActor)
+						&& !TargetActor->IsOwnedBy(BlockingActor)
+						&& BlockingASC != TargetASC)))
 			{
 				continue;
 			}
@@ -227,6 +285,10 @@ void ASovDroneNPCBase::ApplyDeathShutdownState(const bool bIsDead)
 				BrainComponent->StopLogic(TEXT("Drone destroyed"));
 			}
 		}
+		else if (UBrainComponent* BrainComponent = AIController->GetBrainComponent())
+		{
+			BrainComponent->RestartLogic();
+		}
 	}
 
 	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
@@ -281,6 +343,73 @@ void ASovDroneNPCBase::ApplyDeathShutdownState(const bool bIsDead)
 			DroneCapsule->SetCollisionEnabled(InitialCapsuleCollisionEnabled);
 		}
 	}
+}
+
+bool ASovDroneNPCBase::HasCommittedNativeSelfDestruct() const
+{
+	const UWorld* World = GetWorld();
+	if (!IsValid(World))
+	{
+		return false;
+	}
+
+	for (TActorIterator<ASovReformationDroneSelfDestructPresentation> It(World);
+		It;
+		++It)
+	{
+		const ASovReformationDroneSelfDestructPresentation* Presentation = *It;
+		if (!IsValid(Presentation))
+		{
+			continue;
+		}
+
+		const FSovReformationDroneSelfDestructPresentationState State =
+			Presentation->GetPresentationState();
+		if ((Presentation->GetOwner() == this || State.SourceDrone == this)
+			&& State.Phase
+				== ESovReformationDroneSelfDestructPhase::Detonated)
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
+bool ASovDroneNPCBase::IsLivingHostileTarget(
+	const UAbilitySystemComponent* TargetAbilitySystem,
+	const AActor* TargetActor) const
+{
+	if (!IsValid(TargetAbilitySystem)
+		|| !IsValid(TargetActor)
+		|| !TargetAbilitySystem->GetSet<UNarrativeAttributeSetBase>())
+	{
+		return false;
+	}
+
+	if (const UNarrativeAbilitySystemComponent* NarrativeASC =
+		Cast<UNarrativeAbilitySystemComponent>(TargetAbilitySystem);
+		IsValid(NarrativeASC) && NarrativeASC->IsDead())
+	{
+		return false;
+	}
+
+	const FSovGameplayTags& SovTags = FSovGameplayTags::Get();
+	if (TargetAbilitySystem->HasMatchingGameplayTag(
+			FNarrativeGameplayTags::Get().State_IsDead)
+		|| TargetAbilitySystem->HasMatchingGameplayTag(SovTags.State_Fatal)
+		|| TargetAbilitySystem->GetNumericAttribute(
+			UNarrativeAttributeSetBase::GetHealthAttribute())
+			<= KINDA_SMALL_NUMBER)
+	{
+		return false;
+	}
+
+	const INarrativeTeamAgentInterface* SourceTeam =
+		Cast<const INarrativeTeamAgentInterface>(this);
+	return SourceTeam
+		&& SourceTeam->GetTeamAttitudeTowards(*TargetActor)
+			== ETeamAttitude::Hostile;
 }
 
 void ASovDroneNPCBase::MulticastPlayDeathExplosion_Implementation(

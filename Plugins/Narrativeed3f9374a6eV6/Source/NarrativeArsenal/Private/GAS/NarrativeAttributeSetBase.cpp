@@ -4,6 +4,7 @@
 
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemGlobals.h"
+#include "Abilities/GameplayAbility.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
 #include "GAS/SovCombatTypes.h"
 #include "GameplayEffect.h"
@@ -226,6 +227,7 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 			: DamageInstigator;
 
 		FSovDamageResult Result;
+		Result.TransactionId = FGuid::NewGuid();
 		Result.SourceActor = DamageInstigator;
 		Result.TargetActor = TargetActor;
 		Result.BaseDamage = FMath::Max(
@@ -236,6 +238,12 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 			0.f);
 		Result.ResolvedDamage = IncomingDamage;
 		Result.EffectContext = Context;
+		Result.bFromEchoAbility = EffectAssetTags.HasTag(Tags.Ability_Echo);
+		if (const UGameplayAbility* SourceAbility = Context.GetAbility())
+		{
+			Result.bFromEchoAbility = Result.bFromEchoAbility
+				|| SourceAbility->GetAssetTags().HasTag(Tags.Ability_Echo);
+		}
 		if (const FHitResult* Hit = Context.GetHitResult())
 		{
 			Result.HitZone = Hit->BoneName;
@@ -321,90 +329,147 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 			RoutedPoiseDamage = IncomingDamage * PoiseCoefficient;
 		}
 
-		// Guard is an action state, evaluated after mathematical mitigation and
-		// before Shield/Health routing. Heavy attacks demand perfect timing;
-		// unblockable or bypass-tagged attacks ignore the plane.
+		// Action-state defenses are evaluated after mathematical mitigation and
+		// before Shield/Health routing. Deflection is a short all-or-nothing
+		// precision window; it never enters Tarrik's sustained Guard policy.
 		const bool bIsGuarding = Data.Target.HasMatchingGameplayTag(Tags.State_Guarding);
 		const bool bPerfectWindow = Data.Target.HasMatchingGameplayTag(Tags.State_PerfectGuard);
+		const bool bIsDeflecting = Data.Target.HasMatchingGameplayTag(Tags.State_Deflecting);
 		const bool bHeavyAttack = EffectAssetTags.HasTagExact(Tags.Damage_GuardClass_Heavy)
 			|| EffectAssetTags.HasTagExact(Tags.Damage_Heavy);
-		const bool bUnblockable = EffectAssetTags.HasTagExact(Tags.Damage_GuardClass_Unblockable)
+		const bool bUnblockableAttack = EffectAssetTags.HasTagExact(Tags.Damage_GuardClass_Unblockable)
 			|| EffectAssetTags.HasTagExact(Tags.Damage_Unblockable)
-			|| EffectAssetTags.HasTagExact(Tags.Damage_BypassGuard)
 			|| EffectAssetTags.HasTagExact(Tags.Damage_Fatal);
+		const bool bBypassesGuard = bUnblockableAttack
+			|| EffectAssetTags.HasTagExact(Tags.Damage_BypassGuard);
+		const bool bNonInstantDamage = !Data.EffectSpec.Def
+			|| Data.EffectSpec.Def->DurationPolicy
+				!= EGameplayEffectDurationType::Instant;
+		const bool bBypassesDeflection = bUnblockableAttack
+			|| bNonInstantDamage
+			|| EffectAssetTags.HasTagExact(Tags.Damage_BypassDeflection)
+			|| EffectAssetTags.HasTagExact(Tags.Damage_Channel_Environmental);
 
-		bool bInsideGuardArc = false;
 		AActor* DirectionSource = DamageCauser;
-		if (bIsGuarding && TargetActor && DirectionSource && TargetActor != DirectionSource)
+		const auto IsInsideDefenseArc = [TargetActor, DirectionSource](const float HalfAngleDegrees)
 		{
-			const FVector ToSource = (DirectionSource->GetActorLocation() - TargetActor->GetActorLocation()).GetSafeNormal2D();
-			const FVector GuardForward = TargetActor->GetActorForwardVector().GetSafeNormal2D();
-			const float HalfAngle = CombatSettings
-				? FMath::Clamp(CombatSettings->GuardHalfAngleDegrees, 0.f, 180.f)
-				: 70.f;
-			bInsideGuardArc = ToSource.IsNearlyZero()
-				|| FVector::DotProduct(GuardForward, ToSource) >= FMath::Cos(FMath::DegreesToRadians(HalfAngle));
-		}
+			if (!TargetActor || !DirectionSource || TargetActor == DirectionSource)
+			{
+				return false;
+			}
 
-		const bool bGuardCandidate = bIsGuarding && bInsideGuardArc && !bUnblockable;
+			const FVector ToSource = (DirectionSource->GetActorLocation() - TargetActor->GetActorLocation()).GetSafeNormal2D();
+			const FVector DefenseForward = TargetActor->GetActorForwardVector().GetSafeNormal2D();
+			const float ClampedHalfAngle = FMath::Clamp(HalfAngleDegrees, 0.f, 180.f);
+			return ToSource.IsNearlyZero()
+				|| FVector::DotProduct(DefenseForward, ToSource)
+					>= FMath::Cos(FMath::DegreesToRadians(ClampedHalfAngle));
+		};
+
+		const float GuardHalfAngle = CombatSettings
+			? CombatSettings->GuardHalfAngleDegrees
+			: 70.f;
+		const float DeflectionHalfAngle = CombatSettings
+			? CombatSettings->DeflectionHalfAngleDegrees
+			: 65.f;
+		const bool bInsideGuardArc = bIsGuarding && IsInsideDefenseArc(GuardHalfAngle);
+		const bool bInsideDeflectionArc = bIsDeflecting && IsInsideDefenseArc(DeflectionHalfAngle);
+
+		// A valid Deflection wins if a character is accidentally configured with
+		// both defense states. This keeps the narrow window out of Guard's Stamina,
+		// mitigation, break, counter, and reward paths.
 		const float OldStamina = FMath::Max(GetStamina(), 0.f);
-		Result.bPerfectDefense = bGuardCandidate
-			&& bPerfectWindow
+		const bool bDeflectionCandidate = bIsDeflecting
+			&& bInsideDeflectionArc
+			&& !bBypassesDeflection
 			&& OldStamina > KINDA_SMALL_NUMBER;
-		if (Result.bPerfectDefense)
+		const bool bGuardCandidate = !bDeflectionCandidate
+			&& bIsGuarding
+			&& bInsideGuardArc
+			&& !bBypassesGuard;
+		if (bDeflectionCandidate)
 		{
-			const float PerfectGuardCost = CombatSettings
-				? FMath::Max(CombatSettings->PerfectGuardStaminaDamage, 0.f)
-				: 5.f;
-			Result.AppliedStaminaDamage = FMath::Min(OldStamina, PerfectGuardCost);
+			const float DeflectionCost = bHeavyAttack
+				? (CombatSettings
+					? FMath::Max(CombatSettings->HeavyDeflectionStaminaDamage, 0.f)
+					: 18.f)
+				: (CombatSettings
+					? FMath::Max(CombatSettings->DeflectionStaminaDamage, 0.f)
+					: 8.f);
+			Result.AppliedStaminaDamage = FMath::Min(OldStamina, DeflectionCost);
 			SetStamina(FMath::Clamp(
 				OldStamina - Result.AppliedStaminaDamage,
 				0.f,
 				GetMaxStamina()));
 
-			Result.bGuarded = true;
+			Result.DefenseKind = ESovDefenseKind::Deflection;
+			Result.bDeflected = true;
+			Result.bPerfectDefense = true;
 			RoutedDamage = 0.f;
 			RoutedPoiseDamage = 0.f;
-			// The timing remains successful, but spending the last Stamina ends
-			// Guard through the normal replicated broken-state pipeline.
-			Result.bGuardBroken = GetStamina() <= KINDA_SMALL_NUMBER;
 		}
-		else if (bGuardCandidate)
+		else
 		{
-			const float MinimumGuardCost = CombatSettings ? FMath::Max(CombatSettings->MinimumGuardStaminaDamage, 0.f) : 8.f;
-			const float MaximumGuardCost = CombatSettings
-				? FMath::Max(CombatSettings->MaximumGuardStaminaDamage, MinimumGuardCost)
-				: 20.f;
-			const float DefaultGuardCost = FMath::Clamp(
-				IncomingDamage * (CombatSettings ? FMath::Max(CombatSettings->GuardStaminaDamageScalar, 0.f) : 0.5f),
-				MinimumGuardCost,
-				MaximumGuardCost);
-			const float RequestedGuardCost = FMath::Max(
-				Data.EffectSpec.GetSetByCallerMagnitude(
-					Tags.SetByCaller_Damage_GuardStaminaDamage,
-					false,
-					DefaultGuardCost),
-				0.f);
-			const bool bCanPayGuardCost = RequestedGuardCost <= KINDA_SMALL_NUMBER
-				|| OldStamina - RequestedGuardCost > KINDA_SMALL_NUMBER;
-
-			Result.AppliedStaminaDamage = FMath::Min(OldStamina, RequestedGuardCost);
-			SetStamina(FMath::Clamp(OldStamina - Result.AppliedStaminaDamage, 0.f, GetMaxStamina()));
-
-			if (!bHeavyAttack && bCanPayGuardCost)
+			Result.bPerfectDefense = bGuardCandidate
+				&& bPerfectWindow
+				&& OldStamina > KINDA_SMALL_NUMBER;
+			if (Result.bPerfectDefense)
 			{
+				const float PerfectGuardCost = CombatSettings
+					? FMath::Max(CombatSettings->PerfectGuardStaminaDamage, 0.f)
+					: 5.f;
+				Result.AppliedStaminaDamage = FMath::Min(OldStamina, PerfectGuardCost);
+				SetStamina(FMath::Clamp(
+					OldStamina - Result.AppliedStaminaDamage,
+					0.f,
+					GetMaxStamina()));
+
+				Result.DefenseKind = ESovDefenseKind::Guard;
 				Result.bGuarded = true;
-				RoutedDamage *= CombatSettings
-					? FMath::Clamp(CombatSettings->GuardDamageMultiplier, 0.f, 1.f)
-					: 0.25f;
-				RoutedPoiseDamage *= CombatSettings
-					? FMath::Clamp(CombatSettings->GuardPoiseMultiplier, 0.f, 1.f)
-					: 0.25f;
-				SendSovEvent(Tags.Event_Guard_Blocked, IncomingDamage, nullptr);
+				RoutedDamage = 0.f;
+				RoutedPoiseDamage = 0.f;
+				// The timing remains successful, but spending the last Stamina ends
+				// Guard through the normal replicated broken-state pipeline.
+				Result.bGuardBroken = GetStamina() <= KINDA_SMALL_NUMBER;
 			}
-			else
+			else if (bGuardCandidate)
 			{
-				Result.bGuardBroken = true;
+				const float MinimumGuardCost = CombatSettings ? FMath::Max(CombatSettings->MinimumGuardStaminaDamage, 0.f) : 8.f;
+				const float MaximumGuardCost = CombatSettings
+					? FMath::Max(CombatSettings->MaximumGuardStaminaDamage, MinimumGuardCost)
+					: 20.f;
+				const float DefaultGuardCost = FMath::Clamp(
+					IncomingDamage * (CombatSettings ? FMath::Max(CombatSettings->GuardStaminaDamageScalar, 0.f) : 0.5f),
+					MinimumGuardCost,
+					MaximumGuardCost);
+				const float RequestedGuardCost = FMath::Max(
+					Data.EffectSpec.GetSetByCallerMagnitude(
+						Tags.SetByCaller_Damage_GuardStaminaDamage,
+						false,
+						DefaultGuardCost),
+					0.f);
+				const bool bCanPayGuardCost = RequestedGuardCost <= KINDA_SMALL_NUMBER
+					|| OldStamina - RequestedGuardCost > KINDA_SMALL_NUMBER;
+
+				Result.AppliedStaminaDamage = FMath::Min(OldStamina, RequestedGuardCost);
+				SetStamina(FMath::Clamp(OldStamina - Result.AppliedStaminaDamage, 0.f, GetMaxStamina()));
+
+				if (!bHeavyAttack && bCanPayGuardCost)
+				{
+					Result.DefenseKind = ESovDefenseKind::Guard;
+					Result.bGuarded = true;
+					RoutedDamage *= CombatSettings
+						? FMath::Clamp(CombatSettings->GuardDamageMultiplier, 0.f, 1.f)
+						: 0.25f;
+					RoutedPoiseDamage *= CombatSettings
+						? FMath::Clamp(CombatSettings->GuardPoiseMultiplier, 0.f, 1.f)
+						: 0.25f;
+					SendSovEvent(Tags.Event_Guard_Blocked, IncomingDamage, nullptr);
+				}
+				else
+				{
+					Result.bGuardBroken = true;
+				}
 			}
 		}
 
@@ -559,7 +624,16 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 		{
 			SourceASC->DamageResolvedAsSource(Result);
 		}
-		if (Result.bGuarded)
+		if (Result.DefenseKind == ESovDefenseKind::Deflection)
+		{
+			// Keep the legacy notification contract immutable while exposing an
+			// exact callback-local result tag to any presentation path that elects
+			// to observe zero-damage defense transactions.
+			FGameplayEffectSpec DeflectedNotificationSpec(Data.EffectSpec);
+			DeflectedNotificationSpec.AddDynamicAssetTag(Tags.Damage_Result_Deflected);
+			NotifyAppliedDamage(AppliedDamage, DeflectedNotificationSpec);
+		}
+		else if (Result.bGuarded)
 		{
 			// Preserve Narrative's legacy damage notification while giving its
 			// presentation graph an exact, per-hit way to suppress a normal flinch.

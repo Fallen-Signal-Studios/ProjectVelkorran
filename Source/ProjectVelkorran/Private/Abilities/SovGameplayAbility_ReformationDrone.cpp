@@ -9,6 +9,7 @@
 #include "AISystem.h"
 #include "Animation/AnimMontage.h"
 #include "Character/NarrativeCharacterVisual.h"
+#include "Characters/SovDroneNPCBase.h"
 #include "CollisionQueryParams.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Effects/SovGameplayEffect_ReformationDroneWeapons.h"
@@ -1826,6 +1827,13 @@ void USovGameplayAbility_ReformationDroneSelfDestruct::CommitDetonation()
 	}
 	// Narrative death cancels this ability synchronously. Keep this as the final
 	// operation so damage credit and presentation state are already committed.
+	// Suppress the optional generic death blast explicitly. The drone base also
+	// inspects committed presentation state as a compatibility fallback, but the
+	// gameplay contract must not depend on that presentation actor still existing.
+	if (ASovDroneNPCBase* ProjectDrone = Cast<ASovDroneNPCBase>(SourceDrone))
+	{
+		ProjectDrone->SuppressNextDeathExplosion();
+	}
 	const bool bSourceDied = ApplyFatalSelfDamage(
 		SourceASC,
 		SourceDrone,
@@ -1833,6 +1841,11 @@ void USovGameplayAbility_ReformationDroneSelfDestruct::CommitDetonation()
 		ExplosionLocation);
 	if (!bSourceDied)
 	{
+		if (ASovDroneNPCBase* ProjectDrone =
+			Cast<ASovDroneNPCBase>(SourceDrone))
+		{
+			ProjectDrone->ClearDeathExplosionSuppression();
+		}
 		if (IsActive())
 		{
 			UE_LOG(

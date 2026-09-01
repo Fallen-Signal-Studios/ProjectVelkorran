@@ -406,6 +406,7 @@ void ASovVelkorransHungerProjectile::ApplyBurn(
 	BurnSpec->AddDynamicAssetTag(AbilityIdentityTag);
 	BurnSpec->AddDynamicAssetTag(SovTags.Damage_Channel_Thermal);
 	BurnSpec->AddDynamicAssetTag(SovTags.Damage_BypassGuard);
+	BurnSpec->AddDynamicAssetTag(SovTags.Damage_BypassDeflection);
 	BurnSpec->SetSetByCallerMagnitude(
 		FNarrativeGameplayTags::Get().SetByCaller_Damage,
 		BurnDamagePerTick);

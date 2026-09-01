@@ -364,7 +364,7 @@ void USovGuardComponent::HandleDamageResolvedAsTarget(const FSovDamageResult& Re
 	{
 		ExecuteGuardImpactGameplayCue(Result);
 	}
-	if (Result.bPerfectDefense)
+	if (Result.bPerfectDefense && Result.DefenseKind == ESovDefenseKind::Guard)
 	{
 		// A timing window can reward exactly one intercepted hit. Closing it
 		// synchronously prevents a multi-hit packet from farming perfect rewards.

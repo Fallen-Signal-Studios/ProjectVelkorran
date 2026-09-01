@@ -9,6 +9,7 @@ FSovGameplayTags FSovGameplayTags::GameplayTags;
 void FSovGameplayTags::InitializeNativeTags()
 {
 	if (GameplayTags.Character_Player_Tarrik.IsValid()
+		&& GameplayTags.Ability_Defense_Selene_Deflection.IsValid()
 		&& GameplayTags.Ability_Weapon_Cinderline_PrimaryFire.IsValid()
 		&& GameplayTags.Ability_NPC_ReformationDrone_Gunfire.IsValid()
 		&& GameplayTags.Ability_NPC_ReformationDrone_RocketLauncher.IsValid()
@@ -16,6 +17,9 @@ void FSovGameplayTags::InitializeNativeTags()
 		&& GameplayTags.Ability_Echo_Selene_StillpointGrenade.IsValid()
 		&& GameplayTags.Status_Immunity_Burn.IsValid()
 		&& GameplayTags.Status_Immunity_DeviceDisable.IsValid()
+		&& GameplayTags.State_Deflecting.IsValid()
+		&& GameplayTags.Echo_Source_PerfectDeflection.IsValid()
+		&& GameplayTags.Echo_Source_WeakPointBreak.IsValid()
 		&& GameplayTags.Echo_Source_CombatSustainPickup.IsValid())
 	{
 		return;
@@ -33,6 +37,7 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 
 	AddTag(Ability_ActivateFail_Echo, "Sov.Ability.ActivateFail.Echo", "Ability activation failed its Echo threshold or spend check.");
 	AddTag(Ability_Echo, "Sov.Ability.Echo", "Parent classification for every Echo-spending ability.");
+	AddTag(Ability_Defense_Selene_Deflection, "Sov.Ability.Defense.Selene.Deflection", "Selene's short precision-deflection action.");
 	AddTag(Ability_Weapon_Cinderline_PrimaryFire, "Sov.Ability.Weapon.Cinderline.PrimaryFire", "Ordinary Cinderline primary-fire classification used by Tarrik's Echo cadence loop.");
 	AddTag(Ability_NPC_ReformationDrone_Gunfire, "Sov.Ability.NPC.ReformationDrone.Gunfire", "Standard gunfire attack used by Reformation drones.");
 	AddTag(Ability_NPC_ReformationDrone_RocketLauncher, "Sov.Ability.NPC.ReformationDrone.RocketLauncher", "Rocket launcher attack used by Reformation drones.");
@@ -64,6 +69,7 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 	AddTag(State_EchoAbility_Active, "Sov.State.EchoAbility.Active", "A committed character Echo ability currently owns the Echo-action lane.");
 	AddTag(State_Guarding, "Sov.State.Guarding", "A frontal guard plane is active.");
 	AddTag(State_PerfectGuard, "Sov.State.PerfectGuard", "The perfect-defense timing window is active.");
+	AddTag(State_Deflecting, "Sov.State.Deflecting", "Selene's brief precision-deflection window is active.");
 	AddTag(State_Guard_CounterWindow, "Sov.State.Guard.CounterWindow", "A perfect guard opened a counter opportunity.");
 	AddTag(State_Guard_Broken, "Sov.State.Guard.Broken", "Guard stamina was exhausted by an impact.");
 	AddTag(State_Shield_Broken, "Sov.State.Shield.Broken", "Shield is currently depleted.");
@@ -80,8 +86,9 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 	AddTag(Damage_BypassShield, "Sov.Damage.BypassShield", "All resolved health damage bypasses Shield.");
 	AddTag(Damage_BypassShield_Partial, "Sov.Damage.BypassShield.Partial", "Uses the authored partial Shield bypass ratio.");
 	AddTag(Damage_BypassGuard, "Sov.Damage.BypassGuard", "The hit ignores an active guard plane.");
+	AddTag(Damage_BypassDeflection, "Sov.Damage.BypassDeflection", "The hit cannot be intercepted by Selene's Deflection.");
 	AddTag(Damage_AlreadyResolved, "Sov.Damage.Policy.AlreadyResolved", "The authored magnitude bypasses source stats and mitigation.");
-	AddTag(Damage_Fatal, "Sov.Damage.Policy.Fatal", "Fatal policy bypasses invulnerability, Guard, and Shield.");
+	AddTag(Damage_Fatal, "Sov.Damage.Policy.Fatal", "Fatal policy bypasses invulnerability, Guard, Deflection, and Shield.");
 	AddTag(Damage_IgnoreArmor, "Sov.Damage.IgnoreArmor", "The hit bypasses Armor mitigation.");
 	AddTag(Damage_IgnoreResistance, "Sov.Damage.IgnoreResistance", "The hit bypasses channel resistance.");
 	AddTag(Damage_AllowFriendlyFire, "Sov.Damage.AllowFriendlyFire", "The hit may damage a friendly target.");
@@ -93,6 +100,7 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 	AddTag(Damage_GuardClass_Unblockable, "Sov.Damage.GuardClass.Unblockable", "The hit cannot be guarded.");
 	AddTag(Damage_Source_GuardCounter, "Sov.Damage.Source.GuardCounter", "Damage dealt by Tarrik's active guard-counter branch.");
 	AddTag(Damage_Result_Guarded, "Sov.Damage.Result.Guarded", "Callback-local result tag for a hit successfully intercepted by Guard.");
+	AddTag(Damage_Result_Deflected, "Sov.Damage.Result.Deflected", "Callback-local result tag for a hit successfully intercepted by Deflection.");
 	AddTag(Damage_Poise, "Sov.Damage.Poise", "The hit carries explicit Poise pressure.");
 	AddTag(Damage_Channel_Kinetic, "Sov.Damage.Channel.Kinetic", "Projectile, impact, or blunt-force damage.");
 	AddTag(Damage_Channel_Edge, "Sov.Damage.Channel.Edge", "Blade or cutting-field damage.");
@@ -141,10 +149,13 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 	AddTag(Event_Guard_Broken, "Sov.Event.Guard.Broken", "Guard Stamina was exhausted.");
 	AddTag(Event_Guard_CounterWindowOpened, "Sov.Event.Guard.CounterWindowOpened", "Perfect defense opened a counter window.");
 	AddTag(Event_Guard_CounterConsumed, "Sov.Event.Guard.CounterConsumed", "A landed guard counter consumed the counter window.");
+	AddTag(Event_Deflection_Perfect, "Sov.Event.Deflection.Perfect", "Selene intercepted one eligible hit during her Deflection window.");
 	AddTag(Event_Echo_Gained_PerfectGuard, "Sov.Event.Echo.Gained.PerfectGuard", "Echo was granted for a perfect guard.");
 	AddTag(Event_Status_ApplicationRequested, "Sov.Event.Status.ApplicationRequested", "A resolved hit requested project-owned status application.");
 
 	AddTag(Echo_Source_PerfectGuard, "Sov.Echo.Source.PerfectGuard", "Echo source for Tarrik perfect guard.");
+	AddTag(Echo_Source_PerfectDeflection, "Sov.Echo.Source.PerfectDeflection", "Echo source for Selene's correctly timed Deflection.");
+	AddTag(Echo_Source_WeakPointBreak, "Sov.Echo.Source.WeakPointBreak", "Echo source for breaking an authored weak point.");
 	AddTag(Echo_Source_GuardPressure, "Sov.Echo.Source.GuardPressure", "Combat activity caused by intentional guard pressure.");
 	AddTag(Echo_Source_GuardCounter, "Sov.Echo.Source.GuardCounter", "Echo source for a landed Tarrik guard counter.");
 	AddTag(Echo_Source_CinderlineCadence, "Sov.Echo.Source.CinderlineCadence", "Echo source for completing Tarrik's Cinderline firing cadence.");

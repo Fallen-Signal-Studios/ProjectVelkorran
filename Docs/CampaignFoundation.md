@@ -9,7 +9,7 @@ This pass creates project-owned campaign framework seams without discarding Narr
 - `ASovPlayerState` preserves Narrative's replicated Ability System Component and provides the future campaign-state seam.
 - `ASovPlayerCharacterBase` owns Echo, Shield, player Health recharge, and Poise.
 - `ASovTarrikCharacter` additionally owns Guard and Cinderline Echo generation.
-- `ASovSeleneCharacter` intentionally has no placeholder Selene-only component. Deflection and precision/disruption Echo generation should be added when their real gameplay events exist.
+- `ASovSeleneCharacter` additionally owns the one-hit Deflection component and Selene's typed precision Echo generator. The implemented generator rewards perfect Deflection and the first break of an authored weak point; command-link/Sever generation remains deferred until that authoritative encounter contract exists.
 
 Each concrete protagonist supplies a canonical native identity tag. When its Player Definition is applied, the character retains all definition-owned tags, removes the opposite protagonist identity, and adds its own. This uses `SetDefinitionOwnedTags`, rather than an unrelated loose tag, because Narrative's ASC lives on PlayerState and may survive pawn replacement.
 
@@ -17,14 +17,17 @@ Each concrete protagonist supplies a canonical native identity tag. When its Pla
 
 The repository snapshot does not include the project's binary Content assets. Complete these steps in the Unreal Editor after merging the source pass:
 
-1. Before reparenting, record any Tarrik Blueprint overrides on the inherited Guard and Cinderline Echo generator. Their native template owner changes in this pass, so Unreal may not transfer every overridden value automatically.
+1. Before reparenting, record any Tarrik Blueprint overrides on the inherited Guard and Cinderline Echo generator, plus any Blueprint-authored Selene defense, parry, or weak-point reward logic. Native template ownership changes in this pass, so Unreal may not transfer every overridden value automatically.
 2. Close the editor and perform a full Development Editor build. Do not use Hot Reload for the reparenting step.
 3. Reparent the existing Tarrik player Blueprint from `ASovPlayerCharacterBase` to `ASovTarrikCharacter`.
 4. Remove any Blueprint-added Echo, Shield, Health recharge, Poise, Guard, or Tarrik Echo generator that duplicates the inherited native component.
 5. Reapply and verify the recorded Guard/generator tuning on Tarrik's new inherited component templates.
-6. Create or reparent Selene's player Blueprint to `ASovSeleneCharacter`. Confirm it has Echo, Shield, Health recharge, and Poise, but no Guard or Tarrik Echo generator.
-7. Keep `Sov.Character.Player.Tarrik` on Tarrik's Player Definition and `Sov.Character.Player.Selene` on Selene's. The tag picker now permits the `Sov.Character` category.
-8. Compile and save both player Blueprints, then run `CompileAllBlueprints` before testing gameplay.
+6. Create or reparent Selene's player Blueprint to `ASovSeleneCharacter`. Confirm it inherits Echo, Shield, Health recharge, Poise, Deflection, and Selene Echo generation exactly once, but no Guard or Tarrik Echo generator.
+7. Remove any Blueprint-added Deflection or Selene Echo generator that duplicates the new inherited native components. Replace old Blueprint parry/reward logic with presentation bindings only after validating the native result.
+8. Create a Gameplay Ability Blueprint derived from `USovGameplayAbility_SeleneDeflection` and grant it once through Selene's default Ability Configuration. See `Docs/SeleneCoreLoop.md` for input, target, and tuning setup.
+9. Add one `USovWeakPointComponent` to each eligible enemy Blueprint and author stable zones only where the encounter truly exposes a breakable weak point. An empty component is a valid no-op.
+10. Keep `Sov.Character.Player.Tarrik` on Tarrik's Player Definition and `Sov.Character.Player.Selene` on Selene's. The tag picker permits the `Sov.Character` category.
+11. Compile and save the player, ability, and weak-point target Blueprints, then run `CompileAllBlueprints` before testing gameplay.
 
 ## Framework Blueprint migration
 
@@ -43,7 +46,7 @@ Do not switch `GameInstanceClass` yet. Narrative's native GameInstance is empty,
 
 ## Current handoff boundary
 
-This pass establishes class ownership but does not implement Tarrik/Selene handoff on one PlayerState. Destroying the old pawn is not sufficient: Narrative keeps the ASC on PlayerState, and the prior protagonist's granted ability specs and persistent effects can survive the avatar change. Until an explicit ability/effect migration and component-detach policy is implemented, test each protagonist in a separate play session or with a newly created PlayerState. Do not ship an authored protagonist switch through ordinary re-possession.
+This pass establishes class ownership and Selene's first real character-method loop, but does not implement Tarrik/Selene handoff on one PlayerState. Destroying the old pawn is not sufficient: Narrative keeps the ASC on PlayerState, and the prior protagonist's granted ability specs, loose tags, and persistent effects can survive the avatar change. Until an explicit ability/effect migration and component-detach policy is implemented, test each protagonist in a separate play session or with a newly created PlayerState. Do not ship an authored protagonist switch through ordinary re-possession.
 
 ## Verification
 
@@ -51,8 +54,10 @@ Run:
 
 1. `ProjectVelkorranEditor Win64 Development`
 2. `Automation RunTests ProjectVelkorran.Campaign.Foundation`
-3. `CompileAllBlueprints`
-4. Standalone PIE with Tarrik
-5. Standalone PIE with Selene
+3. `Automation RunTests ProjectVelkorran.Campaign.Selene`
+4. `CompileAllBlueprints`
+5. Standalone PIE with Tarrik
+6. Standalone PIE with Selene
+7. Two-player listen-server PIE and, when available, dedicated-server PIE using the matrix in `Docs/SeleneCoreLoop.md`
 
-Verify that Tarrik reaches readiness with one Guard and one Cinderline generator, Selene reaches readiness with neither, and both retain the shared resource components exactly once.
+Verify that Tarrik reaches readiness with one Guard and one Cinderline generator and no Selene systems. Verify that Selene reaches readiness with one Deflection component and one Selene Echo generator, no Tarrik systems, and all shared resource components exactly once. A valid perfect Deflection must award `+10` Echo once; the first valid break of an authored hostile weak point must award `+8` once; ordinary body hits, repeated hits on the same broken zone, friendly targets, and Tarrik must award neither.

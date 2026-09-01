@@ -27,6 +27,7 @@ public:
 
 	FGameplayTag Ability_ActivateFail_Echo;
 	FGameplayTag Ability_Echo;
+	FGameplayTag Ability_Defense_Selene_Deflection;
 	FGameplayTag Ability_Weapon_Cinderline_PrimaryFire;
 	FGameplayTag Ability_NPC_ReformationDrone_Gunfire;
 	FGameplayTag Ability_NPC_ReformationDrone_RocketLauncher;
@@ -58,6 +59,7 @@ public:
 	FGameplayTag State_EchoAbility_Active;
 	FGameplayTag State_Guarding;
 	FGameplayTag State_PerfectGuard;
+	FGameplayTag State_Deflecting;
 	FGameplayTag State_Guard_CounterWindow;
 	FGameplayTag State_Guard_Broken;
 	FGameplayTag State_Shield_Broken;
@@ -74,6 +76,7 @@ public:
 	FGameplayTag Damage_BypassShield;
 	FGameplayTag Damage_BypassShield_Partial;
 	FGameplayTag Damage_BypassGuard;
+	FGameplayTag Damage_BypassDeflection;
 	FGameplayTag Damage_AlreadyResolved;
 	FGameplayTag Damage_Fatal;
 	FGameplayTag Damage_IgnoreArmor;
@@ -87,6 +90,7 @@ public:
 	FGameplayTag Damage_GuardClass_Unblockable;
 	FGameplayTag Damage_Source_GuardCounter;
 	FGameplayTag Damage_Result_Guarded;
+	FGameplayTag Damage_Result_Deflected;
 	FGameplayTag Damage_Poise;
 	FGameplayTag Damage_Channel_Kinetic;
 	FGameplayTag Damage_Channel_Edge;
@@ -135,10 +139,13 @@ public:
 	FGameplayTag Event_Guard_Broken;
 	FGameplayTag Event_Guard_CounterWindowOpened;
 	FGameplayTag Event_Guard_CounterConsumed;
+	FGameplayTag Event_Deflection_Perfect;
 	FGameplayTag Event_Echo_Gained_PerfectGuard;
 	FGameplayTag Event_Status_ApplicationRequested;
 
 	FGameplayTag Echo_Source_PerfectGuard;
+	FGameplayTag Echo_Source_PerfectDeflection;
+	FGameplayTag Echo_Source_WeakPointBreak;
 	FGameplayTag Echo_Source_GuardPressure;
 	FGameplayTag Echo_Source_GuardCounter;
 	FGameplayTag Echo_Source_CinderlineCadence;
