@@ -93,7 +93,7 @@ void ASovCombatSustainPickup::BeginPlay()
 		GetNetMode() != NM_DedicatedServer
 		&& FMath::Abs(RotationRateDegrees) > KINDA_SMALL_NUMBER);
 
-	if (HasAuthority())
+	if (HasAuthority() && !bClaimed)
 	{
 		SetLifeSpan(FMath::Max(PickupLifetimeSeconds, 0.1f));
 	}
