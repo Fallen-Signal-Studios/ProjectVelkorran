@@ -37,7 +37,7 @@ public:
 	TArray<FLootTableRoll> DefaultItemLoadout;
 
 	/** Add any custom tags the character needs in here, for example State.Invulnerable if you want the character to never take damage. */
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "Character", meta = (Categories = "Narrative.State"))
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "Character", meta = (Categories = "Narrative.State,Sov.Character"))
 	FGameplayTagContainer DefaultOwnedTags;
 
 	/**The factions this character will be in by default - you can set the characters faction to something else later if desired. */

@@ -44,7 +44,7 @@ Do not implement the generic `Event ActivateAbility` in these children. The nati
 
 ## Granting
 
-Add `Sov.Character.Player.Tarrik` to Tarrik's Player Definition/default owned tags. During migration the common base permits an avatar with no player-identity tag, preserving existing content; once any `Sov.Character.Player` identity is present, the Tarrik adapter rejects Selene and other mismatches.
+Tarrik's player Blueprint must derive from `ASovTarrikCharacter`. That concrete class merges `Sov.Character.Player.Tarrik` into the definition-owned ASC tag contribution and removes a conflicting Selene identity. Keep the same Tarrik tag on the Player Definition so the asset remains self-describing. Legacy Blueprints still deriving directly from `ASovPlayerCharacterBase` retain the temporary untagged migration fallback.
 
 Grant the Sticky Grenade once through Tarrik's default `UAbilityConfiguration`. Do not add it to both weapon assets or dual-wield/source-object variants can create duplicate specs. It is character-granted and works with either Tarrik weapon, so it deliberately ignores `AllowedWeaponClasses`.
 
@@ -56,7 +56,7 @@ The native Tarrik Guard parent now blocks while Narrative Busy or an Echo abilit
 
 ## Cinderline Echo generation
 
-`ASovPlayerCharacterBase` now owns a replicated `USovTarrikEchoGenerationComponent`. Tarrik's Blueprint should derive from that player base. Do not add a second generator in the Blueprint Components panel: duplicates are rejected at runtime so one hit cannot award twice. The generator listens to Narrative's post-resolution `OnDealtDamage` callback on authority and awards through the existing Echo component; it never writes the GAS Echo attribute directly.
+`ASovTarrikCharacter` owns the replicated `USovTarrikEchoGenerationComponent`; the shared player base and Selene do not. Do not add a second generator in the Blueprint Components panel: duplicates are rejected at runtime so one hit cannot award twice. The generator listens to Narrative's post-resolution `OnDealtDamage` callback on authority and awards through the existing Echo component; it never writes the GAS Echo attribute directly.
 
 The default **Cinderline Cadence** loop is:
 
@@ -69,7 +69,7 @@ The default **Cinderline Cadence** loop is:
 
 Unfinished Cadence expires 1.5 seconds after the most recent qualifying hit. This is a confirmed-hit streak with a maximum inter-hit gap, not a beat detector or an authored minimum/ideal burst interval. Ordinary Cadence payouts are limited to one per second with no reward backlog. A completed sequence waits out the short payout cooldown instead of being deleted by the unfinished-sequence timer. Bosses tagged `Sov.Character.Enemy.Boss` contribute and pay at 75% strength by default; the component weights every accepted point so building on a boss and finishing on a grunt cannot bypass that reduction.
 
-Shield damage counts. Misses, zero-damage immunity, attacks into the air, friendly targets, successful Guard interception, Burn ticks, grenades, explosions, Judgement, Requiem, other weapons, and all `Sov.Ability.Echo` abilities do not count. The sequence clears on timeout, unwielding its source Cinderline instance, a damage callback from another ranged weapon, death/fatal state, Echo-action start, ASC replacement, or reaching full Echo. At full Echo the loop pauses and discards partial Cadence; the TDD's future Overflow resource is outside this component's current scope.
+Shield damage counts. Misses, zero-damage immunity, attacks into the air, friendly targets, successful Guard interception, Burn ticks, grenades, explosions, Judgement, Requiem, other weapons, and all `Sov.Ability.Echo` abilities do not count. The sequence clears on timeout, unwielding its source Cinderline instance, a damage callback from another ranged weapon, death/fatal state, Echo-action start, ASC replacement, or reaching full Echo. At full Echo the loop pauses and discards partial Cadence; campaign Echo is capped at 100 with no overflow resource.
 
 ### Primary-fire setup
 

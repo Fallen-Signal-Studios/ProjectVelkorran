@@ -5,6 +5,7 @@
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/GameplayAbilityTypes.h"
+#include "Characters/SovPlayerCharacterBase.h"
 #include "Components/SovEchoComponent.h"
 #include "Engine/World.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
@@ -13,6 +14,8 @@
 #include "Settings/NarrativeCombatDeveloperSettings.h"
 #include "Sovereign/SovGameplayTags.h"
 #include "UnrealFramework/NarrativeCharacter.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogSovGuard, Log, All);
 
 USovGuardComponent::USovGuardComponent()
 {
@@ -52,8 +55,27 @@ void USovGuardComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 bool USovGuardComponent::InitializeWithAbilitySystem(UAbilitySystemComponent* InAbilitySystemComponent)
 {
 	if (!IsValid(InAbilitySystemComponent)
+		|| !IsValid(GetOwner())
 		|| !InAbilitySystemComponent->GetSet<UNarrativeAttributeSetBase>())
 	{
+		return false;
+	}
+
+	const USovGuardComponent* CanonicalGuard =
+		GetOwner()->FindComponentByClass<USovGuardComponent>();
+	if (const ASovPlayerCharacterBase* PlayerOwner =
+		Cast<ASovPlayerCharacterBase>(GetOwner()))
+	{
+		CanonicalGuard = PlayerOwner->GetGuardComponent();
+	}
+	if (CanonicalGuard != this)
+	{
+		UE_LOG(
+			LogSovGuard,
+			Error,
+			TEXT("%s has a non-canonical or duplicate Guard component. Ignoring %s."),
+			*GetNameSafe(GetOwner()),
+			*GetNameSafe(this));
 		return false;
 	}
 

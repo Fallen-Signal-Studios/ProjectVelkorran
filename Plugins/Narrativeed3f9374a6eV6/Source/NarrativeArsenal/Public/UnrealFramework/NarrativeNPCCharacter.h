@@ -114,7 +114,7 @@ public:
 	uint8 bOverride_DefaultOwnedTags : 1;
 
 	/** Add any custom tags the character needs in here, for example State.Invulnerable if you want the character to never take damage, or LockMovement to make the character locked in place. */
-	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "Tags", meta = (Categories = "Narrative.State", EditCondition="bOverride_DefaultOwnedTags"))
+	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "Tags", meta = (Categories = "Narrative.State,Sov.Character", EditCondition="bOverride_DefaultOwnedTags"))
 	FGameplayTagContainer DefaultOwnedTags;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category=Overrides, meta=(PinHiddenByDefault, InlineEditConditionToggle))

@@ -44,7 +44,7 @@ Every Selene parent fails activation when its required payload classes are unass
 
 ## Identity and granting
 
-Add `Sov.Character.Player.Selene` to Selene's Player Definition/default owned tags and `Sov.Character.Player.Tarrik` to Tarrik's. During migration, the native base permits characters with no `Sov.Character.Player` identity at all so the existing Tarrik kit does not break. As soon as any player identity tag is present, a mismatched protagonist is rejected.
+Selene's player Blueprint must derive from `ASovSeleneCharacter`. That concrete class merges `Sov.Character.Player.Selene` into the definition-owned ASC tag contribution and removes a conflicting Tarrik identity. Keep the same Selene tag on her Player Definition so the asset remains self-describing. Tarrik should likewise derive from `ASovTarrikCharacter`. Legacy Blueprints still deriving directly from `ASovPlayerCharacterBase` retain the temporary untagged migration fallback.
 
 Grant Stillpoint Grenade and Dispatch once through Selene's default `UAbilityConfiguration`:
 

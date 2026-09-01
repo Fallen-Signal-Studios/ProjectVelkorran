@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "GameplayTagContainer.h"
 #include "UnrealFramework/NarrativePlayerCharacter.h"
 #include "SovPlayerCharacterBase.generated.h"
 
@@ -36,15 +37,22 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Components")
 	class USovGuardComponent* GetGuardComponent() const { return GuardComponent; }
 
+	/** Exact project identity owned by the concrete protagonist class. */
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Identity")
+	virtual FGameplayTag GetProtagonistIdentityTag() const;
+
 protected:
 	virtual void HandleAbilitySystemReady(UNarrativeAbilitySystemComponent* ReadyAbilitySystem) override;
 	virtual bool AreAdditionalCharacterSystemsReady() const override;
-	virtual void OnRep_WieldState(const FWeaponWieldState& OldWieldState) override;
+	virtual void OnDefinitionSet_Implementation(UCharacterDefinition* NewDefinition) override;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sovereign|Components")
 	TObjectPtr<class USovEchoComponent> EchoComponent;
 
-	/** Tarrik's Cinderline performance loop. It remains inert on explicitly non-Tarrik players. */
+	/**
+	 * Optional compatibility slot owned only by ASovTarrikCharacter.
+	 * It remains declared here so existing Blueprint getter/property references survive migration.
+	 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sovereign|Components")
 	TObjectPtr<class USovTarrikEchoGenerationComponent> TarrikEchoGenerationComponent;
 
@@ -58,6 +66,7 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sovereign|Components")
 	TObjectPtr<class USovPoiseComponent> PoiseComponent;
 
+	/** Optional compatibility slot owned only by ASovTarrikCharacter. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sovereign|Components")
 	TObjectPtr<class USovGuardComponent> GuardComponent;
 };

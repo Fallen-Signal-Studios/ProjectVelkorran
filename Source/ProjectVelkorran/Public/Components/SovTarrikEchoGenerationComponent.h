@@ -77,7 +77,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Sovereign|Echo|Cinderline")
 	void ResetCinderlineCadence();
 
-	/** Called by the project player base after Narrative applies a new wield state. */
+	/** Called by Tarrik's concrete player class after Narrative applies a new wield state. */
 	void HandleOwnerWieldStateChanged();
 
 	UPROPERTY(BlueprintAssignable, Category = "Sovereign|Echo|Cinderline|Presentation")
