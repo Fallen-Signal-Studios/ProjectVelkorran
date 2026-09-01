@@ -1,6 +1,6 @@
 # Combat Sustain pickups and Cinderline damage
 
-This integration adds short-lived, automatic ammo and Echo rewards to player-caused hostile kills, plus deterministic distance-based damage variation for ordinary Cinderline fire. Gameplay transactions run on authority; Blueprint children own meshes, Niagara, audio, and tuning.
+This integration adds short-lived, automatic ammo and Echo rewards to player-caused hostile kills, plus deterministic distance-based damage variation for ordinary Cinderline fire. Gameplay transactions run on authority; Blueprint children own meshes, Niagara, audio, and tuning. Pickups use a small replicated physics body so they fall from their spawn offsets and settle on the ground.
 
 ## Design decision
 
@@ -30,10 +30,10 @@ In each Blueprint:
 - select the inherited **Pickup Mesh** component and assign the desired static mesh;
 - optionally configure the inherited **Idle Niagara** and **Idle Audio** components;
 - assign **Collection Niagara System** and **Collection Sound** for the successful pickup burst;
-- tune **Pickup Radius** (`70 cm` by default), **Pickup Lifetime Seconds** (`20 s`), hover, and rotation under `Sovereign | Combat Sustain`; and
+- tune **Pickup Radius** (`70 cm` by default), **Ground Collision Radius** (`12 cm`), damping, **Pickup Lifetime Seconds** (`20 s`), and rotation under `Sovereign | Combat Sustain`; and
 - use `On Pickup Collected` only for extra presentation. Do not add ammo, Echo, collision, replication, or destruction logic in Blueprint.
 
-The native actor overlaps only pawns, accepts `ASovPlayerCharacterBase`, grants once on the server, replicates its claimed state, and cleans itself up after the collection presentation. If the player cannot accept the reward, the pickup remains available until its lifetime expires. This includes a full ammo stack or a full Echo meter.
+The native actor's small physics sphere blocks world geometry while its larger trigger overlaps only pawns. It accepts `ASovPlayerCharacterBase`, grants once on the server, replicates its movement and claimed state, and cleans itself up after the collection presentation. Vertical hover is intentionally disabled so the mesh remains grounded after settling. If the player cannot accept the reward, the pickup remains available until its lifetime expires. This includes a full ammo stack or a full Echo meter.
 
 ## Configure Cinderline ammunition
 
@@ -104,7 +104,7 @@ Telemetry caveat: for captured `AttackDamage` attacks without `SetByCaller.Damag
 
 ## Validation pass
 
-1. Kill a hostile NPC with the player and confirm each configured pickup appears exactly once on server and clients.
+1. Kill a hostile NPC with the player and confirm each configured pickup appears exactly once, falls to the floor, and settles at the same location on server and clients.
 2. Walk over both actors. Confirm ammo enters only the matching reserve and Echo reports the `CombatSustainPickup` source.
 3. Fill the matching ammo stack and Echo meter, then confirm the corresponding pickup remains unclaimed.
 4. Partially fill the ammo stack, collect a pack larger than the remaining capacity, and confirm only the unaccepted remainder stays in the world.
