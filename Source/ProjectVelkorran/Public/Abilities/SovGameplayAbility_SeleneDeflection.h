@@ -9,6 +9,7 @@
 
 class UAbilitySystemComponent;
 class UAbilityTask_WaitDelay;
+class ASovTransformingWeaponVisual;
 class USovDeflectionComponent;
 
 /** Tap defense that opens Selene's brief precision-Deflection window. */
@@ -67,6 +68,8 @@ private:
 	void BindDeflectionComponent(USovDeflectionComponent* NewDeflectionComponent);
 	void UnbindDeflectionComponent();
 	bool ShouldRunLocalPresentation() const;
+	void PlayDeflectionWeaponMontage();
+	void StopDeflectionWeaponMontage();
 
 	UFUNCTION()
 	void HandlePerfectDeflection(const FSovDamageResult& Result);
@@ -86,6 +89,10 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UAbilitySystemComponent> BoundAbilitySystem;
+
+	/** Exact visual that accepted this activation, retained for cancellation cleanup. */
+	UPROPERTY(Transient)
+	TObjectPtr<ASovTransformingWeaponVisual> ActiveDeflectionWeaponVisual;
 
 	FDelegateHandle DeadTagChangedHandle;
 	FDelegateHandle FatalTagChangedHandle;

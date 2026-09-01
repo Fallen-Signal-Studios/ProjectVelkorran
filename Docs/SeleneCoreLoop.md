@@ -29,8 +29,18 @@ Close the editor and perform a full `ProjectVelkorranEditor Win64 Development` b
 2. Add it once to Selene's default Narrative Ability Configuration. Do not also grant it from every weapon.
 3. The native input is `Narrative.Input.AltAttack`. Narrative may activate every granted spec that claims the same input, so verify that no simultaneously active weapon or placeholder ability also owns Alt Attack. Resolve any conflict in the Ability Configuration before testing.
 4. Leave the ability Cost Gameplay Effect empty for the prototype. The authoritative intercepted hit pays Deflection Stamina through the damage pipeline; adding an ability Stamina cost would charge twice. The native recovery is the current repeat-rate limiter.
-5. Use `Deflection Ability Started` and `Deflection Ability Ended` for montage, pose, audio, Niagara, and UI setup/cleanup only. They execute in the predicted/authority ability lifecycle and are not permission to apply gameplay.
+5. Use `Deflection Ability Started` and `Deflection Ability Ended` for character montage, pose, audio, Niagara, and UI setup/cleanup only. They execute in the predicted/authority ability lifecycle and are not permission to apply gameplay. Verity's weapon-skeleton montage has a dedicated native path described below.
 6. Use the cosmetic `Perfect Deflection` event for locally controlled hit confirmation. Do not grant Echo, damage the attacker, or change target state from that event.
+
+### Verity Deflection spin
+
+1. Open the Verity weapon visual Blueprint derived from `ASovTransformingWeaponVisual` (for example, `BP_VerityWeaponVisual`). Under **Sovereign → Weapon Transition → Deflection**, assign the Verity-skeleton montage to **Weapon Deflection Montage**. Assign **Local Weapon Deflection Montage** only when first person needs a different asset; otherwise it falls back to the main montage.
+2. Create or assign a weapon Anim Blueprint that uses Verity's weapon skeleton on both `WeaponMesh` and `LocalWeaponMesh`. Add a Slot node whose name matches the montage's Slot track between the base pose and the output pose.
+3. Disable **Use Native Single Node Weapon Animation** on the weapon visual. Single-node playback does not run the weapon AnimBP Slot graph required by a montage. Once disabled, the weapon AnimBP/Blueprint must also present Verity's holstered, deploy, ready, and retract states instead of relying on the native `PlayAnimation` path.
+4. Optionally set **Weapon Deflection Montage Play Rate**, **Weapon Deflection Montage Start Section**, and the cancellation blend-out time. Empty montage/section values are safe no-ops.
+5. Do not call the montage from `Deflection Ability Started` as well. Native code starts it once after the predicted Deflection commits, multicasts it to observers, lets it finish through a normal recovery end, and stops it when death, Fatal, Poise break, ragdoll, Sequencer control, or prediction rejection cancels the ability.
+
+Deflection is blocked while `Narrative.State.Weapon.Equipping`, and the montage plays only while the transforming visual is fully Ready. This prevents the spin from overwriting draw/deploy/retract presentation.
 
 ### Combat project settings
 
@@ -100,6 +110,7 @@ Run the functional checks first in Standalone, then repeat the network-sensitive
 | Cancellation | Apply death, Fatal, Poise Broken, ragdoll, or Sequencer control during recovery | Ability/window closes, tags clean up, and no late award occurs |
 | Prediction | Activate as remote client at 150 ms simulated lag, then miss and hit | No stuck Deflecting/Busy tag, double Stamina payment, or duplicate `+10` |
 | Deflection presentation | Observe owner, server, and second client | Gameplay resolves once; owner gets one confirmation; proxies do not grant gameplay or duplicate Echo |
+| Verity spin montage | Deflect with Verity in third person, first person, and as a remote client | The predicted owner sees one immediate spin; observers see one spin; normal recovery lets it finish; cancellation blends it out |
 | Weak point | Break one hostile authored zone | Broken ID replicates and Selene receives exactly `+8` |
 | Weak-point replay | Hit the same broken zone repeatedly | No additional break or Echo until an authoritative reset |
 | Multiple zones | Break two distinct zones | Each newly broken zone can award once |

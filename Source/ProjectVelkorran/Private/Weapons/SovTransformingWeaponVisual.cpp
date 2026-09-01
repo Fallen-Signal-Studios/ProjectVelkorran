@@ -67,6 +67,7 @@ void ASovTransformingWeaponVisual::EndPlay(
 		World->GetTimerManager().ClearTimer(PhaseTimerHandle);
 		World->GetTimerManager().ClearTimer(CollisionRefreshTimerHandle);
 	}
+	StopDeflectionWeaponMontageLocal(0.0f);
 	StopCharacterTransitionMontages(0.0f);
 	SetTransitionGateActive(false);
 	Super::EndPlay(EndPlayReason);
@@ -493,6 +494,45 @@ float ASovTransformingWeaponVisual::GetTransitionProgress() const
 	}
 }
 
+bool ASovTransformingWeaponVisual::PlayDeflectionWeaponMontage()
+{
+	if (!IsWeaponReady() || !WeaponDeflectionMontage)
+	{
+		return false;
+	}
+
+	if (HasAuthority())
+	{
+		FlushNetDormancy();
+		MulticastPlayDeflectionWeaponMontage();
+		return true;
+	}
+
+	const bool bPlayed = PlayDeflectionWeaponMontageLocal();
+	if (IsValid(CharacterOwner) && CharacterOwner->IsLocallyControlled())
+	{
+		// Busy serializes Deflection attempts. This token survives a short
+		// montage finishing before its authority multicast reaches the owner.
+		bAwaitingAuthoritativeDeflectionMontage = bPlayed;
+	}
+	return bPlayed;
+}
+
+void ASovTransformingWeaponVisual::StopDeflectionWeaponMontage()
+{
+	const float BlendOutTime = FMath::Max(
+		WeaponDeflectionMontageCancelBlendOutTime,
+		0.0f);
+	if (HasAuthority())
+	{
+		FlushNetDormancy();
+		MulticastStopDeflectionWeaponMontage(BlendOutTime);
+		return;
+	}
+
+	StopDeflectionWeaponMontageLocal(BlendOutTime);
+}
+
 void ASovTransformingWeaponVisual::HandleAttachedToOwner_Implementation()
 {
 	Super::HandleAttachedToOwner_Implementation();
@@ -746,6 +786,13 @@ void ASovTransformingWeaponVisual::ApplyTransitionState()
 
 	if (bPresentationChanged)
 	{
+		if (TransitionState.Phase != ESovWeaponTransitionPhase::Ready)
+		{
+			// A physical draw/stow transition always takes priority over a
+			// cosmetic Deflection spin that was still blending out.
+			StopDeflectionWeaponMontageLocal(0.10f);
+		}
+
 		const bool bWasExtending =
 			LastPresentedPhase == ESovWeaponTransitionPhase::Drawing
 			|| LastPresentedPhase == ESovWeaponTransitionPhase::Deploying;
@@ -980,6 +1027,153 @@ void ASovTransformingWeaponVisual::StopCharacterTransitionMontages(
 	{
 		StopOnMesh(LocalMesh, ActiveLocalCharacterMontage);
 	}
+}
+
+bool ASovTransformingWeaponVisual::PlayDeflectionWeaponMontageLocal()
+{
+	if (GetNetMode() == NM_DedicatedServer
+		|| !IsWeaponReady()
+		|| !WeaponDeflectionMontage)
+	{
+		return false;
+	}
+
+	if (bUseNativeSingleNodeWeaponAnimation)
+	{
+		if (!bLoggedDeflectionMontageSetupWarning)
+		{
+			UE_LOG(
+				LogSovTransformingWeaponVisual,
+				Warning,
+				TEXT("%s cannot play WeaponDeflectionMontage while native single-node weapon animation is enabled. Assign a weapon AnimBP with the montage Slot and disable bUseNativeSingleNodeWeaponAnimation."),
+				*GetNameSafe(this));
+			bLoggedDeflectionMontageSetupWarning = true;
+		}
+		return false;
+	}
+
+	const float PlayRate = FMath::Max(
+		WeaponDeflectionMontagePlayRate,
+		KINDA_SMALL_NUMBER);
+	auto PlayOnMesh = [this, PlayRate](
+		USkeletalMeshComponent* Mesh,
+		UAnimMontage* Montage,
+		TObjectPtr<UAnimMontage>& ActiveMontage)
+	{
+		if (!IsValid(Mesh) || !Montage)
+		{
+			return false;
+		}
+
+		UAnimInstance* AnimInstance = Mesh->GetAnimInstance();
+		if (!AnimInstance)
+		{
+			return false;
+		}
+		if (ActiveMontage.Get() && ActiveMontage.Get() != Montage)
+		{
+			AnimInstance->Montage_Stop(0.05f, ActiveMontage.Get());
+		}
+
+		const float Duration = AnimInstance->Montage_Play(
+			Montage,
+			PlayRate,
+			EMontagePlayReturnType::MontageLength,
+			0.0f,
+			false);
+		if (Duration <= 0.0f)
+		{
+			return false;
+		}
+
+		if (!WeaponDeflectionMontageStartSection.IsNone()
+			&& Montage->GetSectionIndex(
+				WeaponDeflectionMontageStartSection) != INDEX_NONE)
+		{
+			AnimInstance->Montage_JumpToSection(
+				WeaponDeflectionMontageStartSection,
+				Montage);
+		}
+		ActiveMontage = Montage;
+		return true;
+	};
+
+	UAnimMontage* MainMontage = WeaponDeflectionMontage.Get();
+	UAnimMontage* LocalMontage = LocalWeaponDeflectionMontage.Get()
+		? LocalWeaponDeflectionMontage.Get()
+		: MainMontage;
+	const bool bPlayedMain = PlayOnMesh(
+		WeaponMesh,
+		MainMontage,
+		ActiveMainWeaponDeflectionMontage);
+	const bool bPlayedLocal = LocalWeaponMesh != WeaponMesh
+		&& PlayOnMesh(
+			LocalWeaponMesh,
+			LocalMontage,
+			ActiveLocalWeaponDeflectionMontage);
+	if (!bPlayedMain && !bPlayedLocal
+		&& !bLoggedDeflectionMontageSetupWarning)
+	{
+		UE_LOG(
+			LogSovTransformingWeaponVisual,
+			Warning,
+			TEXT("%s could not play its Deflection montage. Verify both weapon meshes use a compatible AnimBP and that its graph contains the montage Slot."),
+			*GetNameSafe(this));
+		bLoggedDeflectionMontageSetupWarning = true;
+	}
+
+	return bPlayedMain || bPlayedLocal;
+}
+
+void ASovTransformingWeaponVisual::StopDeflectionWeaponMontageLocal(
+	const float BlendOutTime)
+{
+	auto StopOnMesh = [BlendOutTime](
+		USkeletalMeshComponent* Mesh,
+		TObjectPtr<UAnimMontage>& ActiveMontage)
+	{
+		if (IsValid(Mesh) && ActiveMontage.Get())
+		{
+			if (UAnimInstance* AnimInstance = Mesh->GetAnimInstance())
+			{
+				AnimInstance->Montage_Stop(
+					FMath::Max(BlendOutTime, 0.0f),
+					ActiveMontage.Get());
+			}
+		}
+		ActiveMontage = nullptr;
+	};
+
+	StopOnMesh(WeaponMesh, ActiveMainWeaponDeflectionMontage);
+	if (LocalWeaponMesh != WeaponMesh)
+	{
+		StopOnMesh(
+			LocalWeaponMesh,
+			ActiveLocalWeaponDeflectionMontage);
+	}
+}
+
+void ASovTransformingWeaponVisual::MulticastPlayDeflectionWeaponMontage_Implementation()
+{
+	// The autonomous proxy already played from its local-predicted ability.
+	// Consume the attempt token rather than checking current playback: a short
+	// predicted montage may have finished before this RPC arrives.
+	if (!HasAuthority()
+		&& IsValid(CharacterOwner)
+		&& CharacterOwner->IsLocallyControlled()
+		&& bAwaitingAuthoritativeDeflectionMontage)
+	{
+		bAwaitingAuthoritativeDeflectionMontage = false;
+		return;
+	}
+
+	PlayDeflectionWeaponMontageLocal();
+}
+
+void ASovTransformingWeaponVisual::MulticastStopDeflectionWeaponMontage_Implementation(
+	const float BlendOutTime)
+{
+	StopDeflectionWeaponMontageLocal(BlendOutTime);
 }
 
 void ASovTransformingWeaponVisual::ApplyStableWeaponPose(

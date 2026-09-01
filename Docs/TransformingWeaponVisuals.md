@@ -28,6 +28,7 @@ Verity should use one skeletal mesh with rigidly weighted hilt and blade assembl
 | `AS_Verity_Retract` | Extended-to-collapsed sequence |
 | `AM_Selene_Verity_Draw` | Character draw montage |
 | `AM_Selene_Verity_Stow` | Character stow montage |
+| `AM_Verity_Deflection` | Optional weapon-skeleton spin montage for Deflection |
 
 The weapon sequences must use Verity's weapon skeleton. Stable animation endpoints should match the transition endpoints exactly. The character AnimBP must expose the montage slot used by the draw and stow montages.
 
@@ -45,6 +46,8 @@ The weapon sequences must use Verity's weapon skeleton. Stable animation endpoin
 10. Keep using Verity's normal Narrative `Holster Attachment Configs` and `Wield Attachment Configs`. The transition system stages when those existing configurations are physically applied.
 
 `bUseNativeSingleNodeWeaponAnimation` should remain enabled when Verity's weapon mesh has no competing weapon AnimBP. Disable it if a child Blueprint owns weapon animation through a custom AnimBP, then use `Weapon Transition Phase Changed` to drive that graph.
+
+The optional Deflection spin is the custom-AnimBP path. Assign `Weapon Deflection Montage` (and an optional first-person override), put its Slot in the Verity weapon AnimBP, assign that AnimBP to both weapon meshes, and disable native single-node animation. The custom graph must then own the holstered/deploy/ready/retract presentation as well. Deflection starts the montage only while the visual is `Ready`; owner prediction is immediate, authority multicasts it to observers, cancellation blends it out, and normal recovery lets it finish.
 
 For direct weapon swaps, have Narrative pass through its empty/holstered wield state before requesting the next weapon. This gives the outgoing transforming weapon ownership of its stow montage and overlay until its holster handoff, then lets the incoming weapon install its own overlay and draw cleanly.
 
@@ -94,7 +97,8 @@ Run these checks in Standalone, listen-server PIE with two clients, and dedicate
 7. Joining or becoming relevant during every phase reconstructs the correct socket, animation time, and material value without replaying stale one-shots.
 8. Death during transition clears the gameplay gate and settles around the socket that was already physically committed, without teleporting the weapon toward a pending target. If that character revives, the visual resumes toward Narrative's latest semantic wield target. Nonlethal ragdoll keeps the authoritative timer running so recovery cannot desynchronize Narrative's semantic wield state from the physical socket.
 9. Saving/loading restores Narrative's stable wield endpoint rather than saving a transient cosmetic timer.
-10. An ordinary non-transforming weapon still attaches immediately and behaves exactly as before.
+10. Deflection plays one Verity spin immediately for the owning player and once for observers; cancellation blends it out without affecting gameplay, while a normal recovery lets it finish.
+11. An ordinary non-transforming weapon still attaches immediately and behaves exactly as before.
 
 Useful runtime check:
 
@@ -102,4 +106,4 @@ Useful runtime check:
 showdebug abilitysystem
 ```
 
-If Verity moves sockets but does not animate, verify the weapon animation assets use Verity's skeleton and that native single-node animation is enabled. If Selene's montage does not play, verify its slot exists in both the third-person and local character AnimBP paths.
+If Verity uses the native transition path and moves sockets but does not animate, verify the weapon sequences use Verity's skeleton and native single-node animation is enabled. If a custom weapon AnimBP owns transitions or Deflection, disable native single-node animation and verify the appropriate Slot exists in both weapon-mesh graph paths. If Selene's character montage does not play, verify its Slot exists in both the third-person and local character AnimBP paths.

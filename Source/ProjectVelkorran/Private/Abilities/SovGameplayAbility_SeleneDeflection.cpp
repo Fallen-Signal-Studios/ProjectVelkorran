@@ -8,6 +8,8 @@
 #include "GameFramework/Actor.h"
 #include "NarrativeGameplayTags.h"
 #include "Sovereign/SovGameplayTags.h"
+#include "UnrealFramework/NarrativeCharacter.h"
+#include "Weapons/SovTransformingWeaponVisual.h"
 
 USovGameplayAbility_SeleneDeflection::USovGameplayAbility_SeleneDeflection()
 {
@@ -23,6 +25,7 @@ USovGameplayAbility_SeleneDeflection::USovGameplayAbility_SeleneDeflection()
 	ActivationBlockedTags.AddTag(NarrativeTags.State_Interacting);
 	ActivationBlockedTags.AddTag(NarrativeTags.State_SequencerControlled);
 	ActivationBlockedTags.AddTag(NarrativeTags.State_Movement_Ragdoll);
+	ActivationBlockedTags.AddTag(NarrativeTags.State_Weapon_Equipping);
 	ActivationBlockedTags.AddTag(SovTags.State_Fatal);
 	ActivationBlockedTags.AddTag(SovTags.State_Guarding);
 	ActivationBlockedTags.AddTag(SovTags.State_Guard_Broken);
@@ -101,6 +104,7 @@ void USovGameplayAbility_SeleneDeflection::OnRemoveAbility(
 	const FGameplayAbilityActorInfo* ActorInfo,
 	const FGameplayAbilitySpec& Spec)
 {
+	StopDeflectionWeaponMontage();
 	UnbindCancellationTags();
 	UnbindDeflectionComponent();
 	Super::OnRemoveAbility(ActorInfo, Spec);
@@ -138,6 +142,7 @@ void USovGameplayAbility_SeleneDeflection::ActivateAbility(
 		return;
 	}
 
+	PlayDeflectionWeaponMontage();
 	ReceiveDeflectionAbilityStarted();
 	if (DeflectionRecoveryDuration <= KINDA_SMALL_NUMBER)
 	{
@@ -169,6 +174,15 @@ void USovGameplayAbility_SeleneDeflection::EndAbility(
 	const bool bWasCancelled)
 {
 	UnbindCancellationTags();
+	if (bWasCancelled)
+	{
+		StopDeflectionWeaponMontage();
+	}
+	else
+	{
+		// A normal recovery end does not cut off a longer authored spin.
+		ActiveDeflectionWeaponVisual = nullptr;
+	}
 	if (IsValid(DeflectionComponent) && bDeflectionStarted)
 	{
 		DeflectionComponent->EndDeflection();
@@ -222,6 +236,30 @@ void USovGameplayAbility_SeleneDeflection::UnbindDeflectionComponent()
 bool USovGameplayAbility_SeleneDeflection::ShouldRunLocalPresentation() const
 {
 	return CurrentActorInfo && CurrentActorInfo->IsLocallyControlled();
+}
+
+void USovGameplayAbility_SeleneDeflection::PlayDeflectionWeaponMontage()
+{
+	ActiveDeflectionWeaponVisual = nullptr;
+	ANarrativeCharacter* NarrativeCharacter = GetOwningNarrativeCharacter();
+	ASovTransformingWeaponVisual* WeaponVisual = NarrativeCharacter
+		? Cast<ASovTransformingWeaponVisual>(
+			NarrativeCharacter->GetWieldedWeaponVisual(true))
+		: nullptr;
+	if (IsValid(WeaponVisual)
+		&& WeaponVisual->PlayDeflectionWeaponMontage())
+	{
+		ActiveDeflectionWeaponVisual = WeaponVisual;
+	}
+}
+
+void USovGameplayAbility_SeleneDeflection::StopDeflectionWeaponMontage()
+{
+	if (IsValid(ActiveDeflectionWeaponVisual))
+	{
+		ActiveDeflectionWeaponVisual->StopDeflectionWeaponMontage();
+	}
+	ActiveDeflectionWeaponVisual = nullptr;
 }
 
 void USovGameplayAbility_SeleneDeflection::HandlePerfectDeflection(

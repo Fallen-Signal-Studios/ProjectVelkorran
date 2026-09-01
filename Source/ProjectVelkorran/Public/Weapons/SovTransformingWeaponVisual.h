@@ -135,6 +135,18 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Weapon Transition")
 	float GetTransitionProgress() const;
 
+	/**
+	 * Plays the optional weapon-skeleton montage authored for a Deflection attempt.
+	 * The predicted owner plays immediately; authority multicasts the cosmetic to
+	 * observers. The visual must be wielded and fully Ready.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Sovereign|Weapon Transition|Deflection")
+	bool PlayDeflectionWeaponMontage();
+
+	/** Stops only the montage started by PlayDeflectionWeaponMontage. */
+	UFUNCTION(BlueprintCallable, Category = "Sovereign|Weapon Transition|Deflection")
+	void StopDeflectionWeaponMontage();
+
 protected:
 	virtual void OnWielded() override;
 	virtual void OnHolstered() override;
@@ -204,6 +216,29 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Weapon Transition|Weapon")
 	bool bUseNativeSingleNodeWeaponAnimation = true;
 
+	/**
+	 * Optional Verity-skeleton montage played when Selene starts Deflection.
+	 * This requires a weapon AnimBP with the montage's Slot node and requires
+	 * native single-node weapon animation to be disabled on the visual.
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Weapon Transition|Deflection")
+	TObjectPtr<UAnimMontage> WeaponDeflectionMontage = nullptr;
+
+	/** Optional first-person weapon override. Falls back to Weapon Deflection Montage. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Weapon Transition|Deflection")
+	TObjectPtr<UAnimMontage> LocalWeaponDeflectionMontage = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Weapon Transition|Deflection", meta = (ClampMin = "0.01"))
+	float WeaponDeflectionMontagePlayRate = 1.0f;
+
+	/** Optional montage section to start from. Empty starts at the montage beginning. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Weapon Transition|Deflection")
+	FName WeaponDeflectionMontageStartSection = NAME_None;
+
+	/** Used when death, Fatal, Poise break, ragdoll, or Sequencer control cancels Deflection. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Weapon Transition|Deflection", meta = (ClampMin = "0.0", Units = "s"))
+	float WeaponDeflectionMontageCancelBlendOutTime = 0.10f;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Weapon Transition|Presentation")
 	FSovWeaponTransitionCue DrawCue;
 
@@ -255,6 +290,8 @@ private:
 	void ApplyWeaponAnimation(float PhaseAge);
 	void ApplyCharacterMontage(float PhaseAge);
 	void StopCharacterTransitionMontages(float BlendOutTime = 0.10f);
+	bool PlayDeflectionWeaponMontageLocal();
+	void StopDeflectionWeaponMontageLocal(float BlendOutTime);
 	void ApplyStableWeaponPose(bool bReadyPose);
 	void PlayPhaseCue(const FSovWeaponTransitionCue& Cue, float PhaseAge);
 	void RefreshDynamicMaterials();
@@ -270,6 +307,12 @@ private:
 		float FallbackDuration) const;
 	bool IsTransitionPhase() const;
 	bool IsOwnerDead() const;
+
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastPlayDeflectionWeaponMontage();
+
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastStopDeflectionWeaponMontage(float BlendOutTime);
 
 	UPROPERTY(ReplicatedUsing = OnRep_TransitionState)
 	FSovWeaponTransitionState TransitionState;
@@ -288,6 +331,12 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UAnimMontage> ActiveLocalCharacterMontage = nullptr;
 
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimMontage> ActiveMainWeaponDeflectionMontage = nullptr;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimMontage> ActiveLocalWeaponDeflectionMontage = nullptr;
+
 	ESovWeaponTransitionPhase LastPresentedPhase = ESovWeaponTransitionPhase::Holstered;
 	int32 LastPresentedSerial = INDEX_NONE;
 	bool bOwnsLocalLooseTransitionGate = false;
@@ -296,6 +345,8 @@ private:
 	bool bHasQueuedAttachmentRequest = false;
 	bool bAwaitingDeathRecovery = false;
 	bool bHasReceivedAuthoritativeTransitionState = false;
+	bool bLoggedDeflectionMontageSetupWarning = false;
+	bool bAwaitingAuthoritativeDeflectionMontage = false;
 	uint32 AttachmentRequestGeneration = 0;
 	uint32 QueuedRequestGeneration = 0;
 	FGameplayTag LatestRequestedWieldSlot;
