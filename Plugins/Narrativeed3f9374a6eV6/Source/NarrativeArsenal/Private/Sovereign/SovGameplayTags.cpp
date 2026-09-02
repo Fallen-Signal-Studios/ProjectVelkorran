@@ -14,6 +14,9 @@ void FSovGameplayTags::InitializeNativeTags()
 		&& GameplayTags.Ability_NPC_ReformationDrone_Gunfire.IsValid()
 		&& GameplayTags.Ability_NPC_ReformationDrone_RocketLauncher.IsValid()
 		&& GameplayTags.Ability_NPC_ReformationDrone_SelfDestruct.IsValid()
+		&& GameplayTags.Ability_NPC_DominionHound_Bite.IsValid()
+		&& GameplayTags.Ability_NPC_DominionHound_HornCharge.IsValid()
+		&& GameplayTags.Ability_NPC_DominionHound_Pounce.IsValid()
 		&& GameplayTags.Ability_Echo_Selene_StillpointGrenade.IsValid()
 		&& GameplayTags.Status_Immunity_Burn.IsValid()
 		&& GameplayTags.Status_Immunity_DeviceDisable.IsValid()
@@ -42,6 +45,9 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 	AddTag(Ability_NPC_ReformationDrone_Gunfire, "Sov.Ability.NPC.ReformationDrone.Gunfire", "Standard gunfire attack used by Reformation drones.");
 	AddTag(Ability_NPC_ReformationDrone_RocketLauncher, "Sov.Ability.NPC.ReformationDrone.RocketLauncher", "Rocket launcher attack used by Reformation drones.");
 	AddTag(Ability_NPC_ReformationDrone_SelfDestruct, "Sov.Ability.NPC.ReformationDrone.SelfDestruct", "Pursuit and radial self-destruction attack used by explosive Reformation drones.");
+	AddTag(Ability_NPC_DominionHound_Bite, "Sov.Ability.NPC.DominionHound.Bite", "Standard close-range bite attack used by Dominion hounds.");
+	AddTag(Ability_NPC_DominionHound_HornCharge, "Sov.Ability.NPC.DominionHound.HornCharge", "Committed heavy horn-charge attack used by Dominion hounds.");
+	AddTag(Ability_NPC_DominionHound_Pounce, "Sov.Ability.NPC.DominionHound.Pounce", "Snapshot-target heavy pounce attack used by Dominion hounds.");
 	AddTag(Ability_Echo_Tarrik_CinderSlam, "Sov.Ability.Echo.Tarrik.CinderSlam", "Tarrik's sword-exclusive Cinder Slam Echo ability.");
 	AddTag(Ability_Echo_Tarrik_VelkorransHunger, "Sov.Ability.Echo.Tarrik.VelkorransHunger", "Tarrik's sword-exclusive Velkorran's Hunger Echo ability.");
 	AddTag(Ability_Echo_Tarrik_CinderStickyGrenade, "Sov.Ability.Echo.Tarrik.CinderStickyGrenade", "Tarrik's shared Cinder Sticky Grenade Echo ability.");

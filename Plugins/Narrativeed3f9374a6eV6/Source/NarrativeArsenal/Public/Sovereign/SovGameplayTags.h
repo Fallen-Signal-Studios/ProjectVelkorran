@@ -32,6 +32,9 @@ public:
 	FGameplayTag Ability_NPC_ReformationDrone_Gunfire;
 	FGameplayTag Ability_NPC_ReformationDrone_RocketLauncher;
 	FGameplayTag Ability_NPC_ReformationDrone_SelfDestruct;
+	FGameplayTag Ability_NPC_DominionHound_Bite;
+	FGameplayTag Ability_NPC_DominionHound_HornCharge;
+	FGameplayTag Ability_NPC_DominionHound_Pounce;
 	FGameplayTag Ability_Echo_Tarrik_CinderSlam;
 	FGameplayTag Ability_Echo_Tarrik_VelkorransHunger;
 	FGameplayTag Ability_Echo_Tarrik_CinderStickyGrenade;
