@@ -5,11 +5,19 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "GAS/SovCombatTypes.h"
+#include "GameplayTagContainer.h"
+#include "TimerManager.h"
 #include "SovWeakPointComponent.generated.h"
 
+class ANarrativeCharacter;
+class ANarrativeCharacterVisual;
 class FLifetimeProperty;
 class UNarrativeAbilitySystemComponent;
+class UDecalComponent;
+class UMaterialInterface;
+class UMeshComponent;
 class UPhysicalMaterial;
+class USkeletalMeshComponent;
 
 UENUM(BlueprintType)
 enum class ESovWeakPointHitResolution : uint8
@@ -44,6 +52,48 @@ struct PROJECTVELKORRAN_API FSovWeakPointZone
 	/** Allows an encounter variant to begin with this zone unavailable. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Sovereign|Weak Point")
 	bool bStartsBroken = false;
+
+	/**
+	 * Bone or socket used to anchor the temporary reveal decal. When empty, the
+	 * first authored HitBones entry is used.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Sovereign|Weak Point|Reveal")
+	FName RevealAttachPoint = NAME_None;
+
+	/** Optional component tag used when more than one skeletal mesh owns the bone. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Sovereign|Weak Point|Reveal")
+	FName RevealMeshComponentTag = NAME_None;
+
+	/** Bone/socket-relative placement and orientation of the projected decal. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Sovereign|Weak Point|Reveal")
+	FTransform RevealRelativeTransform = FTransform::Identity;
+
+	/** Decal projection depth, width, and height in centimeters. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Sovereign|Weak Point|Reveal")
+	FVector RevealDecalSize = FVector(12.0f, 24.0f, 24.0f);
+
+	/** Optional zone-specific material; otherwise the component default is used. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Sovereign|Weak Point|Reveal")
+	TObjectPtr<UMaterialInterface> RevealDecalMaterialOverride = nullptr;
+};
+
+/** Replicated timing for a temporary weak-point reveal. */
+USTRUCT(BlueprintType)
+struct PROJECTVELKORRAN_API FSovWeakPointRevealState
+{
+	GENERATED_BODY()
+
+	/** Changes on every authoritative start, refresh, or clear. */
+	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Weak Point|Reveal")
+	int32 Serial = 0;
+
+	/** Synchronized GameState server time at which the reveal ends. */
+	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Weak Point|Reveal")
+	float EndServerWorldTime = 0.0f;
+
+	/** Actor responsible for the reveal, normally Selene. */
+	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Weak Point|Reveal")
+	TObjectPtr<AActor> RevealInstigator = nullptr;
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
@@ -55,6 +105,12 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
 	FSovWeakPointBrokenSignature,
 	FName, WeakPointId,
 	const FSovDamageResult&, DamageResult);
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(
+	FSovWeakPointRevealStateChangedSignature,
+	bool, bIsRevealed,
+	float, RemainingSeconds,
+	AActor*, RevealInstigator);
 
 /**
  * Authoritative, replicated lifecycle for explicitly authored weak points.
@@ -84,6 +140,48 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Weak Point")
 	TArray<FName> GetBrokenWeakPointIds() const { return BrokenWeakPointIds; }
+
+	/** Begins or extends a replicated reveal of every currently unbroken zone. */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Weak Point|Reveal")
+	bool RevealWeakPoints(
+		float Duration,
+		AActor* RevealInstigator = nullptr);
+
+	/** Clears the replicated reveal immediately. */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Weak Point|Reveal")
+	void ClearWeakPointReveal();
+
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Weak Point|Reveal")
+	bool IsWeakPointRevealActive() const;
+
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Weak Point|Reveal")
+	float GetWeakPointRevealRemainingSeconds() const;
+
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Weak Point|Reveal")
+	FLinearColor GetWeakPointRevealColor() const
+	{
+		return WeakPointRevealColor;
+	}
+
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Weak Point|Reveal")
+	FName GetWeakPointRevealColorParameterName() const
+	{
+		return RevealColorParameterName;
+	}
+
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Weak Point|Reveal")
+	float GetWeakPointRevealFadeOutDuration() const
+	{
+		return FMath::Max(RevealFadeOutDuration, 0.0f);
+	}
+
+	/** Returns the unbroken zone IDs visible during the current reveal. */
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Weak Point|Reveal")
+	TArray<FName> GetRevealedWeakPointIds() const;
+
+	/** Rebuilds local decals after an appearance or material change. */
+	UFUNCTION(BlueprintCallable, Category = "Sovereign|Weak Point|Reveal")
+	void RefreshWeakPointRevealPresentation();
 
 	/** Reports invalid IDs, duplicate IDs, and zones with no authored matcher. */
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Weak Point")
@@ -118,6 +216,10 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Sovereign|Weak Point|Presentation")
 	FSovWeakPointBrokenSignature OnWeakPointBroken;
 
+	/** Local notification reconstructed from the replicated timed reveal state. */
+	UPROPERTY(BlueprintAssignable, Category = "Sovereign|Weak Point|Reveal")
+	FSovWeakPointRevealStateChangedSignature OnWeakPointRevealStateChanged;
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -131,6 +233,25 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Sovereign|Weak Point", meta = (ClampMin = "0.0"))
 	float MinimumAppliedDamage = 0.01f;
 
+	/**
+	 * Deferred Decal material used to project a localized reveal onto the mesh.
+	 * Its opacity should multiply Unreal's Decal Lifetime Opacity for fading.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Sovereign|Weak Point|Reveal")
+	TObjectPtr<UMaterialInterface> WeakPointRevealDecalMaterial = nullptr;
+
+	/** Color supplied to RevealColorParameterName on a per-reveal material instance. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Sovereign|Weak Point|Reveal")
+	FLinearColor WeakPointRevealColor = FLinearColor(1.0f, 0.015f, 0.01f, 1.0f);
+
+	/** Vector parameter expected by the reveal decal material. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Sovereign|Weak Point|Reveal")
+	FName RevealColorParameterName = TEXT("WeakPointRevealColor");
+
+	/** Seconds at the end of the reveal during which the decal fades out. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Sovereign|Weak Point|Reveal", meta = (ClampMin = "0.0", Units = "s"))
+	float RevealFadeOutDuration = 0.35f;
+
 private:
 	struct FPendingWeakPointBreak
 	{
@@ -141,10 +262,32 @@ private:
 		FName WeakPointId = NAME_None;
 	};
 
+	struct FDecalReceiverBinding
+	{
+		TWeakObjectPtr<UMeshComponent> MeshComponent;
+		bool bPreviouslyReceivedDecals = false;
+	};
+
 	void TryInitializeFromOwner();
 	void UninitializeFromAbilitySystem();
 	void ApplyAuthoredStartingState();
 	void ClearPendingBreaks();
+	void BindCharacterVisual(ANarrativeCharacterVisual* NewCharacterVisual);
+	void ApplyWeakPointRevealState();
+	void ScheduleWeakPointRevealExpiry();
+	void ScheduleWeakPointRevealVisualRefresh();
+	void HandleWeakPointRevealExpired();
+	void HandleDeferredWeakPointRevealVisualRefresh();
+	void ClearWeakPointRevealPresentation();
+	void DestroyActiveRevealDecals();
+	void RefreshDecalReceiverBindings();
+	void ClearDecalReceiverBindings();
+	void GatherPresentationMeshes(TArray<UMeshComponent*>& OutMeshes) const;
+	UMeshComponent* ResolveRevealAttachmentMesh(
+		const FSovWeakPointZone& Zone,
+		FName AttachPoint) const;
+	FName ResolveRevealAttachPoint(const FSovWeakPointZone& Zone) const;
+	float GetSynchronizedServerWorldTimeSeconds() const;
 	const FSovWeakPointZone* FindMatchingZone(
 		const FSovDamageResult& DamageResult) const;
 	bool MatchesBone(
@@ -159,6 +302,15 @@ private:
 	void HandleOwnerASCInitialized();
 
 	UFUNCTION()
+	void HandleCharacterVisualInitialized(ANarrativeCharacter* Character);
+
+	UFUNCTION()
+	void HandleBaseAppearanceApplied();
+
+	UFUNCTION()
+	void HandleAppearancePartChanged(FGameplayTag AppearanceSlot);
+
+	UFUNCTION()
 	void HandleDamageResolvedAsTarget(const FSovDamageResult& DamageResult);
 
 	UFUNCTION()
@@ -170,16 +322,33 @@ private:
 	UFUNCTION()
 	void OnRep_BrokenWeakPointIds(const TArray<FName>& OldBrokenWeakPointIds);
 
+	UFUNCTION()
+	void OnRep_WeakPointRevealState();
+
 	UPROPERTY(ReplicatedUsing = OnRep_BrokenWeakPointIds, Transient)
 	TArray<FName> BrokenWeakPointIds;
 
+	UPROPERTY(ReplicatedUsing = OnRep_WeakPointRevealState, Transient)
+	FSovWeakPointRevealState WeakPointRevealState;
+
 	UPROPERTY(Transient)
 	TObjectPtr<UNarrativeAbilitySystemComponent> AbilitySystemComponent;
+
+	UPROPERTY(Transient)
+	TObjectPtr<ANarrativeCharacterVisual> BoundCharacterVisual;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UDecalComponent>> ActiveRevealDecals;
 
 	/**
 	 * Normally consumed immediately by the source callback. A small array keeps
 	 * that contract correct if a presentation listener causes nested damage.
 	 */
 	TArray<FPendingWeakPointBreak> PendingBreaks;
+	TArray<FDecalReceiverBinding> DecalReceiverBindings;
+	FTimerHandle WeakPointRevealExpiryTimerHandle;
+	FTimerHandle WeakPointRevealVisualRefreshTimerHandle;
 	bool bAppliedStartingState = false;
+	bool bLocalWeakPointRevealActive = false;
+	bool bWeakPointRevealVisualRefreshPending = false;
 };

@@ -2,6 +2,8 @@
 
 #include "Abilities/SovGameplayAbility_SeleneEcho.h"
 
+#include "AbilitySystemComponent.h"
+#include "Components/SovSeleneEchoGenerationComponent.h"
 #include "GameplayEffect.h"
 #include "NarrativeGameplayTags.h"
 #include "Sovereign/SovGameplayTags.h"
@@ -121,6 +123,57 @@ USovGameplayAbility_SeleneAxiomNullPulse::USovGameplayAbility_SeleneAxiomNullPul
 		"SovSeleneEcho",
 		"AxiomNullPulseDescription",
 		"Charge Axiom and release a directed EMP pulse that collapses Shields, suppresses recharge, and disables eligible combat systems.");
+}
+
+ESovCommandLinkSeverResolution
+USovGameplayAbility_SeleneAxiomNullPulse::TrySeverAxiomCommandLink(
+	AActor* CommandNode,
+	FSovCommandLinkSeverResult& OutResult)
+{
+	OutResult = FSovCommandLinkSeverResult();
+	if (!CurrentActorInfo
+		|| !CurrentActorInfo->IsNetAuthority()
+		|| !IsActive())
+	{
+		return ESovCommandLinkSeverResolution::Invalid;
+	}
+
+	AActor* Avatar = CurrentActorInfo->AvatarActor.Get();
+	UAbilitySystemComponent* SourceAbilitySystem =
+		CurrentActorInfo->AbilitySystemComponent.Get();
+	if (!IsValid(Avatar)
+		|| !IsValid(SourceAbilitySystem)
+		|| !IsValid(CommandNode)
+		|| CommandNode == Avatar
+		|| CommandNode->GetWorld() != Avatar->GetWorld()
+		|| MaximumPulseRange <= KINDA_SMALL_NUMBER
+		|| FVector::DistSquared(
+				Avatar->GetActorLocation(),
+				CommandNode->GetActorLocation())
+			> FMath::Square(MaximumPulseRange))
+	{
+		return ESovCommandLinkSeverResolution::Invalid;
+	}
+
+	USovCommandLinkComponent* CommandLink =
+		CommandNode->FindComponentByClass<USovCommandLinkComponent>();
+	if (!IsValid(CommandLink))
+	{
+		return ESovCommandLinkSeverResolution::Invalid;
+	}
+
+	const ESovCommandLinkSeverResolution Resolution =
+		CommandLink->TrySeverCommandLink(Avatar, OutResult);
+	if (Resolution == ESovCommandLinkSeverResolution::NewlySevered)
+	{
+		if (USovSeleneEchoGenerationComponent* EchoGeneration =
+			Avatar->FindComponentByClass<USovSeleneEchoGenerationComponent>())
+		{
+			EchoGeneration->ConsumeCommandLinkSever(OutResult);
+		}
+	}
+
+	return Resolution;
 }
 
 bool USovGameplayAbility_SeleneAxiomNullPulse::HasRequiredPayloadConfiguration() const

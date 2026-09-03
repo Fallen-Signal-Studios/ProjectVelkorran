@@ -892,7 +892,7 @@ void USovGameplayAbility_DominionHoundAttackBase::BindCancellationTags(
 	BoundAbilitySystem = AbilitySystem;
 	const FNarrativeGameplayTags& NarrativeTags = FNarrativeGameplayTags::Get();
 	const FSovGameplayTags& SovTags = FSovGameplayTags::Get();
-	const FGameplayTag TagsToWatch[] = {
+	TArray<FGameplayTag> TagsToWatch = {
 		NarrativeTags.State_IsDead,
 		NarrativeTags.State_Interacting,
 		NarrativeTags.State_SequencerControlled,
@@ -902,6 +902,10 @@ void USovGameplayAbility_DominionHoundAttackBase::BindCancellationTags(
 		SovTags.State_Poise_Broken,
 		SovTags.State_Status_Frozen,
 		SovTags.State_Status_DeviceDisabled};
+	if (bInterruptedByCommandLinkSever)
+	{
+		TagsToWatch.Add(SovTags.State_CommandLink_Severed);
+	}
 	for (const FGameplayTag& Tag : TagsToWatch)
 	{
 		FDelegateHandle Handle = BoundAbilitySystem
@@ -1063,6 +1067,11 @@ USovGameplayAbility_DominionHoundHornCharge::
 	AssetTags.AddTag(NarrativeTags.Ability_DamageType_Heavy);
 	SetAssetTags(AssetTags);
 	ActivationOwnedTags.AddTag(NarrativeTags.State_Movement_PostponePathUpdates);
+	// The charge is a handler-coordinated commitment. A severed link interrupts
+	// an active charge through the base cancellation watcher and prevents a new
+	// one while the encounter remains severed. Bites and pounces stay available.
+	bInterruptedByCommandLinkSever = true;
+	ActivationBlockedTags.AddTag(SovTags.State_CommandLink_Severed);
 
 	DamageChannels.AddTag(SovTags.Damage_Channel_Kinetic);
 	DamageChannels.AddTag(SovTags.Damage_Channel_Edge);

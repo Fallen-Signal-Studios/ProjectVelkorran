@@ -60,6 +60,8 @@ public:
 	FGameplayTag State_Damage_Immune;
 	FGameplayTag State_Fatal;
 	FGameplayTag State_EchoAbility_Active;
+	FGameplayTag State_CommandLink_Active;
+	FGameplayTag State_CommandLink_Severed;
 	FGameplayTag State_Guarding;
 	FGameplayTag State_PerfectGuard;
 	FGameplayTag State_Deflecting;
@@ -143,12 +145,14 @@ public:
 	FGameplayTag Event_Guard_CounterWindowOpened;
 	FGameplayTag Event_Guard_CounterConsumed;
 	FGameplayTag Event_Deflection_Perfect;
+	FGameplayTag Event_CommandLink_Severed;
 	FGameplayTag Event_Echo_Gained_PerfectGuard;
 	FGameplayTag Event_Status_ApplicationRequested;
 
 	FGameplayTag Echo_Source_PerfectGuard;
 	FGameplayTag Echo_Source_PerfectDeflection;
 	FGameplayTag Echo_Source_WeakPointBreak;
+	FGameplayTag Echo_Source_CommandLinkSever;
 	FGameplayTag Echo_Source_GuardPressure;
 	FGameplayTag Echo_Source_GuardCounter;
 	FGameplayTag Echo_Source_CinderlineCadence;

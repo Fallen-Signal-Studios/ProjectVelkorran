@@ -1,6 +1,6 @@
 # Selene Phase 1 core loop
 
-This slice gives Selene her first native, character-specific combat loop: tap a short Deflection window, intercept one eligible attack through the authoritative damage pipeline, or break a deliberately authored enemy weak point, then receive Echo from the validated result. It does not infer precision from critical chance, raw damage, a bone-name convention, or cosmetic Blueprint events.
+This slice gives Selene her first native, character-specific combat loop: tap a short Deflection window, intercept one eligible attack through the authoritative damage pipeline, break a deliberately authored enemy weak point, or use Axiom to sever a live command network, then receive Echo from the validated result. It does not infer precision from critical chance, raw damage, a bone-name convention, Shield break, Device Disabled, or cosmetic Blueprint events.
 
 ## Implemented scope
 
@@ -8,8 +8,10 @@ This slice gives Selene her first native, character-specific combat loop: tap a 
 - `USovGameplayAbility_SeleneDeflection` is a local-predicted tap ability on `Narrative.Input.AltAttack` with an authority-validated result.
 - Deflection is a separate `ESovDefenseKind::Deflection` path. It is not Selene-flavored Guard and never enters sustained mitigation, chip damage, Guard break, or Guard-counter logic.
 - `USovWeakPointComponent` gives an eligible target explicitly authored, independently breakable zones identified by skeletal bones and/or physical materials.
-- `USovSeleneEchoGenerationComponent` awards `+10` for an authoritative perfect Deflection and `+8` for the first authoritative break of an authored hostile weak point.
-- Body hits, critical chance alone, repeated hits on a broken zone, friendly targets, Tarrik, and damage from an Echo ability do not receive either precision reward.
+- `USovCommandLinkComponent` owns one authored encounter link's authoritative `Inactive`, `Active`, and `Severed` lifecycle, participant tags/effect, and unique Sever transaction.
+- `USovSeleneEchoGenerationComponent` awards `+10` for an authoritative perfect Deflection, `+8` for the first authoritative break of an authored hostile weak point, and `+12` for Selene's first valid Sever of an active hostile link instance.
+- A successful Sever temporarily reveals each participant's remaining weak points through localized red, bone-attached decals.
+- Body hits, critical chance alone, repeated hits on a broken zone, friendly targets, Tarrik, and ordinary damage from an Echo ability do not receive precision rewards. The validated command-link Sever is the narrow exception allowed during Axiom's active Echo-ability state.
 
 ## One-time editor setup
 
@@ -65,8 +67,11 @@ An eligible hit needs a valid source/damage causer so the server can test Selene
 5. Ensure the authoritative trace places the bone and, when used, physical material in the damage effect's `FHitResult`. A cosmetic trace or reticle result is insufficient.
 6. Set the target's Narrative team so Selene regards it as hostile. A valid break on a friendly or neutral actor changes the target's authored zone state but does not reward Selene.
 7. Bind `On Weak Point Broken` and `On Weak Point State Changed` only for target presentation and encounter reactions. The replicated `BrokenWeakPointIds` array is the gameplay truth.
+8. For actors that participate in an Axiom-severable network, author each zone's reveal attach bone/socket, relative transform, decal size, and optional material override. Assign the component's default Deferred Decal material and keep its vector parameter named `WeakPointRevealColor` unless the native parameter-name setting is intentionally changed.
 
 An empty Weak Point component is a valid no-op, but invalid IDs, duplicate IDs, and zones with no bone/material matcher are authoring errors. A zone currently resets to its authored starting state when the target returns from death. It is replicated for active play but is not yet a campaign checkpoint/save record.
+
+Command-node, Axiom Blueprint, and reveal-material setup is documented in `Docs/SeleneCommandLinkAndWeakPointReveal.md`.
 
 ## Prototype tuning
 
@@ -77,6 +82,8 @@ An empty Weak Point component is a valid no-op, but invalid IDs, duplicate IDs, 
 | Ability recovery | 0.35 s | `GA_Selene_Deflection` |
 | Perfect Deflection Echo | +10 | Selene's inherited Echo generator |
 | First weak-point break Echo | +8 | Selene's inherited Echo generator |
+| First active hostile command-link Sever Echo | +12 | Selene's inherited Echo generator |
+| Weak-point reveal after Sever | 5.0 s | Command-link component |
 | Standard/Heavy hit Stamina | 8 / 18 | Narrative Combat Settings |
 | Facing half-angle | 65 degrees | Narrative Combat Settings |
 
@@ -90,6 +97,8 @@ The start threshold is not a prepaid cost. The resolved hit spends up to the rem
 4. `USovDeflectionComponent` consumes the server window before callbacks, emits `Sov.Event.Deflection.Perfect`, and multicasts the immutable result for presentation. The local timer is a fallback if the unreliable presentation multicast is lost.
 5. `USovSeleneEchoGenerationComponent` observes the validated Deflection on authority, writes `+10` through `USovEchoComponent`, and sends an owning-client presentation notification through `OnSeleneEchoAwarded`.
 6. For a weak point, the target component resolves and replicates the new break during the target-side damage callback. Selene's source-side callback consumes that exact `FSovDamageResult.TransactionId` once, then writes `+8` on authority. The unique transaction ID prevents a reused Gameplay Effect context from claiming an earlier break.
+7. For Sever, the authority-owned Axiom pulse calls `TrySeverAxiomCommandLink` on the actual command node. Its `USovCommandLinkComponent` alone may perform `Active -> Severed`, remove its participant contributions, mint the unique transaction, and begin the replicated weak-point reveal.
+8. Axiom routes only `NewlySevered` to Selene's generator. The generator consumes the transaction ID once and writes eligible `+12` through `USovEchoComponent`; `AlreadySevered`, Shield break, Device Disabled, and link deactivation never award it.
 
 `USovEchoComponent` remains the only shared Echo writer/storage policy. Its normal `0–100` clamping, encounter activity, decay, threshold, and checkpoint-value APIs still apply. UI may observe `OnSeleneEchoAwarded` and the shared Echo delegates; it must not predict or reapply an award.
 
@@ -119,6 +128,12 @@ Run the functional checks first in Standalone, then repeat the network-sensitive
 | Replication | Join/relevancy after a zone is broken | Client reconstructs the replicated broken state without generating a second break event/reward |
 | Reset | Restore the enemy from death or restart the encounter | Zones return to authored start state; no award occurs merely from reset |
 | Resource cap | Earn at 96/100 and at 100/100 Echo | First grant clamps to 100 and reports only the applied amount; full meter grants nothing |
+| Command link | Sever one active hostile authored link with Axiom | State becomes Severed, active contributions clear, linked specialist action cancels, and Selene receives exactly `+12` |
+| Sever replay | Invoke Axiom again against the same severed instance | Returns `AlreadySevered`; no second event, reveal, or Echo award |
+| Sever filters | Try inactive, immune, non-hostile, missing, or out-of-range command nodes | No successful transition, reveal, or `+12` |
+| Axiom independence | Collapse Shield/apply Device Disabled on an actor without an active link | Existing Axiom payload resolves, but it produces no Sever reward |
+| Weak-point reveal | Sever a link whose participants own authored unbroken zones | Owner and proxies see localized red decals for the synchronized duration; broken/unconfigured zones do not appear |
+| Command reset | Reset the encounter and Sever the new active instance | Reset itself grants nothing; the new unique instance may award once when legitimately severed |
 
 Also run:
 
@@ -128,11 +143,9 @@ Also run:
 
 ## Explicitly deferred
 
-### Command-link and Axiom/Sever Echo
+### Physical projectile reflection
 
-The TDD's `+12` reward for severing an active command/system link is not part of this slice. Axiom Null Pulse can collapse Shield, block recharge, and apply Device Disabled, but those effects do not prove that an active encounter link existed or was severed. Do not award `+12` from damage amount, Shield break, Device Disabled, an ability activation, or a Blueprint animation event.
-
-Implement the network encounter first with a server-owned, typed command-link identity and one authoritative `active → severed` transaction. Then extend `USovSeleneEchoGenerationComponent` to consume that transaction once, verify Selene/hostility/encounter ownership, and write `Sov.Echo.Source.SeverLink` (or the approved stable equivalent) through `USovEchoComponent`. That work is the next network-loop slice, not a hidden part of this precision prototype.
+Deflection currently consumes an eligible authoritative damage transaction; it does not reflect, retarget, or transfer ownership of the underlying projectile actor. That requires a separate server-owned projectile contract for collision consumption, velocity/target reassignment, faction attribution, and duplicate-hit prevention. The command-link/Sever slice does not alter that boundary.
 
 ### Runtime protagonist handoff
 
@@ -140,4 +153,4 @@ Runtime Tarrik/Selene handoff remains deferred. Narrative's ASC lives on PlayerS
 
 ### Other deferred Selene rules
 
-Precision chains, mark/exposure kills, undetected threat bypass, Deflection counter/exposure payloads, weak-point checkpoint persistence, and full camera/movement differentiation are not fabricated by this slice. Add each only when its real authoritative gameplay event and acceptance test exist.
+Precision chains, mark/exposure kills, undetected threat bypass, Deflection counter/exposure payloads, command-link discovery/chaining, weak-point checkpoint persistence, and full camera/movement differentiation are not fabricated by this slice. Add each only when its real authoritative gameplay event and acceptance test exist.

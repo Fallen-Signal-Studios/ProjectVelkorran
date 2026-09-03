@@ -1,11 +1,13 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 
 #include "Abilities/SovGameplayAbility_SeleneDeflection.h"
+#include "Abilities/SovGameplayAbility_SeleneEcho.h"
 #include "Characters/SovDroneNPCBase.h"
 #include "Characters/SovNPCCharacterBase.h"
 #include "Characters/SovPlayerCharacterBase.h"
 #include "Characters/SovSeleneCharacter.h"
 #include "Characters/SovTarrikCharacter.h"
+#include "Components/SovCommandLinkComponent.h"
 #include "Components/SovDeflectionComponent.h"
 #include "Components/SovEchoComponent.h"
 #include "Components/SovGuardComponent.h"
@@ -33,6 +35,12 @@ static_assert(std::is_same_v<std::underlying_type_t<ESovDefenseKind>, uint8>);
 static_assert(std::is_same_v<
 	decltype(FSovDamageResult{}.DefenseKind),
 	ESovDefenseKind>);
+static_assert(std::is_same_v<
+	std::underlying_type_t<ESovCommandLinkState>,
+	uint8>);
+static_assert(std::is_same_v<
+	std::underlying_type_t<ESovCommandLinkSeverResolution>,
+	uint8>);
 
 #if WITH_AUTOMATION_TESTS
 
@@ -152,15 +160,22 @@ bool FSovSeleneCoreLoopContractTest::RunTest(const FString& Parameters)
 		? Selene->GetSeleneEchoGenerationComponent()
 		: nullptr;
 	const USovWeakPointComponent* WeakPoint = GetDefault<USovWeakPointComponent>();
+	const USovCommandLinkComponent* CommandLink =
+		GetDefault<USovCommandLinkComponent>();
 	const USovGameplayAbility_SeleneDeflection* DeflectionAbility =
 		GetDefault<USovGameplayAbility_SeleneDeflection>();
+	const USovGameplayAbility_SeleneAxiomNullPulse* AxiomNullPulse =
+		GetDefault<USovGameplayAbility_SeleneAxiomNullPulse>();
 
 	TestNotNull(TEXT("Selene CDO exists"), Selene);
 	TestNotNull(TEXT("Deflection component exists"), Deflection);
 	TestNotNull(TEXT("Selene Echo generator exists"), EchoGeneration);
 	TestNotNull(TEXT("Weak Point component CDO exists"), WeakPoint);
+	TestNotNull(TEXT("Command Link component CDO exists"), CommandLink);
 	TestNotNull(TEXT("Deflection ability CDO exists"), DeflectionAbility);
-	if (!Deflection || !EchoGeneration || !WeakPoint || !DeflectionAbility)
+	TestNotNull(TEXT("Axiom Null Pulse ability CDO exists"), AxiomNullPulse);
+	if (!Deflection || !EchoGeneration || !WeakPoint || !CommandLink
+		|| !DeflectionAbility || !AxiomNullPulse)
 	{
 		return false;
 	}
@@ -185,6 +200,18 @@ bool FSovSeleneCoreLoopContractTest::RunTest(const FString& Parameters)
 		FMath::IsNearlyEqual(
 			EchoGeneration->GetWeakPointBreakEchoReward(),
 			8.0f));
+	TestTrue(
+		TEXT("First active command-link Sever grants prototype Echo"),
+		FMath::IsNearlyEqual(
+			EchoGeneration->GetCommandLinkSeverEchoReward(),
+			12.0f));
+	TestTrue(
+		TEXT("Axiom Null Pulse uses the Sever prototype cost"),
+		FMath::IsNearlyEqual(AxiomNullPulse->GetEchoCost(), 30.0f));
+	TestTrue(
+		TEXT("Axiom Null Pulse remains in the Axiom weapon family"),
+		AxiomNullPulse->GetEchoWeaponFamily()
+			== ESovSeleneEchoWeaponFamily::Axiom);
 
 	const FSovGameplayTags& Tags = FSovGameplayTags::Get();
 	TestTrue(TEXT("Deflection state tag is registered"), Tags.State_Deflecting.IsValid());
@@ -194,6 +221,25 @@ bool FSovSeleneCoreLoopContractTest::RunTest(const FString& Parameters)
 	TestTrue(
 		TEXT("Weak Point Echo source is registered"),
 		Tags.Echo_Source_WeakPointBreak.IsValid());
+	TestTrue(
+		TEXT("Active command-link state is registered"),
+		Tags.State_CommandLink_Active.IsValid());
+	TestTrue(
+		TEXT("Severed command-link state is registered"),
+		Tags.State_CommandLink_Severed.IsValid());
+	TestTrue(
+		TEXT("Command-link Sever event is registered"),
+		Tags.Event_CommandLink_Severed.IsValid());
+	TestTrue(
+		TEXT("Command-link Sever Echo source is registered"),
+		Tags.Echo_Source_CommandLinkSever.IsValid());
+	TestTrue(
+		TEXT("Command-link lifecycle tags remain distinct"),
+		Tags.State_CommandLink_Active != Tags.State_CommandLink_Severed);
+	TestTrue(
+		TEXT("Axiom Null Pulse carries its stable identity"),
+		AxiomNullPulse->GetAssetTags().HasTagExact(
+			Tags.Ability_Echo_Selene_AxiomNullPulse));
 	TestTrue(
 		TEXT("Deflection ability carries its stable identity"),
 		DeflectionAbility->GetAssetTags().HasTagExact(
@@ -220,6 +266,40 @@ bool FSovSeleneCoreLoopContractTest::RunTest(const FString& Parameters)
 	TestTrue(
 		TEXT("An empty Weak Point component is a valid no-op"),
 		WeakPoint->HasValidWeakPointConfiguration());
+	TestFalse(
+		TEXT("Weak Point reveal begins inactive"),
+		WeakPoint->IsWeakPointRevealActive());
+	TestTrue(
+		TEXT("Weak Point reveal begins with no revealed zones"),
+		WeakPoint->GetRevealedWeakPointIds().IsEmpty());
+	const FLinearColor RevealColor = WeakPoint->GetWeakPointRevealColor();
+	TestTrue(
+		TEXT("Weak Point reveal defaults to a red-dominant overlay"),
+		RevealColor.R > RevealColor.G && RevealColor.R > RevealColor.B);
+	TestTrue(
+		TEXT("Weak Point reveal exposes a material color parameter"),
+		WeakPoint->GetWeakPointRevealColorParameterName() != NAME_None);
+	TestTrue(
+		TEXT("Weak Point reveal has a finite nonnegative fade"),
+		FMath::IsFinite(WeakPoint->GetWeakPointRevealFadeOutDuration())
+			&& WeakPoint->GetWeakPointRevealFadeOutDuration() >= 0.0f);
+	TestTrue(
+		TEXT("Command Link begins inactive before an authored encounter starts"),
+		CommandLink->GetCommandLinkState()
+			== ESovCommandLinkState::Inactive);
+	TestFalse(
+		TEXT("A Command Link without a stable authored LinkId fails closed"),
+		CommandLink->HasValidCommandLinkConfiguration());
+	const FSovCommandLinkSeverResult EmptySeverResult;
+	TestFalse(
+		TEXT("An unresolved Sever has no transaction identity"),
+		EmptySeverResult.TransactionId.IsValid());
+	TestFalse(
+		TEXT("An unresolved Sever has no link-instance identity"),
+		EmptySeverResult.LinkInstanceId.IsValid());
+	TestTrue(
+		TEXT("An unresolved Sever has no authored LinkId"),
+		EmptySeverResult.LinkId == NAME_None);
 
 	const ASovDroneNPCBase* Drone = GetDefault<ASovDroneNPCBase>();
 	TestNotNull(TEXT("Drone base CDO exists"), Drone);

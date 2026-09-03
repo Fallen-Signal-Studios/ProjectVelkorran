@@ -21,8 +21,11 @@ void FSovGameplayTags::InitializeNativeTags()
 		&& GameplayTags.Status_Immunity_Burn.IsValid()
 		&& GameplayTags.Status_Immunity_DeviceDisable.IsValid()
 		&& GameplayTags.State_Deflecting.IsValid()
+		&& GameplayTags.State_CommandLink_Active.IsValid()
+		&& GameplayTags.State_CommandLink_Severed.IsValid()
 		&& GameplayTags.Echo_Source_PerfectDeflection.IsValid()
 		&& GameplayTags.Echo_Source_WeakPointBreak.IsValid()
+		&& GameplayTags.Echo_Source_CommandLinkSever.IsValid()
 		&& GameplayTags.Echo_Source_CombatSustainPickup.IsValid())
 	{
 		return;
@@ -73,6 +76,8 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 	AddTag(State_Damage_Immune, "Sov.State.Damage.Immune", "Target is immune to ordinary damage execution.");
 	AddTag(State_Fatal, "Sov.State.Fatal", "Health reached zero and normal combat input is disabled.");
 	AddTag(State_EchoAbility_Active, "Sov.State.EchoAbility.Active", "A committed character Echo ability currently owns the Echo-action lane.");
+	AddTag(State_CommandLink_Active, "Sov.State.CommandLink.Active", "This combatant is receiving coordination from an active authored command link.");
+	AddTag(State_CommandLink_Severed, "Sov.State.CommandLink.Severed", "This combatant's authored command link was severed for the current encounter state.");
 	AddTag(State_Guarding, "Sov.State.Guarding", "A frontal guard plane is active.");
 	AddTag(State_PerfectGuard, "Sov.State.PerfectGuard", "The perfect-defense timing window is active.");
 	AddTag(State_Deflecting, "Sov.State.Deflecting", "Selene's brief precision-deflection window is active.");
@@ -156,12 +161,14 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 	AddTag(Event_Guard_CounterWindowOpened, "Sov.Event.Guard.CounterWindowOpened", "Perfect defense opened a counter window.");
 	AddTag(Event_Guard_CounterConsumed, "Sov.Event.Guard.CounterConsumed", "A landed guard counter consumed the counter window.");
 	AddTag(Event_Deflection_Perfect, "Sov.Event.Deflection.Perfect", "Selene intercepted one eligible hit during her Deflection window.");
+	AddTag(Event_CommandLink_Severed, "Sov.Event.CommandLink.Severed", "An active authored command link completed one authoritative Active-to-Severed transition.");
 	AddTag(Event_Echo_Gained_PerfectGuard, "Sov.Event.Echo.Gained.PerfectGuard", "Echo was granted for a perfect guard.");
 	AddTag(Event_Status_ApplicationRequested, "Sov.Event.Status.ApplicationRequested", "A resolved hit requested project-owned status application.");
 
 	AddTag(Echo_Source_PerfectGuard, "Sov.Echo.Source.PerfectGuard", "Echo source for Tarrik perfect guard.");
 	AddTag(Echo_Source_PerfectDeflection, "Sov.Echo.Source.PerfectDeflection", "Echo source for Selene's correctly timed Deflection.");
 	AddTag(Echo_Source_WeakPointBreak, "Sov.Echo.Source.WeakPointBreak", "Echo source for breaking an authored weak point.");
+	AddTag(Echo_Source_CommandLinkSever, "Sov.Echo.Source.CommandLinkSever", "Echo source for Selene severing one active hostile command link.");
 	AddTag(Echo_Source_GuardPressure, "Sov.Echo.Source.GuardPressure", "Combat activity caused by intentional guard pressure.");
 	AddTag(Echo_Source_GuardCounter, "Sov.Echo.Source.GuardCounter", "Echo source for a landed Tarrik guard counter.");
 	AddTag(Echo_Source_CinderlineCadence, "Sov.Echo.Source.CinderlineCadence", "Echo source for completing Tarrik's Cinderline firing cadence.");

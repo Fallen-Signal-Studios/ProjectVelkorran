@@ -11,12 +11,14 @@
 class UNarrativeAbilitySystemComponent;
 class USovDeflectionComponent;
 class USovEchoComponent;
+struct FSovCommandLinkSeverResult;
 
 UENUM(BlueprintType)
 enum class ESovSeleneEchoAwardType : uint8
 {
 	PerfectDeflection UMETA(DisplayName = "Perfect Deflection"),
-	WeakPointBreak UMETA(DisplayName = "Weak Point Break")
+	WeakPointBreak UMETA(DisplayName = "Weak Point Break"),
+	CommandLinkSever UMETA(DisplayName = "Command Link Sever")
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(
@@ -61,6 +63,20 @@ public:
 		return FMath::Max(WeakPointBreakEchoReward, 0.0f);
 	}
 
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Echo|Selene")
+	float GetCommandLinkSeverEchoReward() const
+	{
+		return FMath::Max(CommandLinkSeverEchoReward, 0.0f);
+	}
+
+	/**
+	 * Consumes one authoritative command-link Sever transaction. The Axiom
+	 * ability routes a successful target-owned transaction here; it never
+	 * writes Echo directly.
+	 */
+	bool ConsumeCommandLinkSever(
+		const FSovCommandLinkSeverResult& SeverResult);
+
 	UPROPERTY(BlueprintAssignable, Category = "Sovereign|Echo|Selene|Presentation")
 	FSovSeleneEchoAwardedSignature OnSeleneEchoAwarded;
 
@@ -74,10 +90,13 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo|Selene|Tuning", meta = (ClampMin = "0.0"))
 	float WeakPointBreakEchoReward = 8.0f;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo|Selene|Tuning", meta = (ClampMin = "0.0"))
+	float CommandLinkSeverEchoReward = 12.0f;
+
 private:
 	void TryInitializeFromOwner();
 	void UninitializeFromAbilitySystem();
-	bool CanGenerateSeleneEcho() const;
+	bool CanGenerateSeleneEcho(bool bAllowDuringEchoAbility = false) const;
 	bool IsEchoAbilityDamage(const FSovDamageResult& DamageResult) const;
 	bool IsHostileWeakPointTarget(const AActor* TargetActor) const;
 	void AwardEcho(
@@ -85,7 +104,8 @@ private:
 		const FGameplayTag& SourceTag,
 		ESovSeleneEchoAwardType AwardType,
 		FName WeakPointId,
-		AActor* OtherActor);
+		AActor* OtherActor,
+		bool bAllowDuringEchoAbility = false);
 
 	UFUNCTION()
 	void HandleOwnerASCInitialized();
@@ -112,4 +132,7 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<USovDeflectionComponent> DeflectionComponent;
+
+	/** Server-only replay fence for command-link transactions. */
+	TSet<FGuid> ConsumedCommandLinkSeverTransactions;
 };

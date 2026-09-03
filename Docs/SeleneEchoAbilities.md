@@ -137,8 +137,15 @@ CC-resistant elites and bosses should reject hard Freeze through immunity tags a
 - Then apply the duration recharge-block effect. `Sov.State.Shield.RechargeBlocked` only pauses recharge; the Disruption packet is what removes existing Shield while preserving Shield-break events, material state, and Niagara.
 - Apply Device Disabled only to eligible targets that do not carry `Sov.Status.Immunity.DeviceDisable`.
 - Exact full-Shield collapse for 30 Echo is intentionally aggressive. Bosses or shield-critical elites should carry an authored EMP immunity/cap policy if they must retain phase mechanics.
+- The command-link payload is separate. Add `USovCommandLinkComponent` to the actual hostile command node, give it a stable `LinkId`, and assign/register its encounter participants. Do not award Sever from the Shield or Device Disabled result.
+- Inside the existing `Echo Ability Authority Committed` pulse target loop, call `Try Sever Axiom Command Link` once for each unique command-node actor selected by the authoritative pulse. Do not call it from local presentation, an animation notify, a Gameplay Cue, or client-authored target data.
+- The helper revalidates active ability state, authority, world, maximum Axiom range, and component presence. The component then validates hostility against the link's actual participants. Only `NewlySevered` changes link state. The helper automatically submits that transaction to Selene's Echo generator; Blueprint must not add the `+12` itself.
+- `Inactive`, `NotHostile`, `Immune`, `AlreadySevered`, and `Invalid` are deliberate no-award outcomes. A repeated call returns the existing Sever identity and cannot restart the reveal or repay Echo.
+- A successful Sever removes the component's `Sov.State.CommandLink.Active` and optional active-link Gameplay Effect contributions, adds `Sov.State.CommandLink.Severed`, interrupts watched specialist actions, and begins the configured weak-point reveal on affected actors.
 
 This implementation is a Shield collapse plus timed suppression. If the design later needs an intact but temporarily bypassed Shield, add a separate routing contract rather than pretending RechargeBlocked disables it.
+
+Full command-node and red decal authoring instructions are in `Docs/SeleneCommandLinkAndWeakPointReveal.md`.
 
 ### Dispatch
 
@@ -165,8 +172,11 @@ Narrative's stock projectile task is not suitable for Dispatch's authoritative s
 - Staccato Zero weak-point/ordinary miss, immune fallback, and server/client aim divergence
 - Axiom target with full, partial, zero, and no MaxShield; no Health overflow at any charge
 - Axiom recharge remains blocked for the authored duration, then resumes normally
+- Axiom first active hostile link Sever returns `NewlySevered`, grants exactly `+12`, and exposes only unbroken authored weak points
+- Axiom repeated, inactive, immune, non-hostile, missing-link, and out-of-range Sever attempts grant no Echo or reveal
+- Axiom spends `30` before the eligible Sever reward: verify `100 -> 82` and `30 -> 12`, with no replay after later meter changes
 - Dispatch early recall, timed recall, range recall, owner death, interruption, obstruction, and owner disconnect
 - Dispatch one hit per actor per leg, including repeated overlaps at low speed
 - first-person owner and third-person simulated-proxy montage/cue presentation
 
-These native classes are intentionally abstract scaffolds. Blueprint children, projectiles, effects, AnimSets, Gameplay Cues, Niagara, audio, and final balance must still be authored in the Unreal project.
+These native classes are intentionally abstract scaffolds. Blueprint children, projectiles, effects, AnimSets, Gameplay Cues, Niagara, audio, reveal decal materials, command-node membership, and final balance must still be authored in the Unreal project. Physical projectile reflection/retargeting remains a separate deferred system; this Sever integration does not change projectile ownership or trajectory.

@@ -177,6 +177,15 @@ bool FSovDominionHoundAbilityContractTest::RunTest(const FString& Parameters)
 	TestTrue(
 		TEXT("Pounce uses native authority movement by default"),
 		Pounce->IsUsingNativeMovement());
+	TestFalse(
+		TEXT("Sever does not interrupt an ordinary Bite"),
+		Bite->IsInterruptedByCommandLinkSever());
+	TestTrue(
+		TEXT("Sever interrupts the specialist Horn Charge"),
+		HornCharge->IsInterruptedByCommandLinkSever());
+	TestFalse(
+		TEXT("Sever does not interrupt an ordinary Pounce"),
+		Pounce->IsInterruptedByCommandLinkSever());
 
 	return true;
 }

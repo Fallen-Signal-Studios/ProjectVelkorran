@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Abilities/SovGameplayAbility_Echo.h"
+#include "Components/SovCommandLinkComponent.h"
 #include "SovGameplayAbility_SeleneEcho.generated.h"
 
 class UGameplayEffect;
@@ -158,6 +159,16 @@ class PROJECTVELKORRAN_API USovGameplayAbility_SeleneAxiomNullPulse : public USo
 
 public:
 	USovGameplayAbility_SeleneAxiomNullPulse();
+
+	/**
+	 * Attempts the command-link portion of Null Pulse against one command node
+	 * already selected by the authoritative pulse payload. Shield collapse,
+	 * recharge suppression, and device disable remain independently authored.
+	 */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Echo Ability|Axiom")
+	ESovCommandLinkSeverResolution TrySeverAxiomCommandLink(
+		AActor* CommandNode,
+		FSovCommandLinkSeverResult& OutResult);
 
 protected:
 	virtual bool HasRequiredPayloadConfiguration() const override;

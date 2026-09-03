@@ -3,10 +3,21 @@
 #include "Components/SovWeakPointComponent.h"
 
 #include "AbilitySystemBlueprintLibrary.h"
+#include "Character/NarrativeCharacterVisual.h"
+#include "Components/DecalComponent.h"
+#include "Components/MeshComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Components/SkinnedMeshComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/World.h"
+#include "GameFramework/GameStateBase.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
+#include "Kismet/GameplayStatics.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
 #include "Net/UnrealNetwork.h"
 #include "PhysicalMaterials/PhysicalMaterial.h"
+#include "TimerManager.h"
 #include "UnrealFramework/NarrativeCharacter.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogSovWeakPoint, Log, All);
@@ -32,8 +43,13 @@ void USovWeakPointComponent::BeginPlay()
 		NarrativeOwner->OnASCInitialized.AddUniqueDynamic(
 			this,
 			&ThisClass::HandleOwnerASCInitialized);
+		NarrativeOwner->CharacterVisualInitialized.AddUniqueDynamic(
+			this,
+			&ThisClass::HandleCharacterVisualInitialized);
+		BindCharacterVisual(NarrativeOwner->GetCharacterVisual());
 	}
 	TryInitializeFromOwner();
+	ApplyWeakPointRevealState();
 }
 
 void USovWeakPointComponent::EndPlay(
@@ -45,8 +61,21 @@ void USovWeakPointComponent::EndPlay(
 		NarrativeOwner->OnASCInitialized.RemoveDynamic(
 			this,
 			&ThisClass::HandleOwnerASCInitialized);
+		NarrativeOwner->CharacterVisualInitialized.RemoveDynamic(
+			this,
+			&ThisClass::HandleCharacterVisualInitialized);
 	}
 
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(
+			WeakPointRevealExpiryTimerHandle);
+		World->GetTimerManager().ClearTimer(
+			WeakPointRevealVisualRefreshTimerHandle);
+	}
+	bWeakPointRevealVisualRefreshPending = false;
+	BindCharacterVisual(nullptr);
+	ClearWeakPointRevealPresentation();
 	UninitializeFromAbilitySystem();
 	Super::EndPlay(EndPlayReason);
 }
@@ -56,6 +85,7 @@ void USovWeakPointComponent::GetLifetimeReplicatedProps(
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(USovWeakPointComponent, BrokenWeakPointIds);
+	DOREPLIFETIME(USovWeakPointComponent, WeakPointRevealState);
 }
 
 bool USovWeakPointComponent::InitializeWithAbilitySystem(
@@ -91,6 +121,7 @@ bool USovWeakPointComponent::InitializeWithAbilitySystem(
 	AbilitySystemComponent->OnDeathStateChanged.AddUniqueDynamic(
 		this,
 		&ThisClass::HandleDeathStateChanged);
+	ApplyWeakPointRevealState();
 	return true;
 }
 
@@ -104,6 +135,122 @@ bool USovWeakPointComponent::IsWeakPointBroken(
 {
 	return WeakPointId != NAME_None
 		&& BrokenWeakPointIds.Contains(WeakPointId);
+}
+
+bool USovWeakPointComponent::RevealWeakPoints(
+	const float Duration,
+	AActor* RevealInstigator)
+{
+	AActor* Owner = GetOwner();
+	if (!IsValid(Owner)
+		|| !Owner->HasAuthority()
+		|| (IsValid(AbilitySystemComponent.Get())
+			&& AbilitySystemComponent->IsDead())
+		|| !FMath::IsFinite(Duration)
+		|| Duration <= KINDA_SMALL_NUMBER)
+	{
+		return false;
+	}
+
+	const bool bHasUnbrokenZone = WeakPointZones.ContainsByPredicate(
+		[this](const FSovWeakPointZone& Zone)
+		{
+			return Zone.ZoneId != NAME_None
+				&& !IsWeakPointBroken(Zone.ZoneId);
+		});
+	if (!bHasUnbrokenZone)
+	{
+		return false;
+	}
+
+	const float RequestedEndTime =
+		GetSynchronizedServerWorldTimeSeconds() + Duration;
+	WeakPointRevealState.EndServerWorldTime = FMath::Max(
+		WeakPointRevealState.EndServerWorldTime,
+		RequestedEndTime);
+	WeakPointRevealState.RevealInstigator = RevealInstigator;
+	WeakPointRevealState.Serial =
+		WeakPointRevealState.Serial >= MAX_int32
+			? 1
+			: WeakPointRevealState.Serial + 1;
+
+	ApplyWeakPointRevealState();
+	Owner->FlushNetDormancy();
+	Owner->ForceNetUpdate();
+	return true;
+}
+
+void USovWeakPointComponent::ClearWeakPointReveal()
+{
+	AActor* Owner = GetOwner();
+	if (!IsValid(Owner) || !Owner->HasAuthority())
+	{
+		return;
+	}
+
+	const bool bHadRevealState =
+		WeakPointRevealState.EndServerWorldTime > 0.0f
+		|| IsValid(WeakPointRevealState.RevealInstigator.Get());
+	if (!bHadRevealState)
+	{
+		ApplyWeakPointRevealState();
+		return;
+	}
+
+	WeakPointRevealState.EndServerWorldTime = 0.0f;
+	WeakPointRevealState.RevealInstigator = nullptr;
+	WeakPointRevealState.Serial =
+		WeakPointRevealState.Serial >= MAX_int32
+			? 1
+			: WeakPointRevealState.Serial + 1;
+
+	ApplyWeakPointRevealState();
+	Owner->FlushNetDormancy();
+	Owner->ForceNetUpdate();
+}
+
+bool USovWeakPointComponent::IsWeakPointRevealActive() const
+{
+	if (IsValid(AbilitySystemComponent.Get())
+		&& AbilitySystemComponent->IsDead())
+	{
+		return false;
+	}
+
+	return WeakPointRevealState.EndServerWorldTime
+		> GetSynchronizedServerWorldTimeSeconds() + KINDA_SMALL_NUMBER;
+}
+
+float USovWeakPointComponent::GetWeakPointRevealRemainingSeconds() const
+{
+	if (!IsWeakPointRevealActive())
+	{
+		return 0.0f;
+	}
+
+	return FMath::Max(
+		WeakPointRevealState.EndServerWorldTime
+			- GetSynchronizedServerWorldTimeSeconds(),
+		0.0f);
+}
+
+TArray<FName> USovWeakPointComponent::GetRevealedWeakPointIds() const
+{
+	TArray<FName> RevealedIds;
+	if (!IsWeakPointRevealActive())
+	{
+		return RevealedIds;
+	}
+
+	for (const FSovWeakPointZone& Zone : WeakPointZones)
+	{
+		if (Zone.ZoneId != NAME_None
+			&& !IsWeakPointBroken(Zone.ZoneId))
+		{
+			RevealedIds.AddUnique(Zone.ZoneId);
+		}
+	}
+	return RevealedIds;
 }
 
 bool USovWeakPointComponent::HasValidWeakPointConfiguration() const
@@ -200,6 +347,7 @@ void USovWeakPointComponent::ResetWeakPoints()
 	{
 		return;
 	}
+	ClearWeakPointReveal();
 
 	TArray<FName> DesiredBrokenIds;
 	for (const FSovWeakPointZone& Zone : WeakPointZones)
@@ -231,6 +379,393 @@ void USovWeakPointComponent::ResetWeakPoints()
 	}
 
 	GetOwner()->ForceNetUpdate();
+}
+
+void USovWeakPointComponent::RefreshWeakPointRevealPresentation()
+{
+	DestroyActiveRevealDecals();
+
+	const UWorld* World = GetWorld();
+	const float RemainingSeconds = GetWeakPointRevealRemainingSeconds();
+	if (!IsValid(World)
+		|| World->GetNetMode() == NM_DedicatedServer
+		|| RemainingSeconds <= KINDA_SMALL_NUMBER)
+	{
+		ClearDecalReceiverBindings();
+		return;
+	}
+
+	const bool bHasPresentationMaterial = WeakPointZones.ContainsByPredicate(
+		[this](const FSovWeakPointZone& Zone)
+		{
+			return Zone.ZoneId != NAME_None
+				&& !IsWeakPointBroken(Zone.ZoneId)
+				&& (IsValid(Zone.RevealDecalMaterialOverride.Get())
+					|| IsValid(WeakPointRevealDecalMaterial.Get()));
+		});
+	if (!bHasPresentationMaterial)
+	{
+		ClearDecalReceiverBindings();
+		return;
+	}
+
+	RefreshDecalReceiverBindings();
+	for (const FSovWeakPointZone& Zone : WeakPointZones)
+	{
+		if (Zone.ZoneId == NAME_None || IsWeakPointBroken(Zone.ZoneId))
+		{
+			continue;
+		}
+
+		UMaterialInterface* SourceMaterial =
+			IsValid(Zone.RevealDecalMaterialOverride.Get())
+				? Zone.RevealDecalMaterialOverride.Get()
+				: WeakPointRevealDecalMaterial.Get();
+		if (!IsValid(SourceMaterial))
+		{
+			continue;
+		}
+
+		const FName AttachPoint = ResolveRevealAttachPoint(Zone);
+		UMeshComponent* AttachmentMesh =
+			ResolveRevealAttachmentMesh(Zone, AttachPoint);
+		if (!IsValid(AttachmentMesh))
+		{
+			continue;
+		}
+
+		UMaterialInstanceDynamic* RevealMaterial =
+			UMaterialInstanceDynamic::Create(SourceMaterial, this);
+		if (!IsValid(RevealMaterial))
+		{
+			continue;
+		}
+		if (RevealColorParameterName != NAME_None)
+		{
+			RevealMaterial->SetVectorParameterValue(
+				RevealColorParameterName,
+				WeakPointRevealColor);
+		}
+
+		const FVector DecalSize(
+			FMath::Max(FMath::Abs(Zone.RevealDecalSize.X), 1.0f),
+			FMath::Max(FMath::Abs(Zone.RevealDecalSize.Y), 1.0f),
+			FMath::Max(FMath::Abs(Zone.RevealDecalSize.Z), 1.0f));
+		UDecalComponent* Decal = UGameplayStatics::SpawnDecalAttached(
+			RevealMaterial,
+			DecalSize,
+			AttachmentMesh,
+			AttachPoint,
+			Zone.RevealRelativeTransform.GetLocation(),
+			Zone.RevealRelativeTransform.Rotator(),
+			EAttachLocation::KeepRelativeOffset,
+			RemainingSeconds);
+		if (!IsValid(Decal))
+		{
+			continue;
+		}
+
+		Decal->SetRelativeScale3D(
+			Zone.RevealRelativeTransform.GetScale3D());
+		const float FadeOutSeconds = FMath::Clamp(
+			RevealFadeOutDuration,
+			0.0f,
+			RemainingSeconds);
+		if (FadeOutSeconds > KINDA_SMALL_NUMBER)
+		{
+			Decal->SetFadeOut(
+				FMath::Max(RemainingSeconds - FadeOutSeconds, 0.0f),
+				FadeOutSeconds,
+				false);
+		}
+		ActiveRevealDecals.Add(Decal);
+	}
+}
+
+void USovWeakPointComponent::BindCharacterVisual(
+	ANarrativeCharacterVisual* NewCharacterVisual)
+{
+	if (BoundCharacterVisual == NewCharacterVisual)
+	{
+		return;
+	}
+
+	if (IsValid(BoundCharacterVisual.Get()))
+	{
+		BoundCharacterVisual->OnBaseAppearanceApplied.RemoveDynamic(
+			this,
+			&ThisClass::HandleBaseAppearanceApplied);
+		BoundCharacterVisual->OnAppearancePartChanged.RemoveDynamic(
+			this,
+			&ThisClass::HandleAppearancePartChanged);
+	}
+
+	BoundCharacterVisual = NewCharacterVisual;
+	if (IsValid(BoundCharacterVisual.Get()))
+	{
+		BoundCharacterVisual->OnBaseAppearanceApplied.AddUniqueDynamic(
+			this,
+			&ThisClass::HandleBaseAppearanceApplied);
+		BoundCharacterVisual->OnAppearancePartChanged.AddUniqueDynamic(
+			this,
+			&ThisClass::HandleAppearancePartChanged);
+	}
+}
+
+void USovWeakPointComponent::ApplyWeakPointRevealState()
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(
+			WeakPointRevealExpiryTimerHandle);
+	}
+
+	const bool bTimedRevealActive = IsWeakPointRevealActive();
+	const bool bShouldBeActive = bTimedRevealActive
+		&& !GetRevealedWeakPointIds().IsEmpty();
+	if (bTimedRevealActive)
+	{
+		ScheduleWeakPointRevealExpiry();
+	}
+	if (bShouldBeActive)
+	{
+		RefreshWeakPointRevealPresentation();
+	}
+	else
+	{
+		ClearWeakPointRevealPresentation();
+	}
+
+	if (bLocalWeakPointRevealActive != bShouldBeActive)
+	{
+		bLocalWeakPointRevealActive = bShouldBeActive;
+		OnWeakPointRevealStateChanged.Broadcast(
+			bShouldBeActive,
+			bShouldBeActive
+				? GetWeakPointRevealRemainingSeconds()
+				: 0.0f,
+			bShouldBeActive
+				? WeakPointRevealState.RevealInstigator.Get()
+				: nullptr);
+	}
+}
+
+void USovWeakPointComponent::ScheduleWeakPointRevealExpiry()
+{
+	UWorld* World = GetWorld();
+	const float RemainingSeconds = GetWeakPointRevealRemainingSeconds();
+	if (!IsValid(World) || RemainingSeconds <= KINDA_SMALL_NUMBER)
+	{
+		return;
+	}
+
+	World->GetTimerManager().SetTimer(
+		WeakPointRevealExpiryTimerHandle,
+		this,
+		&ThisClass::HandleWeakPointRevealExpired,
+		RemainingSeconds,
+		false,
+		RemainingSeconds);
+}
+
+void USovWeakPointComponent::ScheduleWeakPointRevealVisualRefresh()
+{
+	if (!IsWeakPointRevealActive()
+		|| bWeakPointRevealVisualRefreshPending)
+	{
+		return;
+	}
+
+	if (UWorld* World = GetWorld())
+	{
+		bWeakPointRevealVisualRefreshPending = true;
+		WeakPointRevealVisualRefreshTimerHandle =
+			World->GetTimerManager().SetTimerForNextTick(
+				FTimerDelegate::CreateUObject(
+					this,
+					&ThisClass::HandleDeferredWeakPointRevealVisualRefresh));
+	}
+	else
+	{
+		RefreshWeakPointRevealPresentation();
+	}
+}
+
+void USovWeakPointComponent::HandleWeakPointRevealExpired()
+{
+	if (IsWeakPointRevealActive())
+	{
+		ScheduleWeakPointRevealExpiry();
+		return;
+	}
+
+	if (AActor* Owner = GetOwner(); IsValid(Owner) && Owner->HasAuthority())
+	{
+		ClearWeakPointReveal();
+	}
+	else
+	{
+		ApplyWeakPointRevealState();
+	}
+}
+
+void USovWeakPointComponent::HandleDeferredWeakPointRevealVisualRefresh()
+{
+	bWeakPointRevealVisualRefreshPending = false;
+	RefreshWeakPointRevealPresentation();
+}
+
+void USovWeakPointComponent::ClearWeakPointRevealPresentation()
+{
+	DestroyActiveRevealDecals();
+	ClearDecalReceiverBindings();
+}
+
+void USovWeakPointComponent::DestroyActiveRevealDecals()
+{
+	for (UDecalComponent* Decal : ActiveRevealDecals)
+	{
+		if (IsValid(Decal))
+		{
+			Decal->DestroyComponent();
+		}
+	}
+	ActiveRevealDecals.Reset();
+}
+
+void USovWeakPointComponent::RefreshDecalReceiverBindings()
+{
+	ClearDecalReceiverBindings();
+
+	TArray<UMeshComponent*> PresentationMeshes;
+	GatherPresentationMeshes(PresentationMeshes);
+	for (UMeshComponent* MeshComponent : PresentationMeshes)
+	{
+		if (!IsValid(MeshComponent))
+		{
+			continue;
+		}
+
+		FDecalReceiverBinding& Binding =
+			DecalReceiverBindings.AddDefaulted_GetRef();
+		Binding.MeshComponent = MeshComponent;
+		Binding.bPreviouslyReceivedDecals = MeshComponent->bReceivesDecals;
+		MeshComponent->SetReceivesDecals(true);
+	}
+}
+
+void USovWeakPointComponent::ClearDecalReceiverBindings()
+{
+	for (const FDecalReceiverBinding& Binding : DecalReceiverBindings)
+	{
+		if (UMeshComponent* MeshComponent = Binding.MeshComponent.Get();
+			IsValid(MeshComponent))
+		{
+			MeshComponent->SetReceivesDecals(
+				Binding.bPreviouslyReceivedDecals);
+		}
+	}
+	DecalReceiverBindings.Reset();
+}
+
+void USovWeakPointComponent::GatherPresentationMeshes(
+	TArray<UMeshComponent*>& OutMeshes) const
+{
+	OutMeshes.Reset();
+	const auto GatherFromActor = [&OutMeshes](AActor* Actor)
+	{
+		if (!IsValid(Actor))
+		{
+			return;
+		}
+
+		TInlineComponentArray<UMeshComponent*> MeshComponents;
+		Actor->GetComponents(MeshComponents);
+		for (UMeshComponent* MeshComponent : MeshComponents)
+		{
+			if (IsValid(MeshComponent)
+				&& (MeshComponent->IsA<USkeletalMeshComponent>()
+					|| MeshComponent->IsA<UStaticMeshComponent>()))
+			{
+				OutMeshes.AddUnique(MeshComponent);
+			}
+		}
+	};
+
+	GatherFromActor(GetOwner());
+	GatherFromActor(BoundCharacterVisual.Get());
+}
+
+UMeshComponent* USovWeakPointComponent::ResolveRevealAttachmentMesh(
+	const FSovWeakPointZone& Zone,
+	const FName AttachPoint) const
+{
+	TArray<UMeshComponent*> PresentationMeshes;
+	GatherPresentationMeshes(PresentationMeshes);
+	UMeshComponent* HiddenFallback = nullptr;
+	for (UMeshComponent* MeshComponent : PresentationMeshes)
+	{
+		if (!IsValid(MeshComponent)
+			|| (Zone.RevealMeshComponentTag != NAME_None
+				&& !MeshComponent->ComponentTags.Contains(
+					Zone.RevealMeshComponentTag)))
+		{
+			continue;
+		}
+
+		if (AttachPoint != NAME_None)
+		{
+			USkeletalMeshComponent* SkeletalMesh =
+				Cast<USkeletalMeshComponent>(MeshComponent);
+			if (!IsValid(SkeletalMesh)
+				|| (SkeletalMesh->GetBoneIndex(AttachPoint) == INDEX_NONE
+					&& !SkeletalMesh->DoesSocketExist(AttachPoint)))
+			{
+				continue;
+			}
+		}
+
+		if (MeshComponent->IsVisible() && !MeshComponent->bHiddenInGame)
+		{
+			return MeshComponent;
+		}
+		if (!IsValid(HiddenFallback))
+		{
+			HiddenFallback = MeshComponent;
+		}
+	}
+	return HiddenFallback;
+}
+
+FName USovWeakPointComponent::ResolveRevealAttachPoint(
+	const FSovWeakPointZone& Zone) const
+{
+	if (Zone.RevealAttachPoint != NAME_None)
+	{
+		return Zone.RevealAttachPoint;
+	}
+	for (const FName HitBone : Zone.HitBones)
+	{
+		if (HitBone != NAME_None)
+		{
+			return HitBone;
+		}
+	}
+	return NAME_None;
+}
+
+float USovWeakPointComponent::GetSynchronizedServerWorldTimeSeconds() const
+{
+	UWorld* World = GetWorld();
+	if (!IsValid(World))
+	{
+		return 0.0f;
+	}
+	if (const AGameStateBase* GameState = World->GetGameState())
+	{
+		return GameState->GetServerWorldTimeSeconds();
+	}
+	return World->GetTimeSeconds();
 }
 
 void USovWeakPointComponent::TryInitializeFromOwner()
@@ -407,12 +942,37 @@ void USovWeakPointComponent::SetWeakPointBroken(
 		BrokenWeakPointIds.Remove(WeakPointId);
 	}
 	OnWeakPointStateChanged.Broadcast(WeakPointId, bShouldBeBroken);
+	ApplyWeakPointRevealState();
 	GetOwner()->ForceNetUpdate();
 }
 
 void USovWeakPointComponent::HandleOwnerASCInitialized()
 {
 	TryInitializeFromOwner();
+}
+
+void USovWeakPointComponent::HandleCharacterVisualInitialized(
+	ANarrativeCharacter* Character)
+{
+	if (Character != GetOwner())
+	{
+		return;
+	}
+
+	BindCharacterVisual(Character->GetCharacterVisual());
+	ScheduleWeakPointRevealVisualRefresh();
+}
+
+void USovWeakPointComponent::HandleBaseAppearanceApplied()
+{
+	ScheduleWeakPointRevealVisualRefresh();
+}
+
+void USovWeakPointComponent::HandleAppearancePartChanged(
+	const FGameplayTag AppearanceSlot)
+{
+	static_cast<void>(AppearanceSlot);
+	ScheduleWeakPointRevealVisualRefresh();
 }
 
 void USovWeakPointComponent::HandleDamageResolvedAsTarget(
@@ -427,9 +987,38 @@ void USovWeakPointComponent::HandleDeathStateChanged(
 	UNarrativeAbilitySystemComponent* ChangedActorASC,
 	const bool bIsDead)
 {
-	if (!bIsDead
-		&& (ChangedActor == GetOwner()
-			|| ChangedActorASC == AbilitySystemComponent.Get()))
+	if (ChangedActor != GetOwner()
+		&& ChangedActorASC != AbilitySystemComponent.Get())
+	{
+		return;
+	}
+
+	if (bIsDead)
+	{
+		if (AActor* Owner = GetOwner();
+			IsValid(Owner) && Owner->HasAuthority())
+		{
+			ClearWeakPointReveal();
+		}
+		else
+		{
+			if (UWorld* World = GetWorld())
+			{
+				World->GetTimerManager().ClearTimer(
+					WeakPointRevealExpiryTimerHandle);
+			}
+			ClearWeakPointRevealPresentation();
+			if (bLocalWeakPointRevealActive)
+			{
+				bLocalWeakPointRevealActive = false;
+				OnWeakPointRevealStateChanged.Broadcast(
+					false,
+					0.0f,
+					nullptr);
+			}
+		}
+	}
+	else
 	{
 		ResetWeakPoints();
 	}
@@ -452,4 +1041,10 @@ void USovWeakPointComponent::OnRep_BrokenWeakPointIds(
 			OnWeakPointStateChanged.Broadcast(NewId, true);
 		}
 	}
+	ApplyWeakPointRevealState();
+}
+
+void USovWeakPointComponent::OnRep_WeakPointRevealState()
+{
+	ApplyWeakPointRevealState();
 }

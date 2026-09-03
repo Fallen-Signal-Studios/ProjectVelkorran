@@ -87,6 +87,13 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Dominion Hound|Targeting")
 	float GetMaximumAttackRange() const { return MaximumAttackRange; }
 
+	/** True when Sever interrupts this attack's active execution. */
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Dominion Hound|Command Link")
+	bool IsInterruptedByCommandLinkSever() const
+	{
+		return bInterruptedByCommandLinkSever;
+	}
+
 protected:
 	virtual void ActivateAbility(
 		const FGameplayAbilitySpecHandle Handle,
@@ -206,6 +213,10 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Dominion Hound|Timing", meta = (ClampMin = "0.1", Units = "s"))
 	float MaximumActiveDuration = 2.0f;
+
+	/** Specialist attacks opt into interruption when their command link is Severed. */
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Dominion Hound|Command Link")
+	bool bInterruptedByCommandLinkSever = false;
 
 	/** Presentation hooks only. Gameplay remains wholly native and authoritative. */
 	UFUNCTION(BlueprintImplementableEvent, Category = "Sovereign|Dominion Hound|Presentation", meta = (DisplayName = "Hound Attack Started"))

@@ -3,6 +3,7 @@
 #include "Components/SovSeleneEchoGenerationComponent.h"
 
 #include "AbilitySystemBlueprintLibrary.h"
+#include "Components/SovCommandLinkComponent.h"
 #include "Components/SovDeflectionComponent.h"
 #include "Components/SovEchoComponent.h"
 #include "Components/SovWeakPointComponent.h"
@@ -163,7 +164,8 @@ void USovSeleneEchoGenerationComponent::UninitializeFromAbilitySystem()
 	DeflectionComponent = nullptr;
 }
 
-bool USovSeleneEchoGenerationComponent::CanGenerateSeleneEcho() const
+bool USovSeleneEchoGenerationComponent::CanGenerateSeleneEcho(
+	const bool bAllowDuringEchoAbility) const
 {
 	if (!IsInitialized()
 		|| !GetOwner()
@@ -185,8 +187,9 @@ bool USovSeleneEchoGenerationComponent::CanGenerateSeleneEcho() const
 		|| AbilitySystemComponent->HasMatchingGameplayTag(
 			NarrativeTags.State_IsDead)
 		|| AbilitySystemComponent->HasMatchingGameplayTag(SovTags.State_Fatal)
-		|| AbilitySystemComponent->HasMatchingGameplayTag(
-			SovTags.State_EchoAbility_Active))
+		|| (!bAllowDuringEchoAbility
+			&& AbilitySystemComponent->HasMatchingGameplayTag(
+				SovTags.State_EchoAbility_Active)))
 	{
 		return false;
 	}
@@ -232,14 +235,52 @@ bool USovSeleneEchoGenerationComponent::IsHostileWeakPointTarget(
 			== ETeamAttitude::Hostile;
 }
 
+bool USovSeleneEchoGenerationComponent::ConsumeCommandLinkSever(
+	const FSovCommandLinkSeverResult& SeverResult)
+{
+	AActor* CommandNode = SeverResult.LinkOwner.Get();
+	AActor* SeverInstigator = SeverResult.SeveredBy.Get();
+	if (!GetOwner()
+		|| !GetOwner()->HasAuthority()
+		|| !SeverResult.TransactionId.IsValid()
+		|| !SeverResult.LinkInstanceId.IsValid()
+		|| SeverResult.LinkId == NAME_None
+		|| SeverInstigator != GetOwner()
+		|| !IsValid(CommandNode)
+		|| CommandNode->GetWorld() != GetWorld()
+		|| ConsumedCommandLinkSeverTransactions.Contains(
+			SeverResult.TransactionId))
+	{
+		return false;
+	}
+
+	// Consume the transaction before any resource or target policy can discard
+	// its reward. A replay must never become payable after Echo later changes.
+	ConsumedCommandLinkSeverTransactions.Add(SeverResult.TransactionId);
+	if (!SeverResult.bEligibleForEchoReward)
+	{
+		return true;
+	}
+
+	AwardEcho(
+		GetCommandLinkSeverEchoReward(),
+		FSovGameplayTags::Get().Echo_Source_CommandLinkSever,
+		ESovSeleneEchoAwardType::CommandLinkSever,
+		SeverResult.LinkId,
+		CommandNode,
+		true);
+	return true;
+}
+
 void USovSeleneEchoGenerationComponent::AwardEcho(
 	const float RequestedEcho,
 	const FGameplayTag& SourceTag,
 	const ESovSeleneEchoAwardType AwardType,
 	const FName WeakPointId,
-	AActor* OtherActor)
+	AActor* OtherActor,
+	const bool bAllowDuringEchoAbility)
 {
-	if (!CanGenerateSeleneEcho()
+	if (!CanGenerateSeleneEcho(bAllowDuringEchoAbility)
 		|| RequestedEcho <= KINDA_SMALL_NUMBER
 		|| !SourceTag.IsValid())
 	{
