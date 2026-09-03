@@ -105,6 +105,7 @@ USovGameplayAbility_DominionHoundAttackBase::
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerOnly;
 	NetSecurityPolicy = EGameplayAbilityNetSecurityPolicy::ServerOnly;
 	bRequiresAmmo = false;
+	bRequiresNarrativeAttackToken = true;
 
 	const FNarrativeGameplayTags& NarrativeTags = FNarrativeGameplayTags::Get();
 	const FSovGameplayTags& SovTags = FSovGameplayTags::Get();
@@ -230,6 +231,7 @@ void USovGameplayAbility_DominionHoundAttackBase::ActivateAbility(
 	const FGameplayAbilityActivationInfo ActivationInfo,
 	const FGameplayEventData* TriggerEventData)
 {
+	const uint64 ThisActivationEpoch = AdvanceActivationEpoch();
 	bPayloadStarted = false;
 	bPayloadFinished = false;
 	bAbilityStarted = false;
@@ -275,6 +277,10 @@ void USovGameplayAbility_DominionHoundAttackBase::ActivateAbility(
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
+	if (!IsActivationEpochCurrent(ThisActivationEpoch))
+	{
+		return;
+	}
 
 	if (UWorld* World = GetWorld())
 	{
@@ -283,7 +289,7 @@ void USovGameplayAbility_DominionHoundAttackBase::ActivateAbility(
 	}
 
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
-	if (!IsActive())
+	if (!IsActivationEpochCurrent(ThisActivationEpoch))
 	{
 		return;
 	}
@@ -296,8 +302,12 @@ void USovGameplayAbility_DominionHoundAttackBase::ActivateAbility(
 
 	bAbilityStarted = true;
 	StartAttackMontage();
+	if (!IsActivationEpochCurrent(ThisActivationEpoch))
+	{
+		return;
+	}
 	ReceiveHoundAttackStarted(TargetActor);
-	if (!IsActive())
+	if (!IsActivationEpochCurrent(ThisActivationEpoch))
 	{
 		return;
 	}
@@ -307,29 +317,38 @@ void USovGameplayAbility_DominionHoundAttackBase::ActivateAbility(
 		const float SafeImpactDelay = FMath::Max(ActiveImpactDelay, 0.0f);
 		if (SafeImpactDelay <= KINDA_SMALL_NUMBER)
 		{
-			HandleImpactTimer();
+			HandleImpactTimer(ThisActivationEpoch);
 		}
 		else
 		{
-			World->GetTimerManager().SetTimer(
-				ImpactTimerHandle,
+			const FTimerDelegate ImpactTimerDelegate = FTimerDelegate::CreateUObject(
 				this,
 				&ThisClass::HandleImpactTimer,
+				ThisActivationEpoch);
+			World->GetTimerManager().SetTimer(
+				ImpactTimerHandle,
+				ImpactTimerDelegate,
 				SafeImpactDelay,
 				false);
 		}
 
-		if (!IsActive())
+		if (!IsActivationEpochCurrent(ThisActivationEpoch))
 		{
 			return;
 		}
-		World->GetTimerManager().SetTimer(
-			MaximumDurationTimerHandle,
+		const FTimerDelegate WatchdogTimerDelegate = FTimerDelegate::CreateUObject(
 			this,
 			&ThisClass::HandleMaximumDurationExpired,
+			ThisActivationEpoch);
+		World->GetTimerManager().SetTimer(
+			MaximumDurationTimerHandle,
+			WatchdogTimerDelegate,
 			FMath::Max(MaximumActiveDuration, 0.1f),
 			false);
+		return;
 	}
+
+	CancelHoundAttack();
 }
 
 void USovGameplayAbility_DominionHoundAttackBase::EndAbility(
@@ -339,11 +358,29 @@ void USovGameplayAbility_DominionHoundAttackBase::EndAbility(
 	const bool bReplicateEndAbility,
 	const bool bWasCancelled)
 {
+	if (!IsEndAbilityValid(Handle, ActorInfo))
+	{
+		return;
+	}
+	if (ScopeLockCount > 0)
+	{
+		WaitingToExecute.Add(FPostLockDelegate::CreateUObject(
+			this,
+			&ThisClass::EndAbility,
+			Handle,
+			ActorInfo,
+			ActivationInfo,
+			bReplicateEndAbility,
+			bWasCancelled));
+		return;
+	}
+
 	if (bEndingAbility)
 	{
 		return;
 	}
 	bEndingAbility = true;
+	AdvanceActivationEpoch();
 
 	UnbindCancellationTags();
 	StopOwnedMovement();
@@ -438,11 +475,16 @@ void USovGameplayAbility_DominionHoundAttackBase::PrepareAttack()
 
 void USovGameplayAbility_DominionHoundAttackBase::BeginAttackPayload()
 {
+	const uint64 ExpectedEpoch = GetActiveActivationEpoch();
 	const FVector Start = ResolveAttackProbeLocation();
 	const FVector End = Start
 		+ ResolveAttackDirection(Start) * FMath::Max(TraceReach, 0.0f);
 	bool bBlockedByWorld = false;
 	ApplyAttackSweep(Start, End, TraceRadius, bBlockedByWorld);
+	if (!IsActivationEpochCurrent(ExpectedEpoch))
+	{
+		return;
+	}
 	FinishAttackPayload();
 }
 
@@ -464,6 +506,7 @@ bool USovGameplayAbility_DominionHoundAttackBase::TryBeginAttackPayload()
 	{
 		return false;
 	}
+	const uint64 ExpectedEpoch = GetActiveActivationEpoch();
 
 	bPayloadStarted = true;
 	if (UWorld* World = GetWorld())
@@ -471,7 +514,7 @@ bool USovGameplayAbility_DominionHoundAttackBase::TryBeginAttackPayload()
 		World->GetTimerManager().ClearTimer(ImpactTimerHandle);
 	}
 	BeginAttackPayload();
-	return IsActive();
+	return IsActivationEpochCurrent(ExpectedEpoch);
 }
 
 void USovGameplayAbility_DominionHoundAttackBase::FinishAttackPayload()
@@ -486,7 +529,12 @@ void USovGameplayAbility_DominionHoundAttackBase::FinishAttackPayload()
 		return;
 	}
 
+	const uint64 ExpectedEpoch = GetActiveActivationEpoch();
 	StopOwnedMovement();
+	if (!IsActivationEpochCurrent(ExpectedEpoch))
+	{
+		return;
+	}
 	bPayloadFinished = true;
 	if (UWorld* World = GetWorld())
 	{
@@ -495,21 +543,24 @@ void USovGameplayAbility_DominionHoundAttackBase::FinishAttackPayload()
 	const float Recovery = FMath::Max(ActiveRecoveryAfterImpact, 0.0f);
 	if (Recovery <= KINDA_SMALL_NUMBER)
 	{
-		HandleRecoveryFinished();
+		HandleRecoveryFinished(GetActiveActivationEpoch());
 		return;
 	}
 
 	if (UWorld* World = GetWorld())
 	{
-		World->GetTimerManager().SetTimer(
-			RecoveryTimerHandle,
+		const FTimerDelegate RecoveryTimerDelegate = FTimerDelegate::CreateUObject(
 			this,
 			&ThisClass::HandleRecoveryFinished,
+			ExpectedEpoch);
+		World->GetTimerManager().SetTimer(
+			RecoveryTimerHandle,
+			RecoveryTimerDelegate,
 			Recovery,
 			false);
 		return;
 	}
-	HandleRecoveryFinished();
+	HandleRecoveryFinished(GetActiveActivationEpoch());
 }
 
 void USovGameplayAbility_DominionHoundAttackBase::CancelHoundAttack()
@@ -564,6 +615,25 @@ bool USovGameplayAbility_DominionHoundAttackBase::
 			|| !AbilitySystem->HasMatchingGameplayTag(
 				SovTags.State_CommandLink_Severed))
 		&& HasRequiredAttackTokenLease();
+}
+
+bool USovGameplayAbility_DominionHoundAttackBase::
+	IsActivationEpochCurrent(const uint64 ExpectedEpoch) const
+{
+	return ExpectedEpoch != 0
+		&& ExpectedEpoch == ActivationEpoch
+		&& IsActive()
+		&& !bEndingAbility;
+}
+
+uint64 USovGameplayAbility_DominionHoundAttackBase::AdvanceActivationEpoch()
+{
+	++ActivationEpoch;
+	if (ActivationEpoch == 0)
+	{
+		++ActivationEpoch;
+	}
+	return ActivationEpoch;
 }
 
 bool USovGameplayAbility_DominionHoundAttackBase::
@@ -713,6 +783,7 @@ bool USovGameplayAbility_DominionHoundAttackBase::ApplyAttackSweep(
 	const float Radius,
 	bool& bOutBlockedByWorld)
 {
+	const uint64 ExpectedEpoch = GetActiveActivationEpoch();
 	bOutBlockedByWorld = false;
 	TArray<FHitResult> Hits = PerformTraceMulti(
 		Start,
@@ -729,17 +800,17 @@ bool USovGameplayAbility_DominionHoundAttackBase::ApplyAttackSweep(
 		: nullptr;
 	for (const FHitResult& Hit : Hits)
 	{
+		if (!IsActivationEpochCurrent(ExpectedEpoch))
+		{
+			return false;
+		}
+
 		UAbilitySystemComponent* TargetAbilitySystem =
 			ResolveAbilitySystemFromHoundHit(Hit.GetActor());
-		if (bRequiresNarrativeAttackToken
-			&& TargetAbilitySystem != AttackTokenTargetAbilitySystem.Get())
-		{
-			// The finite attacker slot belongs to the selected target. Another
-			// hostile crossing the sweep cannot inherit that reservation or take
-			// unbudgeted damage from this committed charge.
-			continue;
-		}
-		if (IsValidAttackTarget(
+		const bool bMatchesReservedTarget = !bRequiresNarrativeAttackToken
+			|| TargetAbilitySystem == AttackTokenTargetAbilitySystem.Get();
+		if (bMatchesReservedTarget
+			&& IsValidAttackTarget(
 				SourceActor,
 				SourceAbilitySystem,
 				TargetAbilitySystem))
@@ -757,13 +828,21 @@ bool USovGameplayAbility_DominionHoundAttackBase::ApplyAttackSweep(
 			const bool bAppliedDamage = ApplyPointDamage(
 				Hit,
 				TargetAbilitySystem);
-			if (bAppliedDamage && IsActive() && !bEndingAbility)
+			if (!IsActivationEpochCurrent(ExpectedEpoch))
+			{
+				return bAppliedDamage;
+			}
+			if (bAppliedDamage)
 			{
 				ReceiveHoundAttackImpact();
 			}
 			return bAppliedDamage;
 		}
 
+		// A different ASC cannot inherit the selected target's finite attacker
+		// slot, but it and ordinary world geometry still remain solid obstacles.
+		// Evaluate blocking after damage eligibility so token filtering never lets
+		// Bite, Charge, or Pounce trace through cover.
 		if (IsMovementBlockingSurface(Hit))
 		{
 			bOutBlockedByWorld = true;
@@ -995,17 +1074,24 @@ void USovGameplayAbility_DominionHoundAttackBase::StartAttackMontage()
 	MontageTask->ReadyForActivation();
 }
 
-void USovGameplayAbility_DominionHoundAttackBase::HandleImpactTimer()
+void USovGameplayAbility_DominionHoundAttackBase::HandleImpactTimer(
+	const uint64 ExpectedEpoch)
 {
-	if (!TryBeginAttackPayload())
+	if (!IsActivationEpochCurrent(ExpectedEpoch))
+	{
+		return;
+	}
+	if (!TryBeginAttackPayload()
+		&& IsActivationEpochCurrent(ExpectedEpoch))
 	{
 		CancelHoundAttack();
 	}
 }
 
-void USovGameplayAbility_DominionHoundAttackBase::HandleRecoveryFinished()
+void USovGameplayAbility_DominionHoundAttackBase::HandleRecoveryFinished(
+	const uint64 ExpectedEpoch)
 {
-	if (IsActive())
+	if (IsActivationEpochCurrent(ExpectedEpoch))
 	{
 		EndAbility(
 			CurrentSpecHandle,
@@ -1017,8 +1103,12 @@ void USovGameplayAbility_DominionHoundAttackBase::HandleRecoveryFinished()
 }
 
 void USovGameplayAbility_DominionHoundAttackBase::
-	HandleMaximumDurationExpired()
+	HandleMaximumDurationExpired(const uint64 ExpectedEpoch)
 {
+	if (!IsActivationEpochCurrent(ExpectedEpoch))
+	{
+		return;
+	}
 	UE_LOG(
 		LogSovDominionHoundAbility,
 		Warning,
@@ -1234,7 +1324,6 @@ USovGameplayAbility_DominionHoundHornCharge::
 	bInterruptedByCommandLinkSever = true;
 	bRequiresActiveCommandLink = true;
 	bRequiresHandlerOrderAuthorization = true;
-	bRequiresNarrativeAttackToken = true;
 	ActivationRequiredTags.AddTag(SovTags.State_CommandLink_Active);
 	ActivationRequiredTags.AddTag(
 		SovTags.State_CommandLink_HoundChargeAuthorized);
@@ -1324,6 +1413,7 @@ bool USovGameplayAbility_DominionHoundHornCharge::
 
 void USovGameplayAbility_DominionHoundHornCharge::BeginAttackPayload()
 {
+	const uint64 ExpectedEpoch = GetActiveActivationEpoch();
 	ACharacter* Character = Cast<ACharacter>(GetAvatarActorFromActorInfo());
 	UWorld* World = GetWorld();
 	if (!IsValid(Character) || !IsValid(World))
@@ -1362,26 +1452,43 @@ void USovGameplayAbility_DominionHoundHornCharge::BeginAttackPayload()
 			Cast<AAIController>(GetOwningController()))
 		{
 			AIController->StopMovement();
+			if (!IsActivationEpochCurrent(ExpectedEpoch))
+			{
+				return;
+			}
 		}
 		OwnedMovementComponent = Movement;
 		SavedMaxWalkSpeed = Movement->MaxWalkSpeed;
+		bOwnsChargeMovement = true;
 		Movement->MaxWalkSpeed = FMath::Max(ChargeSpeed, 1.0f);
 		Movement->StopMovementImmediately();
+		if (!IsActivationEpochCurrent(ExpectedEpoch))
+		{
+			return;
+		}
 		Movement->Velocity = ChargeDirection * FMath::Max(ChargeSpeed, 0.0f);
-		bOwnsChargeMovement = true;
 	}
 
-	World->GetTimerManager().SetTimer(
-		ChargeUpdateTimerHandle,
+	if (!IsActivationEpochCurrent(ExpectedEpoch))
+	{
+		return;
+	}
+	const FTimerDelegate ChargeTimerDelegate = FTimerDelegate::CreateUObject(
 		this,
 		&ThisClass::UpdateCharge,
+		ExpectedEpoch);
+	World->GetTimerManager().SetTimer(
+		ChargeUpdateTimerHandle,
+		ChargeTimerDelegate,
 		FMath::Max(MovementSweepInterval, 0.005f),
 		true);
-	UpdateCharge();
+	UpdateCharge(ExpectedEpoch);
 }
 
 void USovGameplayAbility_DominionHoundHornCharge::StopOwnedMovement()
 {
+	const uint64 ExpectedEpoch = GetActiveActivationEpoch();
+	const bool bCleanupDuringEnd = IsEndingHoundAbility();
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(ChargeUpdateTimerHandle);
@@ -1393,6 +1500,11 @@ void USovGameplayAbility_DominionHoundHornCharge::StopOwnedMovement()
 			OwnedMovementComponent.Get())
 		{
 			Movement->StopMovementImmediately();
+			if (!bCleanupDuringEnd
+				&& !IsActivationEpochCurrent(ExpectedEpoch))
+			{
+				return;
+			}
 			Movement->MaxWalkSpeed = SavedMaxWalkSpeed;
 		}
 	}
@@ -1401,8 +1513,13 @@ void USovGameplayAbility_DominionHoundHornCharge::StopOwnedMovement()
 	ChargeStartTime = 0.0;
 }
 
-void USovGameplayAbility_DominionHoundHornCharge::UpdateCharge()
+void USovGameplayAbility_DominionHoundHornCharge::UpdateCharge(
+	const uint64 ExpectedEpoch)
 {
+	if (!IsActivationEpochCurrent(ExpectedEpoch))
+	{
+		return;
+	}
 	if (!CanContinueAttackPayload())
 	{
 		CancelHoundAttack();
@@ -1442,6 +1559,10 @@ void USovGameplayAbility_DominionHoundHornCharge::UpdateCharge()
 			+ ChargeDirection * FMath::Max(TraceReach, 0.0f),
 		TraceRadius,
 		bBlockedByWorld);
+	if (!IsActivationEpochCurrent(ExpectedEpoch))
+	{
+		return;
+	}
 	PreviousProbeLocation = CurrentProbeLocation;
 
 	const float Elapsed = static_cast<float>(
@@ -1510,6 +1631,7 @@ bool USovGameplayAbility_DominionHoundPounce::
 
 void USovGameplayAbility_DominionHoundPounce::BeginAttackPayload()
 {
+	const uint64 ExpectedEpoch = GetActiveActivationEpoch();
 	ACharacter* Character = Cast<ACharacter>(GetAvatarActorFromActorInfo());
 	AActor* Target = GetAttackTarget();
 	UWorld* World = GetWorld();
@@ -1546,11 +1668,20 @@ void USovGameplayAbility_DominionHoundPounce::BeginAttackPayload()
 			Cast<AAIController>(GetOwningController()))
 		{
 			AIController->StopMovement();
+			if (!IsActivationEpochCurrent(ExpectedEpoch))
+			{
+				return;
+			}
 		}
 		OwnedMovementComponent = Movement;
 		SavedAirControl = Movement->AirControl;
+		bOwnsPounceMovement = true;
 		Movement->AirControl = 0.0f;
 		Movement->StopMovementImmediately();
+		if (!IsActivationEpochCurrent(ExpectedEpoch))
+		{
+			return;
+		}
 
 		const float FlightTime = FMath::Max(PounceFlightDuration, 0.1f);
 		FVector LaunchVelocity = (TargetLocation - StartLocation) / FlightTime;
@@ -1558,20 +1689,32 @@ void USovGameplayAbility_DominionHoundPounce::BeginAttackPayload()
 		LaunchVelocity = LaunchVelocity.GetClampedToMaxSize(
 			FMath::Max(MaximumLaunchSpeed, 1.0f));
 		Character->LaunchCharacter(LaunchVelocity, true, true);
-		bOwnsPounceMovement = true;
+		if (!IsActivationEpochCurrent(ExpectedEpoch))
+		{
+			return;
+		}
 	}
 
-	World->GetTimerManager().SetTimer(
-		PounceUpdateTimerHandle,
+	if (!IsActivationEpochCurrent(ExpectedEpoch))
+	{
+		return;
+	}
+	const FTimerDelegate PounceTimerDelegate = FTimerDelegate::CreateUObject(
 		this,
 		&ThisClass::UpdatePounce,
+		ExpectedEpoch);
+	World->GetTimerManager().SetTimer(
+		PounceUpdateTimerHandle,
+		PounceTimerDelegate,
 		FMath::Max(MovementSweepInterval, 0.005f),
 		true);
-	UpdatePounce();
+	UpdatePounce(ExpectedEpoch);
 }
 
 void USovGameplayAbility_DominionHoundPounce::StopOwnedMovement()
 {
+	const uint64 ExpectedEpoch = GetActiveActivationEpoch();
+	const bool bCleanupDuringEnd = IsEndingHoundAbility();
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(PounceUpdateTimerHandle);
@@ -1586,11 +1729,21 @@ void USovGameplayAbility_DominionHoundPounce::StopOwnedMovement()
 			// Clear that queue as well as live velocity when cancellation races
 			// the launch frame.
 			Character->LaunchCharacter(FVector::ZeroVector, true, true);
+			if (!bCleanupDuringEnd
+				&& !IsActivationEpochCurrent(ExpectedEpoch))
+			{
+				return;
+			}
 		}
 		if (UCharacterMovementComponent* Movement =
 			OwnedMovementComponent.Get())
 		{
 			Movement->StopMovementImmediately();
+			if (!bCleanupDuringEnd
+				&& !IsActivationEpochCurrent(ExpectedEpoch))
+			{
+				return;
+			}
 			Movement->AirControl = SavedAirControl;
 		}
 	}
@@ -1599,8 +1752,13 @@ void USovGameplayAbility_DominionHoundPounce::StopOwnedMovement()
 	PounceStartTime = 0.0;
 }
 
-void USovGameplayAbility_DominionHoundPounce::UpdatePounce()
+void USovGameplayAbility_DominionHoundPounce::UpdatePounce(
+	const uint64 ExpectedEpoch)
 {
+	if (!IsActivationEpochCurrent(ExpectedEpoch))
+	{
+		return;
+	}
 	if (!CanContinueAttackPayload())
 	{
 		CancelHoundAttack();
@@ -1628,6 +1786,10 @@ void USovGameplayAbility_DominionHoundPounce::UpdatePounce()
 			+ PounceDirection * FMath::Max(TraceReach, 0.0f),
 		TraceRadius,
 		bBlockedByWorld);
+	if (!IsActivationEpochCurrent(ExpectedEpoch))
+	{
+		return;
+	}
 	PreviousProbeLocation = CurrentProbeLocation;
 
 	const float Elapsed = static_cast<float>(

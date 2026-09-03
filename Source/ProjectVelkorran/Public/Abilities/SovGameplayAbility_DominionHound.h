@@ -78,6 +78,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Dominion Hound|Damage")
 	float GetPoiseDamageAmount() const { return PoiseDamageAmount; }
 
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Dominion Hound|Cost")
+	bool RequiresAmmoForAttack() const { return bRequiresAmmo; }
+
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Dominion Hound|Damage")
 	FGameplayTagContainer GetAttackClassifications() const { return AttackClassifications; }
 
@@ -156,6 +159,11 @@ protected:
 	virtual void PrepareAttack();
 	virtual void BeginAttackPayload();
 	virtual void StopOwnedMovement();
+
+	/** Guards continuations against synchronous End-and-reactivate callbacks. */
+	bool IsActivationEpochCurrent(uint64 ExpectedEpoch) const;
+	uint64 GetActiveActivationEpoch() const { return ActivationEpoch; }
+	bool IsEndingHoundAbility() const { return bEndingAbility; }
 
 	/** Starts the payload exactly once, including through re-entrant BP events. */
 	bool TryBeginAttackPayload();
@@ -269,7 +277,7 @@ protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Dominion Hound|Command Link")
 	bool bRequiresHandlerOrderAuthorization = false;
 
-	/** Directly-issued commitments reserve a target attacker slot themselves. */
+	/** Every Hound attack reserves or borrows its exact target's attacker slot. */
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Dominion Hound|Attack Tokens")
 	bool bRequiresNarrativeAttackToken = false;
 
@@ -319,17 +327,13 @@ private:
 	bool ApplyPointDamage(
 		const FHitResult& Hit,
 		UAbilitySystemComponent* TargetAbilitySystem);
+	uint64 AdvanceActivationEpoch();
 
 	void StartAttackMontage();
 
-	UFUNCTION()
-	void HandleImpactTimer();
-
-	UFUNCTION()
-	void HandleRecoveryFinished();
-
-	UFUNCTION()
-	void HandleMaximumDurationExpired();
+	void HandleImpactTimer(uint64 ExpectedEpoch);
+	void HandleRecoveryFinished(uint64 ExpectedEpoch);
+	void HandleMaximumDurationExpired(uint64 ExpectedEpoch);
 
 	UFUNCTION()
 	void HandleMontageCompleted();
@@ -367,6 +371,7 @@ private:
 	FTimerHandle MaximumDurationTimerHandle;
 	double NextAllowedActivationTime = 0.0;
 	uint64 AttackTokenLeaseSerial = 0;
+	uint64 ActivationEpoch = 0;
 	float ActiveMontagePlayRate = 1.0f;
 	float ActiveImpactDelay = 0.22f;
 	float ActiveRecoveryAfterImpact = 0.42f;
@@ -448,8 +453,7 @@ protected:
 	float MovementSweepInterval = 0.016f;
 
 private:
-	UFUNCTION()
-	void UpdateCharge();
+	void UpdateCharge(uint64 ExpectedEpoch);
 
 	TWeakObjectPtr<UCharacterMovementComponent> OwnedMovementComponent;
 	FTimerHandle ChargeUpdateTimerHandle;
@@ -496,8 +500,7 @@ protected:
 	float MovementSweepInterval = 0.016f;
 
 private:
-	UFUNCTION()
-	void UpdatePounce();
+	void UpdatePounce(uint64 ExpectedEpoch);
 
 	TWeakObjectPtr<UCharacterMovementComponent> OwnedMovementComponent;
 	FTimerHandle PounceUpdateTimerHandle;

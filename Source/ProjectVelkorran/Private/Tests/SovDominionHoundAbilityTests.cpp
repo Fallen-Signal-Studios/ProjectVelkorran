@@ -136,6 +136,21 @@ bool FSovDominionHoundAbilityContractTest::RunTest(const FString& Parameters)
 			*FString::Printf(TEXT("%s carries Kinetic damage"), AttackName),
 			Ability->GetDamageChannels().HasTagExact(
 				FSovGameplayTags::Get().Damage_Channel_Kinetic));
+		TestTrue(
+			*FString::Printf(TEXT("%s is instanced per actor"), AttackName),
+			Ability->GetInstancingPolicy()
+				== EGameplayAbilityInstancingPolicy::InstancedPerActor);
+		TestTrue(
+			*FString::Printf(TEXT("%s executes only on the server"), AttackName),
+			Ability->GetNetExecutionPolicy()
+				== EGameplayAbilityNetExecutionPolicy::ServerOnly);
+		TestTrue(
+			*FString::Printf(TEXT("%s accepts activation only from the server"), AttackName),
+			Ability->GetNetSecurityPolicy()
+				== EGameplayAbilityNetSecurityPolicy::ServerOnly);
+		TestFalse(
+			*FString::Printf(TEXT("%s does not require ammunition"), AttackName),
+			Ability->RequiresAmmoForAttack());
 	};
 
 	TestSaneAttackDefaults(TEXT("Bite"), Bite);
@@ -190,8 +205,8 @@ bool FSovDominionHoundAbilityContractTest::RunTest(const FString& Parameters)
 	TestFalse(
 		TEXT("Ordinary Bite does not require a Handler order"),
 		Bite->RequiresHandlerOrderAuthorization());
-	TestFalse(
-		TEXT("Ordinary Bite relies on its AI token owner"),
+	TestTrue(
+		TEXT("Bite reserves or borrows a Narrative attack token"),
 		Bite->RequiresNarrativeAttackToken());
 	TestTrue(
 		TEXT("Sever interrupts the specialist Horn Charge"),
@@ -223,8 +238,8 @@ bool FSovDominionHoundAbilityContractTest::RunTest(const FString& Parameters)
 	TestFalse(
 		TEXT("Ordinary Pounce does not require a Handler order"),
 		Pounce->RequiresHandlerOrderAuthorization());
-	TestFalse(
-		TEXT("Ordinary Pounce relies on its AI token owner"),
+	TestTrue(
+		TEXT("Pounce reserves or borrows a Narrative attack token"),
 		Pounce->RequiresNarrativeAttackToken());
 
 	return true;

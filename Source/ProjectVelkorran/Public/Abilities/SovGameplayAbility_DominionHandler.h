@@ -59,6 +59,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Dominion Handler|Command Link")
 	bool BlocksCommandLinkSeverAtActivation() const;
 
+	/** True when weapon-equipping state prevents a command wind-up. */
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Dominion Handler|State")
+	bool BlocksWeaponEquippingAtActivation() const;
+
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Dominion Handler|Cost")
 	bool RequiresAmmoForCommand() const { return bRequiresAmmo; }
 
@@ -173,17 +177,14 @@ protected:
 private:
 	bool HasRequiredCommandConfiguration() const;
 	bool CanContinueCommand() const;
+	bool IsActivationEpochCurrent(uint64 ExpectedEpoch) const;
+	uint64 AdvanceActivationEpoch();
 	void CancelCommandAbility();
 	void StartCommandMontage();
 
-	UFUNCTION()
-	void HandleCommandIssueTimer();
-
-	UFUNCTION()
-	void HandleRecoveryFinished();
-
-	UFUNCTION()
-	void HandleMaximumDurationExpired();
+	void HandleCommandIssueTimer(uint64 ExpectedEpoch);
+	void HandleRecoveryFinished(uint64 ExpectedEpoch);
+	void HandleMaximumDurationExpired(uint64 ExpectedEpoch);
 
 	UFUNCTION()
 	void HandleMontageCompleted();
@@ -220,6 +221,7 @@ private:
 	FTimerHandle MaximumDurationTimerHandle;
 	FGuid CapturedLinkInstanceId;
 	double NextAllowedActivationTime = 0.0;
+	uint64 ActivationEpoch = 0;
 	bool bIssueAttempted = false;
 	bool bOrderIssued = false;
 	bool bAbilityStarted = false;

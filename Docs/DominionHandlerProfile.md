@@ -26,7 +26,7 @@ The link and order need a non-color cue as well as Dominion color language: use 
 | Narrative input | `Narrative.Input.Ability1` |
 | Execution | Server initiated and server owned |
 | Command membership | Candidates come only from the Handler's active command-link participants |
-| Specialist lookup | The Hound spec is found by the exact `Sov.Ability.NPC.DominionHound.HornCharge` asset tag |
+| Specialist lookup | The Hound spec must derive from `USovGameplayAbility_DominionHoundHornCharge` and carry the exact `Sov.Ability.NPC.DominionHound.HornCharge` asset tag |
 | Activation | Authority briefly supplies `Sov.State.CommandLink.HoundChargeAuthorized`, opens a private native dispatch scope on the exact Horn Charge instance, calls `TryActivateAbility` for that exact spec handle, then closes both authorizers |
 | Range | Handler-to-Hound command distance, not Hound-to-player attack distance |
 | Line of sight | Optional Handler-to-Hound Visibility trace, enabled by default |
@@ -47,7 +47,7 @@ A command candidate must pass all of these checks when candidates are collected 
 - it has no stale `Sov.State.CommandLink.HoundChargeAuthorized` contribution before dispatch;
 - it is inside the authored Handler-to-Hound command range;
 - it has clear Handler-to-Hound line of sight when that option is enabled;
-- it owns an inactive ability spec with the exact Horn Charge asset identity.
+- it owns an inactive `USovGameplayAbility_DominionHoundHornCharge` spec with the exact Horn Charge asset identity.
 
 Candidate discovery is intentionally optimistic. It does not reach into another ASC's actor info to pre-run `CanActivateAbility`, and it does not treat a broad input query as readiness. At issue time, exact `TryActivateAbility` is the definitive Hound target, range, cooldown, state, and attack-configuration check. The Handler does not bypass those rules. If the anticipated Hound fails or loses validity during anticipation, the order fails cleanly without consuming command cooldown. A later AI request may select and visibly anticipate a different Hound; the release frame never substitutes an untelegraphed pack member.
 
@@ -58,7 +58,7 @@ Selection is least-recently-anticipated within the current link instance, then n
 1. AI requests the Handler's `Narrative.Input.Ability1` ability.
 2. `CanActivateAbility` verifies authority, the active link, and at least one structurally commandable Hound. This is permission to begin anticipation, not proof that Horn Charge will still pass its own activation checks at issue time.
 3. The ability commits, owns the Handler's busy/path-postpone state, starts its optional montage, multicasts the selected Hound's one-shot anticipation cue, and opens native anticipation timing.
-4. At the native issue time, the Handler revalidates the exact Hound named by anticipation, adds the transient order tag while the private native dispatch scope is still closed, then opens that native scope only around one exact Horn Charge activation call. Synchronous tag listeners therefore cannot steal the authorization window. The captured link-instance identity is revalidated after those callbacks and after activation. Horn Charge must also acquire or already hold one of the selected player's Narrative attack tokens. At a full budget, Narrative's existing age/proximity rules may reassign an eligible token; otherwise the attempt is rejected.
+4. At the native issue time, the Handler revalidates the exact Hound named by anticipation, adds the transient order tag while the private native dispatch scope is still closed, then opens that native scope only around one exact Horn Charge activation call. Synchronous tag listeners therefore cannot steal the authorization window. The captured link-instance identity is revalidated after those callbacks and after activation. Horn Charge must also reserve or acquire one of the selected player's Narrative attack tokens through the Hound's `ANarrativeNPCController`. At a full budget, Narrative's existing age/proximity rules may reassign an eligible unreserved token during acquisition; otherwise the attempt is rejected.
 5. A successful activation starts command recovery and command cooldown, and publishes presentation data for the selected Hound and its resolved attack target.
 6. Total dispatch failure cancels cleanly without consuming the command cooldown.
 7. Death, fatal state, Poise break, Freeze, device disable, ragdoll, interaction, sequence control, link Sever, or loss of the active-link state cancels outstanding native timers and authority state. The already-sent one-shot anticipation cue is not recalled.
@@ -141,7 +141,7 @@ On each placed Handler instance:
 ### 4. Configure linked Hounds
 
 1. Grant Bite, Horn Charge, and Pounce from the Hound's Narrative Ability Configuration as described in `Docs/DominionHoundAbilities.md`.
-2. Preserve Horn Charge on `Narrative.Input.Ability1` with exact identity `Sov.Ability.NPC.DominionHound.HornCharge`.
+2. Ensure the Hound uses `ANarrativeNPCController` or a subclass so every physical attack can reserve its exact target's finite attacker slot. Preserve Horn Charge on `Narrative.Input.Ability1` with exact identity `Sov.Ability.NPC.DominionHound.HornCharge`.
 3. Preserve Horn Charge's native Active and HoundChargeAuthorized activation requirements. Never grant `Sov.State.CommandLink.HoundChargeAuthorized` from a Gameplay Effect, Character Definition, Behavior Tree, or Blueprint; the tag alone is deliberately insufficient, and the Handler's exact native dispatch owns its complete lifetime.
 4. Register the Hound on exactly one Handler link for this profile.
 5. Remove Ability1/Horn Charge requests from the Hound's own attack service. Keep Bite and Pounce selection local to the Hound.
@@ -207,15 +207,16 @@ First test with empty cosmetic Blueprint children, then repeat after final anima
 | Command sight | Put hard Visibility-blocking cover between Handler and Hound | Command is rejected with sight required; clearing cover restores eligibility |
 | Hound target failure | Linked Hound has no valid hostile target | No charge starts and a total dispatch failure consumes no command cooldown |
 | Target attacker budget | Fill the target player's budget with fresh, non-stealable tokens | No charge starts, no token is overcommitted, and total dispatch failure consumes no Handler command cooldown |
-| Eligible token steal | Make one full-budget token eligible under Narrative's normal age/proximity policy | The slot is reassigned rather than overcommitted; Horn Charge holds the new lease through its commitment |
+| Eligible token steal | Make one full-budget, unreserved token eligible under Narrative's normal age/proximity policy | The slot is reassigned during acquisition rather than overcommitted; Horn Charge then reserves the new lease through its commitment |
 | Different-target token | Give the selected Hound a token for another player before ordering it toward the current target | The order fails without abandoning the earlier behavior's token; returning it makes the Hound eligible again |
-| Attack-token cleanup | Let Horn Charge finish, then repeat with cancellation and Sever | Any token the charge newly acquired is returned on every path; a pre-existing same-target token remains owned by its original behavior |
+| Attack-token cleanup | Let Horn Charge finish, then repeat with cancellation, Sever, two consecutive borrowed reservations, delayed old cleanup, and controller EndPlay | A new token is returned on every path; a borrowed token stays with its original behavior unless its deferred return was requested; stale cleanup cannot release a newer reservation; no stale ASC entry remains |
 | First Sever | Sever during order anticipation and during active charge | Handler order cancels; active charge cancels; Horn Charge stays blocked; one Echo/reveal transaction resolves |
 | Handler death | Kill Handler before issue, then repeat after the Hound commits | Wind-up order cancels and future charges are unauthorized; an already committed charge completes; no synthetic Sever Echo/reveal is created |
 | Wrong command source | Activate a Handler-owned link with another actor as source | The Handler cannot issue orders until a fresh link instance uses that Handler as its command source |
 | Hound destruction | Destroy a registered Hound, then reset/reactivate the encounter link | The Hound is removed from replicated membership automatically; surviving members reactivate and the stale reference cannot poison configuration validation |
 | Other cancellation | Poise-break, Freeze, disable, ragdoll, or sequence the Handler | Pending order/timers clear with no late Hound activation |
 | Missing montage | Remove Handler command montage | Native order timing and cleanup still work |
+| Synchronous callback re-entry | From a server-side anticipation/order presentation callback, cancel and immediately request Command Hound again | Old callback continuations and epoch-bound timers cannot issue, finish, or overwrite the new activation |
 | Listen server | Observe from host and remote client | One authority order/charge; presentation agrees for both clients |
 | Dedicated server | Run server plus two clients, including offscreen actors | Selection, order, cancellation, damage, and cooldown do not depend on local animation or effects |
 | Encounter reset | Reset/activate a completed encounter link | Fresh instance can command and later pay one legitimate new Sever transaction |

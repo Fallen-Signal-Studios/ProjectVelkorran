@@ -277,7 +277,10 @@ bool ANarrativeNPCController::CanAcquireAttackTokenFor(
 		return false;
 	}
 
-	if (GrantedToken == TargetToAttack)
+	const UNarrativeAbilitySystemComponent* ExistingTarget = GrantedToken.Get();
+	const bool bHasReciprocalToken = IsValid(ExistingTarget)
+		&& ExistingTarget->HasAttackTokenFor(this);
+	if (ExistingTarget == TargetToAttack && bHasReciprocalToken)
 	{
 		return true;
 	}
@@ -286,7 +289,7 @@ bool ANarrativeNPCController::CanAcquireAttackTokenFor(
 	// token held by another behavior just because a direct ability was issued.
 	// The target ASC remains the final authority: its claim may consume a free
 	// slot or apply Narrative's existing token-steal policy.
-	return !IsValid(GrantedToken.Get());
+	return !bHasReciprocalToken;
 }
 
 bool ANarrativeNPCController::TryAcquireAttackTokenFor(
@@ -296,6 +299,15 @@ bool ANarrativeNPCController::TryAcquireAttackTokenFor(
 {
 	OutLeaseSerial = 0;
 	bOutNewlyAcquired = false;
+	UNarrativeAbilitySystemComponent* ExistingTarget = GrantedToken.Get();
+	if (ExistingTarget != nullptr
+		&& (!IsValid(ExistingTarget)
+			|| !ExistingTarget->HasAttackTokenFor(this)))
+	{
+		// Normalize local state before preflight. Otherwise a still-valid ASC
+		// pointer with no reciprocal token entry can block every future target.
+		SetGrantedAttackToken(nullptr);
+	}
 	if (ReservedAttackTokenLeaseSerial != 0)
 	{
 		if (IsAttackTokenLeaseCurrent(
@@ -312,31 +324,17 @@ bool ANarrativeNPCController::TryAcquireAttackTokenFor(
 		return false;
 	}
 
-	if (GrantedToken == TargetToAttack
-		&& !TargetToAttack->HasAttackTokenFor(this))
-	{
-		// Repair split-brain local state before making a fresh authoritative claim.
-		SetGrantedAttackToken(nullptr);
-	}
-
 	if (GrantedToken == TargetToAttack)
 	{
-		// Backward compatibility for a token established before native lease
-		// tracking began (for example, an already-running PIE session).
-		if (AttackTokenLeaseSerial == 0)
-		{
-			AdvanceAttackTokenLeaseSerial();
-		}
+		// Every direct reservation receives a fresh epoch, even when borrowing a
+		// token the Behavior Tree already owns. A delayed/double release from an
+		// earlier ability can therefore never match and release this reservation.
+		AdvanceAttackTokenLeaseSerial();
 		OutLeaseSerial = AttackTokenLeaseSerial;
 		ReservedAttackTokenLeaseSerial = AttackTokenLeaseSerial;
 		bReturnAttackTokenWhenReservationEnds = false;
 		return true;
 	}
-	if (!IsValid(GrantedToken.Get()) && GrantedToken.Get() != nullptr)
-	{
-		SetGrantedAttackToken(nullptr);
-	}
-
 	if (!RequestAttackToken(TargetToAttack)
 		|| GrantedToken != TargetToAttack
 		|| !TargetToAttack->HasAttackTokenFor(this)

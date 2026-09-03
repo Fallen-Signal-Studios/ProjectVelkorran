@@ -9,6 +9,7 @@
 #include "Misc/AutomationTest.h"
 #include "NarrativeGameplayTags.h"
 #include "Sovereign/SovGameplayTags.h"
+#include "UObject/Class.h"
 
 #include <type_traits>
 
@@ -70,6 +71,9 @@ bool FSovDominionHandlerProfileContractTest::RunTest(
 		TestFalse(
 			TEXT("Handler command link CDO has no authored encounter identity"),
 			CommandLink->HasValidCommandLinkConfiguration());
+		TestTrue(
+			TEXT("Handler command link includes its owner as a participant"),
+			CommandLink->IncludesOwnerAsParticipant());
 	}
 
 	TestTrue(
@@ -77,11 +81,43 @@ bool FSovDominionHandlerProfileContractTest::RunTest(
 		FMath::IsFinite(Handler->GetMaximumCommandDistance())
 			&& Handler->GetMaximumCommandDistance() > 0.0f);
 	TestTrue(
+		TEXT("Handler command distance retains the prototype default"),
+		FMath::IsNearlyEqual(Handler->GetMaximumCommandDistance(), 2500.0f));
+	TestTrue(
 		TEXT("Handler command requires line of sight by default"),
 		Handler->RequiresCommandLineOfSight());
 	TestTrue(
 		TEXT("Handler CDO begins without a last commanded Hound"),
 		Handler->GetLastCommandedHound() == nullptr);
+
+	const UFunction* AnticipationMulticast = Handler->FindFunction(
+		TEXT("MulticastPresentHoundHornChargeAnticipation"));
+	const UFunction* SuccessMulticast = Handler->FindFunction(
+		TEXT("MulticastPresentHoundHornChargeOrder"));
+	TestNotNull(
+		TEXT("Handler exposes its replicated anticipation cue"),
+		AnticipationMulticast);
+	TestNotNull(
+		TEXT("Handler exposes its replicated successful-order cue"),
+		SuccessMulticast);
+	if (AnticipationMulticast)
+	{
+		TestTrue(
+			TEXT("Anticipation cue is a multicast RPC"),
+			AnticipationMulticast->HasAnyFunctionFlags(FUNC_NetMulticast));
+		TestTrue(
+			TEXT("Anticipation cue is reliable"),
+			AnticipationMulticast->HasAnyFunctionFlags(FUNC_NetReliable));
+	}
+	if (SuccessMulticast)
+	{
+		TestTrue(
+			TEXT("Successful-order cue is a multicast RPC"),
+			SuccessMulticast->HasAnyFunctionFlags(FUNC_NetMulticast));
+		TestFalse(
+			TEXT("Successful-order cue remains non-blocking/unreliable"),
+			SuccessMulticast->HasAnyFunctionFlags(FUNC_NetReliable));
+	}
 
 	const FSovGameplayTags& SovTags = FSovGameplayTags::Get();
 	const FNarrativeGameplayTags& NarrativeTags =
@@ -123,6 +159,9 @@ bool FSovDominionHandlerProfileContractTest::RunTest(
 	TestTrue(
 		TEXT("Handler command GAS blockers contain the Severed tag"),
 		CommandAbility->BlocksCommandLinkSeverAtActivation());
+	TestTrue(
+		TEXT("Handler command GAS blockers contain weapon-equipping state"),
+		CommandAbility->BlocksWeaponEquippingAtActivation());
 	TestFalse(
 		TEXT("Handler command does not require weapon ammunition"),
 		CommandAbility->RequiresAmmoForCommand());

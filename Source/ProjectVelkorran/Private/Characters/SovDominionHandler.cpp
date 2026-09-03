@@ -356,6 +356,7 @@ bool ASovDominionHandler::TryActivateExactHornCharge(
 			|| PendingSpec->IsActive()
 			|| !IsValid(Cast<USovGameplayAbility_DominionHoundHornCharge>(
 				PendingSpec->Ability))
+			|| !PendingSpec->Ability->GetAssetTags().HasTagExact(HornChargeTag)
 			|| !IsValid(PendingHornAbility))
 		{
 			if (PendingSpec && PendingSpec->IsActive())
@@ -427,6 +428,9 @@ bool ASovDominionHandler::TryActivateExactHornCharge(
 			: nullptr;
 		if (!ActivatedSpec
 			|| !ActivatedSpec->IsActive()
+			|| !IsValid(Cast<USovGameplayAbility_DominionHoundHornCharge>(
+				ActivatedSpec->Ability))
+			|| !ActivatedSpec->Ability->GetAssetTags().HasTagExact(HornChargeTag)
 			|| !IsValid(HoundAbility)
 			|| !HoundAbility->IsActive())
 		{

@@ -73,6 +73,13 @@ bool USovGameplayAbility_DominionHandlerCommandHound::
 		FSovGameplayTags::Get().State_CommandLink_Severed);
 }
 
+bool USovGameplayAbility_DominionHandlerCommandHound::
+	BlocksWeaponEquippingAtActivation() const
+{
+	return ActivationBlockedTags.HasTagExact(
+		FNarrativeGameplayTags::Get().State_Weapon_Equipping);
+}
+
 bool USovGameplayAbility_DominionHandlerCommandHound::CanActivateAbility(
 	const FGameplayAbilitySpecHandle Handle,
 	const FGameplayAbilityActorInfo* ActorInfo,
@@ -145,6 +152,7 @@ void USovGameplayAbility_DominionHandlerCommandHound::ActivateAbility(
 	const FGameplayAbilityActivationInfo ActivationInfo,
 	const FGameplayEventData* TriggerEventData)
 {
+	const uint64 ThisActivationEpoch = AdvanceActivationEpoch();
 	bIssueAttempted = false;
 	bOrderIssued = false;
 	bAbilityStarted = false;
@@ -179,15 +187,23 @@ void USovGameplayAbility_DominionHandlerCommandHound::ActivateAbility(
 	CapturedLinkInstanceId = CommandLink->GetLinkInstanceId();
 	PendingHound = Handler->FindBestCommandableHound();
 	if (!CapturedLinkInstanceId.IsValid()
-		|| !IsValid(PendingHound.Get())
-		|| !CommitAbility(Handle, ActorInfo, ActivationInfo))
+		|| !IsValid(PendingHound.Get()))
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
+	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
+	{
+		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+		return;
+	}
+	if (!IsActivationEpochCurrent(ThisActivationEpoch))
+	{
+		return;
+	}
 
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
-	if (!IsActive())
+	if (!IsActivationEpochCurrent(ThisActivationEpoch))
 	{
 		return;
 	}
@@ -200,24 +216,41 @@ void USovGameplayAbility_DominionHandlerCommandHound::ActivateAbility(
 	}
 
 	bAbilityStarted = true;
+	StartCommandMontage();
+	if (!IsActivationEpochCurrent(ThisActivationEpoch))
+	{
+		return;
+	}
+	if (!IsValid(Handler.Get()))
+	{
+		CancelCommandAbility();
+		return;
+	}
+	// Selection fairness follows visible attempts, not speculative activation
+	// checks. Record immediately before the reliable anticipation cue is sent.
 	Handler->RecordCommandAttempt(
 		PendingHound.Get(),
 		CapturedLinkInstanceId);
-	StartCommandMontage();
-	if (!IsActive() || !IsValid(Handler.Get()))
-	{
-		return;
-	}
 	Handler->MulticastPresentHoundHornChargeAnticipation(
 		PendingHound.Get(),
 		CapturedLinkInstanceId);
-	if (!IsActive())
+	if (!IsActivationEpochCurrent(ThisActivationEpoch))
 	{
 		return;
 	}
-	ReceiveHoundOrderStarted(PendingHound.Get(), CapturedLinkInstanceId);
-	if (!IsActive())
+	if (!IsValid(Handler.Get()))
 	{
+		CancelCommandAbility();
+		return;
+	}
+	ReceiveHoundOrderStarted(PendingHound.Get(), CapturedLinkInstanceId);
+	if (!IsActivationEpochCurrent(ThisActivationEpoch))
+	{
+		return;
+	}
+	if (!IsValid(Handler.Get()))
+	{
+		CancelCommandAbility();
 		return;
 	}
 
@@ -231,26 +264,32 @@ void USovGameplayAbility_DominionHandlerCommandHound::ActivateAbility(
 	const float SafeIssueDelay = FMath::Max(CommandIssueDelay, 0.0f);
 	if (SafeIssueDelay <= KINDA_SMALL_NUMBER)
 	{
-		HandleCommandIssueTimer();
+		HandleCommandIssueTimer(ThisActivationEpoch);
 	}
 	else
 	{
-		World->GetTimerManager().SetTimer(
-			CommandIssueTimerHandle,
+		const FTimerDelegate IssueTimerDelegate = FTimerDelegate::CreateUObject(
 			this,
 			&ThisClass::HandleCommandIssueTimer,
+			ThisActivationEpoch);
+		World->GetTimerManager().SetTimer(
+			CommandIssueTimerHandle,
+			IssueTimerDelegate,
 			SafeIssueDelay,
 			false);
 	}
 
-	if (!IsActive())
+	if (!IsActivationEpochCurrent(ThisActivationEpoch))
 	{
 		return;
 	}
-	World->GetTimerManager().SetTimer(
-		MaximumDurationTimerHandle,
+	const FTimerDelegate WatchdogTimerDelegate = FTimerDelegate::CreateUObject(
 		this,
 		&ThisClass::HandleMaximumDurationExpired,
+		ThisActivationEpoch);
+	World->GetTimerManager().SetTimer(
+		MaximumDurationTimerHandle,
+		WatchdogTimerDelegate,
 		FMath::Max(MaximumActiveDuration, 0.1f),
 		false);
 }
@@ -262,6 +301,10 @@ void USovGameplayAbility_DominionHandlerCommandHound::EndAbility(
 	const bool bReplicateEndAbility,
 	const bool bWasCancelled)
 {
+	if (!IsEndAbilityValid(Handle, ActorInfo))
+	{
+		return;
+	}
 	// Exact Hound activation can synchronously emit tag/death callbacks. Let the
 	// dispatch return first so an accepted charge is recorded before Ended fires.
 	if (bDispatchInProgress)
@@ -271,11 +314,25 @@ void USovGameplayAbility_DominionHandlerCommandHound::EndAbility(
 		bDeferredEndWasCancelled |= bWasCancelled;
 		return;
 	}
+	if (ScopeLockCount > 0)
+	{
+		WaitingToExecute.Add(FPostLockDelegate::CreateUObject(
+			this,
+			&ThisClass::EndAbility,
+			Handle,
+			ActorInfo,
+			ActivationInfo,
+			bReplicateEndAbility,
+			bWasCancelled));
+		return;
+	}
+
 	if (bEndingAbility)
 	{
 		return;
 	}
 	bEndingAbility = true;
+	AdvanceActivationEpoch();
 
 	UnbindCancellationTags();
 	if (UWorld* World = GetWorld())
@@ -392,6 +449,26 @@ bool USovGameplayAbility_DominionHandlerCommandHound::
 			SovTags.State_Status_DeviceDisabled);
 }
 
+bool USovGameplayAbility_DominionHandlerCommandHound::
+	IsActivationEpochCurrent(const uint64 ExpectedEpoch) const
+{
+	return ExpectedEpoch != 0
+		&& ExpectedEpoch == ActivationEpoch
+		&& IsActive()
+		&& !bEndingAbility;
+}
+
+uint64 USovGameplayAbility_DominionHandlerCommandHound::
+	AdvanceActivationEpoch()
+{
+	++ActivationEpoch;
+	if (ActivationEpoch == 0)
+	{
+		++ActivationEpoch;
+	}
+	return ActivationEpoch;
+}
+
 void USovGameplayAbility_DominionHandlerCommandHound::
 	CancelCommandAbility()
 {
@@ -447,9 +524,9 @@ void USovGameplayAbility_DominionHandlerCommandHound::StartCommandMontage()
 }
 
 void USovGameplayAbility_DominionHandlerCommandHound::
-	HandleCommandIssueTimer()
+	HandleCommandIssueTimer(const uint64 ExpectedEpoch)
 {
-	if (bIssueAttempted || !IsActive())
+	if (bIssueAttempted || !IsActivationEpochCurrent(ExpectedEpoch))
 	{
 		return;
 	}
@@ -476,6 +553,10 @@ void USovGameplayAbility_DominionHandlerCommandHound::
 			&& IsValid(IssuedHound);
 		bDispatchInProgress = false;
 	}
+	if (!IsActivationEpochCurrent(ExpectedEpoch))
+	{
+		return;
+	}
 	if (!bAcceptedOrder)
 	{
 		if (FinishDeferredEndIfRequested())
@@ -487,7 +568,7 @@ void USovGameplayAbility_DominionHandlerCommandHound::
 			ReceiveHoundOrderFailed(
 				RequestedHound.Get(),
 				IssuingLinkInstanceId);
-			if (IsActive())
+			if (IsActivationEpochCurrent(ExpectedEpoch))
 			{
 				CancelCommandAbility();
 			}
@@ -519,11 +600,16 @@ void USovGameplayAbility_DominionHandlerCommandHound::
 
 	// Commit gameplay state before presentation: a synchronous server-side
 	// Blueprint response must observe this as an issued order.
+	if (!IsValid(IssuingHandler))
+	{
+		CancelCommandAbility();
+		return;
+	}
 	IssuingHandler->MulticastPresentHoundHornChargeOrder(
 		IssuedHound,
 		IssuedTarget,
 		IssuingLinkInstanceId);
-	if (!IsActive())
+	if (!IsActivationEpochCurrent(ExpectedEpoch))
 	{
 		return;
 	}
@@ -532,7 +618,7 @@ void USovGameplayAbility_DominionHandlerCommandHound::
 		IssuedHound,
 		IssuedTarget,
 		IssuingLinkInstanceId);
-	if (!IsActive())
+	if (!IsActivationEpochCurrent(ExpectedEpoch))
 	{
 		return;
 	}
@@ -540,15 +626,18 @@ void USovGameplayAbility_DominionHandlerCommandHound::
 	const float Recovery = FMath::Max(PostIssueRecovery, 0.0f);
 	if (Recovery <= KINDA_SMALL_NUMBER)
 	{
-		HandleRecoveryFinished();
+		HandleRecoveryFinished(ExpectedEpoch);
 		return;
 	}
 	if (UWorld* World = GetWorld())
 	{
-		World->GetTimerManager().SetTimer(
-			RecoveryTimerHandle,
+		const FTimerDelegate RecoveryTimerDelegate = FTimerDelegate::CreateUObject(
 			this,
 			&ThisClass::HandleRecoveryFinished,
+			ExpectedEpoch);
+		World->GetTimerManager().SetTimer(
+			RecoveryTimerHandle,
+			RecoveryTimerDelegate,
 			Recovery,
 			false);
 		return;
@@ -580,9 +669,9 @@ bool USovGameplayAbility_DominionHandlerCommandHound::
 }
 
 void USovGameplayAbility_DominionHandlerCommandHound::
-	HandleRecoveryFinished()
+	HandleRecoveryFinished(const uint64 ExpectedEpoch)
 {
-	if (IsActive())
+	if (IsActivationEpochCurrent(ExpectedEpoch))
 	{
 		EndAbility(
 			CurrentSpecHandle,
@@ -594,8 +683,12 @@ void USovGameplayAbility_DominionHandlerCommandHound::
 }
 
 void USovGameplayAbility_DominionHandlerCommandHound::
-	HandleMaximumDurationExpired()
+	HandleMaximumDurationExpired(const uint64 ExpectedEpoch)
 {
+	if (!IsActivationEpochCurrent(ExpectedEpoch))
+	{
+		return;
+	}
 	UE_LOG(
 		LogSovDominionHandlerAbility,
 		Warning,

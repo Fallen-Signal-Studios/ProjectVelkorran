@@ -131,7 +131,7 @@ private:
 	void AdvanceAttackTokenLeaseSerial();
 	void ForceReleaseAttackToken();
 
-	/** Monotonic, server-local identity for the controller's current token. */
+	/** Monotonic, server-local identity for token ownership and each reservation. */
 	uint64 AttackTokenLeaseSerial = 0;
 
 	/** One direct ability may reserve the current token against BT return/steal. */

@@ -165,6 +165,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Command Link")
 	bool ContainsLinkedActor(const AActor* Actor) const;
 
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Command Link")
+	bool IncludesOwnerAsParticipant() const
+	{
+		return bIncludeOwnerAsParticipant;
+	}
+
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Command Link|Presentation")
 	bool IsWeakPointRevealEnabledOnSever() const
 	{

@@ -509,7 +509,13 @@ bool UNarrativeAbilitySystemComponent::TryClaimToken(class ANarrativeNPCControll
 		PruneInvalidAttackTokens();
 		if (Claimer->GrantedToken == this)
 		{
-			return true;
+			if (HasAttackTokenFor(Claimer))
+			{
+				return true;
+			}
+
+			// Repair the inverse split-brain case before making a fresh claim.
+			Claimer->SetGrantedAttackToken(nullptr);
 		}
 		if (Claimer->GrantedToken != nullptr)
 		{
@@ -600,13 +606,15 @@ bool UNarrativeAbilitySystemComponent::HasAttackTokenFor(
 
 void UNarrativeAbilitySystemComponent::ReturnTokenAtIndex(int32 Index)
 {
-	if (GrantedAttackTokens.IsValidIndex(Index))
+	if (!GrantedAttackTokens.IsValidIndex(Index))
 	{
-		if (IsValid(GrantedAttackTokens[Index].Owner)
-			&& GrantedAttackTokens[Index].Owner->GrantedToken == this)
-		{
-			GrantedAttackTokens[Index].Owner->SetGrantedAttackToken(nullptr);
-		}
+		return;
+	}
+
+	if (IsValid(GrantedAttackTokens[Index].Owner)
+		&& GrantedAttackTokens[Index].Owner->GrantedToken == this)
+	{
+		GrantedAttackTokens[Index].Owner->SetGrantedAttackToken(nullptr);
 	}
 
 	GrantedAttackTokens.RemoveAt(Index);
@@ -732,15 +740,19 @@ void UNarrativeAbilitySystemComponent::PruneInvalidAttackTokens()
 
 int32 UNarrativeAbilitySystemComponent::GetValidAttackTokenCount() const
 {
-	return GrantedAttackTokens.CountByPredicate(
-		[this](const FAttackToken& Token)
+	int32 ValidTokenCount = 0;
+	for (const FAttackToken& Token : GrantedAttackTokens)
+	{
+		const ANarrativeNPCController* Owner = Token.Owner.Get();
+		if (IsValid(Owner)
+			&& Owner->IsAlive()
+			&& IsValid(Owner->GetPawn())
+			&& Owner->GrantedToken == this)
 		{
-			const ANarrativeNPCController* Owner = Token.Owner.Get();
-			return IsValid(Owner)
-				&& Owner->IsAlive()
-				&& IsValid(Owner->GetPawn())
-				&& Owner->GrantedToken == this;
-		});
+			++ValidTokenCount;
+		}
+	}
+	return ValidTokenCount;
 }
 
 float UNarrativeAbilitySystemComponent::GetAttackPriority() const
