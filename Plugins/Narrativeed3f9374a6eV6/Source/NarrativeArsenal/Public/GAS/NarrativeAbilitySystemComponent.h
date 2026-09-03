@@ -175,6 +175,8 @@ public:
 
 	//NPCControllers call this when they want to claim one of our attack tokens. 
 	bool TryClaimToken(class ANarrativeNPCController* Claimer);
+	bool HasAttackTokenFor(
+		const class ANarrativeNPCController* Claimer) const;
 
 	//Return a token. Never fails. 
 	void ReturnTokenAtIndex(int32 Index);
@@ -269,5 +271,9 @@ protected:
 
 	virtual void PrepareForSave_Implementation() override;
 	virtual void Load_Implementation() override;
+
+private:
+	void PruneInvalidAttackTokens();
+	int32 GetValidAttackTokenCount() const;
 
 };

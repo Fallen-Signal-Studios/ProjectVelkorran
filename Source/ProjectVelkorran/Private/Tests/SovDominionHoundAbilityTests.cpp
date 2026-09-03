@@ -175,17 +175,57 @@ bool FSovDominionHoundAbilityContractTest::RunTest(const FString& Parameters)
 		TEXT("Horn Charge uses native authority movement by default"),
 		HornCharge->IsUsingNativeMovement());
 	TestTrue(
+		TEXT("Horn Charge keeps a nonzero native command wind-up"),
+		FMath::IsFinite(HornCharge->GetConfiguredImpactDelay())
+			&& HornCharge->GetConfiguredImpactDelay() >= 0.05f);
+	TestTrue(
 		TEXT("Pounce uses native authority movement by default"),
 		Pounce->IsUsingNativeMovement());
 	TestFalse(
 		TEXT("Sever does not interrupt an ordinary Bite"),
 		Bite->IsInterruptedByCommandLinkSever());
+	TestFalse(
+		TEXT("Ordinary Bite does not require an active command link"),
+		Bite->RequiresActiveCommandLink());
+	TestFalse(
+		TEXT("Ordinary Bite does not require a Handler order"),
+		Bite->RequiresHandlerOrderAuthorization());
+	TestFalse(
+		TEXT("Ordinary Bite relies on its AI token owner"),
+		Bite->RequiresNarrativeAttackToken());
 	TestTrue(
 		TEXT("Sever interrupts the specialist Horn Charge"),
 		HornCharge->IsInterruptedByCommandLinkSever());
+	TestTrue(
+		TEXT("Specialist Horn Charge requires an active command link"),
+		HornCharge->RequiresActiveCommandLink());
+	TestTrue(
+		TEXT("Specialist Horn Charge requires a Handler order"),
+		HornCharge->RequiresHandlerOrderAuthorization());
+	TestTrue(
+		TEXT("Handler-issued Horn Charge reserves a Narrative attack token"),
+		HornCharge->RequiresNarrativeAttackToken());
+	TestTrue(
+		TEXT("Horn Charge GAS requirements contain the active-link tag"),
+		HornCharge->HasActiveCommandLinkActivationRequirement());
+	TestTrue(
+		TEXT("Horn Charge GAS requirements contain the Handler-order tag"),
+		HornCharge->HasHandlerOrderAuthorizationActivationRequirement());
+	TestTrue(
+		TEXT("Horn Charge GAS blockers contain the Severed tag"),
+		HornCharge->BlocksCommandLinkSeverAtActivation());
 	TestFalse(
 		TEXT("Sever does not interrupt an ordinary Pounce"),
 		Pounce->IsInterruptedByCommandLinkSever());
+	TestFalse(
+		TEXT("Ordinary Pounce does not require an active command link"),
+		Pounce->RequiresActiveCommandLink());
+	TestFalse(
+		TEXT("Ordinary Pounce does not require a Handler order"),
+		Pounce->RequiresHandlerOrderAuthorization());
+	TestFalse(
+		TEXT("Ordinary Pounce relies on its AI token owner"),
+		Pounce->RequiresNarrativeAttackToken());
 
 	return true;
 }

@@ -9,11 +9,14 @@
 #include "SovGameplayAbility_DominionHound.generated.h"
 
 class ACharacter;
+class ANarrativeNPCController;
+class ASovDominionHandler;
 class UAbilitySystemComponent;
 class UAbilityTask_PlayMontageAndWait;
 class UAnimMontage;
 class UCharacterMovementComponent;
 class UGameplayEffect;
+class UNarrativeAbilitySystemComponent;
 
 /** One authored bite presentation and its native, server-owned attack timing. */
 USTRUCT(BlueprintType)
@@ -87,12 +90,52 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Dominion Hound|Targeting")
 	float GetMaximumAttackRange() const { return MaximumAttackRange; }
 
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Dominion Hound|Timing")
+	float GetConfiguredImpactDelay() const { return ImpactDelay; }
+
+	/** Target selected by the authoritative attack activation, if still active. */
+	UFUNCTION(BlueprintPure, BlueprintAuthorityOnly, Category = "Sovereign|Dominion Hound|Targeting")
+	AActor* GetCurrentAttackTarget() const { return AttackTarget.Get(); }
+
 	/** True when Sever interrupts this attack's active execution. */
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Dominion Hound|Command Link")
 	bool IsInterruptedByCommandLinkSever() const
 	{
 		return bInterruptedByCommandLinkSever;
 	}
+
+	/** True when this attack is available only while a command link is active. */
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Dominion Hound|Command Link")
+	bool RequiresActiveCommandLink() const
+	{
+		return bRequiresActiveCommandLink;
+	}
+
+	/** True when activation also requires the Handler's tag-plus-native dispatch. */
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Dominion Hound|Command Link")
+	bool RequiresHandlerOrderAuthorization() const
+	{
+		return bRequiresHandlerOrderAuthorization;
+	}
+
+	/** True when activation must hold one of the target's attacker slots. */
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Dominion Hound|Attack Tokens")
+	bool RequiresNarrativeAttackToken() const
+	{
+		return bRequiresNarrativeAttackToken;
+	}
+
+	/** True when the actual GAS activation container requires an active link. */
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Dominion Hound|Command Link")
+	bool HasActiveCommandLinkActivationRequirement() const;
+
+	/** True when the actual GAS activation container requires a native Handler order. */
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Dominion Hound|Command Link")
+	bool HasHandlerOrderAuthorizationActivationRequirement() const;
+
+	/** True when the actual GAS activation container blocks a severed link. */
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Dominion Hound|Command Link")
+	bool BlocksCommandLinkSeverAtActivation() const;
 
 protected:
 	virtual void ActivateAbility(
@@ -218,6 +261,18 @@ protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Dominion Hound|Command Link")
 	bool bInterruptedByCommandLinkSever = false;
 
+	/** Specialist attacks opt into active-link authorization. */
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Dominion Hound|Command Link")
+	bool bRequiresActiveCommandLink = false;
+
+	/** Specialist moves may require the Handler's transient tag and native scope. */
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Dominion Hound|Command Link")
+	bool bRequiresHandlerOrderAuthorization = false;
+
+	/** Directly-issued commitments reserve a target attacker slot themselves. */
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Dominion Hound|Attack Tokens")
+	bool bRequiresNarrativeAttackToken = false;
+
 	/** Presentation hooks only. Gameplay remains wholly native and authoritative. */
 	UFUNCTION(BlueprintImplementableEvent, Category = "Sovereign|Dominion Hound|Presentation", meta = (DisplayName = "Hound Attack Started"))
 	void ReceiveHoundAttackStarted(AActor* TargetActor);
@@ -229,6 +284,20 @@ protected:
 	void ReceiveHoundAttackEnded(bool bWasCancelled);
 
 private:
+	friend class ASovDominionHandler;
+
+	/**
+	 * Opens the native-only half of a Handler order authorization.
+	 *
+	 * The transient gameplay tag remains observable for GAS requirements, but
+	 * cannot authorize Horn Charge by itself. Only ASovDominionHandler may open
+	 * this scope around one exact TryActivateAbility call.
+	 */
+	void SetHandlerOrderDispatchInProgress(bool bInProgress)
+	{
+		bHandlerOrderDispatchInProgress = bInProgress;
+	}
+
 	AActor* FindBestAttackTarget(
 		AActor* SourceActor,
 		UAbilitySystemComponent* SourceAbilitySystem) const;
@@ -237,6 +306,15 @@ private:
 		AActor* SourceActor,
 		UAbilitySystemComponent* SourceAbilitySystem,
 		UAbilitySystemComponent* TargetAbilitySystem) const;
+
+	bool CanAcquireRequiredAttackToken(
+		const FGameplayAbilityActorInfo* ActorInfo,
+		AActor* TargetActor) const;
+	bool AcquireRequiredAttackToken(
+		const FGameplayAbilityActorInfo* ActorInfo,
+		AActor* TargetActor);
+	bool HasRequiredAttackTokenLease() const;
+	void ReleaseClaimedAttackToken();
 
 	bool ApplyPointDamage(
 		const FHitResult& Hit,
@@ -275,12 +353,20 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UAbilitySystemComponent> BoundAbilitySystem;
 
+	UPROPERTY(Transient)
+	TObjectPtr<ANarrativeNPCController> AttackTokenController;
+
+	/** Exact target ASC whose finite attacker slot backs this direct attack. */
+	UPROPERTY(Transient)
+	TObjectPtr<UNarrativeAbilitySystemComponent> AttackTokenTargetAbilitySystem;
+
 	TSet<TWeakObjectPtr<UAbilitySystemComponent>> HitTargets;
 	TArray<TPair<FGameplayTag, FDelegateHandle>> CancellationTagHandles;
 	FTimerHandle ImpactTimerHandle;
 	FTimerHandle RecoveryTimerHandle;
 	FTimerHandle MaximumDurationTimerHandle;
 	double NextAllowedActivationTime = 0.0;
+	uint64 AttackTokenLeaseSerial = 0;
 	float ActiveMontagePlayRate = 1.0f;
 	float ActiveImpactDelay = 0.22f;
 	float ActiveRecoveryAfterImpact = 0.42f;
@@ -289,6 +375,8 @@ private:
 	bool bPayloadFinished = false;
 	bool bAbilityStarted = false;
 	bool bEndingAbility = false;
+	bool bNewlyClaimedAttackToken = false;
+	bool bHandlerOrderDispatchInProgress = false;
 };
 
 /** Close-range Standard bite. Three authored variants avoid immediate repeats. */
@@ -331,6 +419,13 @@ public:
 	bool IsUsingNativeMovement() const { return bUseNativeMovement; }
 
 protected:
+	virtual bool CanActivateAbility(
+		const FGameplayAbilitySpecHandle Handle,
+		const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayTagContainer* SourceTags = nullptr,
+		const FGameplayTagContainer* TargetTags = nullptr,
+		FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
+
 	virtual bool HasRequiredAttackConfiguration() const override;
 	virtual void BeginAttackPayload() override;
 	virtual void StopOwnedMovement() override;

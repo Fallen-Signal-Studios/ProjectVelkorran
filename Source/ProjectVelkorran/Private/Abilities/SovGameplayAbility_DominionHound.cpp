@@ -7,6 +7,7 @@
 #include "Abilities/GameplayAbility.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "AIController.h"
+#include "AI/NarrativeNPCController.h"
 #include "Animation/AnimMontage.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Effects/SovGameplayEffect_DominionHound.h"
@@ -84,6 +85,17 @@ namespace
 		return !ImpactNormal.IsNearlyZero()
 			&& FVector::DotProduct(ImpactNormal, FVector::UpVector) < 0.65f;
 	}
+
+	ANarrativeNPCController* ResolveNarrativeNPCController(
+		const FGameplayAbilityActorInfo* ActorInfo)
+	{
+		APawn* AvatarPawn = ActorInfo
+			? Cast<APawn>(ActorInfo->AvatarActor.Get())
+			: nullptr;
+		return IsValid(AvatarPawn)
+			? Cast<ANarrativeNPCController>(AvatarPawn->GetController())
+			: nullptr;
+	}
 }
 
 USovGameplayAbility_DominionHoundAttackBase::
@@ -109,6 +121,27 @@ USovGameplayAbility_DominionHoundAttackBase::
 	ActivationOwnedTags.AddTag(NarrativeTags.State_Weapon_IsFiring);
 }
 
+bool USovGameplayAbility_DominionHoundAttackBase::
+	HasActiveCommandLinkActivationRequirement() const
+{
+	return ActivationRequiredTags.HasTagExact(
+		FSovGameplayTags::Get().State_CommandLink_Active);
+}
+
+bool USovGameplayAbility_DominionHoundAttackBase::
+	HasHandlerOrderAuthorizationActivationRequirement() const
+{
+	return ActivationRequiredTags.HasTagExact(
+		FSovGameplayTags::Get().State_CommandLink_HoundChargeAuthorized);
+}
+
+bool USovGameplayAbility_DominionHoundAttackBase::
+	BlocksCommandLinkSeverAtActivation() const
+{
+	return ActivationBlockedTags.HasTagExact(
+		FSovGameplayTags::Get().State_CommandLink_Severed);
+}
+
 bool USovGameplayAbility_DominionHoundAttackBase::CanActivateAbility(
 	const FGameplayAbilitySpecHandle Handle,
 	const FGameplayAbilityActorInfo* ActorInfo,
@@ -132,6 +165,16 @@ bool USovGameplayAbility_DominionHoundAttackBase::CanActivateAbility(
 		{
 			OptionalRelevantTags->AddTag(
 				FNarrativeGameplayTags::Get().Ability_ActivateFail_Networking);
+		}
+		return false;
+	}
+	if (bRequiresHandlerOrderAuthorization
+		&& !bHandlerOrderDispatchInProgress)
+	{
+		if (OptionalRelevantTags)
+		{
+			OptionalRelevantTags->AddTag(
+				FNarrativeGameplayTags::Get().Ability_ActivateFail_TagsMissing);
 		}
 		return false;
 	}
@@ -164,7 +207,11 @@ bool USovGameplayAbility_DominionHoundAttackBase::CanActivateAbility(
 		return false;
 	}
 
-	if (!IsValid(FindBestAttackTarget(SourceActor, SourceAbilitySystem)))
+	AActor* TargetActor = FindBestAttackTarget(
+		SourceActor,
+		SourceAbilitySystem);
+	if (!IsValid(TargetActor)
+		|| !CanAcquireRequiredAttackToken(ActorInfo, TargetActor))
 	{
 		if (OptionalRelevantTags)
 		{
@@ -187,6 +234,10 @@ void USovGameplayAbility_DominionHoundAttackBase::ActivateAbility(
 	bPayloadFinished = false;
 	bAbilityStarted = false;
 	bEndingAbility = false;
+	ReleaseClaimedAttackToken();
+	AttackTokenController = nullptr;
+	AttackTokenLeaseSerial = 0;
+	bNewlyClaimedAttackToken = false;
 	HitTargets.Reset();
 	AttackTarget.Reset();
 	ActiveMontage = nullptr;
@@ -201,8 +252,11 @@ void USovGameplayAbility_DominionHoundAttackBase::ActivateAbility(
 	AActor* TargetActor = FindBestAttackTarget(SourceActor, SourceAbilitySystem);
 	if (!ActorInfo
 		|| !ActorInfo->IsNetAuthority()
+		|| (bRequiresHandlerOrderAuthorization
+			&& !bHandlerOrderDispatchInProgress)
 		|| !IsValid(CharacterOwner.Get())
-		|| !IsValid(TargetActor))
+		|| !IsValid(TargetActor)
+		|| !AcquireRequiredAttackToken(ActorInfo, TargetActor))
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
@@ -302,12 +356,14 @@ void USovGameplayAbility_DominionHoundAttackBase::EndAbility(
 
 	MontageTask = nullptr;
 	ActiveMontage = nullptr;
+	ReleaseClaimedAttackToken();
 	AttackTarget.Reset();
 	HitTargets.Reset();
 	const bool bShouldBroadcastEnd = bAbilityStarted;
 	bAbilityStarted = false;
 	bPayloadStarted = false;
 	bPayloadFinished = false;
+	bHandlerOrderDispatchInProgress = false;
 	if (bShouldBroadcastEnd)
 	{
 		ReceiveHoundAttackEnded(bWasCancelled);
@@ -331,8 +387,15 @@ float USovGameplayAbility_DominionHoundAttackBase::
 bool USovGameplayAbility_DominionHoundAttackBase::
 	HasRequiredAttackConfiguration() const
 {
+	const FSovGameplayTags& SovTags = FSovGameplayTags::Get();
 	return InputTag.IsValid()
 		&& AbilityIdentityTag.IsValid()
+		&& (!bRequiresActiveCommandLink
+			|| ActivationRequiredTags.HasTagExact(
+				SovTags.State_CommandLink_Active))
+		&& (!bRequiresHandlerOrderAuthorization
+			|| ActivationRequiredTags.HasTagExact(
+				SovTags.State_CommandLink_HoundChargeAuthorized))
 		&& DamageEffectClass.Get()
 		&& !DamageChannels.IsEmpty()
 		&& !AttackClassifications.IsEmpty()
@@ -496,7 +559,96 @@ bool USovGameplayAbility_DominionHoundAttackBase::
 		&& !AbilitySystem->HasMatchingGameplayTag(SovTags.State_Poise_Broken)
 		&& !AbilitySystem->HasMatchingGameplayTag(SovTags.State_Status_Frozen)
 		&& !AbilitySystem->HasMatchingGameplayTag(
-			SovTags.State_Status_DeviceDisabled);
+			SovTags.State_Status_DeviceDisabled)
+		&& (!bInterruptedByCommandLinkSever
+			|| !AbilitySystem->HasMatchingGameplayTag(
+				SovTags.State_CommandLink_Severed))
+		&& HasRequiredAttackTokenLease();
+}
+
+bool USovGameplayAbility_DominionHoundAttackBase::
+	CanAcquireRequiredAttackToken(
+		const FGameplayAbilityActorInfo* ActorInfo,
+		AActor* TargetActor) const
+{
+	if (!bRequiresNarrativeAttackToken)
+	{
+		return true;
+	}
+
+	const ANarrativeNPCController* NarrativeController =
+		ResolveNarrativeNPCController(ActorInfo);
+	const UNarrativeAbilitySystemComponent* TargetAbilitySystem =
+		Cast<UNarrativeAbilitySystemComponent>(
+			ResolveAbilitySystemFromHoundHit(TargetActor));
+	return IsValid(NarrativeController)
+		&& IsValid(TargetAbilitySystem)
+		&& NarrativeController->CanAcquireAttackTokenFor(
+			TargetAbilitySystem);
+}
+
+bool USovGameplayAbility_DominionHoundAttackBase::
+	AcquireRequiredAttackToken(
+		const FGameplayAbilityActorInfo* ActorInfo,
+		AActor* TargetActor)
+{
+	if (!bRequiresNarrativeAttackToken)
+	{
+		return true;
+	}
+
+	ANarrativeNPCController* NarrativeController =
+		ResolveNarrativeNPCController(ActorInfo);
+	UNarrativeAbilitySystemComponent* TargetAbilitySystem =
+		Cast<UNarrativeAbilitySystemComponent>(
+			ResolveAbilitySystemFromHoundHit(TargetActor));
+	uint64 LeaseSerial = 0;
+	bool bNewlyAcquired = false;
+	if (!IsValid(NarrativeController)
+		|| !IsValid(TargetAbilitySystem)
+		|| !NarrativeController->TryAcquireAttackTokenFor(
+			TargetAbilitySystem,
+			LeaseSerial,
+			bNewlyAcquired))
+	{
+		return false;
+	}
+
+	AttackTokenController = NarrativeController;
+	AttackTokenTargetAbilitySystem = TargetAbilitySystem;
+	AttackTokenLeaseSerial = LeaseSerial;
+	bNewlyClaimedAttackToken = bNewlyAcquired;
+	return HasRequiredAttackTokenLease();
+}
+
+bool USovGameplayAbility_DominionHoundAttackBase::
+	HasRequiredAttackTokenLease() const
+{
+	if (!bRequiresNarrativeAttackToken)
+	{
+		return true;
+	}
+
+	return IsValid(AttackTokenController.Get())
+		&& AttackTokenController->IsAttackTokenLeaseCurrent(
+			AttackTokenLeaseSerial,
+			AttackTokenTargetAbilitySystem.Get());
+}
+
+void USovGameplayAbility_DominionHoundAttackBase::
+	ReleaseClaimedAttackToken()
+{
+	if (IsValid(AttackTokenController.Get()))
+	{
+		AttackTokenController->ReleaseAttackTokenLease(
+			AttackTokenLeaseSerial,
+			bNewlyClaimedAttackToken);
+	}
+
+	AttackTokenController = nullptr;
+	AttackTokenTargetAbilitySystem = nullptr;
+	AttackTokenLeaseSerial = 0;
+	bNewlyClaimedAttackToken = false;
 }
 
 void USovGameplayAbility_DominionHoundAttackBase::ConfigureActiveAttack(
@@ -579,6 +731,14 @@ bool USovGameplayAbility_DominionHoundAttackBase::ApplyAttackSweep(
 	{
 		UAbilitySystemComponent* TargetAbilitySystem =
 			ResolveAbilitySystemFromHoundHit(Hit.GetActor());
+		if (bRequiresNarrativeAttackToken
+			&& TargetAbilitySystem != AttackTokenTargetAbilitySystem.Get())
+		{
+			// The finite attacker slot belongs to the selected target. Another
+			// hostile crossing the sweep cannot inherit that reservation or take
+			// unbudgeted damage from this committed charge.
+			continue;
+		}
 		if (IsValidAttackTarget(
 				SourceActor,
 				SourceAbilitySystem,
@@ -1067,10 +1227,17 @@ USovGameplayAbility_DominionHoundHornCharge::
 	AssetTags.AddTag(NarrativeTags.Ability_DamageType_Heavy);
 	SetAssetTags(AssetTags);
 	ActivationOwnedTags.AddTag(NarrativeTags.State_Movement_PostponePathUpdates);
-	// The charge is a handler-coordinated commitment. A severed link interrupts
-	// an active charge through the base cancellation watcher and prevents a new
-	// one while the encounter remains severed. Bites and pounces stay available.
+	// The charge is a handler-coordinated commitment. The active-link tag proves
+	// the relationship. The transient authorization tag plus the native-only
+	// dispatch scope prove one exact order. Sever interrupts a charge while
+	// ordinary deactivation does not.
 	bInterruptedByCommandLinkSever = true;
+	bRequiresActiveCommandLink = true;
+	bRequiresHandlerOrderAuthorization = true;
+	bRequiresNarrativeAttackToken = true;
+	ActivationRequiredTags.AddTag(SovTags.State_CommandLink_Active);
+	ActivationRequiredTags.AddTag(
+		SovTags.State_CommandLink_HoundChargeAuthorized);
 	ActivationBlockedTags.AddTag(SovTags.State_CommandLink_Severed);
 
 	DamageChannels.AddTag(SovTags.Damage_Channel_Kinetic);
@@ -1093,10 +1260,53 @@ USovGameplayAbility_DominionHoundHornCharge::
 	DefaultBotAttackRange = 1650.0f;
 }
 
+bool USovGameplayAbility_DominionHoundHornCharge::CanActivateAbility(
+	const FGameplayAbilitySpecHandle Handle,
+	const FGameplayAbilityActorInfo* ActorInfo,
+	const FGameplayTagContainer* SourceTags,
+	const FGameplayTagContainer* TargetTags,
+	FGameplayTagContainer* OptionalRelevantTags) const
+{
+	if (!Super::CanActivateAbility(
+			Handle,
+			ActorInfo,
+			SourceTags,
+			TargetTags,
+			OptionalRelevantTags))
+	{
+		return false;
+	}
+
+	if (bUseNativeMovement)
+	{
+		const ACharacter* Character = ActorInfo
+			? Cast<ACharacter>(ActorInfo->AvatarActor.Get())
+			: nullptr;
+		const UCharacterMovementComponent* Movement = IsValid(Character)
+			? Character->GetCharacterMovement()
+			: nullptr;
+		if (!IsValid(Movement) || !Movement->IsMovingOnGround())
+		{
+			if (OptionalRelevantTags)
+			{
+				OptionalRelevantTags->AddTag(
+					FNarrativeGameplayTags::Get().Ability_ActivateFail_TagsMissing);
+			}
+			return false;
+		}
+	}
+
+	return true;
+}
+
 bool USovGameplayAbility_DominionHoundHornCharge::
 	HasRequiredAttackConfiguration() const
 {
 	return Super::HasRequiredAttackConfiguration()
+		// Handler dispatch verifies that this instance remains active after the
+		// exact activation call. A short native wind-up guarantees valid charges
+		// cannot apply their payload and end synchronously inside that call.
+		&& ImpactDelay >= 0.05f
 		&& FMath::IsFinite(ChargeSpeed)
 		&& ChargeSpeed >= 0.0f
 		&& (!bUseNativeMovement || ChargeSpeed > KINDA_SMALL_NUMBER)

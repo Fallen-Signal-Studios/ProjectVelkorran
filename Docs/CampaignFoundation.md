@@ -10,6 +10,7 @@ This pass creates project-owned campaign framework seams without discarding Narr
 - `ASovPlayerCharacterBase` owns Echo, Shield, player Health recharge, and Poise.
 - `ASovTarrikCharacter` additionally owns Guard and Cinderline Echo generation.
 - `ASovSeleneCharacter` additionally owns the one-hit Deflection component and Selene's typed precision Echo generator. The implemented generator rewards perfect Deflection, the first break of an authored weak point, and Axiom's first valid Sever of an active hostile command link.
+- `ASovDominionHandler` is the first concrete Commander profile: it owns one command link and a server-authoritative ability that orders an exact linked Hound Horn Charge. Horn Charge requires both the active relationship and a transient native Handler order.
 
 Each concrete protagonist supplies a canonical native identity tag. When its Player Definition is applied, the character retains all definition-owned tags, removes the opposite protagonist identity, and adds its own. This uses `SetDefinitionOwnedTags`, rather than an unrelated loose tag, because Narrative's ASC lives on PlayerState and may survive pawn replacement.
 
@@ -26,9 +27,10 @@ The repository snapshot does not include the project's binary Content assets. Co
 7. Remove any Blueprint-added Deflection or Selene Echo generator that duplicates the new inherited native components. Replace old Blueprint parry/reward logic with presentation bindings only after validating the native result.
 8. Create a Gameplay Ability Blueprint derived from `USovGameplayAbility_SeleneDeflection` and grant it once through Selene's default Ability Configuration. See `Docs/SeleneCoreLoop.md` for input, target, and tuning setup.
 9. Add one `USovWeakPointComponent` to each eligible enemy Blueprint and author stable zones only where the encounter truly exposes a breakable weak point. An empty component is a valid no-op.
-10. Add `USovCommandLinkComponent` to each authored command node that Axiom may Sever, assign its linked actors, and configure the linked actors' red weak-point reveal presentation. Wire `Try Sever Axiom Command Link` into Axiom's authority-owned pulse flow. See `Docs/SeleneCommandLinkAndWeakPointReveal.md`.
-11. Keep `Sov.Character.Player.Tarrik` on Tarrik's Player Definition and `Sov.Character.Player.Selene` on Selene's. The tag picker permits the `Sov.Character` category.
-12. Compile and save the player, ability, command-node, material, and weak-point target Blueprints, then run `CompileAllBlueprints` before testing gameplay.
+10. Use `ASovDominionHandler` for the Dominion Handler Blueprint and keep its inherited `USovCommandLinkComponent`; add the component explicitly only to other authored command nodes. Keep **Include Owner As Participant** enabled for the Handler so its ASC receives the active-link state, assign linked actors, and configure their red weak-point reveal presentation. Wire `Try Sever Axiom Command Link` into Axiom's authority-owned pulse flow. See `Docs/SeleneCommandLinkAndWeakPointReveal.md`.
+11. Create and grant the Handler command ability, reserve Hound Ability1 for native Handler dispatch, and complete the encounter/AI setup in `Docs/DominionHandlerProfile.md`.
+12. Keep `Sov.Character.Player.Tarrik` on Tarrik's Player Definition and `Sov.Character.Player.Selene` on Selene's. The tag picker permits the `Sov.Character` category.
+13. Compile and save the player, ability, command-node, material, and weak-point target Blueprints, then run `CompileAllBlueprints` before testing gameplay.
 
 ## Framework Blueprint migration
 

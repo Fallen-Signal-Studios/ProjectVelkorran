@@ -35,6 +35,7 @@ public:
 	FGameplayTag Ability_NPC_DominionHound_Bite;
 	FGameplayTag Ability_NPC_DominionHound_HornCharge;
 	FGameplayTag Ability_NPC_DominionHound_Pounce;
+	FGameplayTag Ability_NPC_DominionHandler_CommandHound;
 	FGameplayTag Ability_Echo_Tarrik_CinderSlam;
 	FGameplayTag Ability_Echo_Tarrik_VelkorransHunger;
 	FGameplayTag Ability_Echo_Tarrik_CinderStickyGrenade;
@@ -62,6 +63,7 @@ public:
 	FGameplayTag State_EchoAbility_Active;
 	FGameplayTag State_CommandLink_Active;
 	FGameplayTag State_CommandLink_Severed;
+	FGameplayTag State_CommandLink_HoundChargeAuthorized;
 	FGameplayTag State_Guarding;
 	FGameplayTag State_PerfectGuard;
 	FGameplayTag State_Deflecting;

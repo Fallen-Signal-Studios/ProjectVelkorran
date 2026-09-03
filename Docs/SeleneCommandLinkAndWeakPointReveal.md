@@ -1,6 +1,6 @@
 # Selene command-link Sever and weak-point reveal
 
-This slice implements the TDD's first concrete **Sever** contract: Axiom Null Pulse can break one live, authored command link; the server interrupts that network's coordinated behavior, Selene receives `+12` Echo once for the validated hostile transition, and each participating enemy temporarily reveals its remaining weak points in red. It does not treat Shield break, Device Disabled, damage, an animation event, or merely activating Axiom as proof that a link was severed.
+This slice implements the TDD's first concrete **Sever** contract: Axiom Null Pulse can break one live, authored command link; the server interrupts that network's coordinated behavior, Selene receives `+12` Echo once for the validated hostile transition, and each participating enemy temporarily reveals its remaining weak points in red. `ASovDominionHandler` is the first native enemy profile that actively consumes this contract by ordering a linked Hound's Horn Charge. The Sever path does not treat Shield break, Device Disabled, damage, an animation event, or merely activating Axiom as proof that a link was severed.
 
 The current Axiom implementation is the project-specific expression of the TDD's `GA_Selene_Disrupt` role. Its Shield collapse, recharge suppression, and optional Device Disabled payload remain independent of the command-link transaction.
 
@@ -39,7 +39,7 @@ Close the editor and perform a full `ProjectVelkorranEditor Win64 Development` b
 
 ### 1. Author the command node
 
-1. Open the Blueprint for the commander, handler, relay, or device that owns the network and add exactly one `Sov Command Link Component` (`USovCommandLinkComponent`). Do not add one to every linked hound.
+1. For a Dominion Handler, use `ASovDominionHandler` as the Blueprint parent and keep its one inherited `Sov Command Link Component`; do not add a duplicate. A different commander, relay, or device can own exactly one explicitly added `USovCommandLinkComponent`. Do not add one to every linked Hound.
 2. Ensure the owning actor replicates. The component is replicated by default, but a non-replicated owner cannot deliver its state to clients.
 3. Give the command node and linked enemies the correct Narrative team identity. The command-link component fails closed unless Selene is hostile to at least one actual included/registered participant. This permits a neutral relay to coordinate hostile enemies without treating an empty relay as a rewardable link.
 4. Set **Link Id** to a stable, encounter-unique name such as `KennelA_HandlerLink`. Never derive reward identity from a display name or actor label.
@@ -47,8 +47,8 @@ Close the editor and perform a full `ProjectVelkorranEditor Win64 Development` b
 6. Leave **Severable** enabled for an ordinary Axiom target. Disable it for a deliberately immune phase.
 7. Leave **Respect Device Disable Immunity** enabled unless this encounter explicitly allows Sever to bypass `Sov.Status.Immunity.DeviceDisable`.
 8. Leave **Can Grant Selene Echo** enabled for a genuine hostile tactical link. Disable it for tutorial, decorative, or repeatable utility networks that must not generate Echo.
-9. Enable **Include Owner As Participant** when the component owner should receive link tags/effects and have its own weak points revealed. Disable it only when the owner is a pure coordinator that should not participate. At least one included/registered participant must be hostile to Selene for the resulting transaction to be Echo-eligible.
-10. For a placed encounter, assign every controlled enemy in **Linked Actors** on the placed command-node instance. The property is instance-authored. For dynamically spawned members, call `Register Linked Actor` on authority after spawn and `Unregister Linked Actor` before removing one from the network.
+9. Enable **Include Owner As Participant** when the component owner should receive link tags/effects and have its own weak points revealed. It is required for `ASovDominionHandler`, because the Handler's command ability requires `Sov.State.CommandLink.Active` on the Handler's Ability System Component. Disable it only for a different, pure coordinator whose gameplay never consumes participant state. At least one included/registered participant must be hostile to Selene for the resulting transaction to be Echo-eligible.
+10. For a placed encounter, assign every controlled enemy in **Linked Actors** on the placed command-node instance. The property is instance-authored. For a dynamically spawned pack, call `RegisterLinkedActor` on authority for every member after the node and members exist. Then check `IsCommandLinkActive`; only when false, call `ActivateCommandLink(CommandNode)` on authority and handle a failed activation. A valid Link Id with an included owner may already have activated at Begin Play, while other runtime authoring can remain inactive. Call `UnregisterLinkedActor` before a planned removal from the network; actor destruction unregisters that member automatically.
 11. Optionally assign **Active Link Effect Class** to an Infinite-duration Gameplay Effect containing the actual coordination bonus. The component owns the applied handles and removes its contribution when the link is severed, deactivated, unregistered, or torn down. Do not put the permanent Severed state in this effect; the component owns both link-state tags.
 12. Leave **Reveal Weak Points On Sever** enabled and start with **Weak Point Reveal Duration** at `5.0` seconds.
 
@@ -80,7 +80,9 @@ For each `Weak Point Zones` entry:
 5. Keep **Reveal Decal Size** tight around the weak spot. The axes are projection depth, width, and height in centimeters; start around the native `12 x 24 x 24` and tune against the final animation.
 6. Use **Reveal Decal Material Override** only when a zone requires a different mask. Otherwise it inherits the component's **Weak Point Reveal Decal Material**.
 
-For the Dominion Hound, start with a zone such as `Horn` whose hit matcher and reveal attachment use the real horn bone/socket. Ensure the hound is a replicated link participant with its initialized Narrative ASC: actors without an ASC can still reveal weak points, but cannot receive the state tag/effect that interrupts behavior. A successful link Sever cancels an active Horn Charge through `Sov.State.CommandLink.Severed` and blocks another Horn Charge from starting while severed. Bite and Pounce neither cancel nor become blocked, so the hound becomes less coordinated rather than inert.
+For the Dominion Hound, start with a zone such as `Horn` whose hit matcher and reveal attachment use the real horn bone/socket. Ensure the Hound is a replicated link participant with its initialized Narrative ASC: actors without an ASC can still reveal weak points, but cannot receive the state tags that authorize or interrupt behavior. Horn Charge requires the durable `Sov.State.CommandLink.Active` relationship plus a transient Handler-order authorization during activation; a successful link Sever removes the durable authorization, applies `Sov.State.CommandLink.Severed`, and cancels a charge already in progress. Bite and Pounce neither cancel nor become blocked, so the Hound becomes less coordinated rather than inert.
+
+The Handler's command ability is the sole decision owner for Horn Charge. Do not request Ability1 from the Hound's generic attack service just because the active-link tag is present. See `Docs/DominionHandlerProfile.md` for exact-spec activation, Handler/Hound Blueprint setup, and the complete enemy-profile test matrix.
 
 ### 4. Create the red reveal material
 
@@ -116,6 +118,7 @@ The reveal:
 |---|---|
 | `Sov.State.CommandLink.Active` | Server-contributed state on active participants |
 | `Sov.State.CommandLink.Severed` | Server-contributed state after this link is severed; cancels watched specialist abilities |
+| `Sov.State.CommandLink.HoundChargeAuthorized` | Transient server-only proof around one exact Handler-issued Horn Charge activation; never author it into content |
 | `Sov.Event.CommandLink.Severed` | Gameplay event sent to the severing actor for the first successful transition |
 | `Sov.Echo.Source.CommandLinkSever` | Source tag written by `USovEchoComponent` for the validated `+12` award |
 
@@ -129,27 +132,31 @@ Test in Standalone first, then repeat network-sensitive cases with a remote Sele
 
 | Case | Expected result |
 |---|---|
-| Active link begins | Owner/registered live participants have `Sov.State.CommandLink.Active` and one optional effect contribution |
+| Active link begins | Included owner and registered live participants have `Sov.State.CommandLink.Active` and one optional effect contribution |
 | First hostile Axiom Sever | Returns `NewlySevered`; active tag/effect are removed; Severed tag appears; specialist attack cancels; Selene gains exactly `+12` |
 | Repeat on same instance | Returns `AlreadySevered`; no second Echo, reveal restart, event, or effect removal |
 | Inactive / immune / invalid target | Appropriate non-success enum; no Echo and no weak-point reveal |
 | Ordinary Axiom target without a link | Shield/recharge/device payload may resolve; no Sever or `+12` |
 | Link node without Shield | A valid authored link may still Sever; Shield amount is not the Sever predicate |
 | Full and threshold Echo | `100 -> 70 -> 82` and `30 -> 0 -> 12`; transaction cannot pay again after later meter changes |
-| Command source death/destruction | Link becomes Inactive, contributions clear, and no synthetic Sever/Echo/reveal occurs |
+| Command source death/destruction | Link becomes Inactive, pending Handler wind-up cancels, contributions clear, and no synthetic Sever/Echo/reveal occurs; a Horn Charge already committed is not retroactively canceled without Sever |
 | Encounter reset | A fresh link instance activates; a later legitimate Sever can award once for that new instance |
 | Hound behavior | An active Horn Charge cancels on Sever and cannot restart; Bite/Pounce remain eligible subject to their normal rules |
+| Handler command | Active Handler link orders exactly one eligible linked Hound Horn Charge; an unlinked nearby Hound is never selected |
+| Sever during order | Pending Handler order cancels before issue, or an already active Horn Charge cancels; no late timer reactivates it |
 | Red reveal | Every client sees decals only on each participant's unbroken authored zones for the synchronized duration |
 | Reveal break/expiry | Breaking a revealed zone removes its decal; remaining zones persist; all decals fade and restore mesh decal settings at expiry |
 | Relevancy / appearance | A late-relevant client sees only the remaining reveal time; mesh/appearance changes rebuild decals without duplicating gameplay |
 | Friendly/neutral link attempt | Component returns `NotHostile`; no state transition, reveal, or Echo reward |
-| Multiple links sharing a participant | Each coordinator removes only its own tag/effect contribution; one link's reset does not mint or repay another transaction |
+| Multiple links sharing a participant | Each coordinator removes only its own tag/effect contribution; one link's reset does not mint or repay another transaction. Do not share a specialist Hound across Handler links in this first command profile |
 
 Also run:
 
 1. `Automation RunTests ProjectVelkorran.Campaign.Foundation`
 2. `Automation RunTests ProjectVelkorran.Campaign.Selene`
-3. `CompileAllBlueprints`
+3. `Automation RunTests ProjectVelkorran.Campaign.DominionHandler`
+4. `Automation RunTests ProjectVelkorran.Campaign.DominionHound`
+5. `CompileAllBlueprints`
 
 ## Explicitly deferred
 

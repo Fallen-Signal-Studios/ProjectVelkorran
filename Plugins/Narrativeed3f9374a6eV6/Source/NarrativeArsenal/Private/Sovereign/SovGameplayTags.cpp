@@ -17,12 +17,14 @@ void FSovGameplayTags::InitializeNativeTags()
 		&& GameplayTags.Ability_NPC_DominionHound_Bite.IsValid()
 		&& GameplayTags.Ability_NPC_DominionHound_HornCharge.IsValid()
 		&& GameplayTags.Ability_NPC_DominionHound_Pounce.IsValid()
+		&& GameplayTags.Ability_NPC_DominionHandler_CommandHound.IsValid()
 		&& GameplayTags.Ability_Echo_Selene_StillpointGrenade.IsValid()
 		&& GameplayTags.Status_Immunity_Burn.IsValid()
 		&& GameplayTags.Status_Immunity_DeviceDisable.IsValid()
 		&& GameplayTags.State_Deflecting.IsValid()
 		&& GameplayTags.State_CommandLink_Active.IsValid()
 		&& GameplayTags.State_CommandLink_Severed.IsValid()
+		&& GameplayTags.State_CommandLink_HoundChargeAuthorized.IsValid()
 		&& GameplayTags.Echo_Source_PerfectDeflection.IsValid()
 		&& GameplayTags.Echo_Source_WeakPointBreak.IsValid()
 		&& GameplayTags.Echo_Source_CommandLinkSever.IsValid()
@@ -51,6 +53,7 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 	AddTag(Ability_NPC_DominionHound_Bite, "Sov.Ability.NPC.DominionHound.Bite", "Standard close-range bite attack used by Dominion hounds.");
 	AddTag(Ability_NPC_DominionHound_HornCharge, "Sov.Ability.NPC.DominionHound.HornCharge", "Committed heavy horn-charge attack used by Dominion hounds.");
 	AddTag(Ability_NPC_DominionHound_Pounce, "Sov.Ability.NPC.DominionHound.Pounce", "Snapshot-target heavy pounce attack used by Dominion hounds.");
+	AddTag(Ability_NPC_DominionHandler_CommandHound, "Sov.Ability.NPC.DominionHandler.CommandHound", "Dominion Handler order that authorizes a linked hound's horn charge.");
 	AddTag(Ability_Echo_Tarrik_CinderSlam, "Sov.Ability.Echo.Tarrik.CinderSlam", "Tarrik's sword-exclusive Cinder Slam Echo ability.");
 	AddTag(Ability_Echo_Tarrik_VelkorransHunger, "Sov.Ability.Echo.Tarrik.VelkorransHunger", "Tarrik's sword-exclusive Velkorran's Hunger Echo ability.");
 	AddTag(Ability_Echo_Tarrik_CinderStickyGrenade, "Sov.Ability.Echo.Tarrik.CinderStickyGrenade", "Tarrik's shared Cinder Sticky Grenade Echo ability.");
@@ -78,6 +81,7 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 	AddTag(State_EchoAbility_Active, "Sov.State.EchoAbility.Active", "A committed character Echo ability currently owns the Echo-action lane.");
 	AddTag(State_CommandLink_Active, "Sov.State.CommandLink.Active", "This combatant is receiving coordination from an active authored command link.");
 	AddTag(State_CommandLink_Severed, "Sov.State.CommandLink.Severed", "This combatant's authored command link was severed for the current encounter state.");
+	AddTag(State_CommandLink_HoundChargeAuthorized, "Sov.State.CommandLink.HoundChargeAuthorized", "Transient server-only GAS gate used with the Handler's native dispatch scope for one exact hound Horn Charge order.");
 	AddTag(State_Guarding, "Sov.State.Guarding", "A frontal guard plane is active.");
 	AddTag(State_PerfectGuard, "Sov.State.PerfectGuard", "The perfect-defense timing window is active.");
 	AddTag(State_Deflecting, "Sov.State.Deflecting", "Selene's brief precision-deflection window is active.");

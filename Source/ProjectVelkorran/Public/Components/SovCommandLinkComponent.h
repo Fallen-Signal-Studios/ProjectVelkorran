@@ -149,6 +149,13 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Command Link")
 	FGuid GetLinkInstanceId() const { return ReplicationState.LinkInstanceId; }
 
+	/** Authority-selected actor whose death/destruction ends this link instance. */
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Command Link")
+	AActor* GetCommandSource() const
+	{
+		return ReplicationState.CommandSource.Get();
+	}
+
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Command Link")
 	TArray<AActor*> GetLinkedActors() const;
 
@@ -174,6 +181,11 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Command Link")
 	bool RegisterLinkedActor(AActor* Actor);
 
+	/**
+	 * Removes one encounter actor and its link contributions.
+	 * A stale destroyed reference may still be supplied so encounter teardown can
+	 * clean membership before the reference is cleared by garbage collection.
+	 */
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Command Link")
 	bool UnregisterLinkedActor(AActor* Actor);
 
@@ -241,6 +253,7 @@ protected:
 
 private:
 	TArray<AActor*> BuildParticipantSnapshot() const;
+	int32 PruneInvalidLinkedActors();
 	UAbilitySystemComponent* ResolveAbilitySystem(AActor* Actor) const;
 	bool IsDisruptionImmune() const;
 	bool IsHostileToAnyParticipant(const AActor* Instigator) const;

@@ -506,6 +506,19 @@ bool UNarrativeAbilitySystemComponent::TryClaimToken(class ANarrativeNPCControll
 {
 	if (Claimer && Claimer->GetPawn() && GetAvatarActor())
 	{
+		PruneInvalidAttackTokens();
+		if (Claimer->GrantedToken == this)
+		{
+			return true;
+		}
+		if (Claimer->GrantedToken != nullptr)
+		{
+			// Controllers must return their previous target's entry before
+			// claiming from another ASC. Refuse to overwrite the pointer and
+			// leak that earlier target's finite attacker budget.
+			return false;
+		}
+
 		const bool bHasTokensAvailable = GrantedAttackTokens.Num() < GetNumAttackTokens();
 		const APawn* ClaimerPawn = Claimer->GetPawn();
 		const AActor* OurActor = GetAvatarActor();
@@ -548,7 +561,10 @@ bool UNarrativeAbilitySystemComponent::TryClaimToken(class ANarrativeNPCControll
 			{
 				//UE_LOG(LogTemp, Warning, TEXT("We stole a token from %s!"), *GrantedAttackTokens[StealTokenFromIdx].Owner->GetNPCName().ToString());
 
-				GrantedAttackTokens[StealTokenFromIdx].Owner->TokenStolen();
+				if (IsValid(GrantedAttackTokens[StealTokenFromIdx].Owner))
+				{
+					GrantedAttackTokens[StealTokenFromIdx].Owner->TokenStolen();
+				}
 				ReturnTokenAtIndex(StealTokenFromIdx);
 			}
 		}
@@ -559,7 +575,7 @@ bool UNarrativeAbilitySystemComponent::TryClaimToken(class ANarrativeNPCControll
 			FAttackToken NewToken = FAttackToken(Claimer, GetWorld()->GetTimeSeconds());
 			GrantedAttackTokens.Add(NewToken);
 
-			Claimer->GrantedToken = this;
+			Claimer->SetGrantedAttackToken(this);
 			return true; 
 		}
 	}
@@ -567,13 +583,29 @@ bool UNarrativeAbilitySystemComponent::TryClaimToken(class ANarrativeNPCControll
 	return false; 
 }
 
+bool UNarrativeAbilitySystemComponent::HasAttackTokenFor(
+	const ANarrativeNPCController* Claimer) const
+{
+	if (!IsValid(Claimer))
+	{
+		return false;
+	}
+
+	return GrantedAttackTokens.ContainsByPredicate(
+		[Claimer](const FAttackToken& Token)
+		{
+			return Token.Owner == Claimer;
+		});
+}
+
 void UNarrativeAbilitySystemComponent::ReturnTokenAtIndex(int32 Index)
 {
 	if (GrantedAttackTokens.IsValidIndex(Index))
 	{
-		if (GrantedAttackTokens[Index].Owner)
+		if (IsValid(GrantedAttackTokens[Index].Owner)
+			&& GrantedAttackTokens[Index].Owner->GrantedToken == this)
 		{
-			GrantedAttackTokens[Index].Owner->GrantedToken = nullptr;
+			GrantedAttackTokens[Index].Owner->SetGrantedAttackToken(nullptr);
 		}
 	}
 
@@ -602,11 +634,25 @@ void UNarrativeAbilitySystemComponent::ReturnToken(class ANarrativeNPCController
 
 bool UNarrativeAbilitySystemComponent::ShouldImmediatelyStealToken(const FAttackToken& Token) const
 {
-	return !Token.Owner || !Token.Owner->IsAlive() || !Token.Owner->GetPawn();
+	if (!IsValid(Token.Owner))
+	{
+		return true;
+	}
+	if (Token.Owner->IsAttackTokenReservedFor(this))
+	{
+		return false;
+	}
+	return !Token.Owner->IsAlive() || !IsValid(Token.Owner->GetPawn());
 }
 
 bool UNarrativeAbilitySystemComponent::CanStealToken(class ANarrativeNPCController* Stealer, const FAttackToken& ExistingToken, float& StealScore) const
 {
+	if (IsValid(ExistingToken.Owner)
+		&& ExistingToken.Owner->IsAttackTokenReservedFor(this))
+	{
+		return false;
+	}
+
 	if (const UNarrativeCombatDeveloperSettings* CombatSettings = GetDefault<UNarrativeCombatDeveloperSettings>())
 	{
 		if (Stealer && ExistingToken.Owner)
@@ -661,12 +707,40 @@ int32 UNarrativeAbilitySystemComponent::GetNumAttackTokens() const
 
 int32 UNarrativeAbilitySystemComponent::GetAvailableAttackTokens() const
 {
-	return GetNumAttackTokens() - GrantedAttackTokens.Num();
+	return FMath::Max(GetNumAttackTokens() - GetValidAttackTokenCount(), 0);
 }
 
 int32 UNarrativeAbilitySystemComponent::GetNumGrantedAttackTokens() const
 {
-	return GrantedAttackTokens.Num();
+	return GetValidAttackTokenCount();
+}
+
+void UNarrativeAbilitySystemComponent::PruneInvalidAttackTokens()
+{
+	for (int32 Index = GrantedAttackTokens.Num() - 1; Index >= 0; --Index)
+	{
+		ANarrativeNPCController* Owner = GrantedAttackTokens[Index].Owner.Get();
+		if (!IsValid(Owner)
+			|| !Owner->IsAlive()
+			|| !IsValid(Owner->GetPawn())
+			|| Owner->GrantedToken != this)
+		{
+			ReturnTokenAtIndex(Index);
+		}
+	}
+}
+
+int32 UNarrativeAbilitySystemComponent::GetValidAttackTokenCount() const
+{
+	return GrantedAttackTokens.CountByPredicate(
+		[this](const FAttackToken& Token)
+		{
+			const ANarrativeNPCController* Owner = Token.Owner.Get();
+			return IsValid(Owner)
+				&& Owner->IsAlive()
+				&& IsValid(Owner->GetPawn())
+				&& Owner->GrantedToken == this;
+		});
 }
 
 float UNarrativeAbilitySystemComponent::GetAttackPriority() const

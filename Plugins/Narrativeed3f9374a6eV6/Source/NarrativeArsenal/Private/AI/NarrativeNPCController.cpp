@@ -34,12 +34,15 @@ void ANarrativeNPCController::BeginPlay()
 
 void ANarrativeNPCController::EndPlay(EEndPlayReason::Type EndPlayReason)
 {
-	Super::EndPlay(EndPlayReason);
-
 	if (UPathFollowingComponent* PFC = GetPathFollowingComponent())
 	{
 		PFC->OnRequestFinished.RemoveAll(this);
 	}
+
+	// Streaming removal and teardown do not always pass through Destroyed().
+	// Release the finite attacker slot while the target ASC is still available.
+	ForceReleaseAttackToken();
+	Super::EndPlay(EndPlayReason);
 }
 
 class UAbilitySystemComponent* ANarrativeNPCController::GetAbilitySystemComponent() const
@@ -99,10 +102,9 @@ bool ANarrativeNPCController::HasAnyMatchingGameplayTags(const FGameplayTagConta
 
 void ANarrativeNPCController::Destroyed()
 {
+	// Explicit destruction may precede EndPlay. This is intentionally idempotent.
+	ForceReleaseAttackToken();
 	Super::Destroyed();
-
-	//If we're destroyed tell token granter to return token. 
-	ReturnToken();
 }
 
 void ANarrativeNPCController::DisplayDebug(class UCanvas* Canvas, const FDebugDisplayInfo& DebugDisplay, float& YL, float& YPos)
@@ -259,11 +261,183 @@ ANarrativeNPCCharacter* ANarrativeNPCController::GetOwnedNPC() const
 	return OwnedCharacter;
 }
 
+bool ANarrativeNPCController::CanAcquireAttackTokenFor(
+	const UNarrativeAbilitySystemComponent* TargetToAttack) const
+{
+	if (!HasAuthority() || !IsValid(TargetToAttack))
+	{
+		return false;
+	}
+
+	if (ReservedAttackTokenLeaseSerial != 0
+		&& IsAttackTokenLeaseCurrent(
+			ReservedAttackTokenLeaseSerial,
+			GrantedToken.Get()))
+	{
+		return false;
+	}
+
+	if (GrantedToken == TargetToAttack)
+	{
+		return true;
+	}
+
+	// A controller may own only one target's token. Do not silently abandon a
+	// token held by another behavior just because a direct ability was issued.
+	// The target ASC remains the final authority: its claim may consume a free
+	// slot or apply Narrative's existing token-steal policy.
+	return !IsValid(GrantedToken.Get());
+}
+
+bool ANarrativeNPCController::TryAcquireAttackTokenFor(
+	UNarrativeAbilitySystemComponent* TargetToAttack,
+	uint64& OutLeaseSerial,
+	bool& bOutNewlyAcquired)
+{
+	OutLeaseSerial = 0;
+	bOutNewlyAcquired = false;
+	if (ReservedAttackTokenLeaseSerial != 0)
+	{
+		if (IsAttackTokenLeaseCurrent(
+				ReservedAttackTokenLeaseSerial,
+				GrantedToken.Get()))
+		{
+			return false;
+		}
+		ReservedAttackTokenLeaseSerial = 0;
+		bReturnAttackTokenWhenReservationEnds = false;
+	}
+	if (!CanAcquireAttackTokenFor(TargetToAttack))
+	{
+		return false;
+	}
+
+	if (GrantedToken == TargetToAttack
+		&& !TargetToAttack->HasAttackTokenFor(this))
+	{
+		// Repair split-brain local state before making a fresh authoritative claim.
+		SetGrantedAttackToken(nullptr);
+	}
+
+	if (GrantedToken == TargetToAttack)
+	{
+		// Backward compatibility for a token established before native lease
+		// tracking began (for example, an already-running PIE session).
+		if (AttackTokenLeaseSerial == 0)
+		{
+			AdvanceAttackTokenLeaseSerial();
+		}
+		OutLeaseSerial = AttackTokenLeaseSerial;
+		ReservedAttackTokenLeaseSerial = AttackTokenLeaseSerial;
+		bReturnAttackTokenWhenReservationEnds = false;
+		return true;
+	}
+	if (!IsValid(GrantedToken.Get()) && GrantedToken.Get() != nullptr)
+	{
+		SetGrantedAttackToken(nullptr);
+	}
+
+	if (!RequestAttackToken(TargetToAttack)
+		|| GrantedToken != TargetToAttack
+		|| !TargetToAttack->HasAttackTokenFor(this)
+		|| AttackTokenLeaseSerial == 0)
+	{
+		return false;
+	}
+
+	OutLeaseSerial = AttackTokenLeaseSerial;
+	bOutNewlyAcquired = true;
+	ReservedAttackTokenLeaseSerial = AttackTokenLeaseSerial;
+	bReturnAttackTokenWhenReservationEnds = false;
+	return true;
+}
+
+bool ANarrativeNPCController::IsAttackTokenLeaseCurrent(
+	const uint64 LeaseSerial,
+	const UNarrativeAbilitySystemComponent* ExpectedTarget) const
+{
+	return LeaseSerial != 0
+		&& LeaseSerial == AttackTokenLeaseSerial
+		&& LeaseSerial == ReservedAttackTokenLeaseSerial
+		&& IsValid(ExpectedTarget)
+		&& GrantedToken == ExpectedTarget
+		&& ExpectedTarget->HasAttackTokenFor(this);
+}
+
+bool ANarrativeNPCController::IsAttackTokenReservedFor(
+	const UNarrativeAbilitySystemComponent* ExpectedTarget) const
+{
+	return IsAlive()
+		&& IsValid(GetPawn())
+		&& IsAttackTokenLeaseCurrent(
+			ReservedAttackTokenLeaseSerial,
+			ExpectedTarget);
+}
+
+bool ANarrativeNPCController::ReleaseAttackTokenLease(
+	const uint64 LeaseSerial,
+	const bool bReturnTokenAfterRelease)
+{
+	UNarrativeAbilitySystemComponent* ReservedTarget = GrantedToken.Get();
+	if (!HasAuthority()
+		|| !IsAttackTokenLeaseCurrent(LeaseSerial, ReservedTarget))
+	{
+		return false;
+	}
+
+	const bool bShouldReturnToken = bReturnTokenAfterRelease
+		|| bReturnAttackTokenWhenReservationEnds;
+	ReservedAttackTokenLeaseSerial = 0;
+	bReturnAttackTokenWhenReservationEnds = false;
+	return !bShouldReturnToken || ReturnToken();
+}
+
+void ANarrativeNPCController::SetGrantedAttackToken(
+	UNarrativeAbilitySystemComponent* NewGrantedToken)
+{
+	if (GrantedToken == NewGrantedToken)
+	{
+		return;
+	}
+
+	ReservedAttackTokenLeaseSerial = 0;
+	bReturnAttackTokenWhenReservationEnds = false;
+	GrantedToken = NewGrantedToken;
+	AdvanceAttackTokenLeaseSerial();
+}
+
+void ANarrativeNPCController::AdvanceAttackTokenLeaseSerial()
+{
+	++AttackTokenLeaseSerial;
+	// Zero is reserved for "no captured lease" even after uint64 wraparound.
+	if (AttackTokenLeaseSerial == 0)
+	{
+		++AttackTokenLeaseSerial;
+	}
+}
+
+void ANarrativeNPCController::ForceReleaseAttackToken()
+{
+	ReservedAttackTokenLeaseSerial = 0;
+	bReturnAttackTokenWhenReservationEnds = false;
+	ReturnToken();
+}
+
 bool ANarrativeNPCController::RequestAttackToken(UNarrativeAbilitySystemComponent* TargetToAttack)
 {
 	if (TargetToAttack && GrantedToken != TargetToAttack)
 	{
-		if (TargetToAttack->TryClaimToken(this))
+		// A controller owns at most one target token. The public Blueprint path
+		// predates native lease tracking, so make its documented retarget cleanup
+		// explicit as well: never overwrite GrantedToken and strand the old
+		// target's FAttackToken entry.
+		if (GrantedToken.Get() != nullptr)
+		{
+			ReturnToken();
+		}
+
+		if (GrantedToken == nullptr
+			&& TargetToAttack->TryClaimToken(this))
 		{
 			return true;
 		}
@@ -274,9 +448,32 @@ bool ANarrativeNPCController::RequestAttackToken(UNarrativeAbilitySystemComponen
 
 bool ANarrativeNPCController::ReturnToken()
 {
-	if (GrantedToken)
+	if (ReservedAttackTokenLeaseSerial != 0
+		&& IsAttackTokenLeaseCurrent(
+			ReservedAttackTokenLeaseSerial,
+			GrantedToken.Get()))
 	{
-		GrantedToken->ReturnToken(this);
+		// A Behavior Tree may finish the action that originally owned this token
+		// while a direct ability still reserves it. Defer physical return until
+		// that reservation ends so the attack cannot outlive its attacker slot.
+		bReturnAttackTokenWhenReservationEnds = true;
+		return true;
+	}
+
+	UNarrativeAbilitySystemComponent* TokenToReturn = GrantedToken.Get();
+	const uint64 LeaseSerialToReturn = AttackTokenLeaseSerial;
+	if (IsValid(TokenToReturn))
+	{
+		TokenToReturn->ReturnToken(this);
+	}
+
+	// ReturnToken normally clears this through the target ASC. Also clear a
+	// stale local pointer if that target was torn down or its token array was
+	// already repaired. Do not clear a newer lease installed by a callback.
+	if (GrantedToken == TokenToReturn
+		&& AttackTokenLeaseSerial == LeaseSerialToReturn)
+	{
+		SetGrantedAttackToken(nullptr);
 	}
 
 	return true; 

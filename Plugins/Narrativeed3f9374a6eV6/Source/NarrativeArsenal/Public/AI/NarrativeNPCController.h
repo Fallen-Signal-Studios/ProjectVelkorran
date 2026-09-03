@@ -12,6 +12,7 @@
 #include "NarrativeNPCController.generated.h"
 
 struct FPathFollowingResult;
+class UNarrativeAbilitySystemComponent;
 
 /**
  * NPC Controller for NPCs spawned by the Narrative NPC subsystem. 
@@ -76,6 +77,29 @@ public:
 	UFUNCTION(BlueprintPure, Category = "NarrativeNPCController")
 	ANarrativeNPCCharacter* GetOwnedNPC() const;
 
+	/**
+	 * Native, server-only attack-token lease helpers.
+	 *
+	 * Abilities that bypass the normal Behavior Tree token task can use these
+	 * without exposing the controller's mutable token pointer. A lease serial
+	 * prevents a delayed ability cleanup from returning a newer token that the
+	 * controller acquired after its original token was stolen or returned.
+	 */
+	bool CanAcquireAttackTokenFor(
+		const UNarrativeAbilitySystemComponent* TargetToAttack) const;
+	bool TryAcquireAttackTokenFor(
+		UNarrativeAbilitySystemComponent* TargetToAttack,
+		uint64& OutLeaseSerial,
+		bool& bOutNewlyAcquired);
+	bool IsAttackTokenLeaseCurrent(
+		uint64 LeaseSerial,
+		const UNarrativeAbilitySystemComponent* ExpectedTarget) const;
+	bool IsAttackTokenReservedFor(
+		const UNarrativeAbilitySystemComponent* ExpectedTarget) const;
+	bool ReleaseAttackTokenLease(
+		uint64 LeaseSerial,
+		bool bReturnTokenAfterRelease);
+
 protected:
 	
 	/**The NPC activity component, stores the behaviour tree and current state and can write that to disk.*/
@@ -100,6 +124,21 @@ protected:
 	//The current attack token we've claimed 
 	UPROPERTY(BlueprintReadOnly, Category = "Attack Tokens")
 	TObjectPtr<class UNarrativeAbilitySystemComponent> GrantedToken;
+
+private:
+	void SetGrantedAttackToken(
+		UNarrativeAbilitySystemComponent* NewGrantedToken);
+	void AdvanceAttackTokenLeaseSerial();
+	void ForceReleaseAttackToken();
+
+	/** Monotonic, server-local identity for the controller's current token. */
+	uint64 AttackTokenLeaseSerial = 0;
+
+	/** One direct ability may reserve the current token against BT return/steal. */
+	uint64 ReservedAttackTokenLeaseSerial = 0;
+	bool bReturnAttackTokenWhenReservationEnds = false;
+
+protected:
 
 	//Gives our NPC controller a chance to react to death.
 	UFUNCTION(BlueprintNativeEvent, Category = "Narrative|NarrativeCharacter")

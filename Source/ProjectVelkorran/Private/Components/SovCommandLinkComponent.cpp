@@ -131,8 +131,14 @@ bool USovCommandLinkComponent::ContainsLinkedActor(const AActor* Actor) const
 
 bool USovCommandLinkComponent::RegisterLinkedActor(AActor* Actor)
 {
-	if (!GetOwner() || !GetOwner()->HasAuthority() || !IsValid(Actor)
-		|| bCommandLinkMutationInProgress
+	if (!GetOwner() || !GetOwner()->HasAuthority()
+		|| bCommandLinkMutationInProgress)
+	{
+		return false;
+	}
+
+	PruneInvalidLinkedActors();
+	if (!IsValid(Actor)
 		|| Actor->GetWorld() != GetWorld()
 		|| Actor == GetOwner() || LinkedActors.Contains(Actor))
 	{
@@ -148,10 +154,19 @@ bool USovCommandLinkComponent::RegisterLinkedActor(AActor* Actor)
 
 bool USovCommandLinkComponent::UnregisterLinkedActor(AActor* Actor)
 {
-	if (!GetOwner() || !GetOwner()->HasAuthority() || !IsValid(Actor)
-		|| bCommandLinkMutationInProgress
-		|| !LinkedActors.Contains(Actor))
+	if (!GetOwner() || !GetOwner()->HasAuthority()
+		|| bCommandLinkMutationInProgress)
 	{
+		return false;
+	}
+
+	// Do not require IsValid here. OnDestroyed can leave an authored UObject
+	// reference addressable briefly even though normal validity checks reject it.
+	// Removing that exact entry keeps a later reset/reactivation from failing its
+	// otherwise-valid configuration check.
+	if (!LinkedActors.Contains(Actor))
+	{
+		PruneInvalidLinkedActors();
 		return false;
 	}
 
@@ -161,6 +176,7 @@ bool USovCommandLinkComponent::UnregisterLinkedActor(AActor* Actor)
 	{
 		UnbindParticipant(Actor);
 	}
+	PruneInvalidLinkedActors();
 	WakeOwnerForReplication();
 	return true;
 }
@@ -168,9 +184,13 @@ bool USovCommandLinkComponent::UnregisterLinkedActor(AActor* Actor)
 bool USovCommandLinkComponent::ActivateCommandLink(AActor* InCommandSource)
 {
 	if (!GetOwner() || !GetOwner()->HasAuthority()
-		|| !HasValidCommandLinkConfiguration()
 		|| bCommandLinkMutationInProgress
 		|| ReplicationState.State == ESovCommandLinkState::Active)
+	{
+		return false;
+	}
+	PruneInvalidLinkedActors();
+	if (!HasValidCommandLinkConfiguration())
 	{
 		return false;
 	}
@@ -225,6 +245,7 @@ void USovCommandLinkComponent::ResetCommandLink()
 		bDeferredResetRequested = true;
 		return;
 	}
+	PruneInvalidLinkedActors();
 
 	AActor* ExistingSource = ReplicationState.CommandSource.Get();
 	const ESovCommandLinkState OldState = ReplicationState.State;
@@ -377,6 +398,35 @@ TArray<AActor*> USovCommandLinkComponent::BuildParticipantSnapshot() const
 		}
 	}
 	return Participants;
+}
+
+int32 USovCommandLinkComponent::PruneInvalidLinkedActors()
+{
+	if (!GetOwner() || !GetOwner()->HasAuthority()
+		|| bCommandLinkMutationInProgress)
+	{
+		return 0;
+	}
+
+	int32 RemovedCount = 0;
+	for (int32 Index = LinkedActors.Num() - 1; Index >= 0; --Index)
+	{
+		AActor* LinkedActor = LinkedActors[Index].Get();
+		if (IsValid(LinkedActor))
+		{
+			continue;
+		}
+
+		RemoveParticipantContributions(LinkedActor);
+		LinkedActors.RemoveAt(Index);
+		++RemovedCount;
+	}
+
+	if (RemovedCount > 0)
+	{
+		WakeOwnerForReplication();
+	}
+	return RemovedCount;
 }
 
 UAbilitySystemComponent* USovCommandLinkComponent::ResolveAbilitySystem(
@@ -616,7 +666,7 @@ void USovCommandLinkComponent::ReconcileParticipant(AActor* Actor)
 
 void USovCommandLinkComponent::RemoveParticipantContributions(AActor* Actor)
 {
-	if (!IsValid(Actor))
+	if (!Actor)
 	{
 		return;
 	}
@@ -866,18 +916,31 @@ void USovCommandLinkComponent::HandleParticipantDestroyed(AActor* DestroyedActor
 	{
 		return;
 	}
+
+	const bool bDestroyedCommandSource = DestroyedActor == GetOwner()
+		|| DestroyedActor == ReplicationState.CommandSource.Get();
+	const bool bRemovedLinkedActor = LinkedActors.Remove(DestroyedActor) > 0;
+	if (bRemovedLinkedActor)
+	{
+		// ReconcileAllParticipants iterates a snapshot, so membership can be
+		// removed here even when destruction was triggered by a synchronous tag,
+		// effect, or presentation callback during a link mutation.
+		WakeOwnerForReplication();
+	}
 	if (bCommandLinkMutationInProgress)
 	{
-		if (DestroyedActor == GetOwner()
-			|| DestroyedActor == ReplicationState.CommandSource.Get())
+		const TWeakObjectPtr<AActor> WeakDestroyedActor(DestroyedActor);
+		ActiveTagRecipients.Remove(WeakDestroyedActor);
+		SeveredTagRecipients.Remove(WeakDestroyedActor);
+		ActiveEffectHandles.Remove(WeakDestroyedActor);
+		if (bDestroyedCommandSource)
 		{
 			bDeferredDeactivateRequested = true;
 		}
 		return;
 	}
 	RemoveParticipantContributions(DestroyedActor);
-	if (DestroyedActor == GetOwner()
-		|| DestroyedActor == ReplicationState.CommandSource.Get())
+	if (bDestroyedCommandSource)
 	{
 		DeactivateWithoutSever();
 	}
