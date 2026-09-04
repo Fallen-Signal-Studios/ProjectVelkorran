@@ -34,11 +34,7 @@ USovGameplayEffect_CinderGrenadeBurn::USovGameplayEffect_CinderGrenadeBurn()
 	bExecutePeriodicEffectOnApplication = false;
 	Executions.Add(MakeNarrativeDamageExecution());
 
-	StackingType = EGameplayEffectStackingType::AggregateBySource;
-	StackLimitCount = 1;
-	StackDurationRefreshPolicy =
-		EGameplayEffectStackingDurationPolicy::RefreshOnSuccessfulApplication;
-	StackPeriodResetPolicy =
-		EGameplayEffectStackingPeriodPolicy::ResetOnSuccessfulApplication;
-	StackExpirationPolicy = EGameplayEffectStackingExpirationPolicy::ClearEntireStack;
+	// USovStatusComponent owns canonical Burn reapplication and exact effect
+	// replacement. Keeping stacking policy here would create a second source of
+	// truth and uses the UGameplayEffect::StackingType API deprecated in UE 5.7.
 }

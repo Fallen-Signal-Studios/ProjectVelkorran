@@ -134,7 +134,6 @@ private:
 		bool bDamagedTarget,
 		bool bInExpired);
 	bool ApplyDirectHit(UAbilitySystemComponent* TargetAbilitySystem, const FVector& HitLocation);
-	void ApplyBurn(UAbilitySystemComponent* TargetAbilitySystem, const FGameplayEffectContextHandle& Context);
 	bool IsHostileTarget(const UAbilitySystemComponent* TargetAbilitySystem) const;
 	bool IsTargetAlive(const UAbilitySystemComponent* TargetAbilitySystem) const;
 	void PlayResolutionPresentation();
@@ -167,6 +166,7 @@ private:
 	UPROPERTY(Transient)
 	TSubclassOf<UGameplayEffect> DirectDamageEffectClass;
 
+	/** Deprecated payload slot retained so existing Blueprint spawn data remains loadable. */
 	UPROPERTY(Transient)
 	TSubclassOf<UGameplayEffect> BurnEffectClass;
 

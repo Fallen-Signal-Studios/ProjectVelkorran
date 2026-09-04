@@ -8,6 +8,7 @@
 #include "Characters/SovSeleneCharacter.h"
 #include "Characters/SovTarrikCharacter.h"
 #include "Components/SovCommandLinkComponent.h"
+#include "Components/SovCorruptionComponent.h"
 #include "Components/SovDeflectionComponent.h"
 #include "Components/SovEchoComponent.h"
 #include "Components/SovGuardComponent.h"
@@ -15,12 +16,14 @@
 #include "Components/SovPoiseComponent.h"
 #include "Components/SovSeleneEchoGenerationComponent.h"
 #include "Components/SovShieldComponent.h"
+#include "Components/SovStatusComponent.h"
 #include "Components/SovTarrikEchoGenerationComponent.h"
 #include "Components/SovWeakPointComponent.h"
 #include "Framework/SovCampaignGameMode.h"
 #include "Framework/SovPlayerController.h"
 #include "Framework/SovPlayerState.h"
 #include "GAS/SovCombatTypes.h"
+#include "GAS/SovCorruptionAttributeSet.h"
 #include "Misc/AutomationTest.h"
 #include "Sovereign/SovGameplayTags.h"
 #include "UnrealFramework/NarrativeGameState.h"
@@ -80,6 +83,12 @@ bool FSovCampaignCharacterCompositionTest::RunTest(const FString& Parameters)
 		TestNotNull(
 			*FString::Printf(TEXT("%s owns Poise"), OwnerName),
 			Character->GetPoiseComponent());
+		TestNotNull(
+			*FString::Printf(TEXT("%s owns status lifecycle"), OwnerName),
+			Character->GetStatusComponent());
+		TestNotNull(
+			*FString::Printf(TEXT("%s owns corruption lifecycle"), OwnerName),
+			Character->GetCorruptionComponent());
 	};
 
 	TestSharedSystems(TEXT("Shared base"), SharedCharacter);
@@ -127,6 +136,42 @@ bool FSovCampaignCharacterCompositionTest::RunTest(const FString& Parameters)
 		TEXT("Selene owns exactly one precision Echo generator"),
 		SeleneEchoGenerators.Num(),
 		1);
+	TArray<USovStatusComponent*> PlayerStatusComponents;
+	SharedCharacter->GetComponents(PlayerStatusComponents);
+	TArray<USovCorruptionComponent*> PlayerCorruptionComponents;
+	SharedCharacter->GetComponents(PlayerCorruptionComponents);
+	TestEqual(
+		TEXT("Player base owns exactly one status component"),
+		PlayerStatusComponents.Num(),
+		1);
+	TestEqual(
+		TEXT("Player base owns exactly one corruption component"),
+		PlayerCorruptionComponents.Num(),
+		1);
+
+	const ASovNPCCharacterBase* NPCBase = GetDefault<ASovNPCCharacterBase>();
+	TestNotNull(TEXT("NPC base CDO exists"), NPCBase);
+	if (NPCBase)
+	{
+		TArray<USovStatusComponent*> NPCStatusComponents;
+		NPCBase->GetComponents(NPCStatusComponents);
+		TestEqual(
+			TEXT("NPC base owns exactly one status component"),
+			NPCStatusComponents.Num(),
+			1);
+		TestTrue(
+			TEXT("NPC base does not own player corruption"),
+			NPCBase->FindComponentByClass<USovCorruptionComponent>() == nullptr);
+	}
+
+	const ASovPlayerState* PlayerState = GetDefault<ASovPlayerState>();
+	TestNotNull(TEXT("Campaign PlayerState CDO exists"), PlayerState);
+	if (PlayerState)
+	{
+		TestNotNull(
+			TEXT("Campaign PlayerState owns persistent corruption attributes"),
+			PlayerState->GetCorruptionAttributeSet());
+	}
 
 	const FSovGameplayTags& Tags = FSovGameplayTags::Get();
 	TestTrue(
@@ -206,6 +251,11 @@ bool FSovSeleneCoreLoopContractTest::RunTest(const FString& Parameters)
 			EchoGeneration->GetCommandLinkSeverEchoReward(),
 			12.0f));
 	TestTrue(
+		TEXT("Defeating a hostile during Selene's Exposed window grants Echo"),
+		FMath::IsNearlyEqual(
+			EchoGeneration->GetExposureKillEchoReward(),
+			6.0f));
+	TestTrue(
 		TEXT("Axiom Null Pulse uses the Sever prototype cost"),
 		FMath::IsNearlyEqual(AxiomNullPulse->GetEchoCost(), 30.0f));
 	TestTrue(
@@ -233,6 +283,15 @@ bool FSovSeleneCoreLoopContractTest::RunTest(const FString& Parameters)
 	TestTrue(
 		TEXT("Command-link Sever Echo source is registered"),
 		Tags.Echo_Source_CommandLinkSever.IsValid());
+	TestTrue(
+		TEXT("Exposed status request is registered"),
+		Tags.Status_Apply_Exposed.IsValid());
+	TestTrue(
+		TEXT("Exposed state tag is registered"),
+		Tags.State_Status_Exposed.IsValid());
+	TestTrue(
+		TEXT("Exposure-kill Echo source is registered"),
+		Tags.Echo_Source_ExposureKill.IsValid());
 	TestTrue(
 		TEXT("Command-link lifecycle tags remain distinct"),
 		Tags.State_CommandLink_Active != Tags.State_CommandLink_Severed);
@@ -319,6 +378,13 @@ bool FSovSeleneCoreLoopContractTest::RunTest(const FString& Parameters)
 		TestFalse(
 			TEXT("Ordinary drone death explosion is opt-in"),
 			Drone->IsDeathExplosionEnabledOnDeath());
+		TestNotNull(
+			TEXT("Drone inherits centralized status ownership"),
+			Drone->GetStatusComponent());
+		TestTrue(
+			TEXT("Drone explicitly accepts Device Disabled"),
+			Drone->GetStatusComponent()
+				&& Drone->GetStatusComponent()->IsDeviceStatusEligible());
 	}
 
 	return true;

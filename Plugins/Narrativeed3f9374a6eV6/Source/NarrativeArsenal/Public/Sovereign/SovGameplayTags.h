@@ -25,6 +25,7 @@ public:
 	FGameplayTag Character_Player_Selene;
 	FGameplayTag Character_Enemy_Boss;
 
+	FGameplayTag Ability;
 	FGameplayTag Ability_ActivateFail_Echo;
 	FGameplayTag Ability_Echo;
 	FGameplayTag Ability_Defense_Selene_Deflection;
@@ -76,9 +77,18 @@ public:
 	FGameplayTag State_Poise_Recovering;
 	FGameplayTag State_Poise_RegenBlocked;
 	FGameplayTag State_Poise_SuperArmor;
+	FGameplayTag State_Status;
+	FGameplayTag State_Status_Burning;
 	FGameplayTag State_Status_Chilled;
 	FGameplayTag State_Status_Frozen;
 	FGameplayTag State_Status_DeviceDisabled;
+	FGameplayTag State_Status_Exposed;
+	FGameplayTag State_Status_Corrupted;
+	FGameplayTag State_Corruption;
+	FGameplayTag State_Corruption_Trace;
+	FGameplayTag State_Corruption_Intrusion;
+	FGameplayTag State_Corruption_Contest;
+	FGameplayTag State_Corruption_OverwriteRisk;
 
 	FGameplayTag Damage_BypassShield;
 	FGameplayTag Damage_BypassShield_Partial;
@@ -119,10 +129,24 @@ public:
 	FGameplayTag Status_Apply_Chill;
 	FGameplayTag Status_Apply_Freeze;
 	FGameplayTag Status_Apply_DeviceDisabled;
+	FGameplayTag Status_Apply_Exposed;
+	FGameplayTag Status_Apply_Corruption;
 	FGameplayTag Status_Immunity;
+	FGameplayTag Status_Immunity_All;
 	FGameplayTag Status_Immunity_Burn;
+	FGameplayTag Status_Immunity_Chill;
 	FGameplayTag Status_Immunity_Freeze;
 	FGameplayTag Status_Immunity_DeviceDisable;
+	FGameplayTag Status_Immunity_Exposed;
+	FGameplayTag Status_Immunity_Corruption;
+	FGameplayTag Status_Cleanse;
+	FGameplayTag Status_Cleanse_All;
+	FGameplayTag Status_Cleanse_Burn;
+	FGameplayTag Status_Cleanse_Chill;
+	FGameplayTag Status_Cleanse_Freeze;
+	FGameplayTag Status_Cleanse_DeviceDisabled;
+	FGameplayTag Status_Cleanse_Exposed;
+	FGameplayTag Status_Cleanse_Corruption;
 
 	FGameplayTag SetByCaller_Damage_AbilityScalar;
 	FGameplayTag SetByCaller_Damage_SourceModifier;
@@ -136,6 +160,7 @@ public:
 	FGameplayTag SetByCaller_Damage_PoiseCoefficient;
 	FGameplayTag SetByCaller_Damage_GuardStaminaDamage;
 	FGameplayTag SetByCaller_Status_Magnitude;
+	FGameplayTag SetByCaller_Status_Duration;
 
 	FGameplayTag Event_Character_Ready;
 	FGameplayTag Event_Damage_Resolved;
@@ -150,6 +175,16 @@ public:
 	FGameplayTag Event_CommandLink_Severed;
 	FGameplayTag Event_Echo_Gained_PerfectGuard;
 	FGameplayTag Event_Status_ApplicationRequested;
+	FGameplayTag Event_Status_Applied;
+	FGameplayTag Event_Status_Refreshed;
+	FGameplayTag Event_Status_StackChanged;
+	FGameplayTag Event_Status_Removed;
+	FGameplayTag Event_Status_Cleansed;
+	FGameplayTag Event_Status_Rejected;
+	FGameplayTag Event_Corruption_ExposureChanged;
+	FGameplayTag Event_Corruption_BandChanged;
+	FGameplayTag Event_Corruption_RemedyChanged;
+	FGameplayTag Event_Corruption_OverwriteRiskReached;
 
 	FGameplayTag Echo_Source_PerfectGuard;
 	FGameplayTag Echo_Source_PerfectDeflection;
@@ -160,6 +195,7 @@ public:
 	FGameplayTag Echo_Source_CinderlineCadence;
 	FGameplayTag Echo_Source_CinderlinePrecisionKill;
 	FGameplayTag Echo_Source_CombatSustainPickup;
+	FGameplayTag Echo_Source_ExposureKill;
 
 private:
 	void AddAllTags(UGameplayTagsManager& Manager);

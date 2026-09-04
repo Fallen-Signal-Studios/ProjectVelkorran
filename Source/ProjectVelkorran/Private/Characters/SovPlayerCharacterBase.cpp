@@ -3,10 +3,12 @@
 #include "Characters/SovPlayerCharacterBase.h"
 
 #include "Character/CharacterDefinition.h"
+#include "Components/SovCorruptionComponent.h"
 #include "Components/SovEchoComponent.h"
 #include "Components/SovHealthRechargeComponent.h"
 #include "Components/SovPoiseComponent.h"
 #include "Components/SovShieldComponent.h"
+#include "Components/SovStatusComponent.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
 #include "Sovereign/SovGameplayTags.h"
 
@@ -18,6 +20,9 @@ ASovPlayerCharacterBase::ASovPlayerCharacterBase(const FObjectInitializer& Objec
 	HealthRechargeComponent = CreateDefaultSubobject<USovHealthRechargeComponent>(
 		TEXT("SovHealthRechargeComponent"));
 	PoiseComponent = CreateDefaultSubobject<USovPoiseComponent>(TEXT("SovPoiseComponent"));
+	StatusComponent = CreateDefaultSubobject<USovStatusComponent>(TEXT("SovStatusComponent"));
+	CorruptionComponent = CreateDefaultSubobject<USovCorruptionComponent>(
+		TEXT("SovCorruptionComponent"));
 }
 
 void ASovPlayerCharacterBase::HandleAbilitySystemReady(
@@ -41,6 +46,14 @@ void ASovPlayerCharacterBase::HandleAbilitySystemReady(
 	{
 		PoiseComponent->InitializeWithAbilitySystem(ReadyAbilitySystem);
 	}
+	if (StatusComponent)
+	{
+		StatusComponent->InitializeWithAbilitySystem(ReadyAbilitySystem);
+	}
+	if (CorruptionComponent)
+	{
+		CorruptionComponent->InitializeWithAbilitySystem(ReadyAbilitySystem);
+	}
 }
 
 FGameplayTag ASovPlayerCharacterBase::GetProtagonistIdentityTag() const
@@ -54,7 +67,9 @@ bool ASovPlayerCharacterBase::AreAdditionalCharacterSystemsReady() const
 		&& IsValid(EchoComponent) && EchoComponent->IsInitialized()
 		&& IsValid(ShieldComponent) && ShieldComponent->IsInitialized()
 		&& IsValid(HealthRechargeComponent) && HealthRechargeComponent->IsInitialized()
-		&& IsValid(PoiseComponent) && PoiseComponent->IsInitialized();
+		&& IsValid(PoiseComponent) && PoiseComponent->IsInitialized()
+		&& IsValid(StatusComponent) && StatusComponent->IsInitialized()
+		&& IsValid(CorruptionComponent) && CorruptionComponent->IsInitialized();
 }
 
 void ASovPlayerCharacterBase::OnDefinitionSet_Implementation(

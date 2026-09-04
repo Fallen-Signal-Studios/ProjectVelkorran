@@ -115,7 +115,6 @@ void ASovVelkorransHungerProjectile::BeginPlay()
 			|| !SourceAbilitySystem.IsValid()
 			|| !SourceAvatar.IsValid()
 			|| !DirectDamageEffectClass.Get()
-			|| !BurnEffectClass.Get()
 			|| FVector(ReplicatedInitialVelocity).IsNearlyZero()
 			|| CollisionRadius <= KINDA_SMALL_NUMBER
 			|| FlightDuration <= KINDA_SMALL_NUMBER
@@ -334,6 +333,7 @@ bool ASovVelkorransHungerProjectile::ApplyDirectHit(
 	DamageSpec->AddDynamicAssetTag(SovTags.Damage_Channel_Edge);
 	DamageSpec->AddDynamicAssetTag(SovTags.Damage_Channel_Thermal);
 	DamageSpec->AddDynamicAssetTag(SovTags.Damage_GuardClass_Standard);
+	DamageSpec->AddDynamicAssetTag(SovTags.Status_Apply_Burn);
 	DamageSpec->SetSetByCallerMagnitude(
 		FNarrativeGameplayTags::Get().SetByCaller_Damage,
 		DirectDamage);
@@ -343,6 +343,12 @@ bool ASovVelkorransHungerProjectile::ApplyDirectHit(
 			SovTags.SetByCaller_Damage_PoiseDamage,
 			DirectPoiseDamage);
 	}
+	DamageSpec->SetSetByCallerMagnitude(
+		SovTags.SetByCaller_Status_Magnitude,
+		BurnDamagePerTick);
+	DamageSpec->SetSetByCallerMagnitude(
+		SovTags.SetByCaller_Status_Duration,
+		BurnDuration);
 
 	const float OldShield = TargetAbilitySystem->GetNumericAttribute(
 		UNarrativeAttributeSetBase::GetShieldAttribute());
@@ -363,57 +369,7 @@ bool ASovVelkorransHungerProjectile::ApplyDirectHit(
 		|| TargetAbilitySystem->GetNumericAttribute(
 			UNarrativeAttributeSetBase::GetPoiseAttribute())
 			< OldPoise - KINDA_SMALL_NUMBER;
-	if (bDamageResolved && IsTargetAlive(TargetAbilitySystem))
-	{
-		ApplyBurn(TargetAbilitySystem, Context);
-	}
 	return bDamageResolved;
-}
-
-void ASovVelkorransHungerProjectile::ApplyBurn(
-	UAbilitySystemComponent* TargetAbilitySystem,
-	const FGameplayEffectContextHandle& Context)
-{
-	UAbilitySystemComponent* SourceASC = SourceAbilitySystem.Get();
-	if (!IsValid(SourceASC)
-		|| !IsValid(TargetAbilitySystem)
-		|| !BurnEffectClass.Get()
-		|| BurnDamagePerTick <= KINDA_SMALL_NUMBER
-		|| BurnDuration <= KINDA_SMALL_NUMBER)
-	{
-		return;
-	}
-
-	const FSovGameplayTags& SovTags = FSovGameplayTags::Get();
-	FGameplayTagContainer TargetTags;
-	TargetAbilitySystem->GetOwnedGameplayTags(TargetTags);
-	if (TargetTags.HasTagExact(SovTags.Status_Immunity)
-		|| TargetTags.HasTag(SovTags.Status_Immunity_Burn))
-	{
-		return;
-	}
-
-	FGameplayEffectSpecHandle BurnSpecHandle = SourceASC->MakeOutgoingSpec(
-		BurnEffectClass,
-		EffectLevel,
-		Context);
-	FGameplayEffectSpec* BurnSpec = BurnSpecHandle.Data.Get();
-	if (!BurnSpec)
-	{
-		return;
-	}
-
-	BurnSpec->AddDynamicAssetTag(AbilityIdentityTag);
-	BurnSpec->AddDynamicAssetTag(SovTags.Damage_Channel_Thermal);
-	BurnSpec->AddDynamicAssetTag(SovTags.Damage_BypassGuard);
-	BurnSpec->AddDynamicAssetTag(SovTags.Damage_BypassDeflection);
-	BurnSpec->SetSetByCallerMagnitude(
-		FNarrativeGameplayTags::Get().SetByCaller_Damage,
-		BurnDamagePerTick);
-	BurnSpec->SetSetByCallerMagnitude(
-		FNarrativeGameplayTags::Get().SetByCaller_Duration,
-		BurnDuration);
-	SourceASC->ApplyGameplayEffectSpecToTarget(*BurnSpec, TargetAbilitySystem);
 }
 
 bool ASovVelkorransHungerProjectile::IsHostileTarget(

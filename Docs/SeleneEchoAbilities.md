@@ -40,7 +40,7 @@ Do not add an Echo Cost Gameplay Effect and do not implement the generic Bluepri
 - `Echo Ability Ended` for presentation cleanup;
 - `Finish Echo Ability` when the authored flow is complete or interrupted.
 
-Every Selene parent fails activation when its required payload classes are unassigned, preventing a paid no-op. Treat every non-optional slot in the sections below as required before testing. Optional accents such as Stillpoint detonation damage, Dispatch's Frozen shatter, Axiom's device disable, and their presentation assets may remain empty.
+Every Selene parent fails activation when its required payload classes are unassigned, preventing a paid no-op. Treat every non-optional slot in the sections below as required before testing. The current native parents still validate their legacy Chill/Freeze effect-class slots as compatibility scaffolds; keep those slots assigned until each ability payload is migrated to submit centralized status requests. Do not use those compatibility effects as a second status-application path. Optional accents such as Stillpoint detonation damage, Dispatch's Frozen shatter, Axiom's device disable, and their presentation assets may remain empty.
 
 ## Identity and granting
 
@@ -73,7 +73,7 @@ Resolve through `Get Anim Set` with `Search Linked Layers = true`. Gameplay-sign
 
 ## Status effects required
 
-The source publishes these native contracts:
+The centralized `USovStatusComponent` consumes these native contracts:
 
 - `Sov.Status.Apply.Chill`
 - `Sov.Status.Apply.Freeze`
@@ -84,18 +84,17 @@ The source publishes these native contracts:
 - `Sov.Status.Immunity.Freeze`
 - `Sov.Status.Immunity.DeviceDisable`
 
-There is not yet a tracked status manager that consumes `Sov.Event.Status.ApplicationRequested`. For this pass, apply the configured duration Gameplay Effects directly from the authority after faction, life-state, invulnerability, and immunity validation.
+For status coupled to damage, add the exact `Sov.Status.Apply.*` tag and `Sov.SetByCaller.Status.Magnitude` / `Sov.SetByCaller.Status.Duration` to the same authoritative damage spec. The unified damage transaction submits a typed request only after positive, nonfatal Health, Shield, or Poise damage. For a non-damaging payload, call `Apply Status By Tag` on the target's status component from authority. Do not directly apply a second duration GE in the ability Blueprint.
 
-Recommended authored effects:
+Native definitions provide functional Burn, Chill, Freeze, Device Disabled, and Exposed behavior. Optional `USovStatusDefinition` assets can replace them by exact request tag. Relevant rules are:
 
-- `GE_Status_Chilled`: duration effect granting `Sov.State.Status.Chilled`, with the tuned slow/control-vulnerability policy.
-- `GE_Status_Frozen`: hard-CC duration effect granting `Sov.State.Status.Frozen` and the appropriate Narrative movement/action lock tags.
-- `GE_Status_FreezeImmunity`: short post-thaw immunity/refreeze lockout for targets that should not be chain-frozen.
+- Chill lasts 4 seconds, adds up to three stacks, refreshes on a valid added stack, and grants the prototype movement-slow constraint.
+- Freeze lasts 1.25 seconds, grants Busy, Movement Lock, and Weapon Block Firing, stops current controller movement, and applies 1.5 seconds of Freeze immunity after removal.
 - `GE_Damage_FrostDOT`: periodic damage through `UNarrativeDamageExecCalc`, never a direct Health or Damage-meta modifier.
-- `GE_Status_DeviceDisabled`: duration effect granting `Sov.State.Status.DeviceDisabled` only to eligible targets.
+- Device Disabled lasts 4 seconds and succeeds only on a status component explicitly marked device-eligible. `ASovDroneNPCBase` opts in by default.
 - `GE_Status_ShieldRechargeBlocked`: duration effect granting `Sov.State.Shield.RechargeBlocked`.
 
-CC-resistant elites and bosses should reject hard Freeze through immunity tags and receive the authored Chill/exposure fallback. Do not play a Frozen pose when the authoritative target rejected the effect.
+CC-resistant elites and bosses should reject hard Freeze through immunity tags and receive the authored Chill/exposure fallback. Branch presentation from the returned status result or `On Status Changed`; do not play a Frozen pose when the authoritative target rejected the request. See `Docs/StatusAndCorruptionPrototype.md` for definitions, cleanses, checkpoint semantics, and PIE coverage.
 
 ## Payload contracts
 

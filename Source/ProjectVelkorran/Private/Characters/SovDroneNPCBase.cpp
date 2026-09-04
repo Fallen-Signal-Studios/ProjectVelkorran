@@ -9,6 +9,7 @@
 #include "CollisionQueryParams.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/SovStatusComponent.h"
 #include "Effects/SovGameplayEffect_ReformationDroneWeapons.h"
 #include "Engine/OverlapResult.h"
 #include "Engine/World.h"
@@ -40,6 +41,10 @@ ASovDroneNPCBase::ASovDroneNPCBase(const FObjectInitializer& ObjectInitializer)
 	PrimaryActorTick.bCanEverTick = true;
 	DeathExplosionDamageEffectClass =
 		USovGameplayEffect_ReformationDroneDamage::StaticClass();
+	if (USovStatusComponent* Status = GetStatusComponent())
+	{
+		Status->SetDeviceStatusEligible(true);
+	}
 }
 
 void ASovDroneNPCBase::BeginPlay()

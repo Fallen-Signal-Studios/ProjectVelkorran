@@ -167,7 +167,6 @@ private:
 	void Detonate();
 	void ApplyExplosionPhysicsImpulse();
 	void ApplyExplosion();
-	void ApplyBurn(UAbilitySystemComponent* TargetAbilitySystem, const FGameplayEffectContextHandle& Context);
 	bool IsTargetAlive(const UAbilitySystemComponent* TargetAbilitySystem) const;
 	bool HasExplosionLineOfSight(AActor* TargetActor) const;
 	bool FindExplosionDecalSurface(FHitResult& OutSurfaceHit) const;
@@ -204,6 +203,7 @@ private:
 	UPROPERTY(Transient)
 	TSubclassOf<UGameplayEffect> ExplosionDamageEffectClass;
 
+	/** Deprecated payload slot retained so existing Blueprint spawn data remains loadable. */
 	UPROPERTY(Transient)
 	TSubclassOf<UGameplayEffect> BurnEffectClass;
 

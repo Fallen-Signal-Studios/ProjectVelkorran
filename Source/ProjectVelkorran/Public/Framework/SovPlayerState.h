@@ -14,4 +14,15 @@ class PROJECTVELKORRAN_API ASovPlayerState : public ANarrativePlayerState
 
 public:
 	ASovPlayerState(const FObjectInitializer& ObjectInitializer);
+
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Corruption")
+	class USovCorruptionAttributeSet* GetCorruptionAttributeSet() const
+	{
+		return CorruptionAttributeSet;
+	}
+
+protected:
+	/** Persistent player-owned Eclipse exposure attributes. */
+	UPROPERTY(Transient)
+	TObjectPtr<class USovCorruptionAttributeSet> CorruptionAttributeSet;
 };

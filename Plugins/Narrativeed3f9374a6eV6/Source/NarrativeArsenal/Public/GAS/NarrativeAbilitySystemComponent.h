@@ -103,6 +103,14 @@ public:
 	virtual void DamageResolvedAsTarget(const FSovDamageResult& Result);
 	virtual void DamageResolvedAsSource(const FSovDamageResult& Result);
 
+	/**
+	 * Broadcasts a structurally complete request to target-owned status
+	 * consumers. The method is intentionally authority-neutral so callers with
+	 * non-damage delivery paths can share the contract; consumers still enforce
+	 * authoritative mutation.
+	 */
+	virtual void StatusApplicationRequested(const FSovStatusApplicationRequest& Request);
+
 	/** Blueprint bridge for inspecting the raw spec supplied by legacy damage delegates. */
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Damage", meta = (DisplayName = "Gameplay Effect Spec Has Asset Tag"))
 	static bool GameplayEffectSpecHasAssetTag(
@@ -215,6 +223,9 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "Sovereign|Damage")
 	FSovDamageResolvedSignature OnDamageResolvedAsSource;
+
+	UPROPERTY(BlueprintAssignable, Category = "Sovereign|Status")
+	FSovStatusApplicationRequestedSignature OnStatusApplicationRequested;
 
 	//Use this in rare cases when you want to deal damage without using your own gameplay effect. Typically if we take fall damage, fall out of world etc. 
 	UFUNCTION(BlueprintCallable, Category = "Narrative|GAS")

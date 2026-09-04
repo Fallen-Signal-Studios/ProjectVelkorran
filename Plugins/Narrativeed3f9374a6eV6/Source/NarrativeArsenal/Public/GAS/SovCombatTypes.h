@@ -16,6 +16,69 @@ enum class ESovDefenseKind : uint8
 	Deflection UMETA(DisplayName = "Deflection")
 };
 
+/** Authoritative outcome returned by the project-owned status resolver. */
+UENUM(BlueprintType)
+enum class ESovStatusApplicationResult : uint8
+{
+	Applied,
+	Refreshed,
+	RejectedInvalidRequest,
+	RejectedAuthority,
+	RejectedDeadTarget,
+	RejectedImmune,
+	RejectedIneligibleTarget,
+	RejectedWeakerExisting,
+	RejectedDuplicate
+};
+
+/**
+ * One exact status application request emitted after a Sovereign damage
+ * transaction resolves. Damage-delivered requests reuse that transaction's
+ * identity, making (RequestId, StatusTag) a stable deduplication key.
+ */
+USTRUCT(BlueprintType)
+struct NARRATIVEARSENAL_API FSovStatusApplicationRequest
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Status")
+	FGuid RequestId;
+
+	/** Exact Sov.Status.Apply.* tag requested by the source effect. */
+	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Status")
+	FGameplayTag StatusTag;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Status")
+	TObjectPtr<AActor> SourceActor = nullptr;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Status")
+	TObjectPtr<AActor> TargetActor = nullptr;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Status")
+	float Magnitude = 1.f;
+
+	/** Zero delegates duration selection to the status definition. */
+	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Status")
+	float Duration = 0.f;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Status")
+	float EffectLevel = 1.f;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Status")
+	FGameplayEffectContextHandle Context;
+
+	/**
+	 * Filtered Sov.Ability.* source identity retained by periodic status
+	 * payloads without copying damage channels or Status.Apply tags.
+	 */
+	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Status")
+	FGameplayTagContainer SourceAbilityTags;
+
+	/** True when this request was gated by positive applied damage or Poise. */
+	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Status")
+	bool bRequiresAppliedDamage = false;
+};
+
 /** One authoritative, ordered result for a Sovereign damage transaction. */
 USTRUCT(BlueprintType)
 struct NARRATIVEARSENAL_API FSovDamageResult
@@ -117,3 +180,7 @@ struct NARRATIVEARSENAL_API FSovDamageResult
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
 	FSovDamageResolvedSignature,
 	const FSovDamageResult&, Result);
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
+	FSovStatusApplicationRequestedSignature,
+	const FSovStatusApplicationRequest&, Request);
