@@ -11,6 +11,7 @@
 #include "GAS/NarrativeAbilitySystemComponent.h"
 #include "GAS/NarrativeAttributeSetBase.h"
 #include "GameFramework/Actor.h"
+#include "NarrativeGameplayTags.h"
 #include "Settings/NarrativeCombatDeveloperSettings.h"
 #include "Sovereign/SovGameplayTags.h"
 #include "UnrealFramework/NarrativeCharacter.h"
@@ -54,7 +55,8 @@ void USovGuardComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 bool USovGuardComponent::InitializeWithAbilitySystem(UAbilitySystemComponent* InAbilitySystemComponent)
 {
-	if (!IsValid(InAbilitySystemComponent)
+	if (bUninitializing
+		|| !IsValid(InAbilitySystemComponent)
 		|| !IsValid(GetOwner())
 		|| !InAbilitySystemComponent->GetSet<UNarrativeAttributeSetBase>())
 	{
@@ -86,6 +88,7 @@ bool USovGuardComponent::InitializeWithAbilitySystem(UAbilitySystemComponent* In
 
 	UninitializeFromAbilitySystem();
 	AbilitySystemComponent = InAbilitySystemComponent;
+	BindInterruptionTags();
 	if (UNarrativeAbilitySystemComponent* NarrativeASC = Cast<UNarrativeAbilitySystemComponent>(AbilitySystemComponent))
 	{
 		NarrativeASC->OnDamageResolvedAsTarget.AddUniqueDynamic(this, &ThisClass::HandleDamageResolvedAsTarget);
@@ -101,7 +104,13 @@ bool USovGuardComponent::IsInitialized() const
 
 bool USovGuardComponent::BeginGuard()
 {
-	if (!IsInitialized())
+	return BeginGuardInternal(0);
+}
+
+bool USovGuardComponent::BeginGuardInternal(const int32 OwnedBusyContributions)
+{
+	if (!IsInitialized() || bEndingGuard || bUninitializing || !GetWorld()
+		|| HasGuardInterruptState(OwnedBusyContributions))
 	{
 		return false;
 	}
@@ -121,8 +130,12 @@ bool USovGuardComponent::BeginGuard()
 		return false;
 	}
 
+	const uint32 Epoch = ++GuardEpoch;
+	GuardOwnedBusyContributions = OwnedBusyContributions;
 	SetOwnedLooseTag(Tags.State_Guarding, true, bAppliedGuardingTag);
+	if (GuardEpoch != Epoch || !bAppliedGuardingTag) { return false; }
 	SetOwnedLooseTag(Tags.State_PerfectGuard, true, bAppliedPerfectDefenseTag);
+	if (GuardEpoch != Epoch || !bAppliedGuardingTag) { return false; }
 
 	if (UWorld* World = GetWorld())
 	{
@@ -144,11 +157,14 @@ bool USovGuardComponent::BeginGuard()
 	}
 
 	OnGuardStarted.Broadcast();
-	return true;
+	return GuardEpoch == Epoch && bAppliedGuardingTag;
 }
 
 void USovGuardComponent::EndGuard()
 {
+	if (bEndingGuard) { return; }
+	TGuardValue<bool> EndingGuard(bEndingGuard, true);
+	++GuardEpoch;
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(PerfectDefenseTimerHandle);
@@ -158,6 +174,7 @@ void USovGuardComponent::EndGuard()
 	const FSovGameplayTags& Tags = FSovGameplayTags::Get();
 	SetOwnedLooseTag(Tags.State_PerfectGuard, false, bAppliedPerfectDefenseTag);
 	SetOwnedLooseTag(Tags.State_Guarding, false, bAppliedGuardingTag);
+	GuardOwnedBusyContributions = 0;
 	if (bWasGuarding)
 	{
 		OnGuardEnded.Broadcast();
@@ -203,12 +220,17 @@ void USovGuardComponent::HandleOwnerASCInitialized()
 
 void USovGuardComponent::UninitializeFromAbilitySystem()
 {
+	if (bUninitializing) { return; }
+	TGuardValue<bool> Uninitializing(bUninitializing, true);
+	UnbindInterruptionTags();
+	EndGuard();
 	if (UWorld* World = GetWorld())
 	{
 		FTimerManager& TimerManager = World->GetTimerManager();
 		TimerManager.ClearTimer(PerfectDefenseTimerHandle);
 		TimerManager.ClearTimer(CounterWindowTimerHandle);
 		TimerManager.ClearTimer(GuardBrokenTimerHandle);
+		TimerManager.ClearTimer(GuardBrokenBroadcastTimerHandle);
 	}
 
 	if (UNarrativeAbilitySystemComponent* NarrativeASC = Cast<UNarrativeAbilitySystemComponent>(AbilitySystemComponent))
@@ -233,6 +255,76 @@ void USovGuardComponent::UninitializeFromAbilitySystem()
 	bAppliedGuardBrokenTag = false;
 }
 
+bool USovGuardComponent::HasGuardInterruptState(const int32 OwnedBusyContributions) const
+{
+	if (!IsInitialized()) { return true; }
+	const FNarrativeGameplayTags& Narrative = FNarrativeGameplayTags::Get();
+	const FSovGameplayTags& Sov = FSovGameplayTags::Get();
+	FGameplayTagContainer Blocking;
+	Blocking.AddTag(Narrative.State_IsDead);
+	Blocking.AddTag(Narrative.State_Interacting);
+	Blocking.AddTag(Narrative.State_SequencerControlled);
+	Blocking.AddTag(Narrative.State_Movement_Ragdoll);
+	Blocking.AddTag(Sov.State_Fatal);
+	Blocking.AddTag(Sov.State_Poise_Broken);
+	Blocking.AddTag(Sov.State_Guard_Broken);
+	Blocking.AddTag(Sov.State_EchoAbility_Active);
+	Blocking.AddTag(Sov.State_Deflecting);
+	return AbilitySystemComponent->HasAnyMatchingGameplayTags(Blocking)
+		|| AbilitySystemComponent->GetGameplayTagCount(Narrative.State_Busy) > OwnedBusyContributions;
+}
+
+void USovGuardComponent::BindInterruptionTags()
+{
+	UnbindInterruptionTags();
+	if (!IsInitialized()) { return; }
+	const FNarrativeGameplayTags& Narrative = FNarrativeGameplayTags::Get();
+	const FSovGameplayTags& Sov = FSovGameplayTags::Get();
+	const FGameplayTag Tags[] = {
+		Narrative.State_IsDead, Narrative.State_Interacting,
+		Narrative.State_SequencerControlled, Narrative.State_Movement_Ragdoll,
+		Sov.State_Fatal, Sov.State_Poise_Broken, Sov.State_Guard_Broken,
+		Sov.State_EchoAbility_Active, Sov.State_Deflecting };
+	for (const FGameplayTag& Tag : Tags)
+	{
+		InterruptionTagHandles.Add(Tag, AbilitySystemComponent
+			->RegisterGameplayTagEvent(Tag, EGameplayTagEventType::NewOrRemoved)
+			.AddUObject(this, &ThisClass::HandleInterruptionTagChanged));
+	}
+	BusyTagChangedHandle = AbilitySystemComponent
+		->RegisterGameplayTagEvent(Narrative.State_Busy, EGameplayTagEventType::AnyCountChange)
+		.AddUObject(this, &ThisClass::HandleInterruptionTagChanged);
+}
+
+void USovGuardComponent::UnbindInterruptionTags()
+{
+	if (IsInitialized())
+	{
+		for (const TPair<FGameplayTag, FDelegateHandle>& Entry : InterruptionTagHandles)
+		{
+			AbilitySystemComponent->RegisterGameplayTagEvent(Entry.Key, EGameplayTagEventType::NewOrRemoved)
+				.Remove(Entry.Value);
+		}
+		AbilitySystemComponent
+			->RegisterGameplayTagEvent(FNarrativeGameplayTags::Get().State_Busy, EGameplayTagEventType::AnyCountChange)
+			.Remove(BusyTagChangedHandle);
+	}
+	InterruptionTagHandles.Reset();
+	BusyTagChangedHandle.Reset();
+}
+
+void USovGuardComponent::HandleInterruptionTagChanged(const FGameplayTag Tag, const int32 NewCount)
+{
+	if (NewCount > 0 && HasGuardInterruptState(GuardOwnedBusyContributions))
+	{
+		// Direct Blueprint entry and GAS entry share the same interruption contract.
+		// A counter attack may itself become Busy. Preserve its short opportunity
+		// through that transition, but never through incapacity or another defense.
+		if (Tag != FNarrativeGameplayTags::Get().State_Busy) { CloseCounterWindow(); }
+		EndGuard();
+	}
+}
+
 void USovGuardComponent::ClosePerfectDefenseWindow()
 {
 	if (UWorld* World = GetWorld())
@@ -248,7 +340,9 @@ void USovGuardComponent::ClosePerfectDefenseWindow()
 
 void USovGuardComponent::OpenCounterWindow()
 {
-	if (!IsInitialized() || !GetOwner()->HasAuthority())
+	if (!IsInitialized() || !GetOwner()->HasAuthority() || !bAppliedGuardingTag
+		|| HasGuardInterruptState(GuardOwnedBusyContributions)
+		|| AbilitySystemComponent->GetNumericAttribute(UNarrativeAttributeSetBase::GetStaminaAttribute()) <= KINDA_SMALL_NUMBER)
 	{
 		return;
 	}
@@ -257,16 +351,7 @@ void USovGuardComponent::OpenCounterWindow()
 		FSovGameplayTags::Get().State_Guard_CounterWindow,
 		true,
 		bAppliedCounterWindowTag);
-
-	FGameplayEventData CounterPayload;
-	CounterPayload.EventTag = FSovGameplayTags::Get().Event_Guard_CounterWindowOpened;
-	CounterPayload.Instigator = GetOwner();
-	CounterPayload.Target = GetOwner();
-	CounterPayload.EventMagnitude = CounterWindowDuration;
-	UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(
-		GetOwner(),
-		CounterPayload.EventTag,
-		CounterPayload);
+	if (!bAppliedCounterWindowTag) { return; }
 
 	if (UWorld* World = GetWorld())
 	{
@@ -285,6 +370,17 @@ void USovGuardComponent::OpenCounterWindow()
 				CounterWindowDuration,
 				false);
 		}
+	}
+	// Arm expiry before dispatch. A gameplay-event listener can immediately
+	// consume the window, cancel Guard, or uninitialize this component.
+	if (bAppliedCounterWindowTag)
+	{
+		FGameplayEventData CounterPayload;
+		CounterPayload.EventTag = FSovGameplayTags::Get().Event_Guard_CounterWindowOpened;
+		CounterPayload.Instigator = GetOwner();
+		CounterPayload.Target = GetOwner();
+		CounterPayload.EventMagnitude = CounterWindowDuration;
+		UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(GetOwner(), CounterPayload.EventTag, CounterPayload);
 	}
 }
 
@@ -323,6 +419,9 @@ void USovGuardComponent::SetOwnedLooseTag(
 	{
 		return;
 	}
+	// GAS tag delegates fire synchronously. Publish ownership before dispatch so
+	// a reentrant cancellation can remove the contribution currently being added.
+	bAppliedFlag = bShouldApply;
 
 	if (bShouldApply)
 	{
@@ -349,7 +448,6 @@ void USovGuardComponent::SetOwnedLooseTag(
 	{
 		AbilitySystemComponent->RemoveLooseGameplayTag(Tag);
 	}
-	bAppliedFlag = bShouldApply;
 }
 
 void USovGuardComponent::HandleDamageResolvedAsTarget(const FSovDamageResult& Result)
@@ -360,15 +458,17 @@ void USovGuardComponent::HandleDamageResolvedAsTarget(const FSovDamageResult& Re
 	}
 
 	USovEchoComponent* EchoComponent = GetOwner()->FindComponentByClass<USovEchoComponent>();
+	if (Result.bPerfectDefense && Result.DefenseKind == ESovDefenseKind::Guard)
+	{
+		// Consume the timing state before gameplay cues can reenter damage routing.
+		ClosePerfectDefenseWindow();
+	}
 	if (Result.bGuarded)
 	{
 		ExecuteGuardImpactGameplayCue(Result);
 	}
 	if (Result.bPerfectDefense && Result.DefenseKind == ESovDefenseKind::Guard)
 	{
-		// A timing window can reward exactly one intercepted hit. Closing it
-		// synchronously prevents a multi-hit packet from farming perfect rewards.
-		ClosePerfectDefenseWindow();
 		if (EchoComponent)
 		{
 			EchoComponent->AddEcho(PerfectGuardEchoReward, FSovGameplayTags::Get().Echo_Source_PerfectGuard);
@@ -425,8 +525,13 @@ void USovGuardComponent::HandleDamageResolvedAsTarget(const FSovDamageResult& Re
 		PendingGuardBrokenResult = Result;
 		if (UWorld* World = GetWorld())
 		{
-			World->GetTimerManager().SetTimerForNextTick(
-				FTimerDelegate::CreateUObject(this, &ThisClass::BroadcastPendingGuardBroken));
+			const uint32 Epoch = GuardEpoch;
+			World->GetTimerManager().ClearTimer(GuardBrokenBroadcastTimerHandle);
+			GuardBrokenBroadcastTimerHandle = World->GetTimerManager().SetTimerForNextTick(
+				FTimerDelegate::CreateWeakLambda(this, [this, Epoch]()
+				{
+					if (IsInitialized() && GuardEpoch == Epoch) { BroadcastPendingGuardBroken(); }
+				}));
 		}
 	}
 }
@@ -437,6 +542,7 @@ void USovGuardComponent::HandleDamageResolvedAsSource(const FSovDamageResult& Re
 	if (!IsInitialized()
 		|| Result.SourceActor != GetOwner()
 		|| !GetOwner()->HasAuthority()
+		|| !bAppliedCounterWindowTag
 		|| !IsCounterWindowOpen()
 		|| !Result.AttackClassifications.HasTagExact(Tags.Damage_Source_GuardCounter)
 		|| Result.AppliedShieldDamage + Result.AppliedHealthDamage <= KINDA_SMALL_NUMBER)
@@ -444,11 +550,12 @@ void USovGuardComponent::HandleDamageResolvedAsSource(const FSovDamageResult& Re
 		return;
 	}
 
+	// Consume before reward delegates. Reentrant damage cannot reward twice.
+	CloseCounterWindow();
 	if (USovEchoComponent* EchoComponent = GetOwner()->FindComponentByClass<USovEchoComponent>())
 	{
 		EchoComponent->AddEcho(GuardCounterEchoReward, Tags.Echo_Source_GuardCounter);
 	}
-	CloseCounterWindow();
 	FGameplayEventData CounterPayload;
 	CounterPayload.EventTag = Tags.Event_Guard_CounterConsumed;
 	CounterPayload.Instigator = GetOwner();

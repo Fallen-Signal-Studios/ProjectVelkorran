@@ -159,7 +159,7 @@ public:
  
 //Information about where the NPC spawned, what owns it
 USTRUCT(BlueprintType)
-struct FNPCSpawnInfo
+struct NARRATIVEARSENAL_API FNPCSpawnInfo
 {
 	GENERATED_BODY()
 

@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "GameplayEffect.h"
+#include "GAS/SovCombatTypes.h"
 #include "GameplayTagContainer.h"
 #include "TimerManager.h"
 #include "SovTarrikEchoGenerationComponent.generated.h"
@@ -13,6 +14,12 @@ class FLifetimeProperty;
 class UNarrativeAbilitySystemComponent;
 class URangedWeaponItem;
 class USovEchoComponent;
+class USovProtectionInterceptReceipt;
+
+UENUM(BlueprintType)
+enum class ESovTarrikEchoAwardType : uint8 { PoiseBreak, HeavyMultiHit, CommandTargetKill, ProtectionIntercept };
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FSovTarrikEchoAwardedSignature,
+	float, AwardedEcho, float, NewEcho, ESovTarrikEchoAwardType, AwardType, AActor*, Target);
 
 UENUM(BlueprintType)
 enum class ESovCinderlineEchoAwardType : uint8
@@ -61,6 +68,9 @@ public:
 
 	bool InitializeWithAbilitySystem(UNarrativeAbilitySystemComponent* InAbilitySystemComponent);
 
+	/** Native only: source-owned receipt must prove the committed interception before reward policy. */
+	void ConsumeProtectionIntercept(USovProtectionInterceptReceipt* Receipt, const FSovDamageResult& Result);
+
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Echo|Cinderline")
 	bool IsInitialized() const;
 
@@ -89,6 +99,9 @@ public:
 	/** Owning-client cosmetic hook for reticle, audio, muzzle, and weapon feedback. */
 	UPROPERTY(BlueprintAssignable, Category = "Sovereign|Echo|Cinderline|Presentation")
 	FSovCinderlineHitConfirmedSignature OnCinderlineHitConfirmed;
+
+	UPROPERTY(BlueprintAssignable, Category = "Sovereign|Echo|Tarrik|Presentation")
+	FSovTarrikEchoAwardedSignature OnTarrikEchoAwarded;
 
 protected:
 	virtual void BeginPlay() override;
@@ -149,7 +162,29 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo|Cinderline|Precision", meta = (EditCondition = "bUsePhysicalMaterialWeakPoints", ClampMin = "1.0"))
 	float PrecisionPhysicalMaterialMultiplierThreshold = 1.01f;
 
+	UPROPERTY(EditDefaultsOnly, Category = "Sovereign|Echo|Tarrik|Tuning", meta = (ClampMin = "0.1"))
+	float ProtectionInterceptSourceCooldown = 5.0f;
+
 private:
+	bool CanGenerateTarrikEcho() const;
+	TMap<TWeakObjectPtr<AActor>, float> ProtectionSourceAwardTimes;
+	TSet<FGuid> ConsumedProtectionTransactions;
+	UFUNCTION()
+	void HandleDamageResolvedAsSource(const FSovDamageResult& Result);
+	UFUNCTION()
+	void HandleEncounterScopeChanged(bool bStarted);
+	void AwardTarrikEcho(float Amount, FGameplayTag Tag, ESovTarrikEchoAwardType Type, AActor* Target);
+	UFUNCTION(Client, Unreliable)
+	void ClientNotifyTarrikEchoAwarded(float Amount, float NewEcho, ESovTarrikEchoAwardType Type, AActor* Target);
+	struct FHeavyAttackProgress
+	{
+		TSet<TWeakObjectPtr<AActor>> Targets;
+		bool bConsumed = false;
+	};
+	TMap<FGuid, FHeavyAttackProgress> HeavyAttacks;
+	TSet<FGuid> ConsumedCombatTransactions;
+	TSet<FGuid> ConsumedHeavyAttacks;
+	uint32 ResourceScopeEpoch = 0;
 	void TryInitializeFromOwner();
 	void UninitializeFromAbilitySystem();
 	bool CanGenerateCinderlineEcho() const;

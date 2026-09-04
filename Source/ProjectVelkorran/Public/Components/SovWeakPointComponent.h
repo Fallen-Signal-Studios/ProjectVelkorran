@@ -6,6 +6,8 @@
 #include "Components/ActorComponent.h"
 #include "GAS/SovCombatTypes.h"
 #include "GameplayTagContainer.h"
+#include "GameplayEffectTypes.h"
+#include "NarrativeSavableComponent.h"
 #include "TimerManager.h"
 #include "SovWeakPointComponent.generated.h"
 
@@ -18,13 +20,59 @@ class UMaterialInterface;
 class UMeshComponent;
 class UPhysicalMaterial;
 class USkeletalMeshComponent;
+struct FActiveGameplayEffect;
 
 UENUM(BlueprintType)
 enum class ESovWeakPointHitResolution : uint8
 {
 	NotWeakPoint UMETA(DisplayName = "Not a Weak Point"),
 	AlreadyBroken UMETA(DisplayName = "Already Broken"),
-	NewlyBroken UMETA(DisplayName = "Newly Broken")
+	NewlyBroken UMETA(DisplayName = "Newly Broken"),
+	AcceptedUnbrokenHit UMETA(DisplayName = "Accepted Unbroken Hit")
+};
+
+/** Sustained capability loss authored on a zone, independent of its hit matcher. */
+USTRUCT(BlueprintType)
+struct PROJECTVELKORRAN_API FSovWeakPointConsequence
+{
+	GENERATED_BODY()
+
+	/** Ability asset tags blocked while the consequence is active. Shared counts are preserved. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Consequence")
+	FGameplayTagContainer BlockedAbilityTags;
+
+	/** Active abilities with these tags are canceled once on a new break, never during restore. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Consequence")
+	FGameplayTagContainer CancelAbilityTags;
+
+	/** Equipment/system state tags supplied by an owned native GameplayEffect. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Consequence")
+	FGameplayTagContainer GrantedStateTags;
+
+	/** Zero lasts until zone reset. Positive durations expire without repairing the zone. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Consequence", meta = (ClampMin = "0.0", Units = "s"))
+	float Duration = 0.f;
+};
+
+USTRUCT(BlueprintType)
+struct PROJECTVELKORRAN_API FSovWeakPointConsequenceSnapshot
+{
+	GENERATED_BODY()
+	UPROPERTY(SaveGame, BlueprintReadOnly, Category = "Snapshot")
+	FName ZoneId = NAME_None;
+	/** -1 denotes a permanent consequence; positive values are remaining world seconds. */
+	UPROPERTY(SaveGame, BlueprintReadOnly, Category = "Snapshot")
+	float RemainingSeconds = -1.f;
+};
+
+USTRUCT(BlueprintType)
+struct PROJECTVELKORRAN_API FSovWeakPointStateSnapshot
+{
+	GENERATED_BODY()
+	UPROPERTY(SaveGame, BlueprintReadOnly, Category = "Snapshot")
+	TArray<FName> BrokenZoneIds;
+	UPROPERTY(SaveGame, BlueprintReadOnly, Category = "Snapshot")
+	TArray<FSovWeakPointConsequenceSnapshot> Consequences;
 };
 
 /** One authored, independently breakable weak-point zone. */
@@ -52,6 +100,9 @@ struct PROJECTVELKORRAN_API FSovWeakPointZone
 	/** Allows an encounter variant to begin with this zone unavailable. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Sovereign|Weak Point")
 	bool bStartsBroken = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Sovereign|Weak Point|Consequence")
+	FSovWeakPointConsequence Consequence;
 
 	/**
 	 * Bone or socket used to anchor the temporary reveal decal. When empty, the
@@ -121,12 +172,28 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(
  * repeatedly rewarding hits against a zone that is already broken.
  */
 UCLASS(ClassGroup = (Sovereign), BlueprintType, meta = (BlueprintSpawnableComponent))
-class PROJECTVELKORRAN_API USovWeakPointComponent : public UActorComponent
+class PROJECTVELKORRAN_API USovWeakPointComponent : public UActorComponent, public INarrativeSavableComponent
 {
 	GENERATED_BODY()
 
 public:
 	USovWeakPointComponent();
+	virtual void PrepareForSave_Implementation() override;
+	virtual void Load_Implementation() override;
+
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Weak Point|Save")
+	FSovWeakPointStateSnapshot CaptureWeakPointState() const;
+
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Weak Point|Save")
+	bool CanRestoreWeakPointState(const FSovWeakPointStateSnapshot& State) const;
+
+	/** Restores state and remaining sustained consequences, with no hit, reward, or cancellation replay. */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Weak Point|Save")
+	bool RestoreWeakPointState(const FSovWeakPointStateSnapshot& State);
+
+	/** Authored anatomical/system failure. No damage transaction or Echo award is fabricated. */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Weak Point")
+	bool BreakWeakPointWithoutReward(FName WeakPointId);
 
 	UFUNCTION(BlueprintCallable, Category = "Sovereign|Weak Point")
 	bool InitializeWithAbilitySystem(
@@ -205,6 +272,10 @@ public:
 		const FSovDamageResult& DamageResult,
 		FName& OutWeakPointId);
 
+	/** Consumes a positive applied Health/Shield hit on a zone that was unbroken before this transaction. */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Weak Point")
+	bool ConsumeWeakPointHit(const FSovDamageResult& DamageResult, FName& OutWeakPointId);
+
 	/** Restores the authored starting state. Only authority may mutate it. */
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Weak Point")
 	void ResetWeakPoints();
@@ -253,6 +324,28 @@ protected:
 	float RevealFadeOutDuration = 0.35f;
 
 private:
+	struct FActiveConsequence
+	{
+		FName ZoneId = NAME_None;
+		uint32 Serial = 0;
+		FActiveGameplayEffectHandle Handle;
+		FGameplayTagContainer BlockedAbilityTags;
+	};
+	void ApplyConsequence(const FSovWeakPointZone& Zone, float RemainingSeconds, bool bCancelActiveAbilities);
+	void ClearConsequences();
+	void HandleConsequenceRemoved(const FActiveGameplayEffect& Effect);
+	const FSovWeakPointZone* FindZoneById(FName ZoneId) const;
+	TArray<FActiveConsequence> ActiveConsequences;
+	uint32 ConsequenceSerial = 0;
+	uint32 StateEpoch = 0;
+	bool bRestoringState = false;
+	bool bUninitializingState = false;
+	bool bPendingConsequenceRestore = false;
+	FSovWeakPointStateSnapshot PendingConsequenceRestore;
+	UPROPERTY(SaveGame)
+	FSovWeakPointStateSnapshot SavedWeakPointState;
+	UPROPERTY(SaveGame)
+	bool bHasSavedWeakPointState = false;
 	struct FPendingWeakPointBreak
 	{
 		FGuid TransactionId;
@@ -345,6 +438,8 @@ private:
 	 * that contract correct if a presentation listener causes nested damage.
 	 */
 	TArray<FPendingWeakPointBreak> PendingBreaks;
+	TArray<FPendingWeakPointBreak> PendingHits;
+	TSet<FGuid> ResolvedHitTransactions;
 	TArray<FDecalReceiverBinding> DecalReceiverBindings;
 	FTimerHandle WeakPointRevealExpiryTimerHandle;
 	FTimerHandle WeakPointRevealVisualRefreshTimerHandle;

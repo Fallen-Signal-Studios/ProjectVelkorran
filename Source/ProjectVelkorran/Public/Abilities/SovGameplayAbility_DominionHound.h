@@ -72,6 +72,11 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Dominion Hound|Identity")
 	FGameplayTag GetConfiguredInputTag() const { return InputTag; }
 
+	virtual float GetBotAttackMinimumRange_Implementation() const override { return MinimumAttackRange; }
+	virtual float GetBotAttackMaximumRange_Implementation() const override { return MaximumAttackRange; }
+	virtual bool RequiresBotAttackToken_Implementation() const override { return bRequiresNarrativeAttackToken; }
+	virtual bool ManagesBotAttackToken_Implementation() const override { return true; }
+
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Dominion Hound|Damage")
 	float GetDamageAmount() const { return DamageAmount; }
 

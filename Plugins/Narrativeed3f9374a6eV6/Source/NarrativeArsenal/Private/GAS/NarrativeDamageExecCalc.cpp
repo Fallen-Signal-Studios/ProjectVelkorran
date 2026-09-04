@@ -6,6 +6,7 @@
 #include "AbilitySystemComponent.h"
 #include "GAS/NarrativeGameplayAbility.h"
 #include "GAS/NarrativeAttributeSetBase.h"
+#include "GAS/SovCombatTransactionPolicy.h"
 #include "GameplayEffect.h"
 #include "Items/RangedWeaponItem.h"
 #include "NarrativeGameplayTags.h"
@@ -192,23 +193,17 @@ UNarrativeDamageExecCalc::UNarrativeDamageExecCalc()
 	RelevantAttributesToCapture.Add(NarrativeDamage::Statics().DamageResistanceDef);
 }
 
-void UNarrativeDamageExecCalc::Execute_Implementation(
-	const FGameplayEffectCustomExecutionParameters& ExecutionParams,
-	FGameplayEffectCustomExecutionOutput& OutExecutionOutput) const
+bool UNarrativeDamageExecCalc::ShouldRejectTransaction(
+	const UAbilitySystemComponent* SourceASC,
+	const UAbilitySystemComponent* TargetASC,
+	const FGameplayEffectSpec& Spec)
 {
-	UAbilitySystemComponent* SourceASC = ExecutionParams.GetSourceAbilitySystemComponent();
-	UAbilitySystemComponent* TargetASC = ExecutionParams.GetTargetAbilitySystemComponent();
 	AActor* SourceActor = SourceASC ? SourceASC->GetAvatarActor() : nullptr;
 	AActor* TargetActor = TargetASC ? TargetASC->GetAvatarActor() : nullptr;
-
-	const FGameplayEffectSpec& Spec = ExecutionParams.GetOwningSpec();
 	FGameplayTagContainer EffectTags;
 	Spec.GetAllAssetTags(EffectTags);
-
 	const FSovGameplayTags& SovTags = FSovGameplayTags::Get();
 	const bool bFatalPolicy = EffectTags.HasTagExact(SovTags.Damage_Fatal);
-	const bool bAlreadyResolved = bFatalPolicy
-		|| EffectTags.HasTagExact(SovTags.Damage_AlreadyResolved);
 	if (!bFatalPolicy
 		&& TargetASC
 		&& (TargetASC->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_Invulnerable)
@@ -216,7 +211,7 @@ void UNarrativeDamageExecCalc::Execute_Implementation(
 			|| TargetASC->HasMatchingGameplayTag(SovTags.State_Damage_Immune)
 			|| NarrativeDamage::IsImmuneToChannels(TargetASC, EffectTags)))
 	{
-		return;
+		return true;
 	}
 
 	if (!bFatalPolicy && SourceActor && TargetActor && SourceActor != TargetActor)
@@ -227,8 +222,32 @@ void UNarrativeDamageExecCalc::Execute_Implementation(
 		if (!bAllowsFriendlyFire
 			&& UArsenalStatics::GetAttitude(SourceActor, TargetActor) == ETeamAttitude::Friendly)
 		{
-			return;
+			return true;
 		}
+	}
+
+	return false;
+}
+
+void UNarrativeDamageExecCalc::Execute_Implementation(
+	const FGameplayEffectCustomExecutionParameters& ExecutionParams,
+	FGameplayEffectCustomExecutionOutput& OutExecutionOutput) const
+{
+	UAbilitySystemComponent* SourceASC = ExecutionParams.GetSourceAbilitySystemComponent();
+	UAbilitySystemComponent* TargetASC = ExecutionParams.GetTargetAbilitySystemComponent();
+	AActor* SourceActor = SourceASC ? SourceASC->GetAvatarActor() : nullptr;
+
+	const FGameplayEffectSpec& Spec = ExecutionParams.GetOwningSpec();
+	FGameplayTagContainer EffectTags;
+	Spec.GetAllAssetTags(EffectTags);
+
+	const FSovGameplayTags& SovTags = FSovGameplayTags::Get();
+	const bool bFatalPolicy = EffectTags.HasTagExact(SovTags.Damage_Fatal);
+	const bool bAlreadyResolved = bFatalPolicy
+		|| EffectTags.HasTagExact(SovTags.Damage_AlreadyResolved);
+	if (ShouldRejectTransaction(SourceASC, TargetASC, Spec))
+	{
+		return;
 	}
 
 	FGameplayTagContainer EvaluationSourceTags;
@@ -277,11 +296,11 @@ void UNarrativeDamageExecCalc::Execute_Implementation(
 		}
 	}
 
-	BaseDamage = FMath::Max(BaseDamage, 0.f);
-	if (BaseDamage <= KINDA_SMALL_NUMBER)
+	if (!FMath::IsFinite(BaseDamage))
 	{
 		return;
 	}
+	BaseDamage = FMath::Max(BaseDamage, 0.f);
 
 	float AttackRating = 0.f;
 	ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(
@@ -359,13 +378,26 @@ void UNarrativeDamageExecCalc::Execute_Implementation(
 			* MitigationMultiplier,
 			0.f);
 
-	if (ResolvedDamage > KINDA_SMALL_NUMBER)
+	const float ExplicitPoise = Spec.GetSetByCallerMagnitude(SovTags.SetByCaller_Damage_PoiseDamage, false, 0.f);
+	bool bHasStatusRequest = false;
+	for (const FGameplayTag& Tag : EffectTags)
 	{
-		// One pre-routing packet preserves deterministic guard, Shield, Health,
-		// Poise, break, death, and telemetry ordering in the AttributeSet.
-		OutExecutionOutput.AddOutputModifier(FGameplayModifierEvaluatedData(
-			UNarrativeAttributeSetBase::GetDamageAttribute(),
-			EGameplayModOp::Additive,
-			ResolvedDamage));
+		bHasStatusRequest |= Tag != SovTags.Status_Apply && Tag.MatchesTag(SovTags.Status_Apply);
 	}
+	const auto Packet = SovCombatTransaction::SelectPacket(ResolvedDamage, ExplicitPoise, bHasStatusRequest,
+		Spec.GetSetByCallerMagnitude(SovTags.SetByCaller_Status_Magnitude, false, 1.f), KINDA_SMALL_NUMBER);
+	FGameplayAttribute Attribute;
+	float Magnitude = 0.f;
+	switch (Packet)
+	{
+	case SovCombatTransaction::EPacket::Body:
+		Attribute = UNarrativeAttributeSetBase::GetDamageAttribute(); Magnitude = ResolvedDamage; break;
+	case SovCombatTransaction::EPacket::Poise:
+		Attribute = UNarrativeAttributeSetBase::GetPoiseDamageAttribute(); Magnitude = ExplicitPoise; break;
+	case SovCombatTransaction::EPacket::Control:
+		Attribute = UNarrativeAttributeSetBase::GetControlRequestAttribute(); Magnitude = 1.f; break;
+	default: return;
+	}
+	// One pre-routing packet preserves the existing defense, break and telemetry ordering.
+	OutExecutionOutput.AddOutputModifier(FGameplayModifierEvaluatedData(Attribute, EGameplayModOp::Additive, Magnitude));
 }

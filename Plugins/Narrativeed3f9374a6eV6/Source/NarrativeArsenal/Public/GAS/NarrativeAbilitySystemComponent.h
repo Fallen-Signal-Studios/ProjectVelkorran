@@ -6,6 +6,7 @@
 #include "AbilitySystemComponent.h"
 #include "NarrativeSavableComponent.h"
 #include "GAS/SovCombatTypes.h"
+#include "GAS/NarrativeBotAttackSelection.h"
 #include "../../../../Plugins/Runtime/GameplayAbilities/Source/GameplayAbilities/Public/Abilities/GameplayAbilityTargetTypes.h"
 #include "NarrativeAbilitySystemComponent.generated.h"
 
@@ -89,6 +90,29 @@ public:
 	//Get the range a given attack should cover, Used for bots. InputTag must have a combat ability on it. IE Input.Attack, AltAttack, etc. 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Narrative|GAS")
 	virtual float GetBotAttackRange(FGameplayTag InputTag);
+
+	/** Empty input filter enumerates every granted combat ability, including Ability1/2. */
+	UFUNCTION(BlueprintCallable, Category = "Narrative|GAS|Bot Combat")
+	TArray<FNarrativeBotAttackCandidate> GetBotAttackCandidates(AActor* Target, FGameplayTag InputFilter);
+
+	/** Read-only choice. Activation must still revalidate the exact granted handle. */
+	UFUNCTION(BlueprintCallable, Category = "Narrative|GAS|Bot Combat")
+	bool SelectBotAttack(AActor* Target, FGameplayTag InputFilter, FNarrativeBotAttackCandidate& OutCandidate);
+
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Narrative|GAS|Bot Combat")
+	bool TryActivateBotAttack(AActor* Target, FGameplayAbilitySpecHandle Handle);
+
+	/** Tries ready candidates in ranked order; never broadcasts an input tag. */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Narrative|GAS|Bot Combat")
+	bool TryActivateBestBotAttack(AActor* Target, FGameplayTag InputFilter, FNarrativeBotAttackCandidate& OutCandidate);
+
+	/** Active attack guard for BT tasks; its own Busy/IsFiring tags are permitted. */
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Narrative|GAS|Bot Combat")
+	bool IsBotAttackExecutionValid(AActor* Target, FGameplayAbilitySpecHandle Handle) const;
+
+	/** A useful positioning range survives cooldown, LOS and temporary state blocks. */
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Narrative|GAS|Bot Combat")
+	float GetBotCombatMovementRange(AActor* Target, FGameplayTag InputFilter);
 
 	//Workaround for attribute changed GEData not containing a valid instigator - we need the instigator so bots know when they receive damage. 
 	virtual void HealedBy(UNarrativeAbilitySystemComponent* Healer, const float Amount, const FGameplayEffectSpec& Spec);
@@ -273,6 +297,16 @@ protected:
 	virtual void Load_Implementation() override;
 
 private:
+	bool IsBotCombatContextValid(AActor* Target, bool bDuringOwnedAttack = false) const;
+	void HandleBotAttackEnded(const FAbilityEndedData& Data);
+	void ReleaseBotAttackLease(FGameplayAbilitySpecHandle Handle);
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	TMap<FGameplayAbilitySpecHandle, FNarrativeBotAttackLease> BotAttackLeases;
+	TMap<FGameplayAbilitySpecHandle, double> BotAttackNextAllowedTimes;
+	TMap<FGameplayAbilitySpecHandle, uint64> BotAttackLastUsed;
+	FDelegateHandle BotAttackEndedDelegate;
+	uint64 BotAttackSelectionSerial = 0;
+	bool bBotAttackActivationInProgress = false;
 	void PruneInvalidAttackTokens();
 	int32 GetValidAttackTokenCount() const;
 

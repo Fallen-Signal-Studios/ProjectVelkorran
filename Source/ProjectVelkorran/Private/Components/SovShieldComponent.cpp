@@ -135,6 +135,21 @@ bool USovShieldComponent::InitializeWithAbilitySystem(UAbilitySystemComponent* I
 	return true;
 }
 
+void USovShieldComponent::ResetForCheckpoint()
+{
+	if (!CanWriteShield()) { return; }
+	ClearLifecycleTimers();
+	RemoveShieldBrokenTag();
+	bShieldBroken = false;
+	bHasRecordedShieldDamage = false;
+	bRechargeDelayElapsed = true;
+	LastShieldDamageWorldTime = GetWorldTimeSeconds();
+	LastRechargeUpdateWorldTime = LastShieldDamageWorldTime;
+	RefreshShieldBrokenState(GetShield(), false);
+	RefreshShieldVisuals();
+	if (GetShield() + KINDA_SMALL_NUMBER < GetMaxShield()) { RecordShieldDamage(); }
+}
+
 bool USovShieldComponent::IsInitialized() const
 {
 	return IsValid(AbilitySystemComponent);
@@ -446,13 +461,13 @@ void USovShieldComponent::HandleShieldAttributeChanged(const FOnAttributeChangeD
 	const float OldShield = FMath::Max(ChangeData.OldValue, 0.0f);
 	const float NewShield = FMath::Clamp(ChangeData.NewValue, 0.0f, GetMaxShield());
 
-	if (CanWriteShield() && NewShield + KINDA_SMALL_NUMBER < OldShield)
+	if (CanWriteShield() && !bRestoringCheckpoint && NewShield + KINDA_SMALL_NUMBER < OldShield)
 	{
 		RecordShieldDamage();
 	}
 
 	UpdateShieldVisualScalar();
-	RefreshShieldBrokenState(NewShield, true);
+	RefreshShieldBrokenState(NewShield, !bRestoringCheckpoint);
 	OnShieldChanged.Broadcast(OldShield, NewShield, GetMaxShield());
 
 	if (!CanWriteShield())

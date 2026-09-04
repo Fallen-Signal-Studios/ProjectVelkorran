@@ -28,13 +28,33 @@ class PROJECTVELKORRAN_API USovGameplayAbility_TarrikEchoBase : public USovGamep
 
 public:
 	USovGameplayAbility_TarrikEchoBase();
+	virtual bool CheckCost(const FGameplayAbilitySpecHandle Handle,
+		const FGameplayAbilityActorInfo* ActorInfo, FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
 
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Echo Ability")
 	ESovTarrikEchoWeaponFamily GetEchoWeaponFamily() const { return WeaponFamily; }
 
 protected:
+	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle,
+		const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo,
+		const FGameplayEventData* TriggerEventData) override;
+	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle,
+		const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo,
+		bool bReplicateEndAbility, bool bWasCancelled) override;
+	/** Timer callbacks are fenced to the activation which armed them. */
+	void ArmTarrikPayload(float Delay, uint64 ExpectedActivation);
+	void BeginTarrikRecovery(float Delay, uint64 ExpectedActivation);
+	bool IsTarrikReleaseContextValid() const;
+	uint64 GetTarrikActivationSerial() const { return TarrikActivationSerial; }
+	virtual void ExecuteAutomaticTarrikPayload() {}
+
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Identity")
 	ESovTarrikEchoWeaponFamily WeaponFamily = ESovTarrikEchoWeaponFamily::Universal;
+
+private:
+	FTimerHandle TarrikReleaseTimer;
+	FTimerHandle TarrikRecoveryTimer;
+	uint64 TarrikActivationSerial = 0;
 };
 
 /** Sword signature: radial damage/Poise pressure, knockback, and a short ward. */
@@ -45,9 +65,18 @@ class PROJECTVELKORRAN_API USovGameplayAbility_TarrikCinderSlam : public USovGam
 
 public:
 	USovGameplayAbility_TarrikCinderSlam();
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Echo Ability|Cinder Slam")
+	bool ReleaseCinderSlam();
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "Sovereign|Echo Ability|Cinder Slam")
+	void ReceiveCinderSlamReleased(FVector Origin, float Radius, int32 TargetsResolved);
 
 protected:
 	virtual bool HasRequiredPayloadConfiguration() const override;
+	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle,
+		const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo,
+		const FGameplayEventData* TriggerEventData) override;
+	virtual void ExecuteAutomaticTarrikPayload() override;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload")
 	TSubclassOf<UGameplayEffect> RadialDamageEffectClass;
@@ -60,6 +89,22 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload", meta = (ClampMin = "0.0"))
 	float KnockbackStrength = 900.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload", meta=(ClampMin="0.0"))
+	float SlamDamage = 90.0f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload", meta=(ClampMin="0.0"))
+	float SlamPoiseDamage = 80.0f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload", meta=(ClampMin="0.0", ClampMax="1.0"))
+	float MinimumSlamDamageFraction = 0.5f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload", meta=(ClampMin="0.01", Units="s"))
+	float WardDuration = 2.5f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Timing", meta=(ClampMin="0.0", Units="s"))
+	float PayloadReleaseDelay = 0.55f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Timing", meta=(ClampMin="0.0", Units="s"))
+	float PostReleaseRecovery = 0.65f;
+
+private:
+	bool bSlamReleaseAttempted = false;
 };
 
 /** Sword release: a slung inferno projectile with direct damage and Burn. */
@@ -162,6 +207,14 @@ private:
 	TSubclassOf<ASovVelkorransHungerProjectile> ResolveHungerProjectileClass() const;
 	TSubclassOf<UGameplayEffect> ResolveHungerDamageEffectClass() const;
 	TSubclassOf<UGameplayEffect> ResolveHungerBurnEffectClass() const;
+protected:
+	virtual void ExecuteAutomaticTarrikPayload() override;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Timing", meta=(ClampMin="0.0", Units="s"))
+	float PayloadReleaseDelay = 0.35f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Timing", meta=(ClampMin="0.0", Units="s"))
+	float PostReleaseRecovery = 0.4f;
+
+private:
 	bool bHungerReleaseAttempted = false;
 };
 
@@ -283,6 +336,14 @@ private:
 	TSubclassOf<ASovCinderStickyGrenadeProjectile> ResolveGrenadeClass() const;
 	TSubclassOf<UGameplayEffect> ResolveExplosionDamageEffectClass() const;
 	TSubclassOf<UGameplayEffect> ResolveBurnEffectClass() const;
+protected:
+	virtual void ExecuteAutomaticTarrikPayload() override;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Timing", meta=(ClampMin="0.0", Units="s"))
+	float PayloadReleaseDelay = 0.35f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Timing", meta=(ClampMin="0.0", Units="s"))
+	float PostReleaseRecovery = 0.4f;
+
+private:
 	bool bGrenadeReleaseAttempted = false;
 };
 
@@ -471,9 +532,17 @@ class PROJECTVELKORRAN_API USovGameplayAbility_TarrikCinderlineRequiem : public 
 
 public:
 	USovGameplayAbility_TarrikCinderlineRequiem();
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Echo Ability|Cinderline Requiem")
+	bool ReleaseCinderlineRequiemFromAim();
+	UFUNCTION(BlueprintImplementableEvent, Category = "Sovereign|Echo Ability|Cinderline Requiem")
+	void ReceiveCinderlineRequiemReleased(FVector Start, FVector End, int32 PenetratedTargets);
 
 protected:
 	virtual bool HasRequiredPayloadConfiguration() const override;
+	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle,
+		const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo,
+		const FGameplayEventData* TriggerEventData) override;
+	virtual void ExecuteAutomaticTarrikPayload() override;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload")
 	TSubclassOf<UGameplayEffect> PenetratingDamageEffectClass;
@@ -489,4 +558,33 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload", meta = (ClampMin = "0.0", Units = "cm"))
 	float LineDetonationRadius = 220.0f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload", meta=(ClampMin="0.0"))
+	float PenetratingDamage = 100.0f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload", meta=(ClampMin="0.0"))
+	float PenetratingPoiseDamage = 80.0f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload", meta=(ClampMin="0.0"))
+	float LineDetonationDamage = 60.0f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload", meta=(ClampMin="0.0"))
+	float LineDetonationPoiseDamage = 100.0f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload", meta=(ClampMin="0.01"))
+	float BurnDamagePerTick = 5.0f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload", meta=(ClampMin="0.01", Units="s"))
+	float BurnDuration = 4.0f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload", meta=(ClampMin="1.0", Units="cm"))
+	float LineDetonationSpacing = 350.0f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload", meta=(ClampMin="0.01", Units="s"))
+	float LineDetonationInterval = 0.035f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Targeting")
+	FName MuzzleSocketName = TEXT("Muzzle");
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Targeting")
+	FVector FallbackMuzzleOffset = FVector(95.0f, 15.0f, 70.0f);
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Timing", meta=(ClampMin="0.0", Units="s"))
+	float PayloadReleaseDelay = 0.45f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Timing", meta=(ClampMin="0.0", Units="s"))
+	float PostReleaseRecovery = 0.65f;
+	/** Optional replicated lane actor child for per-node cosmetic events. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Presentation")
+	TSubclassOf<class ASovCinderRequiemLine> LineClass;
+private:
+	bool bRequiemReleaseAttempted = false;
 };

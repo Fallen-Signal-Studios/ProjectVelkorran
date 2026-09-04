@@ -10,6 +10,9 @@
 #include "Components/SkinnedMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/World.h"
+#include "Effects/SovGameplayEffect_WeakPointConsequence.h"
+#include "GameplayEffect.h"
+#include "NarrativeGameplayTags.h"
 #include "GameFramework/GameStateBase.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
 #include "Kismet/GameplayStatics.h"
@@ -26,6 +29,209 @@ USovWeakPointComponent::USovWeakPointComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
 	SetIsReplicatedByDefault(true);
+}
+
+const FSovWeakPointZone* USovWeakPointComponent::FindZoneById(const FName ZoneId) const
+{
+	return WeakPointZones.FindByPredicate([ZoneId](const FSovWeakPointZone& Zone)
+	{
+		return ZoneId != NAME_None && Zone.ZoneId == ZoneId;
+	});
+}
+
+void USovWeakPointComponent::PrepareForSave_Implementation()
+{
+	if (GetOwner() && GetOwner()->HasAuthority())
+	{
+		SavedWeakPointState = CaptureWeakPointState();
+		bHasSavedWeakPointState = true;
+	}
+}
+
+void USovWeakPointComponent::Load_Implementation()
+{
+	if (bHasSavedWeakPointState)
+	{
+		RestoreWeakPointState(SavedWeakPointState);
+	}
+}
+
+FSovWeakPointStateSnapshot USovWeakPointComponent::CaptureWeakPointState() const
+{
+	if (bPendingConsequenceRestore)
+	{
+		return PendingConsequenceRestore;
+	}
+	FSovWeakPointStateSnapshot State;
+	State.BrokenZoneIds = BrokenWeakPointIds;
+	if (AbilitySystemComponent && GetWorld())
+	{
+		for (const FActiveConsequence& Consequence : ActiveConsequences)
+		{
+			const FActiveGameplayEffect* Effect = AbilitySystemComponent->GetActiveGameplayEffect(Consequence.Handle);
+			if (!Effect) { continue; }
+			const float Remaining = Effect->GetTimeRemaining(GetWorld()->GetTimeSeconds());
+			if (Remaining > KINDA_SMALL_NUMBER || Effect->Spec.GetDuration() == UGameplayEffect::INFINITE_DURATION)
+			{
+				FSovWeakPointConsequenceSnapshot& Entry = State.Consequences.AddDefaulted_GetRef();
+				Entry.ZoneId = Consequence.ZoneId;
+				Entry.RemainingSeconds = Effect->Spec.GetDuration() == UGameplayEffect::INFINITE_DURATION ? -1.f : Remaining;
+			}
+		}
+	}
+	return State;
+}
+
+bool USovWeakPointComponent::CanRestoreWeakPointState(const FSovWeakPointStateSnapshot& State) const
+{
+	if (!GetOwner() || !GetOwner()->HasAuthority() || bRestoringState || bUninitializingState || !HasValidWeakPointConfiguration())
+	{
+		return false;
+	}
+	TSet<FName> BrokenIds;
+	for (const FName Id : State.BrokenZoneIds)
+	{
+		if (!FindZoneById(Id) || BrokenIds.Contains(Id)) { return false; }
+		BrokenIds.Add(Id);
+	}
+	TSet<FName> ConsequenceIds;
+	for (const FSovWeakPointConsequenceSnapshot& Entry : State.Consequences)
+	{
+		const FSovWeakPointZone* Zone = FindZoneById(Entry.ZoneId);
+		if (!Zone || !BrokenIds.Contains(Entry.ZoneId) || ConsequenceIds.Contains(Entry.ZoneId)
+			|| !FMath::IsFinite(Entry.RemainingSeconds)
+			|| (Entry.RemainingSeconds != -1.f && Entry.RemainingSeconds <= KINDA_SMALL_NUMBER)
+			|| ((Zone->Consequence.Duration == 0.f) != (Entry.RemainingSeconds == -1.f))
+			|| (Entry.RemainingSeconds > Zone->Consequence.Duration && Entry.RemainingSeconds != -1.f))
+		{
+			return false;
+		}
+		ConsequenceIds.Add(Entry.ZoneId);
+	}
+	return true;
+}
+
+bool USovWeakPointComponent::RestoreWeakPointState(const FSovWeakPointStateSnapshot& State)
+{
+	if (!CanRestoreWeakPointState(State)) { return false; }
+	// State may alias a member cleared by lifecycle callbacks.
+	const FSovWeakPointStateSnapshot Snapshot = State;
+	TGuardValue<bool> Restoring(bRestoringState, true);
+	++StateEpoch;
+	ClearPendingBreaks();
+	ClearWeakPointReveal();
+	ClearConsequences();
+	const TArray<FName> OldIds = BrokenWeakPointIds;
+	BrokenWeakPointIds = Snapshot.BrokenZoneIds;
+	bAppliedStartingState = true;
+	bPendingConsequenceRestore = !IsInitialized();
+	PendingConsequenceRestore = Snapshot;
+	if (IsInitialized())
+	{
+		for (const FSovWeakPointConsequenceSnapshot& Entry : Snapshot.Consequences)
+		{
+			if (const FSovWeakPointZone* Zone = FindZoneById(Entry.ZoneId))
+			{
+				ApplyConsequence(*Zone, Entry.RemainingSeconds, false);
+			}
+		}
+	}
+	for (const FName Id : OldIds)
+	{
+		if (!BrokenWeakPointIds.Contains(Id)) { OnWeakPointStateChanged.Broadcast(Id, false); }
+	}
+	for (const FName Id : BrokenWeakPointIds)
+	{
+		if (!OldIds.Contains(Id)) { OnWeakPointStateChanged.Broadcast(Id, true); }
+	}
+	ApplyWeakPointRevealState();
+	GetOwner()->FlushNetDormancy();
+	GetOwner()->ForceNetUpdate();
+	return true;
+}
+
+bool USovWeakPointComponent::BreakWeakPointWithoutReward(const FName WeakPointId)
+{
+	if (!GetOwner() || !GetOwner()->HasAuthority() || bRestoringState || bUninitializingState
+		|| !FindZoneById(WeakPointId) || IsWeakPointBroken(WeakPointId)) { return false; }
+	SetWeakPointBroken(WeakPointId, true);
+	return IsWeakPointBroken(WeakPointId);
+}
+
+void USovWeakPointComponent::ApplyConsequence(const FSovWeakPointZone& Zone, const float RemainingSeconds, const bool bCancelActiveAbilities)
+{
+	UNarrativeAbilitySystemComponent* ASC = AbilitySystemComponent.Get();
+	if (!ASC || !GetOwner() || !GetOwner()->HasAuthority()
+		|| !FMath::IsFinite(RemainingSeconds)
+		|| (RemainingSeconds != -1.f && RemainingSeconds <= KINDA_SMALL_NUMBER)
+		|| (Zone.Consequence.BlockedAbilityTags.IsEmpty() && Zone.Consequence.GrantedStateTags.IsEmpty()
+			&& Zone.Consequence.CancelAbilityTags.IsEmpty())
+		|| ActiveConsequences.ContainsByPredicate([&Zone](const FActiveConsequence& Entry) { return Entry.ZoneId == Zone.ZoneId; }))
+	{
+		return;
+	}
+	const FGameplayTagContainer CancelTags = Zone.Consequence.CancelAbilityTags;
+	const uint32 Epoch = StateEpoch;
+	const uint32 Serial = ++ConsequenceSerial;
+	FActiveConsequence& Entry = ActiveConsequences.AddDefaulted_GetRef();
+	Entry.ZoneId = Zone.ZoneId;
+	Entry.Serial = Serial;
+	Entry.BlockedAbilityTags = Zone.Consequence.BlockedAbilityTags;
+	ASC->BlockAbilitiesWithTags(Entry.BlockedAbilityTags);
+	const UGameplayEffect* Effect = RemainingSeconds < 0.f
+		? static_cast<const UGameplayEffect*>(GetDefault<USovGameplayEffect_WeakPointPermanentConsequence>())
+		: static_cast<const UGameplayEffect*>(GetDefault<USovGameplayEffect_WeakPointTimedConsequence>());
+	FGameplayEffectContextHandle Context = ASC->MakeEffectContext();
+	Context.AddSourceObject(this);
+	FGameplayEffectSpec Spec(Effect, Context, 1.f);
+	Spec.DynamicGrantedTags.AppendTags(Zone.Consequence.GrantedStateTags);
+	if (RemainingSeconds > 0.f)
+	{
+		Spec.SetSetByCallerMagnitude(FNarrativeGameplayTags::Get().SetByCaller_Duration, RemainingSeconds);
+	}
+	const FActiveGameplayEffectHandle Handle = ASC->ApplyGameplayEffectSpecToSelf(Spec);
+	FActiveConsequence* Stored = ActiveConsequences.FindByPredicate([Serial](const FActiveConsequence& Item) { return Item.Serial == Serial; });
+	if (!Stored || StateEpoch != Epoch || AbilitySystemComponent != ASC)
+	{
+		if (Handle.IsValid()) { ASC->RemoveActiveGameplayEffect(Handle); }
+		return;
+	}
+	Stored->Handle = Handle;
+	if (!Handle.IsValid() || !ASC->GetActiveGameplayEffect(Handle))
+	{
+		const FGameplayTagContainer Blocks = Stored->BlockedAbilityTags;
+		ActiveConsequences.RemoveAll([Serial](const FActiveConsequence& Item) { return Item.Serial == Serial; });
+		ASC->UnBlockAbilitiesWithTags(Blocks);
+		return;
+	}
+	if (bCancelActiveAbilities && !CancelTags.IsEmpty())
+	{
+		ASC->CancelAbilities(&CancelTags);
+	}
+}
+
+void USovWeakPointComponent::HandleConsequenceRemoved(const FActiveGameplayEffect& Effect)
+{
+	const int32 Index = ActiveConsequences.IndexOfByPredicate([&Effect](const FActiveConsequence& Entry) { return Entry.Handle == Effect.Handle; });
+	if (Index != INDEX_NONE)
+	{
+		const FGameplayTagContainer Blocks = ActiveConsequences[Index].BlockedAbilityTags;
+		ActiveConsequences.RemoveAt(Index);
+		if (AbilitySystemComponent) { AbilitySystemComponent->UnBlockAbilitiesWithTags(Blocks); }
+	}
+}
+
+void USovWeakPointComponent::ClearConsequences()
+{
+	const TArray<FActiveConsequence> Removed = MoveTemp(ActiveConsequences);
+	ActiveConsequences.Reset();
+	UNarrativeAbilitySystemComponent* ASC = AbilitySystemComponent.Get();
+	if (!ASC) { return; }
+	for (const FActiveConsequence& Entry : Removed)
+	{
+		ASC->UnBlockAbilitiesWithTags(Entry.BlockedAbilityTags);
+		if (Entry.Handle.IsValid()) { ASC->RemoveActiveGameplayEffect(Entry.Handle); }
+	}
 }
 
 void USovWeakPointComponent::BeginPlay()
@@ -91,7 +297,9 @@ void USovWeakPointComponent::GetLifetimeReplicatedProps(
 bool USovWeakPointComponent::InitializeWithAbilitySystem(
 	UNarrativeAbilitySystemComponent* InAbilitySystemComponent)
 {
-	if (!IsValid(InAbilitySystemComponent) || !IsValid(GetOwner()))
+	if (bRestoringState || bUninitializingState) { return false; }
+	if (!IsValid(InAbilitySystemComponent) || !IsValid(GetOwner())
+		|| InAbilitySystemComponent->GetAvatarActor() != GetOwner())
 	{
 		UninitializeFromAbilitySystem();
 		return false;
@@ -121,6 +329,17 @@ bool USovWeakPointComponent::InitializeWithAbilitySystem(
 	AbilitySystemComponent->OnDeathStateChanged.AddUniqueDynamic(
 		this,
 		&ThisClass::HandleDeathStateChanged);
+	AbilitySystemComponent->OnAnyGameplayEffectRemovedDelegate().AddUObject(this, &ThisClass::HandleConsequenceRemoved);
+	if (GetOwner()->HasAuthority())
+	{
+		if (bPendingConsequenceRestore)
+		{
+			const FSovWeakPointStateSnapshot Pending = PendingConsequenceRestore;
+			bPendingConsequenceRestore = false;
+			RestoreWeakPointState(Pending);
+		}
+		else { ApplyAuthoredStartingState(); }
+	}
 	ApplyWeakPointRevealState();
 	return true;
 }
@@ -260,7 +479,8 @@ bool USovWeakPointComponent::HasValidWeakPointConfiguration() const
 	{
 		if (Zone.ZoneId == NAME_None
 			|| SeenZoneIds.Contains(Zone.ZoneId)
-			|| (Zone.HitBones.IsEmpty() && Zone.PhysicalMaterials.IsEmpty()))
+			|| (Zone.HitBones.IsEmpty() && Zone.PhysicalMaterials.IsEmpty())
+			|| !FMath::IsFinite(Zone.Consequence.Duration) || Zone.Consequence.Duration < 0.f)
 		{
 			return false;
 		}
@@ -276,13 +496,14 @@ ESovWeakPointHitResolution USovWeakPointComponent::ResolveWeakPointHit(
 	OutWeakPointId = NAME_None;
 	if (!GetOwner()
 		|| !GetOwner()->HasAuthority()
+		|| bRestoringState || bUninitializingState
 		|| !DamageResult.TransactionId.IsValid()
 		|| DamageResult.TargetActor.Get() != GetOwner()
 		|| DamageResult.SourceActor.Get() == GetOwner()
-		|| DamageResult.AppliedShieldDamage
-			+ DamageResult.AppliedHealthDamage
-			+ KINDA_SMALL_NUMBER
-			< FMath::Max(MinimumAppliedDamage, 0.0f))
+		|| ResolvedHitTransactions.Contains(DamageResult.TransactionId)
+		|| DamageResult.bGuarded || DamageResult.bDeflected
+		|| !FMath::IsFinite(DamageResult.AppliedShieldDamage + DamageResult.AppliedHealthDamage)
+		|| DamageResult.AppliedShieldDamage + DamageResult.AppliedHealthDamage <= 0.0f)
 	{
 		return ESovWeakPointHitResolution::NotWeakPoint;
 	}
@@ -299,14 +520,33 @@ ESovWeakPointHitResolution USovWeakPointComponent::ResolveWeakPointHit(
 		return ESovWeakPointHitResolution::AlreadyBroken;
 	}
 
-	SetWeakPointBroken(MatchingZone->ZoneId, true);
+	const uint32 Epoch = StateEpoch;
+	const FName ZoneId = MatchingZone->ZoneId;
+	ResolvedHitTransactions.Add(DamageResult.TransactionId);
+	// Periodic contexts can retain the original bone, but are not another precision impact.
+	if (!DamageResult.bPeriodicDamage)
+	{
+		// Hits and breaks are distinct receipts. Below-threshold damage still hit a live weak point.
+		if (PendingHits.Num() >= 32) PendingHits.RemoveAt(0);
+		FPendingWeakPointBreak& PendingHit = PendingHits.AddDefaulted_GetRef();
+		PendingHit.TransactionId = DamageResult.TransactionId;
+		PendingHit.SourceActor = DamageResult.SourceActor.Get();
+		PendingHit.EffectContext = DamageResult.EffectContext;
+		PendingHit.HitZone = DamageResult.HitZone;
+		PendingHit.WeakPointId = ZoneId;
+	}
+	if (DamageResult.AppliedShieldDamage + DamageResult.AppliedHealthDamage + KINDA_SMALL_NUMBER
+		< FMath::Max(MinimumAppliedDamage, 0.0f))
+		return DamageResult.bPeriodicDamage ? ESovWeakPointHitResolution::NotWeakPoint : ESovWeakPointHitResolution::AcceptedUnbrokenHit;
 	FPendingWeakPointBreak& PendingBreak = PendingBreaks.AddDefaulted_GetRef();
 	PendingBreak.TransactionId = DamageResult.TransactionId;
 	PendingBreak.SourceActor = DamageResult.SourceActor.Get();
 	PendingBreak.EffectContext = DamageResult.EffectContext;
 	PendingBreak.HitZone = DamageResult.HitZone;
-	PendingBreak.WeakPointId = MatchingZone->ZoneId;
-	OnWeakPointBroken.Broadcast(MatchingZone->ZoneId, DamageResult);
+	PendingBreak.WeakPointId = ZoneId;
+	SetWeakPointBroken(ZoneId, true);
+	if (Epoch != StateEpoch || !IsWeakPointBroken(ZoneId)) { return ESovWeakPointHitResolution::NotWeakPoint; }
+	OnWeakPointBroken.Broadcast(ZoneId, DamageResult);
 	return ESovWeakPointHitResolution::NewlyBroken;
 }
 
@@ -341,44 +581,45 @@ bool USovWeakPointComponent::ConsumeWeakPointBreak(
 	return false;
 }
 
+bool USovWeakPointComponent::ConsumeWeakPointHit(const FSovDamageResult& DamageResult, FName& OutWeakPointId)
+{
+	OutWeakPointId = NAME_None;
+	if (!GetOwner() || !GetOwner()->HasAuthority() || DamageResult.TargetActor.Get() != GetOwner()) return false;
+	for (int32 Index = 0; Index < PendingHits.Num(); ++Index)
+	{
+		const FPendingWeakPointBreak& Hit = PendingHits[Index];
+		if (!Hit.WeakPointId.IsNone() && Hit.TransactionId.IsValid()
+			&& Hit.TransactionId == DamageResult.TransactionId
+			&& Hit.SourceActor.Get() == DamageResult.SourceActor.Get()
+			&& Hit.EffectContext.Get() == DamageResult.EffectContext.Get()
+			&& Hit.HitZone == DamageResult.HitZone)
+		{
+			OutWeakPointId = Hit.WeakPointId;
+			PendingHits.RemoveAt(Index);
+			return true;
+		}
+	}
+	return false;
+}
+
 void USovWeakPointComponent::ResetWeakPoints()
 {
-	if (!GetOwner() || !GetOwner()->HasAuthority())
-	{
-		return;
-	}
-	ClearWeakPointReveal();
-
-	TArray<FName> DesiredBrokenIds;
+	if (!GetOwner() || !GetOwner()->HasAuthority() || bRestoringState) { return; }
+	FSovWeakPointStateSnapshot StartingState;
 	for (const FSovWeakPointZone& Zone : WeakPointZones)
 	{
 		if (Zone.bStartsBroken && Zone.ZoneId != NAME_None)
 		{
-			DesiredBrokenIds.AddUnique(Zone.ZoneId);
+			StartingState.BrokenZoneIds.AddUnique(Zone.ZoneId);
+			if (!Zone.Consequence.BlockedAbilityTags.IsEmpty() || !Zone.Consequence.GrantedStateTags.IsEmpty())
+			{
+				FSovWeakPointConsequenceSnapshot& Entry = StartingState.Consequences.AddDefaulted_GetRef();
+				Entry.ZoneId = Zone.ZoneId;
+				Entry.RemainingSeconds = Zone.Consequence.Duration > 0.f ? Zone.Consequence.Duration : -1.f;
+			}
 		}
 	}
-
-	const TArray<FName> OldBrokenIds = BrokenWeakPointIds;
-	BrokenWeakPointIds = MoveTemp(DesiredBrokenIds);
-	ClearPendingBreaks();
-	bAppliedStartingState = true;
-
-	for (const FName OldId : OldBrokenIds)
-	{
-		if (!BrokenWeakPointIds.Contains(OldId))
-		{
-			OnWeakPointStateChanged.Broadcast(OldId, false);
-		}
-	}
-	for (const FName NewId : BrokenWeakPointIds)
-	{
-		if (!OldBrokenIds.Contains(NewId))
-		{
-			OnWeakPointStateChanged.Broadcast(NewId, true);
-		}
-	}
-
-	GetOwner()->ForceNetUpdate();
+	RestoreWeakPointState(StartingState);
 }
 
 void USovWeakPointComponent::RefreshWeakPointRevealPresentation()
@@ -787,8 +1028,18 @@ void USovWeakPointComponent::TryInitializeFromOwner()
 
 void USovWeakPointComponent::UninitializeFromAbilitySystem()
 {
+	if (bUninitializingState) { return; }
+	TGuardValue<bool> Uninitializing(bUninitializingState, true);
+	++StateEpoch;
+	if (IsInitialized() && GetOwner() && GetOwner()->HasAuthority())
+	{
+		PendingConsequenceRestore = CaptureWeakPointState();
+		bPendingConsequenceRestore = true;
+	}
+	ClearConsequences();
 	if (IsValid(AbilitySystemComponent.Get()))
 	{
+		AbilitySystemComponent->OnAnyGameplayEffectRemovedDelegate().RemoveAll(this);
 		AbilitySystemComponent->OnDamageResolvedAsTarget.RemoveDynamic(
 			this,
 			&ThisClass::HandleDamageResolvedAsTarget);
@@ -837,6 +1088,7 @@ void USovWeakPointComponent::ApplyAuthoredStartingState()
 
 void USovWeakPointComponent::ClearPendingBreaks()
 {
+	PendingHits.Reset();
 	PendingBreaks.Reset();
 }
 
@@ -933,15 +1185,35 @@ void USovWeakPointComponent::SetWeakPointBroken(
 		return;
 	}
 
+	const uint32 Epoch = StateEpoch;
 	if (bShouldBeBroken)
 	{
 		BrokenWeakPointIds.AddUnique(WeakPointId);
+		if (const FSovWeakPointZone* Zone = FindZoneById(WeakPointId))
+		{
+			const float Duration = Zone->Consequence.Duration > 0.f ? Zone->Consequence.Duration : -1.f;
+			if (IsInitialized()) { ApplyConsequence(*Zone, Duration, true); }
+			else
+			{
+				PendingConsequenceRestore.BrokenZoneIds = BrokenWeakPointIds;
+				if (!Zone->Consequence.BlockedAbilityTags.IsEmpty() || !Zone->Consequence.GrantedStateTags.IsEmpty())
+				{
+					FSovWeakPointConsequenceSnapshot& Entry = PendingConsequenceRestore.Consequences.AddDefaulted_GetRef();
+					Entry.ZoneId = WeakPointId;
+					Entry.RemainingSeconds = Duration;
+				}
+				bPendingConsequenceRestore = true;
+				bAppliedStartingState = true;
+			}
+		}
 	}
 	else
 	{
 		BrokenWeakPointIds.Remove(WeakPointId);
 	}
+	if (Epoch != StateEpoch || IsWeakPointBroken(WeakPointId) != bShouldBeBroken) { return; }
 	OnWeakPointStateChanged.Broadcast(WeakPointId, bShouldBeBroken);
+	if (Epoch != StateEpoch) { return; }
 	ApplyWeakPointRevealState();
 	GetOwner()->ForceNetUpdate();
 }

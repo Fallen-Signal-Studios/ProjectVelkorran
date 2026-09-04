@@ -97,6 +97,17 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 	AddTag(State_Status_Chilled, "Sov.State.Status.Chilled", "Movement and control resistance are reduced by cryothermal pressure.");
 	AddTag(State_Status_Frozen, "Sov.State.Status.Frozen", "The target is held by an authored hard-Freeze effect.");
 	AddTag(State_Status_DeviceDisabled, "Sov.State.Status.DeviceDisabled", "Eligible combat systems are disabled by Disruption.");
+	AddTag(State_Weapon_VerityAbsent, "Sov.State.Weapon.VerityAbsent", "Verity is committed to its authoritative Dispatch flight and cannot be drawn as a duplicate.");
+	AddTag(Campaign_Value_Withheld, "Sov.Campaign.Value.Withheld", "Authored immutable campaign fact or discrete value.");
+	AddTag(Campaign_Fact_MarketShot, "Sov.Campaign.Fact.MarketShot", "Authored immutable campaign fact or discrete value.");
+	AddTag(Campaign_Value_WoundedAlive, "Sov.Campaign.Value.WoundedAlive", "Authored immutable campaign fact or discrete value.");
+	AddTag(Campaign_Fact_Caelus, "Sov.Campaign.Fact.Caelus", "Authored immutable campaign fact or discrete value.");
+	AddTag(Campaign_Value_Tarrik, "Sov.Campaign.Value.Tarrik", "Authored immutable campaign fact or discrete value.");
+	AddTag(Campaign_Fact_Heir, "Sov.Campaign.Fact.Heir", "Authored immutable campaign fact or discrete value.");
+	AddTag(State_Corruption_OverwriteRisk, "Sov.State.Corruption.OverwriteRisk", "Mission-permitted corruption exposure band; presentation never changes player input.");
+	AddTag(State_Corruption_Contest, "Sov.State.Corruption.Contest", "Mission-permitted corruption exposure band; presentation never changes player input.");
+	AddTag(State_Corruption_Intrusion, "Sov.State.Corruption.Intrusion", "Mission-permitted corruption exposure band; presentation never changes player input.");
+	AddTag(State_Corruption_Trace, "Sov.State.Corruption.Trace", "Mission-permitted corruption exposure band; presentation never changes player input.");
 
 	AddTag(Damage_BypassShield, "Sov.Damage.BypassShield", "All resolved health damage bypasses Shield.");
 	AddTag(Damage_BypassShield_Partial, "Sov.Damage.BypassShield.Partial", "Uses the authored partial Shield bypass ratio.");
@@ -172,12 +183,23 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 	AddTag(Echo_Source_PerfectGuard, "Sov.Echo.Source.PerfectGuard", "Echo source for Tarrik perfect guard.");
 	AddTag(Echo_Source_PerfectDeflection, "Sov.Echo.Source.PerfectDeflection", "Echo source for Selene's correctly timed Deflection.");
 	AddTag(Echo_Source_WeakPointBreak, "Sov.Echo.Source.WeakPointBreak", "Echo source for breaking an authored weak point.");
+	AddTag(Echo_Source_WeakPointHit, "Sov.Echo.Source.WeakPointHit", "Echo source for an accepted hit on an unbroken authored weak point.");
 	AddTag(Echo_Source_CommandLinkSever, "Sov.Echo.Source.CommandLinkSever", "Echo source for Selene severing one active hostile command link.");
 	AddTag(Echo_Source_GuardPressure, "Sov.Echo.Source.GuardPressure", "Combat activity caused by intentional guard pressure.");
 	AddTag(Echo_Source_GuardCounter, "Sov.Echo.Source.GuardCounter", "Echo source for a landed Tarrik guard counter.");
 	AddTag(Echo_Source_CinderlineCadence, "Sov.Echo.Source.CinderlineCadence", "Echo source for completing Tarrik's Cinderline firing cadence.");
 	AddTag(Echo_Source_CinderlinePrecisionKill, "Sov.Echo.Source.CinderlinePrecisionKill", "Echo source for a Cinderline precision kill.");
 	AddTag(Echo_Source_CombatSustainPickup, "Sov.Echo.Source.CombatSustainPickup", "Echo source for collecting a transient combat-sustain mote.");
+	AddTag(State_CommandTarget_Window, "Sov.State.CommandTarget.Window", "Target-owned authored command-target reward window.");
+	AddTag(State_Target_Exposed, "Sov.State.Target.Exposed", "Target-owned authored exposure for precision reward eligibility.");
+	AddTag(State_Target_Marked, "Sov.State.Target.Marked", "Target-owned authored mark for precision reward eligibility.");
+	AddTag(Echo_Source_UndetectedBypass, "Sov.Echo.Source.UndetectedBypass", "Echo awarded for crossing a registered encounter without being perceived.");
+	AddTag(Echo_Source_PrecisionChain, "Sov.Echo.Source.PrecisionChain", "Echo awarded for a verified precision kill chain.");
+	AddTag(Echo_Source_MarkedKill, "Sov.Echo.Source.MarkedKill", "Echo awarded for killing a marked or exposed hostile.");
+	AddTag(Echo_Source_CommandTargetKill, "Sov.Echo.Source.CommandTargetKill", "Echo awarded for killing a target within its authored command window.");
+	AddTag(Echo_Source_PoiseBreak, "Sov.Echo.Source.PoiseBreak", "Echo awarded for an accepted hostile Poise break.");
+	AddTag(Echo_Source_HeavyMultiHit, "Sov.Echo.Source.HeavyMultiHit", "Echo awarded once for one verified heavy attack hitting three distinct hostiles.");
+	AddTag(Echo_Source_ProtectionIntercept, "Sov.Echo.Source.ProtectionIntercept", "Echo awarded from an authoritative ally-protection damage receipt.");
 }
 
 void FSovGameplayTags::AddTag(FGameplayTag& OutTag, const ANSICHAR* TagName, const ANSICHAR* TagComment)

@@ -79,6 +79,17 @@ public:
 	FGameplayTag State_Status_Chilled;
 	FGameplayTag State_Status_Frozen;
 	FGameplayTag State_Status_DeviceDisabled;
+	FGameplayTag State_Weapon_VerityAbsent;
+	FGameplayTag Campaign_Value_Withheld;
+	FGameplayTag Campaign_Fact_MarketShot;
+	FGameplayTag Campaign_Value_WoundedAlive;
+	FGameplayTag Campaign_Fact_Caelus;
+	FGameplayTag Campaign_Value_Tarrik;
+	FGameplayTag Campaign_Fact_Heir;
+	FGameplayTag State_Corruption_OverwriteRisk;
+	FGameplayTag State_Corruption_Contest;
+	FGameplayTag State_Corruption_Intrusion;
+	FGameplayTag State_Corruption_Trace;
 
 	FGameplayTag Damage_BypassShield;
 	FGameplayTag Damage_BypassShield_Partial;
@@ -154,12 +165,23 @@ public:
 	FGameplayTag Echo_Source_PerfectGuard;
 	FGameplayTag Echo_Source_PerfectDeflection;
 	FGameplayTag Echo_Source_WeakPointBreak;
+	FGameplayTag Echo_Source_WeakPointHit;
 	FGameplayTag Echo_Source_CommandLinkSever;
 	FGameplayTag Echo_Source_GuardPressure;
 	FGameplayTag Echo_Source_GuardCounter;
 	FGameplayTag Echo_Source_CinderlineCadence;
 	FGameplayTag Echo_Source_CinderlinePrecisionKill;
 	FGameplayTag Echo_Source_CombatSustainPickup;
+	FGameplayTag State_CommandTarget_Window;
+	FGameplayTag State_Target_Exposed;
+	FGameplayTag State_Target_Marked;
+	FGameplayTag Echo_Source_UndetectedBypass;
+	FGameplayTag Echo_Source_PrecisionChain;
+	FGameplayTag Echo_Source_MarkedKill;
+	FGameplayTag Echo_Source_CommandTargetKill;
+	FGameplayTag Echo_Source_PoiseBreak;
+	FGameplayTag Echo_Source_HeavyMultiHit;
+	FGameplayTag Echo_Source_ProtectionIntercept;
 
 private:
 	void AddAllTags(UGameplayTagsManager& Manager);

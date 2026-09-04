@@ -15,6 +15,7 @@
 #include "Character/CharacterMapMarker.h"
 
 ANarrativePlayerState::ANarrativePlayerState(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
 {
 	// Create ability system component, and set it to be explicitly replicated
 	AbilitySystemComponent = CreateDefaultSubobject<UNarrativeAbilitySystemComponent>(TEXT("AbilitySystemComponent"));

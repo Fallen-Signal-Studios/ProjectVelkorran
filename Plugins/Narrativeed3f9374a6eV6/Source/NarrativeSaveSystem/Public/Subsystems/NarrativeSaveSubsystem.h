@@ -58,6 +58,10 @@ public:
 	persistence, where we can change levels and keep each players items and weapons in its own file. We can also support having players leave and re-join the game later,
 	whilst keeping all their stuff saved. */
 	virtual bool CreatePlayerOnlySave(APlayerController* PC);
+	/** Explicit slot for authored campaign travel; independent of a character display name. */
+	bool CreatePlayerOnlySaveInSlot(APlayerController* PC, const FString& SlotName);
+	/** Read records without applying them to the currently possessed pawn or replacing world state. */
+	bool ReadPlayerOnlySave(const FString& SlotName, FNarrativeSavePlayer& OutPlayerData) const;
 	virtual bool LoadPlayerOnlySave(APlayerController* PC);
 	virtual bool DeletePlayerOnlySave(APlayerController* PC);
 
@@ -135,10 +139,13 @@ public:
 	/** Allows you to quickly lookup an actor reference using its save GUID. Useful for actor references - save the GUID to disk and look it up later.  */
 	UFUNCTION(BlueprintPure, Category = "Lookups")
 	AActor* LookupActorByGUID(const FGuid& SearchGUID);
+	/** Refresh derived lookup state after a deferred actor receives its saved identity. */
+	void RefreshStableActorIdentity(AActor* Actor) const;
 
 	//Helper functions for creating a record from an actor, or initializing an actor from an actor record. 
 	bool CreateActorRecord(class AActor* Actor, FNarrativeActorRecord& ActorRecord) const;
-	void LoadActorFromRecord(class AActor* Actor, const FNarrativeActorRecord& ActorRecord) const;
+	/** Returns false on invalid records, archive errors or invalidation during callbacks. */
+	bool LoadActorFromRecord(class AActor* Actor, const FNarrativeActorRecord& ActorRecord) const;
 
 	/** Called by GameMode->InitGame */
 	void InitializeSaveSystem(UWorld& InWorld);
@@ -200,6 +207,6 @@ private:
 
 	TSubclassOf<class UNarrativeSave> GetSaveGameClass() const;
 
-	TMap<FGuid, TWeakObjectPtr<class AActor>> QuickLookupMap;
+	mutable TMap<FGuid, TWeakObjectPtr<class AActor>> QuickLookupMap;
 
 };

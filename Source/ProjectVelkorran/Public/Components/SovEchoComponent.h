@@ -12,6 +12,8 @@ class UAbilitySystemComponent;
 class UNarrativeAbilitySystemComponent;
 struct FOnAttributeChangeData;
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FSovEchoEncounterScopeChanged, bool, bStarted);
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(
 	FSovEchoChangedSignature,
 	float, OldEcho,
@@ -78,7 +80,11 @@ public:
 	bool IsResonant() const { return bIsResonant; }
 
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Echo")
-	bool IsSignatureReady() const { return bIsSignatureReady; }
+	bool IsSignatureReady() const;
+
+	/** Meter requirement of the currently wielded, granted signature; -1 if none. */
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Echo")
+	float GetSignatureEchoRequirement() const;
 
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Echo")
 	bool IsEncounterActive() const { return bEncounterActive; }
@@ -140,6 +146,10 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Sovereign|Echo")
 	FSovEchoThresholdChangedSignature OnSignatureReadyStateChanged;
 
+	/** Explicit begin/retry/end boundaries reset action-chain ledgers. */
+	UPROPERTY(BlueprintAssignable, Category = "Sovereign|Echo")
+	FSovEchoEncounterScopeChanged OnEncounterScopeChanged;
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -168,8 +178,8 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo|Tuning", meta = (ClampMin = "0.0", ClampMax = "100.0"))
 	float ResonantThreshold = 75.0f;
 
-	/** Echo threshold that makes the signature release available. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo|Tuning", meta = (ClampMin = "0.0", ClampMax = "100.0"))
+	/** Retained for serialized assets; readiness now reads the granted signature. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo|Tuning", meta = (DeprecatedProperty, DeprecationMessage = "Readiness uses the equipped signature ability cost and threshold."))
 	float SignatureReadyThreshold = 100.0f;
 
 private:

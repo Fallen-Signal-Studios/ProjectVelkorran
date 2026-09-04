@@ -34,17 +34,17 @@ The shared `USovGameplayAbility_EchoBase` now owns predicted activation, server-
 
 Do not add an Echo Cost Gameplay Effect and do not implement the generic Blueprint `Event ActivateAbility`. Use:
 
-- `Echo Ability Started` for predicted/authority montage and task setup;
+- `Echo Ability Started` for predicted/authority presentation setup;
 - `Echo Ability Local Presentation` for owner-only camera, audio, rumble, and cosmetic hit-stop;
-- `Echo Ability Authority Committed` for authority-owned payload work in Stillpoint, Dispatch, Staccato Zero, and Verity's Wake; Axiom already owns its payload natively, so its Blueprint hook is presentation-only;
+- `Echo Ability Authority Committed` for presentation only: every Selene payload now executes natively;
 - `Echo Ability Ended` for presentation cleanup;
-- `Finish Echo Ability` when a Blueprint-owned payload flow is complete or interrupted. Axiom owns its charge, release, recovery, and normal end; do not finish it from a charge-start montage or its authority-committed hook.
+- `Receive Native Selene Payload Released` for the confirmed Stillpoint/Wake/Zero/Dispatch release; the actor parameter is the projectile or Zero's confirmed target. Native code owns normal completion. Do not finish abilities from start/commit hooks; explicit interruption may call `Finish Echo Ability(true)`.
 
-Stillpoint, Dispatch, Staccato Zero, and Verity's Wake remain payload scaffolds: assign their required classes and implement the authoritative projectile/effect behavior below before testing. Their configuration checks reject missing required classes but do not implement those payloads. Optional accents such as Stillpoint detonation damage, Dispatch's Frozen shatter, and presentation assets may remain empty. Axiom now supplies its complete native pulse and safe damage/suppression/device-disable Gameplay Effect defaults; follow [AxiomNullPulse.md](AxiomNullPulse.md) to migrate its Blueprint to presentation only.
+All five abilities now have native gameplay payloads and safe effect defaults. Stillpoint, Wake, and Dispatch use `ASovSeleneCombatProjectile`, whose Blueprint children may supply presentation; no custom projectile asset is required to execute gameplay. Serialized legacy Gameplay Effect overrides remain for migration but are not executed. See [SeleneNativePayloads.md](SeleneNativePayloads.md) for lifecycle, tuning, tests, and migration; Axiom retains its detailed [AxiomNullPulse.md](AxiomNullPulse.md) contract.
 
 ## Identity and granting
 
-Selene's player Blueprint must derive from `ASovSeleneCharacter`. That concrete class merges `Sov.Character.Player.Selene` into the definition-owned ASC tag contribution and removes a conflicting Tarrik identity. Keep the same Selene tag on her Player Definition so the asset remains self-describing. Tarrik should likewise derive from `ASovTarrikCharacter`. Other Selene payload scaffolds retain the temporary untagged migration fallback for legacy Blueprints derived directly from `ASovPlayerCharacterBase`. Axiom fails closed without the explicit Selene identity and a valid currently wielded granting weapon; migrate its player Blueprint before testing.
+Selene's player Blueprint must derive from `ASovSeleneCharacter`. That concrete class merges `Sov.Character.Player.Selene` into the definition-owned ASC tag contribution and removes a conflicting Tarrik identity. Keep the same Selene tag on her Player Definition so the asset remains self-describing. Tarrik should likewise derive from `ASovTarrikCharacter`. All Selene native payloads fail closed without the explicit Selene identity. Weapon variants additionally require their actual granting weapon to remain wielded. Migrate legacy untagged player Blueprints before testing.
 
 Grant Stillpoint Grenade and Dispatch once through Selene's default `UAbilityConfiguration`:
 
@@ -84,18 +84,15 @@ The source publishes these native contracts:
 - `Sov.Status.Immunity.Freeze`
 - `Sov.Status.Immunity.DeviceDisable`
 
-There is not yet a tracked status manager that consumes `Sov.Event.Status.ApplicationRequested`. Stillpoint, Dispatch, Staccato Zero, and Verity's Wake must apply their configured duration Gameplay Effects from their authority-owned payload after faction, life-state, invulnerability, and immunity validation. Axiom applies its own bounded native suppression and device-disable effects; do not duplicate them in Blueprint.
+Native Selene payloads apply their own bounded, independently owned status effects. Zero and Wake first send their requested control tags through Narrative's single damage transaction and use its typed `bStatusApplicationRequested` result; perfect defense cannot still Freeze a target. Stillpoint is an explicitly guard-independent area-control field and validates hostile/alive/invulnerability/control immunity directly.
 
-Recommended authored effects for the remaining payloads (Axiom uses its native defaults):
+- `USovGameplayEffect_SeleneControl` supplies finite, nonperiodic grants. Frozen grants `Sov.State.Status.Frozen`, Narrative movement lock, and Busy; Chill grants `Sov.State.Status.Chilled` and Narrative slow-walking. Known active enemy attacks are canceled when Frozen is accepted.
+- A separate duration grant owns Freeze immunity for Freeze duration plus `RefreezeLockout`. Removing Frozen does not remove that protection. Overlapping effects never overwrite another cast's tag count or shorten its duration.
+- Bosses and Freeze-immune actors fall back to Chill. An exact root `Sov.Status.Immunity` tag rejects control; individual Burn/Freeze immunity children do not become blanket immunity.
+- `USovGameplayEffect_SeleneFrozenDOT` checks Frozen before every Narrative damage execution. Thawed targets cannot receive its ticks. `USovGameplayEffect_SeleneFrostDOT` supplies resistant/Wake damage without requiring Frozen. Both tick every second, without an initial application tick.
+- Native damage keeps Echo/Thermal channels, the Echo ability source tag, hit context, zero DOT Poise, and the existing shield/health/poise resolver. No native Selene payload directly writes Health or Shield.
 
-- `GE_Status_Chilled`: duration effect granting `Sov.State.Status.Chilled`, with the tuned slow/control-vulnerability policy.
-- `GE_Status_Frozen`: hard-CC duration effect granting `Sov.State.Status.Frozen` and the appropriate Narrative movement/action lock tags.
-- `GE_Status_FreezeImmunity`: short post-thaw immunity/refreeze lockout for targets that should not be chain-frozen.
-- `GE_Damage_FrostDOT`: periodic damage through `UNarrativeDamageExecCalc`, never a direct Health or Damage-meta modifier.
-- `GE_Status_DeviceDisabled`: duration effect granting `Sov.State.Status.DeviceDisabled` only to eligible targets.
-- `GE_Status_ShieldRechargeBlocked`: duration effect granting `Sov.State.Shield.RechargeBlocked`.
-
-CC-resistant elites and bosses should reject hard Freeze through immunity tags and receive the authored Chill/exposure fallback. Do not play a Frozen pose when the authoritative target rejected the effect.
+Do not add a second generic status listener for these native attacks. Axiom's Disruption, suppression and device-disable effects retain their separate policy.
 
 ## Payload contracts
 
@@ -104,8 +101,8 @@ CC-resistant elites and bosses should reject hard Freeze through immunity tags a
 - Spawn one replicated grenade on authority. Prediction may spawn a separate non-gameplay throw/trail cosmetic.
 - Authority owns the fuse, overlap, faction filter, target deduplication, and refreeze lockout.
 - Standard enemies in the detonation field receive Freeze plus Frost DOT. Freeze-immune targets receive Chill plus the authored reduced DOT.
-- Author the Frozen DOT so it requires `Sov.State.Status.Frozen` and ends or inhibits when Freeze ends. Use the separate resistant-target DOT slot for the reduced fallback; do not reuse the Frozen-only effect.
-- Treat `StasisDuration` as the target duration for Freeze and its DOT, then copy that value into the projectile/effect payload instead of maintaining unrelated timers.
+- The native Frozen DOT requires `Sov.State.Status.Frozen` on every tick; the resistant fallback uses a separate native DOT shell at half the standard magnitude.
+- `StasisDuration` is the field lifetime and the maximum Freeze/DOT duration. Late entrants receive its remaining lifetime. Each field reserves an actor once before applying effects, so repeated overlaps cannot re-freeze it.
 - The field is the reliable area lockdown tool; it should not also become Selene's highest burst-damage option.
 - The ability may end once the initialized authority grenade exists. Copy all ASC/effect/tuning data into the grenade and never retain the Gameplay Ability instance.
 
@@ -144,17 +141,17 @@ Command-node and red decal authoring instructions are in [SeleneCommandLinkAndWe
 
 ### Dispatch
 
-**Required content:** `ReturningVerityClass` must be a project-owned replicated actor derived from `ANarrativeProjectile` that implements the state machine, steering validation, hit ledgers, recall, forced return, and cleanup below. The native Gameplay Ability supplies the paid lifecycle contract but does not fabricate that actor behavior.
+`ReturningVerityClass` defaults to `ASovSeleneCombatProjectile`, which implements this state machine natively. An optional Blueprint child may provide the Verity mesh and phase presentation. Set `VerityWeaponClasses` to the actual Verity item classes to hide their existing equipped/holstered visuals during flight; inventory and equipment remain intact.
 
 - Spawn one authority-owned replicated Verity actor with explicit `Outbound`, `Recalling`, and `Returned/Expired` states.
 - The server accepts control rotation/aim intent, never client projectile positions. Clamp steering rate, speed, range, and lifetime.
 - In the active ability, use GAS `Wait Input Press` for the second press. That request recalls the existing Verity actor and never spends Echo again.
 - Auto-recall at the outbound timer/range limit. Death, interruption, owner loss, or timeout must also force return/cleanup.
 - Maintain separate server hit ledgers so each actor can be damaged at most once outbound and once inbound.
-- A return pass through a Frozen or Chilled target may consume/shatter that state for bonus Poise pressure, but must not duplicate the base leg hit.
+- A return pass through a Frozen or Chilled target adds `ShatterBonusPoise` to that leg's single damage transaction. It preserves independently owned status effects and never duplicates base damage.
 - Keep the ability active until Verity returns or the failsafe resolves. The native Dispatch parent raises the general maximum duration to seven seconds.
 
-Narrative's stock projectile task is not suitable for Dispatch's authoritative state machine and can create unreconciled predicted/authority copies for replicated projectiles. Use a project-owned returning-weapon actor.
+Native Dispatch owns the GAS recall task, its queued-input latch, an equipment/owner watchdog, and the finite `Sov.State.Weapon.VerityAbsent` effect. Return, death, cancellation, obstruction on return, or timeout cleans the actor and restores only its captured Verity visuals. Narrative's stock projectile task is not used.
 
 ## Minimum PIE matrix
 
@@ -176,4 +173,4 @@ Narrative's stock projectile task is not suitable for Dispatch's authoritative s
 - Dispatch one hit per actor per leg, including repeated overlaps at low speed
 - first-person owner and third-person simulated-proxy montage/cue presentation
 
-Stillpoint, Dispatch, Staccato Zero, and Verity's Wake remain native payload scaffolds. Axiom supplies native gameplay, but its Blueprint grant, exact weapon allowlist, AnimSets, Gameplay Cues, Niagara, audio, reveal decal materials, command-node membership, and final balance still need Unreal content setup. The other four abilities additionally require their authored projectile/effect payloads. Physical projectile reflection/retargeting remains a separate deferred system; this Sever integration does not change projectile ownership or trajectory.
+All five Selene payloads now execute in native code. Blueprint grants, exact weapon allowlists, Verity visual item classes, AnimSets, Gameplay Cues, meshes, Niagara, audio, reveal materials, command-node membership, and final balance still require Unreal content setup. The native payloads have source review and portable math coverage; their Unreal automation tests require an installed UE 5.7 editor and have not been run in this workspace. Physical projectile reflection/retargeting remains a separate system.

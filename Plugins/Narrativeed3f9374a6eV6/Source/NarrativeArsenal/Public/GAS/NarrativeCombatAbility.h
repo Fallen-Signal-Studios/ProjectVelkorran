@@ -127,7 +127,14 @@ protected:
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
 
+private:
+	FGuid CurrentCombatAttackId;
+	FGameplayAbilitySpecHandle CombatAttackSpecHandle;
+
 public:
+	/** Receipt factories capture this identity; the mutable ability itself is deliberately not a receipt. */
+	bool GetSovAttackIdentity(const AActor* ExpectedSource, FGuid& OutAttackId) const;
+
 	virtual bool CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayTagContainer* SourceTags = nullptr, const FGameplayTagContainer* TargetTags = nullptr, OUT FGameplayTagContainer* OptionalRelevantTags = nullptr) const;
 
 protected: 
@@ -197,6 +204,38 @@ public:
 	UFUNCTION(BlueprintNativeEvent, BlueprintPure, Category = "Narrative Combat Ability - Bots")
 	float GetBotAttackRange() const;
 	virtual float GetBotAttackRange_Implementation() const;
+
+	/** Whole-repertoire NPC selection. Disable for reactions, passives or player-only actions. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Narrative Combat Ability - Bots")
+	bool bBotSelectionEnabled = true;
+
+	/** Higher priority wins; equal-priority ready abilities rotate least recently used first. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Narrative Combat Ability - Bots")
+	float BotSelectionPriority = 0.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Narrative Combat Ability - Bots")
+	bool bBotRequiresLineOfSight = true;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Narrative Combat Ability - Bots")
+	bool bBotRequiresAttackToken = true;
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintPure, Category = "Narrative Combat Ability - Bots")
+	float GetBotAttackMinimumRange() const;
+	virtual float GetBotAttackMinimumRange_Implementation() const;
+
+	/** Actual activation range, distinct from the preferred positioning range. */
+	UFUNCTION(BlueprintNativeEvent, BlueprintPure, Category = "Narrative Combat Ability - Bots")
+	float GetBotAttackMaximumRange() const;
+	virtual float GetBotAttackMaximumRange_Implementation() const;
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintPure, Category = "Narrative Combat Ability - Bots")
+	bool RequiresBotAttackToken() const;
+	virtual bool RequiresBotAttackToken_Implementation() const;
+
+	/** True only when the payload already acquires/releases Narrative's token lease itself. */
+	UFUNCTION(BlueprintNativeEvent, BlueprintPure, Category = "Narrative Combat Ability - Bots")
+	bool ManagesBotAttackToken() const;
+	virtual bool ManagesBotAttackToken_Implementation() const;
 
 	//Get the weapon hand this combat ability acts on - can be overriden to specify a hand. Not neccesarily used by all combat abilities, some may not need. 
 	UFUNCTION(BlueprintNativeEvent, BlueprintPure, Category = "Narrative Combat Ability")

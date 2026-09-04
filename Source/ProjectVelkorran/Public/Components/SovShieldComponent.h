@@ -69,6 +69,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Sovereign|Shield")
 	bool InitializeWithAbilitySystem(UAbilitySystemComponent* InAbilitySystemComponent);
 
+	/** Native restore seam: discard prior-attempt timers; preserve other systems' tag counts. */
+	void ResetForCheckpoint();
+	void SetCheckpointRestoreInProgress(bool bInProgress) { bRestoringCheckpoint = bInProgress; }
+
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Shield")
 	bool IsInitialized() const;
 
@@ -195,6 +199,7 @@ protected:
 	FTransform ShieldBreakRelativeTransform = FTransform::Identity;
 
 private:
+	bool bRestoringCheckpoint = false;
 	void TryInitializeFromOwner();
 
 	UFUNCTION()

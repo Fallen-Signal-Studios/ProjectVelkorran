@@ -26,10 +26,10 @@ DECLARE_MULTICAST_DELEGATE_FourParams(
 /**
  * Core Narrative Pro attributes used by Project Velkorran.
  *
- * Damage and PoiseDamage are transient meta attributes. Damage executions write one
+ * Damage, PoiseDamage and ControlRequest are transient meta attributes. Executions write one
  * final incoming amount to Damage, and this set resolves Guard, partial/full
  * Shield bypass, Shield/Health coefficients, Poise, breaks, death, and typed
- * telemetry in one transaction. Standalone poise loss may enter PoiseDamage.
+ * telemetry in one transaction. PoiseDamage and ControlRequest use the same resolver.
  * Echo is a 0..MaxEcho momentum resource. Its protagonist-specific gain, decay, and
  * spending rules live in abilities/effects rather than inside the attribute set.
  */
@@ -136,6 +136,12 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "Meta Attributes")
 	FGameplayAttributeData PoiseDamage;
 	ATTRIBUTE_ACCESSORS(UNarrativeAttributeSetBase, PoiseDamage)
+
+	/** Transaction marker for status-only attacks. Contains no body or Poise damage. */
+	UPROPERTY(BlueprintReadOnly, Category = "Attributes|Meta")
+	FGameplayAttributeData ControlRequest;
+	ATTRIBUTE_ACCESSORS(UNarrativeAttributeSetBase, ControlRequest)
+
 
 	// Fired once when Health crosses from above zero to zero due to a resolved hit.
 	FNarrativeAttributeEvent OnOutOfHealth;

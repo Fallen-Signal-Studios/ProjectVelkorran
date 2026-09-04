@@ -1,6 +1,6 @@
 # Gameplay systems audit and playable-slice roadmap
 
-Audit date: 4 September 2026. Baseline: `main` at `aef0371e10c11b55b61cb68d0f47d9fb814f2597`. The audit describes that baseline; implementation results for the selected slice are recorded separately in `AxiomNullPulse.md`.
+Audit date: 4 September 2026. Baseline: `main` at `aef0371e10c11b55b61cb68d0f47d9fb814f2597`. The audit describes that baseline; the initial selected slice is recorded in `AxiomNullPulse.md`. The subsequent authorized engineering pass is tracked in [CampaignEngineeringDelivery.md](CampaignEngineeringDelivery.md), which distinguishes implemented source from remaining engine/content gates.
 
 ## Authority and evidence
 

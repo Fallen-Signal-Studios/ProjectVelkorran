@@ -10,6 +10,7 @@
 
 class FLifetimeProperty;
 class UAnimMontage;
+class UAnimInstance;
 class UAnimSequenceBase;
 class UAbilitySystemComponent;
 class UMaterialInstanceDynamic;
@@ -274,6 +275,7 @@ protected:
 	void ReceiveHolsterAttachmentCommitted();
 
 private:
+	friend struct FSovEchoResourceTestAccess;
 	UFUNCTION()
 	void OnRep_TransitionState();
 
@@ -324,6 +326,10 @@ private:
 	FTimerHandle CollisionRefreshTimerHandle;
 	FActiveGameplayEffectHandle TransitionGateEffectHandle;
 	TWeakObjectPtr<UAbilitySystemComponent> TransitionGateAbilitySystem;
+	TWeakObjectPtr<UAnimInstance> ActiveMainCharacterAnimInstance;
+	TWeakObjectPtr<UAnimInstance> ActiveLocalCharacterAnimInstance;
+	bool bUpdatingTransitionGate = false;
+	bool bRequestedTransitionGate = false;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UAnimMontage> ActiveMainCharacterMontage = nullptr;
