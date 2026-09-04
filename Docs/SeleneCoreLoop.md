@@ -11,6 +11,7 @@ This slice gives Selene her first native, character-specific combat loop: tap a 
 - `USovCommandLinkComponent` owns one authored encounter link's authoritative `Inactive`, `Active`, and `Severed` lifecycle, participant tags/effect, and unique Sever transaction.
 - `USovSeleneEchoGenerationComponent` awards `+10` for an authoritative perfect Deflection, `+8` for the first authoritative break of an authored hostile weak point, and `+12` for Selene's first valid Sever of an active hostile link instance.
 - A successful Sever temporarily reveals each participant's remaining weak points through localized red, bone-attached decals.
+- Axiom now owns native authoritative charge/release, Shield-only collapse, bounded recharge/device suppression, and command-node selection. Its Blueprint supplies presentation and its actual weapon grant/allowlist; see [AxiomNullPulse.md](AxiomNullPulse.md). The other four Selene Echo abilities still need their authored payload implementations.
 - Body hits, critical chance alone, repeated hits on a broken zone, friendly targets, Tarrik, and ordinary damage from an Echo ability do not receive precision rewards. The validated command-link Sever is the narrow exception allowed during Axiom's active Echo-ability state.
 
 ## One-time editor setup
@@ -71,7 +72,7 @@ An eligible hit needs a valid source/damage causer so the server can test Selene
 
 An empty Weak Point component is a valid no-op, but invalid IDs, duplicate IDs, and zones with no bone/material matcher are authoring errors. A zone currently resets to its authored starting state when the target returns from death. It is replicated for active play but is not yet a campaign checkpoint/save record.
 
-Command-node, Axiom Blueprint, and reveal-material setup is documented in `Docs/SeleneCommandLinkAndWeakPointReveal.md`.
+Command-node and reveal-material setup is documented in [SeleneCommandLinkAndWeakPointReveal.md](SeleneCommandLinkAndWeakPointReveal.md). Migrate Axiom's Blueprint using [AxiomNullPulse.md](AxiomNullPulse.md): remove old charge/release timers, pulse damage/status/Sever calls and normal-end logic, retain presentation, and grant it only from the actual wielded Axiom weapon.
 
 ## Prototype tuning
 
@@ -97,7 +98,7 @@ The start threshold is not a prepaid cost. The resolved hit spends up to the rem
 4. `USovDeflectionComponent` consumes the server window before callbacks, emits `Sov.Event.Deflection.Perfect`, and multicasts the immutable result for presentation. The local timer is a fallback if the unreliable presentation multicast is lost.
 5. `USovSeleneEchoGenerationComponent` observes the validated Deflection on authority, writes `+10` through `USovEchoComponent`, and sends an owning-client presentation notification through `OnSeleneEchoAwarded`.
 6. For a weak point, the target component resolves and replicates the new break during the target-side damage callback. Selene's source-side callback consumes that exact `FSovDamageResult.TransactionId` once, then writes `+8` on authority. The unique transaction ID prevents a reused Gameplay Effect context from claiming an earlier break.
-7. For Sever, the authority-owned Axiom pulse calls `TrySeverAxiomCommandLink` on the actual command node. Its `USovCommandLinkComponent` alone may perform `Active -> Severed`, remove its participant contributions, mint the unique transaction, and begin the replicated weak-point reveal.
+7. Axiom spends once, charges on authority, and releases on input release or its full-charge timer. Its native range/cone/visibility checks authorize the actual command node before the internal `TrySeverAxiomCommandLink` call; direct external helper calls return `Invalid`. Its `USovCommandLinkComponent` alone may perform `Active -> Severed`, remove its participant contributions, mint the unique transaction, and begin the replicated weak-point reveal.
 8. Axiom routes only `NewlySevered` to Selene's generator. The generator consumes the transaction ID once and writes eligible `+12` through `USovEchoComponent`; `AlreadySevered`, Shield break, Device Disabled, and link deactivation never award it.
 
 `USovEchoComponent` remains the only shared Echo writer/storage policy. Its normal `0–100` clamping, encounter activity, decay, threshold, and checkpoint-value APIs still apply. UI may observe `OnSeleneEchoAwarded` and the shared Echo delegates; it must not predict or reapply an award.
@@ -129,8 +130,10 @@ Run the functional checks first in Standalone, then repeat the network-sensitive
 | Reset | Restore the enemy from death or restart the encounter | Zones return to authored start state; no award occurs merely from reset |
 | Resource cap | Earn at 96/100 and at 100/100 Echo | First grant clamps to 100 and reports only the applied amount; full meter grants nothing |
 | Command link | Sever one active hostile authored link with Axiom | State becomes Severed, active contributions clear, linked specialist action cancels, and Selene receives exactly `+12` |
-| Sever replay | Invoke Axiom again against the same severed instance | Returns `AlreadySevered`; no second event, reveal, or Echo award |
-| Sever filters | Try inactive, immune, non-hostile, missing, or out-of-range command nodes | No successful transition, reveal, or `+12` |
+| Sever replay | Release a later valid Axiom pulse against the same severed instance | Native link transaction returns `AlreadySevered`; no second event, reveal, or Echo award |
+| Axiom release | Input release and full-charge timer coincide | One authoritative pulse and one Echo spend; no late payload after interruption or source-weapon replacement |
+| Axiom helper | Call Sever directly from Blueprint | `Invalid`; no state change or Echo award |
+| Sever filters | Try inactive, immune, non-hostile, missing, outside-charge-cone/range, or occluded command nodes | No successful transition, reveal, or `+12` |
 | Axiom independence | Collapse Shield/apply Device Disabled on an actor without an active link | Existing Axiom payload resolves, but it produces no Sever reward |
 | Weak-point reveal | Sever a link whose participants own authored unbroken zones | Owner and proxies see localized red decals for the synchronized duration; broken/unconfigured zones do not appear |
 | Command reset | Reset the encounter and Sever the new active instance | Reset itself grants nothing; the new unique instance may award once when legitimately severed |
@@ -139,7 +142,8 @@ Also run:
 
 1. `Automation RunTests ProjectVelkorran.Campaign.Foundation`
 2. `Automation RunTests ProjectVelkorran.Campaign.Selene`
-3. `CompileAllBlueprints`
+3. `Automation RunTests ProjectVelkorran.Campaign.AxiomNullPulse`
+4. `CompileAllBlueprints`
 
 ## Explicitly deferred
 

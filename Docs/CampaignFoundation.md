@@ -10,6 +10,7 @@ This pass creates project-owned campaign framework seams without discarding Narr
 - `ASovPlayerCharacterBase` owns Echo, Shield, player Health recharge, and Poise.
 - `ASovTarrikCharacter` additionally owns Guard and Cinderline Echo generation.
 - `ASovSeleneCharacter` additionally owns the one-hit Deflection component and Selene's typed precision Echo generator. The implemented generator rewards perfect Deflection, the first break of an authored weak point, and Axiom's first valid Sever of an active hostile command link.
+- `USovGameplayAbility_SeleneAxiomNullPulse` owns native charge, directed Shield collapse, timed recharge/device suppression, and validated command-link Sever. Its Blueprint supplies presentation and the exact Axiom weapon grant/allowlist. The other four Selene Echo abilities still require their authored payload implementations.
 - `ASovDominionHandler` is the first concrete Commander profile: it owns one command link and a server-authoritative ability that orders an exact linked Hound Horn Charge. Horn Charge requires both the active relationship and a transient native Handler order.
 
 Each concrete protagonist supplies a canonical native identity tag. When its Player Definition is applied, the character retains all definition-owned tags, removes the opposite protagonist identity, and adds its own. This uses `SetDefinitionOwnedTags`, rather than an unrelated loose tag, because Narrative's ASC lives on PlayerState and may survive pawn replacement.
@@ -27,7 +28,7 @@ The repository snapshot does not include the project's binary Content assets. Co
 7. Remove any Blueprint-added Deflection or Selene Echo generator that duplicates the new inherited native components. Replace old Blueprint parry/reward logic with presentation bindings only after validating the native result.
 8. Create a Gameplay Ability Blueprint derived from `USovGameplayAbility_SeleneDeflection` and grant it once through Selene's default Ability Configuration. See `Docs/SeleneCoreLoop.md` for input, target, and tuning setup.
 9. Add one `USovWeakPointComponent` to each eligible enemy Blueprint and author stable zones only where the encounter truly exposes a breakable weak point. An empty component is a valid no-op.
-10. Use `ASovDominionHandler` for the Dominion Handler Blueprint and keep its inherited `USovCommandLinkComponent`; add the component explicitly only to other authored command nodes. Keep **Include Owner As Participant** enabled for the Handler so its ASC receives the active-link state, assign linked actors, and configure their red weak-point reveal presentation. Wire `Try Sever Axiom Command Link` into Axiom's authority-owned pulse flow. See `Docs/SeleneCommandLinkAndWeakPointReveal.md`.
+10. Use `ASovDominionHandler` for the Dominion Handler Blueprint and keep its inherited `USovCommandLinkComponent`; add the component explicitly only to other authored command nodes. Keep **Include Owner As Participant** enabled for the Handler so its ASC receives the active-link state, assign linked actors, and configure their red weak-point reveal presentation. Use the native Axiom pulse by granting `USovGameplayAbility_SeleneAxiomNullPulse` from Axiom's weapon item with its exact allowlist. Remove old Blueprint pulse/status/Sever gameplay; native charge/release owns it and direct helper calls are invalid. See [AxiomNullPulse.md](AxiomNullPulse.md) and [SeleneCommandLinkAndWeakPointReveal.md](SeleneCommandLinkAndWeakPointReveal.md).
 11. Create and grant the Handler command ability, reserve Hound Ability1 for native Handler dispatch, and complete the encounter/AI setup in `Docs/DominionHandlerProfile.md`.
 12. Keep `Sov.Character.Player.Tarrik` on Tarrik's Player Definition and `Sov.Character.Player.Selene` on Selene's. The tag picker permits the `Sov.Character` category.
 13. Compile and save the player, ability, command-node, material, and weak-point target Blueprints, then run `CompileAllBlueprints` before testing gameplay.
@@ -58,9 +59,10 @@ Run:
 1. `ProjectVelkorranEditor Win64 Development`
 2. `Automation RunTests ProjectVelkorran.Campaign.Foundation`
 3. `Automation RunTests ProjectVelkorran.Campaign.Selene`
-4. `CompileAllBlueprints`
-5. Standalone PIE with Tarrik
-6. Standalone PIE with Selene
-7. Two-player listen-server PIE and, when available, dedicated-server PIE using the matrix in `Docs/SeleneCoreLoop.md`
+4. `Automation RunTests ProjectVelkorran.Campaign.AxiomNullPulse`
+5. `CompileAllBlueprints`
+6. Standalone PIE with Tarrik
+7. Standalone PIE with Selene
+8. Two-player listen-server PIE and, when available, dedicated-server PIE using the matrix in `Docs/SeleneCoreLoop.md`
 
 Verify that Tarrik reaches readiness with one Guard and one Cinderline generator and no Selene systems. Verify that Selene reaches readiness with one Deflection component and one Selene Echo generator, no Tarrik systems, and all shared resource components exactly once. A valid perfect Deflection must award `+10` Echo once; the first valid break of an authored hostile weak point must award `+8` once; and Axiom's first valid Sever of an active hostile link instance must award `+12` once. Ordinary body hits, repeated hits on the same broken zone, Shield break or Device Disabled without a live link, friendly targets, Tarrik, and replayed Sever transactions must not grant those rewards.

@@ -9,6 +9,7 @@
 
 class UGameplayEffect;
 class ANarrativeProjectile;
+class UAbilityTask_WaitInputRelease;
 
 /** Weapon context used to organize Selene's Echo loadout in UI and content. */
 UENUM(BlueprintType)
@@ -160,10 +161,22 @@ class PROJECTVELKORRAN_API USovGameplayAbility_SeleneAxiomNullPulse : public USo
 public:
 	USovGameplayAbility_SeleneAxiomNullPulse();
 
+	virtual bool CanActivateAbility(const FGameplayAbilitySpecHandle Handle,
+		const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayTagContainer* SourceTags = nullptr,
+		const FGameplayTagContainer* TargetTags = nullptr,
+		FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
+
+	/** Release uses the authority clock and aim; callers cannot supply targets or charge. */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Echo Ability|Axiom")
+	bool ReleaseAxiomNullPulseFromAim();
+
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Echo Ability|Axiom")
+	float GetAxiomChargeAlpha() const;
+
 	/**
 	 * Attempts the command-link portion of Null Pulse against one command node
-	 * already selected by the authoritative pulse payload. Shield collapse,
-	 * recharge suppression, and device disable remain independently authored.
+	 * authorized by the native release. Calls outside that transaction fail closed.
 	 */
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Echo Ability|Axiom")
 	ESovCommandLinkSeverResolution TrySeverAxiomCommandLink(
@@ -172,6 +185,31 @@ public:
 
 protected:
 	virtual bool HasRequiredPayloadConfiguration() const override;
+	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle,
+		const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayAbilityActivationInfo ActivationInfo,
+		const FGameplayEventData* TriggerEventData) override;
+	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle,
+		const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayAbilityActivationInfo ActivationInfo,
+		bool bReplicateEndAbility, bool bWasCancelled) override;
+
+	/** Authority-only cosmetic result. Gameplay has already completed. */
+	UFUNCTION(BlueprintImplementableEvent, Category = "Sovereign|Echo Ability|Axiom|Presentation")
+	void ReceiveAxiomPulseReleased(FVector Origin, FVector Direction, float ChargeAlpha,
+		float Range, float HalfAngleDegrees, int32 ShieldTargets,
+		int32 DisabledDevices, int32 SeveredLinks);
+
+	/** Biological enemies are never disabled unless their exact archetype opts in. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Axiom")
+	TArray<TSubclassOf<AActor>> AdditionalDisableTargetClasses;
+
+	/** Boss devices resist hard shutdown by default. Shield/link rules remain separate. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Axiom")
+	bool bAllowBossDeviceDisable = false;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Lifecycle", meta = (ClampMin = "0.0", Units = "s"))
+	float PostPulseRecovery = 0.25f;
 
 	/** Must route through NarrativeDamageExecCalc with HealthCoefficient set to zero. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload")
@@ -204,6 +242,41 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload", meta = (ClampMin = "0.0", Units = "s"))
 	float MaximumShieldSuppressionDuration = 4.0f;
+
+private:
+	friend struct FSovAxiomNullPulseTestAccess;
+	bool IsCurrentAxiomActivation(uint32 Epoch) const;
+	bool ContinueAxiomRelease(uint32 Epoch);
+	bool CanReleaseAxiomPulse() const;
+	bool IsAxiomTargetInPulse(AActor* Target) const;
+	bool HasAxiomLineOfSight(AActor* Target, const FVector& TargetPoint) const;
+	bool IsAxiomTargetEligible(AActor* Target, UAbilitySystemComponent* TargetASC) const;
+	bool ApplyAxiomShieldCollapse(UAbilitySystemComponent* TargetASC);
+	bool ApplyAxiomDurationEffect(UAbilitySystemComponent* TargetASC,
+		TSubclassOf<UGameplayEffect> EffectClass, FGameplayTag GrantedTag, float Duration);
+	bool IsAxiomDeviceEligible(AActor* Target, UAbilitySystemComponent* TargetASC) const;
+	void ClearAxiomTasksAndTimers();
+	void StartAxiomRecovery(uint32 Epoch);
+
+	UFUNCTION()
+	void HandleAxiomInputReleased(float TimeHeld);
+
+	UPROPERTY(Transient)
+	TObjectPtr<UAbilityTask_WaitInputRelease> AxiomInputReleaseTask;
+	TWeakObjectPtr<UWeaponItem> ExpectedWeapon;
+	TWeakObjectPtr<AActor> AuthorizedCommandNode;
+	FTimerHandle AxiomFullChargeTimer;
+	FTimerHandle AxiomRecoveryTimer;
+	uint32 ActivationEpoch = 0;
+	uint32 ReleaseTaskEpoch = 0;
+	double ChargeStartWorldTime = 0.0;
+	bool bNativeLifecycleReady = false;
+	bool bPulseReleased = false;
+	FVector ReleaseOrigin = FVector::ZeroVector;
+	FVector ReleaseDirection = FVector::ForwardVector;
+	float ReleasedChargeAlpha = 0.0f;
+	float ReleasedRange = 0.0f;
+	float ReleasedHalfAngle = 0.0f;
 };
 
 /** Verity lane technique: an advancing wave that Chills and conditionally Freezes. */

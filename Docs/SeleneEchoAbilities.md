@@ -36,15 +36,15 @@ Do not add an Echo Cost Gameplay Effect and do not implement the generic Bluepri
 
 - `Echo Ability Started` for predicted/authority montage and task setup;
 - `Echo Ability Local Presentation` for owner-only camera, audio, rumble, and cosmetic hit-stop;
-- `Echo Ability Authority Committed` as the only point that may spawn gameplay actors or apply gameplay effects;
+- `Echo Ability Authority Committed` for authority-owned payload work in Stillpoint, Dispatch, Staccato Zero, and Verity's Wake; Axiom already owns its payload natively, so its Blueprint hook is presentation-only;
 - `Echo Ability Ended` for presentation cleanup;
-- `Finish Echo Ability` when the authored flow is complete or interrupted.
+- `Finish Echo Ability` when a Blueprint-owned payload flow is complete or interrupted. Axiom owns its charge, release, recovery, and normal end; do not finish it from a charge-start montage or its authority-committed hook.
 
-Every Selene parent fails activation when its required payload classes are unassigned, preventing a paid no-op. Treat every non-optional slot in the sections below as required before testing. Optional accents such as Stillpoint detonation damage, Dispatch's Frozen shatter, Axiom's device disable, and their presentation assets may remain empty.
+Stillpoint, Dispatch, Staccato Zero, and Verity's Wake remain payload scaffolds: assign their required classes and implement the authoritative projectile/effect behavior below before testing. Their configuration checks reject missing required classes but do not implement those payloads. Optional accents such as Stillpoint detonation damage, Dispatch's Frozen shatter, and presentation assets may remain empty. Axiom now supplies its complete native pulse and safe damage/suppression/device-disable Gameplay Effect defaults; follow [AxiomNullPulse.md](AxiomNullPulse.md) to migrate its Blueprint to presentation only.
 
 ## Identity and granting
 
-Selene's player Blueprint must derive from `ASovSeleneCharacter`. That concrete class merges `Sov.Character.Player.Selene` into the definition-owned ASC tag contribution and removes a conflicting Tarrik identity. Keep the same Selene tag on her Player Definition so the asset remains self-describing. Tarrik should likewise derive from `ASovTarrikCharacter`. Legacy Blueprints still deriving directly from `ASovPlayerCharacterBase` retain the temporary untagged migration fallback.
+Selene's player Blueprint must derive from `ASovSeleneCharacter`. That concrete class merges `Sov.Character.Player.Selene` into the definition-owned ASC tag contribution and removes a conflicting Tarrik identity. Keep the same Selene tag on her Player Definition so the asset remains self-describing. Tarrik should likewise derive from `ASovTarrikCharacter`. Other Selene payload scaffolds retain the temporary untagged migration fallback for legacy Blueprints derived directly from `ASovPlayerCharacterBase`. Axiom fails closed without the explicit Selene identity and a valid currently wielded granting weapon; migrate its player Blueprint before testing.
 
 Grant Stillpoint Grenade and Dispatch once through Selene's default `UAbilityConfiguration`:
 
@@ -84,9 +84,9 @@ The source publishes these native contracts:
 - `Sov.Status.Immunity.Freeze`
 - `Sov.Status.Immunity.DeviceDisable`
 
-There is not yet a tracked status manager that consumes `Sov.Event.Status.ApplicationRequested`. For this pass, apply the configured duration Gameplay Effects directly from the authority after faction, life-state, invulnerability, and immunity validation.
+There is not yet a tracked status manager that consumes `Sov.Event.Status.ApplicationRequested`. Stillpoint, Dispatch, Staccato Zero, and Verity's Wake must apply their configured duration Gameplay Effects from their authority-owned payload after faction, life-state, invulnerability, and immunity validation. Axiom applies its own bounded native suppression and device-disable effects; do not duplicate them in Blueprint.
 
-Recommended authored effects:
+Recommended authored effects for the remaining payloads (Axiom uses its native defaults):
 
 - `GE_Status_Chilled`: duration effect granting `Sov.State.Status.Chilled`, with the tuned slow/control-vulnerability policy.
 - `GE_Status_Frozen`: hard-CC duration effect granting `Sov.State.Status.Frozen` and the appropriate Narrative movement/action lock tags.
@@ -126,26 +126,21 @@ CC-resistant elites and bosses should reject hard Freeze through immunity tags a
 
 ### Axiom Null Pulse
 
-- Clamp charge alpha on authority and interpolate the authored minimum/maximum pulse range, half-angle, and suppression duration. Charge never accepts an unvalidated client damage value.
-- On authority, send a shield-only Disruption packet through the normal SetByCaller damage Gameplay Effect:
-  - `Sov.Damage.Channel.Disruption`
-  - `Sov.Damage.Policy.AlreadyResolved` when submitting an exact Shield-collapse magnitude
-  - `Sov.Damage.BypassGuard` if the EMP is not meant to be intercepted by a physical guard plane
-  - Shield coefficient `1`
-  - Health coefficient `0`
-  - Poise damage `0` unless separately authored
-- Then apply the duration recharge-block effect. `Sov.State.Shield.RechargeBlocked` only pauses recharge; the Disruption packet is what removes existing Shield while preserving Shield-break events, material state, and Niagara.
-- Apply Device Disabled only to eligible targets that do not carry `Sov.Status.Immunity.DeviceDisable`.
-- Exact full-Shield collapse for 30 Echo is intentionally aggressive. Bosses or shield-critical elites should carry an authored EMP immunity/cap policy if they must retain phase mechanics.
-- The command-link payload is separate. Add `USovCommandLinkComponent` to the actual hostile command node, give it a stable `LinkId`, and assign/register its encounter participants. Do not award Sever from the Shield or Device Disabled result.
-- Inside the existing `Echo Ability Authority Committed` pulse target loop, call `Try Sever Axiom Command Link` once for each unique command-node actor selected by the authoritative pulse. Do not call it from local presentation, an animation notify, a Gameplay Cue, or client-authored target data.
-- The helper revalidates active ability state, authority, world, maximum Axiom range, and component presence. The component then validates hostility against the link's actual participants. Only `NewlySevered` changes link state. The helper automatically submits that transaction to Selene's Echo generator; Blueprint must not add the `+12` itself.
-- `Inactive`, `NotHostile`, `Immune`, `AlreadySevered`, and `Invalid` are deliberate no-award outcomes. A repeated call returns the existing Sever identity and cannot restart the reveal or repay Echo.
-- A successful Sever removes the component's `Sov.State.CommandLink.Active` and optional active-link Gameplay Effect contributions, adds `Sov.State.CommandLink.Severed`, interrupts watched specialist actions, and begins the configured weak-point reveal on affected actors.
+Axiom has a complete native gameplay payload. See [AxiomNullPulse.md](AxiomNullPulse.md) for the setup, migration, tuning, and validation details.
 
-This implementation is a Shield collapse plus timed suppression. If the design later needs an intact but temporarily bypassed Shield, add a separate routing contract rather than pretending RechargeBlocked disables it.
+- Grant `GA_Selene_AxiomNullPulse` only from the actual Axiom `UWeaponItem`, and set `AllowedWeaponClasses` to that item class. Native activation and release require Selene's identity, the original granting weapon still wielded, and no weapon transition.
+- Native code spends Echo once, starts its authoritative charge clock, releases on input release or the `0.65`-second full-charge timer, and ends after native recovery. It interpolates range, cone half-angle, and suppression duration from that clock. No client supplies target or charge magnitude.
+- The release deduplicates candidates and applies charge-derived range/cone and visibility checks. The target and source are revalidated as the transaction progresses.
+- Exact Shield collapse uses the existing Narrative damage execution with Disruption, guard/deflection bypass, Shield coefficient `1`, Health coefficient `0`, and zero Poise. Native duration effects pause Shield recharge and expire normally; this preserves Shield-break feedback without Health overflow.
+- Device Disabled defaults to eligible `ASovDroneNPCBase` targets and explicitly opted-in additional classes. Immunity and boss policy still apply. Organic Handlers and Hounds are not globally disabled; their command-dependent action stops through genuine link Sever while independent Bite/Pounce remain available.
+- Native safe Gameplay Effect shells are supplied. Legacy Blueprint effect overrides are retained as serialized references but safely replaced by native shells during application. Reset those fields to the native defaults when migrating; leaving an old slot empty does not disable the native payload.
+- Author `USovCommandLinkComponent` on the actual hostile command node, with its stable `LinkId` and encounter participants. Native release authorizes each eligible node and calls `TrySeverAxiomCommandLink` internally. Direct Blueprint calls to that helper now return `Invalid`; do not build a second target loop or call Sever from `Echo Ability Authority Committed`.
+- Only a new valid link transaction awards the existing `+12` Echo and reveals weak points. Shield collapse, Device Disabled, link deactivation, and repeated attempts cannot substitute for Sever or repay a consumed transaction.
+- Use `Echo Ability Started`, local presentation, `Receive Axiom Pulse Released`, and `Echo Ability Ended` for animation/audio/VFX/UI only. The release-result event runs on authority after gameplay; route observer cosmetics through the existing replicated presentation mechanisms when needed. Remove old Blueprint charge timers, input-release tasks, damage/status applications, direct Sever/Echo writes, and normal-end calls.
 
-Full command-node and red decal authoring instructions are in `Docs/SeleneCommandLinkAndWeakPointReveal.md`.
+Exact Shield collapse for 30 Echo is an aggressive prototype. Author immunity on phase-critical targets when needed; any future capped-collapse behavior needs its own explicit native policy. RechargeBlocked pauses regeneration and does not make an intact Shield bypassable.
+
+Command-node and red decal authoring instructions are in [SeleneCommandLinkAndWeakPointReveal.md](SeleneCommandLinkAndWeakPointReveal.md).
 
 ### Dispatch
 
@@ -173,10 +168,12 @@ Narrative's stock projectile task is not suitable for Dispatch's authoritative s
 - Axiom target with full, partial, zero, and no MaxShield; no Health overflow at any charge
 - Axiom recharge remains blocked for the authored duration, then resumes normally
 - Axiom first active hostile link Sever returns `NewlySevered`, grants exactly `+12`, and exposes only unbroken authored weak points
-- Axiom repeated, inactive, immune, non-hostile, missing-link, and out-of-range Sever attempts grant no Echo or reveal
+- Axiom repeated, inactive, immune, non-hostile, missing-link, outside-charge-cone/range, and occluded targets grant no Sever Echo or reveal
+- Direct Blueprint Sever calls fail; input release plus full-charge timer releases at most one pulse
+- Death, cinematic interruption, or weapon replacement during charge prevents a late payload
 - Axiom spends `30` before the eligible Sever reward: verify `100 -> 82` and `30 -> 12`, with no replay after later meter changes
 - Dispatch early recall, timed recall, range recall, owner death, interruption, obstruction, and owner disconnect
 - Dispatch one hit per actor per leg, including repeated overlaps at low speed
 - first-person owner and third-person simulated-proxy montage/cue presentation
 
-These native classes are intentionally abstract scaffolds. Blueprint children, projectiles, effects, AnimSets, Gameplay Cues, Niagara, audio, reveal decal materials, command-node membership, and final balance must still be authored in the Unreal project. Physical projectile reflection/retargeting remains a separate deferred system; this Sever integration does not change projectile ownership or trajectory.
+Stillpoint, Dispatch, Staccato Zero, and Verity's Wake remain native payload scaffolds. Axiom supplies native gameplay, but its Blueprint grant, exact weapon allowlist, AnimSets, Gameplay Cues, Niagara, audio, reveal decal materials, command-node membership, and final balance still need Unreal content setup. The other four abilities additionally require their authored projectile/effect payloads. Physical projectile reflection/retargeting remains a separate deferred system; this Sever integration does not change projectile ownership or trajectory.

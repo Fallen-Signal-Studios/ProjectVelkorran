@@ -3,7 +3,6 @@
 #include "Abilities/SovGameplayAbility_SeleneEcho.h"
 
 #include "AbilitySystemComponent.h"
-#include "Components/SovSeleneEchoGenerationComponent.h"
 #include "GameplayEffect.h"
 #include "NarrativeGameplayTags.h"
 #include "Sovereign/SovGameplayTags.h"
@@ -104,87 +103,6 @@ bool USovGameplayAbility_SeleneStaccatoZero::HasRequiredPayloadConfiguration() c
 		&& ResistantTargetChillEffectClass.Get()
 		&& MaximumRange > KINDA_SMALL_NUMBER
 		&& DamageMultiplier > KINDA_SMALL_NUMBER;
-}
-
-USovGameplayAbility_SeleneAxiomNullPulse::USovGameplayAbility_SeleneAxiomNullPulse()
-{
-	const FSovGameplayTags& Tags = FSovGameplayTags::Get();
-	MinimumEchoRequired = 30.0f;
-	EchoCost = 30.0f;
-	EchoSpendTag = Tags.Ability_Echo_Selene_AxiomNullPulse;
-	FGameplayTagContainer AssetTags = GetAssetTags();
-	AssetTags.AddTag(EchoSpendTag);
-	SetAssetTags(AssetTags);
-	AbilityAnimSetTag = Tags.AnimSet_Ability_Selene_AxiomNullPulse;
-	InputTag = FNarrativeGameplayTags::Get().Narrative_Input_Ability2;
-	WeaponFamily = ESovSeleneEchoWeaponFamily::Axiom;
-	AbilityDisplayName = NSLOCTEXT("SovSeleneEcho", "AxiomNullPulseName", "Axiom Null Pulse");
-	AbilityDescription = NSLOCTEXT(
-		"SovSeleneEcho",
-		"AxiomNullPulseDescription",
-		"Charge Axiom and release a directed EMP pulse that collapses Shields, suppresses recharge, and disables eligible combat systems.");
-}
-
-ESovCommandLinkSeverResolution
-USovGameplayAbility_SeleneAxiomNullPulse::TrySeverAxiomCommandLink(
-	AActor* CommandNode,
-	FSovCommandLinkSeverResult& OutResult)
-{
-	OutResult = FSovCommandLinkSeverResult();
-	if (!CurrentActorInfo
-		|| !CurrentActorInfo->IsNetAuthority()
-		|| !IsActive())
-	{
-		return ESovCommandLinkSeverResolution::Invalid;
-	}
-
-	AActor* Avatar = CurrentActorInfo->AvatarActor.Get();
-	UAbilitySystemComponent* SourceAbilitySystem =
-		CurrentActorInfo->AbilitySystemComponent.Get();
-	if (!IsValid(Avatar)
-		|| !IsValid(SourceAbilitySystem)
-		|| !IsValid(CommandNode)
-		|| CommandNode == Avatar
-		|| CommandNode->GetWorld() != Avatar->GetWorld()
-		|| MaximumPulseRange <= KINDA_SMALL_NUMBER
-		|| FVector::DistSquared(
-				Avatar->GetActorLocation(),
-				CommandNode->GetActorLocation())
-			> FMath::Square(MaximumPulseRange))
-	{
-		return ESovCommandLinkSeverResolution::Invalid;
-	}
-
-	USovCommandLinkComponent* CommandLink =
-		CommandNode->FindComponentByClass<USovCommandLinkComponent>();
-	if (!IsValid(CommandLink))
-	{
-		return ESovCommandLinkSeverResolution::Invalid;
-	}
-
-	const ESovCommandLinkSeverResolution Resolution =
-		CommandLink->TrySeverCommandLink(Avatar, OutResult);
-	if (Resolution == ESovCommandLinkSeverResolution::NewlySevered)
-	{
-		if (USovSeleneEchoGenerationComponent* EchoGeneration =
-			Avatar->FindComponentByClass<USovSeleneEchoGenerationComponent>())
-		{
-			EchoGeneration->ConsumeCommandLinkSever(OutResult);
-		}
-	}
-
-	return Resolution;
-}
-
-bool USovGameplayAbility_SeleneAxiomNullPulse::HasRequiredPayloadConfiguration() const
-{
-	return ShieldDisruptionDamageEffectClass.Get()
-		&& ShieldRechargeBlockEffectClass.Get()
-		&& FullChargeDuration > KINDA_SMALL_NUMBER
-		&& MinimumPulseRange > KINDA_SMALL_NUMBER
-		&& MaximumPulseRange >= MinimumPulseRange
-		&& MaximumPulseHalfAngleDegrees >= MinimumPulseHalfAngleDegrees
-		&& MaximumShieldSuppressionDuration >= MinimumShieldSuppressionDuration;
 }
 
 USovGameplayAbility_SeleneVeritysWake::USovGameplayAbility_SeleneVeritysWake()
