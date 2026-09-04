@@ -200,57 +200,6 @@ void UNarrativeAbilitySystemComponent::GetLifetimeReplicatedProps(TArray<FLifeti
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 }
 
-float UNarrativeAbilitySystemComponent::GetBotAttackFrequency(FGameplayTag InputTag)
-{
-	TArray<FGameplayAbilitySpecHandle> Specs;
-	FindAbilitiesWithTag(InputTag, Specs);
-
-	for (auto& Spec : Specs)
-	{
-		if (Spec.IsValid())
-		{
-			if (FGameplayAbilitySpec* AbilitySpec = FindAbilitySpecFromHandle(Spec))
-			{
-				if (UNarrativeCombatAbility* CombatAbility = Cast<UNarrativeCombatAbility>(AbilitySpec->GetPrimaryInstance()))
-				{
-					if (CombatAbility->CanActivateAbility(Spec, AbilityActorInfo.Get(), nullptr, nullptr))
-					{
-						return CombatAbility->GetBotAttackFrequency();
-					}
-				}
-			}
-		}
-	}
-
-	return 1.f; 
-}
-
-float UNarrativeAbilitySystemComponent::GetBotAttackRange(FGameplayTag InputTag)
-{
-	TArray<FGameplayAbilitySpecHandle> Specs;
-	FindAbilitiesWithTag(InputTag, Specs);
-
-	for (auto& Spec : Specs)
-	{
-		if (Spec.IsValid())
-		{
-			if (FGameplayAbilitySpec* AbilitySpec = FindAbilitySpecFromHandle(Spec))
-			{
-				if (UNarrativeCombatAbility* CombatAbility = Cast<UNarrativeCombatAbility>(AbilitySpec->GetPrimaryInstance()))
-				{
-					//Our unarmed punch etc will still be granted so find the ability we're actually going to activate. 
-					if (CombatAbility->CanActivateAbility(Spec, AbilityActorInfo.Get(), nullptr, nullptr))
-					{
-						return CombatAbility->GetBotAttackRange();
-					}
-				}
-			}
-		}
-	}
-
-	return 1.f;
-}
-
 void UNarrativeAbilitySystemComponent::HealedBy(UNarrativeAbilitySystemComponent* Healer, const float Damage, const FGameplayEffectSpec& Spec)
 {
 	if (Healer)

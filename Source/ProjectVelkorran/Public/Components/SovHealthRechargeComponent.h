@@ -36,6 +36,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Sovereign|Health")
 	bool InitializeWithAbilitySystem(UAbilitySystemComponent* InAbilitySystemComponent);
 
+	/** Restart recharge timing from restored current Health without a damage event. */
+	void ResetForCheckpoint();
+
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Health")
 	bool IsInitialized() const;
 

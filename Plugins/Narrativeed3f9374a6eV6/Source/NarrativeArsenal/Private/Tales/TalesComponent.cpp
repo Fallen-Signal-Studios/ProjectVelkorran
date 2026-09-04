@@ -817,31 +817,22 @@ void UTalesComponent::PrepareForSave_Implementation()
 
 void UTalesComponent::Load_Implementation()
 {
-	if (SavedQuests.Num())
+	// An empty checkpoint is still a complete state: quests begun after that
+	// checkpoint must be forgotten on both server and client.
+	PerformLoad();
+
+	if (HasAuthority() && GetNetMode() != NM_Standalone)
 	{
-		PerformLoad();
-
-		//We've loaded on the server, we need to send all the load data to the client so it is synced 
-		if (HasAuthority() && GetNetMode() != NM_Standalone)
-		{
-			//Send the unpacked save file to the client - need to split MasterTaskList into 2 arrays since TMaps can be RPCed
-			TArray<FString> Tasks;
-			TArray<int32> Quantities;
-			MasterTaskList.GenerateKeyArray(Tasks);
-			MasterTaskList.GenerateValueArray(Quantities);
-
-			ClientReceiveSave(SavedQuests, Tasks, Quantities);
-		}
+		TArray<FString> Tasks;
+		TArray<int32> Quantities;
+		MasterTaskList.GenerateKeyArray(Tasks);
+		MasterTaskList.GenerateValueArray(Quantities);
+		ClientReceiveSave(SavedQuests, Tasks, Quantities);
 	}
 }
 
 void UTalesComponent::PerformLoad()
 {
-
-	if(!SavedQuests.Num())
-	{
-		return;
-	}
 
 	//TODO this feels a little hacky, maybe need a better way of checking this 
 	bIsLoading = true;

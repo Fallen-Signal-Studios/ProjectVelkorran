@@ -59,6 +59,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Sovereign|Poise")
 	bool InitializeWithAbilitySystem(UAbilitySystemComponent* InAbilitySystemComponent);
 
+	/** Clear prior-attempt owned state/timers and derive state from restored Poise. */
+	void ResetForCheckpoint();
+	void SetCheckpointRestoreInProgress(bool bInProgress) { bRestoringCheckpoint = bInProgress; }
+
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Poise")
 	bool IsInitialized() const;
 
@@ -146,6 +150,7 @@ protected:
 	float RecoveryImmunityDuration = 1.5f;
 
 private:
+	bool bRestoringCheckpoint = false;
 	void TryInitializeFromOwner();
 
 	UFUNCTION()

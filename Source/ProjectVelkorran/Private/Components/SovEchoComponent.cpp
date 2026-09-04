@@ -4,6 +4,11 @@
 
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
+#include "Combat/SovEchoAwardPolicy.h"
+#include "Abilities/SovGameplayAbility_SeleneEcho.h"
+#include "Abilities/SovGameplayAbility_TarrikEcho.h"
+#include "Items/WeaponItem.h"
+#include "Sovereign/SovGameplayTags.h"
 #include "Engine/World.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
 #include "GAS/NarrativeAttributeSetBase.h"
@@ -50,6 +55,8 @@ void USovEchoComponent::TickComponent(
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
+	// Equipment/spec replication can change readiness without changing Echo.
+	RefreshThresholdStates(GetEcho(), true);
 	const float CurrentWorldTime = GetWorldTimeSeconds();
 	if (!CanWriteEcho() || !bEncounterActive || DecayRate <= 0.0f)
 	{
@@ -162,7 +169,42 @@ float USovEchoComponent::GetMaxEcho() const
 
 bool USovEchoComponent::CanAffordEcho(const float Cost) const
 {
-	return Cost >= 0.0f && IsInitialized() && GetEcho() + KINDA_SMALL_NUMBER >= Cost;
+	return FMath::IsFinite(Cost) && Cost >= 0.0f && IsInitialized() && GetEcho() + KINDA_SMALL_NUMBER >= Cost;
+}
+
+float USovEchoComponent::GetSignatureEchoRequirement() const
+{
+	if (!IsInitialized() || !IsValid(AbilitySystemComponent->GetOwnerActor())
+		|| !IsValid(AbilitySystemComponent->GetAvatarActor())
+		|| AbilitySystemComponent->GetAvatarActor() != GetOwner()) return -1.0f;
+	FGameplayAbilityActorInfo ActorInfo;
+	ActorInfo.InitFromActor(AbilitySystemComponent->GetOwnerActor(), AbilitySystemComponent->GetAvatarActor(), AbilitySystemComponent);
+	const FSovGameplayTags& Tags = FSovGameplayTags::Get();
+	float Requirement = -1.0f;
+	for (const FGameplayAbilitySpec& Spec : AbilitySystemComponent->GetActivatableAbilities())
+	{
+		const USovGameplayAbility_EchoBase* Ability = Cast<USovGameplayAbility_EchoBase>(Spec.Ability);
+		if (!Ability || Spec.PendingRemove || !Ability->CanUseEchoWeaponContext(Spec.Handle, &ActorInfo)) continue;
+		const bool bTarrik = Ability->IsA<USovGameplayAbility_TarrikCinderlineRequiem>()
+			&& AbilitySystemComponent->HasMatchingGameplayTag(Tags.Character_Player_Tarrik)
+			&& !AbilitySystemComponent->HasMatchingGameplayTag(Tags.Character_Player_Selene);
+		const bool bSelene = Ability->IsA<USovGameplayAbility_SeleneDispatch>()
+			&& AbilitySystemComponent->HasMatchingGameplayTag(Tags.Character_Player_Selene)
+			&& !AbilitySystemComponent->HasMatchingGameplayTag(Tags.Character_Player_Tarrik);
+		if (!bTarrik && !bSelene) continue;
+		const float Cost = Ability->GetEchoCost();
+		const float Minimum = Ability->GetMinimumEchoRequired();
+		if (!FMath::IsFinite(Cost) || !FMath::IsFinite(Minimum)) continue;
+		const float Candidate = FMath::Max(Cost, Minimum);
+		Requirement = Requirement < 0.0f ? Candidate : FMath::Min(Requirement, Candidate);
+	}
+	return Requirement;
+}
+
+bool USovEchoComponent::IsSignatureReady() const
+{
+	const float Requirement = GetSignatureEchoRequirement();
+	return IsInitialized() && SovEchoAwardPolicy::IsMeterReady(GetEcho(), Requirement);
 }
 
 float USovEchoComponent::GetSecondsUntilDecay() const
@@ -179,20 +221,22 @@ float USovEchoComponent::GetSecondsUntilDecay() const
 
 float USovEchoComponent::AddEcho(const float Amount, const FGameplayTag& SourceTag)
 {
-	if (!CanWriteEcho() || Amount <= 0.0f)
+	if (!CanWriteEcho() || !FMath::IsFinite(Amount) || Amount <= 0.0f)
 	{
 		return 0.0f;
 	}
 
 	RecordCombatActivity(SourceTag);
 
+	UAbilitySystemComponent* OriginalASC = AbilitySystemComponent.Get();
 	const float OldEcho = GetEcho();
-	SetEchoInternal(OldEcho + Amount);
-	const float AppliedAmount = FMath::Max(GetEcho() - OldEcho, 0.0f);
-
-	if (AppliedAmount > KINDA_SMALL_NUMBER)
+	const float CommittedEcho = FMath::Clamp(OldEcho + Amount, 0.0f, GetMaxEcho());
+	const float AppliedAmount = FMath::Max(CommittedEcho - OldEcho, 0.0f);
+	SetEchoInternal(CommittedEcho);
+	// Attribute callbacks may spend/grant recursively. Report this write, not the nested net delta.
+	if (AppliedAmount > KINDA_SMALL_NUMBER && CanWriteEcho() && AbilitySystemComponent.Get() == OriginalASC)
 	{
-		OnEchoGranted.Broadcast(SourceTag, AppliedAmount, GetEcho());
+		OnEchoGranted.Broadcast(SourceTag, AppliedAmount, CommittedEcho);
 	}
 
 	return AppliedAmount;
@@ -200,7 +244,7 @@ float USovEchoComponent::AddEcho(const float Amount, const FGameplayTag& SourceT
 
 bool USovEchoComponent::TrySpendEcho(const float Cost, const FGameplayTag& SpendTag)
 {
-	if (!CanWriteEcho() || Cost < 0.0f || !CanAffordEcho(Cost))
+	if (!CanWriteEcho() || !FMath::IsFinite(Cost) || Cost < 0.0f || !CanAffordEcho(Cost))
 	{
 		return false;
 	}
@@ -212,13 +256,14 @@ bool USovEchoComponent::TrySpendEcho(const float Cost, const FGameplayTag& Spend
 
 	RecordCombatActivity(SpendTag);
 
+	UAbilitySystemComponent* OriginalASC = AbilitySystemComponent.Get();
 	const float OldEcho = GetEcho();
-	SetEchoInternal(OldEcho - Cost);
-	const float AppliedCost = FMath::Max(OldEcho - GetEcho(), 0.0f);
-
-	if (AppliedCost > KINDA_SMALL_NUMBER)
+	const float CommittedEcho = FMath::Clamp(OldEcho - Cost, 0.0f, GetMaxEcho());
+	const float AppliedCost = FMath::Max(OldEcho - CommittedEcho, 0.0f);
+	SetEchoInternal(CommittedEcho);
+	if (AppliedCost > KINDA_SMALL_NUMBER && CanWriteEcho() && AbilitySystemComponent.Get() == OriginalASC)
 	{
-		OnEchoSpent.Broadcast(SpendTag, AppliedCost, GetEcho());
+		OnEchoSpent.Broadcast(SpendTag, AppliedCost, CommittedEcho);
 	}
 
 	return AppliedCost + KINDA_SMALL_NUMBER >= Cost;
@@ -226,7 +271,7 @@ bool USovEchoComponent::TrySpendEcho(const float Cost, const FGameplayTag& Spend
 
 float USovEchoComponent::RestoreEchoFromCheckpoint(const float AuthoredValue)
 {
-	if (!CanWriteEcho())
+	if (!CanWriteEcho() || !FMath::IsFinite(AuthoredValue))
 	{
 		return GetEcho();
 	}
@@ -249,11 +294,12 @@ void USovEchoComponent::BeginEncounter()
 	const float CurrentWorldTime = GetWorldTimeSeconds();
 	LastActivityWorldTime = CurrentWorldTime;
 	LastDecayUpdateWorldTime = CurrentWorldTime;
+	OnEncounterScopeChanged.Broadcast(true);
 }
 
 float USovEchoComponent::EndEncounter(const float ReserveOverride)
 {
-	if (!CanWriteEcho())
+	if (!CanWriteEcho() || !FMath::IsFinite(ReserveOverride))
 	{
 		return GetEcho();
 	}
@@ -270,6 +316,7 @@ float USovEchoComponent::EndEncounter(const float ReserveOverride)
 		: DefaultEncounterReserve;
 
 	SetEchoInternal(Reserve);
+	OnEncounterScopeChanged.Broadcast(false);
 	return GetEcho();
 }
 
@@ -311,6 +358,8 @@ void USovEchoComponent::HandleOwnerASCInitialized()
 
 void USovEchoComponent::UninitializeFromAbilitySystem()
 {
+	bIsResonant = false;
+	bIsSignatureReady = false;
 	if (!IsValid(AbilitySystemComponent))
 	{
 		AbilitySystemComponent = nullptr;
@@ -348,7 +397,7 @@ void USovEchoComponent::UninitializeFromAbilitySystem()
 
 void USovEchoComponent::SetEchoInternal(const float NewEcho)
 {
-	if (!CanWriteEcho())
+	if (!CanWriteEcho() || !FMath::IsFinite(NewEcho))
 	{
 		return;
 	}
@@ -362,7 +411,7 @@ void USovEchoComponent::SetEchoInternal(const float NewEcho)
 void USovEchoComponent::RefreshThresholdStates(const float CurrentEcho, const bool bBroadcastChanges)
 {
 	const bool bNewResonant = CurrentEcho + KINDA_SMALL_NUMBER >= ResonantThreshold;
-	const bool bNewSignatureReady = CurrentEcho + KINDA_SMALL_NUMBER >= SignatureReadyThreshold;
+	const bool bNewSignatureReady = IsSignatureReady();
 
 	if (bNewResonant != bIsResonant)
 	{
@@ -385,7 +434,8 @@ void USovEchoComponent::RefreshThresholdStates(const float CurrentEcho, const bo
 
 bool USovEchoComponent::CanWriteEcho() const
 {
-	return IsInitialized() && IsValid(GetOwner()) && GetOwner()->HasAuthority();
+	return IsInitialized() && IsValid(GetOwner()) && !GetOwner()->IsActorBeingDestroyed()
+		&& GetOwner()->HasAuthority() && AbilitySystemComponent->GetAvatarActor() == GetOwner();
 }
 
 float USovEchoComponent::GetWorldTimeSeconds() const
@@ -396,14 +446,14 @@ float USovEchoComponent::GetWorldTimeSeconds() const
 void USovEchoComponent::HandleEchoAttributeChanged(const FOnAttributeChangeData& ChangeData)
 {
 	OnEchoChanged.Broadcast(ChangeData.OldValue, ChangeData.NewValue, GetMaxEcho());
-	RefreshThresholdStates(ChangeData.NewValue, true);
+	RefreshThresholdStates(GetEcho(), true);
 }
 
 void USovEchoComponent::HandleMaxEchoAttributeChanged(const FOnAttributeChangeData& ChangeData)
 {
 	const float CurrentEcho = GetEcho();
 	OnEchoChanged.Broadcast(CurrentEcho, CurrentEcho, ChangeData.NewValue);
-	RefreshThresholdStates(CurrentEcho, true);
+	RefreshThresholdStates(GetEcho(), true);
 }
 
 void USovEchoComponent::HandleDealtDamage(

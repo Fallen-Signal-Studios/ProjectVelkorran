@@ -15,6 +15,7 @@ class UAbilitySystemComponent;
 class UAbilityTask_PlayMontageAndWait;
 class UAnimMontage;
 class UGameplayEffect;
+class USovProtectionInterceptReceipt;
 
 /**
  * Shared server-authoritative shell for integral Reformation drone weapons.
@@ -91,7 +92,8 @@ protected:
 	bool ApplyPointDamage(
 		const FHitResult& Hit,
 		float Damage,
-		float PoiseDamage) const;
+		float PoiseDamage,
+		USovProtectionInterceptReceipt* ProtectionReceipt = nullptr) const;
 
 	bool IsHostileTarget(const UAbilitySystemComponent* TargetAbilitySystem) const;
 	bool IsTargetAlive(const UAbilitySystemComponent* TargetAbilitySystem) const;
@@ -255,6 +257,7 @@ private:
 		int32 ShotIndex) const;
 
 	FTimerHandle BurstTimerHandle;
+	uint32 BurstEpoch = 0;
 	int32 ShotsFired = 0;
 	bool bBurstStarted = false;
 };

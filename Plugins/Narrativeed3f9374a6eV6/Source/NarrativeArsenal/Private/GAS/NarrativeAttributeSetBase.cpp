@@ -6,7 +6,10 @@
 #include "AbilitySystemGlobals.h"
 #include "Abilities/GameplayAbility.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
+#include "GAS/NarrativeDamageExecCalc.h"
 #include "GAS/SovCombatTypes.h"
+#include "GAS/SovCombatTransactionPolicy.h"
+#include "GAS/SovAttackReceiptSource.h"
 #include "GameplayEffect.h"
 #include "GameplayEffectExtension.h"
 #include "GameplayTagContainer.h"
@@ -131,16 +134,13 @@ bool UNarrativeAttributeSetBase::PreGameplayEffectExecute(FGameplayEffectModCall
 		return false;
 	}
 
-	const FSovGameplayTags& SovTags = FSovGameplayTags::Get();
-	FGameplayTagContainer EffectAssetTags;
-	Data.EffectSpec.GetAllAssetTags(EffectAssetTags);
-	const bool bFatalPolicy = EffectAssetTags.HasTagExact(SovTags.Damage_Fatal);
-	if (Data.EvaluatedData.Attribute == GetDamageAttribute()
-		&& Data.EvaluatedData.Magnitude > 0.f
-		&& !bFatalPolicy
-		&& (Data.Target.HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_Invulnerable)
-			|| Data.Target.HasMatchingGameplayTag(SovTags.State_Invulnerable)
-			|| Data.Target.HasMatchingGameplayTag(SovTags.State_Damage_Immune)))
+	const bool bCombatPacket = Data.EvaluatedData.Attribute == GetDamageAttribute()
+		|| Data.EvaluatedData.Attribute == GetPoiseDamageAttribute()
+		|| Data.EvaluatedData.Attribute == GetControlRequestAttribute();
+	if (bCombatPacket && (!FMath::IsFinite(Data.EvaluatedData.Magnitude)
+		|| UNarrativeDamageExecCalc::ShouldRejectTransaction(
+			Data.EffectSpec.GetContext().GetOriginalInstigatorAbilitySystemComponent(),
+			&Data.Target, Data.EffectSpec)))
 	{
 		Data.EvaluatedData.Magnitude = 0.f;
 		return false;
@@ -205,12 +205,22 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 		}
 	};
 
-	if (Data.EvaluatedData.Attribute == GetDamageAttribute())
+	const bool bBodyPacket = Data.EvaluatedData.Attribute == GetDamageAttribute();
+	const bool bPoisePacket = Data.EvaluatedData.Attribute == GetPoiseDamageAttribute();
+	const bool bControlPacket = Data.EvaluatedData.Attribute == GetControlRequestAttribute();
+	if (bBodyPacket || bPoisePacket || bControlPacket)
 	{
-		const float IncomingDamage = FMath::Max(GetDamage(), 0.f);
-		SetDamage(0.f);
-
-		if (IncomingDamage <= KINDA_SMALL_NUMBER)
+		FGameplayTagContainer TargetTagsAtEntry;
+		Data.Target.GetOwnedGameplayTags(TargetTagsAtEntry);
+		const bool bPeriodicDelivery = Data.EffectSpec.GetPeriod() > 0.f;
+		const float IncomingDamage = bBodyPacket ? FMath::Max(GetDamage(), 0.f) : 0.f;
+		const float IncomingPoise = bPoisePacket ? FMath::Max(GetPoiseDamage(), 0.f) : 0.f;
+		const float IncomingControl = bControlPacket ? FMath::Max(GetControlRequest(), 0.f) : 0.f;
+		// Clear only our own packet before any callback can synchronously apply another.
+		if (bBodyPacket) { SetDamage(0.f); }
+		if (bPoisePacket) { SetPoiseDamage(0.f); }
+		if (bControlPacket) { SetControlRequest(0.f); }
+		if (IncomingDamage + IncomingPoise + IncomingControl <= KINDA_SMALL_NUMBER)
 		{
 			return;
 		}
@@ -228,8 +238,25 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 
 		FSovDamageResult Result;
 		Result.TransactionId = FGuid::NewGuid();
+		Result.bPeriodicDamage = bPeriodicDelivery;
+		Result.TargetTagsBeforeDamage = MoveTemp(TargetTagsAtEntry);
 		Result.SourceActor = DamageInstigator;
 		Result.TargetActor = TargetActor;
+		if (IsValid(DamageInstigator) && DamageInstigator->HasAuthority())
+		{
+			const UObject* ReceiptCandidates[] = {Context.GetSourceObject(), Context.GetEffectCauser()};
+			for (const UObject* Candidate : ReceiptCandidates)
+			{
+				const ISovAttackReceiptSource* Receipt = Cast<ISovAttackReceiptSource>(Candidate);
+				FGuid CandidateId;
+				if (Receipt && Receipt->GetSovAttackIdentity(DamageInstigator, CandidateId) && CandidateId.IsValid())
+				{
+					Result.AttackId = CandidateId;
+					break;
+				}
+			}
+		}
+
 		Result.BaseDamage = FMath::Max(
 			Data.EffectSpec.GetSetByCallerMagnitude(
 				FNarrativeGameplayTags::Get().SetByCaller_Damage,
@@ -312,7 +339,7 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 		};
 
 		float RoutedDamage = IncomingDamage;
-		float RoutedPoiseDamage = Data.EffectSpec.GetSetByCallerMagnitude(
+		float RoutedPoiseDamage = bPoisePacket ? IncomingPoise : bControlPacket ? 0.f : Data.EffectSpec.GetSetByCallerMagnitude(
 			Tags.SetByCaller_Damage_PoiseDamage,
 			false,
 			-1.f);
@@ -328,6 +355,9 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 				0.f);
 			RoutedPoiseDamage = IncomingDamage * PoiseCoefficient;
 		}
+
+		RoutedPoiseDamage = FMath::IsFinite(RoutedPoiseDamage) ? FMath::Max(RoutedPoiseDamage, 0.f) : 0.f;
+		Result.RequestedPoiseDamage = RoutedPoiseDamage;
 
 		// Action-state defenses are evaluated after mathematical mitigation and
 		// before Shield/Health routing. Deflection is a short all-or-nothing
@@ -588,12 +618,18 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 				Result.AppliedPoiseDamage);
 			SendSovEvent(Tags.Event_Poise_Broken, Result.AppliedPoiseDamage, nullptr);
 		}
-		if (!Result.RequestedStatusTags.IsEmpty()
-			&& AppliedDamage + Result.AppliedPoiseDamage > KINDA_SMALL_NUMBER)
+		const float RequestedStatusMagnitude = Data.EffectSpec.GetSetByCallerMagnitude(
+			Tags.SetByCaller_Status_Magnitude, false, 1.f);
+		Result.bStatusApplicationRequested = SovCombatTransaction::AcceptStatusRequest(
+			!Result.RequestedStatusTags.IsEmpty() && FMath::IsFinite(RequestedStatusMagnitude)
+				&& RequestedStatusMagnitude > KINDA_SMALL_NUMBER,
+			Result.bPerfectDefense, Result.bGuarded,
+			bControlPacket, AppliedDamage + Result.AppliedPoiseDamage, KINDA_SMALL_NUMBER);
+		if (Result.bStatusApplicationRequested)
 		{
 			SendSovEvent(
 				Tags.Event_Status_ApplicationRequested,
-				FMath::Max(Data.EffectSpec.GetSetByCallerMagnitude(Tags.SetByCaller_Status_Magnitude, false, 1.f), 0.f),
+				RequestedStatusMagnitude,
 				&Result.RequestedStatusTags);
 		}
 
@@ -647,48 +683,6 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 			NotifyAppliedDamage(AppliedDamage, Data.EffectSpec);
 		}
 		SendSovEvent(Tags.Event_Damage_Resolved, AppliedDamage, nullptr);
-
-		return;
-	}
-
-	if (Data.EvaluatedData.Attribute == GetPoiseDamageAttribute())
-	{
-		const float IncomingPoiseDamage = FMath::Max(GetPoiseDamage(), 0.f);
-		SetPoiseDamage(0.f);
-
-		if (IncomingPoiseDamage <= KINDA_SMALL_NUMBER)
-		{
-			return;
-		}
-
-		const float OldPoise = FMath::Max(GetPoise(), 0.f);
-
-		// Recovering is a hard-control immunity window, not permanent Poise
-		// invulnerability. Hits may still drain Poise, but cannot reduce it to zero
-		// and immediately trigger another break.
-		const FSovGameplayTags& Tags = FSovGameplayTags::Get();
-		const bool bHasRecoveryImmunity = Data.Target.HasMatchingGameplayTag(Tags.State_Poise_Recovering)
-			|| Data.Target.HasMatchingGameplayTag(Tags.State_Poise_SuperArmor);
-		const float RecoveryFloor = bHasRecoveryImmunity
-			? FMath::Min(
-				GetMaxPoise(),
-				FMath::Max(GetMaxPoise() * 0.01f, 1.f))
-			: 0.f;
-
-		SetPoise(FMath::Clamp(
-			OldPoise - IncomingPoiseDamage,
-			RecoveryFloor,
-			GetMaxPoise()));
-		const float AppliedPoiseDamage = FMath::Max(OldPoise - GetPoise(), 0.f);
-
-		if (OldPoise > 0.f && GetPoise() <= 0.f)
-		{
-			OnPoiseBroken.Broadcast(
-				Context.GetOriginalInstigator(),
-				Context.GetEffectCauser(),
-				Data.EffectSpec,
-				AppliedPoiseDamage);
-		}
 
 		return;
 	}

@@ -14,6 +14,7 @@ UCLASS()
 class NARRATIVEARSENAL_API ANarrativeGameMode : public AGameModeBase
 {
 	GENERATED_BODY()
+	friend struct FNarrativeTravelTestAccess;
 	
 protected:
 

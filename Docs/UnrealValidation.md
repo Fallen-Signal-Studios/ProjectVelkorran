@@ -56,3 +56,9 @@ Every invocation that reaches the build phase uses a fresh timestamped folder un
 `-NullRHI` is appropriate for these native gameplay tests. It does not validate rendered materials, animation presentation, input/UI wiring, replication across multiple processes, or Level 1/2 campaign playthroughs. Those remain separate Unreal editor and PIE acceptance checks.
 
 The runner uses Epic's documented [automation command-line interface](https://dev.epicgames.com/documentation/en-us/unreal-engine/run-automation-tests-in-unreal-engine?application_version=5.7) and [JSON report fields](https://dev.epicgames.com/documentation/en-us/unreal-engine/review-test-results-in-unreal-engine?application_version=5.7). No CI runner or remote Unreal build service is configured by this script.
+
+## Expanded native engineering pass
+
+`python Scripts/Test-NativePolicies.py` compiles and runs all production-used portable C++ policy suites with warnings as errors and undefined-behavior sanitization. These cover numeric/policy behavior only. They are not UHT, GAS, serialization, physics, AI, Blueprint, or Unreal build results.
+
+The campaign automation namespace now includes the additional bot, combat-routing, Guard, native payload, resource, encounter, story, handoff, Technique, travel and other newly authored suites. Run the complete namespace after a clean Development Editor build; a subset cannot certify the complete engineering pass. Then run `CompileAllBlueprints`, the explicit mission preflight in [CampaignHandoff.md](CampaignHandoff.md), and the actual M01/M02 playthrough and repeated checkpoint tests with content.

@@ -6,6 +6,8 @@
 #include "Components/ActorComponent.h"
 #include "NarrativeSavableComponent.h"
 #include "TreeSkill.h"
+#include "GameplayAbilitySpecHandle.h"
+#include "GameplayEffectTypes.h"
 #include "SkillTreeComponent.generated.h"
 
 USTRUCT()
@@ -123,6 +125,9 @@ public:
 	void PrepareForSave_Implementation() override;
 	void Load_Implementation() override;
 
+	/** Removes only the GAS grants created by owned perks; safe to repeat before protagonist restore. */
+	void ClearPurchasedPerksForRestore();
+
 protected:
 
 	virtual void BeginPlay() override;
@@ -172,6 +177,14 @@ protected:
 	bool HasPerk(TSubclassOf<UTreePerk> PerkClass) const;
 
 private:
+	void ApplyPurchasedPerkLevel(UTreePerk* Perk, int32 Level);
+	struct FOwnedPerkGrants
+	{
+		TArray<FGameplayAbilitySpecHandle> Abilities;
+		TArray<FActiveGameplayEffectHandle> Effects;
+	};
+	TMap<TWeakObjectPtr<UTreePerk>, FOwnedPerkGrants> OwnedPerkGrants;
+	bool bRestoringPerks = false;
 
 	FSavedSkill SkillToSaveData(const UTreeSkill* Skill) const;
 	FSavedPerk PerkToSaveData(const UTreePerk* Perk) const;

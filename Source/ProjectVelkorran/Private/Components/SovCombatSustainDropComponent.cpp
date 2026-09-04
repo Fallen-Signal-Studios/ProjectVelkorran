@@ -212,7 +212,7 @@ void USovCombatSustainDropComponent::SpawnConfiguredDrops()
 			World->SpawnActorDeferred<ASovAmmoCombatSustainPickup>(
 				AmmoPickupClass,
 				SpawnTransform,
-				nullptr,
+				Owner, // encounter cleanup can attribute this transient reward to its source
 				nullptr,
 				ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn);
 		if (IsValid(AmmoPickup))
@@ -241,7 +241,7 @@ void USovCombatSustainDropComponent::SpawnConfiguredDrops()
 			World->SpawnActorDeferred<ASovEchoCombatSustainPickup>(
 				EchoPickupClass,
 				SpawnTransform,
-				nullptr,
+				Owner, // encounter cleanup can attribute this transient reward to its source
 				nullptr,
 				ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn);
 		if (IsValid(EchoPickup))

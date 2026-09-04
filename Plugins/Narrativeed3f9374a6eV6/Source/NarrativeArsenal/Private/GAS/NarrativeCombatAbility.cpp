@@ -57,8 +57,30 @@ bool UNarrativeCombatAbility::CanActivateAbility(const FGameplayAbilitySpecHandl
 	return Super::CanActivateAbility(Handle, ActorInfo, SourceTags, TargetTags, OptionalRelevantTags);
 }
 
+bool UNarrativeCombatAbility::GetSovAttackIdentity(const AActor* ExpectedSource, FGuid& OutAttackId) const
+{
+	OutAttackId.Invalidate();
+	if (!IsValid(ExpectedSource) || !ExpectedSource->HasAuthority() || !IsActive()
+		|| HasAnyFlags(RF_ClassDefaultObject) || GetInstancingPolicy() == EGameplayAbilityInstancingPolicy::NonInstanced
+		|| !CurrentCombatAttackId.IsValid() || CombatAttackSpecHandle != CurrentSpecHandle
+		|| !CurrentActorInfo || CurrentActorInfo->AvatarActor.Get() != ExpectedSource
+		|| !CurrentActorInfo->IsNetAuthority())
+	{
+		return false;
+	}
+	OutAttackId = CurrentCombatAttackId;
+	return true;
+}
+
 void UNarrativeCombatAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
+	CurrentCombatAttackId.Invalidate();
+	CombatAttackSpecHandle = Handle;
+	if (ActorInfo && ActorInfo->IsNetAuthority() && !HasAnyFlags(RF_ClassDefaultObject)
+		&& GetInstancingPolicy() != EGameplayAbilityInstancingPolicy::NonInstanced)
+	{
+		CurrentCombatAttackId = FGuid::NewGuid();
+	}
 	// Bind target data callback
 	UAbilitySystemComponent* MyAbilityComponent = CurrentActorInfo->AbilitySystemComponent.Get();
 	check(MyAbilityComponent);
@@ -79,6 +101,8 @@ void UNarrativeCombatAbility::EndAbility(const FGameplayAbilitySpecHandle Handle
 			return;
 		}
 
+		CurrentCombatAttackId.Invalidate();
+		CombatAttackSpecHandle = FGameplayAbilitySpecHandle();
 		if (CurrentActorInfo)
 		{
 			if (UAbilitySystemComponent* MyAbilityComponent = CurrentActorInfo->AbilitySystemComponent.Get())
@@ -526,3 +550,8 @@ FTransform UTargetingTransformProvider_WeaponTowardsFocus::ProvideTargetingTrans
 
 
 #undef LOCTEXT_NAMESPACE 
+
+float UNarrativeCombatAbility::GetBotAttackMinimumRange_Implementation() const { return 0.f; }
+float UNarrativeCombatAbility::GetBotAttackMaximumRange_Implementation() const { return GetBotAttackRange(); }
+bool UNarrativeCombatAbility::RequiresBotAttackToken_Implementation() const { return bBotRequiresAttackToken; }
+bool UNarrativeCombatAbility::ManagesBotAttackToken_Implementation() const { return false; }

@@ -6,6 +6,9 @@
 #include "AbilitySystemBlueprintLibrary.h"
 #include "ArsenalStatics.h"
 #include "Characters/SovPlayerCharacterBase.h"
+#include "Combat/SovEchoAttackReceipt.h"
+#include "Combat/SovProtectionInterceptReceipt.h"
+#include "Combat/SovProtectionAwardPolicy.h"
 #include "Components/SkinnedMeshComponent.h"
 #include "Components/SovEchoComponent.h"
 #include "Engine/World.h"
@@ -128,10 +131,12 @@ bool USovTarrikEchoGenerationComponent::InitializeWithAbilitySystem(
 
 	if (GetOwner()->HasAuthority())
 	{
+		AbilitySystemComponent->OnDamageResolvedAsSource.AddUniqueDynamic(this, &ThisClass::HandleDamageResolvedAsSource);
 		AbilitySystemComponent->OnDealtDamage.AddUniqueDynamic(
 			this,
 			&ThisClass::HandleDealtDamage);
 	}
+	EchoComponent->OnEncounterScopeChanged.AddUniqueDynamic(this, &ThisClass::HandleEncounterScopeChanged);
 	EchoComponent->OnEchoChanged.AddUniqueDynamic(
 		this,
 		&ThisClass::HandleEchoChanged);
@@ -211,6 +216,9 @@ void USovTarrikEchoGenerationComponent::TryInitializeFromOwner()
 
 void USovTarrikEchoGenerationComponent::UninitializeFromAbilitySystem()
 {
+	++ResourceScopeEpoch;
+	ProtectionSourceAwardTimes.Reset();
+	HeavyAttacks.Reset();
 	if (GetOwner() && GetOwner()->HasAuthority())
 	{
 		ResetCinderlineCadenceInternal();
@@ -228,6 +236,7 @@ void USovTarrikEchoGenerationComponent::UninitializeFromAbilitySystem()
 
 	if (IsValid(AbilitySystemComponent.Get()))
 	{
+		AbilitySystemComponent->OnDamageResolvedAsSource.RemoveDynamic(this, &ThisClass::HandleDamageResolvedAsSource);
 		AbilitySystemComponent->OnDealtDamage.RemoveDynamic(
 			this,
 			&ThisClass::HandleDealtDamage);
@@ -262,6 +271,7 @@ void USovTarrikEchoGenerationComponent::UninitializeFromAbilitySystem()
 
 	if (IsValid(EchoComponent.Get()))
 	{
+		EchoComponent->OnEncounterScopeChanged.RemoveDynamic(this, &ThisClass::HandleEncounterScopeChanged);
 		EchoComponent->OnEchoChanged.RemoveDynamic(
 			this,
 			&ThisClass::HandleEchoChanged);
@@ -653,12 +663,16 @@ void USovTarrikEchoGenerationComponent::AwardEcho(
 		return;
 	}
 
-	const float AppliedEcho = EchoComponent->AddEcho(RequestedEcho, SourceTag);
+	USovEchoComponent* OriginalEcho = EchoComponent.Get();
+	const uint32 Epoch = ResourceScopeEpoch;
+	const float BeforeEcho = OriginalEcho->GetEcho();
+	const float AppliedEcho = OriginalEcho->AddEcho(RequestedEcho, SourceTag);
+	if (ResourceScopeEpoch != Epoch || EchoComponent.Get() != OriginalEcho || !IsValid(OriginalEcho)) return;
 	if (AppliedEcho > KINDA_SMALL_NUMBER)
 	{
 		ClientNotifyCinderlineEchoAwarded(
 			AppliedEcho,
-			EchoComponent->GetEcho(),
+			BeforeEcho + AppliedEcho,
 			AwardType,
 			bBossReduced);
 	}
@@ -841,4 +855,105 @@ void USovTarrikEchoGenerationComponent::ClientNotifyCinderlineHitConfirmed_Imple
 		bPrecisionHit,
 		HitBone,
 		bBossReduced);
+}
+
+void USovTarrikEchoGenerationComponent::HandleEncounterScopeChanged(bool bStarted)
+{
+	++ResourceScopeEpoch;
+	ProtectionSourceAwardTimes.Reset();
+	HeavyAttacks.Reset();
+	ResetCinderlineCadence();
+	LastCadenceAwardWorldTime = -BIG_NUMBER;
+}
+
+bool USovTarrikEchoGenerationComponent::CanGenerateTarrikEcho() const
+{
+	if (!IsInitialized() || !IsValid(GetOwner()) || GetOwner()->IsActorBeingDestroyed()
+		|| !GetOwner()->HasAuthority() || AbilitySystemComponent->GetAvatarActor() != GetOwner()) return false;
+	const FSovGameplayTags& Tags = FSovGameplayTags::Get();
+	return AbilitySystemComponent->HasMatchingGameplayTag(Tags.Character_Player_Tarrik)
+		&& !AbilitySystemComponent->HasMatchingGameplayTag(Tags.Character_Player_Selene)
+		&& !AbilitySystemComponent->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_IsDead)
+		&& !AbilitySystemComponent->HasMatchingGameplayTag(Tags.State_Fatal)
+		&& !AbilitySystemComponent->HasMatchingGameplayTag(Tags.State_EchoAbility_Active);
+}
+
+void USovTarrikEchoGenerationComponent::AwardTarrikEcho(float Amount, FGameplayTag Tag,
+	ESovTarrikEchoAwardType Type, AActor* Target)
+{
+	if (!CanGenerateTarrikEcho()) return;
+	USovEchoComponent* OriginalEcho = EchoComponent.Get();
+	UNarrativeAbilitySystemComponent* OriginalASC = AbilitySystemComponent.Get();
+	const uint32 Epoch = ResourceScopeEpoch;
+	const float BeforeEcho = OriginalEcho->GetEcho();
+	const float Granted = OriginalEcho->AddEcho(Amount, Tag);
+	if (ResourceScopeEpoch != Epoch || EchoComponent.Get() != OriginalEcho
+		|| AbilitySystemComponent.Get() != OriginalASC || !IsValid(OriginalEcho) || !IsValid(GetOwner())) return;
+	if (Granted > KINDA_SMALL_NUMBER) ClientNotifyTarrikEchoAwarded(Granted, BeforeEcho + Granted, Type, Target);
+}
+
+void USovTarrikEchoGenerationComponent::HandleDamageResolvedAsSource(const FSovDamageResult& Result)
+{
+	AActor* Target = Result.TargetActor.Get();
+	if (!GetOwner() || !GetOwner()->HasAuthority() || Result.SourceActor.Get() != GetOwner()
+		|| !IsValid(Target) || !Result.TransactionId.IsValid()
+		|| ConsumedCombatTransactions.Contains(Result.TransactionId)) return;
+	ConsumedCombatTransactions.Add(Result.TransactionId);
+	const FSovGameplayTags& Tags = FSovGameplayTags::Get();
+	const UGameplayAbility* SourceAbility = Result.EffectContext.GetAbility();
+	if (Result.bFromEchoAbility || (SourceAbility && SourceAbility->GetAssetTags().HasTag(Tags.Ability_Echo))
+		|| UArsenalStatics::GetAttitude(GetOwner(), Target) != ETeamAttitude::Hostile) return;
+
+	const uint32 ExpectedScope = ResourceScopeEpoch;
+	bool bHeavyReward = false;
+	const USovEchoAttackReceipt* Receipt = Cast<USovEchoAttackReceipt>(Result.EffectContext.GetSourceObject());
+	if (!Result.bPeriodicDamage && Result.AttackId.IsValid() && !ConsumedHeavyAttacks.Contains(Result.AttackId) && Receipt && Receipt->MatchesCommittedHeavyAttack(GetOwner(), Result.AttackId)
+		&& Result.AttackClassifications.HasTag(Tags.Damage_Heavy)
+		&& Result.AppliedHealthDamage + Result.AppliedShieldDamage + Result.AppliedPoiseDamage > 0.0f)
+	{
+		FHeavyAttackProgress& Progress = HeavyAttacks.FindOrAdd(Result.AttackId);
+		Progress.Targets.Add(Target);
+		bHeavyReward = !Progress.bConsumed && Progress.Targets.Num() >= 3;
+		if (bHeavyReward)
+		{
+			Progress.bConsumed = true;
+			ConsumedHeavyAttacks.Add(Result.AttackId);
+		}
+	}
+	// All reward eligibility is captured before delegates can cause reentrant damage.
+	if (bHeavyReward) AwardTarrikEcho(8.0f, Tags.Echo_Source_HeavyMultiHit, ESovTarrikEchoAwardType::HeavyMultiHit, Target);
+	if (ResourceScopeEpoch != ExpectedScope) return;
+	if (Result.bPoiseBroken) AwardTarrikEcho(15.0f, Tags.Echo_Source_PoiseBreak, ESovTarrikEchoAwardType::PoiseBreak, Target);
+	if (ResourceScopeEpoch != ExpectedScope) return;
+	if (Result.bFatal && Result.AppliedHealthDamage > 0.0f
+		&& Result.TargetTagsBeforeDamage.HasTag(Tags.State_CommandTarget_Window))
+		AwardTarrikEcho(8.0f, Tags.Echo_Source_CommandTargetKill, ESovTarrikEchoAwardType::CommandTargetKill, Target);
+}
+
+void USovTarrikEchoGenerationComponent::ClientNotifyTarrikEchoAwarded_Implementation(float Amount, float NewEcho,
+	ESovTarrikEchoAwardType Type, AActor* Target)
+{
+	OnTarrikEchoAwarded.Broadcast(Amount, NewEcho, Type, Target);
+}
+
+void USovTarrikEchoGenerationComponent::ConsumeProtectionIntercept(USovProtectionInterceptReceipt* Receipt,
+	const FSovDamageResult& Result)
+{
+	AActor* Threat = nullptr;
+	AActor* Protected = nullptr;
+	if (!IsValid(Receipt) || !GetOwner() || !GetOwner()->HasAuthority()
+		|| !Receipt->ConsumeForProtector(GetOwner(), Result, Threat, Protected)
+		|| !Result.TransactionId.IsValid() || ConsumedProtectionTransactions.Contains(Result.TransactionId)) return;
+	ConsumedProtectionTransactions.Add(Result.TransactionId);
+	if (!CanGenerateTarrikEcho() || !IsValid(Threat) || !IsValid(Protected)
+		|| !FMath::IsFinite(ProtectionInterceptSourceCooldown)) return;
+	const FGameplayTag Tag = FSovGameplayTags::Get().Echo_Source_ProtectionIntercept;
+	EchoComponent->RecordCombatActivity(Tag);
+	const float Now = GetWorldTimeSeconds();
+	if (const float* Previous = ProtectionSourceAwardTimes.Find(Threat))
+		if (!SovProtectionAwardPolicy::HasCooldownElapsed(Now, *Previous, ProtectionInterceptSourceCooldown)) return;
+	for (auto It = ProtectionSourceAwardTimes.CreateIterator(); It; ++It)
+		if (!It.Key().IsValid()) It.RemoveCurrent();
+	ProtectionSourceAwardTimes.Add(Threat, Now);
+	AwardTarrikEcho(15.f, Tag, ESovTarrikEchoAwardType::ProtectionIntercept, Protected);
 }

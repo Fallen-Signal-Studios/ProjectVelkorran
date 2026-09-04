@@ -54,6 +54,17 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Dismemberment")
 	bool IsRegionSevered(ESovDismembermentRegion Region) const;
 
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Dismemberment|Save")
+	int32 GetSeveredRegionMask() const { return SeveredRegionMask; }
+
+	/** A live actor cannot undo terminated limb physics; smaller masks require checkpoint respawn. */
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Dismemberment|Save")
+	bool CanRestoreSeveredRegionMask(int32 SavedMask) const;
+
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Dismemberment|Save")
+	bool RestoreSeveredRegionMask(int32 SavedMask);
+
+
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Dismemberment")
 	void GetSeveredRegions(TArray<ESovDismembermentRegion>& OutRegions) const;
 
@@ -183,6 +194,8 @@ protected:
 	int32 SeveredRegionMask = 0;
 
 private:
+	void ApplyAuthoredSeverConsequences();
+	int32 ObservedSeveredRegionMask = 0;
 	UFUNCTION()
 	void HandleDamageResolved(const FSovDamageResult& Result);
 

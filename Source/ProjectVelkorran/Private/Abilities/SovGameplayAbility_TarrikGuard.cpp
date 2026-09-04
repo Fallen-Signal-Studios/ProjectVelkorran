@@ -17,11 +17,25 @@ USovGameplayAbility_TarrikGuard::USovGameplayAbility_TarrikGuard()
 
 	ActivationBlockedTags.AddTag(FNarrativeGameplayTags::Get().State_IsDead);
 	ActivationBlockedTags.AddTag(FNarrativeGameplayTags::Get().State_Busy);
+	ActivationBlockedTags.AddTag(FNarrativeGameplayTags::Get().State_Interacting);
 	ActivationBlockedTags.AddTag(FNarrativeGameplayTags::Get().State_SequencerControlled);
+	ActivationBlockedTags.AddTag(FNarrativeGameplayTags::Get().State_Movement_Ragdoll);
 	ActivationBlockedTags.AddTag(FSovGameplayTags::Get().State_Fatal);
 	ActivationBlockedTags.AddTag(FSovGameplayTags::Get().State_EchoAbility_Active);
 	ActivationBlockedTags.AddTag(FSovGameplayTags::Get().State_Guard_Broken);
 	ActivationBlockedTags.AddTag(FSovGameplayTags::Get().State_Poise_Broken);
+	ActivationBlockedTags.AddTag(FSovGameplayTags::Get().State_Deflecting);
+}
+
+bool USovGameplayAbility_TarrikGuard::CanActivateAbility(
+	const FGameplayAbilitySpecHandle Handle,
+	const FGameplayAbilityActorInfo* ActorInfo,
+	const FGameplayTagContainer* SourceTags,
+	const FGameplayTagContainer* TargetTags,
+	FGameplayTagContainer* OptionalRelevantTags) const
+{
+	return !bEndingGuardAbility
+		&& Super::CanActivateAbility(Handle, ActorInfo, SourceTags, TargetTags, OptionalRelevantTags);
 }
 
 void USovGameplayAbility_TarrikGuard::OnAvatarSet(
@@ -39,6 +53,11 @@ void USovGameplayAbility_TarrikGuard::OnRemoveAbility(
 	const FGameplayAbilityActorInfo* ActorInfo,
 	const FGameplayAbilitySpec& Spec)
 {
+	if (IsActive())
+	{
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+	}
+	UnbindCancellationTags();
 	UnbindGuardComponent();
 	Super::OnRemoveAbility(ActorInfo, Spec);
 }
@@ -48,12 +67,17 @@ void USovGameplayAbility_TarrikGuard::BindGuardComponent(
 {
 	if (GuardComponent != NewGuardComponent)
 	{
+		if (IsActive() && bGuardStarted)
+		{
+			EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+		}
 		UnbindGuardComponent();
 		GuardComponent = NewGuardComponent;
 	}
 
 	if (IsValid(GuardComponent))
 	{
+		GuardComponent->OnGuardEnded.AddUniqueDynamic(this, &ThisClass::HandleGuardEnded);
 		GuardComponent->OnGuardImpact.AddUniqueDynamic(
 			this,
 			&ThisClass::HandleGuardImpact);
@@ -73,6 +97,7 @@ void USovGameplayAbility_TarrikGuard::UnbindGuardComponent()
 {
 	if (IsValid(GuardComponent))
 	{
+		GuardComponent->OnGuardEnded.RemoveDynamic(this, &ThisClass::HandleGuardEnded);
 		GuardComponent->OnGuardImpact.RemoveDynamic(
 			this,
 			&ThisClass::HandleGuardImpact);
@@ -101,7 +126,9 @@ void USovGameplayAbility_TarrikGuard::ActivateAbility(
 	const FGameplayAbilityActivationInfo ActivationInfo,
 	const FGameplayEventData* TriggerEventData)
 {
+	const uint32 Epoch = ++ActivationEpoch;
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
+	if (Epoch != ActivationEpoch || !IsActive()) { return; }
 
 	if (!ActorInfo)
 	{
@@ -112,21 +139,36 @@ void USovGameplayAbility_TarrikGuard::ActivateAbility(
 	AActor* Avatar = ActorInfo->AvatarActor.Get();
 	BindGuardComponent(
 		Avatar ? Avatar->FindComponentByClass<USovGuardComponent>() : nullptr);
-	if (!IsValid(GuardComponent) || !GuardComponent->BeginGuard())
+	if (Epoch != ActivationEpoch || !IsActive()) { return; }
+	if (!IsValid(GuardComponent))
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
 
+	// BeginGuard broadcasts synchronously. Claim the lifecycle before that event
+	// so cancellation from Blueprint can unwind both GAS and component state.
 	bGuardStarted = true;
+	const int32 OwnedBusy = ActivationOwnedTags.HasTag(FNarrativeGameplayTags::Get().State_Busy) ? 1 : 0;
+	const bool bBeganGuard = GuardComponent->BeginGuardInternal(OwnedBusy);
+	if (Epoch != ActivationEpoch || !IsActive()) { return; }
+	if (!bBeganGuard)
+	{
+		bGuardStarted = false;
+		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+		return;
+	}
 	BindCancellationTags(ActorInfo->AbilitySystemComponent.Get());
+	if (Epoch != ActivationEpoch || !IsActive()) { return; }
 	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
+	if (Epoch != ActivationEpoch || !IsActive()) { return; }
 
 	ReceiveGuardAbilityStarted();
+	if (Epoch != ActivationEpoch || !IsActive()) { return; }
 
 	InputReleaseTask = UAbilityTask_WaitInputRelease::WaitInputRelease(this, true);
 	if (InputReleaseTask)
@@ -147,20 +189,44 @@ void USovGameplayAbility_TarrikGuard::EndAbility(
 	const bool bReplicateEndAbility,
 	const bool bWasCancelled)
 {
+	if (bEndingGuardAbility || !IsEndAbilityValid(Handle, ActorInfo)) { return; }
+	if (ScopeLockCount > 0)
+	{
+		// Stop native activation continuation even when GAS must defer teardown.
+		++ActivationEpoch;
+		WaitingToExecute.Add(FPostLockDelegate::CreateUObject(this, &ThisClass::EndAbility,
+			Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled));
+		return;
+	}
+	TGuardValue<bool> EndingGuardAbility(bEndingGuardAbility, true);
+	++ActivationEpoch;
 	UnbindCancellationTags();
-	if (IsValid(GuardComponent) && bGuardStarted)
+	const bool bWasGuardStarted = bGuardStarted;
+	bGuardStarted = false;
+	if (InputReleaseTask)
+	{
+		InputReleaseTask->OnRelease.RemoveDynamic(this, &ThisClass::HandleInputReleased);
+		InputReleaseTask->EndTask();
+		InputReleaseTask = nullptr;
+	}
+	if (IsValid(GuardComponent) && bWasGuardStarted)
 	{
 		GuardComponent->EndGuard();
 	}
 
-	InputReleaseTask = nullptr;
-	const bool bWasGuardStarted = bGuardStarted;
-	bGuardStarted = false;
 	if (bWasGuardStarted)
 	{
 		ReceiveGuardAbilityEnded(bWasCancelled);
 	}
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
+}
+
+void USovGameplayAbility_TarrikGuard::HandleGuardEnded()
+{
+	if (bGuardStarted && IsActive() && !bEndingGuardAbility)
+	{
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+	}
 }
 
 void USovGameplayAbility_TarrikGuard::HandleInputReleased(const float TimeHeld)
@@ -193,12 +259,13 @@ void USovGameplayAbility_TarrikGuard::HandlePerfectDefense(
 void USovGameplayAbility_TarrikGuard::HandleGuardBroken(
 	const FSovDamageResult& Result)
 {
+	const uint32 Epoch = ActivationEpoch;
 	if (ShouldRunLocalPresentation())
 	{
 		ReceiveGuardBroken(Result);
 	}
 
-	if (IsActive())
+	if (Epoch == ActivationEpoch && IsActive())
 	{
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 	}
@@ -225,46 +292,60 @@ void USovGameplayAbility_TarrikGuard::BindCancellationTags(
 	BoundAbilitySystem = AbilitySystem;
 	const FNarrativeGameplayTags& NarrativeTags = FNarrativeGameplayTags::Get();
 	const FSovGameplayTags& SovTags = FSovGameplayTags::Get();
-	DeadTagChangedHandle = BoundAbilitySystem
-		->RegisterGameplayTagEvent(NarrativeTags.State_IsDead, EGameplayTagEventType::NewOrRemoved)
+	FGameplayTagContainer Tags;
+	Tags.AddTag(NarrativeTags.State_IsDead);
+	Tags.AddTag(NarrativeTags.State_Interacting);
+	Tags.AddTag(NarrativeTags.State_SequencerControlled);
+	Tags.AddTag(NarrativeTags.State_Movement_Ragdoll);
+	Tags.AddTag(SovTags.State_Fatal);
+	Tags.AddTag(SovTags.State_Poise_Broken);
+	Tags.AddTag(SovTags.State_Guard_Broken);
+	Tags.AddTag(SovTags.State_EchoAbility_Active);
+	Tags.AddTag(SovTags.State_Deflecting);
+	for (const FGameplayTag& Tag : Tags)
+	{
+		CancellationTagHandles.Add(Tag, BoundAbilitySystem
+			->RegisterGameplayTagEvent(Tag, EGameplayTagEventType::NewOrRemoved)
+			.AddUObject(this, &ThisClass::HandleCancellationTagChanged));
+	}
+	BusyTagChangedHandle = BoundAbilitySystem
+		->RegisterGameplayTagEvent(NarrativeTags.State_Busy, EGameplayTagEventType::AnyCountChange)
 		.AddUObject(this, &ThisClass::HandleCancellationTagChanged);
-	PoiseBrokenTagChangedHandle = BoundAbilitySystem
-		->RegisterGameplayTagEvent(SovTags.State_Poise_Broken, EGameplayTagEventType::NewOrRemoved)
-		.AddUObject(this, &ThisClass::HandleCancellationTagChanged);
-	SequencerTagChangedHandle = BoundAbilitySystem
-		->RegisterGameplayTagEvent(NarrativeTags.State_SequencerControlled, EGameplayTagEventType::NewOrRemoved)
-		.AddUObject(this, &ThisClass::HandleCancellationTagChanged);
+	const int32 OwnedBusy = ActivationOwnedTags.HasTag(NarrativeTags.State_Busy) ? 1 : 0;
+	if (BoundAbilitySystem->HasAnyMatchingGameplayTags(Tags)
+		|| BoundAbilitySystem->GetGameplayTagCount(NarrativeTags.State_Busy) > OwnedBusy)
+	{
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+	}
 }
 
 void USovGameplayAbility_TarrikGuard::UnbindCancellationTags()
 {
-	if (BoundAbilitySystem)
+	if (IsValid(BoundAbilitySystem))
 	{
-		const FNarrativeGameplayTags& NarrativeTags = FNarrativeGameplayTags::Get();
-		const FSovGameplayTags& SovTags = FSovGameplayTags::Get();
+		for (const TPair<FGameplayTag, FDelegateHandle>& Entry : CancellationTagHandles)
+		{
+			BoundAbilitySystem->RegisterGameplayTagEvent(Entry.Key, EGameplayTagEventType::NewOrRemoved)
+				.Remove(Entry.Value);
+		}
 		BoundAbilitySystem
-			->RegisterGameplayTagEvent(NarrativeTags.State_IsDead, EGameplayTagEventType::NewOrRemoved)
-			.Remove(DeadTagChangedHandle);
-		BoundAbilitySystem
-			->RegisterGameplayTagEvent(SovTags.State_Poise_Broken, EGameplayTagEventType::NewOrRemoved)
-			.Remove(PoiseBrokenTagChangedHandle);
-		BoundAbilitySystem
-			->RegisterGameplayTagEvent(NarrativeTags.State_SequencerControlled, EGameplayTagEventType::NewOrRemoved)
-			.Remove(SequencerTagChangedHandle);
+			->RegisterGameplayTagEvent(FNarrativeGameplayTags::Get().State_Busy, EGameplayTagEventType::AnyCountChange)
+			.Remove(BusyTagChangedHandle);
 	}
 
 	BoundAbilitySystem = nullptr;
-	DeadTagChangedHandle.Reset();
-	PoiseBrokenTagChangedHandle.Reset();
-	SequencerTagChangedHandle.Reset();
+	CancellationTagHandles.Reset();
+	BusyTagChangedHandle.Reset();
 }
 
 void USovGameplayAbility_TarrikGuard::HandleCancellationTagChanged(
 	const FGameplayTag CallbackTag,
 	const int32 NewCount)
 {
-	static_cast<void>(CallbackTag);
-	if (NewCount > 0 && IsActive())
+	const FGameplayTag BusyTag = FNarrativeGameplayTags::Get().State_Busy;
+	const int32 OwnedBusy = ActivationOwnedTags.HasTag(BusyTag) ? 1 : 0;
+	const int32 AllowedCount = CallbackTag == BusyTag ? OwnedBusy : 0;
+	if (NewCount > AllowedCount && IsActive())
 	{
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 	}

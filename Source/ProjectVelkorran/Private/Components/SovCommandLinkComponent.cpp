@@ -234,6 +234,57 @@ bool USovCommandLinkComponent::ActivateCommandLink(AActor* InCommandSource)
 	return true;
 }
 
+FSovCommandLinkSnapshot USovCommandLinkComponent::CaptureCommandLinkState() const
+{
+	FSovCommandLinkSnapshot Snapshot;
+	Snapshot.LinkId = GetLinkId();
+	Snapshot.State = ReplicationState.State;
+	Snapshot.LinkInstanceId = ReplicationState.LinkInstanceId;
+	Snapshot.LastSeverTransactionId = ReplicationState.LastSeverTransactionId;
+	return Snapshot;
+}
+
+bool USovCommandLinkComponent::RestoreCommandLinkState(const FSovCommandLinkSnapshot& Snapshot, AActor* CommandSource, const TArray<AActor*>& Participants)
+{
+	if (!GetOwner() || !GetOwner()->HasAuthority() || bCommandLinkMutationInProgress
+		|| Snapshot.LinkId.IsNone() || Snapshot.LinkId != LinkId
+		|| (Snapshot.State != ESovCommandLinkState::Inactive && Snapshot.State != ESovCommandLinkState::Active && Snapshot.State != ESovCommandLinkState::Severed)
+		|| (Snapshot.State != ESovCommandLinkState::Inactive && !Snapshot.LinkInstanceId.IsValid())
+		|| (Snapshot.State == ESovCommandLinkState::Severed && !Snapshot.LastSeverTransactionId.IsValid())) { return false; }
+	AActor* Source = IsValid(CommandSource) ? CommandSource : GetOwner();
+	if (Source->GetWorld() != GetWorld()) { return false; }
+	TSet<AActor*> UniqueParticipants;
+	for (AActor* Participant : Participants)
+	{
+		if (!IsValid(Participant) || Participant == GetOwner() || Participant->GetWorld() != GetWorld() || UniqueParticipants.Contains(Participant)) { return false; }
+		UniqueParticipants.Add(Participant);
+	}
+	const ESovCommandLinkState PreviousState = ReplicationState.State;
+	bCommandLinkMutationInProgress = true;
+	ClearAllParticipantContributions();
+	UnbindAllParticipants();
+	LinkedActors.Reset();
+	for (AActor* Participant : Participants) { LinkedActors.Add(Participant); }
+	ReplicationState.State = Snapshot.State;
+	ReplicationState.LinkId = Snapshot.LinkId;
+	ReplicationState.LinkInstanceId = Snapshot.LinkInstanceId;
+	ReplicationState.LastSeverTransactionId = Snapshot.LastSeverTransactionId;
+	ReplicationState.CommandSource = Source;
+	ReplicationState.LastSeveredBy = nullptr;
+	ReplicationState.bLastSeverEligibleForEchoReward = false;
+	ReplicationState.LastSeverAffectedActors.Reset();
+	++ReplicationState.Revision;
+	BindParticipant(GetOwner());
+	BindParticipant(Source);
+	for (AActor* Participant : Participants) { BindParticipant(Participant); }
+	ReconcileAllParticipants();
+	WakeOwnerForReplication();
+	if (PreviousState != Snapshot.State) { OnCommandLinkStateChanged.Broadcast(PreviousState, Snapshot.State); }
+	bCommandLinkMutationInProgress = false;
+	ProcessDeferredMutation();
+	return true;
+}
+
 void USovCommandLinkComponent::ResetCommandLink()
 {
 	if (!GetOwner() || !GetOwner()->HasAuthority())

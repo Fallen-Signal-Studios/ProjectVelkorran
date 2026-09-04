@@ -5,11 +5,15 @@
 #include "CoreMinimal.h"
 #include "Abilities/SovGameplayAbility_Echo.h"
 #include "Components/SovCommandLinkComponent.h"
+#include "Combat/SovSelenePayload.h"
 #include "SovGameplayAbility_SeleneEcho.generated.h"
 
 class UGameplayEffect;
 class ANarrativeProjectile;
 class UAbilityTask_WaitInputRelease;
+class UAbilityTask_WaitInputPress;
+class ASovSeleneCombatProjectile;
+class AWeaponVisual;
 
 /** Weapon context used to organize Selene's Echo loadout in UI and content. */
 UENUM(BlueprintType)
@@ -29,11 +33,28 @@ class PROJECTVELKORRAN_API USovGameplayAbility_SeleneEchoBase : public USovGamep
 
 public:
 	USovGameplayAbility_SeleneEchoBase();
+	virtual bool CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayTagContainer* SourceTags = nullptr, const FGameplayTagContainer* TargetTags = nullptr,
+		FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
 
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Echo Ability")
 	ESovSeleneEchoWeaponFamily GetEchoWeaponFamily() const { return WeaponFamily; }
 
 protected:
+	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
+	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
+	bool CanExecuteNativePayload(uint32 Epoch) const;
+	bool ContinueNativePayload(uint32 Epoch);
+	FSovSelenePayloadContext MakeNativePayloadContext() const;
+	uint32 NativePayloadEpoch = 0;
+	TWeakObjectPtr<UWeaponItem> NativeSourceWeapon;
+
+	/** Result presentation only: gameplay is already applied by authority. */
+	UFUNCTION(BlueprintImplementableEvent, Category = "Sovereign|Echo Ability|Presentation")
+	void ReceiveNativeSelenePayloadReleased(AActor* PayloadActor, FVector Origin, FVector Direction);
+
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Identity")
 	ESovSeleneEchoWeaponFamily WeaponFamily = ESovSeleneEchoWeaponFamily::Universal;
 };
@@ -49,6 +70,14 @@ public:
 
 protected:
 	virtual bool HasRequiredPayloadConfiguration() const override;
+	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
+
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload", meta = (ClampMin = "0.0"))
+	float DetonationDamage = 0.0f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload", meta = (ClampMin = "0.0"))
+	float FrozenDamagePerSecond = 12.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload")
 	TSubclassOf<ANarrativeProjectile> GrenadeClass;
@@ -93,6 +122,22 @@ public:
 
 protected:
 	virtual bool HasRequiredPayloadConfiguration() const override;
+	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
+
+
+	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
+
+	/** Authored Verity items identify only their own equipped/holstered visual. Inventory is never removed. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Presentation")
+	TArray<TSubclassOf<UWeaponItem>> VerityWeaponClasses;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload", meta = (ClampMin = "0.0"))
+	float DamagePerLeg = 70.0f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload", meta = (ClampMin = "0.0"))
+	float PoiseDamagePerLeg = 35.0f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload", meta = (ClampMin = "0.0"))
+	float ShatterBonusPoise = 30.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload")
 	TSubclassOf<ANarrativeProjectile> ReturningVerityClass;
@@ -121,6 +166,26 @@ protected:
 	/** Server-clamped steering rate; the client never supplies projectile position. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload", meta = (ClampMin = "0.0", ClampMax = "720.0", Units = "deg/s"))
 	float MaximumSteeringDegreesPerSecond = 180.0f;
+private:
+	UFUNCTION()
+	void HandleDispatchRecallPressed(float TimeWaited);
+	UFUNCTION()
+	void HandleDispatchFinished(ASovSeleneCombatProjectile* Projectile, bool bReturned);
+	void UpdateDispatch(uint32 Epoch);
+	void RestoreDispatchPresentation();
+	UPROPERTY(Transient)
+	TObjectPtr<ASovSeleneCombatProjectile> ActiveDispatch;
+	UPROPERTY(Transient)
+	TObjectPtr<UAbilityTask_WaitInputPress> RecallInputTask;
+	TMap<TWeakObjectPtr<AWeaponVisual>, bool> HiddenVerityVisuals;
+	FActiveGameplayEffectHandle VerityAbsentEffect;
+	TWeakObjectPtr<UAbilitySystemComponent> DispatchSourceASC;
+	TWeakObjectPtr<UWeaponItem> DispatchMainWeapon;
+	TWeakObjectPtr<UWeaponItem> DispatchOffWeapon;
+	FTimerHandle DispatchWatchdog;
+	uint32 DispatchTaskEpoch = 0;
+	bool bDispatchRecallPending = false;
+
 };
 
 /** Staccato precision technique: one empowered shot with deterministic control. */
@@ -134,6 +199,18 @@ public:
 
 protected:
 	virtual bool HasRequiredPayloadConfiguration() const override;
+	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
+
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload", meta = (ClampMin = "0.0"))
+	float BaseShotDamage = 60.0f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload", meta = (ClampMin = "0.0"))
+	float ShotPoiseDamage = 30.0f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload", meta = (ClampMin = "0.01"))
+	float FreezeDuration = 2.5f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload", meta = (ClampMin = "0.0"))
+	float RefreezeLockout = 3.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload")
 	TSubclassOf<UGameplayEffect> EmpoweredShotDamageEffectClass;
@@ -290,6 +367,18 @@ public:
 
 protected:
 	virtual bool HasRequiredPayloadConfiguration() const override;
+	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
+
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload", meta = (ClampMin = "0.0"))
+	float WaveDamage = 50.0f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload", meta = (ClampMin = "0.0"))
+	float WavePoiseDamage = 20.0f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload", meta = (ClampMin = "0.01"))
+	float ControlDuration = 3.0f;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload", meta = (ClampMin = "0.0"))
+	float FrostDamagePerSecond = 10.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload")
 	TSubclassOf<ANarrativeProjectile> WaveClass;

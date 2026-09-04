@@ -131,6 +131,12 @@ struct PROJECTVELKORRAN_API FSovDismembermentRegionDefinition
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Presentation", meta = (Categories = "Narrative.Equipment.Slot"))
 	TArray<FGameplayTag> PresentationSlotsToHide;
 
+	/** Explicit weak-point zone identities whose authored capabilities fail when this region is severed.
+	 * The weak-point component owns lifetime, save state, and ability blocking. No bone-name inference or reward. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Region|Gameplay Consequences")
+	TArray<FName> ConsequenceWeakPointIds;
+
+
 	/** Hides Narrative face, helmet, facial hair, and groom components. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Presentation")
 	bool bHideHeadPresentation = false;

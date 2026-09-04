@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Combat/SovEchoAwardPolicy.h"
 #include "Components/ActorComponent.h"
 #include "GAS/SovCombatTypes.h"
 #include "GameplayTagContainer.h"
@@ -12,13 +13,18 @@ class UNarrativeAbilitySystemComponent;
 class USovDeflectionComponent;
 class USovEchoComponent;
 struct FSovCommandLinkSeverResult;
+class ASovEchoBypassGate;
 
 UENUM(BlueprintType)
 enum class ESovSeleneEchoAwardType : uint8
 {
 	PerfectDeflection UMETA(DisplayName = "Perfect Deflection"),
 	WeakPointBreak UMETA(DisplayName = "Weak Point Break"),
-	CommandLinkSever UMETA(DisplayName = "Command Link Sever")
+	CommandLinkSever UMETA(DisplayName = "Command Link Sever"),
+	MarkedOrExposedKill UMETA(DisplayName = "Marked or Exposed Kill"),
+	PrecisionChain UMETA(DisplayName = "Precision Chain"),
+	UndetectedBypass UMETA(DisplayName = "Undetected Bypass"),
+	WeakPointHit UMETA(DisplayName = "Unbroken Weak Point Hit")
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(
@@ -34,7 +40,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(
  *
  * The component consumes typed authoritative results. It never infers a body
  * shot as precision, never grants for Tarrik, and can consume each target-owned
- * weak-point break transaction only once.
+ * unbroken weak-point hit transaction only once.
  */
 UCLASS(ClassGroup = (Sovereign), BlueprintType, meta = (BlueprintSpawnableComponent))
 class PROJECTVELKORRAN_API USovSeleneEchoGenerationComponent : public UActorComponent
@@ -62,6 +68,10 @@ public:
 	{
 		return FMath::Max(WeakPointBreakEchoReward, 0.0f);
 	}
+
+	/** Existing serialized WeakPointBreakEchoReward is retained as the hit reward tuning alias. */
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Echo|Selene")
+	float GetWeakPointHitEchoReward() const { return GetWeakPointBreakEchoReward(); }
 
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Echo|Selene")
 	float GetCommandLinkSeverEchoReward() const
@@ -93,7 +103,25 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo|Selene|Tuning", meta = (ClampMin = "0.0"))
 	float CommandLinkSeverEchoReward = 12.0f;
 
+	/** Additional distinct precision targets within this interval continue the chain. */
+	UPROPERTY(EditDefaultsOnly, Category = "Sovereign|Echo|Selene|Tuning", meta = (ClampMin = "0.05"))
+	float PrecisionChainWindow = 3.0f;
+	UPROPERTY(EditDefaultsOnly, Category = "Sovereign|Echo|Selene|Tuning", meta = (ClampMin = "1"))
+	int32 MaximumPrecisionChainBonusLinks = 3;
+	UPROPERTY(EditDefaultsOnly, Category = "Sovereign|Echo|Selene|Tuning", meta = (ClampMin = "0.0"))
+	float PrecisionChainEchoReward = 4.0f;
+	UPROPERTY(EditDefaultsOnly, Category = "Sovereign|Echo|Selene|Tuning", meta = (ClampMin = "0.0"))
+	float MarkedKillEchoReward = 6.0f;
+
 private:
+	friend class ASovEchoBypassGate;
+	/** Gate-owned native receipt only; no freely callable boolean reward API. */
+	void ConsumeUndetectedBypass(ASovEchoBypassGate* Gate, const FGuid& ReceiptId);
+	void ResetPrecisionChain();
+	UFUNCTION()
+	void HandleEncounterScopeChanged(bool bStarted);
+	UFUNCTION()
+	void HandleDamageResolvedAsTarget(const FSovDamageResult& DamageResult);
 	void TryInitializeFromOwner();
 	void UninitializeFromAbilitySystem();
 	bool CanGenerateSeleneEcho(bool bAllowDuringEchoAbility = false) const;
@@ -135,4 +163,9 @@ private:
 
 	/** Server-only replay fence for command-link transactions. */
 	TSet<FGuid> ConsumedCommandLinkSeverTransactions;
+	TSet<FGuid> ConsumedDamageTransactions;
+	TSet<FGuid> ConsumedDeflectionTransactions;
+	TSet<FGuid> ConsumedBypassAttempts;
+	SovEchoAwardPolicy::TPrecisionChain<TWeakObjectPtr<AActor>> PrecisionChain;
+	uint32 ResourceScopeEpoch = 0;
 };

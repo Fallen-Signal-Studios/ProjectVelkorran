@@ -186,32 +186,6 @@ USovGameplayAbility_TarrikEchoBase::USovGameplayAbility_TarrikEchoBase()
 	RequiredCharacterTag = FSovGameplayTags::Get().Character_Player_Tarrik;
 }
 
-USovGameplayAbility_TarrikCinderSlam::USovGameplayAbility_TarrikCinderSlam()
-{
-	const FSovGameplayTags& Tags = FSovGameplayTags::Get();
-	MinimumEchoRequired = 90.0f;
-	EchoCost = 90.0f;
-	EchoSpendTag = Tags.Ability_Echo_Tarrik_CinderSlam;
-	FGameplayTagContainer AssetTags = GetAssetTags();
-	AssetTags.AddTag(EchoSpendTag);
-	SetAssetTags(AssetTags);
-	AbilityAnimSetTag = Tags.AnimSet_Ability_Tarrik_CinderSlam;
-	InputTag = FNarrativeGameplayTags::Get().Narrative_Input_Ability3;
-	WeaponFamily = ESovTarrikEchoWeaponFamily::Velkorran;
-	AbilityDisplayName = NSLOCTEXT("SovTarrikEcho", "CinderSlamName", "Cinder Slam");
-	AbilityDescription = NSLOCTEXT(
-		"SovTarrikEcho",
-		"CinderSlamDescription",
-		"Drive Velkorran into the ground, releasing a radial Cinder blast with heavy Poise pressure and a brief protective ward around Tarrik.");
-}
-
-bool USovGameplayAbility_TarrikCinderSlam::HasRequiredPayloadConfiguration() const
-{
-	return RadialDamageEffectClass.Get()
-		&& ProtectiveWardEffectClass.Get()
-		&& SlamRadius > KINDA_SMALL_NUMBER;
-}
-
 USovGameplayAbility_TarrikVelkorransHunger::USovGameplayAbility_TarrikVelkorransHunger()
 {
 	const FSovGameplayTags& Tags = FSovGameplayTags::Get();
@@ -245,7 +219,9 @@ void USovGameplayAbility_TarrikVelkorransHunger::ActivateAbility(
 {
 	// Super synchronously enters the Blueprint hooks, so reset before it runs.
 	bHungerReleaseAttempted = false;
+	const uint64 Activation = GetTarrikActivationSerial() + 1;
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
+	if (!bHungerReleaseAttempted) { ArmTarrikPayload(PayloadReleaseDelay, Activation); }
 }
 
 bool USovGameplayAbility_TarrikVelkorransHunger::HasRequiredPayloadConfiguration() const
@@ -265,7 +241,10 @@ bool USovGameplayAbility_TarrikVelkorransHunger::HasRequiredPayloadConfiguration
 		&& MaximumHungerProjectileSpeed + KINDA_SMALL_NUMBER >= HungerProjectileSpeed
 		&& HungerProjectileCollisionRadius >= 1.0f
 		&& HungerProjectileFlightDuration >= 0.1f
-		&& MaximumHungerSpawnDistance > KINDA_SMALL_NUMBER;
+		&& MaximumHungerSpawnDistance > KINDA_SMALL_NUMBER
+		&& FMath::IsFinite(PayloadReleaseDelay) && PayloadReleaseDelay >= 0.0f
+		&& FMath::IsFinite(PostReleaseRecovery) && PostReleaseRecovery >= 0.0f
+		&& MaximumActiveDuration >= PayloadReleaseDelay + PostReleaseRecovery;
 }
 
 TSubclassOf<ASovVelkorransHungerProjectile>
@@ -399,6 +378,8 @@ USovGameplayAbility_TarrikVelkorransHunger::ReleaseVelkorransHunger(
 		return nullptr;
 	}
 
+	if (!IsTarrikReleaseContextValid()) { FinishEchoAbility(true); return nullptr; }
+	const uint64 Activation = GetTarrikActivationSerial();
 	bHungerReleaseAttempted = true;
 	AActor* Avatar = CurrentActorInfo->AvatarActor.Get();
 	UWorld* World = GetWorld();
@@ -503,6 +484,7 @@ USovGameplayAbility_TarrikVelkorransHunger::ReleaseVelkorransHunger(
 		return nullptr;
 	}
 
+	BeginTarrikRecovery(PostReleaseRecovery, Activation);
 	return HungerProjectile;
 }
 
@@ -542,7 +524,9 @@ void USovGameplayAbility_TarrikCinderStickyGrenade::ActivateAbility(
 {
 	// Super synchronously enters the Blueprint hooks, so reset before it runs.
 	bGrenadeReleaseAttempted = false;
+	const uint64 Activation = GetTarrikActivationSerial() + 1;
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
+	if (!bGrenadeReleaseAttempted) { ArmTarrikPayload(PayloadReleaseDelay, Activation); }
 }
 
 bool USovGameplayAbility_TarrikCinderStickyGrenade::HasRequiredPayloadConfiguration() const
@@ -567,7 +551,10 @@ bool USovGameplayAbility_TarrikCinderStickyGrenade::HasRequiredPayloadConfigurat
 		&& FMath::IsFinite(GrenadeGravityScale)
 		&& GrenadeGravityScale >= 0.0f
 		&& MaximumGrenadeLaunchSpeed + KINDA_SMALL_NUMBER >= DefaultGrenadeLaunchSpeed
-		&& MaximumGrenadeSpawnDistance > KINDA_SMALL_NUMBER;
+		&& MaximumGrenadeSpawnDistance > KINDA_SMALL_NUMBER
+		&& FMath::IsFinite(PayloadReleaseDelay) && PayloadReleaseDelay >= 0.0f
+		&& FMath::IsFinite(PostReleaseRecovery) && PostReleaseRecovery >= 0.0f
+		&& MaximumActiveDuration >= PayloadReleaseDelay + PostReleaseRecovery;
 }
 
 bool USovGameplayAbility_TarrikCinderStickyGrenade::MeetsWeaponRequirement(
@@ -703,6 +690,8 @@ USovGameplayAbility_TarrikCinderStickyGrenade::ReleaseCinderStickyGrenade(
 		return nullptr;
 	}
 
+	if (!IsTarrikReleaseContextValid()) { FinishEchoAbility(true); return nullptr; }
+	const uint64 Activation = GetTarrikActivationSerial();
 	bGrenadeReleaseAttempted = true;
 	AActor* Avatar = CurrentActorInfo->AvatarActor.Get();
 	UWorld* World = GetWorld();
@@ -798,6 +787,7 @@ USovGameplayAbility_TarrikCinderStickyGrenade::ReleaseCinderStickyGrenade(
 		return nullptr;
 	}
 
+	BeginTarrikRecovery(PostReleaseRecovery, Activation);
 	return Grenade;
 }
 
@@ -841,11 +831,13 @@ void USovGameplayAbility_TarrikCinderJudgement::ActivateAbility(
 	// Super synchronously enters the Blueprint hooks, so reset first. A manual
 	// authority release from that hook and the native timer share one gate.
 	bJudgementReleaseAttempted = false;
+	const uint64 Activation = GetTarrikActivationSerial() + 1;
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 	if (!IsActive()
 		|| !ActorInfo
 		|| !ActorInfo->IsNetAuthority()
 		|| bJudgementReleaseAttempted
+		|| GetTarrikActivationSerial() != Activation
 		|| !bAutoReleasePayload)
 	{
 		return;
@@ -964,7 +956,8 @@ USovGameplayAbility_TarrikCinderJudgement::
 void USovGameplayAbility_TarrikCinderJudgement::
 	HandleAutomaticJudgementRelease()
 {
-	if (!ReleaseCinderJudgementFromAim() && IsActive())
+	const uint64 Activation = GetTarrikActivationSerial();
+	if (!ReleaseCinderJudgementFromAim() && IsActive() && GetTarrikActivationSerial() == Activation)
 	{
 		FinishEchoAbility(true);
 	}
@@ -1058,6 +1051,7 @@ bool USovGameplayAbility_TarrikCinderJudgement::
 	{
 		return false;
 	}
+	if (!IsTarrikReleaseContextValid()) { FinishEchoAbility(true); return false; }
 	bJudgementReleaseAttempted = true;
 
 	if (UWorld* World = GetWorld())
@@ -1685,30 +1679,15 @@ void USovGameplayAbility_TarrikCinderJudgement::BeginJudgementRecovery()
 	FinishEchoAbility(false);
 }
 
-USovGameplayAbility_TarrikCinderlineRequiem::USovGameplayAbility_TarrikCinderlineRequiem()
+
+void USovGameplayAbility_TarrikVelkorransHunger::ExecuteAutomaticTarrikPayload()
 {
-	const FSovGameplayTags& Tags = FSovGameplayTags::Get();
-	MinimumEchoRequired = 90.0f;
-	EchoCost = 90.0f;
-	EchoSpendTag = Tags.Ability_Echo_Tarrik_CinderlineRequiem;
-	FGameplayTagContainer AssetTags = GetAssetTags();
-	AssetTags.AddTag(EchoSpendTag);
-	SetAssetTags(AssetTags);
-	AbilityAnimSetTag = Tags.AnimSet_Ability_Tarrik_CinderlineRequiem;
-	InputTag = FNarrativeGameplayTags::Get().Narrative_Input_Ability3;
-	WeaponFamily = ESovTarrikEchoWeaponFamily::Cinderline;
-	AbilityDisplayName = NSLOCTEXT("SovTarrikEcho", "CinderlineRequiemName", "Cinderline Requiem");
-	AbilityDescription = NSLOCTEXT(
-		"SovTarrikEcho",
-		"CinderlineRequiemDescription",
-		"Release a penetrating Cinderline shot that marks its path, then erupts into a chained burning line with extreme Poise pressure.");
+	const uint64 Activation = GetTarrikActivationSerial();
+	if (!ReleaseVelkorransHungerFromAim() && IsActive() && GetTarrikActivationSerial() == Activation) { FinishEchoAbility(true); }
 }
 
-bool USovGameplayAbility_TarrikCinderlineRequiem::HasRequiredPayloadConfiguration() const
+void USovGameplayAbility_TarrikCinderStickyGrenade::ExecuteAutomaticTarrikPayload()
 {
-	return PenetratingDamageEffectClass.Get()
-		&& LineDetonationEffectClass.Get()
-		&& BurnEffectClass.Get()
-		&& MaximumRange > KINDA_SMALL_NUMBER
-		&& LineDetonationRadius > KINDA_SMALL_NUMBER;
+	const uint64 Activation = GetTarrikActivationSerial();
+	if (!ReleaseCinderStickyGrenadeFromAim() && IsActive() && GetTarrikActivationSerial() == Activation) { FinishEchoAbility(true); }
 }

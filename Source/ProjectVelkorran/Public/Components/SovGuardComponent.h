@@ -10,6 +10,7 @@
 #include "SovGuardComponent.generated.h"
 
 class UAbilitySystemComponent;
+class USovGameplayAbility_TarrikGuard;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSovGuardStateSignature);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
@@ -98,6 +99,13 @@ protected:
 	bool bExecuteGuardImpactGameplayCue = true;
 
 private:
+	friend class USovGameplayAbility_TarrikGuard;
+	/** Only the native ability may discount its own activation-owned Busy tag. */
+	bool BeginGuardInternal(int32 OwnedBusyContributions);
+	bool HasGuardInterruptState(int32 OwnedBusyContributions) const;
+	void BindInterruptionTags();
+	void UnbindInterruptionTags();
+	void HandleInterruptionTagChanged(FGameplayTag Tag, int32 NewCount);
 	void TryInitializeFromOwner();
 
 	UFUNCTION()
@@ -136,6 +144,13 @@ private:
 	FTimerHandle PerfectDefenseTimerHandle;
 	FTimerHandle CounterWindowTimerHandle;
 	FTimerHandle GuardBrokenTimerHandle;
+	FTimerHandle GuardBrokenBroadcastTimerHandle;
+	TMap<FGameplayTag, FDelegateHandle> InterruptionTagHandles;
+	FDelegateHandle BusyTagChangedHandle;
+	uint32 GuardEpoch = 0;
+	int32 GuardOwnedBusyContributions = 0;
+	bool bEndingGuard = false;
+	bool bUninitializing = false;
 
 	bool bAppliedGuardingTag = false;
 	bool bAppliedPerfectDefenseTag = false;

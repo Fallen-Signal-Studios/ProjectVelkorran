@@ -16,8 +16,21 @@ class PROJECTVELKORRAN_API ASovPlayerCharacterBase : public ANarrativePlayerChar
 public:
 	ASovPlayerCharacterBase(const FObjectInitializer& ObjectInitializer);
 
+	/** Campaign controller owns save/default inventory application before readiness. Set before possession. */
+	bool PrepareCampaignInitialization(class UPlayerDefinition* Definition);
+	bool IsCampaignDataReadyToApply() const;
+	bool CompleteCampaignDataInitialization(bool bGrantDefaultInventory);
+	void FailCampaignInitialization();
+	virtual FGuid GetActorGUID_Implementation() const override;
+	virtual void SetActorGUID_Implementation(const FGuid& SavedGUID) override;
+	virtual bool ShouldRespawn_Implementation() const override { return false; }
+
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Components")
 	class USovEchoComponent* GetEchoComponent() const { return EchoComponent; }
+
+	/** Dormant until an explicitly mission-permitted source makes real authority contact. */
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Components")
+	class USovCorruptionComponent* GetCorruptionComponent() const { return CorruptionComponent; }
 
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Components")
 	class USovTarrikEchoGenerationComponent* GetTarrikEchoGenerationComponent() const
@@ -50,12 +63,17 @@ public:
 	void SovPreCMCTick();
 
 protected:
+	virtual void OnCharacterVisualInitialized() override;
+	virtual class UNarrativeSaveWithCreatorData* GetCharacterCreatorData() const override;
 	virtual void HandleAbilitySystemReady(UNarrativeAbilitySystemComponent* ReadyAbilitySystem) override;
 	virtual bool AreAdditionalCharacterSystemsReady() const override;
 	virtual void OnDefinitionSet_Implementation(UCharacterDefinition* NewDefinition) override;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sovereign|Components")
 	TObjectPtr<class USovEchoComponent> EchoComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sovereign|Components")
+	TObjectPtr<class USovCorruptionComponent> CorruptionComponent;
 
 	/**
 	 * Optional compatibility slot owned only by ASovTarrikCharacter.
@@ -77,4 +95,9 @@ protected:
 	/** Optional compatibility slot owned only by ASovTarrikCharacter. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sovereign|Components")
 	TObjectPtr<class USovGuardComponent> GuardComponent;
+
+private:
+	UPROPERTY(SaveGame) FGuid CampaignSaveGuid;
+	bool bCampaignManagedInitialization = false;
+	bool bCampaignInitializationFailed = false;
 };
