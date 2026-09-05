@@ -228,6 +228,14 @@ public:
 	UPROPERTY(EditAnywhere, Instanced, BlueprintReadOnly, Category = "Details - NPC Dialogue Node")
 	class UNarrativeDialogueSequence* SelectingReplyShot;
 
+	/** Opt-in pressure for the replies following this NPC node. Zero is the default: no timer. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Details - NPC Dialogue Node|Pressure", meta=(ClampMin="0", ClampMax="300"))
+	float ReplyPressureSeconds = 0.f;
+
+	/** Existing player-node ID; it must be one of the currently available, non-auto-selected replies. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Details - NPC Dialogue Node|Pressure")
+	FName SilenceReplyID;
+
 	/**Grab this NPC node, appending all follow up responses to that node. Since multiple NPC replies can be linked together, 
 	we need to grab the chain of replies the NPC has to say. */
 	TArray<class UDialogueNode_NPC*> GetReplyChain(APlayerController* OwningController, APawn* OwningPawn, class UTalesComponent* NarrativeComponent);

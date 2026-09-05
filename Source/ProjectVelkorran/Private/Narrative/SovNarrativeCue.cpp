@@ -10,7 +10,7 @@ bool USovNarrativeCue::Validate(FString& Error) const
 	{ Error = TEXT("Cue requires stable IDs, valid timing/priority, and a diegetic summary for recorded critical content."); return false; }
 	if (Dialogue)
 	{
-		if (!BarkVariants.IsEmpty() || !Dialogue->GetDefaultObject<UDialogue>()->CanSuspendPlayback())
+		if (!BarkVariants.IsEmpty() || !ControllerAudioClass.IsNull() || !Dialogue->GetDefaultObject<UDialogue>()->CanSuspendPlayback())
 		{ Error = TEXT("Queued conversations must be free-movement Narrative graphs without speaker control tags, body montages or camera shots."); return false; }
 	}
 	else

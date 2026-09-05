@@ -21,6 +21,18 @@ struct PROJECTVELKORRAN_API FSovHapticSettings
 };
 
 USTRUCT(BlueprintType)
+struct PROJECTVELKORRAN_API FSovHDRCalibration
+{
+	GENERATED_BODY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0.000001", ClampMax="1")) float BlackFloorNits = .0001f;
+	/** Scene reference white maps to the renderer's 18%-gray target. Not measured panel luminance. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="80", ClampMax="500")) float PaperWhiteNits = 83.333333f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="80", ClampMax="500")) float UIWhiteNits = 300.f;
+	bool IsValid() const;
+	bool Equals(const FSovHDRCalibration& Other) const;
+};
+
+USTRUCT(BlueprintType)
 struct PROJECTVELKORRAN_API FSovHDROutputStatus
 {
 	GENERATED_BODY()
@@ -29,5 +41,7 @@ struct PROJECTVELKORRAN_API FSovHDROutputStatus
 	UPROPERTY(BlueprintReadOnly) bool bEnabled = false;
 	/** Engine-selected output level, which may differ from the requested level. Zero means SDR. */
 	UPROPERTY(BlueprintReadOnly) int32 PeakNits = 0;
+	/** Current viewport's unambiguous physical monitor identity/topology. Empty means it cannot be established. */
+	UPROPERTY(BlueprintReadOnly) FString DisplayIdentity;
 };
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FSovHapticSettingsChanged, const FSovHapticSettings&, Settings);

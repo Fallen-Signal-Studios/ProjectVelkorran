@@ -122,6 +122,33 @@ void AWeaponVisual::BeginPlay()
 	//UpdateWeaponAttachment();
 }
 
+bool AWeaponVisual::HasCommittedAttachment(FGameplayTag EquipmentSlot, FGameplayTag WieldSlot) const
+{
+	if (!bHasAppliedAttachment || !bAttachedSuccesfully || AttachState.EquippedSlot != EquipmentSlot
+		|| AttachState.WieldedSlot != WieldSlot || AppliedWieldSlot != WieldSlot || !IsValid(WeaponOwner)
+		|| !IsValid(VisualOwner) || !IsValid(CharacterOwner) || IsActorBeingDestroyed()
+		|| AttachState.WeaponOwner != WeaponOwner || AttachState.CharOwner != CharacterOwner
+		|| AttachState.VisualOwner != VisualOwner || CharacterOwner->GetCharacterVisual() != VisualOwner) { return false; }
+	const FWeaponAttachmentConfig Config = WieldSlot.IsValid()
+		? WeaponOwner->GetWeaponWieldAttachConfig(WieldSlot) : WeaponOwner->GetWeaponHolsterAttachConfig(EquipmentSlot);
+	if (Config.SocketName.IsNone() || !Config.Offset.IsValid()) { return false; }
+	USkeletalMeshComponent* Parent = VisualOwner->GetBodyMesh();
+	if (!IsValid(Parent) || !Parent->DoesSocketExist(Config.SocketName)) { Parent = VisualOwner->GetMainMesh(); }
+	const auto Matches = [&](const USkeletalMeshComponent* Mesh, const USkeletalMeshComponent* ExpectedParent)
+	{
+		return IsValid(Mesh) && IsValid(ExpectedParent) && ExpectedParent->DoesSocketExist(Config.SocketName)
+			&& Mesh->GetAttachParent() == ExpectedParent && Mesh->GetAttachSocketName() == Config.SocketName
+			&& Mesh->GetRelativeTransform().Equals(Config.Offset, .01f);
+	};
+	if (!Matches(WeaponMesh, Parent)) { return false; }
+	if (LocalWeaponMesh && CharacterOwner->IsPlayerControlled() && CharacterOwner->IsLocallyControlled())
+	{
+		USkeletalMeshComponent* LocalParent = WieldSlot.IsValid() ? VisualOwner->GetLocalMesh() : Parent;
+		if (LocalParent && !Matches(LocalWeaponMesh, LocalParent)) { return false; }
+	}
+	return true;
+}
+
 void AWeaponVisual::Destroyed()
 {
 	Super::Destroyed();

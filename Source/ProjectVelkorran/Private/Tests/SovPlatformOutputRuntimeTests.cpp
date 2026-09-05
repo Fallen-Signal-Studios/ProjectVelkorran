@@ -10,8 +10,49 @@
 struct FSovPlatformOutputTestAccess
 {
 	static bool TickPreview(USovGameUserSettings* Settings) { return Settings->TickHDRPreview(0.f); }
+	static void DisplayMetricsChanged(USovGameUserSettings* Settings) { Settings->bDisplayMetricsInvalidated = true; }
 };
 #if WITH_DEV_AUTOMATION_TESTS
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovFullHDRCalibrationRuntime, "ProjectVelkorran.Campaign.PlatformOutput.FullCalibrationAndDisplayIdentity", EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+bool FSovFullHDRCalibrationRuntime::RunTest(const FString& Parameters)
+{
+	auto* Settings = NewObject<USovPlatformOutputTestSettings>(); Settings->InitializeOutput(false, 1000);
+	const FSovHDRCalibration Original = Settings->PhysicalCalibration;
+	FSovHDRCalibration Request; Request.BlackFloorNits = .005f; Request.PaperWhiteNits = 200.f; Request.UIWhiteNits = 150.f;
+	FGuid Receipt; FString Error;
+	TestTrue(TEXT("Full HDR calibration applies real adapter fields"), Settings->PreviewHDRDisplay(true, 2000, Request, Receipt, Error));
+	TestTrue(TEXT("Renderer receives all requested fields"), Settings->PhysicalCalibration.Equals(Request));
+	Settings->SaveSettings();
+	TestTrue(TEXT("Unrelated saves retain confirmed calibration"), Settings->SavedCalibration.Equals(Original));
+	TestTrue(TEXT("Preview display persists only matching receipt"), Settings->ConfirmHDRCalibration(Receipt, Error));
+	TestTrue(TEXT("Confirmed calibration stored"), Settings->SavedCalibration.Equals(Request));
+	FSovHDRCalibration Second = Request; Second.PaperWhiteNits = 300.f; Second.UIWhiteNits = 350.f;
+	TestTrue(TEXT("Second calibrated preview"), Settings->PreviewHDRDisplay(true, 2000, Second, Receipt, Error));
+	Settings->DisplayIdentity = TEXT("display-b"); // Deliberately identical HDR support and nits.
+	TestFalse(TEXT("Move to identically capable display cannot confirm"), Settings->ConfirmHDRCalibration(Receipt, Error));
+	TestTrue(TEXT("Display move restores previous renderer calibration"), Settings->PhysicalCalibration.Equals(Request));
+	Settings->SaveSettings(); TestTrue(TEXT("Display move preserves confirmed config"), Settings->SavedCalibration.Equals(Request));
+	TestTrue(TEXT("Restart on the new display"), Settings->PreviewHDRDisplay(true, 2000, Second, Receipt, Error));
+	FSovPlatformOutputTestAccess::DisplayMetricsChanged(Settings);
+	TestFalse(TEXT("Hotplug event invalidates even unchanged monitor descriptor"), FSovPlatformOutputTestAccess::TickPreview(Settings));
+	TestTrue(TEXT("Hotplug reverted values"), Settings->PhysicalCalibration.Equals(Request));
+	TestTrue(TEXT("External calibration conflict starts"), Settings->PreviewHDRDisplay(true, 2000, Second, Receipt, Error));
+	Settings->PhysicalCalibration.UIWhiteNits = 225.f;
+	TestFalse(TEXT("External renderer adjustment refuses confirmation"), Settings->ConfirmHDRCalibration(Receipt, Error));
+	TestEqual(TEXT("Rollback preserves external UI adjustment"), Settings->PhysicalCalibration.UIWhiteNits, 225.f);
+	TestEqual(TEXT("Rollback restores still-owned scene white"), Settings->PhysicalCalibration.PaperWhiteNits, Request.PaperWhiteNits);
+	TestTrue(TEXT("Unavailable rollback case starts"), Settings->PreviewHDRDisplay(true, 2000, Second, Receipt, Error));
+	Settings->bAvailable = false; Settings->Now += 15.;
+	TestFalse(TEXT("Unavailable timeout retires preview"), FSovPlatformOutputTestAccess::TickPreview(Settings));
+	Settings->SaveSettings(); TestTrue(TEXT("Device loss never persists unconfirmed calibration"), Settings->SavedCalibration.Equals(Request));
+	Settings->bAvailable = true; Settings->DisplayIdentity.Reset();
+	TestFalse(TEXT("Unknown physical display refuses HDR receipt"), Settings->PreviewHDRCalibration(true, 1000, Receipt, Error));
+	Settings->DisplayIdentity = TEXT("display-b"); Settings->bCalibrationAvailable = false;
+	TestFalse(TEXT("Missing renderer controls explicitly reject full calibration"), Settings->PreviewHDRDisplay(true, 2000, Request, Receipt, Error));
+	Settings->bCalibrationAvailable = true; Request.PaperWhiteNits = std::numeric_limits<float>::quiet_NaN();
+	TestFalse(TEXT("Malformed calibration cannot write"), Settings->PreviewHDRDisplay(true, 2000, Request, Receipt, Error));
+	return true;
+}
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovHDRPreviewRuntime, "ProjectVelkorran.Campaign.PlatformOutput.HDRPreviewTransaction", EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::EngineFilter)
 bool FSovHDRPreviewRuntime::RunTest(const FString& Parameters)
 {

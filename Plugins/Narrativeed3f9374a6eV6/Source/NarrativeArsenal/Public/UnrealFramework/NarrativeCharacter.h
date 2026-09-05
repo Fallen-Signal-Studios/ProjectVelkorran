@@ -644,6 +644,7 @@ public:
 	//Set our wielded weapons 
 	UFUNCTION(BlueprintCallable, Category = "Narrative|Getters/Setters")
 	void SetWieldState(const FWeaponWieldState& NewWieldState);
+	uint64 GetWeaponWieldRevision() const { return WeaponWieldRevision; }
 
 	//WieldState can rep back to client, but several things need to be valid before we 
 	virtual bool CanApplyWieldState() const;
@@ -654,6 +655,10 @@ public:
 	//Returns our characters current wield state. 
 	UFUNCTION(BlueprintPure, Category = "Narrative|Getters/Setters")
 	FORCEINLINE FWeaponWieldState GetWeaponWieldState() const {return WieldState;};
+
+private:
+	uint64 WeaponWieldRevision = 0;
+public:
 
 	//Returns our characters narrative anim instance, which should always be on Char mesh. 
 	UFUNCTION(BlueprintPure, Category = "Narrative|Getters/Setters")

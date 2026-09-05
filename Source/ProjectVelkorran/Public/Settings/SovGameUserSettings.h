@@ -7,8 +7,14 @@
 #include "SovGameUserSettings.generated.h"
 
 class USovCampaignStateComponent;
+class GenericApplication;
+struct FDisplayMetrics;
 UENUM(BlueprintType)
 enum class ESovDifficultyPreset : uint8 { Story, Standard, Veteran, Sovereign, Custom };
+UENUM(BlueprintType)
+enum class ESovColorVisionPreset : uint8 { Default, Deuteranopia, Protanopia, Tritanopia };
+UENUM(BlueprintType)
+enum class ESovDialoguePressureMode : uint8 { Standard, Extended, Disabled };
 
 /** Device-independent gameplay/accessibility values. Cosmetic assets and widget layout remain authored. */
 USTRUCT(BlueprintType)
@@ -37,6 +43,33 @@ struct PROJECTVELKORRAN_API FSovUserSettingsSnapshot
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bDisableCameraShake = false;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bReduceLensEffects = false;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bReduceCorruptionEffects = false;
+	// Local accessibility preferences: never part of the eleven-byte gameplay export.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float UIScale = 1.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float SubtitleScale = 1.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bSubtitles = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bClosedCaptions = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float SubtitleBackgroundOpacity = .85f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bSubtitleSpeakerNames = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bSubtitleDirections = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 SubtitleCharactersPerLine = 42;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 SubtitleMaximumLines = 3;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bHighContrastHUD = false;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) ESovColorVisionPreset ColorVisionPreset = ESovColorVisionPreset::Default;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bOverrideTeamColor = false;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) FLinearColor TeamColor = FLinearColor(.1f, .65f, 1.f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bOverrideThreatColor = false;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) FLinearColor ThreatColor = FLinearColor(1.f, .3f, .1f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bInteractableOutlines = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bWeakPointOutlines = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float OutlineThickness = 2.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bNavigationContrast = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bNavigationPulse = false;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bMenuNavigationWrap = true;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bMenuNarration = false;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) ESovDialoguePressureMode DialoguePressureMode = ESovDialoguePressureMode::Standard;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float DialogueMinimumReadSeconds = 5.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float DialoguePressureExtension = 2.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) float ControllerAudioVolume = 1.f;
 };
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FSovUserSettingsChanged, const FSovUserSettingsSnapshot&, Settings);
 
@@ -55,12 +88,17 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Sovereign|Settings|Feedback") bool ApplyHapticSettings(const FSovHapticSettings& Value, FString& Error);
 	UPROPERTY(BlueprintAssignable, Category="Sovereign|Settings|Feedback") FSovHapticSettingsChanged OnHapticSettingsChanged;
 	UFUNCTION(BlueprintCallable, Category="Sovereign|Settings|HDR") FSovHDROutputStatus GetHDROutputStatus();
+	UFUNCTION(BlueprintPure, Category="Sovereign|Settings|HDR") FSovHDRCalibration GetHDRCalibration() const { return DisplayCalibration; }
+	UFUNCTION(BlueprintCallable, Category="Sovereign|Settings|HDR") bool PreviewHDRDisplay(bool bEnable, int32 PeakNits, const FSovHDRCalibration& Calibration, FGuid& Receipt, FString& Error);
 	/** Applies engine output immediately; unconfirmed preview automatically reverts after 15 real seconds. */
 	UFUNCTION(BlueprintCallable, Category="Sovereign|Settings|HDR") bool PreviewHDRCalibration(bool bEnable, int32 PeakNits, FGuid& Receipt, FString& Error);
 	UFUNCTION(BlueprintCallable, Category="Sovereign|Settings|HDR") bool ConfirmHDRCalibration(FGuid Receipt, FString& Error);
 	UFUNCTION(BlueprintCallable, Category="Sovereign|Settings|HDR") bool RevertHDRCalibration(FGuid Receipt);
 	virtual void SetGameplayDifficulty(const ENarrativeGameplayDifficulty NewDifficulty) override;
 	UFUNCTION(BlueprintPure, Category="Sovereign|Settings") FSovUserSettingsSnapshot GetSettingsSnapshot() const { return Settings; }
+	UFUNCTION(BlueprintPure, Category="Sovereign|Settings") bool HasCompletedAccessibilitySetup() const { return bAccessibilitySetupCompleted; }
+	/** Explicit Continue in the native first-boot menu, never inferred from a gameplay save. */
+	UFUNCTION(BlueprintCallable, Category="Sovereign|Settings") bool CompleteAccessibilitySetup();
 	/** Validates the complete transaction before mutation, then persists immediately and emits one typed event. */
 	UFUNCTION(BlueprintCallable, Category="Sovereign|Settings") bool ApplySettingsSnapshot(const FSovUserSettingsSnapshot& NewSettings, FString& Error);
 	/** Presets preserve explicitly chosen assistance/comfort values. Story only increases assistance. */
@@ -104,10 +142,36 @@ protected:
 	virtual void WriteHDROutput(bool bEnable, int32 PeakNits);
 	virtual bool CanApplyHDROutput() const;
 	virtual double HDRTime() const;
+	virtual bool ReadDisplayCalibration(FSovHDRCalibration& Out) const;
+	virtual bool WriteDisplayCalibration(const FSovHDRCalibration& Value);
+	virtual void RestoreDisplayCalibration(const FSovHDRCalibration& Expected, const FSovHDRCalibration& Before, float ExpectedUILevel, float BeforeUILevel);
+	virtual class IConsoleVariable* FindDisplayCalibrationVariable(const TCHAR* Name) const;
+	virtual float DisplayUIBaseNits() const;
+	virtual bool CanApplyDisplayCalibration() const;
 	virtual void PersistSettings();
 private:
 	friend struct FSovPlatformOutputTestAccess;
 	bool TickHDRPreview(float DeltaTime);
+	bool BeginHDRPreview(bool bEnable, int32 PeakNits, const FSovHDRCalibration* Calibration, FGuid& Receipt, FString& Error);
+	void BeginDisplayObservation();
+	void EndDisplayObservation();
+	void HandleDisplayMetricsChanged(const FDisplayMetrics& Metrics);
+	FDelegateHandle DisplayMetricsHandle;
+	TWeakPtr<GenericApplication> ObservedDisplayApplication;
+	bool bDisplayMetricsInvalidated = false;
+	void ApplyConfirmedDisplayCalibration();
+	void RestorePreviewDisplayCalibration();
+	float PreviewUIBaseNits = 0.f;
+	float PreviewUILevel = 0.f;
+	float BeforeRenderUILevel = 0.f;
+	UPROPERTY(config) FSovHDRCalibration DisplayCalibration;
+	UPROPERTY(config) bool bHasDisplayCalibration = false;
+	FSovHDRCalibration BeforeDisplayCalibration;
+	FSovHDRCalibration BeforeRenderCalibration;
+	FSovHDRCalibration PreviewDisplayCalibration;
+	bool bPreviewOwnsCalibration = false;
+	bool bHadDisplayCalibration = false;
+	FString HDRPreviewDisplayIdentity;
 	void RemoveHDRPreviewTicker();
 	UPROPERTY(config) FSovHapticSettings HapticSettings;
 	FGuid HDRPreviewReceipt;
@@ -121,5 +185,6 @@ private:
 	UPROPERTY(config) FSovUserSettingsSnapshot Settings;
 	UPROPERTY(config) bool bCampaignCompleted = false;
 	UPROPERTY(config) bool bLocalDiagnosticsEnabled = false;
+	UPROPERTY(config) bool bAccessibilitySetupCompleted = false;
 	bool bApplying = false;
 };

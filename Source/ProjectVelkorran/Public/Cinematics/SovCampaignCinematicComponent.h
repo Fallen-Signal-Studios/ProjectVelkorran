@@ -4,6 +4,7 @@
 #include "Components/ActorComponent.h"
 #include "Containers/Ticker.h"
 #include "UnrealFramework/NarrativeCharacter.h"
+#include "Items/NarrativeCinematicTransaction.h"
 #include "SovCampaignCinematicComponent.generated.h"
 class ANarrativeLevelSequenceActor;
 class ASovPlayerController;
@@ -13,12 +14,62 @@ class ULevelStreaming;
 class UAbilitySystemComponent;
 class UWorldPartitionStreamingSourceComponent;
 class ASovWorldTransitActor;
+class UEquippableItem;
+class UEquipmentComponent;
 struct FStreamableHandle;
 
 UENUM(BlueprintType)
 enum class ESovCinematicPhase : uint8 { Idle, Loading, Playing, Paused, Committing, Completed, Failed };
 UENUM(BlueprintType)
 enum class ESovCinematicExitWield : uint8 { Keep, Holster, DrawRequiredWeapon };
+
+USTRUCT(BlueprintType)
+struct FSovCinematicInventoryPostcondition
+{
+    GENERATED_BODY()
+    UPROPERTY(EditAnywhere, BlueprintReadOnly) FName ParticipantBinding;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly) FNarrativeCinematicItemMutation Mutation;
+};
+
+/** Replaces one exact slot. Empty previous/replacement class explicitly means the slot must be/remain empty. */
+USTRUCT(BlueprintType)
+struct FSovCinematicEquipmentPostcondition
+{
+    GENERATED_BODY()
+    UPROPERTY(EditAnywhere, BlueprintReadOnly) FName ParticipantBinding;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly) FGameplayTag EquipmentSlot;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly) TSubclassOf<UEquippableItem> PreviousItemClass;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly) FGuid PreviousItemGUID;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly) TSubclassOf<UEquippableItem> ReplacementItemClass;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly) FGuid ReplacementItemGUID;
+    /** Resolve the new instance from this participant's explicitly named Grant mutation, never by first-match class. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly) FName ReplacementGrantId;
+};
+
+USTRUCT()
+struct FSovCinematicEquipmentSnapshot
+{
+    GENERATED_BODY()
+    UPROPERTY() FSovCinematicEquipmentPostcondition Contract;
+    UPROPERTY() TWeakObjectPtr<ANarrativeCharacter> Character;
+    UPROPERTY() TWeakObjectPtr<UNarrativeInventoryComponent> Inventory;
+    UPROPERTY() TWeakObjectPtr<UEquipmentComponent> Equipment;
+    UPROPERTY() TObjectPtr<UEquippableItem> Previous;
+    UPROPERTY() TObjectPtr<UEquippableItem> Replacement;
+    UPROPERTY() FGuid PreviousGUID;
+    UPROPERTY() FGuid ReplacementGUID;
+    uint64 InventoryLoadRevision = 0;
+    uint64 ExpectedSlotRevision = 0;
+    uint64 ExpectedPreviousRevision = 0;
+    uint64 ExpectedReplacementRevision = 0;
+    uint64 PreviousMembershipRevision = 0;
+    uint64 ReplacementMembershipRevision = 0;
+    uint64 ExpectedPreviousStateRevision = 0;
+    uint64 ExpectedReplacementStateRevision = 0;
+    bool bPreviousUnequipped = false;
+    bool bReplacementEquipped = false;
+    bool bRetired = false;
+};
 
 /** Runtime cells intersecting this bounded sphere must reach Activated, not merely Loaded. */
 USTRUCT(BlueprintType)
@@ -100,6 +151,10 @@ struct FSovCinematicParticipantSnapshot
     UPROPERTY() TWeakObjectPtr<UWeaponItem> RequiredWeapon;
     UPROPERTY() FTransform Transform;
     UPROPERTY() FWeaponWieldState Wield;
+    uint64 OriginalWieldRevision = 0;
+    uint64 AppliedWieldRevision = 0;
+    bool bWieldApplied = false;
+    bool bTransformApplied = false;
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FSovCinematicPhaseChanged, ESovCinematicPhase, Phase, const FString&, Reason);
@@ -120,6 +175,8 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Campaign Cinematic") TArray<FName> RequiredStreamingLevels;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Campaign Cinematic") TArray<FSovCinematicPartitionRegion> RequiredPartitionRegions;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Campaign Cinematic") TArray<FSovCinematicTransitPostcondition> TransitPostconditions;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Campaign Cinematic") TArray<FSovCinematicInventoryPostcondition> InventoryPostconditions;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Campaign Cinematic") TArray<FSovCinematicEquipmentPostcondition> EquipmentPostconditions;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Campaign Cinematic", meta=(ClampMin="1",ClampMax="60")) float LoadingTimeoutSeconds = 15.f;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Campaign Cinematic", meta=(ClampMin="1",ClampMax="2000")) float RequestRange = 400.f;
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Campaign Cinematic") bool RequestPlay(ASovPlayerController* Player, FString& OutError);
@@ -141,6 +198,7 @@ private:
     bool HasCommitReceipt(const USovCampaignStateComponent* State, FName RequestedBeat, bool bSkipped) const;
     bool IsContextCurrent() const;
     bool CheckPreparationWatchdog(uint64 Epoch);
+    bool WaitForInitialAccessibilitySetup();
     bool ResolveParticipants(FString& OutError);
     bool AcquirePartitionSources(FString& OutError);
     bool ArePartitionRegionsReady() const;
@@ -149,6 +207,13 @@ private:
     bool ValidateTransitPostconditions(bool bApplied, FString& OutError) const;
     bool ApplyTransitPostconditions(FString& OutError);
     void RestoreTransitPostconditions();
+    bool ResolveInventoryPostconditions(FString& OutError);
+    bool ValidateInventoryPostconditions(bool bFinal, FString& OutError) const;
+    bool ApplyInventoryPostconditions(FString& OutError);
+    void RestoreInventoryPostconditions();
+    bool SetOwnedWield(int32 ParticipantIndex, const FWeaponWieldState& Wield, FString& OutError);
+    UWeaponItem* GetExitWeapon(int32 ParticipantIndex) const;
+    void AdvanceOwnedItemState(UNarrativeItem* Item);
     bool ValidateParticipants(bool bCheckExit, FString& OutError) const;
     bool ValidatePresentationSequence(ULevelSequence* Asset, FString& OutError) const;
     void StartPreparedPlayback();
@@ -157,6 +222,7 @@ private:
     bool OwnsPlaybackGeneration() const;
     bool ValidateExitPostconditions(FString& OutError) const;
     bool Commit(bool bSkipped, FString& OutError);
+    bool CommitNativePostconditions(bool bSkipped, FString& OutError);
     void RestoreParticipants();
     void ReleaseOwnership();
     void ChangePhase(ESovCinematicPhase NewPhase, const FString& Reason = FString());
@@ -171,6 +237,8 @@ private:
     UPROPERTY(Transient) TArray<TObjectPtr<ULevelStreaming>> StreamingLevels;
     UPROPERTY(Transient) TArray<FSovCinematicPartitionLease> PartitionLeases;
     UPROPERTY(Transient) TArray<FSovCinematicTransitSnapshot> TransitSnapshots;
+    UPROPERTY(Transient) TArray<FNarrativeCinematicItemChange> InventoryChanges;
+    UPROPERTY(Transient) TArray<FSovCinematicEquipmentSnapshot> EquipmentSnapshots;
     UPROPERTY(Transient) TWeakObjectPtr<AActor> OriginalViewTarget;
     FRotator OriginalControlRotation;
     TSharedPtr<FStreamableHandle> LoadHandle;
@@ -181,6 +249,7 @@ private:
     uint64 ExpectedPlaybackGeneration = 0;
     uint64 ReservedPlaybackGeneration = 0;
     double LoadingStartedSeconds = 0.0;
+    double AccessibilityWaitStartedSeconds = 0.0;
     uint8 ConsecutivePartitionReadyTicks = 0;
     double PlayedSeconds = 0.0;
     double DurationSeconds = 0.0;
@@ -196,4 +265,7 @@ private:
     bool bFullViewEligible = true;
     bool bReceiptAvailable = false;
     bool bReceiptSkipped = false;
+    bool bInventoryPostconditionsApplied = false;
+    bool bInventoryTransactionCommitted = false;
+    bool bInventoryRollbackIncomplete = false;
 };

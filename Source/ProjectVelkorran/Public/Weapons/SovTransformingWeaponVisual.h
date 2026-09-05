@@ -149,6 +149,9 @@ public:
 	void StopDeflectionWeaponMontage();
 
 protected:
+	friend class USovCampaignCinematicComponent;
+	/** Finite cinematic exit: finish the existing native phases, fenced against a newer semantic request. */
+	bool CompleteCinematicHandoff(FGameplayTag ExpectedWieldSlot);
 	virtual void OnWielded() override;
 	virtual void OnHolstered() override;
 	virtual void HandleAttachedToOwner_Implementation() override;

@@ -6,6 +6,7 @@
 #include "SovNarrativeCue.generated.h"
 class UDialogue;
 class USoundBase;
+class USoundClass;
 
 UENUM(BlueprintType)
 enum class ESovNarrativeCuePriority : uint8 { LethalWarning, ObjectiveCritical, CompanionRescue, Tactical, Relationship, Ambient };
@@ -32,6 +33,9 @@ public:
 	/** Optional native Narrative graph; otherwise select the next bark variant. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly) TSubclassOf<UDialogue> Dialogue;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly) TArray<FSovBarkVariant> BarkVariants;
+	/** Optional platform-authored voice class. Must request ControllerFallbackToSpeaker, never controller-only.
+	 * Unsupported/unconfigured classes retain ordinary positional speech. Hardware delivery is platform-dependent. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Audio") TSoftObjectPtr<USoundClass> ControllerAudioClass;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly) bool bPlayerSpeaker = false;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(ClampMin="0",ClampMax="300")) float CooldownSeconds = 8.f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(ClampMin="1",ClampMax="120")) float ContextLifetimeSeconds = 15.f;

@@ -198,6 +198,8 @@ void UDialogue::Deinitialize()
 	}
 
 	bDeinitialized = true;
+	bRepliesPresented = false;
+	++ReplyPresentationRevision;
 	bPlaybackSuspended = false;
 	bPlaybackStartPending = false;
 	if (GetWorld())
@@ -562,6 +564,8 @@ bool UDialogue::GenerateDialogueChunk(UDialogueNode_NPC* NPCNode)
 {
 	if (NPCNode && OwningComp && OwningComp->HasAuthority())
 	{	
+		bRepliesPresented = false;
+		++ReplyPresentationRevision;
 		//Generate the NPC reply chain
 		NPCReplyChain = NPCNode->GetReplyChain(OwningController, OwningPawn, OwningComp);
 
@@ -588,6 +592,8 @@ void UDialogue::ClientReceiveDialogueChunk(const TArray<FName>& NPCReplyIDs, con
 {	
 	if (OwningComp && !OwningComp->HasAuthority())
 	{
+		bRepliesPresented = false;
+		++ReplyPresentationRevision;
 		
 		/**TODO definitely look at cleaning this up when we refactor 
 		We want to end the current line before playing the new chunk, but we can't call EndCurrentLine since it tries skipping to the next line, 
@@ -1112,6 +1118,9 @@ void UDialogue::NPCFinishedTalking()
 		}
 
 		SetPartyCurrentSpeaker(nullptr);
+		UTalesComponent* PresentationOwner = OwningComp;
+		UDialogueNode* PresentationNode = CurrentNode;
+		const int64 BeforePresentationRevision = ReplyPresentationRevision;
 
 		AActor* PlayerAvatar = GetPlayerAvatar();
 		AActor* ListeningActor = nullptr;
@@ -1160,7 +1169,14 @@ void UDialogue::NPCFinishedTalking()
 		}
 
 		//NPC has finished talking. Let UI know it can show the player replies. Party comps don't need to broadcast this, clients put their own ones up
+		if (bDeinitialized || OwningComp != PresentationOwner || PresentationOwner->GetCurrentDialogue() != this
+			|| CurrentNode != PresentationNode || ReplyPresentationRevision != BeforePresentationRevision) { return; }
+		bRepliesPresented = true;
+		++ReplyPresentationRevision;
+		const int64 PublishedRevision = ReplyPresentationRevision;
 		OwningComp->OnDialogueRepliesAvailable.Broadcast(this, AvailableResponses);
+		if (bDeinitialized || OwningComp != PresentationOwner || PresentationOwner->GetCurrentDialogue() != this
+			|| CurrentNode != PresentationNode || ReplyPresentationRevision != PublishedRevision) { return; }
 
 		//Also make sure we stop playing any dialogue audio that was previously playing
 		if (DialogueAudio)
@@ -1185,6 +1201,8 @@ void UDialogue::PlayNPCDialogueNode(class UDialogueNode_NPC* NPCReply)
 
 	if (NPCReply)
 	{
+		bRepliesPresented = false;
+		++ReplyPresentationRevision;
 		CurrentNode = NPCReply;
 		bCurrentLineFinished=false;
 		CurrentLine = NPCReply->GetRandomLine(OwningComp->GetNetMode() == NM_Standalone);
@@ -1250,6 +1268,8 @@ void UDialogue::PlayPlayerDialogueNode(class UDialogueNode_Player* PlayerReply)
 	if (OwningComp && PlayerReply)
 	{
 		//Player started talking, clear responses 
+		bRepliesPresented = false;
+		++ReplyPresentationRevision;
 		AvailableResponses.Empty();
 
 		CurrentNode = PlayerReply;

@@ -47,6 +47,7 @@ private:
 	bool MatchesContext(const USovNarrativeCue* Cue) const;
 	AActor* ResolveSpeaker(FSovQueuedCue& Request) const;
 	bool StartRequest(FSovQueuedCue Request);
+	static bool ConfigureControllerOutput(UAudioComponent* Audio, USoundClass* Class, float Volume);
 	void StopBark(bool bInterrupted, bool bPreserveCritical = true);
 	void RememberUnheard(USovNarrativeCue* Cue);
 	UFUNCTION() void HandleDialogueFinished(UDialogue* Dialogue, bool bStartingNew, EExitDialogueReason Reason);
@@ -68,5 +69,6 @@ private:
 	bool bMutation = false;
 	bool bOwnerEndingPlay = false;
 	bool bStartingConversation = false;
+	bool bBarkUsesControllerOutput = false;
 	bool bCompletedDuringStart = false;
 };

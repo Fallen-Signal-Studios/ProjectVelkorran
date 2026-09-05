@@ -270,13 +270,14 @@ void UNarrativeItem::OnRep_bActive(const bool bOldActive)
 
 void UNarrativeItem::SetActive(const bool bNewActive, const bool bForce)
 {
+	++CinematicStateRevision;
 	if (bCanActivate)
 	{
 		if (bNewActive != bActive || bForce)
 		{
 			bActive = bNewActive;
-			OnRep_bActive(!bActive);
 			MarkDirtyForReplication();
+			OnRep_bActive(!bActive);
 		}
 	}
 
@@ -284,6 +285,7 @@ void UNarrativeItem::SetActive(const bool bNewActive, const bool bForce)
 
 void UNarrativeItem::SetBusy(const bool bNewBusy)
 {
+	++CinematicStateRevision;
 	if (bIsBusy != bNewBusy)
 	{
 		bIsBusy = bNewBusy;
@@ -300,12 +302,14 @@ void UNarrativeItem::OnRep_Quantity(const int32 OldQuantity)
 
 void UNarrativeItem::SetQuantity(const int32 NewQuantity)
 {
+	++QuantityRevision;
+	// Publish the write token before delegates, including an intentional same-value write.
+	MarkDirtyForReplication();
 	if (NewQuantity != Quantity)
 	{
 		const int32 OldQuantity = Quantity;
 		Quantity = FMath::Clamp(NewQuantity, 0, GetMaxStackSize());
 		OnRep_Quantity(OldQuantity);
-		MarkDirtyForReplication();
 	}
 }
 
@@ -527,6 +531,7 @@ void UNarrativeItem::RemovedFromInventory(class UNarrativeInventoryComponent* In
 
 void UNarrativeItem::MarkDirtyForReplication()
 {
+	++CinematicStateRevision;
 	//Mark this object for replication
 	++RepKey;
 

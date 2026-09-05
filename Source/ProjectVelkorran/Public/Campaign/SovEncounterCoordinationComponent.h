@@ -59,6 +59,11 @@ public:
 	UFUNCTION(BlueprintPure, Category="Encounter") int32 GetCurrentWave() const { return CurrentWave; }
 	UFUNCTION(BlueprintPure, Category="Encounter") bool IsPressureReliefActive() const;
 	UFUNCTION(BlueprintPure, Category="Encounter") bool ValidateComposition(FString& Error) const;
+	/** Director-only representation ownership hooks; neither resets waves nor steals other suspension leases. */
+	bool CanChangeRepresentation(FName ParticipantId) const;
+	bool CanPromoteRepresentation(FName ParticipantId) const;
+	void ReleaseRepresentationActor(FName ParticipantId, ASovNPCCharacterBase* Character);
+	void RefreshRepresentationBindings();
 	virtual bool CanAdmitAttack(UNarrativeAbilitySystemComponent* Source, AActor* Target,
 		const UNarrativeCombatAbility* Ability, FGameplayAbilitySpecHandle Handle) const override;
 	virtual FGuid ReserveAttack(UNarrativeAbilitySystemComponent* Source, AActor* Target,

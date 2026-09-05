@@ -72,6 +72,7 @@ void UNarrativeInventoryComponent::PrepareForSave_Implementation()
 
 void UNarrativeInventoryComponent::Load_Implementation()
 {
+	++CinematicLoadRevision;
 	bIsLoading = true;
 
 	SetCurrency(SavedCurrency);
@@ -86,6 +87,7 @@ void UNarrativeInventoryComponent::Load_Implementation()
 	}
 
 	Items.Empty();
+	ItemGUIDMap.Empty();
 	ReplicatedItems.Items.Empty();
 	ReplicatedItems.MarkArrayDirty();
 
@@ -306,7 +308,7 @@ FItemAddResult UNarrativeInventoryComponent::TryAddItemFromClass(TSubclassOf<cla
 
 int32 UNarrativeInventoryComponent::ConsumeItem(class UNarrativeItem* Item, const int32 Quantity)
 {
-	if (Item && Item->CanBeRemoved() && Quantity > 0)
+	if (Item && Item->OwningInventory == this && Items.Contains(Item) && Item->CanBeRemoved() && Quantity > 0)
 	{
 		if (GetOwnerRole() < ROLE_Authority)
 		{
@@ -316,6 +318,7 @@ int32 UNarrativeInventoryComponent::ConsumeItem(class UNarrativeItem* Item, cons
 
 		if (GetOwner() && GetOwner()->HasAuthority())
 		{
+			if (!IsValid(Item) || Item->OwningInventory != this || !Items.Contains(Item)) { return 0; }
 			const int32 RemoveQuantity = FMath::Min(Quantity, Item->GetQuantity());
 
 			//We shouldn't have a negative amount of the item after the drop
@@ -403,7 +406,7 @@ int32 UNarrativeInventoryComponent::ConsumeItemsOfClass(TSubclassOf<UNarrativeIt
 
 bool UNarrativeInventoryComponent::RemoveItem(class UNarrativeItem* Item)
 {
-	if (Item && Item->CanBeRemoved())
+	if (Item && Item->OwningInventory == this && Items.Contains(Item) && Item->CanBeRemoved())
 	{
 		if (GetOwnerRole() < ROLE_Authority)
 		{
@@ -413,28 +416,9 @@ bool UNarrativeInventoryComponent::RemoveItem(class UNarrativeItem* Item)
 
 		if (GetOwner() && GetOwner()->HasAuthority())
 		{
-			if (Item)
+			if (IsValid(Item) && Item->OwningInventory == this && Items.Contains(Item))
 			{
-				Item->RemovedFromInventory(this);
-				
-				Items.RemoveSingle(Item);
-				
-				// Experimental fast array replication
-				ReplicatedItems.Items.RemoveSingle(FNarrativeItemEntry(Item));
-				ReplicatedItems.MarkArrayDirty();
-				
-				//Consume item will have called this delegate, if we've called RemoveItem we need to call it 
-				if (Item->GetQuantity() != 0)
-				{
-					OnItemRemoved.Broadcast(Item, Item->GetQuantity());
-				}
-
-				ReplicatedItemsKey++;
-
-				//Clients get this via an OnRep, server needs to manually call 
-				OnInventoryUpdated.Broadcast();
-				
-				return true;
+				return RemoveOwnedItemInternal(Item);
 			}
 		}
 
@@ -950,6 +934,7 @@ UNarrativeItem* UNarrativeInventoryComponent::AddItem(TSubclassOf<class UNarrati
 		UNarrativeItem* NewItem = NewObject<UNarrativeItem>(GetOwner(), ItemClass);
 		NewItem->World = GetWorld();
 		NewItem->OwningInventory = this;
+		++NewItem->InventoryMembershipRevision;
 
 		NewItem->SetQuantity(Quantity);
 
@@ -1338,4 +1323,3 @@ bool UNarrativeInventoryComponent::IsLoading() const
 
 
 #undef LOCTEXT_NAMESPACE
-

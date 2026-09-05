@@ -9,6 +9,7 @@
 #include "Save/SovSaveSubsystem.h"
 #include "Recovery/SovRecoveryExclusionVolume.h"
 #include "World/SovWorldTransitActor.h"
+#include "UI/SovFrontendComponent.h"
 #include "AbilitySystemGlobals.h"
 #include "AbilitySystemComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -61,6 +62,7 @@ bool USovCampaignCinematicComponent::ValidateConfiguration(FString& OutError) co
     if (!Cast<ANarrativeLevelSequenceActor>(GetOwner()) || MissionId.IsNone() || BeatId.IsNone() || Sequence.IsNull()
         || Participants.IsEmpty() || Participants.Num() > 16 || PreloadAssets.Num() > 128 || RequiredStreamingLevels.Num() > 32
         || RequiredPartitionRegions.Num() > 16 || TransitPostconditions.Num() > 16
+        || InventoryPostconditions.Num() > 32 || EquipmentPostconditions.Num() > 16
         || !FMath::IsFinite(LoadingTimeoutSeconds) || LoadingTimeoutSeconds < 1.f || LoadingTimeoutSeconds > 60.f
         || !FMath::IsFinite(RequestRange) || RequestRange <= 0.f || RequestRange > 2000.f) { return Fail(); }
     TSet<FName> Bindings, ActorIds, Levels; int32 PlayerCount = 0;
@@ -72,11 +74,52 @@ bool USovCampaignCinematicComponent::ValidateConfiguration(FString& OutError) co
         if (Participant.bControlledProtagonist) { ++PlayerCount; if (!Participant.ActorTag.IsNone()) { return Fail(); } }
         else { if (Participant.ActorTag.IsNone() || ActorIds.Contains(Participant.ActorTag)) { return Fail(); } ActorIds.Add(Participant.ActorTag); }
         if (Participant.RequiredWeapon && !Participant.EquipmentSlot.IsValid()) { return Fail(); }
-        if (Participant.ExitWield == ESovCinematicExitWield::DrawRequiredWeapon && (!Participant.RequiredWeapon || !Participant.WieldSlot.IsValid())) { return Fail(); }
+        if (Participant.ExitWield == ESovCinematicExitWield::DrawRequiredWeapon)
+        {
+            bool bHasExitWeapon = Participant.RequiredWeapon != nullptr;
+            for (const auto& Equipment : EquipmentPostconditions)
+            { bHasExitWeapon |= Equipment.ParticipantBinding == Participant.BindingTag && Equipment.EquipmentSlot == Participant.EquipmentSlot
+                && Equipment.ReplacementItemClass && Equipment.ReplacementItemClass->IsChildOf(UWeaponItem::StaticClass()); }
+            if (!bHasExitWeapon || !Participant.WieldSlot.IsValid() || !Participant.EquipmentSlot.IsValid()) { return Fail(); }
+        }
         if (Participant.bApplyExitTransform && (!Participant.ExitTransform.IsValid()
             || !Participant.ExitTransform.GetScale3D().Equals(FVector::OneVector))) { return Fail(); }
     }
     if (PlayerCount != 1) { return Fail(); }
+    TSet<FName> MutationIds;
+    for (const auto& Entry : InventoryPostconditions)
+    {
+        const auto& Mutation = Entry.Mutation;
+        if (!Bindings.Contains(Entry.ParticipantBinding) || Mutation.MutationId.IsNone() || MutationIds.Contains(Mutation.MutationId)
+            || !Mutation.ItemClass || Mutation.Quantity < 1 || Mutation.Quantity > 100000
+            || Mutation.Operation > ENarrativeCinematicItemOperation::Remove
+            || (Mutation.Operation == ENarrativeCinematicItemOperation::Grant && Mutation.ItemGUID.IsValid())) { return Fail(); }
+        const auto* Defaults = Mutation.ItemClass->GetDefaultObject<UNarrativeItem>();
+        if (Mutation.Quantity > Defaults->GetMaxStackSize()
+            || (Mutation.Operation == ENarrativeCinematicItemOperation::Grant ? !Defaults->bAllowCampaignCinematicGrant : !Defaults->bAllowCampaignCinematicRemoval)) { return Fail(); }
+        MutationIds.Add(Mutation.MutationId);
+    }
+    for (int32 Index = 0; Index < EquipmentPostconditions.Num(); ++Index)
+    {
+        const auto& Entry = EquipmentPostconditions[Index];
+        if (!Bindings.Contains(Entry.ParticipantBinding) || !Entry.EquipmentSlot.IsValid()
+            || (!Entry.PreviousItemClass && !Entry.ReplacementItemClass)
+            || (!Entry.PreviousItemClass && Entry.PreviousItemGUID.IsValid())
+            || (!Entry.ReplacementItemClass && (Entry.ReplacementItemGUID.IsValid() || !Entry.ReplacementGrantId.IsNone()))
+            || (Entry.ReplacementItemGUID.IsValid() && !Entry.ReplacementGrantId.IsNone())) { return Fail(); }
+        if ((Entry.PreviousItemClass && !Entry.PreviousItemClass->GetDefaultObject<UNarrativeItem>()->bAllowCampaignCinematicEquipment)
+            || (Entry.ReplacementItemClass && !Entry.ReplacementItemClass->GetDefaultObject<UNarrativeItem>()->bAllowCampaignCinematicEquipment)) { return Fail(); }
+        if (!Entry.ReplacementGrantId.IsNone())
+        {
+            bool bFoundGrant = false;
+            for (const auto& Item : InventoryPostconditions)
+            { bFoundGrant |= Item.ParticipantBinding == Entry.ParticipantBinding && Item.Mutation.MutationId == Entry.ReplacementGrantId
+                && Item.Mutation.Operation == ENarrativeCinematicItemOperation::Grant && Item.Mutation.ItemClass.Get() == Entry.ReplacementItemClass.Get(); }
+            if (!bFoundGrant) { return Fail(); }
+        }
+        for (int32 Prior = 0; Prior < Index; ++Prior)
+        { if (EquipmentPostconditions[Prior].ParticipantBinding == Entry.ParticipantBinding && EquipmentPostconditions[Prior].EquipmentSlot == Entry.EquipmentSlot) { return Fail(); } }
+    }
     for (const auto& Asset : PreloadAssets) { if (!Asset.IsValid()) { return Fail(); } }
     for (FName Level : RequiredStreamingLevels) { if (Level.IsNone() || Levels.Contains(Level)) { return Fail(); } Levels.Add(Level); }
     TSet<FName> RegionIds, TransitIds; TSet<FSoftObjectPath> TransitPaths;
@@ -292,6 +335,7 @@ bool USovCampaignCinematicComponent::ResolveParticipants(FString& OutError)
         FSovCinematicParticipantSnapshot Entry;
         Entry.Character = Character; Entry.ASC = UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(Character);
         Entry.Transform = Character->GetActorTransform(); Entry.Wield = Character->GetWeaponWieldState();
+        Entry.OriginalWieldRevision = Character->GetWeaponWieldRevision();
         if (Contract.RequiredWeapon && Character->GetEquipmentComponent())
         { Entry.RequiredWeapon = Character->GetEquipmentComponent()->GetEquippedWeaponAtSlot(Contract.EquipmentSlot); }
         Snapshot.Add(Entry);
@@ -324,10 +368,13 @@ bool USovCampaignCinematicComponent::ValidateParticipants(bool bCheckExit, FStri
         { OutError = TEXT("The cinematic protagonist is not ready."); return false; }
         if (const auto* NPC = Cast<ASovNPCCharacterBase>(Character); NPC && !NPC->IsEncounterSnapshotReady())
         { OutError = TEXT("A cinematic NPC has not finished its native initialization."); return false; }
-        if (Contract.RequiredWeapon)
+        bool bReplacedSlot = false;
+        if (bInventoryPostconditionsApplied)
+        { for (const auto& Equipment : EquipmentSnapshots) { bReplacedSlot |= Equipment.Character == Entry.Character && Equipment.Contract.EquipmentSlot == Contract.EquipmentSlot; } }
+        if ((!bReplacedSlot && Contract.RequiredWeapon) || (bInventoryPostconditionsApplied && Contract.ExitWield == ESovCinematicExitWield::DrawRequiredWeapon))
         {
-            auto* Item = Entry.RequiredWeapon.Get();
-            if (!Item || Item->OwningInventory != Character->GetInventoryComponent() || !Item->IsA(Contract.RequiredWeapon) || !Item->IsEquipped()
+            auto* Item = GetExitWeapon(Index);
+            if (!Item || Item->OwningInventory != Character->GetInventoryComponent() || (!bReplacedSlot && !Item->IsA(Contract.RequiredWeapon)) || !Item->IsEquipped()
                 || !Character->GetEquipmentComponent() || Character->GetEquipmentComponent()->GetEquippedWeaponAtSlot(Contract.EquipmentSlot) != Item
                 || (Contract.ExitWield == ESovCinematicExitWield::DrawRequiredWeapon
                     && (Item->GetWeaponWieldAttachConfig(Contract.WieldSlot).SocketName.IsNone()
@@ -394,12 +441,27 @@ bool USovCampaignCinematicComponent::ValidatePresentationSequence(ULevelSequence
 bool USovCampaignCinematicComponent::RequestPlay(ASovPlayerController* Player, FString& OutError)
 {
     if (!IsRegistered() || !IsComponentTickEnabled()) { OutError = TEXT("Cinematic component must be registered with ticking enabled."); return false; }
+    if (bInventoryRollbackIncomplete)
+    {
+        for (const auto& Change : InventoryChanges)
+        {
+            if (Change.Inventory.IsValid() && Change.Inventory->GetCinematicLoadRevision() == Change.InventoryLoadRevision)
+            { OutError = TEXT("Reload the pre-scene checkpoint before retrying a conflicted cinematic inventory transaction."); return false; }
+        }
+        for (const auto& Entry : EquipmentSnapshots)
+        {
+            if (Entry.Inventory.IsValid() && Entry.Inventory->GetCinematicLoadRevision() == Entry.InventoryLoadRevision)
+            { OutError = TEXT("Reload the pre-scene checkpoint before retrying a conflicted cinematic equipment transaction."); return false; }
+        }
+    }
     // A checkpoint restore can make this beat incomplete again while the same placed actor remains alive.
     if (bRequestStarting || bEndingPlay || bFinishing || (Phase != ESovCinematicPhase::Idle && Phase != ESovCinematicPhase::Failed && Phase != ESovCinematicPhase::Completed)
         || !IsValid(Player) || !Player->HasAuthority() || Player->GetNetMode() != NM_Standalone || !ValidateConfiguration(OutError)) { return false; }
     TGuardValue<bool> Starting(bRequestStarting, true);
     const uint64 Epoch = ++RequestEpoch;
-    Snapshot.Reset(); TransitSnapshots.Reset();
+    Snapshot.Reset(); TransitSnapshots.Reset(); InventoryChanges.Reset(); EquipmentSnapshots.Reset();
+    bInventoryPostconditionsApplied = false; bInventoryTransactionCommitted = false; bInventoryRollbackIncomplete = false;
+    AccessibilityWaitStartedSeconds = 0.0;
     Controller = Player; PlayerPawn = Cast<ANarrativeCharacter>(Player->GetPawn());
     PlayerASC = PlayerPawn.IsValid() ? UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(PlayerPawn.Get()) : nullptr;
     if (!IsContextCurrent() || FVector::DistSquared(PlayerPawn->GetActorLocation(), GetOwner()->GetActorLocation()) > FMath::Square(RequestRange))
@@ -442,6 +504,14 @@ bool USovCampaignCinematicComponent::RequestPlay(ASovPlayerController* Player, F
     PreparationWatchdog = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateWeakLambda(this,
         [this, Epoch](float) { return CheckPreparationWatchdog(Epoch); }), .1f);
     TArray<FSoftObjectPath> Paths = PreloadAssets; Paths.AddUnique(Sequence.ToSoftObjectPath());
+    for (const auto& Equipment : EquipmentPostconditions)
+    {
+        for (UClass* ItemClass : {Equipment.PreviousItemClass.Get(), Equipment.ReplacementItemClass.Get()})
+        {
+            const auto* Weapon = ItemClass ? Cast<UWeaponItem>(ItemClass->GetDefaultObject()) : nullptr;
+            if (Weapon && !Weapon->GetWeaponVisualClass().IsNull()) { Paths.AddUnique(Weapon->GetWeaponVisualClass().ToSoftObjectPath()); }
+        }
+    }
     const auto RequestedLoad = UAssetManager::GetStreamableManager().RequestAsyncLoad(Paths);
     if (RequestEpoch != Epoch || !IsContextCurrent())
     {
@@ -450,24 +520,44 @@ bool USovCampaignCinematicComponent::RequestPlay(ASovPlayerController* Player, F
     }
     LoadHandle = RequestedLoad;
     if (!LoadHandle.IsValid()) { Abort(TEXT("Cinematic asset preload could not start.")); return false; }
+    WaitForInitialAccessibilitySetup();
+    if (RequestEpoch != Epoch || !IsContextCurrent()) { return false; }
     OutError.Reset(); return true;
+}
+
+bool USovCampaignCinematicComponent::WaitForInitialAccessibilitySetup()
+{
+    const double Now = FPlatformTime::Seconds();
+    if (USovFrontendComponent::IsInitialAccessibilitySetupPending(Controller.Get()))
+    {
+        if (AccessibilityWaitStartedSeconds == 0.0) { AccessibilityWaitStartedSeconds = Now; }
+        if (auto* Frontend = Controller->FindComponentByClass<USovFrontendComponent>()) { Frontend->RefreshFrontend(); }
+        return true;
+    }
+    if (AccessibilityWaitStartedSeconds != 0.0)
+    { LoadingStartedSeconds += FMath::Max(0.0, Now - AccessibilityWaitStartedSeconds); AccessibilityWaitStartedSeconds = 0.0; }
+    return false;
 }
 
 bool USovCampaignCinematicComponent::CheckPreparationWatchdog(uint64 Epoch)
 {
     if (RequestEpoch != Epoch || bEndingPlay || (Phase != ESovCinematicPhase::Loading && Phase != ESovCinematicPhase::Playing && Phase != ESovCinematicPhase::Paused)) { return false; }
     if (bFinishing) { return true; }
-    if (!IsRegistered() || !IsComponentTickEnabled()
-        || (Phase == ESovCinematicPhase::Loading && SovCinematicPolicy::LoadingExpired(FPlatformTime::Seconds() - LoadingStartedSeconds, LoadingTimeoutSeconds)))
+    if (!IsRegistered() || !IsComponentTickEnabled() || !IsContextCurrent() || !OwnsPlaybackGeneration())
+    { Abort(TEXT("Cinematic preparation lost its registered component or protagonist.")); return false; }
+    if (Phase == ESovCinematicPhase::Loading && WaitForInitialAccessibilitySetup()) { return true; }
+    if (Phase == ESovCinematicPhase::Loading && SovCinematicPolicy::LoadingExpired(FPlatformTime::Seconds() - LoadingStartedSeconds, LoadingTimeoutSeconds))
     { Abort(TEXT("Cinematic preparation timed out or its component stopped ticking.")); return false; }
     return true;
 }
 
 void USovCampaignCinematicComponent::StartPreparedPlayback()
 {
+    if (WaitForInitialAccessibilitySetup()) { return; }
     FString Error; auto* Asset = Sequence.Get(); auto* Actor = Cast<ANarrativeLevelSequenceActor>(GetOwner());
     if (!IsContextCurrent() || !OwnsPlaybackGeneration() || !Actor || !Asset || !ArePartitionRegionsReady()
-        || !ValidatePresentationSequence(Asset, Error) || !ResolveParticipants(Error) || !ResolveTransitPostconditions(Error)) { Abort(Error); return; }
+        || !ValidatePresentationSequence(Asset, Error) || !ResolveParticipants(Error) || !ResolveTransitPostconditions(Error)
+        || !ResolveInventoryPostconditions(Error)) { Abort(Error); return; }
     for (const auto& Path : PreloadAssets) { if (!Path.ResolveObject()) { Abort(TEXT("A required cinematic presentation asset failed to load.")); return; } }
     auto* Scene = Asset->GetMovieScene(); const auto Range = Scene->GetPlaybackRange();
     DurationSeconds = Scene->GetTickResolution().AsSeconds(FFrameTime(Range.GetUpperBoundValue() - Range.GetLowerBoundValue()));
@@ -587,10 +677,12 @@ void USovCampaignCinematicComponent::HandleFailed() { if (!bFinishing) { Abort(T
 
 bool USovCampaignCinematicComponent::HasCommitReceipt(const USovCampaignStateComponent* State, FName RequestedBeat, bool bSkipped) const
 {
+    FString Error;
     return State && OwnsPlaybackGeneration() && Cast<ANarrativeLevelSequenceActor>(GetOwner())
         && CastChecked<ANarrativeLevelSequenceActor>(GetOwner())->GetPlaybackGeneration() == ExpectedPlaybackGeneration
         && bReceiptAvailable && bFinishing && Phase == ESovCinematicPhase::Committing && SessionId.IsValid()
-        && bReceiptSkipped == bSkipped && RequestedBeat == BeatId && IsContextCurrent() && Controller.Get() == State->GetOwner();
+        && bReceiptSkipped == bSkipped && RequestedBeat == BeatId && IsContextCurrent() && Controller.Get() == State->GetOwner()
+        && bInventoryPostconditionsApplied && !bInventoryTransactionCommitted && ValidateExitPostconditions(Error);
 }
 bool USovCampaignCinematicComponent::ConsumeCommitReceipt(const USovCampaignStateComponent* State, FName RequestedBeat, bool bSkipped)
 { if (!HasCommitReceipt(State, RequestedBeat, bSkipped)) { return false; } bReceiptAvailable = false; return true; }
@@ -599,14 +691,18 @@ bool USovCampaignCinematicComponent::Commit(bool bSkipped, FString& OutError)
 {
     auto* Actor = Cast<ANarrativeLevelSequenceActor>(GetOwner());
     if (bFinishing || !Actor || !OwnsPlaybackGeneration() || !ValidateBindings() || !IsContextCurrent() || !ArePartitionRegionsReady()
-        || !ValidateParticipants(true, OutError) || !ValidateTransitPostconditions(false, OutError)) { Abort(OutError); return false; }
+        || !ValidateParticipants(true, OutError) || !ValidateTransitPostconditions(false, OutError)
+        || !ValidateInventoryPostconditions(false, OutError)) { Abort(OutError); return false; }
     TGuardValue<bool> Finishing(bFinishing, true); const uint64 Epoch = RequestEpoch; Phase = ESovCinematicPhase::Committing;
     Actor->GetSequencePlayer()->Stop(); // Restore evaluated tracks; never jump across arbitrary skipped events.
     if (RequestEpoch != Epoch || !OwnsPlaybackGeneration() || Actor->GetSequencePlayer()->IsPlaying() || Actor->GetSequencePlayer()->IsPaused()
         || !IsContextCurrent() || !ValidateParticipants(true, OutError)) { RestoreParticipants(); ReleaseOwnership(); ChangePhase(ESovCinematicPhase::Failed, OutError); return false; }
+    if (!ApplyInventoryPostconditions(OutError) || RequestEpoch != Epoch || !OwnsPlaybackGeneration() || !IsContextCurrent())
+    { RestoreParticipants(); ReleaseOwnership(); if (!bEndingPlay) { ChangePhase(ESovCinematicPhase::Failed, OutError); } return false; }
     for (int32 Index = 0; Index < Participants.Num(); ++Index)
     {
         const auto& Contract = Participants[Index]; auto* Character = Snapshot[Index].Character.Get();
+        Snapshot[Index].bTransformApplied = Contract.bApplyExitTransform;
         if (Contract.bApplyExitTransform && !Character->SetActorTransform(Contract.ExitTransform, false, nullptr, ETeleportType::TeleportPhysics))
         { OutError = TEXT("Cinematic exit transform could not be applied."); RestoreParticipants(); ReleaseOwnership(); ChangePhase(ESovCinematicPhase::Failed, OutError); return false; }
         if (RequestEpoch != Epoch || !OwnsPlaybackGeneration() || !IsContextCurrent() || !IsValid(Character) || Character->IsActorBeingDestroyed()
@@ -616,7 +712,8 @@ bool USovCampaignCinematicComponent::Commit(bool bSkipped, FString& OutError)
         {
             FWeaponWieldState Wield;
             if (Contract.ExitWield == ESovCinematicExitWield::DrawRequiredWeapon) { Wield.EquipSlots.AddTag(Contract.EquipmentSlot); Wield.WieldSlots.AddTag(Contract.WieldSlot); }
-            Character->SetWieldState(Wield);
+            if (!SetOwnedWield(Index, Wield, OutError))
+            { RestoreParticipants(); ReleaseOwnership(); if (!bEndingPlay) { ChangePhase(ESovCinematicPhase::Failed, OutError); } return false; }
         }
         if (RequestEpoch != Epoch || !OwnsPlaybackGeneration() || !IsContextCurrent() || !ValidateParticipants(false, OutError))
         { RestoreParticipants(); ReleaseOwnership(); if (!bEndingPlay) { ChangePhase(ESovCinematicPhase::Failed, OutError); } return false; }
@@ -625,18 +722,14 @@ bool USovCampaignCinematicComponent::Commit(bool bSkipped, FString& OutError)
             || (Contract.ExitWield == ESovCinematicExitWield::Holster && Wield.EquipSlots.IsEmpty() && Wield.WieldSlots.IsEmpty())
             || (Contract.ExitWield == ESovCinematicExitWield::DrawRequiredWeapon && Wield.EquipSlots.Num() == 1 && Wield.WieldSlots.Num() == 1
                 && Wield.EquipSlots.HasTagExact(Contract.EquipmentSlot) && Wield.WieldSlots.HasTagExact(Contract.WieldSlot)
-                && Wield.EquipWeapons.Num() == 1 && Wield.EquipWeapons[0] == Snapshot[Index].RequiredWeapon.Get());
+                && Wield.EquipWeapons.Num() == 1 && Wield.EquipWeapons[0] == GetExitWeapon(Index));
         if (!bWieldMatches || (Contract.bApplyExitTransform && !Character->GetActorTransform().Equals(Contract.ExitTransform, .1f)))
         { OutError = TEXT("Cinematic exit postconditions did not survive their native callbacks."); RestoreParticipants(); ReleaseOwnership(); ChangePhase(ESovCinematicPhase::Failed, OutError); return false; }
     }
     if (!OwnsPlaybackGeneration() || !ArePartitionRegionsReady() || !ApplyTransitPostconditions(OutError)
         || !ValidateParticipants(true, OutError) || !ValidateExitPostconditions(OutError))
     { RestoreParticipants(); ReleaseOwnership(); if (!bEndingPlay) { ChangePhase(ESovCinematicPhase::Failed, OutError); } return false; }
-    bReceiptAvailable = true; bReceiptSkipped = bSkipped;
-    auto* State = Controller->FindComponentByClass<USovCampaignStateComponent>();
-    const auto Result = State->CompleteCinematic(this, bSkipped);
-    bReceiptAvailable = false;
-    if (Result != ESovCampaignResult::Applied)
+    if (!CommitNativePostconditions(bSkipped, OutError))
     {
         OutError = TEXT("Cinematic postconditions could not commit their campaign beat.");
         RestoreParticipants(); ReleaseOwnership(); ChangePhase(ESovCinematicPhase::Failed, OutError); return false;
@@ -644,6 +737,21 @@ bool USovCampaignCinematicComponent::Commit(bool bSkipped, FString& OutError)
     if (RequestEpoch == Epoch) { ReleaseOwnership(); }
     if (!bEndingPlay && IsValid(GetOwner()) && !GetOwner()->IsActorBeingDestroyed()) { ChangePhase(ESovCinematicPhase::Completed); }
     OutError.Reset(); return true;
+}
+
+bool USovCampaignCinematicComponent::CommitNativePostconditions(bool bSkipped, FString& OutError)
+{
+    if (!bFinishing || Phase != ESovCinematicPhase::Committing || bReceiptAvailable || bInventoryTransactionCommitted
+        || !bInventoryPostconditionsApplied || !OwnsPlaybackGeneration() || !IsContextCurrent()
+        || !ArePartitionRegionsReady() || !ValidateParticipants(true, OutError) || !ValidateExitPostconditions(OutError)) { return false; }
+    bReceiptAvailable = true; bReceiptSkipped = bSkipped;
+    auto* State = Controller->FindComponentByClass<USovCampaignStateComponent>();
+    const auto Result = State->CompleteCinematic(this, bSkipped); bReceiptAvailable = false;
+    if (Result != ESovCampaignResult::Applied) { OutError = TEXT("Cinematic postconditions could not commit their campaign beat."); return false; }
+    bInventoryTransactionCommitted = true;
+    for (auto& Change : InventoryChanges) { Change.bRetired = true; }
+    for (auto& Entry : EquipmentSnapshots) { Entry.bRetired = true; }
+    return true;
 }
 
 bool USovCampaignCinematicComponent::OwnsPlaybackGeneration() const
@@ -655,7 +763,7 @@ bool USovCampaignCinematicComponent::OwnsPlaybackGeneration() const
 
 bool USovCampaignCinematicComponent::ValidateExitPostconditions(FString& OutError) const
 {
-    if (!ValidateTransitPostconditions(true, OutError)) { return false; }
+    if (!ValidateTransitPostconditions(true, OutError) || !ValidateInventoryPostconditions(true, OutError)) { return false; }
     for (int32 Index = 0; Index < Participants.Num(); ++Index)
     {
         const auto& Contract = Participants[Index]; const auto* Character = Snapshot[Index].Character.Get();
@@ -665,7 +773,7 @@ bool USovCampaignCinematicComponent::ValidateExitPostconditions(FString& OutErro
             || (Contract.ExitWield == ESovCinematicExitWield::Holster && Wield.EquipSlots.IsEmpty() && Wield.WieldSlots.IsEmpty())
             || (Contract.ExitWield == ESovCinematicExitWield::DrawRequiredWeapon && Wield.EquipSlots.Num() == 1 && Wield.WieldSlots.Num() == 1
                 && Wield.EquipSlots.HasTagExact(Contract.EquipmentSlot) && Wield.WieldSlots.HasTagExact(Contract.WieldSlot)
-                && Wield.EquipWeapons.Num() == 1 && Wield.EquipWeapons[0] == Snapshot[Index].RequiredWeapon.Get());
+                && Wield.EquipWeapons.Num() == 1 && Wield.EquipWeapons[0] == GetExitWeapon(Index));
         if (!bWieldMatches || (Contract.bApplyExitTransform && !Character->GetActorTransform().Equals(Contract.ExitTransform, .1f)))
         { OutError = TEXT("Cinematic final postconditions were changed by another participant callback."); return false; }
     }
@@ -674,16 +782,27 @@ bool USovCampaignCinematicComponent::ValidateExitPostconditions(FString& OutErro
 
 void USovCampaignCinematicComponent::RestoreParticipants()
 {
+    if (bInventoryTransactionCommitted) { return; }
     RestoreTransitPostconditions();
-    for (const auto& Entry : Snapshot)
+    RestoreInventoryPostconditions();
+    for (int32 Index = 0; Index < Snapshot.Num(); ++Index)
     {
+        auto& Entry = Snapshot[Index];
         if (!OwnsPlaybackGeneration()) { return; }
         auto* Character = Entry.Character.Get();
         if (!Character || Character->IsActorBeingDestroyed() || UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(Character) != Entry.ASC.Get()) { continue; }
-        if (!Character->GetActorTransform().Equals(Entry.Transform, .1f)) { Character->SetActorTransform(Entry.Transform, false, nullptr, ETeleportType::TeleportPhysics); }
+        if (Entry.bTransformApplied && Participants.IsValidIndex(Index) && Character->GetActorTransform().Equals(Participants[Index].ExitTransform, .1f))
+        { Entry.bTransformApplied = false; Character->SetActorTransform(Entry.Transform, false, nullptr, ETeleportType::TeleportPhysics); }
         if (!OwnsPlaybackGeneration() || !IsValid(Character) || Character->IsActorBeingDestroyed() || UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(Character) != Entry.ASC.Get()) { continue; }
-        const auto Current = Character->GetWeaponWieldState();
-        if (Current.EquipSlots != Entry.Wield.EquipSlots || Current.WieldSlots != Entry.Wield.WieldSlots) { Character->SetWieldState(Entry.Wield); }
+        bool bOriginalWeaponsOwned = Character->GetEquipmentComponent() != nullptr;
+        for (int32 WeaponIndex = 0; WeaponIndex < Entry.Wield.EquipSlots.Num(); ++WeaponIndex)
+        {
+            bOriginalWeaponsOwned &= Entry.Wield.EquipWeapons.IsValidIndex(WeaponIndex) && IsValid(Entry.Wield.EquipWeapons[WeaponIndex])
+                && Entry.Wield.EquipWeapons[WeaponIndex]->OwningInventory == Character->GetInventoryComponent()
+                && Character->GetEquipmentComponent() && Character->GetEquipmentComponent()->GetEquippedWeaponAtSlot(Entry.Wield.EquipSlots.GetByIndex(WeaponIndex)) == Entry.Wield.EquipWeapons[WeaponIndex];
+        }
+        if (Entry.bWieldApplied && Character->GetWeaponWieldRevision() == Entry.AppliedWieldRevision && bOriginalWeaponsOwned)
+        { FString Error; if (!SetOwnedWield(Index, Entry.Wield, Error)) { bInventoryRollbackIncomplete = true; } Entry.bWieldApplied = false; }
     }
 }
 
@@ -726,7 +845,12 @@ void USovCampaignCinematicComponent::Abort(const FString& Reason)
 }
 
 void USovCampaignCinematicComponent::ChangePhase(ESovCinematicPhase NewPhase, const FString& Reason)
-{ Phase = NewPhase; OnPhaseChanged.Broadcast(Phase, Reason); }
+{
+    Phase = NewPhase;
+    const FString Detail = bInventoryRollbackIncomplete && NewPhase == ESovCinematicPhase::Failed
+        ? Reason + TEXT(" A later inventory/equipment owner was preserved; reload the pre-scene checkpoint before retrying.") : Reason;
+    OnPhaseChanged.Broadcast(Phase, Detail);
+}
 
 void USovCampaignCinematicComponent::TickComponent(float Delta, ELevelTick TickType, FActorComponentTickFunction* TickFunction)
 {
@@ -734,8 +858,10 @@ void USovCampaignCinematicComponent::TickComponent(float Delta, ELevelTick TickT
     if (bFinishing || bEndingPlay || !FMath::IsFinite(Delta) || Delta < 0.f) { return; }
     if (Phase == ESovCinematicPhase::Loading)
     {
-        if (!IsContextCurrent() || !OwnsPlaybackGeneration()
-            || SovCinematicPolicy::LoadingExpired(FPlatformTime::Seconds() - LoadingStartedSeconds, LoadingTimeoutSeconds))
+        if (!IsContextCurrent() || !OwnsPlaybackGeneration())
+        { Abort(TEXT("Cinematic preparation lost its protagonist or playback owner.")); return; }
+        if (WaitForInitialAccessibilitySetup()) { return; }
+        if (SovCinematicPolicy::LoadingExpired(FPlatformTime::Seconds() - LoadingStartedSeconds, LoadingTimeoutSeconds))
         { Abort(TEXT("Cinematic preparation timed out or lost its protagonist; required assets, cells and activation actors must be available.")); return; }
         bool bLevelsReady = true; for (const auto& Level : StreamingLevels) { bLevelsReady &= Level && Level->IsLevelLoaded() && Level->IsLevelVisible(); }
         ConsecutivePartitionReadyTicks = static_cast<uint8>(SovCinematicPolicy::AdvanceReadyObservations(ConsecutivePartitionReadyTicks, ArePartitionRegionsReady()));
@@ -745,7 +871,8 @@ void USovCampaignCinematicComponent::TickComponent(float Delta, ELevelTick TickT
     {
         auto* Actor = Cast<ANarrativeLevelSequenceActor>(GetOwner()); FString Error;
         if (!IsContextCurrent() || !Actor || !OwnsPlaybackGeneration() || !ArePartitionRegionsReady()
-            || !ValidateBindings() || !ValidateParticipants(false, Error) || !ValidateTransitPostconditions(false, Error))
+            || !ValidateBindings() || !ValidateParticipants(false, Error) || !ValidateTransitPostconditions(false, Error)
+            || !ValidateInventoryPostconditions(false, Error))
         { bFullViewEligible = false; Abort(Error.IsEmpty() ? TEXT("Required cinematic cells or activation actors became unavailable.") : Error); return; }
         if (Phase == ESovCinematicPhase::Playing && Actor->GetSequencePlayer()->IsPlaying())
         {

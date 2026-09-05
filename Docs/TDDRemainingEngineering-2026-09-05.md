@@ -1,5 +1,7 @@
 # Remaining engineering audit and implementation
 
+Subsequent source delivery: [Source engineering closure and adversarial-audit handoff](SourceEngineeringClosure-2026-09-05.md) supersedes the remaining-work list below. This report remains the historical PR #28 baseline and its recorded validation is not rerun engine evidence.
+
 5 September 2026. Baseline: `144544d5d97fa4a3c1720b8420dba822a961bce1`, delivered in PR #27 and merged into the integration branch with identical tree `8f8062a39bf8875fefb31eadd5b6fdef652e6457`. This report supersedes the remaining-work descriptions in `TDDNativeCompletion.md`.
 
 ## Authority and evidence

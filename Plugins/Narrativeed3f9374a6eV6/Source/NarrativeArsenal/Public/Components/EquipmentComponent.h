@@ -33,6 +33,8 @@ class NARRATIVEARSENAL_API UEquipmentComponent : public UActorComponent
 public:	
 	// Sets default values for this component's properties
 	UEquipmentComponent();
+	/** Per-slot writes, including repeated equip requests, protect native transaction rollback. */
+	uint64 GetEquipmentSlotRevision(FGameplayTag Slot) const { return EquipmentSlotRevisions.FindRef(Slot); }
 
 	//TODO remove all this as character visual now handles this 
 
@@ -89,6 +91,7 @@ public:
 	FGameplayTag GetFirstFreeSlot(const FGameplayTagContainer& SlotsToCheck);
 
 protected:
+	TMap<FGameplayTag, uint64> EquipmentSlotRevisions;
 
 	//Mark the weapon as wielded/unwielded. 
 	virtual void WieldWeapon(class UWeaponItem* Weapon, const FGameplayTag& WieldSlot);

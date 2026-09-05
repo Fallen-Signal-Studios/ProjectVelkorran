@@ -23,10 +23,25 @@ public class ProjectVelkorran : ModuleRules
 				"Niagara",
 				"PhysicsCore",
 				"NarrativeArsenal",
-				"NarrativeSaveSystem"
+				"NarrativeSaveSystem",
+				"NarrativeCommonUI",
+				"UMG",
+				"CommonUI",
+				"MassEntity",
+				"MassCommon",
+				"MassActors",
+				"MassSpawner",
+				"MassRepresentation",
+				"MassCrowd"
 			}
 		);
 
-		PrivateDependencyModuleNames.AddRange(new string[] { "AnimGraphRuntime", "NavigationSystem", "AssetRegistry", "LevelSequence", "MovieScene", "MovieSceneTracks" });
+		PrivateDependencyModuleNames.AddRange(new string[] { "AnimGraphRuntime", "NavigationSystem", "AssetRegistry", "LevelSequence", "MovieScene", "MovieSceneTracks", "Slate", "SlateCore", "ApplicationCore", "OnlineSubsystem", "OnlineSubsystemUtils" });
+		if (Target.Platform == UnrealTargetPlatform.Win64)
+		{
+			PrivateDependencyModuleNames.Add("TextToSpeech");
+			PrivateDefinitions.Add("SOV_WITH_TEXT_TO_SPEECH=1");
+		}
+		else { PrivateDefinitions.Add("SOV_WITH_TEXT_TO_SPEECH=0"); }
 	}
 }
