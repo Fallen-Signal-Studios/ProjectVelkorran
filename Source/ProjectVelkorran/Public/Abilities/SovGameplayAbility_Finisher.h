@@ -48,6 +48,7 @@ protected:
     UFUNCTION(BlueprintImplementableEvent, Category="Finisher") void OnFinisherStarted(AActor* Target, bool bCinematicAligned);
     UFUNCTION(BlueprintImplementableEvent, Category="Finisher") void OnFinisherResolved(AActor* Target, bool bPhaseOutcome);
 private:
+    friend struct FSovFinisherRuntimeTestAccess;
     bool SourceValid() const;
     bool OwnsAction(const FGuid& ExpectedLease) const;
     void FinishReservedAction(const FGuid& ExpectedLease);

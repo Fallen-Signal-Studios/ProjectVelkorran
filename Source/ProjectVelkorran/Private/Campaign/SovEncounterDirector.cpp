@@ -489,7 +489,14 @@ void ASovEncounterDirector::HandleDeath(AActor* KilledActor, UNarrativeAbilitySy
 	const FName DefeatedId = FindParticipantId(KilledActor);
 	if (DefeatedId.IsNone()) { return; }
 	DefeatedParticipants.Add(DefeatedId);
-	if (!bCompleteWhenRequiredParticipantsDefeated) { return; }
+	EvaluateCompletionConditions();
+}
+
+void ASovEncounterDirector::EvaluateCompletionConditions()
+{
+	if (!IsValid(this) || IsActorBeingDestroyed() || !HasAuthority()
+		|| State != ESovEncounterState::Active || bMutationInProgress
+		|| !MassPromotions.IsEmpty() || !bCompleteWhenRequiredParticipantsDefeated) { return; }
 	bool bHasRequired = false;
 	for (const FSovEncounterParticipant& Participant : Participants)
 	{
@@ -821,7 +828,11 @@ void ASovEncounterDirector::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	TickMassPromotions();
-	if (!HasAuthority() || State != ESovEncounterState::Restoring || bMutationInProgress) { return; }
+	// The final required death may arrive while an unrelated promotion holds
+	// completion. Revisit its confirmed receipt after the promotion guard releases.
+	EvaluateCompletionConditions();
+	if (!IsValid(this) || IsActorBeingDestroyed() || !HasAuthority()
+		|| State != ESovEncounterState::Restoring || bMutationInProgress) { return; }
 	TGuardValue<bool> Mutation(bMutationInProgress, true);
 	UNarrativeSaveSubsystem* Save = GetWorld()->GetSubsystem<UNarrativeSaveSubsystem>();
 	if (!Save || !IsValid(ResolvePlayer())) { AbortRestore(TEXT("Player or Narrative save subsystem disappeared during restore.")); return; }

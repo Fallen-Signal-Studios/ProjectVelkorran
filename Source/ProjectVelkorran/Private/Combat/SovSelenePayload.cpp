@@ -18,7 +18,7 @@
 
 namespace
 {
-	bool Alive(const UAbilitySystemComponent* ASC)
+	bool IsLivingSelenePayloadParticipant(const UAbilitySystemComponent* ASC)
 	{
 		return IsValid(ASC) && !ASC->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_IsDead)
 			&& !ASC->HasMatchingGameplayTag(FSovGameplayTags::Get().State_Fatal)
@@ -83,7 +83,7 @@ bool SovSelenePayload::ValidSource(const FSovSelenePayloadContext& Context)
 {
 	const auto& Tags = FSovGameplayTags::Get();
 	return Context.SourceAvatar.IsValid() && Context.SourceAvatar->HasAuthority()
-		&& !Context.SourceAvatar->IsActorBeingDestroyed() && Alive(Context.SourceASC.Get())
+		&& !Context.SourceAvatar->IsActorBeingDestroyed() && IsLivingSelenePayloadParticipant(Context.SourceASC.Get())
 		&& Context.SourceASC->GetAvatarActor() == Context.SourceAvatar.Get()
 		&& UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Context.SourceAvatar.Get()) == Context.SourceASC.Get()
 		&& Context.SourceASC->HasMatchingGameplayTag(Tags.Character_Player_Selene)
@@ -114,7 +114,7 @@ bool SovSelenePayload::EligibleTarget(const FSovSelenePayloadContext& Context, A
 		|| Target->IsOwnedBy(Context.SourceAvatar.Get()) || Target->IsActorBeingDestroyed()) { return false; }
 	const auto* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Target);
 	const auto* Team = Cast<INarrativeTeamAgentInterface>(Context.SourceAvatar.Get());
-	return Alive(ASC) && !Immune(ASC) && Team && Team->GetTeamAttitudeTowards(*Target) == ETeamAttitude::Hostile;
+	return IsLivingSelenePayloadParticipant(ASC) && !Immune(ASC) && Team && Team->GetTeamAttitudeTowards(*Target) == ETeamAttitude::Hostile;
 }
 void SovSelenePayload::IgnoreSource(FCollisionQueryParams& Params, AActor* Source)
 {

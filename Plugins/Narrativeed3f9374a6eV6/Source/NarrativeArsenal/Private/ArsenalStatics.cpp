@@ -62,6 +62,7 @@
 #include "Vehicles/Mass/VehicleRepresentationSubsystem.h"
 #include "UnrealFramework/NarrativePlayerCharacter.h"
 #include "GameMapsSettings.h"
+#include "Framework/Application/SlateApplication.h"
 
 #if PLATFORM_WINDOWS
 #include "Windows/WindowsHWrapper.h"
@@ -70,6 +71,7 @@
 
 THIRD_PARTY_INCLUDES_START
 #include "dxgi1_4.h"
+#include <wrl/client.h>
 #include "Windows/HideWindowsPlatformTypes.h"
 THIRD_PARTY_INCLUDES_END
 
@@ -79,6 +81,7 @@ DEFINE_LOG_CATEGORY_STATIC(LogArsenalStatics, Log, All)
 
 TArray<FString> UArsenalStatics::GetMonitorNames()
 {
+	if (!FSlateApplication::IsInitialized()) { return {}; }
 
 	FDisplayMetrics DisplayMetrics;
 	FSlateApplication::Get().GetDisplayMetrics(DisplayMetrics);
@@ -141,29 +144,30 @@ TArray<FString> UArsenalStatics::GetMonitorNames()
 
 bool UArsenalStatics::GetGPUInfo(FGPUInfo& OutInfo)
 {
-	#if PLATFORM_WINDOWS
+	OutInfo = FGPUInfo{};
+#if PLATFORM_WINDOWS
+	Microsoft::WRL::ComPtr<IDXGIFactory4> Factory;
+	if (FAILED(CreateDXGIFactory1(IID_PPV_ARGS(Factory.GetAddressOf())))) { return false; }
 
-	IDXGIFactory4* pFactory;
-	CreateDXGIFactory1(__uuidof(IDXGIFactory4), (void**)&pFactory);
+	// Keep the original primary-display adapter contract; adapter zero is not
+	// necessarily Unreal's active render adapter on a multi-GPU machine.
+	Microsoft::WRL::ComPtr<IDXGIAdapter> BaseAdapter;
+	if (FAILED(Factory->EnumAdapters(0, BaseAdapter.GetAddressOf()))) { return false; }
+	Microsoft::WRL::ComPtr<IDXGIAdapter3> Adapter;
+	if (FAILED(BaseAdapter->QueryInterface(IID_PPV_ARGS(Adapter.GetAddressOf())))) { return false; }
 
-	IDXGIAdapter3* adapter;
-	pFactory->EnumAdapters(0, reinterpret_cast<IDXGIAdapter**>(&adapter));
+	DXGI_QUERY_VIDEO_MEMORY_INFO VideoMemoryInfo = {};
+	if (FAILED(Adapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &VideoMemoryInfo))) { return false; }
+	DXGI_ADAPTER_DESC Description = {};
+	if (FAILED(BaseAdapter->GetDesc(&Description))) { return false; }
 
-	DXGI_QUERY_VIDEO_MEMORY_INFO videoMemoryInfo;
-	adapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &videoMemoryInfo);
-
-	OutInfo.CurrentVRAM = videoMemoryInfo.CurrentUsage / 1024 / 1024;
-	OutInfo.TotalVRAM = videoMemoryInfo.Budget / 1024 / 1024;
-
-	OutInfo.GPUBrand = FPlatformMisc::GetPrimaryGPUBrand();
-
+	OutInfo.CurrentVRAM = static_cast<int32>(FMath::Min<uint64>(VideoMemoryInfo.CurrentUsage / 1024 / 1024, MAX_int32));
+	OutInfo.TotalVRAM = static_cast<int32>(FMath::Min<uint64>(VideoMemoryInfo.Budget / 1024 / 1024, MAX_int32));
+	OutInfo.GPUBrand = Description.Description;
 	return true;
-
-	#else
-
-	return false; 
-
-	#endif 
+#else
+	return false;
+#endif
 }
 
 bool UArsenalStatics::GetGameplayTagFriendlyDisplayName(FGameplayTag Tag, FText& OutText)

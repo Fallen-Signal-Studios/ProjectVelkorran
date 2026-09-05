@@ -54,8 +54,21 @@ USovCampaignStateComponent* USovCorruptionComponent::Campaign() const
 bool USovCorruptionComponent::IsCombatPressureImmune() const
 {
 	const auto* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner());
-	return ASC && (ASC->HasMatchingGameplayTag(FSovGameplayTags::Get().State_Damage_Immune)
-		|| ASC->HasMatchingGameplayTag(FSovGameplayTags::Get().Damage_Immunity_Corruption));
+	if (!IsValid(ASC)) { return false; }
+	const auto& Tags = FSovGameplayTags::Get();
+	FGameplayTagContainer Owned;
+	ASC->GetOwnedGameplayTags(Owned);
+	// Environmental and interaction producers bypass the ordinary damage resolver,
+	// so they must honor its global immunity gates as well as corruption immunity.
+	// Only the exact status-immunity root means all statuses; a Burn-only child does not.
+	return Owned.HasTag(Tags.State_Damage_Immune)
+		|| Owned.HasTag(Tags.Damage_Immunity_All)
+		|| Owned.HasTag(Tags.Damage_Immunity_Corruption)
+		|| Owned.HasTag(Tags.State_Invulnerable)
+		|| Owned.HasTag(FNarrativeGameplayTags::Get().State_Invulnerable)
+		|| Owned.HasTagExact(Tags.Status_Immunity)
+		|| Owned.HasTag(Tags.Status_Immunity_All)
+		|| Owned.HasTag(Tags.Status_Immunity_Corruption);
 }
 bool USovCorruptionComponent::ValidateProfilePermission(const USovCorruptionProfile* Profile,
 	ESovCorruptionBand& OutCap, FName& OutMission) const

@@ -99,5 +99,8 @@ private:
 	FDelegateHandle PoiseBrokenTagChangedHandle;
 	FDelegateHandle RagdollTagChangedHandle;
 	FDelegateHandle SequencerTagChangedHandle;
+	TWeakObjectPtr<USovDeflectionComponent> ActiveDeflectionComponent;
+	uint32 ActivationEpoch = 0;
+	bool bEndingDeflectionAbility = false;
 	bool bDeflectionStarted = false;
 };

@@ -24,7 +24,7 @@ struct FSovSelenePayloadTestAccess
 	static int32 OutboundCount(const ASovSeleneCombatProjectile& Projectile) { return Projectile.OutboundTargets.Num(); }
 	static int32 ReturnCount(const ASovSeleneCombatProjectile& Projectile) { return Projectile.ReturnTargets.Num(); }
 };
-namespace
+namespace SovSelenePayloadTests
 {
 	struct FSeleneTestWorld
 	{
@@ -95,11 +95,11 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovSeleneZeroNativeTest, "ProjectVelkorran.Cam
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovSeleneZeroNativeTest::RunTest(const FString& Parameters)
 {
-	FSeleneTestWorld Fixture;
+	SovSelenePayloadTests::FSeleneTestWorld Fixture;
 	auto* Source = Fixture.Character(FVector::ZeroVector, 0);
 	auto* Target = Fixture.Character(FVector(1000.0f, 0.0f, 0.0f));
 	if (!TestNotNull(TEXT("Source"), Source) || !TestNotNull(TEXT("Target"), Target)) { return false; }
-	auto* Ability = Activate<USovZeroPayloadTestAbility>(*this, Source);
+	auto* Ability = SovSelenePayloadTests::Activate<USovZeroPayloadTestAbility>(*this, Source);
 	if (!TestNotNull(TEXT("Native Zero instance"), Ability)) { return false; }
 	TestEqual(TEXT("One Echo spend"), Source->TestEcho->GetEcho(), 70.0f);
 	TestFalse(TEXT("Native shot closes lifecycle"), Ability->IsActive());
@@ -116,12 +116,12 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovSeleneDefenseReceiptTest, "ProjectVelkorran
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovSeleneDefenseReceiptTest::RunTest(const FString& Parameters)
 {
-	FSeleneTestWorld Fixture;
+	SovSelenePayloadTests::FSeleneTestWorld Fixture;
 	auto* Source = Fixture.Character(FVector::ZeroVector, 0);
 	auto* Target = Fixture.Character(FVector(200.0f, 0.0f, 0.0f));
 	if (!Source || !Target) { AddError(TEXT("Fixture creation failed")); return false; }
 	const auto& Tags = FSovGameplayTags::Get();
-	auto Ctx = Context(Source, Tags.Ability_Echo_Selene_StaccatoZero);
+	auto Ctx = SovSelenePayloadTests::Context(Source, Tags.Ability_Echo_Selene_StaccatoZero);
 	auto* ASC = Target->GetNarrativeAbilitySystemComponent();
 	ASC->AddLooseGameplayTag(Tags.Damage_Immunity_Thermal);
 	TestTrue(TEXT("Thermal immunity alone preserves Echo vulnerability"), SovSelenePayload::EligibleTarget(Ctx, Target));
@@ -133,9 +133,9 @@ bool FSovSeleneDefenseReceiptTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Freeze immunity does not suppress Chill"), ASC->HasMatchingGameplayTag(Tags.State_Status_Chilled));
 	Target->SetActorRotation(FRotator(0.0f, 180.0f, 0.0f));
 	ASC->AddLooseGameplayTag(Tags.State_Deflecting);
-	const float ShieldBefore = Shield(Target);
+	const float ShieldBefore = SovSelenePayloadTests::Shield(Target);
 	TestFalse(TEXT("Perfect defense receipt rejects control"), SovSelenePayload::Damage(Ctx, Target, nullptr, 60.0f, 10.0f, 1.75f, true));
-	TestEqual(TEXT("Perfect deflection negates damage"), Shield(Target), ShieldBefore);
+	TestEqual(TEXT("Perfect deflection negates damage"), SovSelenePayloadTests::Shield(Target), ShieldBefore);
 	return true;
 }
 
@@ -143,13 +143,13 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovSeleneStillpointFieldTest, "ProjectVelkorra
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovSeleneStillpointFieldTest::RunTest(const FString& Parameters)
 {
-	FSeleneTestWorld Fixture;
+	SovSelenePayloadTests::FSeleneTestWorld Fixture;
 	auto* Source = Fixture.Character(FVector::ZeroVector, 0);
 	auto* Target = Fixture.Character(FVector(600.0f, 0.0f, 0.0f));
 	auto* Late = Fixture.Character(FVector(1500.0f, 200.0f, 0.0f));
 	if (!Source || !Target || !Late) { AddError(TEXT("Fixture creation failed")); return false; }
 	FSovSeleneProjectileParameters Data;
-	Data.Context = Context(Source, FSovGameplayTags::Get().Ability_Echo_Selene_StillpointGrenade);
+	Data.Context = SovSelenePayloadTests::Context(Source, FSovGameplayTags::Get().Ability_Echo_Selene_StillpointGrenade);
 	Data.Fuse = 0.0f; Data.DamagePerSecond = 12.0f;
 	auto* Field = ASovSeleneCombatProjectile::SpawnNativePayload(nullptr, FVector(500.0f, 0.0f, 0.0f), Data);
 	if (!TestNotNull(TEXT("Native grenade needs no Blueprint projectile"), Field)) { return false; }
@@ -173,7 +173,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovSeleneWakeLaneTest, "ProjectVelkorran.Campa
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovSeleneWakeLaneTest::RunTest(const FString& Parameters)
 {
-	FSeleneTestWorld Fixture;
+	SovSelenePayloadTests::FSeleneTestWorld Fixture;
 	auto* Source = Fixture.Character(FVector::ZeroVector, 0);
 	auto* Center = Fixture.Character(FVector(500.0f, 0.0f, 0.0f));
 	auto* Flank = Fixture.Character(FVector(500.0f, 180.0f, 0.0f));
@@ -181,7 +181,7 @@ bool FSovSeleneWakeLaneTest::RunTest(const FString& Parameters)
 	if (!Source || !Center || !Flank || !Hidden) { AddError(TEXT("Fixture creation failed")); return false; }
 	Fixture.Wall(FVector(750.0f, 0.0f, 0.0f), FVector(25.0f, 600.0f, 200.0f));
 	FSovSeleneProjectileParameters Data;
-	Data.Context = Context(Source, FSovGameplayTags::Get().Ability_Echo_Selene_VeritysWake);
+	Data.Context = SovSelenePayloadTests::Context(Source, FSovGameplayTags::Get().Ability_Echo_Selene_VeritysWake);
 	Data.Mode = ESovSeleneProjectileMode::Wake; Data.Radius = 250.0f; Data.Damage = 50.0f; Data.Speed = 2200.0f;
 	auto* Wave = ASovSeleneCombatProjectile::SpawnNativePayload(nullptr, FVector::ZeroVector, Data);
 	if (!Wave) { AddError(TEXT("Wave creation failed")); return false; }
@@ -199,11 +199,11 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovSeleneDispatchLedgerTest, "ProjectVelkorran
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovSeleneDispatchLedgerTest::RunTest(const FString& Parameters)
 {
-	FSeleneTestWorld Fixture;
+	SovSelenePayloadTests::FSeleneTestWorld Fixture;
 	auto* Source = Fixture.Character(FVector::ZeroVector, 0);
 	auto* Target = Fixture.Character(FVector(350.0f, 0.0f, 0.0f));
 	if (!Source || !Target) { AddError(TEXT("Fixture creation failed")); return false; }
-	auto* Ability = Activate<USovDispatchPayloadTestAbility>(*this, Source);
+	auto* Ability = SovSelenePayloadTests::Activate<USovDispatchPayloadTestAbility>(*this, Source);
 	auto* Projectile = Fixture.Projectile();
 	if (!TestNotNull(TEXT("Native Dispatch instance"), Ability) || !TestNotNull(TEXT("Returning Verity"), Projectile)) { return false; }
 	TestEqual(TEXT("Signature spends 90 Echo"), Source->TestEcho->GetEcho(), 10.0f);
@@ -218,7 +218,7 @@ bool FSovSeleneDispatchLedgerTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Return closes ability"), Ability->IsActive());
 	TestFalse(TEXT("Return clears only owned absence effect"), Source->GetNarrativeAbilitySystemComponent()->HasMatchingGameplayTag(FSovGameplayTags::Get().State_Weapon_VerityAbsent));
 	Source->TestEcho->RestoreEchoFromCheckpoint(100.0f);
-	auto* Second = Activate<USovDispatchPayloadTestAbility>(*this, Source);
+	auto* Second = SovSelenePayloadTests::Activate<USovDispatchPayloadTestAbility>(*this, Source);
 	if (!Second) { return false; }
 	Second->FinishEchoAbility(true);
 	TestNull(TEXT("Cancellation destroys returning payload"), Fixture.Projectile());
@@ -230,10 +230,10 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovSeleneNativeLaunchTest, "ProjectVelkorran.C
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovSeleneNativeLaunchTest::RunTest(const FString& Parameters)
 {
-	FSeleneTestWorld Fixture;
+	SovSelenePayloadTests::FSeleneTestWorld Fixture;
 	auto* Source = Fixture.Character(FVector::ZeroVector, 0);
 	if (!Source) { AddError(TEXT("Fixture creation failed")); return false; }
-	auto* Stillpoint = Activate<USovStillpointPayloadTestAbility>(*this, Source);
+	auto* Stillpoint = SovSelenePayloadTests::Activate<USovStillpointPayloadTestAbility>(*this, Source);
 	if (!Stillpoint) { return false; }
 	TestEqual(TEXT("Stillpoint spends 35 with native defaults"), Source->TestEcho->GetEcho(), 65.0f);
 	TestFalse(TEXT("Throw closes action while grenade persists"), Stillpoint->IsActive());
@@ -241,7 +241,7 @@ bool FSovSeleneNativeLaunchTest::RunTest(const FString& Parameters)
 	if (!TestNotNull(TEXT("Native initialized grenade exists"), Grenade)) { return false; }
 	Grenade->Destroy();
 	Source->TestEcho->RestoreEchoFromCheckpoint(100.0f);
-	auto* Wake = Activate<USovWakePayloadTestAbility>(*this, Source);
+	auto* Wake = SovSelenePayloadTests::Activate<USovWakePayloadTestAbility>(*this, Source);
 	if (!Wake) { return false; }
 	TestEqual(TEXT("Wake spends 30 with native defaults"), Source->TestEcho->GetEcho(), 70.0f);
 	TestFalse(TEXT("Wave release closes action"), Wake->IsActive());
@@ -253,7 +253,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovSeleneDispatchQueuedInputTest, "ProjectVelk
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovSeleneDispatchQueuedInputTest::RunTest(const FString& Parameters)
 {
-	FSeleneTestWorld Fixture;
+	SovSelenePayloadTests::FSeleneTestWorld Fixture;
 	auto* Source = Fixture.Character(FVector::ZeroVector, 0);
 	if (!Source) { AddError(TEXT("Fixture creation failed")); return false; }
 	auto* ASC = Source->GetNarrativeAbilitySystemComponent();
@@ -284,12 +284,12 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovSeleneFrozenDOTTest, "ProjectVelkorran.Camp
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovSeleneFrozenDOTTest::RunTest(const FString& Parameters)
 {
-	FSeleneTestWorld Fixture;
+	SovSelenePayloadTests::FSeleneTestWorld Fixture;
 	auto* Source = Fixture.Character(FVector::ZeroVector, 0);
 	auto* Frozen = Fixture.Character(FVector(300.0f, 0.0f, 0.0f));
 	auto* Thawed = Fixture.Character(FVector(300.0f, 200.0f, 0.0f));
 	if (!Source || !Frozen || !Thawed) { AddError(TEXT("Fixture creation failed")); return false; }
-	const auto Ctx = Context(Source, FSovGameplayTags::Get().Ability_Echo_Selene_StillpointGrenade);
+	const auto Ctx = SovSelenePayloadTests::Context(Source, FSovGameplayTags::Get().Ability_Echo_Selene_StillpointGrenade);
 	SovSelenePayload::Control(Ctx, Frozen, 3.5f, 3.0f, true);
 	SovSelenePayload::Control(Ctx, Thawed, 3.5f, 3.0f, true);
 	SovSelenePayload::FrostDOT(Ctx, Frozen, 12.0f, 3.5f, true);
@@ -306,8 +306,8 @@ bool FSovSeleneFrozenDOTTest::RunTest(const FString& Parameters)
 		++GFrameCounter;
 		Fixture.World->Tick(LEVELTICK_All, 1.1f);
 	}
-	TestTrue(TEXT("Frozen target receives actual periodic damage"), Shield(Frozen) < 100.0f);
-	TestEqual(TEXT("Thawed target receives no frozen-only damage"), Shield(Thawed), 100.0f);
+	TestTrue(TEXT("Frozen target receives actual periodic damage"), SovSelenePayloadTests::Shield(Frozen) < 100.0f);
+	TestEqual(TEXT("Thawed target receives no frozen-only damage"), SovSelenePayloadTests::Shield(Thawed), 100.0f);
 	return true;
 }
 
@@ -316,7 +316,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovNativeAndGenericStatusOwnershipTest,
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovNativeAndGenericStatusOwnershipTest::RunTest(const FString& Parameters)
 {
-	FSeleneTestWorld Fixture;
+	SovSelenePayloadTests::FSeleneTestWorld Fixture;
 	auto* Source = Fixture.Character(FVector::ZeroVector, 0);
 	auto* Target = Fixture.Character(FVector(200.0f, 0.0f, 0.0f));
 	if (!Source || !Target) { AddError(TEXT("Fixture creation failed")); return false; }
@@ -325,7 +325,7 @@ bool FSovNativeAndGenericStatusOwnershipTest::RunTest(const FString& Parameters)
 	Target->AddInstanceComponent(Status); Status->RegisterComponent();
 	if (!TestTrue(TEXT("Generic status listener initialized"), Status->InitializeWithAbilitySystem(ASC))) { return false; }
 	const auto& Tags = FSovGameplayTags::Get();
-	auto Ctx = Context(Source, Tags.Ability_Echo_Selene_StaccatoZero);
+	auto Ctx = SovSelenePayloadTests::Context(Source, Tags.Ability_Echo_Selene_StaccatoZero);
 	TestTrue(TEXT("Native damage accepts its control receipt"), SovSelenePayload::Damage(Ctx, Target, nullptr, 1.0f, 0.0f, 1.0f, true));
 	TestFalse(TEXT("Receipt does not prematurely apply generic Freeze"), Status->HasActiveStatus(Tags.Status_Apply_Freeze));
 	TestFalse(TEXT("Receipt does not also apply generic Chill"), Status->HasActiveStatus(Tags.Status_Apply_Chill));

@@ -103,5 +103,6 @@ private:
 	TObjectPtr<UAbilitySystemComponent> AbilitySystemComponent;
 
 	FTimerHandle DeflectionWindowTimerHandle;
+	uint32 DeflectionEpoch = 0;
 	bool bAppliedDeflectingTag = false;
 };

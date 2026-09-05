@@ -10,17 +10,12 @@
 #include "NPCGoal.h"
 #include "NPCGoalItem.h"
 #include "NPCGoalGenerator.h"
+#if WITH_GAMEPLAY_DEBUGGER
+#include "GameplayDebuggerCategory.h"
+#endif
 #include "NPCActivityComponent.generated.h"
 
-
-// Copyright Epic Games, Inc. All Rights Reserved.
-
-#pragma once
-
 #if WITH_GAMEPLAY_DEBUGGER
-
-#include "CoreMinimal.h"
-#include "GameplayDebuggerCategory.h"
 
 class AActor;
 class APlayerController;

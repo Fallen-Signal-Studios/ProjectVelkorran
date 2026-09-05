@@ -62,6 +62,9 @@ bool USovGameplayAbility_SeleneDeflection::CanActivateAbility(
 	const FSovGameplayTags& SovTags = FSovGameplayTags::Get();
 	if (!AbilitySystem
 		|| !Avatar
+		|| AbilitySystem->GetAvatarActor() != Avatar
+		|| !FMath::IsFinite(DeflectionRecoveryDuration)
+		|| DeflectionRecoveryDuration < 0.f
 		|| !AbilitySystem->HasMatchingGameplayTag(
 			SovTags.Character_Player_Selene)
 		|| AbilitySystem->HasMatchingGameplayTag(
@@ -116,34 +119,61 @@ void USovGameplayAbility_SeleneDeflection::ActivateAbility(
 	const FGameplayAbilityActivationInfo ActivationInfo,
 	const FGameplayEventData* TriggerEventData)
 {
-	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
-
-	if (!ActorInfo)
+	const uint32 Epoch = ++ActivationEpoch;
+	const TWeakObjectPtr<AActor> StartingAvatar = ActorInfo ? ActorInfo->AvatarActor.Get() : nullptr;
+	const TWeakObjectPtr<UAbilitySystemComponent> StartingASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
+	const auto CanContinue = [this, Epoch, StartingAvatar, StartingASC]()
 	{
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-		return;
-	}
+		if (Epoch != ActivationEpoch || !IsActive()) { return false; }
+		if (!StartingAvatar.IsValid() || !StartingASC.IsValid() || !CurrentActorInfo
+			|| CurrentActorInfo->AvatarActor != StartingAvatar
+			|| CurrentActorInfo->AbilitySystemComponent != StartingASC
+			|| StartingASC->GetAvatarActor() != StartingAvatar.Get())
+		{
+			EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+			return false;
+		}
+		return true;
+	};
+	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
+	if (!CanContinue()) { return; }
 
 	AActor* Avatar = ActorInfo->AvatarActor.Get();
 	BindDeflectionComponent(
 		Avatar ? Avatar->FindComponentByClass<USovDeflectionComponent>() : nullptr);
-	if (!IsValid(DeflectionComponent)
-		|| !DeflectionComponent->BeginDeflection())
+	if (!CanContinue()) { return; }
+	if (!IsValid(DeflectionComponent))
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
 
+	// Claim cleanup before opening the window: both GAS tag callbacks and the
+	// component's start event may cancel this activation synchronously.
+	ActiveDeflectionComponent = DeflectionComponent;
 	bDeflectionStarted = true;
 	BindCancellationTags(ActorInfo->AbilitySystemComponent.Get());
-	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
+	if (!CanContinue()) { return; }
+	const bool bBeganDeflection = DeflectionComponent->BeginDeflection();
+	if (!CanContinue()) { return; }
+	if (!bBeganDeflection)
+	{
+		bDeflectionStarted = false;
+		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+		return;
+	}
+	const bool bCommitted = CommitAbility(Handle, ActorInfo, ActivationInfo);
+	if (!CanContinue()) { return; }
+	if (!bCommitted)
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
 
 	PlayDeflectionWeaponMontage();
+	if (!CanContinue()) { return; }
 	ReceiveDeflectionAbilityStarted();
+	if (!CanContinue()) { return; }
 	if (DeflectionRecoveryDuration <= KINDA_SMALL_NUMBER)
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
@@ -173,7 +203,27 @@ void USovGameplayAbility_SeleneDeflection::EndAbility(
 	const bool bReplicateEndAbility,
 	const bool bWasCancelled)
 {
+	if (bEndingDeflectionAbility || !IsEndAbilityValid(Handle, ActorInfo)) { return; }
+	if (ScopeLockCount > 0)
+	{
+		++ActivationEpoch;
+		WaitingToExecute.Add(FPostLockDelegate::CreateUObject(this, &ThisClass::EndAbility,
+			Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled));
+		return;
+	}
+	TGuardValue<bool> EndingDeflectionAbility(bEndingDeflectionAbility, true);
+	++ActivationEpoch;
 	UnbindCancellationTags();
+	const bool bWasDeflectionStarted = bDeflectionStarted;
+	const TWeakObjectPtr<USovDeflectionComponent> PreviousComponent = ActiveDeflectionComponent;
+	ActiveDeflectionComponent.Reset();
+	bDeflectionStarted = false;
+	if (RecoveryTask)
+	{
+		RecoveryTask->OnFinish.RemoveDynamic(this, &ThisClass::HandleRecoveryFinished);
+		RecoveryTask->EndTask();
+		RecoveryTask = nullptr;
+	}
 	if (bWasCancelled)
 	{
 		StopDeflectionWeaponMontage();
@@ -183,19 +233,19 @@ void USovGameplayAbility_SeleneDeflection::EndAbility(
 		// A normal recovery end does not cut off a longer authored spin.
 		ActiveDeflectionWeaponVisual = nullptr;
 	}
-	if (IsValid(DeflectionComponent) && bDeflectionStarted)
+	if (PreviousComponent.IsValid() && bWasDeflectionStarted)
 	{
-		DeflectionComponent->EndDeflection();
+		PreviousComponent->EndDeflection();
 	}
 
-	RecoveryTask = nullptr;
-	const bool bWasDeflectionStarted = bDeflectionStarted;
-	bDeflectionStarted = false;
 	if (bWasDeflectionStarted)
 	{
 		ReceiveDeflectionAbilityEnded(bWasCancelled);
 	}
 
+	// GAS ended listeners may reactivate this same instance. Native cleanup is
+	// complete; a replacement must be able to cancel itself during its startup.
+	bEndingDeflectionAbility = false;
 	Super::EndAbility(
 		Handle,
 		ActorInfo,
@@ -240,26 +290,29 @@ bool USovGameplayAbility_SeleneDeflection::ShouldRunLocalPresentation() const
 
 void USovGameplayAbility_SeleneDeflection::PlayDeflectionWeaponMontage()
 {
+	const uint32 Epoch = ActivationEpoch;
 	ActiveDeflectionWeaponVisual = nullptr;
 	ANarrativeCharacter* NarrativeCharacter = GetOwningNarrativeCharacter();
 	ASovTransformingWeaponVisual* WeaponVisual = NarrativeCharacter
 		? Cast<ASovTransformingWeaponVisual>(
 			NarrativeCharacter->GetWieldedWeaponVisual(true))
 		: nullptr;
-	if (IsValid(WeaponVisual)
-		&& WeaponVisual->PlayDeflectionWeaponMontage())
+	if (IsValid(WeaponVisual))
 	{
 		ActiveDeflectionWeaponVisual = WeaponVisual;
+		const bool bPlayed = WeaponVisual->PlayDeflectionWeaponMontage();
+		if (Epoch == ActivationEpoch && !bPlayed) { ActiveDeflectionWeaponVisual = nullptr; }
 	}
 }
 
 void USovGameplayAbility_SeleneDeflection::StopDeflectionWeaponMontage()
 {
-	if (IsValid(ActiveDeflectionWeaponVisual))
-	{
-		ActiveDeflectionWeaponVisual->StopDeflectionWeaponMontage();
-	}
+	ASovTransformingWeaponVisual* PreviousVisual = ActiveDeflectionWeaponVisual;
 	ActiveDeflectionWeaponVisual = nullptr;
+	if (IsValid(PreviousVisual))
+	{
+		PreviousVisual->StopDeflectionWeaponMontage();
+	}
 }
 
 void USovGameplayAbility_SeleneDeflection::HandlePerfectDeflection(

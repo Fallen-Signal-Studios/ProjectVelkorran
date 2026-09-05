@@ -14,6 +14,13 @@
 #include "Sovereign/SovGameplayTags.h"
 #include "TimerManager.h"
 #if WITH_AUTOMATION_TESTS
+struct FSovFinisherRuntimeTestAccess
+{
+    // Isolate phase delivery from authored alignment geometry. Keep the real
+    // GAS activation and target reservation for the durable commit boundary.
+    static void AlignedStrike(USovGameplayAbility_Finisher* Ability)
+    { Ability->bAligned=true; Ability->Strike(); }
+};
 struct FSovProjectileDefenseTestAccess
 {
     static void Impact(ASovReformationDroneRocketProjectile* Rocket,AActor* Target)
@@ -95,6 +102,45 @@ bool FSovFinisherFallbackRuntimeTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Fallback is nonlethal for an elite"),EnemyASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()),1.f);
     TestFalse(TEXT("Missing alignment cannot consume cinematic phase outcome"),Component->HasResolvedPhase(T.State_Target_Exposed));
     TestFalse(TEXT("Fallback returns action control within bounded duration"),ASC->FindAbilitySpecFromHandle(Handle)->IsActive());
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovFinisherCommittedOutcomeTest,
+    "ProjectVelkorran.Campaign.Finisher.CommittedOutcomeSurvivesCancellation",EAutomationTestFlags::EditorContext|EAutomationTestFlags::ProductFilter)
+bool FSovFinisherCommittedOutcomeTest::RunTest(const FString& Parameters)
+{
+    FFinisherWorld F; auto* Player=F.Character(0.f,0); auto* Enemy=F.Character(150.f,1);
+    if (!TestNotNull(TEXT("Player fixture"),Player) || !TestNotNull(TEXT("Enemy fixture"),Enemy)) { return false; }
+    auto* Component=F.Eligible(Enemy); auto* ASC=Player->GetNarrativeAbilitySystemComponent();
+    auto* EnemyASC=Enemy->GetNarrativeAbilitySystemComponent(); const auto& T=FSovGameplayTags::Get();
+    Component->TargetKind=ESovFinisherTargetKind::Elite; Component->RequiredPhaseTag=T.State_Target_Exposed;
+    EnemyASC->AddLooseGameplayTag(T.State_Target_Exposed);
+    const auto Handle=ASC->GiveAbility(FGameplayAbilitySpec(USovGameplayAbility_Finisher::StaticClass(),1));
+    if (!TestTrue(TEXT("Real phase finisher activates"),ASC->TryActivateAbility(Handle,false))) { return false; }
+    auto* Ability=Cast<USovGameplayAbility_Finisher>(ASC->FindAbilitySpecFromHandle(Handle)->GetPrimaryInstance());
+    if (!TestNotNull(TEXT("Native finisher instance"),Ability)) { return false; }
+    int32 OutcomeCount=0;
+    bool bPreservedSource=false, bPreservedPhase=false;
+    const auto EventHandle=EnemyASC->GenericGameplayEventCallbacks.FindOrAdd(T.Event_Finisher_PhaseResolved)
+        .AddLambda([&](const FGameplayEventData* Payload)
+        {
+            ++OutcomeCount;
+            bPreservedSource=Payload && Payload->Instigator.Get()==Player && Payload->Target.Get()==Enemy;
+            bPreservedPhase=Payload && Payload->TargetTags.HasTagExact(T.State_Target_Exposed);
+        });
+    const auto HealthHandle=EnemyASC->GetGameplayAttributeValueChangeDelegate(UNarrativeAttributeSetBase::GetHealthAttribute())
+        .AddLambda([&](const FOnAttributeChangeData&) { ASC->CancelAbilityHandle(Handle); });
+    FSovFinisherRuntimeTestAccess::AlignedStrike(Ability);
+    EnemyASC->GetGameplayAttributeValueChangeDelegate(UNarrativeAttributeSetBase::GetHealthAttribute()).Remove(HealthHandle);
+    TestFalse(TEXT("Health callback cancelled the action"),ASC->FindAbilitySpecFromHandle(Handle)->IsActive());
+    TestTrue(TEXT("Phase remains durably committed"),Component->HasResolvedPhase(T.State_Target_Exposed));
+    TestEqual(TEXT("Committed phase still delivers one outcome"),OutcomeCount,1);
+    TestTrue(TEXT("Outcome retains the source and target cleared during cancellation"),bPreservedSource);
+    TestTrue(TEXT("Outcome retains the committed phase"),bPreservedPhase);
+    TestEqual(TEXT("Elite strike remains nonlethal"),EnemyASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()),1.f);
+    FSovFinisherRuntimeTestAccess::AlignedStrike(Ability);
+    TestEqual(TEXT("A duplicate strike cannot replay the outcome"),OutcomeCount,1);
+    TestFalse(TEXT("Committed phase cannot be reserved for repeated damage"),Component->IsAvailableFor(Player));
+    EnemyASC->GenericGameplayEventCallbacks.FindOrAdd(T.Event_Finisher_PhaseResolved).Remove(EventHandle);
     return true;
 }
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovRocketReflectionRuntimeTest,

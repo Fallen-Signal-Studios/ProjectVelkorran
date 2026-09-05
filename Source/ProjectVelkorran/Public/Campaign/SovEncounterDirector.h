@@ -176,6 +176,7 @@ private:
 	void RemoveTimedEffects(UAbilitySystemComponent* ASC);
 	bool RemoveTimedEffects(UAbilitySystemComponent* ASC, TFunctionRef<bool()> CanContinue);
 	UFUNCTION() void HandleDeath(AActor* KilledActor, UNarrativeAbilitySystemComponent* ASC, bool bIsDead);
+	void EvaluateCompletionConditions();
 	void BindDeaths();
 	void UnbindDeaths();
 	UPROPERTY(Transient) TObjectPtr<ASovPlayerCharacterBase> EncounterPlayer;

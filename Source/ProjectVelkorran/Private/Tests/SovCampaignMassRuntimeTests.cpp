@@ -69,7 +69,8 @@ struct FSovCampaignMassTestAccess
 		return Found ? *Found : FSovEncounterMassRecord();
 	}
 	static void CaptureTransforms(ASovEncounterDirector& Director) { Director.CaptureMassTransforms(); }
-	static void StepPromotion(ASovEncounterDirector& Director) { Director.TickMassPromotions(); }
+	static void StepPromotion(ASovEncounterDirector& Director) { Director.Tick(0.f); }
+	static void BindDeaths(ASovEncounterDirector& Director) { Director.BindDeaths(); }
 	static void DestroyEntity(ASovEncounterDirector& Director, FName Id) { Director.DestroyMassEntity(Id); }
 	static bool RecreateEntity(ASovEncounterDirector& Director, FName Id, FString& Error)
 	{
@@ -347,6 +348,67 @@ bool FSovCampaignMassRoundTripTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Verified replacement is visible"), Replacement->IsHidden());
 	Entities->GetMutableEntityManager().FlushCommands();
 	TestFalse(TEXT("Old Mass entity removed after handoff"), Entities->GetMutableEntityManager().IsEntityValid(Entity));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCampaignMassDeferredVictoryTest,
+	"ProjectVelkorran.Campaign.Mass.FinalRequiredDeathDuringOptionalPromotion",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+
+bool FSovCampaignMassDeferredVictoryTest::RunTest(const FString& Parameters)
+{
+	static_cast<void>(Parameters);
+	for (const bool bFailPromotion : { false, true })
+	{
+		FCampaignMassRuntimeWorld Fixture;
+		if (!TestNotNull(TEXT("World"), Fixture.World)) { return false; }
+		auto* Save = Fixture.World->GetSubsystem<UNarrativeSaveSubsystem>();
+		if (!TestNotNull(TEXT("Narrative save authority"), Save) || !Save->UpdateSaveObject(true)) { return false; }
+		auto* Director = Fixture.Director(TEXT("Test.DeferredVictory"));
+		FActorSpawnParameters Spawn; Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		auto* Required = Fixture.World->SpawnActor<ASovCampaignMassRoundTripNPC>(ASovCampaignMassRoundTripNPC::StaticClass(),
+			FVector::ZeroVector, FRotator::ZeroRotator, Spawn);
+		auto* Optional = Fixture.World->SpawnActor<ASovCampaignMassRoundTripNPC>(ASovCampaignMassRoundTripNPC::StaticClass(),
+			FVector(400.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
+		if (!Director || !Required || !Optional) { AddError(TEXT("Encounter fixtures could not spawn")); return false; }
+		TStrongObjectPtr<UNPCDefinition> Definition(NewObject<UNPCDefinition>());
+		Required->SetNPCDefinition(Definition.Get()); Optional->SetNPCDefinition(Definition.Get());
+		FSovEncounterParticipant RequiredParticipant;
+		RequiredParticipant.ParticipantId = TEXT("Required.Guard"); RequiredParticipant.Character = Required;
+		Director->Participants.Add(RequiredParticipant);
+		FSovEncounterParticipant OptionalParticipant;
+		OptionalParticipant.ParticipantId = TEXT("Optional.Guard"); OptionalParticipant.Character = Optional;
+		OptionalParticipant.bRequiredForVictory = false; OptionalParticipant.bAllowMassRepresentation = true;
+		Director->Participants.Add(OptionalParticipant);
+		Director->GetCoordinationComponent()->InitializeCoordination();
+		FString Error;
+		if (!TestTrue(TEXT("Optional participant demotes through the real snapshot path"),
+			Director->SetParticipantRepresentation(OptionalParticipant.ParticipantId, ESovCampaignRepresentationTier::Mass,
+				TEXT("Encounter.ControlledBoundary"), Error))) { AddError(Error); return false; }
+		if (!TestTrue(TEXT("Optional participant begins asynchronous promotion"),
+			Director->SetParticipantRepresentation(OptionalParticipant.ParticipantId, ESovCampaignRepresentationTier::Actor,
+				TEXT("Encounter.ControlledBoundary"), Error))) { AddError(Error); return false; }
+		TestTrue(TEXT("Promotion is pending before the last required death"), Director->IsMassPromotionPending());
+		FSovCampaignMassTestAccess::BindDeaths(*Director);
+		auto* RequiredASC = Required->GetNarrativeAbilitySystemComponent();
+		// Deliver the native GAS death notification while the asynchronous replacement is held.
+		RequiredASC->OnDeathStateChanged.Broadcast(Required, RequiredASC, true);
+		TestEqual(TEXT("Victory waits for promotion stability"), Director->GetEncounterState(), ESovEncounterState::Active);
+		if (bFailPromotion)
+		{
+			auto* Replacement = Director->GetParticipant(OptionalParticipant.ParticipantId);
+			if (!TestNotNull(TEXT("Pending replacement"), Replacement)) { return false; }
+			Replacement->Destroy();
+		}
+		FSovCampaignMassTestAccess::StepPromotion(*Director);
+		const auto Expected = bFailPromotion ? ESovEncounterState::Failed : ESovEncounterState::Succeeded;
+		TestEqual(TEXT("Final receipt resolves only after successful promotion"), Director->GetEncounterState(), Expected);
+		TestEqual(TEXT("Completion reward becomes available only on success"),
+			Director->ClaimCompletionReward(TEXT("Test.Victory")), !bFailPromotion);
+		FSovCampaignMassTestAccess::StepPromotion(*Director);
+		TestEqual(TEXT("A later tick preserves the terminal outcome"), Director->GetEncounterState(), Expected);
+		TestFalse(TEXT("Later evaluation cannot grant the completion reward again"), Director->ClaimCompletionReward(TEXT("Test.Victory")));
+	}
 	return true;
 }
 #endif

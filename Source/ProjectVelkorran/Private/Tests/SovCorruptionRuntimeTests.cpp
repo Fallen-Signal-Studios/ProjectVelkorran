@@ -383,6 +383,41 @@ bool FSovCorruptionBandPressureTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCorruptionGlobalImmunityTest, "ProjectVelkorran.Campaign.Corruption.GlobalImmunity",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCorruptionGlobalImmunityTest::RunTest(const FString& Parameters)
+{
+	const auto& Tags = FSovGameplayTags::Get();
+	const FGameplayTag Immunities[] = { Tags.State_Damage_Immune, Tags.Damage_Immunity_All,
+		Tags.Damage_Immunity_Corruption, Tags.State_Invulnerable, FNarrativeGameplayTags::Get().State_Invulnerable,
+		Tags.Status_Immunity, Tags.Status_Immunity_All, Tags.Status_Immunity_Corruption };
+	for (const FGameplayTag Immunity : Immunities)
+	{
+		FCorruptionWorld F; if (!F.Pawn || !F.PC) { AddError(TEXT("Fixture failed")); return false; }
+		F.PC->State->BeginMission(F.Mission());
+		auto* ASC = F.Pawn->GetNarrativeAbilitySystemComponent();
+		auto* Component = F.Pawn->GetCorruptionComponent();
+		ASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetStaminaRegenRateAttribute(), 20.0f);
+		ASC->AddLooseGameplayTag(Immunity);
+		auto* Profile = F.Profile(TEXT("ImmunityField"), 60.0f);
+		Profile->EscapeRecoveryPerSecond = 0.0f;
+		auto* Source = F.Source(Profile);
+		TestEqual(*FString::Printf(TEXT("%s blocks real field contact"), *Immunity.ToString()), Component->GetCorruptionState().Exposure, 0.0f);
+		TestFalse(TEXT("An immune player acquires no source handle"), Component->AcquireSource(Source).IsValid());
+		ASC->RemoveLooseGameplayTag(Immunity);
+		ASC->AddLooseGameplayTag(Tags.Status_Immunity_Burn);
+		FSovCorruptionTestAccess::Refresh(*Source);
+		TestEqual(TEXT("Unrelated Burn immunity does not block corruption"), Component->GetCorruptionState().Exposure, 60.0f);
+		TestEqual(TEXT("Permitted exposure applies the owned Contest penalty"), ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetStaminaRegenRateAttribute()), 10.0f);
+		ASC->AddLooseGameplayTag(Immunity);
+		TestEqual(TEXT("Immunity immediately prevents status-duration pressure"), USovCorruptionComponent::ResolveIncomingStatusDuration(F.Pawn, 4.0f), 4.0f);
+		Component->TickComponent(0.1f, LEVELTICK_All, nullptr);
+		TestEqual(TEXT("Immunity removes only the owned combat pressure"), ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetStaminaRegenRateAttribute()), 20.0f);
+		TestEqual(TEXT("Immunity does not invent a cleanse or new exposure"), Component->GetCorruptionState().Exposure, 60.0f);
+	}
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCorruptionMachineryTest, "ProjectVelkorran.Campaign.Corruption.NativeMachineryAndProtection",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovCorruptionMachineryTest::RunTest(const FString& Parameters)

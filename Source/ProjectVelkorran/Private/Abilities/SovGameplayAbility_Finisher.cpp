@@ -208,15 +208,19 @@ void USovGameplayAbility_Finisher::Strike()
     Spec.SetSetByCallerMagnitude(FNarrativeGameplayTags::Get().SetByCaller_Damage,Damage);
     Spec.SetSetByCallerMagnitude(T.SetByCaller_Damage_PoiseDamage,0.f);
     if (UNarrativeDamageExecCalc::ShouldRejectTransaction(ActionASC.Get(),TargetASC.Get(),Spec)) { FinishAction(); return; }
-    const bool bPhaseOutcome=!bNormal && bAligned && TargetComponent->CommitPhase(this,Lease);
     const FGameplayTag ResolvedPhase=TargetComponent->RequiredPhaseTag;
+    // A committed phase belongs to the target's durable state. Capture its
+    // outcome before damage callbacks can end this action and clear our source.
+    FGameplayEventData PhasePayload;
+    PhasePayload.EventTag=T.Event_Finisher_PhaseResolved;
+    PhasePayload.Instigator=ActionAvatar.Get(); PhasePayload.Target=Target;
+    if (ResolvedPhase.IsValid()) { PhasePayload.TargetTags.AddTag(ResolvedPhase); }
+    PhasePayload.ContextHandle=Context;
+    const bool bPhaseOutcome=!bNormal && bAligned && TargetComponent->CommitPhase(this,Lease);
     if (Damage>0.f) { ActionASC->ApplyGameplayEffectSpecToTarget(Spec,TargetASC.Get()); }
-    if (!OwnsAction(CapturedLease)) { return; }
-    if (bPhaseOutcome && IsValid(Target))
+    if (bPhaseOutcome && IsValid(Target) && !Target->IsActorBeingDestroyed())
     {
-        FGameplayEventData Payload; Payload.EventTag=T.Event_Finisher_PhaseResolved; Payload.Instigator=ActionAvatar.Get(); Payload.Target=Target;
-        Payload.TargetTags.AddTag(ResolvedPhase); Payload.ContextHandle=Context;
-        UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(Target,Payload.EventTag,Payload);
+        UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(Target,PhasePayload.EventTag,PhasePayload);
     }
     if (OwnsAction(CapturedLease)) { OnFinisherResolved(Target,bPhaseOutcome); }
 }

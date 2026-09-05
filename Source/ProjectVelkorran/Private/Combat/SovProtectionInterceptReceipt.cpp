@@ -39,7 +39,7 @@ UAbilitySystemComponent* ResolveASC(AActor* Actor)
 	}
 	return nullptr;
 }
-bool Alive(UAbilitySystemComponent* ASC)
+bool IsLivingProtectionParticipant(UAbilitySystemComponent* ASC)
 {
 	return IsValid(ASC) && ASC->GetSet<UNarrativeAttributeSetBase>()
 		&& !ASC->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_IsDead)
@@ -91,7 +91,8 @@ USovProtectionInterceptReceipt* USovProtectionInterceptReceipt::TryCreateForDron
 	auto* ThreatTeam = Cast<INarrativeTeamAgentInterface>(Threat);
 	auto* ProtectorTeam = Cast<INarrativeTeamAgentInterface>(Protector);
 	const FSovGameplayTags& Tags = FSovGameplayTags::Get();
-	if (!Alive(Source) || !Alive(Target) || !Alive(Ally) || Source->GetAvatarActor() != Threat
+	if (!IsLivingProtectionParticipant(Source) || !IsLivingProtectionParticipant(Target) || !IsLivingProtectionParticipant(Ally)
+		|| Source->GetAvatarActor() != Threat
 		|| !IsValid(Protector) || !IsValid(Protected) || Protected == Protector || Target == Source || Ally == Source
 		|| !Controller || ResolveASC(Controller->GetFocusActor()) != Ally
 		|| !Target->HasMatchingGameplayTag(Tags.Character_Player_Tarrik)

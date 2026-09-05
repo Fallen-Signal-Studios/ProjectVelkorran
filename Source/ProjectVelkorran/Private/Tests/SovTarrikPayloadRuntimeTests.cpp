@@ -19,7 +19,7 @@
 #include "TimerManager.h"
 
 #if WITH_AUTOMATION_TESTS
-namespace
+namespace SovTarrikPayloadTests
 {
 struct FTarrikTestWorld
 {
@@ -96,7 +96,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovTarrikSlamRuntimeTest,
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovTarrikSlamRuntimeTest::RunTest(const FString& Parameters)
 {
-	FTarrikTestWorld Fixture;
+	SovTarrikPayloadTests::FTarrikTestWorld Fixture;
 	if (!TestNotNull(TEXT("Physics world"), Fixture.World)) { return false; }
 	auto* Source = Fixture.Character(FVector::ZeroVector, 0);
 	auto* Target = Fixture.Character(FVector(200.f, 0.f, 0.f));
@@ -106,19 +106,19 @@ bool FSovTarrikSlamRuntimeTest::RunTest(const FString& Parameters)
 	if (!Source || !Target || !Friendly || !Hidden || !Immune) { AddError(TEXT("Spawn failed")); return false; }
 	Fixture.Wall(FVector(-150.f, 0.f, 0.f), FVector(20.f, 80.f, 160.f));
 	Immune->GetNarrativeAbilitySystemComponent()->AddLooseGameplayTag(FSovGameplayTags::Get().Damage_Immunity_All);
-	auto* Ability = Activate<USovTarrikSlamTestAbility>(*this, Source);
+	auto* Ability = SovTarrikPayloadTests::Activate<USovTarrikSlamTestAbility>(*this, Source);
 	if (!TestNotNull(TEXT("Slam instance"), Ability)) { return false; }
 	TestEqual(TEXT("One 90 Echo commit"), Source->TestEcho->GetEcho(), 10.f);
 	TestTrue(TEXT("Manual release succeeds"), Ability->ReleaseCinderSlam());
 	TestFalse(TEXT("Second release rejected"), Ability->ReleaseCinderSlam());
 	TestEqual(TEXT("One resolved radial hit"), Target->ResolvedHitCount, 1);
-	TestTrue(TEXT("Hostile Shield reduced"), Shield(Target) < 100.f);
-	TestEqual(TEXT("Friendly unchanged"), Shield(Friendly), 100.f);
-	TestEqual(TEXT("Occluded target unchanged"), Shield(Hidden), 100.f);
-	TestEqual(TEXT("Immune target unchanged"), Shield(Immune), 100.f);
+	TestTrue(TEXT("Hostile Shield reduced"), SovTarrikPayloadTests::Shield(Target) < 100.f);
+	TestEqual(TEXT("Friendly unchanged"), SovTarrikPayloadTests::Shield(Friendly), 100.f);
+	TestEqual(TEXT("Occluded target unchanged"), SovTarrikPayloadTests::Shield(Hidden), 100.f);
+	TestEqual(TEXT("Immune target unchanged"), SovTarrikPayloadTests::Shield(Immune), 100.f);
 	TestEqual(TEXT("Ward adds resistance"), Source->GetNarrativeAbilitySystemComponent()->GetNumericAttribute(
 		UNarrativeAttributeSetBase::GetDamageResistanceAttribute()), 50.f);
-	TestEqual(TEXT("Ward does not grant Shield"), Shield(Source), 100.f);
+	TestEqual(TEXT("Ward does not grant Shield"), SovTarrikPayloadTests::Shield(Source), 100.f);
 	Ability->FinishEchoAbility();
 	TestFalse(TEXT("Late notify rejected"), Ability->ReleaseCinderSlam());
 	return true;
@@ -129,7 +129,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovTarrikRequiemRuntimeTest,
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovTarrikRequiemRuntimeTest::RunTest(const FString& Parameters)
 {
-	FTarrikTestWorld Fixture;
+	SovTarrikPayloadTests::FTarrikTestWorld Fixture;
 	if (!Fixture.World) { return false; }
 	auto* Source = Fixture.Character(FVector::ZeroVector, 0);
 	auto* Friendly = Fixture.Character(FVector(150.f, 0.f, 0.f), 0);
@@ -139,14 +139,14 @@ bool FSovTarrikRequiemRuntimeTest::RunTest(const FString& Parameters)
 	auto* Hidden = Fixture.Character(FVector(1200.f, 0.f, 0.f));
 	if (!Source || !Friendly || !First || !Second || !Side || !Hidden) { return false; }
 	Fixture.Wall(FVector(1100.f, 0.f, 0.f), FVector(25.f, 400.f, 160.f));
-	auto* Ability = Activate<USovTarrikRequiemTestAbility>(*this, Source);
+	auto* Ability = SovTarrikPayloadTests::Activate<USovTarrikRequiemTestAbility>(*this, Source);
 	if (!Ability) { return false; }
 	TestTrue(TEXT("Requiem releases"), Ability->ReleaseCinderlineRequiemFromAim());
 	TestFalse(TEXT("Requiem duplicate rejected"), Ability->ReleaseCinderlineRequiemFromAim());
 	TestEqual(TEXT("First enemy penetrated once"), First->ResolvedHitCount, 1);
 	TestEqual(TEXT("Second enemy penetrated once"), Second->ResolvedHitCount, 1);
-	TestEqual(TEXT("Friendly does not absorb or receive penetration"), Shield(Friendly), 100.f);
-	TestEqual(TEXT("World cover stops penetration"), Shield(Hidden), 100.f);
+	TestEqual(TEXT("Friendly does not absorb or receive penetration"), SovTarrikPayloadTests::Shield(Friendly), 100.f);
+	TestEqual(TEXT("World cover stops penetration"), SovTarrikPayloadTests::Shield(Hidden), 100.f);
 	TestEqual(TEXT("One persistent lane actor"), Fixture.Count<ASovCinderRequiemLine>(), 1);
 	Ability->FinishEchoAbility();
 	Source->RemoveTestWeapon();
@@ -155,7 +155,7 @@ bool FSovTarrikRequiemRuntimeTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("First enemy gets exactly one line packet"), First->ResolvedHitCount, 2);
 	TestEqual(TEXT("Second enemy gets exactly one line packet"), Second->ResolvedHitCount, 2);
 	TestEqual(TEXT("Off-axis hostile receives line only"), Side->ResolvedHitCount, 1);
-	TestEqual(TEXT("World cover also stops chained blasts"), Shield(Hidden), 100.f);
+	TestEqual(TEXT("World cover also stops chained blasts"), SovTarrikPayloadTests::Shield(Hidden), 100.f);
 	TestEqual(TEXT("Only one Echo spend"), Source->TestEcho->GetEcho(), 10.f);
 	return true;
 }
@@ -166,9 +166,9 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovTarrikProjectileLifecycleRuntimeTest,
 bool FSovTarrikProjectileLifecycleRuntimeTest::RunTest(const FString& Parameters)
 {
 	{
-		FTarrikTestWorld Fixture;
+		SovTarrikPayloadTests::FTarrikTestWorld Fixture;
 		auto* Source = Fixture.Character(FVector::ZeroVector, 0);
-		auto* Hunger = Activate<USovTarrikHungerTestAbility>(*this, Source);
+		auto* Hunger = SovTarrikPayloadTests::Activate<USovTarrikHungerTestAbility>(*this, Source);
 		if (!Hunger) { return false; }
 		Fixture.World->GetTimerManager().Tick(0.4f);
 		TestEqual(TEXT("Empty Blueprint gameplay releases one Hunger projectile"), Fixture.Count<ASovVelkorransHungerProjectile>(), 1);
@@ -177,9 +177,9 @@ bool FSovTarrikProjectileLifecycleRuntimeTest::RunTest(const FString& Parameters
 		TestEqual(TEXT("Released projectile survives ability end"), Fixture.Count<ASovVelkorransHungerProjectile>(), 1);
 	}
 	{
-		FTarrikTestWorld Fixture;
+		SovTarrikPayloadTests::FTarrikTestWorld Fixture;
 		auto* Source = Fixture.Character(FVector::ZeroVector, 0);
-		auto* Hunger = Activate<USovTarrikHungerTestAbility>(*this, Source);
+		auto* Hunger = SovTarrikPayloadTests::Activate<USovTarrikHungerTestAbility>(*this, Source);
 		if (!Hunger) { return false; }
 		Source->RemoveTestWeapon();
 		Fixture.World->GetTimerManager().Tick(0.4f);
@@ -187,9 +187,9 @@ bool FSovTarrikProjectileLifecycleRuntimeTest::RunTest(const FString& Parameters
 		TestFalse(TEXT("Invalid source cancels recovery lane"), Hunger->IsActive());
 	}
 	{
-		FTarrikTestWorld Fixture;
+		SovTarrikPayloadTests::FTarrikTestWorld Fixture;
 		auto* Source = Fixture.Character(FVector::ZeroVector, 0);
-		auto* Grenade = Activate<USovTarrikGrenadeTestAbility>(*this, Source);
+		auto* Grenade = SovTarrikPayloadTests::Activate<USovTarrikGrenadeTestAbility>(*this, Source);
 		if (!Grenade) { return false; }
 		Fixture.World->GetTimerManager().Tick(0.4f);
 		TestEqual(TEXT("Universal grenade releases without Blueprint gameplay"), Fixture.Count<ASovCinderStickyGrenadeProjectile>(), 1);
@@ -198,7 +198,7 @@ bool FSovTarrikProjectileLifecycleRuntimeTest::RunTest(const FString& Parameters
 		Grenade->FinishEchoAbility();
 	}
 	{
-		FTarrikTestWorld Fixture;
+		SovTarrikPayloadTests::FTarrikTestWorld Fixture;
 		auto* Source = Fixture.Character(FVector::ZeroVector, 0);
 		if (!Source) { return false; }
 		auto* ASC = Source->GetNarrativeAbilitySystemComponent();
@@ -209,9 +209,9 @@ bool FSovTarrikProjectileLifecycleRuntimeTest::RunTest(const FString& Parameters
 		TestEqual(TEXT("Rejected identity spends no Echo"), Source->TestEcho->GetEcho(), 100.f);
 	}
 	{
-		FTarrikTestWorld Fixture;
+		SovTarrikPayloadTests::FTarrikTestWorld Fixture;
 		auto* Source = Fixture.Character(FVector::ZeroVector, 0);
-		auto* Hunger = Activate<USovTarrikHungerTestAbility>(*this, Source);
+		auto* Hunger = SovTarrikPayloadTests::Activate<USovTarrikHungerTestAbility>(*this, Source);
 		if (!Hunger) { return false; }
 		Hunger->FinishEchoAbility(true);
 		Fixture.World->GetTimerManager().Tick(0.4f);

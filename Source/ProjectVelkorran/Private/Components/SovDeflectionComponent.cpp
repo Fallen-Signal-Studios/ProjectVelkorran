@@ -100,6 +100,10 @@ bool USovDeflectionComponent::BeginDeflection()
 {
 	if (!IsInitialized()
 		|| !IsValid(GetOwner())
+		|| AbilitySystemComponent->GetAvatarActor() != GetOwner()
+		|| !GetWorld()
+		|| !FMath::IsFinite(PerfectDeflectionWindow)
+		|| !FMath::IsFinite(MinimumDeflectionStartStamina)
 		|| PerfectDeflectionWindow <= KINDA_SMALL_NUMBER)
 	{
 		return false;
@@ -119,6 +123,7 @@ bool USovDeflectionComponent::BeginDeflection()
 		|| AbilitySystemComponent->HasMatchingGameplayTag(NarrativeTags.State_Interacting)
 		|| AbilitySystemComponent->HasMatchingGameplayTag(NarrativeTags.State_SequencerControlled)
 		|| AbilitySystemComponent->HasMatchingGameplayTag(NarrativeTags.State_Movement_Ragdoll)
+		|| !FMath::IsFinite(CurrentStamina)
 		|| CurrentStamina + KINDA_SMALL_NUMBER < FMath::Max(MinimumDeflectionStartStamina, 0.f))
 	{
 		return false;
@@ -136,9 +141,14 @@ bool USovDeflectionComponent::BeginDeflection()
 		}
 	}
 
+	const uint32 Epoch = ++DeflectionEpoch;
+	const TWeakObjectPtr<UAbilitySystemComponent> StartingASC = AbilitySystemComponent.Get();
 	SetOwnedLooseTag(SovTags.State_Deflecting, true, bAppliedDeflectingTag);
-	if (!bAppliedDeflectingTag)
+	if (Epoch != DeflectionEpoch || !bAppliedDeflectingTag
+		|| !StartingASC.IsValid() || StartingASC.Get() != AbilitySystemComponent
+		|| StartingASC->GetAvatarActor() != GetOwner())
 	{
+		if (Epoch == DeflectionEpoch) { CloseDeflectionWindow(); }
 		return false;
 	}
 
@@ -155,7 +165,11 @@ bool USovDeflectionComponent::BeginDeflection()
 	}
 
 	OnDeflectionStarted.Broadcast();
-	return true;
+	const bool bStillOwnsWindow = Epoch == DeflectionEpoch && bAppliedDeflectingTag
+		&& StartingASC.IsValid() && StartingASC.Get() == AbilitySystemComponent
+		&& StartingASC->GetAvatarActor() == GetOwner();
+	if (!bStillOwnsWindow && Epoch == DeflectionEpoch) { CloseDeflectionWindow(); }
+	return bStillOwnsWindow;
 }
 
 void USovDeflectionComponent::EndDeflection()
@@ -194,6 +208,7 @@ void USovDeflectionComponent::HandleOwnerASCInitialized()
 
 void USovDeflectionComponent::UninitializeFromAbilitySystem()
 {
+	++DeflectionEpoch;
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(DeflectionWindowTimerHandle);
@@ -221,6 +236,7 @@ void USovDeflectionComponent::UninitializeFromAbilitySystem()
 
 void USovDeflectionComponent::CloseDeflectionWindow()
 {
+	const uint32 Epoch = ++DeflectionEpoch;
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(DeflectionWindowTimerHandle);
@@ -231,7 +247,7 @@ void USovDeflectionComponent::CloseDeflectionWindow()
 		FSovGameplayTags::Get().State_Deflecting,
 		false,
 		bAppliedDeflectingTag);
-	if (bWasOpen)
+	if (bWasOpen && Epoch == DeflectionEpoch)
 	{
 		OnDeflectionWindowClosed.Broadcast();
 	}
@@ -249,6 +265,9 @@ void USovDeflectionComponent::SetOwnedLooseTag(
 		return;
 	}
 
+	// GAS publishes tag changes synchronously. Reentrant cleanup must see our
+	// contribution before AddLooseGameplayTag invokes those listeners.
+	bAppliedFlag = bShouldApply;
 	if (bShouldApply)
 	{
 		if (GetOwner() && GetOwner()->HasAuthority())
@@ -274,7 +293,6 @@ void USovDeflectionComponent::SetOwnedLooseTag(
 	{
 		AbilitySystemComponent->RemoveLooseGameplayTag(Tag);
 	}
-	bAppliedFlag = bShouldApply;
 }
 
 AActor* USovDeflectionComponent::ResolveLogicalAttacker(

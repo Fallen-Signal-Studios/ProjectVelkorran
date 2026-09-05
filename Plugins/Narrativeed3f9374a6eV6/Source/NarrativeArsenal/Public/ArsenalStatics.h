@@ -38,9 +38,11 @@ struct FGPUInfo
 {
 	GENERATED_BODY()
 
+	/** Process-local memory budget in MiB; retained legacy name, not installed physical VRAM. */
 	UPROPERTY(BlueprintReadOnly, Category = "GPU Info")
 	int32 TotalVRAM = 0;
 
+	/** Current process-local memory usage in MiB on the queried adapter. */
 	UPROPERTY(BlueprintReadOnly, Category = "GPU Info")
 	int32 CurrentVRAM = 0;
 
@@ -62,7 +64,7 @@ public:
 	UFUNCTION(BlueprintPure, Category = "GPU Info")
 	static TArray<FString> GetMonitorNames();
 
-	//Grab GPU info - only works on windows. Return true if successfully grabbed info. 
+	/** Windows primary-display adapter stats (not necessarily the render adapter). Clears OutInfo and returns false on failure. */
 	UFUNCTION(BlueprintPure, Category = "GPU Info")
 	static bool GetGPUInfo(FGPUInfo& OutInfo);
 
