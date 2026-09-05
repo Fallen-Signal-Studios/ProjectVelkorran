@@ -541,6 +541,8 @@ protected:
 	UFUNCTION(BlueprintNativeEvent, Category = "Narrative|NarrativeCharacter")
 	void HandleDeath(AActor* KilledActor, UNarrativeAbilitySystemComponent* KilledActorASC, const bool bIsDead);
 	virtual void HandleDeath_Implementation(AActor* KilledActor, UNarrativeAbilitySystemComponent* KilledActorASC, const bool bIsDead);
+	/** Project recovery can restore resources explicitly without resetting a persistent ASC's attributes or startup grants. */
+	virtual bool ShouldResetAttributesOnRevive() const { return true; }
 
 	//Called when our spawned data bundle is loaded 
 	UFUNCTION()
@@ -776,4 +778,3 @@ public:
 
 
 };
-

@@ -1,6 +1,7 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 
 #include "Framework/SovPlayerState.h"
+#include "Abilities/GameplayAbility.h"
 #include "Progression/SovTechniqueComponent.h"
 #include "Campaign/SovEncounterSnapshotLibrary.h"
 #include "Characters/SovPlayerCharacterBase.h"
@@ -82,6 +83,12 @@ bool ASovPlayerState::CaptureProtagonistSnapshot(ASovPlayerCharacterBase* Pawn, 
 	Snapshot.Factions = GetFactions();
 	Snapshot.WieldEquipSlots = Pawn->GetWeaponWieldState().EquipSlots;
 	Snapshot.WieldSlots = Pawn->GetWeaponWieldState().WieldSlots;
+	for (const FGameplayAbilitySpec& Spec : AbilitySystemComponent->GetActivatableAbilities())
+	{
+		if (!Spec.Ability || Spec.RemoveAfterActivation) { continue; }
+		FSovProtagonistAbilitySnapshot Grant; Grant.AbilityClass = Spec.Ability->GetClass(); Grant.Level = Spec.Level;
+		Snapshot.GrantedAbilities.Add(Grant);
+	}
 	if (!USovEncounterSnapshotLibrary::CaptureResources(AbilitySystemComponent, Snapshot.Resources)
 		|| !Save->CreateActorRecord(Pawn, Snapshot.PawnRecord)
 		|| !USovEncounterSnapshotLibrary::CaptureComponent(SkillTreeComponent, Snapshot.SkillTreeRecord)

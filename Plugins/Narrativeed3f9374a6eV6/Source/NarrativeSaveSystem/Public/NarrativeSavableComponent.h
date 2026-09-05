@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "UObject/NoExportTypes.h"
 #include <UObject/Interface.h>
+#include "NarrativeSavePhases.h"
 #include "NarrativeSavableComponent.generated.h"
 
 /**
@@ -25,6 +26,12 @@ class NARRATIVESAVESYSTEM_API INarrativeSavableComponent
 	GENERATED_BODY()
 
 public:
+    /** Lower phases deserialize first within their existing actor owner. */
+    virtual ENarrativeRestorePhase GetSaveRestorePhase() const { return ENarrativeRestorePhase::Interactables; }
+	/** Required by default. Use only for cosmetic/DLC state whose absence cannot change canon or progression. */
+	UFUNCTION(BlueprintNativeEvent)
+	bool IsOptionalSaveRecord() const;
+	virtual bool IsOptionalSaveRecord_Implementation() const;
 	
 	//Tell the Component it is about to be saved, and needs to populate all its save data 
 	UFUNCTION(BlueprintNativeEvent)

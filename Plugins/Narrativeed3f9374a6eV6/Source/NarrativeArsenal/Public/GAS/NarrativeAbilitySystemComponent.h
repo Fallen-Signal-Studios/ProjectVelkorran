@@ -170,6 +170,21 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Narrative|GAS")
 	void AbilityInputTagReleased(const FGameplayTag& InputTag);
 
+	/** Register one authored finite node window; delays are relative to this call. No ability retry loop. */
+	FGuid RegisterCombatInputWindow(class UNarrativeCombatAbility* Ability, const FGameplayTagContainer& AllowedInputs,
+		float OpensAfter, float ClosesAfter);
+	/** The owning native node consumes the newest fresh semantic press only while its window is open. */
+	bool ConsumeCombatInputWindow(class UNarrativeCombatAbility* Ability, FGuid WindowId,
+		FGameplayTag& OutInput, bool& bOutStillHeld);
+	void ClearCombatInputWindow(class UNarrativeCombatAbility* Ability, FGuid WindowId);
+	/** Focus loss, modal UI, load and avatar transitions discard pending intent. */
+	UFUNCTION(BlueprintCallable, Category = "Narrative|GAS|Input")
+	void ClearCombatInputBuffer();
+
+	/** Optional native encounter gate. Never replaces another live encounter owner. */
+	bool SetBotAttackCoordinator(UObject* Coordinator);
+	UObject* GetBotAttackCoordinator() const { return BotAttackCoordinator.Get(); }
+
 	void ClearAbilitiesWithTag(const FGameplayTag& InputTag);
 
 	UFUNCTION(BlueprintCallable, Category = "Narrative|GAS", meta=(AutoCreateRefTerm="InputTag"))
@@ -263,6 +278,7 @@ public:
 	virtual void Revive();
 
 protected:
+	virtual void NotifyAbilityActivated(const FGameplayAbilitySpecHandle Handle, UGameplayAbility* Ability) override;
 
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing=OnRep_bIsDead, Category = "Narrative|GAS")
 	bool bIsDead;
@@ -297,6 +313,23 @@ protected:
 	virtual void Load_Implementation() override;
 
 private:
+	friend struct FSovCombatInputTestAccess;
+	uint64 InputActivationSerial = 0;
+	bool IsCombatInputWindowValid() const;
+	bool BufferCombatInput(const FGameplayTag& InputTag);
+	TWeakObjectPtr<class UNarrativeCombatAbility> CombatInputOwner;
+	TWeakObjectPtr<AActor> CombatInputAvatar;
+	FGameplayAbilitySpecHandle CombatInputSpec;
+	FGuid CombatInputAttackId;
+	FGuid CombatInputWindowId;
+	FGameplayTagContainer CombatInputAllowedTags;
+	FGameplayTag BufferedCombatInput;
+	double CombatInputOpensAt = 0.;
+	double CombatInputClosesAt = 0.;
+	double CombatInputPressedAt = 0.;
+	int32 CombatInputReadyEpoch = 0;
+	bool bBufferedCombatInputHeld = false;
+	TWeakObjectPtr<UObject> BotAttackCoordinator;
 	bool IsBotCombatContextValid(AActor* Target, bool bDuringOwnedAttack = false) const;
 	void HandleBotAttackEnded(const FAbilityEndedData& Data);
 	void ReleaseBotAttackLease(FGameplayAbilitySpecHandle Handle);

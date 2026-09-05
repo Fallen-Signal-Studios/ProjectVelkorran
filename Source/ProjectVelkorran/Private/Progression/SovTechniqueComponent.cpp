@@ -6,10 +6,12 @@
 #include "Progression/SovTechniquePolicy.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
+#include "Abilities/SovGameplayAbility_Echo.h"
 #include "Campaign/SovEncounterDirector.h"
 #include "EngineUtils.h"
 #include "Framework/SovPlayerState.h"
 #include "GameFramework/Pawn.h"
+#include "NarrativeGameplayTags.h"
 #include "Sovereign/SovGameplayTags.h"
 
 ASovPlayerState* USovTechniqueComponent::Player() const { return Cast<ASovPlayerState>(GetOwner()); }
@@ -68,7 +70,7 @@ bool USovTechniqueComponent::InitializeNewProtagonist(FGameplayTag Protagonist)
 	// not reset its durable ledger if one replaced/destroyed our active avatar.
 	if (!IsMutationOwnershipCurrent()) { bStateValid = false; return false; }
 	SkillTreeSaveData.ClearData();
-	ClaimedRewards.Reset(); SkillTreePoints = 0; LedgerProtagonist = Protagonist; bStateValid = true;
+	ClaimedRewards.Reset(); SelectedAugments.Reset(); SkillTreePoints = 0; LedgerProtagonist = Protagonist; bStateValid = true;
 	RebuildBranchLevels(); BroadcastChanged();
 	return true;
 }
@@ -114,6 +116,8 @@ bool USovTechniqueComponent::HasValidActiveTree() const
 		{
 			const auto* Perk = Node.Perk.Get() ? Cast<USovTechniquePerk>(Node.Perk->GetDefaultObject()) : nullptr;
 			if (!Perk || PerkClasses.Contains(Node.Perk.Get()) || FindBranch(Node.Perk) != Branch || !Perk->HasValidNativeGrantPolicy()) { return false; }
+			if (Perk->AugmentedAbility.IsValid() && !Perk->AugmentedAbility.ToString().StartsWith(
+				Identity==FSovGameplayTags::Get().Character_Player_Tarrik ? TEXT("Sov.Ability.Echo.Tarrik.") : TEXT("Sov.Ability.Echo.Selene."))) { return false; }
 			PerkClasses.Add(Node.Perk.Get()); TotalRanks += Perk->MaxLevels;
 			for (TSubclassOf<UTreePerk> Link : Node.LinkedTo)
 			{
@@ -258,6 +262,7 @@ bool USovTechniqueComponent::RespecAtSafePoint(ASovTechniqueSafePoint* SafePoint
 	TGuardValue<bool> Guard(bMutating, true);
 	ClearPurchasedPerksForRestore(); SkillTreeSaveData.ClearData();
 	if (!IsMutationContextCurrent()) { bStateValid = false; return false; }
+	SelectedAugments.Reset();
 	SkillTreePoints = GetEarnedTechniquePoints(); RebuildBranchLevels(); BroadcastChanged();
 	return true;
 }
@@ -289,6 +294,12 @@ bool USovTechniqueComponent::ValidateSavedState() const
 		if (!Default || !Branch || Branch->Protagonist != LedgerProtagonist || Seen.Contains(Saved.PerkClass.Get())
 			|| Saved.PerkLevel < 0 || Saved.PerkLevel >= Default->MaxLevels || !Default->HasValidNativeGrantPolicy()) { return false; }
 		Seen.Add(Saved.PerkClass.Get()); Spent += Saved.PerkLevel + 1;
+	}
+	if (SelectedAugments.Num()>16) { return false; }
+	for (const auto& Selection:SelectedAugments)
+	{
+		const auto* Defaults=Selection.Value.Get() ? Selection.Value->GetDefaultObject<USovTechniquePerk>() : nullptr;
+		if (!Selection.Key.IsValid() || !Defaults || Defaults->AugmentedAbility!=Selection.Key || !Seen.Contains(Selection.Value.Get())) { return false; }
 	}
 	for (const FSavedPerk& Saved : SkillTreeSaveData.SavedPerks)
 	{
@@ -331,6 +342,91 @@ bool USovTechniqueComponent::MayApplyPerkGrant(const USovTechniquePerk* Perk, in
 	const int32* Expected = Perk ? AllowedGrantLevels.Find(Perk->GetClass()) : nullptr;
 	return !bApplyingGrant && Expected && *Expected == Level && IsGrantContextCurrent(Perk);
 }
+bool USovTechniqueComponent::ShouldEnablePerkGrant(const USovTechniquePerk* Perk) const
+{
+	return Perk && (!Perk->AugmentedAbility.IsValid() || SelectedAugments.FindRef(Perk->AugmentedAbility).Get()==Perk->GetClass());
+}
+USovTechniquePerk* USovTechniqueComponent::GetSelectedAugment(FGameplayTag Ability) const
+{
+	if (!bStateValid || !IsCurrentIdentity() || (bMutating&&!bSnapshotPublished)) { return nullptr; }
+	const auto Class=SelectedAugments.FindRef(Ability);
+	return Class.Get() ? Cast<USovTechniquePerk>(GetPerk(Class)) : nullptr;
+}
+TArray<USovTechniquePerk*> USovTechniqueComponent::GetUnlockedAugments(FGameplayTag Ability) const
+{
+	TArray<USovTechniquePerk*> Result;
+	if (!bStateValid || !IsCurrentIdentity() || (bMutating&&!bSnapshotPublished)) { return Result; }
+	for (UTreePerk* Purchased:PurchasedPerks)
+	{
+		auto* Perk=Cast<USovTechniquePerk>(Purchased);
+		if (Perk && Perk->PerkLevel>=0 && Perk->AugmentedAbility==Ability && Ability.IsValid()) { Result.Add(Perk); }
+	}
+	return Result;
+}
+bool USovTechniqueComponent::HasAugmentAbilityContext(FGameplayTag Ability) const
+{
+	const auto* PS=Player(); const UAbilitySystemComponent* ASC=PS ? PS->GetAbilitySystemComponent() : nullptr;
+	if (!ASC || !ASC->AbilityActorInfo.IsValid() || !PS->GetPawn() || ASC->GetAvatarActor()!=PS->GetPawn()
+		|| !Ability.IsValid() || Ability==FSovGameplayTags::Get().Ability_Echo || !Ability.MatchesTag(FSovGameplayTags::Get().Ability_Echo)
+		|| ASC->HasMatchingGameplayTag(FSovGameplayTags::Get().State_Weapon_VerityAbsent)
+		|| ASC->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_Weapon_Equipping)) { return false; }
+	const FGameplayAbilitySpec* Core=nullptr;
+	for (const FGameplayAbilitySpec& Spec:ASC->GetActivatableAbilities())
+	{
+		if (Spec.Ability && Spec.Ability->GetAssetTags().HasTagExact(Ability))
+		{
+			if (Core || Spec.IsActive() || Spec.PendingRemove || Spec.RemoveAfterActivation) { return false; }
+			Core=&Spec;
+		}
+	}
+	const auto* Echo=Core ? Cast<USovGameplayAbility_EchoBase>(Core->Ability) : nullptr;
+	return Echo && Echo->CanUseEchoWeaponContext(Core->Handle,ASC->AbilityActorInfo.Get());
+}
+bool USovTechniqueComponent::SelectAugmentAtSafePoint(ASovTechniqueSafePoint* SafePoint,FGameplayTag Ability,
+	TSubclassOf<USovTechniquePerk> Augment,FText& FailureReason)
+{
+	FailureReason=FText::GetEmpty();
+	if (!CanModifyTechniques() || !IsValid(SafePoint) || !SafePoint->AllowsModification(Player()))
+	{ FailureReason=NSLOCTEXT("SovTechnique","AugmentSafePoint","Change augments at a safe point outside combat."); return false; }
+	if (!HasAugmentAbilityContext(Ability))
+	{ FailureReason=NSLOCTEXT("SovTechnique","AugmentEquipment","Equip the matching available weapon before changing this ability's augment."); return false; }
+	auto* NewPerk=Augment.Get() ? Cast<USovTechniquePerk>(GetPerk(Augment)) : nullptr;
+	if (Augment.Get() && (!NewPerk || NewPerk->PerkLevel<0 || NewPerk->AugmentedAbility!=Ability || !NewPerk->HasValidNativeGrantPolicy()))
+	{ FailureReason=NSLOCTEXT("SovTechnique","AugmentLocked","Unlock an augment for this ability first."); return false; }
+	const auto Previous=SelectedAugments.FindRef(Ability);
+	if (Previous==Augment) { return true; }
+	auto* OldPerk=Previous.Get() ? Cast<USovTechniquePerk>(GetPerk(Previous)) : nullptr;
+	if (Previous.Get() && (!OldPerk || OldPerk->PerkLevel<0)) { bStateValid=false; return false; }
+	const int32 OldLevel=OldPerk ? OldPerk->PerkLevel : -1, NewLevel=NewPerk ? NewPerk->PerkLevel : -1;
+	CaptureMutationContext(); TGuardValue<bool> Mutation(bMutating,true);
+	if (Augment.Get()) { SelectedAugments.Add(Ability,Augment); } else { SelectedAugments.Remove(Ability); }
+	const auto Refresh=[this](USovTechniquePerk* Perk,int32 Level)
+	{
+		if (!Perk) { return true; }
+		AllowedGrantLevels.Reset(); AllowedGrantLevels.Add(Perk->GetClass(),Level);
+		ApplyPurchasedPerkLevel(Perk,Level); AllowedGrantLevels.Reset();
+		return IsMutationContextCurrent() && Perk->DidLastGrantSucceed() && Perk->PerkLevel==Level;
+	};
+	const auto RequireRecovery=[this,OldPerk,NewPerk,&FailureReason]()
+	{
+		bStateValid=false;
+		if (NewPerk) { NewPerk->RemoveNativeGrants(); }
+		if (OldPerk) { OldPerk->RemoveNativeGrants(); }
+		FailureReason=NSLOCTEXT("SovTechnique","AugmentRecoveryRequired","Loadout update failed. Reload a checkpoint before continuing.");
+	};
+	const bool bApplied=Refresh(OldPerk,OldLevel) && Refresh(NewPerk,NewLevel);
+	if (!IsMutationContextCurrent()) { RequireRecovery(); return false; }
+	if (!bApplied || !IsValid(SafePoint) || !SafePoint->AllowsModification(Player()) || !HasAugmentAbilityContext(Ability))
+	{
+		// No points or core ability specs changed. Restore only the two affected owned grant sets.
+		if (Previous.Get()) { SelectedAugments.Add(Ability,Previous); } else { SelectedAugments.Remove(Ability); }
+		const bool bRestored=Refresh(NewPerk,NewLevel) && Refresh(OldPerk,OldLevel);
+		if (!bRestored) { RequireRecovery(); return false; }
+		FailureReason=NSLOCTEXT("SovTechnique","AugmentInterrupted","The loadout change was interrupted; the previous selection was retained.");
+		return false;
+	}
+	BroadcastChanged(); return true;
+}
 void USovTechniqueComponent::BroadcastChanged()
 {
 	// Publish a complete save image before any UI/mission callback can save.
@@ -364,6 +460,13 @@ bool USovTechniqueComponent::IsGrantContextCurrent(const USovTechniquePerk* Perk
 }
 void USovTechniqueComponent::Serialize(FArchive& Archive)
 {
+	if (Archive.IsSaveGame() && Archive.IsLoading())
+	{
+		if (bMutating) { Archive.SetError(); return; }
+		// Earlier compatible Technique records have no augment field. Never carry a live
+		// protagonist's current selection into a record that predates the field.
+		SelectedAugments.Reset();
+	}
 	if (Archive.IsSaveGame() && Archive.IsSaving() && (!bStateValid || (bMutating && !bSnapshotPublished)))
 	{
 		// An invalid ledger or callback inside a grant/removal is not a checkpoint.

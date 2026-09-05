@@ -1,6 +1,7 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 
 #include "Components/SovEchoComponent.h"
+#include "Diagnostics/SovDiagnosticsSubsystem.h"
 
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
@@ -244,8 +245,13 @@ float USovEchoComponent::AddEcho(const float Amount, const FGameplayTag& SourceT
 
 bool USovEchoComponent::TrySpendEcho(const float Cost, const FGameplayTag& SpendTag)
 {
-	if (!CanWriteEcho() || !FMath::IsFinite(Cost) || Cost < 0.0f || !CanAffordEcho(Cost))
+	if (!CanWriteEcho() || !FMath::IsFinite(Cost) || Cost < 0.0f)
 	{
+		return false;
+	}
+	if (!CanAffordEcho(Cost))
+	{
+		USovDiagnosticsSubsystem::Record(GetWorld(), ESovDiagnosticKind::ResourceStarvation, SpendTag.GetTagName(), TEXT("Echo"), Cost, GetEcho(), false);
 		return false;
 	}
 

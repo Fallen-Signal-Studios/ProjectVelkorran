@@ -5,7 +5,7 @@
 #include "Components/SovCorruptionComponent.h"
 #include "SovCorruptionSourceVolume.generated.h"
 
-/** Contact producer only; enemy hit/Corruption damage-channel producers remain separate integrations. */
+/** Real environmental contact producer, optionally owned by a destructible corruption node. */
 UCLASS(Blueprintable)
 class PROJECTVELKORRAN_API ASovCorruptionSourceVolume : public AActor
 {
@@ -21,6 +21,8 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Corruption") TObjectPtr<class USphereComponent> ExposureSphere;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Corruption") TObjectPtr<USovCorruptionProfile> Profile;
+	/** Optional actual node. Its matching native source component must resolve DestroyNode before this field stops. */
+	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="Corruption") TObjectPtr<AActor> SourceNode;
 private:
 	friend struct FSovCorruptionTestAccess;
 	void RefreshContacts();

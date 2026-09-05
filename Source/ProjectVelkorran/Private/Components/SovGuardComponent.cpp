@@ -384,6 +384,18 @@ void USovGuardComponent::OpenCounterWindow()
 	}
 }
 
+bool USovGuardComponent::ExtendCounterWindow(float AdditionalSeconds)
+{
+	if (!GetOwner() || !GetOwner()->HasAuthority() || !GetWorld() || !bAppliedCounterWindowTag
+		|| !IsCounterWindowOpen() || !FMath::IsFinite(AdditionalSeconds) || AdditionalSeconds <= 0.f) { return false; }
+	auto& Timers = GetWorld()->GetTimerManager();
+	const float Remaining = Timers.GetTimerRemaining(CounterWindowTimerHandle);
+	if (Remaining <= 0.f) { return false; }
+	Timers.SetTimer(CounterWindowTimerHandle, this, &ThisClass::CloseCounterWindow,
+		Remaining + FMath::Min(AdditionalSeconds, 3.f), false);
+	return true;
+}
+
 void USovGuardComponent::CloseCounterWindow()
 {
 	if (UWorld* World = GetWorld())

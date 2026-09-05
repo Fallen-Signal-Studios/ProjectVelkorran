@@ -10,10 +10,12 @@
 #include "Engine/World.h"
 #include "GAS/NarrativeAttributeSetBase.h"
 #include "GAS/NarrativeCombatAbility.h"
+#include "GAS/SovBotAttackCoordinator.h"
 #include "Items/WeaponItem.h"
 #include "NarrativeGameplayTags.h"
 #include "Sovereign/SovGameplayTags.h"
 #include "UnrealFramework/NarrativeCharacter.h"
+#include "UnrealFramework/NarrativeGameUserSettings.h"
 #include "UnrealFramework/NarrativeTeamAgentInterface.h"
 
 namespace NarrativeBotCombat
@@ -103,6 +105,14 @@ namespace NarrativeBotCombat
 		const FString BPath = GetPathNameSafe(B.AbilityClass.Get());
 		return APath != BPath ? APath < BPath : A.GrantOrder < B.GrantOrder;
 	}
+}
+
+bool UNarrativeAbilitySystemComponent::SetBotAttackCoordinator(UObject* Coordinator)
+{
+	if (Coordinator && !Cast<ISovBotAttackCoordinator>(Coordinator)) { return false; }
+	if (Coordinator && BotAttackCoordinator.IsValid() && BotAttackCoordinator.Get() != Coordinator) { return false; }
+	BotAttackCoordinator = Coordinator;
+	return true;
 }
 
 bool UNarrativeAbilitySystemComponent::IsBotCombatContextValid(AActor* Target, const bool bDuringOwnedAttack) const
@@ -197,7 +207,9 @@ TArray<FNarrativeBotAttackCandidate> UNarrativeAbilitySystemComponent::GetBotAtt
 		const bool bTokenReady = !Candidate.bRequiresAttackToken
 			|| NarrativeBotCombat::HasTokenOpportunity(Controller, TargetASC);
 		if (!bCadenceReady) { Candidate.FailureTags.AddTag(FNarrativeGameplayTags::Get().Ability_ActivateFail_Cooldown); }
-		Candidate.bAvailable = Candidate.bCanActivate && Candidate.bInRange && Candidate.bHasLineOfSight && bTokenReady;
+		const ISovBotAttackCoordinator* Coordinator = Cast<ISovBotAttackCoordinator>(BotAttackCoordinator.Get());
+		const bool bCompositionReady = !Coordinator || Coordinator->CanAdmitAttack(this, Target, Ability, Spec.Handle);
+		Candidate.bAvailable = Candidate.bCanActivate && Candidate.bInRange && Candidate.bHasLineOfSight && bTokenReady && bCompositionReady;
 		Candidates.Add(MoveTemp(Candidate));
 	}
 	Candidates.Sort(NarrativeBotCombat::RankBefore);
@@ -256,15 +268,25 @@ bool UNarrativeAbilitySystemComponent::TryActivateBotAttack(AActor* Target, cons
 		BotAttackEndedDelegate = OnAbilityEnded.AddUObject(this, &ThisClass::HandleBotAttackEnded);
 	}
 	const TWeakObjectPtr<AActor> OriginalAvatar = GetAvatarActor();
+	if (ISovBotAttackCoordinator* Coordinator = Cast<ISovBotAttackCoordinator>(BotAttackCoordinator.Get()))
+	{
+		const FGameplayAbilitySpec* SelectedSpec = FindAbilitySpecFromHandle(Handle);
+		const UNarrativeCombatAbility* Ability = SelectedSpec ? NarrativeBotCombat::ResolveCombatAbility(*SelectedSpec) : nullptr;
+		FNarrativeBotAttackLease Lease;
+		Lease.Coordinator = BotAttackCoordinator;
+		Lease.CoordinationReservation = Coordinator->ReserveAttack(this, Target, Ability, Handle);
+		if (!Lease.CoordinationReservation.IsValid()) { return false; }
+		BotAttackLeases.Add(Handle, Lease);
+	}
 	if (Candidate.bRequiresAttackToken && !Candidate.bManagesAttackToken)
 	{
 		ANarrativeCharacter* Source = Cast<ANarrativeCharacter>(GetAvatarActor());
 		ANarrativeNPCController* Controller = Source ? Cast<ANarrativeNPCController>(Source->GetController()) : nullptr;
 		UNarrativeAbilitySystemComponent* TargetASC = Cast<UNarrativeAbilitySystemComponent>(
 			UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Target));
-		FNarrativeBotAttackLease Lease;
+		FNarrativeBotAttackLease Lease = BotAttackLeases.FindRef(Handle);
 		if (!IsValid(Controller) || !IsValid(TargetASC)
-			|| !Controller->TryAcquireAttackTokenFor(TargetASC, Lease.Serial, Lease.bNewlyAcquired)) { return false; }
+			|| !Controller->TryAcquireAttackTokenFor(TargetASC, Lease.Serial, Lease.bNewlyAcquired)) { ReleaseBotAttackLease(Handle); return false; }
 		Lease.Controller = Controller;
 		Lease.Target = TargetASC;
 		BotAttackLeases.Add(Handle, Lease);
@@ -289,6 +311,15 @@ bool UNarrativeAbilitySystemComponent::TryActivateBotAttack(AActor* Target, cons
 	{
 		ReleaseBotAttackLease(Handle);
 		return false;
+	}
+	if (const FNarrativeBotAttackLease* Lease = BotAttackLeases.Find(Handle))
+	{
+		if (Lease->CoordinationReservation.IsValid())
+		{
+			const ISovBotAttackCoordinator* Coordinator = Cast<ISovBotAttackCoordinator>(Lease->Coordinator.Get());
+			if (!Coordinator || !Coordinator->IsAttackReservationCurrent(Lease->CoordinationReservation, this, Target, Handle))
+			{ ReleaseBotAttackLease(Handle); return false; }
+		}
 	}
 	Spec->InputPressed = true;
 	const bool bActivated = TryActivateAbility(Handle, false);
@@ -317,7 +348,8 @@ bool UNarrativeAbilitySystemComponent::TryActivateBotAttack(AActor* Target, cons
 	++BotAttackSelectionSerial;
 	BotAttackLastUsed.Add(Handle, BotAttackSelectionSerial);
 	BotAttackNextAllowedTimes.Add(Handle, (GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0)
-		+ FMath::Max(Candidate.Frequency, 0.05f));
+		+ FMath::Max(Candidate.Frequency, 0.05f) * (UNarrativeGameUserSettings::GetSovSettings()
+		? UNarrativeGameUserSettings::GetSovSettings()->GetEnemyRecoveryScale() : 1.f));
 	// Instant abilities may end inside TryActivateAbility; their end delegate has
 	// already released the lease. Removal during activation is equally safe.
 	const FGameplayAbilitySpec* ActiveSpec = FindAbilitySpecFromHandle(Handle);
@@ -335,6 +367,10 @@ void UNarrativeAbilitySystemComponent::ReleaseBotAttackLease(const FGameplayAbil
 	FNarrativeBotAttackLease Lease;
 	if (!BotAttackLeases.RemoveAndCopyValue(Handle, Lease)) { return; }
 	// Remove ownership before callbacks. A stale/double end cannot return a new lease.
+	if (ISovBotAttackCoordinator* Coordinator = Cast<ISovBotAttackCoordinator>(Lease.Coordinator.Get()))
+	{
+		Coordinator->ReleaseAttack(Lease.CoordinationReservation);
+	}
 	if (Lease.Controller.IsValid() && Lease.Target.IsValid()
 		&& Lease.Controller->IsAttackTokenLeaseCurrent(Lease.Serial, Lease.Target.Get()))
 	{
@@ -406,10 +442,19 @@ bool UNarrativeAbilitySystemComponent::IsBotAttackExecutionValid(AActor* Target,
 	if (!Spec || !Spec->IsActive() || !NarrativeBotCombat::IsSelectable(*Spec, FGameplayTag(), Cast<ANarrativeCharacter>(GetAvatarActor()))) { return false; }
 	if (const FNarrativeBotAttackLease* Lease = BotAttackLeases.Find(Handle))
 	{
-		return Lease->Controller.IsValid() && Lease->Target.IsValid()
-			&& Lease->Controller->GetPawn() == GetAvatarActor()
-			&& Lease->Target->GetAvatarActor() == Target
-			&& Lease->Controller->IsAttackTokenLeaseCurrent(Lease->Serial, Lease->Target.Get());
+		if (Lease->CoordinationReservation.IsValid())
+		{
+			const ISovBotAttackCoordinator* Coordinator = Cast<ISovBotAttackCoordinator>(Lease->Coordinator.Get());
+			if (!Coordinator || !Coordinator->IsAttackReservationCurrent(Lease->CoordinationReservation, this, Target, Handle)) { return false; }
+		}
+		// Coordination-only and self-managed token abilities deliberately have no selection-owned token.
+		if (Lease->Serial != 0)
+		{
+			return Lease->Controller.IsValid() && Lease->Target.IsValid()
+				&& Lease->Controller->GetPawn() == GetAvatarActor()
+				&& Lease->Target->GetAvatarActor() == Target
+				&& Lease->Controller->IsAttackTokenLeaseCurrent(Lease->Serial, Lease->Target.Get());
+		}
 	}
 	return true;
 }

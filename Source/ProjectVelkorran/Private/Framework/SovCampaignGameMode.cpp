@@ -8,6 +8,8 @@
 #include "UnrealFramework/NarrativeGameState.h"
 
 #include "Campaign/SovCampaignDefinition.h"
+#include "Save/SovSaveSubsystem.h"
+#include "Engine/GameInstance.h"
 #include "Characters/SovPlayerCharacterBase.h"
 #include "Character/PlayerDefinition.h"
 #include "AI/NarrativeCharacterSubsystem.h"
@@ -33,6 +35,9 @@ FString ASovCampaignGameMode::InitNewPlayer(APlayerController* NewPlayerControll
 	ASovPlayerController* PC = Cast<ASovPlayerController>(NewPlayerController);
 	UNarrativeSaveSubsystem* Save = GetWorld()->GetSubsystem<UNarrativeSaveSubsystem>();
 	if (!PC || !Save) { return TEXT("Campaign requires SovPlayerController and NarrativeSaveSubsystem."); }
+	if (Save->DidInitialLoadFail()) { return TEXT("The requested campaign save could not be validated."); }
+	if (USovSaveSubsystem* Slots = GetGameInstance()->GetSubsystem<USovSaveSubsystem>())
+	{ if (!Slots->ValidatePendingWorld(*GetWorld(), Error)) { return Error; } }
 	FNarrativeSavePlayer Records;
 	const bool bTravel = UGameplayStatics::HasOption(OptionsString, TEXT("SovCampaignTransition"));
 	bool bHasRecords = false;
@@ -52,12 +57,16 @@ FString ASovCampaignGameMode::InitNewPlayer(APlayerController* NewPlayerControll
 
 UClass* ASovCampaignGameMode::GetDefaultPawnClassForController_Implementation(AController* InController)
 {
-	return InitialMission ? InitialMission->PawnClass.LoadSynchronous() : Super::GetDefaultPawnClassForController_Implementation(InController);
+	const ASovPlayerController* PC = Cast<ASovPlayerController>(InController);
+	const FGameplayTag Lead = PC ? PC->GetPendingProtagonist() : FGameplayTag();
+	return InitialMission ? InitialMission->ResolvePawnClass(Lead.IsValid() ? Lead : InitialMission->Protagonist).LoadSynchronous() : Super::GetDefaultPawnClassForController_Implementation(InController);
 }
 
 UPlayerDefinition* ASovCampaignGameMode::GetPlayerDefinitionForController_Implementation(AController* InController)
 {
-	return InitialMission ? InitialMission->PlayerDefinition.LoadSynchronous() : Super::GetPlayerDefinitionForController_Implementation(InController);
+	const ASovPlayerController* PC = Cast<ASovPlayerController>(InController);
+	const FGameplayTag Lead = PC ? PC->GetPendingProtagonist() : FGameplayTag();
+	return InitialMission ? InitialMission->ResolvePlayerDefinition(Lead.IsValid() ? Lead : InitialMission->Protagonist).LoadSynchronous() : Super::GetPlayerDefinitionForController_Implementation(InController);
 }
 
 APawn* ASovCampaignGameMode::SpawnDefaultPawnAtTransform_Implementation(AController* NewPlayer, const FTransform& SpawnTransform)
@@ -65,13 +74,13 @@ APawn* ASovCampaignGameMode::SpawnDefaultPawnAtTransform_Implementation(AControl
 	if (!InitialMission) { return Super::SpawnDefaultPawnAtTransform_Implementation(NewPlayer, SpawnTransform); }
 	FString Error;
 	ASovPlayerController* PC = Cast<ASovPlayerController>(NewPlayer);
-	if (!PC || !ASovPlayerController::ValidateMissionPawn(InitialMission, Error))
+	if (!PC || !ASovPlayerController::ValidateMissionPawn(InitialMission, Error, PC->GetPendingProtagonist()))
 	{ UE_LOG(LogTemp, Error, TEXT("Campaign spawn rejected: %s"), *Error); return nullptr; }
 	ASovPlayerCharacterBase* Pawn = GetWorld()->SpawnActorDeferred<ASovPlayerCharacterBase>(
-		InitialMission->PawnClass.Get(), SpawnTransform, PC, nullptr, ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButDontSpawnIfColliding);
+		InitialMission->ResolvePawnClass(PC->GetPendingProtagonist()).Get(), SpawnTransform, PC, nullptr, ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButDontSpawnIfColliding);
 	if (!Pawn) { return nullptr; }
 	Pawn->SetFlags(RF_Transient);
-	if (!Pawn->PrepareCampaignInitialization(InitialMission->PlayerDefinition.Get())) { Pawn->Destroy(); return nullptr; }
+	if (!Pawn->PrepareCampaignInitialization(InitialMission->ResolvePlayerDefinition(PC->GetPendingProtagonist()).Get())) { Pawn->Destroy(); return nullptr; }
 	Pawn->FinishSpawning(SpawnTransform);
 	if (!IsValid(Pawn)) { return nullptr; }
 	if (UNarrativeCharacterSubsystem* Characters = GetWorld()->GetSubsystem<UNarrativeCharacterSubsystem>())

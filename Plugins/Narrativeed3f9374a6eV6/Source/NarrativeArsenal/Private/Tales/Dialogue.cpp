@@ -198,6 +198,13 @@ void UDialogue::Deinitialize()
 	}
 
 	bDeinitialized = true;
+	bPlaybackSuspended = false;
+	bPlaybackStartPending = false;
+	if (GetWorld())
+	{
+		GetWorld()->GetTimerManager().ClearTimer(TimerHandle_NPCReplyFinished);
+		GetWorld()->GetTimerManager().ClearTimer(TimerHandle_PlayerReplyFinished);
+	}
 
 	StopDialogueSequence();
 
@@ -412,6 +419,7 @@ bool UDialogue::SkipCurrentLine()
 
 bool UDialogue::CanSkipCurrentLine() const
 {
+	if (bPlaybackSuspended || bDeinitialized || bCurrentLineFinished || bLineCompletionInProgress) { return false; }
 	if (OwningComp)
 	{
 		if (CurrentNode && CurrentNode->bIsSkippable)
@@ -425,6 +433,7 @@ bool UDialogue::CanSkipCurrentLine() const
 
 void UDialogue::EndCurrentLine()
 {
+	if (bPlaybackSuspended || bDeinitialized || bCurrentLineFinished || bLineCompletionInProgress) { return; }
 	if (CurrentNode)
 	{		
 		//Unbind all listeners for line ending, they need to be reset up when the next line plays 
@@ -461,9 +470,50 @@ void UDialogue::EndCurrentLine()
 	}
 }
 
+bool UDialogue::CanSuspendPlayback() const
+{
+	if (!bFreeMovement || bShowCinematicBars || bAdjustPlayerTransform || DefaultDialogueShot || DialogueCameraShake
+		|| !PlayerSpeakerInfo.OwnedTags.IsEmpty() || IsPartyDialogue()) { return false; }
+	for (const FSpeakerInfo& Speaker : Speakers)
+	{ if (!Speaker.OwnedTags.IsEmpty() || Speaker.DefaultSpeakerShot) { return false; } }
+	for (const UDialogueNode* Node : GetNodes())
+	{
+		if (!Node || Node->Line.Shot || Node->Line.DialogueMontage) { return false; }
+		for (const FDialogueLine& Alternative : Node->AlternativeLines)
+		{ if (Alternative.Shot || Alternative.DialogueMontage) { return false; } }
+	}
+	return true;
+}
+
+bool UDialogue::SetPlaybackSuspended(bool bSuspend)
+{
+	if (bDeinitialized || bLineCompletionInProgress || !IsValid(OwningComp) || OwningComp->GetCurrentDialogue()!=this
+		|| !GetWorld() || GetWorld()->GetNetMode() != NM_Standalone
+		|| !OwningComp->HasAuthority() || !CanSuspendPlayback()) { return false; }
+	if (bPlaybackSuspended == bSuspend) { return true; }
+	UTalesComponent* const ExpectedOwner = OwningComp;
+	bPlaybackSuspended = bSuspend;
+	if (bSuspend)
+	{
+		GetWorld()->GetTimerManager().PauseTimer(TimerHandle_NPCReplyFinished);
+		GetWorld()->GetTimerManager().PauseTimer(TimerHandle_PlayerReplyFinished);
+	}
+	else
+	{
+		GetWorld()->GetTimerManager().UnPauseTimer(TimerHandle_NPCReplyFinished);
+		GetWorld()->GetTimerManager().UnPauseTimer(TimerHandle_PlayerReplyFinished);
+	}
+	if (DialogueAudio) { DialogueAudio->SetPaused(bSuspend); }
+	if (OwningComp != ExpectedOwner || bDeinitialized || bPlaybackSuspended != bSuspend) { return false; }
+	ExpectedOwner->OnDialogueSuspensionChanged.Broadcast(this, bSuspend);
+	if (OwningComp == ExpectedOwner && !bDeinitialized && !bPlaybackSuspended && bPlaybackStartPending)
+	{ bPlaybackStartPending=false; Play(); }
+	return OwningComp == ExpectedOwner && !bDeinitialized && bPlaybackSuspended == bSuspend;
+}
+
 bool UDialogue::CanSelectDialogueOption(UDialogueNode_Player* PlayerNode) const
 {
-	return IsValid(PlayerNode) && AvailableResponses.Contains(PlayerNode);
+	return !bPlaybackSuspended && !bDeinitialized && IsValid(PlayerNode) && AvailableResponses.Contains(PlayerNode);
 }
 
 bool UDialogue::SelectDialogueOption(UDialogueNode_Player* Option)
@@ -578,10 +628,15 @@ void UDialogue::ClientReceiveDialogueChunk(const TArray<FName>& NPCReplyIDs, con
 
 void UDialogue::Play()
 {
+	if (bDeinitialized || bLineCompletionInProgress || !IsValid(OwningComp)) { return; }
+	if (bPlaybackSuspended) { bPlaybackStartPending=true; return; }
 	if (!bBeganPlaying)
 	{
-		OnBeginDialogue();
+		// Mark entry before notifying Blueprint so a reentrant Play cannot repeat entry events.
 		bBeganPlaying = true;
+		OnBeginDialogue();
+		if (bDeinitialized || !IsValid(OwningComp)) { return; }
+		if (bPlaybackSuspended) { bPlaybackStartPending=true; return; }
 	}
 
 	//Start playing through the NPCs replies until we run out
@@ -605,6 +660,7 @@ void UDialogue::ExitDialogue(const EExitDialogueReason Reason)
 
 void UDialogue::TickDialogue_Implementation(const float DeltaTime)
 {
+	if (bPlaybackSuspended || bDeinitialized) { return; }
 	if (CurrentDialogueSequence)
 	{
 		CurrentDialogueSequence->Tick(DeltaTime);
@@ -631,7 +687,7 @@ void UDialogue::TickDialogue_Implementation(const float DeltaTime)
 
 bool UDialogue::CanSkipDialogue_Implementation() const
 {
-	return !bUnskippable;
+	return !bPlaybackSuspended && !bUnskippable;
 }
 
 bool UDialogue::WantsCinematicBars_Implementation() const
@@ -1130,6 +1186,7 @@ void UDialogue::PlayNPCDialogueNode(class UDialogueNode_NPC* NPCReply)
 	if (NPCReply)
 	{
 		CurrentNode = NPCReply;
+		bCurrentLineFinished=false;
 		CurrentLine = NPCReply->GetRandomLine(OwningComp->GetNetMode() == NM_Standalone);
 		ReplaceStringVariables(NPCReply, CurrentLine, CurrentLine.Text);
 
@@ -1196,6 +1253,7 @@ void UDialogue::PlayPlayerDialogueNode(class UDialogueNode_Player* PlayerReply)
 		AvailableResponses.Empty();
 
 		CurrentNode = PlayerReply;
+		bCurrentLineFinished=false;
 		
 		ProcessNodeEvents(PlayerReply, true);
 
@@ -1363,9 +1421,13 @@ void UDialogue::PlayNextNPCReply()
 
 void UDialogue::FinishNPCDialogue()
 {
+	if (bPlaybackSuspended || bDeinitialized || bLineCompletionInProgress || bCurrentLineFinished) { return; }
+	TGuardValue<bool> Completing(bLineCompletionInProgress,true);
 	if (UDialogueNode_NPC* NPCNode = Cast<UDialogueNode_NPC>(CurrentNode))
 	{
+		bCurrentLineFinished=true;
 		FinishDialogueNode(NPCNode, CurrentLine, CurrentSpeaker, CurrentSpeakerAvatar, CurrentListenerAvatar);
+		if (bDeinitialized || !IsValid(OwningComp) || CurrentNode!=NPCNode) { return; }
 
 		if (OwningComp)
 		{
@@ -1373,6 +1435,7 @@ void UDialogue::FinishNPCDialogue()
 			{
 				OwningComp->CompleteNarrativeDataTask(NAME_PlayDialogueNodeTask, NPCNode->GetID().ToString());
 			}
+			if (bDeinitialized || !IsValid(OwningComp) || CurrentNode!=NPCNode) { return; }
 
 			ProcessNodeEvents(NPCNode, false);
 
@@ -1381,8 +1444,10 @@ void UDialogue::FinishNPCDialogue()
 			{
 				//Call delegates and BPNativeEvents
 				OwningComp->OnNPCDialogueLineFinished.Broadcast(this, NPCNode, CurrentLine, CurrentSpeaker);
+				if (bDeinitialized || !IsValid(OwningComp) || CurrentNode!=NPCNode) { return; }
 				OnNPCDialogueLineFinished(NPCNode, CurrentLine, CurrentSpeaker);
-
+				if (bDeinitialized || !IsValid(OwningComp) || CurrentNode!=NPCNode) { return; }
+				bLineCompletionInProgress=false;
 				PlayNextNPCReply();
 			}
 		}
@@ -1391,6 +1456,8 @@ void UDialogue::FinishNPCDialogue()
 
 void UDialogue::FinishPlayerDialogue()
 {
+	if (bPlaybackSuspended || bDeinitialized || bLineCompletionInProgress || bCurrentLineFinished) { return; }
+	TGuardValue<bool> Completing(bLineCompletionInProgress,true);
 	//FString RoleString = OwningComp && OwningComp->HasAuthority() ? "Server" : "Client";
 	//UE_LOG(LogNarrative, Warning, TEXT("FinishPlayerDialogue called on %s with node %s"), *RoleString, *GetNameSafe(CurrentNode));
 	//Players dialogue node has finished, generate the next chunk of dialogue! 
@@ -1402,11 +1469,15 @@ void UDialogue::FinishPlayerDialogue()
 			return;
 		}
 
+		bCurrentLineFinished=true;
 		FinishDialogueNode(PlayerNode, CurrentLine, CurrentSpeaker, CurrentSpeakerAvatar, CurrentListenerAvatar);
+		if (bDeinitialized || !IsValid(OwningComp) || CurrentNode!=PlayerNode) { return; }
 
 		//Call delegates and BPNativeEvents
 		OwningComp->OnPlayerDialogueLineFinished.Broadcast(this, PlayerNode, CurrentLine);
+		if (bDeinitialized || !IsValid(OwningComp) || CurrentNode!=PlayerNode) { return; }
 		OnPlayerDialogueLineFinished(PlayerNode, CurrentLine);
+		if (bDeinitialized || !IsValid(OwningComp) || CurrentNode!=PlayerNode) { return; }
 
 		//No need, generate dialogue chunk already did this: if (PlayerNode->AreConditionsMet(OwningPawn, OwningController, OwningComp))
 		{
@@ -1416,6 +1487,7 @@ void UDialogue::FinishPlayerDialogue()
 			if (OwningComp && OwningComp->HasAuthority())
 			{
 				OwningComp->CompleteNarrativeDataTask(NAME_PlayDialogueNodeTask, PlayerNode->GetID().ToString());
+				if (bDeinitialized || !IsValid(OwningComp) || CurrentNode!=PlayerNode) { return; }
 
 				//Player selected a reply with nothing leading off it, dialogue has ended 
 				if (PlayerNode->NPCReplies.Num() <= 0)
@@ -1448,6 +1520,7 @@ void UDialogue::FinishPlayerDialogue()
 						OwningComp->ClientRecieveDialogueChunk(MakeIDsFromNPCNodes(NPCReplyChain), MakeIDsFromPlayerNodes(AvailableResponses));
 					}
 
+					bLineCompletionInProgress=false;
 					Play();
 				}
 				else
@@ -1785,6 +1858,7 @@ void UDialogue::FinishDialogueNode_Implementation(class UDialogueNode* Node, con
 {
 	if (DialogueAudio)
 	{
+		DialogueAudio->OnAudioFinished.RemoveAll(this);
 		DialogueAudio->Stop();
 	}
 

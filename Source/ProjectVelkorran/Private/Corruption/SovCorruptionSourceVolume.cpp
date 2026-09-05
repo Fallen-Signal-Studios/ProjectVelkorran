@@ -4,6 +4,7 @@
 #include "AbilitySystemComponent.h"
 #include "Components/SphereComponent.h"
 #include "Corruption/SovCorruptionMath.h"
+#include "Corruption/SovCorruptionSourceComponent.h"
 #include "Engine/World.h"
 #include "UnrealFramework/NarrativeCharacter.h"
 
@@ -40,7 +41,7 @@ bool ASovCorruptionSourceVolume::SetCorruptionProfile(USovCorruptionProfile* New
 {
 	if (!HasAuthority() || IsActorBeingDestroyed()) { return false; }
 	FString Error;
-	if (NewProfile && !NewProfile->ValidateProfile(Error)) { return false; }
+	if (NewProfile && (NewProfile->SourceKind != ESovCorruptionSourceKind::Environment || !NewProfile->ValidateProfile(Error))) { return false; }
 	ReleaseContacts();
 	Profile = NewProfile;
 	if (Profile) { ExposureSphere->SetSphereRadius(Profile->Radius, true); }
@@ -51,8 +52,14 @@ bool ASovCorruptionSourceVolume::ValidateContact(AActor* Target, float& OutFallo
 	OutFalloff = 0.0f;
 	FString Error;
 	if (!HasAuthority() || IsActorBeingDestroyed() || !IsValid(Profile) || !Profile->ValidateProfile(Error)
-		|| !IsValid(Target) || Target == this || Target->IsActorBeingDestroyed() || !IsValid(ExposureSphere)
+		|| Profile->SourceKind != ESovCorruptionSourceKind::Environment || !IsValid(Target) || Target == this || Target->IsActorBeingDestroyed() || !IsValid(ExposureSphere)
 		|| !ExposureSphere->IsOverlappingActor(Target)) { return false; }
+	if (Profile->Escape == ESovCorruptionEscape::DestroyNode && !IsValid(SourceNode)) { return false; }
+	if (SourceNode)
+	{
+		const auto* Producer = SourceNode->FindComponentByClass<USovCorruptionSourceComponent>();
+		if (!Producer || Producer->Profile != Profile || Producer->IsResolvedFor(Target)) { return false; }
+	}
 	const float Distance = FVector::Distance(GetActorLocation(), Target->GetActorLocation());
 	OutFalloff = SovCorruptionMath::Falloff(Distance, Profile->Radius, Profile->bLinearFalloff);
 	if (OutFalloff <= 0.0f) { return false; }

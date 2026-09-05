@@ -262,6 +262,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Interaction")
 	float InteractionDistance;
 
+	/** Higher values win among nearby visible candidates; one focused prompt remains authoritative. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Interaction", meta=(ClampMin="-100",ClampMax="100"))
+	int32 InteractionPriority = 0;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Interaction", meta=(ClampMin="1",ClampMax="85"))
+	float MaxViewAngleDegrees = 45.f;
+
 	//The name that will come up when the player looks at the interactable
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Interaction")
 	FText InteractableNameText;

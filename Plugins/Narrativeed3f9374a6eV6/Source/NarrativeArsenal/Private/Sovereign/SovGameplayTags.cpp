@@ -38,6 +38,36 @@ void FSovGameplayTags::InitializeNativeTags()
 
 void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 {
+	AddTag(Input_Evade, "Narrative.Input.Evade", "Semantic evade input, independent of physical device bindings.");
+	AddTag(Input_FieldRecovery, "Narrative.Input.FieldRecovery", "Semantic field recovery input.");
+	AddTag(Ability_FieldRecovery, "Sov.Ability.FieldRecovery", "Interruptible field recovery charge use.");
+	AddTag(State_FieldRecovery, "Sov.State.FieldRecovery", "Native field recovery in progress.");
+	AddTag(Input_ThreatFocus, "Narrative.Input.ThreatFocus", "Toggle native threat focus.");
+	AddTag(Input_CycleTargetLeft, "Narrative.Input.CycleTargetLeft", "Cycle to the visible threat on the left.");
+	AddTag(Input_CycleTargetRight, "Narrative.Input.CycleTargetRight", "Cycle to the visible threat on the right.");
+	AddTag(Input_AbilityModifier, "Narrative.Input.AbilityModifier", "Semantic alternate-ability modifier.");
+	AddTag(Ability_Evade, "Sov.Ability.Evade", "Native campaign runtime contract.");
+	AddTag(State_Evading, "Sov.State.Evading", "Native campaign runtime contract.");
+	AddTag(State_Exertion_Exhausted, "Sov.State.Exertion.Exhausted", "Native campaign runtime contract.");
+	AddTag(Ability_Finisher, "Sov.Ability.Finisher", "Native campaign runtime contract.");
+	AddTag(Input_Finisher, "Sov.Input.Finisher", "Native campaign runtime contract.");
+	AddTag(State_Finisher_Active, "Sov.State.Finisher.Active", "Native campaign runtime contract.");
+	AddTag(State_Finisher_Target, "Sov.State.Finisher.Target", "Native campaign runtime contract.");
+	AddTag(State_InterruptProtected, "Sov.State.InterruptProtected", "Native campaign runtime contract.");
+	AddTag(Event_Finisher_PhaseResolved, "Sov.Event.Finisher.PhaseResolved", "Native campaign runtime contract.");
+	AddTag(Event_Finisher_Strike, "Sov.Event.Finisher.Strike", "Native campaign runtime contract.");
+	AddTag(State_Resonance_Available, "Sov.State.Resonance.Available", "Native campaign runtime contract.");
+	AddTag(State_Resonance_Committed, "Sov.State.Resonance.Committed", "Native campaign runtime contract.");
+	AddTag(Event_Resonance_Setup_PerfectGuard, "Sov.Event.Resonance.Setup.PerfectGuard", "Native campaign runtime contract.");
+	AddTag(Event_Resonance_Setup_CommandExposed, "Sov.Event.Resonance.Setup.CommandExposed", "Native campaign runtime contract.");
+	AddTag(Event_Resonance_Setup_TerminalProtection, "Sov.Event.Resonance.Setup.TerminalProtection", "Native campaign runtime contract.");
+	AddTag(Event_Resonance_Setup_RoutedFire, "Sov.Event.Resonance.Setup.RoutedFire", "Native campaign runtime contract.");
+	AddTag(State_Resonance_CounterWindow, "Sov.State.Resonance.CounterWindow", "Native campaign runtime contract.");
+	AddTag(State_Resonance_ProtectedTarget, "Sov.State.Resonance.ProtectedTarget", "Native campaign runtime contract.");
+	AddTag(State_Invulnerable_Respawn, "Sov.State.Invulnerable.Respawn", "Native campaign runtime contract.");
+	AddTag(State_Recovery_Rescue, "Sov.State.Recovery.Rescue", "Native campaign runtime contract.");
+	AddTag(State_Traversal, "Sov.State.Traversal", "Native campaign runtime contract.");
+	AddTag(State_Choice_Unresolved, "Sov.State.Choice.Unresolved", "Native campaign runtime contract.");
 	AddTag(Character_Player, "Sov.Character.Player", "Parent identity tag for playable Sovereign characters.");
 	AddTag(Character_Player_Tarrik, "Sov.Character.Player.Tarrik", "Tarrik Walcur player character.");
 	AddTag(Character_Player_Selene, "Sov.Character.Player.Selene", "Selene Veyne player character.");

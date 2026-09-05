@@ -7,9 +7,14 @@
 #include "Abilities/GameplayAbility.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
 #include "GAS/NarrativeDamageExecCalc.h"
+#include "UnrealFramework/NarrativeGameUserSettings.h"
+#include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerController.h"
+#include "ArsenalStatics.h"
 #include "GAS/SovCombatTypes.h"
 #include "GAS/SovCombatTransactionPolicy.h"
 #include "GAS/SovAttackReceiptSource.h"
+#include "GAS/SovDamageSourcePolicy.h"
 #include "GameplayEffect.h"
 #include "GameplayEffectExtension.h"
 #include "GameplayTagContainer.h"
@@ -238,6 +243,7 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 
 		FSovDamageResult Result;
 		Result.TransactionId = FGuid::NewGuid();
+		Result.bCanonicalFatal = EffectAssetTags.HasTagExact(Tags.Damage_Fatal);
 		Result.bPeriodicDamage = bPeriodicDelivery;
 		Result.TargetTagsBeforeDamage = MoveTemp(TargetTagsAtEntry);
 		Result.SourceActor = DamageInstigator;
@@ -265,6 +271,7 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 			0.f);
 		Result.ResolvedDamage = IncomingDamage;
 		Result.EffectContext = Context;
+		Result.AcceptedChannelFraction = UNarrativeDamageExecCalc::GetAcceptedChannelFraction(TargetASC, Data.EffectSpec, &Result.RejectedDamageChannels);
 		Result.bFromEchoAbility = EffectAssetTags.HasTag(Tags.Ability_Echo);
 		if (const UGameplayAbility* SourceAbility = Context.GetAbility())
 		{
@@ -357,7 +364,26 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 		}
 
 		RoutedPoiseDamage = FMath::IsFinite(RoutedPoiseDamage) ? FMath::Max(RoutedPoiseDamage, 0.f) : 0.f;
+		if (bPoisePacket || (bBodyPacket && Data.EffectSpec.GetSetByCallerMagnitude(Tags.SetByCaller_Damage_PoiseDamage, false, -1.f) >= 0.f))
+		{
+			RoutedPoiseDamage *= Result.AcceptedChannelFraction;
+		}
 		Result.RequestedPoiseDamage = RoutedPoiseDamage;
+		// Local difficulty adjusts hostile body pressure only, after deriving independent Poise.
+		const APawn* TargetPawn = Cast<APawn>(TargetActor);
+		const APlayerController* LocalPlayer = TargetPawn ? Cast<APlayerController>(TargetPawn->GetController()) : nullptr;
+		if (LocalPlayer && LocalPlayer->IsLocalController() && SourceActor && SourceActor != TargetActor
+			&& !EffectAssetTags.HasTagExact(Tags.Damage_Fatal)
+			&& UArsenalStatics::GetAttitude(SourceActor, TargetActor) == ETeamAttitude::Hostile)
+		{
+			if (const auto* Settings = UNarrativeGameUserSettings::GetSovSettings())
+			{
+				const float Scale = Settings->GetIncomingDamageScale();
+				RoutedDamage *= FMath::IsFinite(Scale) ? FMath::Clamp(Scale, 0.f, 10.f) : 1.f;
+				Result.ResolvedDamage = RoutedDamage;
+			}
+		}
+
 
 		// Action-state defenses are evaluated after mathematical mitigation and
 		// before Shield/Health routing. Deflection is a short all-or-nothing
@@ -572,6 +598,27 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 		Result.AppliedHealthDamage = FMath::Min(OldHealth, RequestedHealthDamage);
 		Result.HealthOverkillDamage = FMath::Max(RequestedHealthDamage - OldHealth, 0.f);
 
+		bool bSourceAllowsStatus = true;
+		if (IsValid(DamageInstigator) && DamageInstigator->HasAuthority())
+		{
+			TInlineComponentArray<UActorComponent*> SourcePolicies(DamageInstigator);
+			for (UActorComponent* Component : SourcePolicies)
+			{
+				const auto* Policy = IsValid(Component) ? Cast<ISovDamageSourcePolicy>(Component) : nullptr;
+				if (!Policy) { continue; }
+				const float ShieldLimit = Result.AppliedShieldDamage, HealthLimit = Result.AppliedHealthDamage;
+				const float PoiseLimit = FMath::Min(RoutedPoiseDamage, OldPoise);
+				float LimitedShield = ShieldLimit, LimitedHealth = HealthLimit, LimitedPoise = PoiseLimit;
+				bSourceAllowsStatus &= Policy->LimitSovDamage(TargetActor, Context, LimitedShield, LimitedHealth, LimitedPoise);
+				// Native policies can reduce their own contribution, never amplify damage or heal.
+				Result.AppliedShieldDamage = FMath::IsFinite(LimitedShield) ? FMath::Clamp(LimitedShield, 0.f, ShieldLimit) : 0.f;
+				Result.AppliedHealthDamage = FMath::IsFinite(LimitedHealth) ? FMath::Clamp(LimitedHealth, 0.f, HealthLimit) : 0.f;
+				RoutedPoiseDamage = FMath::IsFinite(LimitedPoise) ? FMath::Clamp(LimitedPoise, 0.f, PoiseLimit) : 0.f;
+				if (Result.AppliedHealthDamage < HealthLimit) { Result.HealthOverkillDamage = 0.f; }
+				if (Result.AppliedShieldDamage <= 0.f && ShieldLimit > 0.f) { Result.bShieldWasTargeted = false; }
+			}
+		}
+
 		if (Result.AppliedShieldDamage > 0.f)
 		{
 			SetShield(FMath::Clamp(OldShield - Result.AppliedShieldDamage, 0.f, GetMaxShield()));
@@ -589,15 +636,16 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 			SendSovEvent(Tags.Event_Shield_Broken, Result.AppliedShieldDamage, nullptr);
 		}
 
-		if (RequestedHealthDamage > 0.f)
+		if (Result.AppliedHealthDamage > 0.f)
 		{
-			SetHealth(FMath::Clamp(OldHealth - RequestedHealthDamage, 0.f, GetMaxHealth()));
+			SetHealth(FMath::Clamp(OldHealth - Result.AppliedHealthDamage, 0.f, GetMaxHealth()));
 		}
 
 		if (RoutedPoiseDamage > KINDA_SMALL_NUMBER && OldPoise > 0.f)
 		{
 			const bool bPoiseCannotBreak = Data.Target.HasMatchingGameplayTag(Tags.State_Poise_Recovering)
-				|| Data.Target.HasMatchingGameplayTag(Tags.State_Poise_SuperArmor);
+				|| Data.Target.HasMatchingGameplayTag(Tags.State_Poise_SuperArmor)
+				|| Data.Target.HasMatchingGameplayTag(Tags.State_InterruptProtected);
 			const float PoiseFloor = bPoiseCannotBreak
 				? FMath::Min(GetMaxPoise(), FMath::Max(GetMaxPoise() * 0.01f, 1.f))
 				: 0.f;
@@ -617,6 +665,21 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 				Data.EffectSpec,
 				Result.AppliedPoiseDamage);
 			SendSovEvent(Tags.Event_Poise_Broken, Result.AppliedPoiseDamage, nullptr);
+		}
+		// Filter semantic status requests before any gameplay listener sees them. Parent immunity
+		// is exact: a Freeze-only immunity must not silently become immunity to every status.
+		FGameplayTagContainer CurrentTargetTags;
+		Data.Target.GetOwnedGameplayTags(CurrentTargetTags);
+		if (!bSourceAllowsStatus || CurrentTargetTags.HasTagExact(Tags.Status_Immunity)) { Result.RequestedStatusTags.Reset(); }
+		else
+		{
+			if (Data.Target.HasMatchingGameplayTag(Tags.Status_Immunity_Burn)) { Result.RequestedStatusTags.RemoveTag(Tags.Status_Apply_Burn); }
+			if (Data.Target.HasMatchingGameplayTag(Tags.Status_Immunity_DeviceDisable)) { Result.RequestedStatusTags.RemoveTag(Tags.Status_Apply_DeviceDisabled); }
+			if (Data.Target.HasMatchingGameplayTag(Tags.Status_Immunity_Freeze)
+				|| Data.Target.HasMatchingGameplayTag(Tags.State_InterruptProtected)
+				|| Data.Target.HasMatchingGameplayTag(Tags.State_Poise_Recovering)
+				|| Data.Target.HasMatchingGameplayTag(Tags.State_Poise_SuperArmor))
+			{ Result.RequestedStatusTags.RemoveTag(Tags.Status_Apply_Freeze); }
 		}
 		const float RequestedStatusMagnitude = Data.EffectSpec.GetSetByCallerMagnitude(
 			Tags.SetByCaller_Status_Magnitude, false, 1.f);

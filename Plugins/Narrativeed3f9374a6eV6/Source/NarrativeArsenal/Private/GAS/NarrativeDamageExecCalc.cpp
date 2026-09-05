@@ -7,6 +7,7 @@
 #include "GAS/NarrativeGameplayAbility.h"
 #include "GAS/NarrativeAttributeSetBase.h"
 #include "GAS/SovCombatTransactionPolicy.h"
+#include "GAS/SovDamageChannelPolicy.h"
 #include "GameplayEffect.h"
 #include "Items/RangedWeaponItem.h"
 #include "NarrativeGameplayTags.h"
@@ -138,51 +139,16 @@ namespace NarrativeDamage
 			: 0.f;
 	}
 
-	bool IsImmuneToChannels(
-		const UAbilitySystemComponent* TargetASC,
-		const FGameplayTagContainer& EffectTags)
+	struct FChannel { FGameplayTag Channel; FGameplayTag Immunity; };
+	TArray<FChannel, TInlineAllocator<7>> Channels()
 	{
-		if (!TargetASC)
-		{
-			return false;
-		}
-
-		const FSovGameplayTags& Tags = FSovGameplayTags::Get();
-		if (TargetASC->HasMatchingGameplayTag(Tags.Damage_Immunity_All))
-		{
-			return true;
-		}
-
-		// Channels are combinable. Until attacks carry per-channel weights, reject
-		// the transaction only when every declared channel is immune. Conditional
-		// resistance modifiers still evaluate against the full channel container.
-		bool bHasDeclaredChannel = false;
-		bool bAllDeclaredChannelsImmune = true;
-		const auto AccumulateChannelImmunity = [
-			TargetASC,
-			&EffectTags,
-			&bHasDeclaredChannel,
-			&bAllDeclaredChannelsImmune](
-				const FGameplayTag& ChannelTag,
-				const FGameplayTag& ImmunityTag)
-		{
-			if (EffectTags.HasTagExact(ChannelTag))
-			{
-				bHasDeclaredChannel = true;
-				bAllDeclaredChannelsImmune &=
-					TargetASC->HasMatchingGameplayTag(ImmunityTag);
-			}
-		};
-
-		AccumulateChannelImmunity(Tags.Damage_Channel_Kinetic, Tags.Damage_Immunity_Kinetic);
-		AccumulateChannelImmunity(Tags.Damage_Channel_Edge, Tags.Damage_Immunity_Edge);
-		AccumulateChannelImmunity(Tags.Damage_Channel_Thermal, Tags.Damage_Immunity_Thermal);
-		AccumulateChannelImmunity(Tags.Damage_Channel_Echo, Tags.Damage_Immunity_Echo);
-		AccumulateChannelImmunity(Tags.Damage_Channel_Disruption, Tags.Damage_Immunity_Disruption);
-		AccumulateChannelImmunity(Tags.Damage_Channel_Corruption, Tags.Damage_Immunity_Corruption);
-		AccumulateChannelImmunity(Tags.Damage_Channel_Environmental, Tags.Damage_Immunity_Environmental);
-		return bHasDeclaredChannel && bAllDeclaredChannelsImmune;
+		const auto& T = FSovGameplayTags::Get();
+		return {{T.Damage_Channel_Kinetic, T.Damage_Immunity_Kinetic}, {T.Damage_Channel_Edge, T.Damage_Immunity_Edge},
+			{T.Damage_Channel_Thermal, T.Damage_Immunity_Thermal}, {T.Damage_Channel_Echo, T.Damage_Immunity_Echo},
+			{T.Damage_Channel_Disruption, T.Damage_Immunity_Disruption}, {T.Damage_Channel_Corruption, T.Damage_Immunity_Corruption},
+			{T.Damage_Channel_Environmental, T.Damage_Immunity_Environmental}};
 	}
+
 }
 
 UNarrativeDamageExecCalc::UNarrativeDamageExecCalc()
@@ -209,7 +175,7 @@ bool UNarrativeDamageExecCalc::ShouldRejectTransaction(
 		&& (TargetASC->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_Invulnerable)
 			|| TargetASC->HasMatchingGameplayTag(SovTags.State_Invulnerable)
 			|| TargetASC->HasMatchingGameplayTag(SovTags.State_Damage_Immune)
-			|| NarrativeDamage::IsImmuneToChannels(TargetASC, EffectTags)))
+			|| GetAcceptedChannelFraction(TargetASC, Spec) <= 0.f))
 	{
 		return true;
 	}
@@ -227,6 +193,26 @@ bool UNarrativeDamageExecCalc::ShouldRejectTransaction(
 	}
 
 	return false;
+}
+
+float UNarrativeDamageExecCalc::GetAcceptedChannelFraction(const UAbilitySystemComponent* TargetASC,
+	const FGameplayEffectSpec& Spec, FGameplayTagContainer* OutRejectedChannels)
+{
+	FGameplayTagContainer AssetTags;
+	Spec.GetAllAssetTags(AssetTags);
+	const bool bImmuneToAll=TargetASC && TargetASC->HasMatchingGameplayTag(FSovGameplayTags::Get().Damage_Immunity_All);
+	SovDamageChannels::FPortion Portions[7];
+	int32 Count = 0;
+	for (const auto& Channel : NarrativeDamage::Channels())
+	{
+		if (!AssetTags.HasTagExact(Channel.Channel)) { continue; }
+		const bool bImmune = bImmuneToAll || (TargetASC && TargetASC->HasMatchingGameplayTag(Channel.Immunity));
+		const float Weight = Spec.GetSetByCallerMagnitude(Channel.Channel, false, 1.f);
+		Portions[Count++] = {Weight, bImmune, 1.};
+		if (OutRejectedChannels && (bImmune || Weight <= 0.f || !FMath::IsFinite(Weight))) { OutRejectedChannels->AddTag(Channel.Channel); }
+	}
+	// Untagged legacy packets retain ordinary damage behavior, but cannot bypass global immunity.
+	return bImmuneToAll ? 0.f : static_cast<float>(SovDamageChannels::Resolve(Portions, Count));
 }
 
 void UNarrativeDamageExecCalc::Execute_Implementation(
@@ -271,6 +257,7 @@ void UNarrativeDamageExecCalc::Execute_Implementation(
 		FNarrativeGameplayTags::Get().SetByCaller_Damage,
 		false,
 		-1.f);
+	float PrimaryVariationDelta = 0.f;
 	if (AuthoredBaseDamage >= 0.f)
 	{
 		BaseDamage = AuthoredBaseDamage;
@@ -289,6 +276,7 @@ void UNarrativeDamageExecCalc::Execute_Implementation(
 				const float FixedWeaponDamage = VariationWeapon->GetAttackDamage();
 				const float VariedWeaponDamage = VariationWeapon->ResolveAttackDamageForDistance(
 					NarrativeDamage::GetDeterministicHitDistance(*HitResult, SourceActor));
+				PrimaryVariationDelta = VariedWeaponDamage - FixedWeaponDamage;
 				BaseDamage = FMath::Max(
 					BaseDamage - FixedWeaponDamage + VariedWeaponDamage,
 					0.f);
@@ -302,23 +290,6 @@ void UNarrativeDamageExecCalc::Execute_Implementation(
 	}
 	BaseDamage = FMath::Max(BaseDamage, 0.f);
 
-	float AttackRating = 0.f;
-	ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(
-		NarrativeDamage::Statics().AttackRatingDef,
-		EvaluationParameters,
-		AttackRating);
-
-	float Armor = 0.f;
-	ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(
-		NarrativeDamage::Statics().ArmorDef,
-		EvaluationParameters,
-		Armor);
-
-	float Resistance = 0.f;
-	ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(
-		NarrativeDamage::Statics().DamageResistanceDef,
-		EvaluationParameters,
-		Resistance);
 
 	float HitZoneMultiplier = 1.f;
 	if (const FHitResult* Hit = Spec.GetContext().GetHitResult())
@@ -338,7 +309,6 @@ void UNarrativeDamageExecCalc::Execute_Implementation(
 	const float AbilityScalar = FMath::Max(
 		NarrativeDamage::GetSetByCallerOrDefault(Spec, SovTags.SetByCaller_Damage_AbilityScalar, 1.f),
 		0.f);
-	const float AttackRatingMultiplier = 1.f + (FMath::Max(AttackRating, 0.f) / 100.f);
 	const float ExplicitSourceModifier = FMath::Max(
 		NarrativeDamage::GetSetByCallerOrDefault(Spec, SovTags.SetByCaller_Damage_SourceModifier, 1.f),
 		0.f);
@@ -346,36 +316,50 @@ void UNarrativeDamageExecCalc::Execute_Implementation(
 		NarrativeDamage::GetSetByCallerOrDefault(Spec, SovTags.SetByCaller_Damage_DifficultyScalar, 1.f),
 		0.f);
 
-	const float ArmorMultiplier = EffectTags.HasTagExact(SovTags.Damage_IgnoreArmor)
-		? 1.f
-		: 1.f / (1.f + (FMath::Max(Armor, 0.f) / 100.f));
-	const float ResistanceMultiplier = EffectTags.HasTagExact(SovTags.Damage_IgnoreResistance)
-		? 1.f
-		: 1.f - (FMath::Clamp(Resistance, -100.f, 95.f) / 100.f);
 	const float AuthoredMitigationMultiplier = FMath::Max(
-		NarrativeDamage::GetSetByCallerOrDefault(Spec, SovTags.SetByCaller_Damage_MitigationMultiplier, 1.f),
-		0.f);
-
+		NarrativeDamage::GetSetByCallerOrDefault(Spec, SovTags.SetByCaller_Damage_MitigationMultiplier, 1.f), 0.f);
 	const UNarrativeCombatDeveloperSettings* CombatSettings = GetDefault<UNarrativeCombatDeveloperSettings>();
 	const float MinimumMultiplier = CombatSettings ? FMath::Max(CombatSettings->MinimumDamageMultiplier, 0.f) : 0.f;
-	const float MaximumMultiplier = CombatSettings
-		? FMath::Max(CombatSettings->MaximumDamageMultiplier, MinimumMultiplier)
-		: TNumericLimits<float>::Max();
-	const float MitigationMultiplier = FMath::Clamp(
-		ArmorMultiplier * ResistanceMultiplier * AuthoredMitigationMultiplier,
-		MinimumMultiplier,
-		MaximumMultiplier);
+	const float MaximumMultiplier = CombatSettings ? FMath::Max(CombatSettings->MaximumDamageMultiplier, MinimumMultiplier) : TNumericLimits<float>::Max();
+	const auto EvaluateMultiplier = [&]()
+	{
+		float AttackRating = 0.f, Armor = 0.f, Resistance = 0.f;
+		ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(NarrativeDamage::Statics().AttackRatingDef, EvaluationParameters, AttackRating);
+		ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(NarrativeDamage::Statics().ArmorDef, EvaluationParameters, Armor);
+		ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(NarrativeDamage::Statics().DamageResistanceDef, EvaluationParameters, Resistance);
+		if (!FMath::IsFinite(AttackRating) || !FMath::IsFinite(Armor) || !FMath::IsFinite(Resistance)) { return 0.f; }
+		const float ArmorMultiplier = EffectTags.HasTagExact(SovTags.Damage_IgnoreArmor) ? 1.f : 1.f / (1.f + FMath::Max(Armor, 0.f) / 100.f);
+		const float ResistanceMultiplier = EffectTags.HasTagExact(SovTags.Damage_IgnoreResistance) ? 1.f : 1.f - FMath::Clamp(Resistance, -100.f, 95.f) / 100.f;
+		float ChannelBaseDamage = BaseDamage;
+		if (AuthoredBaseDamage < 0.f)
+		{
+			ExecutionParams.AttemptCalculateCapturedAttributeMagnitude(NarrativeDamage::Statics().AttackDamageDef, EvaluationParameters, ChannelBaseDamage);
+			ChannelBaseDamage = FMath::Max(ChannelBaseDamage + PrimaryVariationDelta, 0.f);
+		}
+		if (!FMath::IsFinite(ChannelBaseDamage)) { return 0.f; }
+		return ChannelBaseDamage * (1.f + FMath::Max(AttackRating, 0.f) / 100.f) * FMath::Clamp(ArmorMultiplier * ResistanceMultiplier * AuthoredMitigationMultiplier, MinimumMultiplier, MaximumMultiplier);
+	};
+	SovDamageChannels::FPortion Portions[7];
+	int32 Count = 0;
+	for (const auto& Channel : NarrativeDamage::Channels()) { EvaluationSourceTags.RemoveTag(Channel.Channel); }
+	for (const auto& Channel : NarrativeDamage::Channels())
+	{
+		if (!EffectTags.HasTagExact(Channel.Channel)) { continue; }
+		EvaluationSourceTags.AddTag(Channel.Channel);
+		Portions[Count++] = {Spec.GetSetByCallerMagnitude(Channel.Channel, false, 1.f),
+			TargetASC && TargetASC->HasMatchingGameplayTag(Channel.Immunity), EvaluateMultiplier()};
+		EvaluationSourceTags.RemoveTag(Channel.Channel);
+	}
+	const float ChannelDamage = Count ? static_cast<float>(SovDamageChannels::Resolve(Portions, Count)) : EvaluateMultiplier();
 
 	const float ResolvedDamage = bAlreadyResolved
-		? BaseDamage
+		? BaseDamage * (bFatalPolicy ? 1.f : GetAcceptedChannelFraction(TargetASC, Spec))
 		: FMath::Max(
-			BaseDamage
+			ChannelDamage
 			* AbilityScalar
-			* AttackRatingMultiplier
 			* ExplicitSourceModifier
 			* HitZoneMultiplier
-			* DifficultyScalar
-			* MitigationMultiplier,
+			* DifficultyScalar,
 			0.f);
 
 	const float ExplicitPoise = Spec.GetSetByCallerMagnitude(SovTags.SetByCaller_Damage_PoiseDamage, false, 0.f);

@@ -10,12 +10,19 @@ enum class ESovCorruptionBand : uint8 { Clear, Trace, Intrusion, Contest, Overwr
 UENUM(BlueprintType)
 enum class ESovCorruptionEscape : uint8 { LeaveField, BreakLink, DestroyNode, ProtectSignal, AuthoredCountermeasure, CompleteObjective };
 
+UENUM(BlueprintType)
+enum class ESovCorruptionSourceKind : uint8 { Environment, EnemyAttack, CommandLink, ContaminatedAlly, Machinery };
+
 USTRUCT(BlueprintType)
 struct PROJECTVELKORRAN_API FSovCorruptionMissionPermission
 {
 	GENERATED_BODY()
 	UPROPERTY(EditAnywhere, BlueprintReadOnly) FName MissionId;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly) ESovCorruptionBand MaximumBand = ESovCorruptionBand::Trace;
+	/** Explicit mission opt-in. Expiry can fail only this encounter while it owns the exposed player. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly) bool bAllowOverwriteEncounterFailure = false;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly) FName OverwriteEncounterId;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(ClampMin="1", ClampMax="600")) float OverwriteSeconds = 30.0f;
 };
 
 /** Explicit source contract; an unpermissioned asset is dormant, including in standalone maps. */
@@ -25,6 +32,12 @@ class PROJECTVELKORRAN_API USovCorruptionProfile : public UDataAsset
 	GENERATED_BODY()
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Corruption") FName SourceId;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Corruption") ESovCorruptionSourceKind SourceKind = ESovCorruptionSourceKind::Environment;
+	/** Contaminated allies must actually carry this authored state; proximity alone cannot invent contamination. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Corruption") FGameplayTag ContaminatedAllyState;
+	/** Engineering defaults: percentage points of resistance lost and remaining stamina regeneration. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Corruption|Combat", meta=(ClampMin="0",ClampMax="25")) float IntrusionVulnerability = 5.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Corruption|Combat", meta=(ClampMin="0.1",ClampMax="1")) float ContestStaminaRegenScale = 0.5f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Corruption", meta=(ClampMin="0")) float ExposurePerSecond = 5.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Corruption", meta=(ClampMin="0")) float ContactExposure = 0.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Corruption", meta=(ClampMin="1")) float Radius = 500.0f;

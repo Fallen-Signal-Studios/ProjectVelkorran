@@ -35,9 +35,12 @@ public:
 	bool DidLastGrantSucceed() const { return bLastGrantSucceeded; }
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Technique") TArray<TSubclassOf<UGameplayEffect>> PersistentEffects;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Technique") TArray<TSubclassOf<UGameplayAbility>> GrantedAbilities;
+	/** Empty means an ordinary always-active Technique/refinement. An exact Echo ability tag makes this a selectable augment. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Technique|Augment") FGameplayTag AugmentedAbility;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Technique", meta=(ClampMin="0")) int32 RequiredBranchInvestment = 0;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Technique") TArray<TSubclassOf<UTreePerk>> IncompatiblePerks;
 private:
+	friend class USovTechniqueComponent;
 	void RemoveNativeGrants();
 	TWeakObjectPtr<UAbilitySystemComponent> GrantASC;
 	TArray<FActiveGameplayEffectHandle> EffectHandles;

@@ -1,13 +1,16 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Tests/SovTechniqueRuntimeTestFixtures.h"
-#include "Tests/SovAxiomRuntimeTestFixtures.h"
+#include "Tests/SovHandoffRuntimeTestFixtures.h"
 #include "AbilitySystemComponent.h"
 #include "Campaign/SovEncounterSnapshotLibrary.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "Framework/SovPlayerState.h"
+#include "Character/PlayerDefinition.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "GAS/NarrativeAttributeSetBase.h"
 #include "Misc/AutomationTest.h"
+#include "NarrativeGameplayTags.h"
 #include "Progression/SovTechniqueComponent.h"
 #include "Progression/SovTechniqueRewardSource.h"
 #include "Progression/SovTechniqueSafePoint.h"
@@ -24,6 +27,8 @@ struct FSovTechniqueTestAccess
 	}
 	static UTreePerk* Perk(USovTechniqueComponent* Component) { return Component->GetPerk(USovTechniqueTestPerkA::StaticClass()); }
 	static void CorruptPointBalance(USovTechniqueComponent* Component) { ++Component->SkillTreePoints; }
+	static void CorruptAugmentSlot(USovTechniqueComponent* Component)
+	{ Component->SelectedAugments.Add(FSovGameplayTags::Get().Ability_Echo_Tarrik_CinderJudgement,USovTechniqueTestPerkB::StaticClass()); }
 };
 namespace
 {
@@ -31,7 +36,8 @@ struct FTechniqueWorld
 {
 	UWorld* World = nullptr;
 	ASovPlayerState* Player = nullptr;
-	ASovAxiomRuntimeTestCharacter* Pawn = nullptr;
+	ASovHandoffRuntimeTestPawn* Pawn = nullptr;
+	ASovHandoffRuntimeTestController* Controller = nullptr;
 	USovTechniqueComponent* Techniques = nullptr;
 	ASovTechniqueSafePoint* Safe = nullptr;
 	ASovTechniqueTestEncounter* Encounter = nullptr;
@@ -44,18 +50,20 @@ struct FTechniqueWorld
 		World->InitializeNewWorld(UWorld::InitializationValues().AllowAudioPlayback(false).RequiresHitProxies(false)
 			.CreatePhysicsScene(true).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false));
 		Player = World->SpawnActor<ASovPlayerState>();
-		Pawn = World->SpawnActor<ASovAxiomRuntimeTestCharacter>();
+		Pawn = World->SpawnActor<ASovHandoffRuntimeTestPawn>();
+		Controller = World->SpawnActor<ASovHandoffRuntimeTestController>();
 		Safe = World->SpawnActor<ASovTechniqueSafePoint>();
 		Encounter = World->SpawnActor<ASovTechniqueTestEncounter>();
-		if (!Player || !Pawn || !Safe || !Encounter) { return; }
-		Pawn->InitializeTestCombat(0);
-		Pawn->SetPlayerState(Player);
+		if (!Player || !Pawn || !Controller || !Safe || !Encounter) { return; }
+		auto* Definition=NewObject<UPlayerDefinition>(Controller); Controller->KeepAlive.Add(Definition);
+		Pawn->PrepareCampaignInitialization(Definition); Controller->SetTestPlayerState(Player); Controller->Possess(Pawn);
+		if (!Pawn->StageTestReadiness(Player,true) || !Pawn->CompleteCampaignDataInitialization(false)) { return; }
+		Pawn->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
 		UAbilitySystemComponent* ASC = Player->GetAbilitySystemComponent();
 		ASC->AddAttributeSetSubobject(Player->GetAttributeSetBase());
 		ASC->InitAbilityActorInfo(Player, Pawn);
 		ASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetMaxHealthAttribute(), 100.f);
 		ASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetHealthAttribute(), 100.f);
-		ASC->AddLooseGameplayTag(FSovGameplayTags::Get().Character_Player_Tarrik);
 		Safe->SafePointId = TEXT("Test.Reflection");
 		Encounter->EncounterId = TEXT("Test.Challenge");
 		Encounter->SetTestState(ESovEncounterState::Succeeded);
@@ -320,6 +328,103 @@ bool FSovTechniqueProfileInitializationTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Failed initialization does not mint a fresh balance"), Fixture.Techniques->GetAvailableTechniquePoints(), 4);
 	TestEqual(TEXT("Failed initialization leaves replacement ownership intact"), ASC->GetAvatarActor(), Replacement);
 	TestEqual(TEXT("Removed outgoing modifier is not replayed on replacement"), Fixture.Resistance(), 0.f);
+	return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovTechniqueAugmentSelectionTest,
+	"ProjectVelkorran.Campaign.Techniques.AugmentSelectionOwnedGrantsAndRestore",
+	EAutomationTestFlags::EditorContext|EAutomationTestFlags::ProductFilter)
+bool FSovTechniqueAugmentSelectionTest::RunTest(const FString& Parameters)
+{
+	FTechniqueWorld F; if (!F.Techniques) { return false; }
+	const auto& T=FSovGameplayTags::Get(); const auto Slot=T.Ability_Echo_Tarrik_CinderSlam; FText Reason;
+	const auto Branches=F.Techniques->GetActiveTechniqueBranches(); if (Branches.Num()!=3) { return false; }
+	auto* ASC=F.Player->GetAbilitySystemComponent();
+	const auto Core=ASC->GiveAbility(FGameplayAbilitySpec(USovTechniqueCoreTestAbility::StaticClass(),1));
+	TestFalse(TEXT("An unpurchased option cannot be selected"),F.Techniques->SelectAugmentAtSafePoint(F.Safe,Slot,USovTechniqueTestPerkB::StaticClass(),Reason));
+	TestTrue(TEXT("Authored reward unlocks the point budget"),F.Techniques->ClaimReward(F.Reward));
+	TestTrue(TEXT("First augment is purchased in the existing tree"),F.Techniques->BuyPerk(USovTechniqueTestPerkB::StaticClass(),Branches[0]));
+	TestTrue(TEXT("Alternative augment is purchased in the existing tree"),F.Techniques->BuyPerk(USovTechniqueTestPerkD::StaticClass(),Branches[1]));
+	TestEqual(TEXT("Unlocked options do not auto-equip or stack effects"),F.Resistance(),0.f);
+	TestEqual(TEXT("The existing purchased ledger exposes both options"),F.Techniques->GetUnlockedAugments(Slot).Num(),2);
+	TestTrue(TEXT("First selection activates its real owned effect"),F.Techniques->SelectAugmentAtSafePoint(F.Safe,Slot,USovTechniqueTestPerkB::StaticClass(),Reason));
+	TestEqual(TEXT("Exactly one augment modifier is active"),F.Resistance(),10.f);
+	TestTrue(TEXT("Alternative selection replaces only this slot"),F.Techniques->SelectAugmentAtSafePoint(F.Safe,Slot,USovTechniqueTestPerkD::StaticClass(),Reason));
+	TestEqual(TEXT("Alternative does not accumulate a second modifier"),F.Resistance(),10.f);
+	TestNotNull(TEXT("Core ability grant remains unchanged"),ASC->FindAbilitySpecFromHandle(Core));
+	TestEqual(TEXT("Changing selection spends no Technique points"),F.Techniques->GetAvailableTechniquePoints(),3);
+	FNarrativeSaveComponent Saved;
+	TestTrue(TEXT("Selected augment is part of the existing component snapshot"),USovEncounterSnapshotLibrary::CaptureComponent(F.Techniques,Saved));
+	TestTrue(TEXT("Repeated restore recreates the selected owned grant once"),USovEncounterSnapshotLibrary::RestoreComponent(F.Techniques,Saved));
+	TestTrue(TEXT("Second restore remains valid"),USovEncounterSnapshotLibrary::RestoreComponent(F.Techniques,Saved));
+	TestEqual(TEXT("Save replay does not accumulate effects"),F.Resistance(),10.f);
+	TestTrue(TEXT("Saved selected class survives replay"),F.Techniques->GetSelectedAugment(Slot)&&F.Techniques->GetSelectedAugment(Slot)->IsA<USovTechniqueTestPerkD>());
+	ASC->AddLooseGameplayTag(T.State_Weapon_VerityAbsent);
+	TestFalse(TEXT("Unavailable equipment blocks changes"),F.Techniques->SelectAugmentAtSafePoint(F.Safe,Slot,USovTechniqueTestPerkB::StaticClass(),Reason));
+	ASC->RemoveLooseGameplayTag(T.State_Weapon_VerityAbsent);
+	F.Pawn->SetTestVisualReady(false);
+	TestFalse(TEXT("Pending pawn readiness blocks safe-point changes"),F.Techniques->SelectAugmentAtSafePoint(F.Safe,Slot,USovTechniqueTestPerkB::StaticClass(),Reason));
+	F.Pawn->SetTestVisualReady(true);
+	F.Encounter->SetTestState(ESovEncounterState::Active);
+	TestFalse(TEXT("Combat blocks augment selection"),F.Techniques->SelectAugmentAtSafePoint(F.Safe,Slot,USovTechniqueTestPerkB::StaticClass(),Reason));
+	F.Encounter->SetTestState(ESovEncounterState::Succeeded);
+	const auto Independent=ASC->MakeOutgoingSpec(USovTechniqueTestEffect::StaticClass(),1,ASC->MakeEffectContext());
+	const auto IndependentHandle=ASC->ApplyGameplayEffectSpecToSelf(*Independent.Data.Get());
+	TestTrue(TEXT("Safe-point respec clears selected augmentation"),F.Techniques->RespecAtSafePoint(F.Safe));
+	TestNull(TEXT("Selection clears with its purchased option"),F.Techniques->GetSelectedAugment(Slot));
+	TestNotNull(TEXT("Independent effect survives tracked augment cleanup"),ASC->GetActiveGameplayEffect(IndependentHandle));
+	TestEqual(TEXT("Only the independently owned modifier remains"),F.Resistance(),10.f);
+	TestNotNull(TEXT("Respec never removes the core ability"),ASC->FindAbilitySpecFromHandle(Core));
+	return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovTechniqueAugmentSavedSlotTest,
+	"ProjectVelkorran.Campaign.Techniques.AugmentSavedSlotValidation",
+	EAutomationTestFlags::EditorContext|EAutomationTestFlags::ProductFilter)
+bool FSovTechniqueAugmentSavedSlotTest::RunTest(const FString& Parameters)
+{
+	FTechniqueWorld F; if (!F.Techniques) { return false; }
+	const auto Branches=F.Techniques->GetActiveTechniqueBranches(); if (Branches.Num()!=3) { return false; }
+	F.Techniques->ClaimReward(F.Reward); F.Techniques->BuyPerk(USovTechniqueTestPerkB::StaticClass(),Branches[0]);
+	F.Techniques->PrepareForSave_Implementation(); FSovTechniqueTestAccess::CorruptAugmentSlot(F.Techniques); F.Techniques->Load_Implementation();
+	TestFalse(TEXT("A purchased option cannot be loaded into a different ability slot"),F.Techniques->IsTechniqueStateValid());
+	TestEqual(TEXT("Invalid load does not grant augment effects"),F.Resistance(),0.f);
+	return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovTechniqueAugmentRollbackFailureTest,
+	"ProjectVelkorran.Campaign.Techniques.AugmentRollbackFailureRequiresRecovery",
+	EAutomationTestFlags::EditorContext|EAutomationTestFlags::ProductFilter)
+bool FSovTechniqueAugmentRollbackFailureTest::RunTest(const FString& Parameters)
+{
+	FTechniqueWorld F; if (!F.Techniques) { return false; }
+	const auto Branches=F.Techniques->GetActiveTechniqueBranches(); if (Branches.Num()!=3) { return false; }
+	auto* ASC=F.Player->GetAbilitySystemComponent(); const auto Slot=FSovGameplayTags::Get().Ability_Echo_Tarrik_CinderSlam;
+	ASC->GiveAbility(FGameplayAbilitySpec(USovTechniqueCoreTestAbility::StaticClass(),1));
+	F.Techniques->ClaimReward(F.Reward); F.Techniques->BuyPerk(USovTechniqueTestPerkB::StaticClass(),Branches[0]);
+	F.Techniques->BuyPerk(USovTechniqueTestPerkD::StaticClass(),Branches[1]); FText Reason;
+	if (!TestTrue(TEXT("Establish committed first selection"),F.Techniques->SelectAugmentAtSafePoint(F.Safe,Slot,USovTechniqueTestPerkB::StaticClass(),Reason))) { return false; }
+	const auto Independent=ASC->MakeOutgoingSpec(USovTechniqueTestEffect::StaticClass(),1,ASC->MakeEffectContext());
+	const auto IndependentHandle=ASC->ApplyGameplayEffectSpecToSelf(*Independent.Data.Get());
+	AActor* Replacement=F.World->SpawnActor<AActor>(); if (!Replacement) { return false; }
+	int32 Stage=0;
+	const auto Listener=ASC->OnActiveGameplayEffectAddedDelegateToSelf.AddLambda(
+		[&](UAbilitySystemComponent* Target,const FGameplayEffectSpec& Spec,FActiveGameplayEffectHandle)
+		{
+			const UObject* Source=Spec.GetContext().GetSourceObject();
+			if (Stage==0 && Source && Source->IsA<USovTechniqueTestPerkD>())
+			{ Stage=1; Target->AddLooseGameplayTag(FNarrativeGameplayTags::Get().State_Busy); }
+			else if (Stage==1 && Source && Source->IsA<USovTechniqueTestPerkB>())
+			{ Stage=2; Target->InitAbilityActorInfo(F.Player,Replacement); }
+		});
+	const bool bChanged=F.Techniques->SelectAugmentAtSafePoint(F.Safe,Slot,USovTechniqueTestPerkD::StaticClass(),Reason);
+	ASC->OnActiveGameplayEffectAddedDelegateToSelf.Remove(Listener);
+	TestEqual(TEXT("Both real apply and rollback callbacks executed"),Stage,2);
+	TestFalse(TEXT("A failed rollback does not report success"),bChanged);
+	TestFalse(TEXT("Partial grant state requires an explicit checkpoint restore"),F.Techniques->IsTechniqueStateValid());
+	TestFalse(TEXT("Failed recovery blocks further progression"),F.Techniques->CanModifyTechniques());
+	TestTrue(TEXT("Failure feedback requests a checkpoint rather than claiming rollback succeeded"),Reason.ToString().Contains(TEXT("checkpoint")));
+	TestEqual(TEXT("Both affected augment grant sets are cleaned"),F.Resistance(),10.f);
+	TestNotNull(TEXT("Independent owner is preserved even on failed rollback"),ASC->GetActiveGameplayEffect(IndependentHandle));
+	FNarrativeSaveComponent Rejected;
+	TestFalse(TEXT("An invalid loadout cannot overwrite a checkpoint"),USovEncounterSnapshotLibrary::CaptureComponent(F.Techniques,Rejected));
 	return true;
 }
 #endif

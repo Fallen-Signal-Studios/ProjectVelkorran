@@ -50,7 +50,7 @@ bool ASovCoActionAnchor::ValidatePermission(ASovPlayerCharacterBase* Player, FNa
 	USovCampaignDefinition* Mission = State ? State->GetActiveMission() : nullptr;
 	const FSovCampaignBeatDefinition* Beat = Mission ? Mission->FindBeat(CompletionBeat) : nullptr;
 	if (!State || !State->IsStateValid() || !Mission || Mission->MissionId != MissionId
-		|| Mission->Protagonist != Player->GetProtagonistIdentityTag() || !Beat || !Beat->bRequiresCoActionProof
+		|| State->GetActiveProtagonist() != Player->GetProtagonistIdentityTag() || !Beat || !Beat->bRequiresCoActionProof
 		|| Beat->RequiredCompanionId != RequiredCompanionId || Beat->RequiredCoActionAnchorId != AnchorId
 		|| !Beat->CinematicId.IsNone() || State->IsBeatComplete(MissionId, CompletionBeat))
 	{
@@ -64,7 +64,7 @@ bool ASovCoActionAnchor::ValidatePermission(ASovPlayerCharacterBase* Player, FNa
 	{
 		if (State->GetStateValue(Required.Key) != Required.Value) { Reason = TEXT("Mission state does not permit this co-action."); return false; }
 	}
-	if (!State->HasKnowledge(Mission->Protagonist, Beat->RequiredKnowledge)) { Reason = TEXT("The protagonist lacks required knowledge."); return false; }
+	if (!State->HasKnowledge(State->GetActiveProtagonist(), Beat->RequiredKnowledge)) { Reason = TEXT("The protagonist lacks required knowledge."); return false; }
 	return true;
 }
 

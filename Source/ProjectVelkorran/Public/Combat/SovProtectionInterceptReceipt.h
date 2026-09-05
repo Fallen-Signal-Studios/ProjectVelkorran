@@ -18,6 +18,8 @@ public:
 	bool ArmForDamage(const FGameplayEffectContextHandle& Context, UAbilitySystemComponent* Source, UAbilitySystemComponent* Target);
 	void Disarm();
 	bool ConsumeForProtector(AActor* Protector, const FSovDamageResult& Result, AActor*& OutThreat, AActor*& OutProtected);
+	/** Independent read-only subscriber, valid only during delivery of this exact native transaction. */
+	bool MatchesCommittedForProtector(AActor* Protector, const FSovDamageResult& Result, AActor*& OutProtected) const;
 	UFUNCTION() void ReceiveResult(const FSovDamageResult& Result);
 private:
 	bool Matches(const FSovDamageResult& Result) const;

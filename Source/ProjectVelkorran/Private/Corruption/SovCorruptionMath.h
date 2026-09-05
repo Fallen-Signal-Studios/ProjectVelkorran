@@ -28,6 +28,27 @@ namespace SovCorruptionMath
 		Current = std::clamp(Current, 0.0, 100.0);
 		return std::max(0.0, std::min(Amount, std::clamp(Cap, 0.0, 100.0) - Current));
 	}
+	inline double StatusDurationScale(int ExposureBand)
+	{
+		return ExposureBand >= 3 && ExposureBand <= 4 ? 1.25 : (ExposureBand == 2 ? 1.10 : 1.0);
+	}
+	inline bool AcceptedHit(bool Periodic, bool Defended, double Health, double Shield, bool AcceptedStatus)
+	{
+		return !Periodic && !Defended && std::isfinite(Health) && std::isfinite(Shield)
+			&& Health >= 0.0 && Shield >= 0.0 && (Health + Shield > 0.0 || AcceptedStatus);
+	}
+	inline double AdvanceProtection(double Current, double Delta, double Required, bool Damaged)
+	{
+		if (!std::isfinite(Current) || !std::isfinite(Delta) || !std::isfinite(Required)
+			|| Current < 0.0 || Delta < 0.0 || Required <= 0.0 || Damaged) { return 0.0; }
+		return std::min(Required, Current + Delta);
+	}
+	inline double AdvanceOverwrite(double Current, double Delta, double Duration, bool Eligible)
+	{
+		if (!Eligible || !std::isfinite(Current) || !std::isfinite(Delta) || !std::isfinite(Duration)
+			|| Current < 0.0 || Delta < 0.0 || Duration <= 0.0) { return 0.0; }
+		return std::min(Duration, Current + Delta);
+	}
 	inline double Falloff(double Distance, double Radius, bool Linear)
 	{
 		if (!std::isfinite(Distance) || !std::isfinite(Radius) || Distance < 0.0 || Radius <= 0.0 || Distance > Radius) { return 0.0; }

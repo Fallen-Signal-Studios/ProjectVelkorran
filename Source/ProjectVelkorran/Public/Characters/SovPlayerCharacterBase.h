@@ -24,9 +24,19 @@ public:
 	virtual FGuid GetActorGUID_Implementation() const override;
 	virtual void SetActorGUID_Implementation(const FGuid& SavedGUID) override;
 	virtual bool ShouldRespawn_Implementation() const override { return false; }
+	virtual bool ShouldResetAttributesOnRevive() const override { return false; }
+	UFUNCTION(BlueprintPure, Category="Sovereign|Components") class USovFatalRecoveryComponent* GetRecoveryComponent() const { return RecoveryComponent; }
+	UFUNCTION(BlueprintPure, Category="Sovereign|Components") class USovTargetingComponent* GetTargetingComponent() const { return TargetingComponent; }
 
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Components")
 	class USovEchoComponent* GetEchoComponent() const { return EchoComponent; }
+
+	UFUNCTION(BlueprintPure, Category="Sovereign|Components")
+	class USovExertionComponent* GetExertionComponent() const { return ExertionComponent; }
+	UFUNCTION(BlueprintPure, Category="Sovereign|Components")
+	class USovFieldRecoveryComponent* GetFieldRecoveryComponent() const { return FieldRecoveryComponent; }
+	UFUNCTION(BlueprintPure, Category="Sovereign|Components")
+	class USovResonanceComponent* GetResonanceComponent() const { return ResonanceComponent; }
 
 	/** Dormant until an explicitly mission-permitted source makes real authority contact. */
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Components")
@@ -71,6 +81,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sovereign|Components")
 	TObjectPtr<class USovEchoComponent> EchoComponent;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Sovereign|Components") TObjectPtr<class USovExertionComponent> ExertionComponent;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Sovereign|Components") TObjectPtr<class USovFieldRecoveryComponent> FieldRecoveryComponent;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Sovereign|Components") TObjectPtr<class USovResonanceComponent> ResonanceComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sovereign|Components")
 	TObjectPtr<class USovCorruptionComponent> CorruptionComponent;
@@ -97,6 +110,8 @@ protected:
 	TObjectPtr<class USovGuardComponent> GuardComponent;
 
 private:
+	UPROPERTY(VisibleAnywhere, Category="Sovereign|Components") TObjectPtr<class USovFatalRecoveryComponent> RecoveryComponent;
+	UPROPERTY(VisibleAnywhere, Category="Sovereign|Components") TObjectPtr<class USovTargetingComponent> TargetingComponent;
 	UPROPERTY(SaveGame) FGuid CampaignSaveGuid;
 	bool bCampaignManagedInitialization = false;
 	bool bCampaignInitializationFailed = false;

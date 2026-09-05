@@ -12,3 +12,6 @@ void INarrativeSavableComponent::Load_Implementation()
 {
 
 }
+
+bool INarrativeSavableComponent::IsOptionalSaveRecord_Implementation() const
+{ return false; }

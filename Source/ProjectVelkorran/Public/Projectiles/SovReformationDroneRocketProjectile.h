@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
+#include "GAS/SovCombatTypes.h"
 #include "TimerManager.h"
 #include "Weapons/NarrativeProjectile.h"
 #include "SovReformationDroneRocketProjectile.generated.h"
@@ -65,6 +66,10 @@ struct PROJECTVELKORRAN_API FSovReformationDroneRocketResolution
 
 	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Reformation Drone|Rocket")
 	bool bExpired = false;
+
+	/** Perfect Guard or an exhausted reflection budget dissipated the projectile without blast damage. */
+	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Reformation Drone|Rocket")
+	bool bAbsorbed = false;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Reformation Drone|Rocket")
 	TObjectPtr<AActor> HitActor = nullptr;
@@ -300,12 +305,16 @@ private:
 	UFUNCTION()
 	void OnRep_Resolution();
 
+	bool ResolveDirectDefense(const FHitResult& Hit);
+	void ResumeReflectedFlight();
+	UFUNCTION() void ReceiveDirectDefense(const FSovDamageResult& Result);
+	friend struct FSovProjectileDefenseTestAccess;
 	void StartProjectileMovement();
 	void ConfigureHoming();
 	void DeactivateProjectile();
 	void ExpireProjectile();
 	void ResolveImpact(const FHitResult& Hit);
-	void ResolveExpired();
+	void ResolveExpired(bool bAbsorbed = false);
 	bool ApplyExplosion(const FVector& ExplosionLocation, const FHitResult* DirectHit);
 	void ApplyExplosionPhysicsImpulse(const FVector& ExplosionLocation);
 	bool IsTargetAlive(const UAbilitySystemComponent* TargetAbilitySystem) const;
@@ -347,7 +356,17 @@ private:
 	bool bPayloadInitialized = false;
 	bool bCollisionArmed = false;
 	bool bResolving = false;
+	bool bFlightExpiredWhileResolving = false;
 	bool bPlayedLaunchPresentation = false;
 	bool bPlayedResolutionPresentation = false;
 	FTimerHandle FlightTimerHandle;
+	const FGameplayEffectContext* PendingDirectContext = nullptr;
+	TWeakObjectPtr<UAbilitySystemComponent> DirectDamageTarget;
+	FSovDamageResult DirectResult;
+	bool bReceivedDirectResult = false;
+	uint8 ReflectionCount = 0;
+	/** A reflected rocket can be intercepted once more, then dissipates, preventing infinite ping-pong. */
+	UPROPERTY(EditDefaultsOnly, Category="Sovereign|Reformation Drone|Rocket", meta=(ClampMin="0", ClampMax="4"))
+	uint8 MaximumReflections = 1;
+
 };

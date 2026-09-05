@@ -241,4 +241,56 @@ bool FSovWeakPointResetReentryTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Refused rollback preserves mask"), Dismember->GetSeveredRegionMask(), ArmMask);
 	return true;
 }
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovWeightedChannelRoutingTest,
+    "ProjectVelkorran.Campaign.Defense.WeightedChannels", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovWeightedChannelRoutingTest::RunTest(const FString& Parameters)
+{
+    FCombatRoutingWorld Fixture; auto* Source=Fixture.Character(100.f,0); auto* Target=Fixture.Character(0.f,1);
+    if (!Source || !Target) { return false; }
+    auto* ASC=Target->GetNarrativeAbilitySystemComponent(); auto* SourceASC=Source->GetNarrativeAbilitySystemComponent();
+    const auto& T=FSovGameplayTags::Get();
+    ASC->AddLooseGameplayTag(T.Damage_Immunity_Kinetic);
+    FGameplayEffectSpec Spec(GetDefault<USovCombatRoutingTestEffect>(),SourceASC->MakeEffectContext(),1.f);
+    Spec.AddDynamicAssetTag(T.Damage_Channel_Kinetic); Spec.AddDynamicAssetTag(T.Damage_Channel_Thermal);
+    Spec.SetSetByCallerMagnitude(FNarrativeGameplayTags::Get().SetByCaller_Damage,80.f);
+    Spec.SetSetByCallerMagnitude(T.SetByCaller_Damage_PoiseDamage,40.f);
+    SourceASC->ApplyGameplayEffectSpecToTarget(Spec,ASC);
+    TestEqual(TEXT("Equal semantic channels remove only the immune half"),Target->LastDamageResult.AppliedShieldDamage,40.f);
+    TestEqual(TEXT("Independent Poise removes the same immune half exactly once"),Target->LastDamageResult.AppliedPoiseDamage,20.f);
+    TestTrue(TEXT("Rejected channel available to status consumers"),Target->LastDamageResult.RejectedDamageChannels.HasTagExact(T.Damage_Channel_Kinetic));
+    Spec.SetSetByCallerMagnitude(T.Damage_Channel_Kinetic,3.f); Spec.SetSetByCallerMagnitude(T.Damage_Channel_Thermal,1.f);
+    SourceASC->ApplyGameplayEffectSpecToTarget(Spec,ASC);
+    TestEqual(TEXT("Explicit 3:1 weights retain one quarter"),Target->LastDamageResult.AppliedShieldDamage,20.f);
+    TestEqual(TEXT("Explicit Poise weight is not applied twice"),Target->LastDamageResult.AppliedPoiseDamage,10.f);
+    ASC->AddLooseGameplayTag(T.Damage_Immunity_Thermal); const int32 Before=Target->ResolvedHitCount;
+    SourceASC->ApplyGameplayEffectSpecToTarget(Spec,ASC);
+    TestEqual(TEXT("All declared portions immune emits no accepted transaction"),Target->ResolvedHitCount,Before);
+    FGameplayEffectSpec Untagged(GetDefault<USovCombatRoutingTestEffect>(),SourceASC->MakeEffectContext(),1.f);
+    Untagged.SetSetByCallerMagnitude(FNarrativeGameplayTags::Get().SetByCaller_Damage,10.f);
+    ASC->AddLooseGameplayTag(T.Damage_Immunity_All);
+    SourceASC->ApplyGameplayEffectSpecToTarget(Untagged,ASC);
+    TestEqual(TEXT("Global immunity also rejects untagged legacy damage"),Target->ResolvedHitCount,Before);
+    ASC->RemoveLooseGameplayTag(T.Damage_Immunity_All);
+    SourceASC->ApplyGameplayEffectSpecToTarget(Untagged,ASC);
+    TestEqual(TEXT("Untagged legacy packet keeps ordinary behavior without global immunity"),Target->ResolvedHitCount,Before+1);
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovInterruptionProtectionRoutingTest,
+    "ProjectVelkorran.Campaign.Defense.InterruptionProtection", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovInterruptionProtectionRoutingTest::RunTest(const FString& Parameters)
+{
+    FCombatRoutingWorld Fixture; auto* Source=Fixture.Character(100.f,0); auto* Target=Fixture.Character(0.f,1);
+    if (!Source || !Target) { return false; }
+    auto* ASC=Target->GetNarrativeAbilitySystemComponent(); const auto& T=FSovGameplayTags::Get();
+    ASC->AddLooseGameplayTag(T.State_InterruptProtected);
+    Attack(Source,Target,40.f,300.f,true);
+    TestEqual(TEXT("Finisher protection does not grant damage immunity"),Target->LastDamageResult.AppliedShieldDamage,40.f);
+    TestFalse(TEXT("Finisher protection prevents an interruption break"),Target->LastDamageResult.bPoiseBroken);
+    TestFalse(TEXT("Hard freeze request suppressed during owned action protection"),Target->LastDamageResult.bStatusApplicationRequested);
+    ASC->RemoveLooseGameplayTag(T.State_InterruptProtected);
+    Attack(Source,Target,0.f,0.f,true);
+    TestTrue(TEXT("Control is available again when protection ends"),Target->LastDamageResult.bStatusApplicationRequested);
+    return true;
+}
 #endif

@@ -4,6 +4,7 @@
 #include "AbilitySystemComponent.h"
 #include "Components/ActorComponent.h"
 #include "Components/SovEchoComponent.h"
+#include "Exertion/SovExertionComponent.h"
 #include "Components/SovHealthRechargeComponent.h"
 #include "Components/SovShieldComponent.h"
 #include "Components/SovPoiseComponent.h"
@@ -66,8 +67,8 @@ bool USovEncounterSnapshotLibrary::RestoreResources(UAbilitySystemComponent* ASC
 		if (IsValid(PoiseComponent)) { PoiseComponent->SetCheckpointRestoreInProgress(false); }
 	};
 	const auto StillOwnsAvatar = [&]() { return IsValid(ASC) && IsValid(Avatar) && ASC->GetAvatarActor() == Avatar; };
-	// Revive initializes base attributes/startup effects through Narrative. Do it
-	// before applying the saved currents, never after they have been restored.
+	// Generic Narrative NPCs initialize attributes on revive; campaign players retain
+	// their existing maxima and grants. In either case restore explicit currents last.
 	if (UNarrativeAbilitySystemComponent* NarrativeASC = Cast<UNarrativeAbilitySystemComponent>(ASC))
 	{
 		if (NarrativeASC->IsDead() && Snapshot.Health > 0.f) { NarrativeASC->Revive(); }
@@ -82,15 +83,20 @@ bool USovEncounterSnapshotLibrary::RestoreResources(UAbilitySystemComponent* ASC
 #undef SOV_RESTORE_RESOURCE
 	if (Avatar)
 	{
+		if (USovExertionComponent* Exertion = Avatar->FindComponentByClass<USovExertionComponent>()) { Exertion->ResetForCheckpoint(); }
+		if (!StillOwnsAvatar()) { return false; }
 		if (USovHealthRechargeComponent* Health = Avatar->FindComponentByClass<USovHealthRechargeComponent>()) { Health->ResetForCheckpoint(); }
+		if (!StillOwnsAvatar()) { return false; }
 		if (USovShieldComponent* Shield = Avatar->FindComponentByClass<USovShieldComponent>()) { Shield->ResetForCheckpoint(); }
+		if (!StillOwnsAvatar()) { return false; }
 		if (USovPoiseComponent* Poise = Avatar->FindComponentByClass<USovPoiseComponent>()) { Poise->ResetForCheckpoint(); }
+		if (!StillOwnsAvatar()) { return false; }
 		if (USovEchoComponent* Echo = Avatar->FindComponentByClass<USovEchoComponent>())
 		{
 			Echo->RestoreEchoFromCheckpoint(Snapshot.Echo);
 		}
 	}
-	return true;
+	return StillOwnsAvatar();
 }
 
 bool USovEncounterSnapshotLibrary::CaptureComponent(UActorComponent* Component, FNarrativeSaveComponent& OutRecord)
@@ -99,6 +105,7 @@ bool USovEncounterSnapshotLibrary::CaptureComponent(UActorComponent* Component, 
 	FNarrativeSaveComponent Result;
 	Result.ComponentName = Component->GetFName();
 	INarrativeSavableComponent::Execute_PrepareForSave(Component);
+	if (!IsValid(Component) || Component->GetFName() != Result.ComponentName) { return false; }
 	FMemoryWriter Writer(Result.ByteData);
 	FObjectAndNameAsStringProxyArchive Archive(Writer, true);
 	Archive.ArIsSaveGame = true;

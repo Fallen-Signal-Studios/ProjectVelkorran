@@ -4,6 +4,12 @@
 #include "Sovereign/SovGameplayTags.h"
 #include "Progression/SovTechniqueComponent.h"
 
+USovTechniqueCoreTestAbility::USovTechniqueCoreTestAbility()
+{
+	bRequiresAllowedWeapon=false;
+	FGameplayTagContainer Tags=GetAssetTags(); Tags.AddTag(FSovGameplayTags::Get().Ability_Echo_Tarrik_CinderSlam); SetAssetTags(Tags);
+}
+
 void USovTechniqueSnapshotTestObserver::OnChanged(FGameplayTag Protagonist, int32 Available, int32 Earned)
 {
 	++Notifications;
@@ -26,9 +32,9 @@ USovTechniqueTestPerkA::USovTechniqueTestPerkA(const FObjectInitializer& O) : Su
 	PersistentEffects.Add(USovTechniqueTestEffect::StaticClass());
 	GrantedAbilities.Add(USovTechniqueOwnedTestAbility::StaticClass());
 }
-USovTechniqueTestPerkB::USovTechniqueTestPerkB(const FObjectInitializer& O) : Super(O) { MaxLevels = 4; PersistentEffects.Add(USovTechniqueTestEffect::StaticClass()); }
+USovTechniqueTestPerkB::USovTechniqueTestPerkB(const FObjectInitializer& O) : Super(O) { MaxLevels = 4; PersistentEffects.Add(USovTechniqueTestEffect::StaticClass()); AugmentedAbility=FSovGameplayTags::Get().Ability_Echo_Tarrik_CinderSlam; }
 USovTechniqueTestPerkC::USovTechniqueTestPerkC(const FObjectInitializer& O) : Super(O) { MaxLevels = 4; PersistentEffects.Add(USovTechniqueTestEffect::StaticClass()); }
-USovTechniqueTestPerkD::USovTechniqueTestPerkD(const FObjectInitializer& O) : Super(O) { MaxLevels = 4; PersistentEffects.Add(USovTechniqueTestEffect::StaticClass()); }
+USovTechniqueTestPerkD::USovTechniqueTestPerkD(const FObjectInitializer& O) : Super(O) { MaxLevels = 4; PersistentEffects.Add(USovTechniqueTestEffect::StaticClass()); AugmentedAbility=FSovGameplayTags::Get().Ability_Echo_Tarrik_CinderSlam; }
 USovTechniqueTestPerkE::USovTechniqueTestPerkE(const FObjectInitializer& O) : Super(O) { MaxLevels = 4; PersistentEffects.Add(USovTechniqueTestEffect::StaticClass()); }
 USovTechniqueTestPerkF::USovTechniqueTestPerkF(const FObjectInitializer& O) : Super(O) { MaxLevels = 4; PersistentEffects.Add(USovTechniqueTestEffect::StaticClass()); }
 USovTechniqueTestSkillA::USovTechniqueTestSkillA(const FObjectInitializer& O) : Super(O)

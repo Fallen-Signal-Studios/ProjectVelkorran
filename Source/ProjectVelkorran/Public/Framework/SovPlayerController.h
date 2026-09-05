@@ -26,10 +26,16 @@ class PROJECTVELKORRAN_API ASovPlayerController : public ANarrativePlayerControl
 public:
 	ASovPlayerController(const FObjectInitializer& ObjectInitializer);
 	UFUNCTION(BlueprintPure, Category="Campaign") USovCampaignStateComponent* GetCampaignState() const { return CampaignState; }
+	class USovConvergenceCompanionState* GetConvergenceCompanionState() const { return ConvergenceCompanionState; }
+	UFUNCTION(BlueprintPure, Category="Narrative") class USovNarrativeCueComponent* GetNarrativeCues() const { return NarrativeCues; }
 	UFUNCTION(BlueprintPure, Category="Campaign") ESovCampaignTransitionState GetCampaignTransitionState() const { return TransitionState; }
 	/** Authored handoff after mandatory beats, into content already loaded in this world. */
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Campaign")
 	bool HandoffToMission(USovCampaignDefinition* Destination, const FTransform& SpawnTransform, FString& OutError);
+	/** Requires a matching physical authored M12/M13 anchor; there is no free-switch endpoint. */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Campaign")
+	bool RequestAuthoredHandoff(class ASovCampaignHandoffAnchor* Anchor, FString& OutError);
+	FGameplayTag GetPendingProtagonist() const;
 	/** Writes a Narrative player record before non-seamless authored map travel. */
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Campaign")
 	bool TravelToMission(USovCampaignDefinition* Destination, FString& OutError);
@@ -38,7 +44,7 @@ public:
 	/** GameMode-only staging: actor bytes first; quest/component records after the matching pawn exists. */
 	bool StageCampaignLoad(USovCampaignDefinition* Mission, const FNarrativeSavePlayer* Records, bool bFromTravel, FString& OutError);
 	void InitializeCampaignPawn(ASovPlayerCharacterBase* Pawn);
-	static bool ValidateMissionPawn(USovCampaignDefinition* Mission, FString& OutError);
+	static bool ValidateMissionPawn(USovCampaignDefinition* Mission, FString& OutError, FGameplayTag Lead = FGameplayTag());
 	static const TCHAR* TravelSaveSlot() { return TEXT("SovCampaignTravel"); }
 	virtual FGuid GetActorGUID_Implementation() const override;
 	virtual void SetActorGUID_Implementation(const FGuid& SavedGUID) override;
@@ -47,11 +53,16 @@ public:
 protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Campaign") TObjectPtr<USovCampaignStateComponent> CampaignState;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Campaign") TObjectPtr<class USovConvergenceCompanionState> ConvergenceCompanionState;
 	UPROPERTY(EditDefaultsOnly, Category="Campaign", meta=(ClampMin="1",ClampMax="120")) float InitializationTimeoutSeconds = 30.f;
 
 private:
+	friend struct FSovTransitionCallbackTestAccess;
+	UPROPERTY(VisibleAnywhere, Category="Narrative") TObjectPtr<class USovNarrativeCueComponent> NarrativeCues;
+	bool PrepareTransitionCheckpoint(FName BoundaryId, FString& OutError);
 	bool CanTransitionTo(USovCampaignDefinition* Destination, FString& OutError, bool bRequireDifferentProtagonist = true) const;
-	ASovPlayerCharacterBase* SpawnCampaignPawn(USovCampaignDefinition* Mission, const FTransform& Transform);
+	ASovPlayerCharacterBase* SpawnCampaignPawn(USovCampaignDefinition* Mission, const FTransform& Transform, FGameplayTag Lead = FGameplayTag());
+	bool StartPawnHandoff(USovCampaignDefinition* Destination, FGameplayTag Lead, const FTransform& Transform, FName HandoffBeat, const FGuid& HandoffRequest, FString& OutError);
 	bool ClearOutgoingCombatState();
 	void PollCampaignInitialization(uint64 ExpectedEpoch);
 	void FailCampaignInitialization(const FString& Message);
@@ -60,6 +71,9 @@ private:
 	UPROPERTY(SaveGame) FGuid CampaignControllerGuid;
 	UPROPERTY(SaveGame) TObjectPtr<USovCampaignDefinition> PendingTravelMission;
 	UPROPERTY(Transient) TObjectPtr<USovCampaignDefinition> PendingMission;
+	FGameplayTag PendingProtagonist;
+	FName PendingHandoffBeat;
+	FGuid PendingHandoffRequest;
 	UPROPERTY(Transient) TObjectPtr<USovCampaignDefinition> OriginMission;
 	UPROPERTY(Transient) TObjectPtr<ASovPlayerCharacterBase> PendingPawn;
 	UPROPERTY(Transient) FNarrativeSavePlayer PendingRecords;
@@ -74,4 +88,5 @@ private:
 	bool bHasOriginSnapshot = false;
 	bool bOwnInputLock = false;
 	bool bWasSavingDisabled = false;
+	bool bFailureInProgress = false;
 };

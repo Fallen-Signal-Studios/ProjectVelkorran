@@ -17,6 +17,13 @@ class NARRATIVEARSENAL_API UNarrativeInputSettings : public UEnhancedInputUserSe
 public:
 
 	UNarrativeInputSettings();
+	UFUNCTION(BlueprintCallable, Category=Settings) void SetCameraSensitivity(float Value);
+	UFUNCTION(BlueprintPure, Category=Settings) float GetCameraSensitivity() const;
+	UFUNCTION(BlueprintCallable, Category=Settings) void SetGamepadDeadZone(float Value);
+	UFUNCTION(BlueprintPure, Category=Settings) float GetGamepadDeadZone() const;
+	UFUNCTION(BlueprintCallable, Category=Settings) void SetGamepadAccelerationSeconds(float Value);
+	UFUNCTION(BlueprintPure, Category=Settings) float GetGamepadAccelerationSeconds() const;
+
 		
 	UFUNCTION(BlueprintCallable, Category = Settings)
 	void SetAimSensitivity(const float NewAimSensitivity);
@@ -36,6 +43,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = Settings)
 	bool GetInvertHorizontal() const;
 protected:
+	UPROPERTY(config, SaveGame) float CameraSensitivity = 1.f;
+	/** Zero preserves existing authored Enhanced Input dead-zone modifiers. */
+	UPROPERTY(config, SaveGame) float GamepadDeadZone = 0.f;
+	UPROPERTY(config, SaveGame) float GamepadAccelerationSeconds = 0.f;
 
 	UPROPERTY(config, SaveGame)
 	float AimSensitivity;

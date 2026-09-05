@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameUserSettings.h"
+#include "GameplayTagContainer.h"
 #include "NarrativeGameUserSettings.generated.h"
 
 UENUM(BlueprintType)
@@ -35,6 +36,31 @@ class NARRATIVEARSENAL_API UNarrativeGameUserSettings : public UGameUserSettings
 public:
 
 	UNarrativeGameUserSettings();
+
+	/** Project extension seam; neutral defaults preserve other Narrative consumers. */
+	static const UNarrativeGameUserSettings* GetSovSettings();
+	virtual float GetIncomingDamageScale() const { return 1.f; }
+	virtual float GetEnemyRecoveryScale() const { return 1.f; }
+	virtual float GetDefenseWindowScale() const { return 1.f; }
+	virtual float GetExertionCostScale() const { return 1.f; }
+	virtual float GetInputBufferAssistanceSeconds() const { return 0.f; }
+	virtual float GetMeleeAimAssistStrength() const { return 0.f; }
+	virtual float GetRangedAimAssistStrength() const { return 0.f; }
+	virtual bool IsCompanionRescueAllowed() const { return true; }
+	virtual float GetInteractionHoldScale() const { return 1.f; }
+	virtual bool UseTapInteractions() const { return false; }
+	virtual bool ShouldAimToggle() const { return false; }
+	virtual bool ShouldGuardToggle() const { return false; }
+	virtual bool ShouldSprintToggle() const { return false; }
+	virtual bool UseAutomaticSprint() const { return false; }
+	virtual bool UseAimSnap() const { return false; }
+	virtual bool UseProjectileLead() const { return false; }
+	virtual bool ShouldAbilityModifierToggle() const { return false; }
+	virtual float GetAutoCameraStrength() const { return 0.f; }
+	virtual bool IsCameraShakeDisabled() const { return false; }
+	virtual bool IsReducedLensEffectsEnabled() const { return false; }
+	virtual bool IsReducedCorruptionEffectsEnabled() const { return false; }
+
 
 	virtual void ApplySettings(bool bCheckForCommandLineOverrides) override;
 	virtual void ApplyNonResolutionSettings() override; 
@@ -102,7 +128,7 @@ public:
 
 	//Set the current gameplay difficulty
 	UFUNCTION(BlueprintCallable, Category = Settings)
-	void SetGameplayDifficulty(const ENarrativeGameplayDifficulty NewDifficulty);
+	virtual void SetGameplayDifficulty(const ENarrativeGameplayDifficulty NewDifficulty);
 
 	UFUNCTION(BlueprintCallable, Category = Settings)
 	ENarrativeGameplayDifficulty GetGameplayDifficulty();

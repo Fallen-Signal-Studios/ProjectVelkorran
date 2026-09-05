@@ -26,6 +26,10 @@ void ANarrativePlayerCameraManager::ProcessViewRotation(float DeltaTime, FRotato
 
 void ANarrativePlayerCameraManager::DoUpdateCamera(float DeltaTime)
 {
+	if (const UNarrativeGameUserSettings* Settings = UNarrativeGameUserSettings::GetSovSettings(); Settings && Settings->IsCameraShakeDisabled())
+	{
+		StopAllCameraShakes(true);
+	}
 	Super::DoUpdateCamera(DeltaTime);
 
 	FMinimalViewInfo NewPOV = GetCameraCacheView();
@@ -86,6 +90,23 @@ void ANarrativePlayerCameraManager::DoUpdateCamera(float DeltaTime)
 	}
 
 
+	// Apply comfort reduction after every gameplay/cinematic camera layer. Required cues remain HUD/shape/audio responsibilities.
+	if (const UNarrativeGameUserSettings* Settings = UNarrativeGameUserSettings::GetSovSettings(); Settings && Settings->IsReducedLensEffectsEnabled())
+	{
+		NewPOV.PostProcessSettings.bOverride_SceneFringeIntensity = true;
+		NewPOV.PostProcessSettings.SceneFringeIntensity = 0.f;
+		NewPOV.PostProcessSettings.bOverride_FilmGrainIntensity = true;
+		NewPOV.PostProcessSettings.FilmGrainIntensity = 0.f;
+		NewPOV.PostProcessSettings.bOverride_DepthOfFieldScale = true;
+		NewPOV.PostProcessSettings.DepthOfFieldScale = 0.f;
+		NewPOV.PostProcessSettings.bOverride_LensFlareIntensity = true;
+		NewPOV.PostProcessSettings.LensFlareIntensity = 0.f;
+		NewPOV.PostProcessSettings.bOverride_BloomIntensity = true;
+		NewPOV.PostProcessSettings.BloomIntensity = 0.f;
+		NewPOV.PostProcessSettings.bOverride_MotionBlurAmount = true;
+		NewPOV.PostProcessSettings.MotionBlurAmount = 0.f;
+		NewPOV.PostProcessBlendWeight = 1.f;
+	}
 	NewPOV.FirstPersonScale = FirstPersonRenderScale;
 	NewPOV.bUseFirstPersonParameters = WantsFirstPersonRender();
 	NewPOV.PerspectiveNearClipPlane = 0.01f;

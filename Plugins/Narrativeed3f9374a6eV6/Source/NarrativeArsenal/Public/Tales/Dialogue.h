@@ -180,6 +180,13 @@ public:
 	virtual UWorld* GetWorld() const override;
 	virtual bool Initialize(class UTalesComponent* InitializingComp, const FDialoguePlayParams PlayParams);
 	virtual void Deinitialize();
+	/** Pause an authored walk-and-talk in place. Resuming never replays graph events or a selected choice. */
+	bool SetPlaybackSuspended(bool bSuspend);
+	UFUNCTION(BlueprintPure, Category="Dialogue") bool IsPlaybackSuspended() const { return bPlaybackSuspended; }
+	bool CanSuspendPlayback() const;
+	/** Native campaign critical cues defer forced interruption in the same graph instance. */
+	void SetPreserveOnInterruption(bool bPreserve) { bPreserveOnInterruption = bPreserve; }
+	bool PreservesInterruptedPlayback() const { return bPreserveOnInterruption; }
 
 	virtual void DuplicateAndInitializeFromDialogue(UDialogue* DialogueTemplate);
 
@@ -656,6 +663,11 @@ protected:
 
 	//Deintialize has been called and the dialogue should not play anymore
 	bool bDeinitialized;
+	bool bPlaybackSuspended = false;
+	bool bLineCompletionInProgress = false;
+	bool bCurrentLineFinished = false;
+	bool bPlaybackStartPending = false;
+	bool bPreserveOnInterruption = false;
 
 	//The dialogue may be initialized, but has it began playing yet?
 	bool bBeganPlaying;

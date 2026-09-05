@@ -14,6 +14,8 @@ public:
 	ASovTechniqueSafePoint();
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Technique") TObjectPtr<UBoxComponent> SafeBounds;
 	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="Technique") FName SafePointId;
+	/** Mark only authored major checkpoints and supply stations; ordinary refinement points do not implicitly refill. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Field Recovery") bool bRefillsFieldRecovery = false;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Technique", meta=(ClampMin="100.0", Units="cm")) float HostileExclusionRadius = 1500.f;
 	bool AllowsModification(const ASovPlayerState* Player) const;
 };

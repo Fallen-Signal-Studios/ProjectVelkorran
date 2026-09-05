@@ -8,6 +8,16 @@
 
 class UPlayerDefinition;
 class APawn;
+class UGameplayAbility;
+
+/** Read-only kit evidence used to curate an inactive protagonist's separate companion ASC. */
+USTRUCT(BlueprintType)
+struct PROJECTVELKORRAN_API FSovProtagonistAbilitySnapshot
+{
+	GENERATED_BODY()
+	UPROPERTY(SaveGame, BlueprintReadOnly) TSubclassOf<UGameplayAbility> AbilityClass;
+	UPROPERTY(SaveGame, BlueprintReadOnly) int32 Level = 1;
+};
 
 /** Values are captured for inspection. Restore clamps currents to the current definition's maxima. */
 USTRUCT(BlueprintType)
@@ -42,6 +52,7 @@ struct PROJECTVELKORRAN_API FSovProtagonistSnapshot
 	UPROPERTY(SaveGame, BlueprintReadOnly) FGameplayTagContainer Factions;
 	UPROPERTY(SaveGame, BlueprintReadOnly) FGameplayTagContainer WieldEquipSlots;
 	UPROPERTY(SaveGame, BlueprintReadOnly) FGameplayTagContainer WieldSlots;
+	UPROPERTY(SaveGame, BlueprintReadOnly) TArray<FSovProtagonistAbilitySnapshot> GrantedAbilities;
 	bool IsValid() const;
 };
 

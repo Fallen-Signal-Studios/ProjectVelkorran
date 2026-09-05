@@ -47,6 +47,13 @@ struct NARRATIVEARSENAL_API FSovDamageResult
 	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Damage")
 	FGameplayTagContainer DamageChannels;
 
+	/** Declared portions rejected by channel immunity or zero weight. */
+	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Damage")
+	FGameplayTagContainer RejectedDamageChannels;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Damage")
+	float AcceptedChannelFraction = 1.f;
+
 	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Damage")
 	FGameplayTagContainer AttackClassifications;
 
@@ -127,6 +134,10 @@ struct NARRATIVEARSENAL_API FSovDamageResult
 
 	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Damage")
 	bool bFatal = false;
+
+	/** Authored non-rescuable fatal transaction, captured before damage callbacks. */
+	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Damage")
+	bool bCanonicalFatal = false;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Damage")
 	bool bShouldRestartShieldRecharge = false;
