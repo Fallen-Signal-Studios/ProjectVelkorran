@@ -36,8 +36,9 @@ public:
 protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;
 	virtual void NativeOnAddedToFocusPath(const FFocusEvent& InFocusEvent) override;
-	virtual FReply NativeOnKeyDown(const FGeometry& Geometry, const FKeyEvent& Event) override;
 private:
+	friend struct FSovAccessibilityFrontendTestAccess;
+	UFUNCTION() UWidget* NavigateValue(EUINavigation Direction);
 	UFUNCTION() void Clicked();
 	UPROPERTY(Transient) TObjectPtr<USovAccessibilitySettingsMenu> Menu;
 	UPROPERTY(Transient) TObjectPtr<USovAccessibilityNativeButton> Button;
@@ -56,6 +57,7 @@ public:
 	void Adjust(USovAccessibilitySettingRow* Row, int32 Direction);
 	FText ValueText(const USovAccessibilitySettingRow* Row) const;
 	bool IsRowEnabled(const USovAccessibilitySettingRow* Row) const;
+	bool CanAdjustValue(const USovAccessibilitySettingRow* Row) const;
 	void FocusRow(USovAccessibilitySettingRow* Row, const FText& AccessibleLabel);
 	FSovUserSettingsSnapshot CurrentSettings() const;
 protected:
@@ -65,6 +67,7 @@ protected:
 	virtual void NativeDestruct() override;
 	virtual void NativeOnDeactivated() override;
 	virtual void NativeOnActivated() override;
+	virtual bool NativeOnHandleBackAction() override;
 private:
 	void AddRow(FName Key, const FText& Label, float Min = 0.f, float Max = 1.f, float Step = 1.f);
 	friend struct FSovAccessibilityFrontendTestAccess;

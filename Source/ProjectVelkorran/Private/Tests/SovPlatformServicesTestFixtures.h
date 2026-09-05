@@ -10,6 +10,7 @@ class USovCloudReentryProbe : public UObject
     GENERATED_BODY()
 public:
     UPROPERTY(Transient) TObjectPtr<USovPlatformServicesSubsystem> Service;
+    TFunction<void()> CancelAction;
     bool bCancelReading = false;
     bool bCancelWriting = false;
     bool bRestartOnComplete = false;
@@ -19,6 +20,8 @@ public:
     UFUNCTION() void OnChanged(const FSovCloudReview& Review)
     {
         if (!Service) { return; }
+        if (Review.Phase == ESovCloudPhase::Cancelled && CancelAction)
+        { auto Action = MoveTemp(CancelAction); Action(); }
         if (Review.Phase == ESovCloudPhase::Reading && bDeinitializeOnReading)
         { bDeinitializeOnReading = false; Service->Deinitialize(); return; }
         if (Review.Phase == ESovCloudPhase::Reading && bCancelReading)

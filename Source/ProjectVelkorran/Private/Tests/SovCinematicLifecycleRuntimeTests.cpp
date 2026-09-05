@@ -9,6 +9,7 @@
 #include "Campaign/SovCampaignStateComponent.h"
 #include "Character/PlayerDefinition.h"
 #include "Framework/SovPlayerState.h"
+#include "Framework/SovApplicationLifecycleComponent.h"
 #include "Tracks/MovieSceneEventTrack.h"
 #include "Components/WorldPartitionStreamingSourceComponent.h"
 #include "HAL/PlatformTime.h"
@@ -22,6 +23,16 @@
 #include "TimerManager.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
+struct FSovCinematicInterruptionTestAccess
+{
+    static void Hold(USovApplicationLifecycleComponent* Component, double Started)
+    { Component->State.SetReason(SovLifecyclePolicy::Reason::Background, true, Started); }
+    static bool Resume(USovApplicationLifecycleComponent* Component, double Now)
+    {
+        Component->State.SetReason(SovLifecyclePolicy::Reason::Background, false, Now);
+        return Component->State.Resume(Now);
+    }
+};
 struct FNarrativeSequenceLifecycleTestAccess
 {
 	static void Play(ANarrativeLevelSequenceActor* Actor) { Actor->OnPlay(); }
@@ -55,8 +66,10 @@ struct FSovCinematicTestAccess
 		TGuardValue<bool> Finishing(C->bFinishing, true); return C->CommitNativePostconditions(Skipped, Error);
 	}
 	static void ExpireLoading(USovCampaignCinematicComponent* C)
-	{ C->LoadingStartedSeconds = FPlatformTime::Seconds() - C->LoadingTimeoutSeconds - 1.; C->TickComponent(0.f, LEVELTICK_PauseTick, nullptr); }
+    { C->LoadingStartedSeconds = C->PreparationTimeSeconds() - C->LoadingTimeoutSeconds - 1.; C->TickComponent(0.f, LEVELTICK_PauseTick, nullptr); }
 	static bool CheckWatchdog(USovCampaignCinematicComponent* C) { return C->CheckPreparationWatchdog(C->RequestEpoch); }
+    static void StageLoadingAge(USovCampaignCinematicComponent* C, double Age)
+    { C->LoadingStartedSeconds = C->PreparationTimeSeconds() - Age; }
 	static void StageOwnedSession(USovCampaignCinematicComponent* C, ASovHandoffRuntimeTestController* PC,
 		ASovHandoffRuntimeTestPawn* Pawn, UAbilitySystemComponent* ASC)
 	{
@@ -70,7 +83,7 @@ struct FSovCinematicTestAccess
 		C->Snapshot = {Entry}; C->Phase = ESovCinematicPhase::Loading; ++C->RequestEpoch;
 		C->ReservedPlaybackGeneration = CastChecked<ANarrativeLevelSequenceActor>(C->GetOwner())->GetPlaybackGeneration();
 		C->SessionId = FGuid::NewGuid(); C->bOwnInput = true;
-		C->LoadingStartedSeconds = FPlatformTime::Seconds();
+		C->LoadingStartedSeconds = C->PreparationTimeSeconds();
 		PC->SetIgnoreMoveInput(true); PC->SetIgnoreLookInput(true);
 		C->bOwnSequenceTag = true; ASC->AddLooseGameplayTag(FNarrativeGameplayTags::Get().State_SequencerControlled);
 	}
@@ -388,6 +401,30 @@ bool FSovCinematicPartitionCleanupTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Independent core watchdog retires accidentally disabled component ticking"), FSovCinematicTestAccess::CheckWatchdog(F.Component));
 	TestFalse(TEXT("Tick disable cannot strand source/input/tag leases"), FSovCinematicTestAccess::OwnsAnything(F.Component));
 	return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCinematicConsoleInterruptionTest, "ProjectVelkorran.Campaign.Cinematic.ConsoleInterruptionPreservesPreparation",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCinematicConsoleInterruptionTest::RunTest(const FString& Parameters)
+{
+    FManagedSequenceWorld F;
+    if (!TestNotNull(TEXT("Managed cinematic component"), F.Component)) { return false; }
+    auto* Lifecycle = F.PC->GetApplicationLifecycle();
+    if (!TestNotNull(TEXT("Controller's production lifecycle owner"), Lifecycle)) { return false; }
+    FSovCinematicTestAccess::StageOwnedSession(F.Component, F.PC, F.Pawn, F.ASC);
+    // Simulate a suspend longer than the complete load budget without sleeping or
+    // sending global platform delegates to the editor running this test.
+    FSovCinematicInterruptionTestAccess::Hold(Lifecycle, FPlatformTime::Seconds() - 120.);
+    FSovCinematicTestAccess::StageLoadingAge(F.Component, 2.);
+    TestTrue(TEXT("Independent watchdog remains alive during interruption"), FSovCinematicTestAccess::CheckWatchdog(F.Component));
+    TestEqual(TEXT("Suspended load keeps its preparation phase"), F.Component->GetPhase(), ESovCinematicPhase::Loading);
+    FString Error;
+    TestFalse(TEXT("Interrupted gameplay cannot launch another cinematic transaction"), F.Component->RequestPlay(F.PC, Error));
+    TestTrue(TEXT("Only explicit resume retires the held interval"), FSovCinematicInterruptionTestAccess::Resume(Lifecycle, FPlatformTime::Seconds()));
+    TestTrue(TEXT("Two minutes of suspend do not exhaust two seconds of active loading"), FSovCinematicTestAccess::CheckWatchdog(F.Component));
+    FSovCinematicTestAccess::ExpireLoading(F.Component);
+    TestEqual(TEXT("Genuine active-time timeout still fails and releases ownership"), F.Component->GetPhase(), ESovCinematicPhase::Failed);
+    TestFalse(TEXT("Timeout does not strand cinematic leases"), FSovCinematicTestAccess::OwnsAnything(F.Component));
+    return true;
 }
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCinematicTransitContractTest, "ProjectVelkorran.Campaign.Cinematic.NativeTransitPostconditionAndRollback",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)

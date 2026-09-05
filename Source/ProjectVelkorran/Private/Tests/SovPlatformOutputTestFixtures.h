@@ -12,6 +12,7 @@ class USovPlatformOutputTestSettings : public USovGameUserSettings
 	GENERATED_BODY()
 public:
 	bool bAvailable = true;
+	bool bSystemManaged = false;
 	bool bSupported = true;
 	bool bRejectEnable = false;
 	bool bLoseOutputAfterWrite = false;
@@ -32,6 +33,7 @@ public:
 	FGuid ReentryReceipt;
 	void InitializeOutput(bool bEnabled, int32 Nits)
 	{ bOutputEnabled = bEnabled; OutputNits = bEnabled ? Nits : 0; bUseHDRDisplayOutput = bEnabled; HDRDisplayOutputNits = Nits; }
+	virtual bool IsDisplayOutputSystemManaged() const override { return bSystemManaged; }
 protected:
 	virtual bool CanApplyHDROutput() const override { return bAvailable; }
 	virtual double HDRTime() const override { return Now; }

@@ -13,6 +13,49 @@ struct FSovPlatformOutputTestAccess
 	static void DisplayMetricsChanged(USovGameUserSettings* Settings) { Settings->bDisplayMetricsInvalidated = true; }
 };
 #if WITH_DEV_AUTOMATION_TESTS
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovSystemDisplayOwnershipRuntime, "ProjectVelkorran.Campaign.PlatformOutput.SystemDisplayOwnership", EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+bool FSovSystemDisplayOwnershipRuntime::RunTest(const FString& Parameters)
+{
+	auto* Settings = NewObject<USovPlatformOutputTestSettings>(); Settings->InitializeOutput(true, 2000);
+	Settings->bSystemManaged = true;
+	FSovHDROutputStatus Status = Settings->GetHDROutputStatus();
+	TestTrue(TEXT("System-managed HDR remains observable"), Status.bSupported && Status.bEnabled && Status.bSystemManaged);
+	TestEqual(TEXT("System-managed output keeps observed peak"), Status.PeakNits, 2000);
+	TestFalse(TEXT("System output offers no desktop preview"), Status.bCanPreviewInGame);
+	TestFalse(TEXT("System output offers no renderer calibration"), Status.bCanCalibrateInGame);
+	FGuid Receipt = FGuid::NewGuid(); FString Error;
+	TestFalse(TEXT("Desktop HDR request cannot take over system output"), Settings->PreviewHDRCalibration(true, 1000, Receipt, Error));
+	TestFalse(TEXT("Rejected request has no receipt"), Receipt.IsValid());
+	TestTrue(TEXT("Failure explains platform ownership"), Error.Contains(TEXT("platform display settings")));
+	TestFalse(TEXT("SDR request also cannot take over system output"), Settings->PreviewHDRCalibration(false, 1000, Receipt, Error));
+	TestFalse(TEXT("Full calibration request cannot take over system output"), Settings->PreviewHDRDisplay(true, 1000, FSovHDRCalibration(), Receipt, Error));
+	TestEqual(TEXT("Rejected requests perform no output writes"), Settings->Writes, 0);
+	TestEqual(TEXT("Rejected requests do not persist"), Settings->Saves, 0);
+	auto* RendererSettings = NewObject<USovDisplayCVarTestSettings>();
+	RendererSettings->InitializeVariables(); RendererSettings->bSystemManaged = true;
+	FSovHDRCalibration Calibration; Calibration.PaperWhiteNits = 200.f;
+	TestFalse(TEXT("Direct renderer adapter cannot bypass system display ownership"), RendererSettings->WriteProductionCalibration(Calibration));
+	TestEqual(TEXT("Rejected system calibration preserves renderer gray"), RendererSettings->GetVariable(TEXT("r.HDR.Display.MidLuminance"))->GetFloat(), 15.f);
+	RendererSettings->ResetVariables();
+	Settings->bSystemManaged = false;
+	Status = Settings->GetHDROutputStatus();
+	TestTrue(TEXT("Desktop capabilities restored independently"), Status.bCanPreviewInGame && Status.bCanCalibrateInGame);
+	Settings->bCalibrationAvailable = false;
+	Status = Settings->GetHDROutputStatus();
+	TestTrue(TEXT("Output-only preview does not require compositor"), Status.bCanPreviewInGame);
+	TestFalse(TEXT("Missing compositor disables full calibration"), Status.bCanCalibrateInGame);
+	Settings->DisplayIdentity.Reset();
+	TestFalse(TEXT("Missing physical desktop identity disables preview"), Settings->GetHDROutputStatus().bCanPreviewInGame);
+	Settings->DisplayIdentity = TEXT("display-a"); Settings->bCalibrationAvailable = true;
+	TestTrue(TEXT("Desktop preview before suspension starts"), Settings->PreviewHDRCalibration(false, 1000, Receipt, Error));
+	TestTrue(TEXT("Suspension cancels unconfirmed preview"), Settings->RevertUnconfirmedHDRPreview());
+	TestTrue(TEXT("Suspension restores confirmed HDR"), Settings->GetHDROutputStatus().bEnabled);
+	TestFalse(TEXT("Resume cannot confirm outgoing preview"), Settings->ConfirmHDRCalibration(Receipt, Error));
+	const int32 WritesAfterRollback = Settings->Writes;
+	TestFalse(TEXT("Repeated suspend with no preview is a no-op"), Settings->RevertUnconfirmedHDRPreview());
+	TestEqual(TEXT("Repeated suspension does not touch output"), Settings->Writes, WritesAfterRollback);
+	return true;
+}
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovFullHDRCalibrationRuntime, "ProjectVelkorran.Campaign.PlatformOutput.FullCalibrationAndDisplayIdentity", EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::EngineFilter)
 bool FSovFullHDRCalibrationRuntime::RunTest(const FString& Parameters)
 {

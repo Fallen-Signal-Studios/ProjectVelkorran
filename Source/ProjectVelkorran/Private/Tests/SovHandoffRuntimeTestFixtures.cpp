@@ -55,3 +55,14 @@ void ASovHandoffRuntimeTestController::SetTestPlayerState(ASovPlayerState* State
 	PlayerState = State;
 	if (State) { State->SetOwner(this); }
 }
+void ASovHandoffRuntimeTestController::PrepareForSave_Implementation()
+{
+	Super::PrepareForSave_Implementation();
+	if (OnPrepareTravelSave) { OnPrepareTravelSave(); }
+}
+TFunction<void(bool)> USovTravelOwnerFenceTestSave::OnTravelSerialization;
+void USovTravelOwnerFenceTestSave::Serialize(FArchive& Ar)
+{
+	Super::Serialize(Ar);
+	if (OnTravelSerialization) { OnTravelSerialization(Ar.IsSaving()); }
+}

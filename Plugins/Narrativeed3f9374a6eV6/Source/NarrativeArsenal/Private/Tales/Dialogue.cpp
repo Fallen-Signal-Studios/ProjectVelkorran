@@ -1814,13 +1814,18 @@ void UDialogue::PlayDialogueSound_Implementation(const FDialogueLine& Line, clas
 		}
 		else //Else just play 2D audio 
 		{
-			DialogueAudio = UGameplayStatics::SpawnSound2D(OwningComp, Line.DialogueSound);
+			// Dialogue is gameplay audio even without a spatial speaker. SpawnSound2D
+			// treats it as UI audio and can advance an audio-ended line behind a pause
+			// or console system overlay. Configure before Play so it observes world pause.
+			DialogueAudio = UGameplayStatics::CreateSound2D(OwningComp, Line.DialogueSound);
+			if (DialogueAudio) { DialogueAudio->bIsUISound = false; }
 		}
 
 		if (DialogueAudio && Line.Duration == ELineDuration::LD_WhenAudioEnds)
 		{
 			DialogueAudio->OnAudioFinished.AddDynamic(this, &UDialogue::EndCurrentLine);
 		}
+		if (DialogueAudio && !Speaker) { DialogueAudio->Play(); }
 	}
 }
 

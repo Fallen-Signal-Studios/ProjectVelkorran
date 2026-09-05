@@ -319,34 +319,48 @@ bool UNarrativeSaveSubsystem::CreatePlayerOnlySave(APlayerController* PC)
 	return PS && CreatePlayerOnlySaveInSlot(PC, PS->GetPlayerName());
 }
 
-bool UNarrativeSaveSubsystem::CreatePlayerOnlySaveInSlot(APlayerController* PC, const FString& SlotName)
+bool UNarrativeSaveSubsystem::CreatePlayerOnlySaveInSlot(APlayerController* PC, const FString& SlotName, int32 LocalUserIndex,
+	TFunction<bool()> IsOwnerCurrent)
 {
 	APlayerState* PS = IsValid(PC) ? PC->GetPlayerState<APlayerState>() : nullptr;
 	APawn* Pawn = IsValid(PC) ? PC->GetPawn() : nullptr;
-	if (bSavingDisabled || !IsValid(PS) || !IsValid(Pawn) || !PC->HasAuthority() || SlotName.IsEmpty()) { return false; }
+	const auto CanWrite = [this, PC, PS, Pawn, &IsOwnerCurrent]()
+	{
+		return !bSavingDisabled && IsValid(PC) && IsValid(PS) && IsValid(Pawn) && PC->HasAuthority()
+			&& PC->GetPlayerState<APlayerState>() == PS && PC->GetPawn() == Pawn
+			&& (!IsOwnerCurrent || IsOwnerCurrent());
+	};
+	if (SlotName.IsEmpty() || LocalUserIndex < 0 || !CanWrite()) { return false; }
 	FNarrativeSavePlayer Records;
-	if (!CreateActorRecord(PS, Records.PlayerStateData)
-		|| !CreateActorRecord(PC, Records.ControllerData)
-		|| !CreateActorRecord(Pawn, Records.PawnData)) { return false; }
+	if (!CreateActorRecord(PS, Records.PlayerStateData) || !CanWrite()
+		|| !CreateActorRecord(PC, Records.ControllerData) || !CanWrite()
+		|| !CreateActorRecord(Pawn, Records.PawnData) || !CanWrite()) { return false; }
 	// Preserve configured save-subclass data (including character creator data).
 	// This isolated slot object must never replace the live world save object.
-	UNarrativeSave* PlayerSave = Cast<UNarrativeSave>(UGameplayStatics::LoadGameFromSlot(SlotName, 0));
+	TStrongObjectPtr<UNarrativeSave> PlayerSave(Cast<UNarrativeSave>(UGameplayStatics::LoadGameFromSlot(SlotName, LocalUserIndex)));
+	if (!CanWrite()) { return false; }
 	if (!PlayerSave)
-	{ PlayerSave = Cast<UNarrativeSave>(UGameplayStatics::CreateSaveGameObject(GetSaveGameClass())); }
-	if (!PlayerSave) { return false; }
+	{ PlayerSave.Reset(Cast<UNarrativeSave>(UGameplayStatics::CreateSaveGameObject(GetSaveGameClass()))); }
+	if (!PlayerSave || !CanWrite()) { return false; }
 	Records.PlayerStateData.Transform = FTransform::Identity;
 	Records.ControllerData.Transform = FTransform::Identity;
 	Records.PlayerStateData.bHasTransform = false;
 	Records.ControllerData.bHasTransform = false;
 	PlayerSave->PlayerData = MoveTemp(Records);
-	return UGameplayStatics::SaveGameToSlot(PlayerSave, SlotName, 0);
+	// Serialize before the final owner fence: a SaveGame subclass can revoke ownership
+	// from Serialize. SaveDataToSlot still uses Unreal's existing platform save system.
+	TArray<uint8> Bytes;
+	return UGameplayStatics::SaveGameToMemory(PlayerSave.Get(), Bytes) && CanWrite()
+		&& UGameplayStatics::SaveDataToSlot(Bytes, SlotName, LocalUserIndex);
 }
 
-bool UNarrativeSaveSubsystem::ReadPlayerOnlySave(const FString& SlotName, FNarrativeSavePlayer& OutPlayerData) const
+bool UNarrativeSaveSubsystem::ReadPlayerOnlySave(const FString& SlotName, FNarrativeSavePlayer& OutPlayerData, int32 LocalUserIndex,
+	TFunction<bool()> IsOwnerCurrent) const
 {
-	if (SlotName.IsEmpty()) { return false; }
-	const UNarrativeSave* PlayerSave = Cast<UNarrativeSave>(UGameplayStatics::LoadGameFromSlot(SlotName, 0));
-	if (!PlayerSave || !PlayerSave->PlayerData.IsValid()
+	OutPlayerData = FNarrativeSavePlayer();
+	if (SlotName.IsEmpty() || LocalUserIndex < 0 || (IsOwnerCurrent && !IsOwnerCurrent())) { return false; }
+	const TStrongObjectPtr<UNarrativeSave> PlayerSave(Cast<UNarrativeSave>(UGameplayStatics::LoadGameFromSlot(SlotName, LocalUserIndex)));
+	if ((IsOwnerCurrent && !IsOwnerCurrent()) || !PlayerSave || !PlayerSave->PlayerData.IsValid()
 		|| !PlayerSave->PlayerData.PlayerStateData.IsValid() || !PlayerSave->PlayerData.ControllerData.IsValid()) { return false; }
 	OutPlayerData = PlayerSave->PlayerData;
 	return true;

@@ -16,7 +16,7 @@ void USovPlatformServicesSubsystem::Initialize(FSubsystemCollectionBase& Collect
 {
     Super::Initialize(Collection);
     Saves = Collection.InitializeDependency<USovSaveSubsystem>();
-    Adapter = MakeSovConfiguredPlatformAdapter(GetWorld());
+    Adapter = MakeSovConfiguredPlatformAdapter(GetGameInstance());
     const TWeakObjectPtr<USovPlatformServicesSubsystem> Weak(this);
     Adapter->Start([Weak]() { if (IsInGameThread() && Weak.IsValid()) { Weak->ObserveAccount(); } });
     ObserveAccount();
@@ -39,33 +39,46 @@ void USovPlatformServicesSubsystem::ObserveAccount()
     const auto Transport = Adapter;
     TStrongObjectPtr<USovSaveSubsystem> SaveOwner(Saves);
     const auto Account = Transport->GetAccount();
+    if (Adapter != Transport || Saves != SaveOwner.Get()) { return; }
+    // Revocation precedes every cancellation/account callback: listeners cannot write under an
+    // outgoing user's authorization while this observer is processing a replacement or signout.
+    Saves->ObserveNativePlatformAccount(Account);
+    const bool CloudAvailable = Account.bCloudAvailable && !Account.bUsesPlatformManagedCloud;
     const bool Changed = ObservedStableId != Account.StableId || ObservedLocalUser != Account.LocalUser
-        || bObservedSignedIn != Account.bSignedIn || bObservedCloudAvailable != Account.bCloudAvailable;
+        || bObservedSignedIn != Account.bSignedIn || bObservedCloudAvailable != CloudAvailable
+        || bObservedStorageAuthorized != Account.bStorageAccessAuthorized || bObservedPlatformManagedCloud != Account.bUsesPlatformManagedCloud;
     if (Changed)
     {
         bCloudEnabled = false;
         ObservedStableId = Account.StableId; ObservedLocalUser = Account.LocalUser;
-        bObservedSignedIn = Account.bSignedIn; bObservedCloudAvailable = Account.bCloudAvailable;
+        bObservedSignedIn = Account.bSignedIn; bObservedCloudAvailable = CloudAvailable;
+        bObservedStorageAuthorized = Account.bStorageAccessAuthorized; bObservedPlatformManagedCloud = Account.bUsesPlatformManagedCloud;
         CancelCloudOperation();
         if (Adapter != Transport || Saves != SaveOwner.Get()) { return; }
     }
     FString Error;
     const bool PreviouslyDeferred = bAccountSelectionDeferred;
     // A rejected switch leaves the old account/paused failure/load entirely owned by the native save subsystem.
-    if (Account.bIdentityKnown)
+    const bool Authorized = !Account.bRequiresKnownStorageOwner || Account.bStorageAccessAuthorized;
+    if (Account.bIdentityKnown && Authorized)
     {
         const bool AlreadySelected = Saves->GetAccountNamespace() == FMD5::HashAnsiString(*ObservedStableId)
             && Saves->GetLocalSaveUserIndex() == ObservedLocalUser;
         bAccountSelectionDeferred = !AlreadySelected && !Saves->SelectPlatformUser(ObservedStableId, ObservedLocalUser, Error);
-        Saves->ObservePlatformStorageOwner(ObservedStableId, ObservedLocalUser);
+    }
+    else if (Account.bRequiresKnownStorageOwner)
+    {
+        bAccountSelectionDeferred = true;
     }
     // Unknown identity preserves the restored hash-only profile and any last confirmed access fence.
     // It does not silently select a fresh empty offline namespace over the existing offline campaign.
     if (Changed || PreviouslyDeferred != bAccountSelectionDeferred)
     {
         const uint64 Published = Publish(bCloudEnabled ? ESovCloudPhase::Idle : ESovCloudPhase::Disabled,
-            bAccountSelectionDeferred ? TEXT("Account changed. Current campaign/save transaction keeps its original owner; return to the front end.")
-                : TEXT("Platform account observed. Cloud remains optional and requires explicit opt-in."));
+            !Authorized ? TEXT("The campaign's local platform account is unavailable. Restore that account to continue saving.")
+                : bAccountSelectionDeferred ? TEXT("Account changed. Current campaign/save transaction keeps its original owner; return to the front end.")
+                : bObservedPlatformManagedCloud ? TEXT("Platform account observed. Manual cloud synchronization is not available on this platform.")
+                    : TEXT("Platform account observed. Cloud remains optional and requires explicit opt-in."));
         if (StateGeneration == Published && Adapter == Transport && Saves == SaveOwner.Get())
         { OnPlatformAccountChanged.Broadcast(bObservedSignedIn, bAccountSelectionDeferred); }
     }
@@ -77,12 +90,14 @@ bool USovPlatformServicesSubsystem::SetCloudEnabled(bool Enabled, FString& Error
         const auto Transport = Adapter;
         bCloudEnabled = false; CancelCloudOperation();
         if (Adapter != Transport || bCloudEnabled) { Error = TEXT("Cloud preference was superseded during notification."); return false; }
-        Publish(ESovCloudPhase::Disabled, TEXT("Cloud disabled. Local saves remain available.")); return true;
+        Publish(ESovCloudPhase::Disabled, TEXT("Cloud disabled. Existing saves are retained.")); return true;
     }
     ObserveAccount();
+    if (bObservedPlatformManagedCloud)
+    { Error = TEXT("Manual cloud synchronization is not available on this platform."); return false; }
     if (!Adapter || !Saves || !bObservedSignedIn || !bObservedCloudAvailable || bAccountSelectionDeferred
         || Saves->GetAccountNamespace() != FMD5::HashAnsiString(*ObservedStableId))
-    { Error = TEXT("Cloud is unavailable for the selected account. Offline campaign and local saves remain available."); return false; }
+    { Error = TEXT("Cloud is unavailable for the selected account. Local saving requires the campaign's platform account."); return false; }
     bCloudEnabled = true; Error.Reset();
     if (Review.Phase != ESovCloudPhase::Reading && Review.Phase != ESovCloudPhase::Writing && Review.Phase != ESovCloudPhase::AwaitingChoice)
     { Publish(ESovCloudPhase::Idle, TEXT("Cloud enabled for this account/session. Choose a slot to compare; no automatic upload or download.")); }
@@ -96,7 +111,8 @@ bool USovPlatformServicesSubsystem::CanUseCloud(FString& Error) const
         && Saves->GetAccountNamespace() == FMD5::HashAnsiString(*Live.StableId)
         && Saves->GetLocalSaveUserIndex() == Live.LocalUser;
     const bool Frontend = Saves->CanManagePlatformSaves(Error);
-    if (!SovPlatformServicesPolicy::CanAdmit(bCloudEnabled, Live.bSignedIn, Live.bCloudAvailable, Same, Frontend, false))
+    if (!SovPlatformServicesPolicy::CanAdmit(bCloudEnabled, Live.bSignedIn,
+        Live.bCloudAvailable && !Live.bUsesPlatformManagedCloud, Same, Frontend, false))
     { if (Error.IsEmpty()) { Error = TEXT("Cloud requires opt-in and the same signed-in account. Local play does not."); } return false; }
     return true;
 }
@@ -104,7 +120,7 @@ bool USovPlatformServicesSubsystem::IsCloudAvailable() const
 {
     if (!Adapter || !Saves) { return false; }
     const auto Live = Adapter->GetAccount(); FString Error;
-    return Live.bSignedIn && Live.bCloudAvailable && !bAccountSelectionDeferred
+    return Live.bSignedIn && Live.bCloudAvailable && !Live.bUsesPlatformManagedCloud && !bAccountSelectionDeferred
         && Saves->GetAccountNamespace() == FMD5::HashAnsiString(*Live.StableId)
         && Saves->GetLocalSaveUserIndex() == Live.LocalUser && Saves->CanManagePlatformSaves(Error);
 }
@@ -140,7 +156,8 @@ bool USovPlatformServicesSubsystem::IsCurrentOperation(const FGuid& Request, con
     const auto Live = Adapter->GetAccount();
     return SovPlatformServicesPolicy::CanConsume(Review.RequestId.IsValid() && Review.RequestId == Request,
         OperationNamespace == Namespace && Saves->GetAccountNamespace() == Namespace
-            && Live.bSignedIn && Live.LocalUser == ObservedLocalUser && FMD5::HashAnsiString(*Live.StableId) == Namespace,
+            && Live.bSignedIn && Live.bCloudAvailable && !Live.bUsesPlatformManagedCloud
+            && Live.LocalUser == ObservedLocalUser && FMD5::HashAnsiString(*Live.StableId) == Namespace,
         Review.Phase == Phase, bCloudEnabled);
 }
 void USovPlatformServicesSubsystem::OnCloudRead(FGuid Request, FString Namespace, bool Good, bool Exists, TArray<uint8> Bytes, FString Error)

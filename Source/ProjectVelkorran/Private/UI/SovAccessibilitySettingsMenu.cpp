@@ -3,6 +3,7 @@
 #include "UI/SovAccessibleRecordMenu.h"
 #include "Accessibility/SovAccessibleNarrationSubsystem.h"
 #include "Blueprint/WidgetTree.h"
+#include "Blueprint/WidgetNavigation.h"
 #include "Components/Border.h"
 #include "Components/Button.h"
 #include "Components/SafeZone.h"
@@ -12,7 +13,6 @@
 #include "Components/VerticalBox.h"
 #include "Engine/LocalPlayer.h"
 #include "Engine/GameInstance.h"
-#include "InputCoreTypes.h"
 #include "Styling/CoreStyle.h"
 #include "UObject/UnrealType.h"
 #include "UnrealFramework/NarrativePlayerController.h"
@@ -84,6 +84,11 @@ TSharedRef<SWidget> USovAccessibilitySettingRow::RebuildWidget()
 		Text->SetMargin(FMargin(12.f, 8.f));
 		Button->AddChild(Text);
 		Button->OnClicked.AddDynamic(this, &ThisClass::Clicked);
+		FCustomWidgetNavigationDelegate ChangeValue;
+		ChangeValue.BindDynamic(this, &ThisClass::NavigateValue);
+		// Slate's user/platform navigation configuration supplies both D-pad and analog directions.
+		Button->SetNavigationRuleCustom(EUINavigation::Left, ChangeValue);
+		Button->SetNavigationRuleCustom(EUINavigation::Right, ChangeValue);
 		WidgetTree->RootWidget = Button;
 	}
 	Refresh();
@@ -109,14 +114,23 @@ void USovAccessibilitySettingRow::NativeOnAddedToFocusPath(const FFocusEvent& Ev
 	Super::NativeOnAddedToFocusPath(Event);
 	if (Menu && Text) { Menu->FocusRow(this, Text->GetText()); }
 }
-FReply USovAccessibilitySettingRow::NativeOnKeyDown(const FGeometry& Geometry, const FKeyEvent& Event)
+UWidget* USovAccessibilitySettingRow::NavigateValue(EUINavigation Direction)
 {
-	if (Menu && (Event.GetKey() == EKeys::Left || Event.GetKey() == EKeys::Gamepad_DPad_Left)) { Menu->Adjust(this, -1); return FReply::Handled(); }
-	if (Menu && (Event.GetKey() == EKeys::Right || Event.GetKey() == EKeys::Gamepad_DPad_Right)) { Menu->Adjust(this, 1); return FReply::Handled(); }
-	return Super::NativeOnKeyDown(Geometry, Event);
+	if (Menu && Menu->IsActivated() && Menu->CanAdjustValue(this) &&
+		(Direction == EUINavigation::Left || Direction == EUINavigation::Right))
+	{ Menu->Adjust(this, Direction == EUINavigation::Left ? -1 : 1); }
+	// Commands (Continue, cloud import, HDR confirm) require activation, never a sideways nudge.
+	// Null consumes this custom navigation without proposing a focus target. A settings
+	// callback may have opened a modal, and must retain CommonUI's resulting focus.
+	return nullptr;
 }
-USovAccessibilitySettingsMenu::USovAccessibilitySettingsMenu() { InputConfig = ENarrativeWidgetInputMode::Menu; }
+USovAccessibilitySettingsMenu::USovAccessibilitySettingsMenu() { InputConfig = ENarrativeWidgetInputMode::Menu; bIsBackHandler = true; }
 void USovAccessibilitySettingsMenu::SetFirstBoot(bool bValue) { bFirstBoot = bValue; bDeactivateOnBack = !bValue; RefreshRows(); }
+bool USovAccessibilitySettingsMenu::NativeOnHandleBackAction()
+{
+	if (bFirstBoot) { return true; } // Setup completion is an explicit Continue transaction.
+	return Super::NativeOnHandleBackAction();
+}
 FSovUserSettingsSnapshot USovAccessibilitySettingsMenu::CurrentSettings() const
 { const USovGameUserSettings* Settings = BoundSettings ? BoundSettings.Get() : USovGameUserSettings::Get(); return Settings ? Settings->GetSettingsSnapshot() : FSovUserSettingsSnapshot(); }
 void USovAccessibilitySettingsMenu::AddRow(FName Key, const FText& Label, float Min, float Max, float Step)
@@ -281,7 +295,11 @@ void USovAccessibilitySettingsMenu::RefreshRows()
 	}
 	for (auto* Row : Rows) { if (Row) { Row->Refresh(); } }
 }
-UWidget* USovAccessibilitySettingsMenu::NativeGetDesiredFocusTarget() const { return Rows.Num() ? Rows[0]->GetFocusTarget() : nullptr; }
+UWidget* USovAccessibilitySettingsMenu::NativeGetDesiredFocusTarget() const
+{
+	for (const auto* Row : Rows) { if (Row && IsRowEnabled(Row)) { return Row->GetFocusTarget(); } }
+	return nullptr;
+}
 void USovAccessibilitySettingsMenu::FocusRow(USovAccessibilitySettingRow* Row, const FText& Label)
 {
 	if (Scroll) { Scroll->ScrollWidgetIntoView(Row, false); }
@@ -296,6 +314,8 @@ FText USovAccessibilitySettingsMenu::ValueText(const USovAccessibilitySettingRow
 {
 	if (!Row) { return FText::GetEmpty(); }
 	const FName Key = Row->SettingKey; const FString Name = Key.ToString();
+	if (Name.StartsWith(TEXT("HDR.")) && BoundSettings && BoundSettings->IsDisplayOutputSystemManaged())
+	{ return LOCTEXT("HDRSystemManaged", "Managed by console display settings"); }
 	if(Name.StartsWith(TEXT("Audio.")) && BoundSettings)
 	{
 		if(Key=="Audio.DynamicRange") { static const FText Names[]={LOCTEXT("FullRange","Full"),LOCTEXT("ReducedRange","Reduced"),LOCTEXT("NightRange","Night")}; return Names[FMath::Clamp(int32(BoundSettings->GetAudioDynamicRange()),0,2)]; }
@@ -305,6 +325,7 @@ FText USovAccessibilitySettingsMenu::ValueText(const USovAccessibilitySettingRow
 	if (Key == "HDR.Preview" && BoundSettings && bHDREnabled && !BoundSettings->GetHDROutputStatus().bSupported) { return LOCTEXT("HDRUnavailable","Unavailable on current display"); }
 	if (Name.StartsWith(TEXT("Cloud.")))
 	{
+		if (PlatformServices && PlatformServices->IsCloudManagedByPlatform()) { return LOCTEXT("CloudSystemManaged","Managed by platform save system"); }
 		if (!PlatformServices || !PlatformServices->IsCloudAvailable()) { return LOCTEXT("CloudUnavailable","Unavailable: signed-in cloud provider and frontend required"); }
 		if (Key == "Cloud.Enabled") { return PlatformServices->IsCloudEnabled() ? LOCTEXT("On","On") : LOCTEXT("Off","Off"); }
 		if (Key == "Cloud.Slot") { return FText::AsNumber(CloudManualSlot + 1); }
@@ -328,7 +349,16 @@ FText USovAccessibilitySettingsMenu::ValueText(const USovAccessibilitySettingRow
 bool USovAccessibilitySettingsMenu::IsRowEnabled(const USovAccessibilitySettingRow* Row) const
 {
 	if (!Row) { return false; } const FName Key = Row->SettingKey;
-	if (Key == "HDR.Preview") { return BoundSettings && (!bHDREnabled || BoundSettings->GetHDROutputStatus().bSupported); }
+	if (Key.ToString().StartsWith(TEXT("HDR.")))
+	{
+		if (!BoundSettings || BoundSettings->IsDisplayOutputSystemManaged()) { return false; }
+		if (Key == "HDR.Preview")
+		{
+			const auto Output = BoundSettings->GetHDROutputStatus();
+			return Output.bCanPreviewInGame && (!bHDREnabled || Output.bCanCalibrateInGame);
+		}
+		if (Key == "HDR.Confirm" || Key == "HDR.Revert") { return HDRReceipt.IsValid(); }
+	}
 	if (!Key.ToString().StartsWith(TEXT("Cloud."))) { return true; }
 	if (!PlatformServices || !PlatformServices->IsCloudAvailable()) { return false; }
 	if (Key == "Cloud.Enabled") { return true; }
@@ -337,6 +367,14 @@ bool USovAccessibilitySettingsMenu::IsRowEnabled(const USovAccessibilitySettingR
 	if (Key == "Cloud.KeepLocal" || Key == "Cloud.UseCloud")
 	{ return CloudRequest.IsValid() && Review.RequestId == CloudRequest && Review.Phase == ESovCloudPhase::AwaitingChoice && (Key == "Cloud.KeepLocal" ? Review.bHasLocal : Review.bHasCloud); }
 	return true;
+}
+bool USovAccessibilitySettingsMenu::CanAdjustValue(const USovAccessibilitySettingRow* Row) const
+{
+	if (!Row || !IsRowEnabled(Row)) { return false; }
+	const FName Key = Row->SettingKey; const FString Name = Key.ToString();
+	return Key != "Continue" && !Name.StartsWith(TEXT("Review.")) &&
+		Key != "HDR.Preview" && Key != "HDR.Confirm" && Key != "HDR.Revert" &&
+		(!Name.StartsWith(TEXT("Cloud.")) || Key == "Cloud.Enabled" || Key == "Cloud.Slot");
 }
 void USovAccessibilitySettingsMenu::Adjust(USovAccessibilitySettingRow* Row, int32 Direction)
 {

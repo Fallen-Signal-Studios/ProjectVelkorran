@@ -48,7 +48,7 @@ namespace
         TArray<FGuid> Cancelled;
         void Start(FAccountChanged Callback) override { Changed = MoveTemp(Callback); }
         void Stop() override { Changed = nullptr; }
-        FSovObservedPlatformAccount GetAccount() const override { return Account; }
+        FSovObservedPlatformAccount GetAccount() override { return Account; }
         bool ReadLatest(FGuid, const FString&, FReadComplete Callback) override { Reads.Add(MoveTemp(Callback)); return true; }
         bool WriteRevision(FGuid, const FString&, const TArray<uint8>& Bytes, FWriteComplete Callback) override
         { Uploaded.Add(Bytes); Writes.Add(MoveTemp(Callback)); return true; }
@@ -98,7 +98,140 @@ struct FSovPlatformServicesTestAccess
     { Service.Saves = &Save; Service.Adapter = Adapter; Service.ObserveAccount(); }
     static void Expire(USovPlatformServicesSubsystem& Service)
     { Service.Deadline = FPlatformTime::Seconds() - 1.; Service.Tick(0.1f); }
+    static void SaveTick(USovSaveSubsystem& Save, float Seconds) { Save.Tick(Seconds); }
+    static double PrepareSuspendDeadline(USovSaveSubsystem& Save)
+    { Save.PendingLoadDeadline = FPlatformTime::Seconds() + 100.; return Save.PendingLoadDeadline; }
+    static void SimulateSuspendedTime(USovSaveSubsystem& Save, double Seconds) { Save.PlatformSuspendedAt -= Seconds; }
+    static double SaveDeadline(const USovSaveSubsystem& Save) { return Save.PendingLoadDeadline; }
+    static bool DiscardResumeDelta(const USovSaveSubsystem& Save) { return Save.bDiscardPlatformResumeDelta; }
+    static void RequireNativeOwner(USovSaveSubsystem& Save)
+    { Save.bRequiresNativePlatformAuthorization = true; Save.bPlatformStorageOwnerAvailable = false; }
 };
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovConsoleStorageOwnerRuntime, "ProjectVelkorran.Campaign.PlatformServices.ConsoleOwnerRoutingAndSignout",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FSovConsoleStorageOwnerRuntime::RunTest(const FString&)
+{
+    TStrongObjectPtr<UGameInstance> Instance(NewObject<UGameInstance>());
+    TStrongObjectPtr<USovSaveSubsystem> Save(NewObject<USovSaveSubsystem>(Instance.Get()));
+    TStrongObjectPtr<USovPlatformServicesSubsystem> Service(NewObject<USovPlatformServicesSubsystem>(Instance.Get()));
+    FString Error; FSovCloudTestStorage EmptyStorage;
+    auto* UnselectedStorage = FSovPlatformServicesTestAccess::CopyStorage(*Save, EmptyStorage);
+    FSovPlatformServicesTestAccess::RequireNativeOwner(*Save);
+    TestFalse(TEXT("Public Blueprint selection cannot authorize an invented console user before provider readiness"),
+        Save->SelectPlatformUser(TEXT("Offline.LocalProfile.0"), 0, Error));
+    TestEqual(TEXT("Unauthenticated selection never touches profile-hint storage"), UnselectedStorage->Files.Num(), 0);
+    auto Adapter = MakeShared<FSovCloudTestAdapter>();
+    Adapter->Account.LocalUser = 3; Adapter->Account.bRequiresKnownStorageOwner = true;
+    Adapter->Account.bStorageAccessAuthorized = true; Adapter->Account.bUsesPlatformManagedCloud = true;
+    auto* Storage = FSovPlatformServicesTestAccess::Initialize(*Service, *Save, Adapter);
+    const FString Original = Save->GetAccountNamespace();
+    const int32 BeforeForgedSelection = Storage->Files.Num();
+    TestFalse(TEXT("A caller cannot select a different ID despite an authorized provider account"),
+        Save->SelectPlatformUser(TEXT("InventedOwner"), 3, Error));
+    TestFalse(TEXT("A caller cannot route the authorized ID into user-zero storage"),
+        Save->SelectPlatformUser(TEXT("TestProvider|AccountA"), 0, Error));
+    TestEqual(TEXT("Rejected owner/index pairs perform no profile writes"), Storage->Files.Num(), BeforeForgedSelection);
+    TestEqual(TEXT("The actual platform user is retained instead of player zero"), Save->GetLocalSaveUserIndex(), 3);
+    TestTrue(TEXT("Confirmed owner can write a real native bank"),
+        FSovPlatformServicesTestAccess::Write(*Save, FSovPlatformServicesTestAccess::Envelope(*Save, TEXT("console-owner"))));
+    for (const auto& Pair : Storage->Files)
+    { TestTrue(TEXT("Every native bank and profile operation uses user-three storage"), Pair.Key.StartsWith(TEXT("3Sov"))); }
+    TestTrue(TEXT("Manual cloud is explicitly platform-managed"), Service->IsCloudManagedByPlatform());
+    TestFalse(TEXT("A provider cloud interface cannot accidentally enable generic console cloud"), Service->IsCloudAvailable());
+    TestFalse(TEXT("Console opt-in is rejected before any generic provider I/O"), Service->SetCloudEnabled(true, Error));
+    Adapter->Account.bSignedIn = false; Adapter->Account.bCloudAvailable = false;
+    Service->RefreshPlatformAccount();
+    TestTrue(TEXT("A confirmed offline local profile retains native save access"), Save->IsPlatformStorageOwnerAvailable());
+    FSovPlatformServicesTestAccess::SetPendingLoad(*Save, FSovPlatformServicesTestAccess::Envelope(*Save, TEXT("pending")));
+    Adapter->Account.bIdentityKnown = false; Adapter->Account.bStorageAccessAuthorized = false;
+    Service->RefreshPlatformAccount();
+    TestFalse(TEXT("Unknown console identity immediately fences native storage"), Save->IsPlatformStorageOwnerAvailable());
+    TestFalse(TEXT("Public selection cannot restore a revoked console authorization latch"),
+        Save->SelectPlatformUser(TEXT("TestProvider|AccountA"), 3, Error));
+    TestEqual(TEXT("Unknown identity never relabels outgoing campaign"), Save->GetAccountNamespace(), Original);
+    TestTrue(TEXT("In-flight restore is retained for the original owner"), Save->IsLoadPending());
+    TestFalse(TEXT("Native bank writer also enforces the signout fence"),
+        FSovPlatformServicesTestAccess::Write(*Save, FSovPlatformServicesTestAccess::Envelope(*Save, TEXT("forbidden"))));
+    Adapter->Account.bIdentityKnown = true; Adapter->Account.bStorageAccessAuthorized = true;
+    Service->RefreshPlatformAccount();
+    TestTrue(TEXT("Returning original offline owner restores access without cancelling load"), Save->IsPlatformStorageOwnerAvailable());
+    Adapter->Account.LocalUser = 1; Adapter->ChangeTo(TEXT("TestProvider|AccountB"), true);
+    TestFalse(TEXT("Different platform owner cannot reuse outgoing storage during a load"), Save->IsPlatformStorageOwnerAvailable());
+    TestEqual(TEXT("Different owner preserves original user compartment"), Save->GetLocalSaveUserIndex(), 3);
+    FSovPlatformServicesTestAccess::SetPendingLoad(*Save, nullptr); Service->RefreshPlatformAccount();
+    TestEqual(TEXT("Front end may adopt a confirmed replacement platform user"), Save->GetLocalSaveUserIndex(), 1);
+    Adapter->Account.bStorageAccessAuthorized = false; Service->RefreshPlatformAccount();
+    TestFalse(TEXT("With no transaction pending, public selection still cannot restore revoked native authorization"),
+        Save->SelectPlatformUser(TEXT("TestProvider|AccountB"), 1, Error));
+    TestFalse(TEXT("Rejected reauthorization leaves native storage fenced"), Save->IsPlatformStorageOwnerAvailable());
+    TestEqual(TEXT("No generic cloud I/O performed on a managed platform"), Adapter->Reads.Num() + Adapter->Writes.Num(), 0);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovPlatformRevocationReentryRuntime, "ProjectVelkorran.Campaign.PlatformServices.RevokeBeforeCloudCancellationCallbacks",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FSovPlatformRevocationReentryRuntime::RunTest(const FString&)
+{
+    TStrongObjectPtr<UGameInstance> Instance(NewObject<UGameInstance>());
+    TStrongObjectPtr<USovSaveSubsystem> Save(NewObject<USovSaveSubsystem>(Instance.Get()));
+    TStrongObjectPtr<USovPlatformServicesSubsystem> Service(NewObject<USovPlatformServicesSubsystem>(Instance.Get()));
+    TStrongObjectPtr<USovCloudReentryProbe> Listener(NewObject<USovCloudReentryProbe>());
+    auto Adapter = MakeShared<FSovCloudTestAdapter>(); auto* Storage = FSovPlatformServicesTestAccess::Initialize(*Service, *Save, Adapter);
+    TestTrue(TEXT("Initial outgoing-owner bank is written"),
+        FSovPlatformServicesTestAccess::Write(*Save, FSovPlatformServicesTestAccess::Envelope(*Save, TEXT("original"))));
+    FString Error; Service->SetCloudEnabled(true, Error);
+    TestTrue(TEXT("Create an active review that publishes cancellation on owner change"), Service->InspectCloudSlot(ESovSaveSlotKind::Manual, 0, Error));
+    const int32 BeforeBanks = Storage->CountCampaignFiles(); bool bCallbackRan = false, bWriteSucceeded = false, bOwnerAvailable = true;
+    Listener->Service = Service.Get();
+    Listener->CancelAction = [&]()
+    {
+        bCallbackRan = true; bOwnerAvailable = Save->IsPlatformStorageOwnerAvailable();
+        bWriteSucceeded = FSovPlatformServicesTestAccess::Write(*Save,
+            FSovPlatformServicesTestAccess::Envelope(*Save, TEXT("forbidden-cancellation-write")));
+    };
+    Service->OnCloudReviewChanged.AddDynamic(Listener.Get(), &USovCloudReentryProbe::OnChanged);
+    Adapter->Account.LocalUser = 2; Adapter->ChangeTo(TEXT("TestProvider|Replacement"), true);
+    TestTrue(TEXT("The synchronous cancellation listener ran"), bCallbackRan);
+    TestFalse(TEXT("Outgoing save access is revoked before listener code executes"), bOwnerAvailable);
+    TestFalse(TEXT("Reentrant native-bank write is rejected"), bWriteSucceeded);
+    TestEqual(TEXT("No outgoing campaign bank is mutated by cancellation callback"), Storage->CountCampaignFiles(), BeforeBanks);
+    TestEqual(TEXT("After callbacks the front end may adopt the confirmed replacement user"), Save->GetLocalSaveUserIndex(), 2);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovSaveSuspensionRuntime, "ProjectVelkorran.Campaign.PlatformServices.SuspendHoldsStorageAndWatchdogs",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FSovSaveSuspensionRuntime::RunTest(const FString&)
+{
+    TStrongObjectPtr<UGameInstance> Instance(NewObject<UGameInstance>());
+    TStrongObjectPtr<USovSaveSubsystem> Save(NewObject<USovSaveSubsystem>(Instance.Get()));
+    TStrongObjectPtr<USovPlatformServicesSubsystem> Service(NewObject<USovPlatformServicesSubsystem>(Instance.Get()));
+    auto Adapter = MakeShared<FSovCloudTestAdapter>(); auto* Storage = FSovPlatformServicesTestAccess::Initialize(*Service, *Save, Adapter);
+    const double Before = FSovPlatformServicesTestAccess::PrepareSuspendDeadline(*Save);
+    FSovPlatformServicesTestAccess::SetPendingLoad(*Save, FSovPlatformServicesTestAccess::Envelope(*Save, TEXT("suspended-load")));
+    const int32 OriginalFiles = Storage->Files.Num(); Save->SetPlatformSuspended(true);
+    FSovPlatformServicesTestAccess::SimulateSuspendedTime(*Save, 3600.);
+    Save->SetPlatformSuspended(true); // Duplicate platform delegates cannot restart the suspension clock.
+    TestFalse(TEXT("No write dispatch during suspension"),
+        FSovPlatformServicesTestAccess::Write(*Save, FSovPlatformServicesTestAccess::Envelope(*Save, TEXT("suspended"))));
+    TestEqual(TEXT("Suspension does not emit a save or autosave"), Storage->Files.Num(), OriginalFiles);
+    FSovPlatformServicesTestAccess::SaveTick(*Save, 3600.f);
+    TestTrue(TEXT("Suspension retains the owned pending load"), Save->IsLoadPending());
+    TestEqual(TEXT("Suspended ticker does not change pending load deadline"), FSovPlatformServicesTestAccess::SaveDeadline(*Save), Before);
+    Save->SetPlatformSuspended(false);
+    const double After = FSovPlatformServicesTestAccess::SaveDeadline(*Save);
+    TestTrue(TEXT("Load watchdog resumes with its remaining foreground budget"), After >= Before + 3600.);
+    Save->SetPlatformSuspended(false);
+    TestEqual(TEXT("Repeated resume does not extend a deadline again"), FSovPlatformServicesTestAccess::SaveDeadline(*Save), After);
+    TestTrue(TEXT("First foreground delta is explicitly discarded"), FSovPlatformServicesTestAccess::DiscardResumeDelta(*Save));
+    FSovPlatformServicesTestAccess::SaveTick(*Save, 3600.f);
+    TestFalse(TEXT("Discard is consumed exactly once"), FSovPlatformServicesTestAccess::DiscardResumeDelta(*Save));
+    FSovPlatformServicesTestAccess::SetPendingLoad(*Save, nullptr);
+    TestTrue(TEXT("Confirmed local owner can write again after foreground revalidation"),
+        FSovPlatformServicesTestAccess::Write(*Save, FSovPlatformServicesTestAccess::Envelope(*Save, TEXT("resumed"))));
+    return true;
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovPlatformAccountRuntime, "ProjectVelkorran.Campaign.PlatformServices.AccountChangePreservesTransactions",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

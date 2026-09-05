@@ -88,6 +88,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Sovereign|Settings|Feedback") bool ApplyHapticSettings(const FSovHapticSettings& Value, FString& Error);
 	UPROPERTY(BlueprintAssignable, Category="Sovereign|Settings|Feedback") FSovHapticSettingsChanged OnHapticSettingsChanged;
 	UFUNCTION(BlueprintCallable, Category="Sovereign|Settings|HDR") FSovHDROutputStatus GetHDROutputStatus();
+	/** No desktop calibration receipt or output override is offered on fixed/fullscreen platforms. */
+	UFUNCTION(BlueprintPure, Category="Sovereign|Settings|HDR") virtual bool IsDisplayOutputSystemManaged() const;
+	/** Application suspension cancels an unconfirmed display change before handing output to the system. */
+	bool RevertUnconfirmedHDRPreview();
 	UFUNCTION(BlueprintPure, Category="Sovereign|Settings|HDR") FSovHDRCalibration GetHDRCalibration() const { return DisplayCalibration; }
 	UFUNCTION(BlueprintCallable, Category="Sovereign|Settings|HDR") bool PreviewHDRDisplay(bool bEnable, int32 PeakNits, const FSovHDRCalibration& Calibration, FGuid& Receipt, FString& Error);
 	/** Applies engine output immediately; unconfirmed preview automatically reverts after 15 real seconds. */

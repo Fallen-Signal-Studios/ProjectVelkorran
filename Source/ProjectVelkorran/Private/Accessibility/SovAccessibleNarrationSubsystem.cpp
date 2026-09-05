@@ -81,13 +81,13 @@ bool USovAccessibleNarrationSubsystem::Announce(UObject* Owner, const FText& Tex
 {
 	check(IsInGameThread());
 	OutRequest.Invalidate();
-	if (bShuttingDown || !IsValid(Owner) || Text.IsEmpty()) { return false; }
+	if (bShuttingDown || bApplicationSuspended || !IsValid(Owner) || Text.IsEmpty()) { return false; }
 	const uint64 Expected = ++Generation;
 	Retire(true);
 	// A cancelled owner's callback may have submitted a newer request.
-	if (Generation != Expected || bShuttingDown) { return false; }
+	if (Generation != Expected || bShuttingDown || bApplicationSuspended) { return false; }
 	TSharedPtr<ISovAccessibleSpeech> NewBackend = CreateBackend();
-	if (!NewBackend || Generation != Expected || bShuttingDown || !IsValid(Owner)) { return false; }
+	if (!NewBackend || Generation != Expected || bShuttingDown || bApplicationSuspended || !IsValid(Owner)) { return false; }
 	Backend = NewBackend;
 	RequestOwner = Owner;
 	ActiveRequest = FGuid::NewGuid();
@@ -144,6 +144,15 @@ void USovAccessibleNarrationSubsystem::Cancel(UObject* Owner)
 	if (RequestOwner.Get() != Owner) { return; }
 	++Generation;
 	Retire(true);
+}
+
+void USovAccessibleNarrationSubsystem::SetApplicationSuspended(bool bSuspended)
+{
+	check(IsInGameThread());
+	if (bApplicationSuspended == bSuspended) { return; }
+	bApplicationSuspended = bSuspended;
+	++Generation;
+	if (bSuspended) { Retire(true); }
 }
 
 void USovAccessibleNarrationSubsystem::Deinitialize()

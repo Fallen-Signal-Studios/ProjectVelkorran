@@ -152,6 +152,35 @@ bool FSovNarrationFactoryReentryTest::RunTest(const FString&)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovNarrationApplicationSuspendTest, "ProjectVelkorran.Platform.Lifecycle.NarrationSuspension",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovNarrationApplicationSuspendTest::RunTest(const FString&)
+{
+	ULocalPlayer* Player = NewObject<ULocalPlayer>();
+	auto* Narration = NewObject<USovAccessibleNarrationSubsystem>(Player);
+	auto* Owner = NewObject<UObject>(); auto Backend = MakeShared<FTestSpeech>();
+	FSovNarrationTestAccess::SetFactory(Narration, [Backend]() { return StaticCastSharedPtr<ISovAccessibleSpeech>(Backend); });
+	int32 Completed = 0, Cancelled = 0; bool bRestartAccepted = false; FGuid Request;
+	Narration->Announce(Owner, FText::FromString(TEXT("Before suspend")), Request,
+		FSovNarrationCompletion::CreateLambda([&](FGuid, bool bCompleted)
+		{
+			if (bCompleted) { ++Completed; } else
+			{
+				++Cancelled; FGuid NewRequest;
+				bRestartAccepted = Narration->Announce(Owner, FText::FromString(TEXT("Reentrant speech")), NewRequest);
+			}
+		}));
+	Narration->SetApplicationSuspended(true); Narration->SetApplicationSuspended(true);
+	TestEqual(TEXT("Suspend cancels narration once"), Cancelled, 1);
+	TestFalse(TEXT("Cancellation callback cannot speak over platform UI"), bRestartAccepted);
+	Backend->Finished.ExecuteIfBound();
+	TestEqual(TEXT("Queued platform completion does not report a finished reading after suspend"), Completed, 0);
+	TestFalse(TEXT("Suspended subsystem rejects further requests"), Narration->Announce(Owner, FText::FromString(TEXT("Hidden")), Request));
+	Narration->SetApplicationSuspended(false);
+	TestTrue(TEXT("Foreground can narrate the explicit resume screen"), Narration->Announce(Owner, FText::FromString(TEXT("Resume game")), Request));
+	Narration->Deinitialize(); return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovDialogueRevisionTest, "ProjectVelkorran.UI.Dialogue.TalesPresentationRevision",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovDialogueRevisionTest::RunTest(const FString&)

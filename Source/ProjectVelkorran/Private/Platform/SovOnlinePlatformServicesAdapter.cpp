@@ -5,6 +5,10 @@
 #include "Interfaces/OnlineUserCloudInterface.h"
 #include "OnlineSubsystem.h"
 #include "OnlineSubsystemUtils.h"
+#include "Engine/GameInstance.h"
+#include "Engine/LocalPlayer.h"
+#include "Engine/World.h"
+#include "GenericPlatform/GenericPlatformInputDeviceMapper.h"
 
 namespace
 {
@@ -28,26 +32,17 @@ namespace
             bool bCancelled = false;
         };
     public:
-        explicit FSovOnlinePlatformServicesAdapter(IOnlineSubsystem* Subsystem)
-        {
-            if (Subsystem)
-            {
-                Provider = Subsystem->GetSubsystemName();
-                Identity = Subsystem->GetIdentityInterface(); Cloud = Subsystem->GetUserCloudInterface();
-            }
-        }
+        explicit FSovOnlinePlatformServicesAdapter(UGameInstance* InInstance) : Instance(InInstance) {}
         ~FSovOnlinePlatformServicesAdapter() override { Stop(); }
         void Start(FAccountChanged Changed) override
         {
+            bStarted = true;
             AccountChanged = MoveTemp(Changed);
             const TWeakPtr<FSovOnlinePlatformServicesAdapter> Weak = AsShared();
             if (Identity)
             {
-                LoginStatusHandle = Identity->AddOnLoginStatusChangedDelegate_Handle(0,
-                    FOnLoginStatusChangedDelegate::CreateLambda([Weak](int32 LocalUser, ELoginStatus::Type, ELoginStatus::Type, const FUniqueNetId&)
-                    { if (!IsInGameThread()) { return; } if (const auto Self = Weak.Pin(); Self && LocalUser == 0 && Self->AccountChanged) { Self->AccountChanged(); } }));
                 LoginChangedHandle = Identity->AddOnLoginChangedDelegate_Handle(FOnLoginChangedDelegate::CreateLambda([Weak](int32 LocalUser)
-                    { if (!IsInGameThread()) { return; } if (const auto Self = Weak.Pin(); Self && LocalUser == 0 && Self->AccountChanged) { Self->AccountChanged(); } }));
+                    { if (!IsInGameThread()) { return; } if (const auto Self = Weak.Pin(); Self && (LocalUser == Self->ResolveLocalUser() || LocalUser == INDEX_NONE) && Self->AccountChanged) { Self->AccountChanged(); } }));
             }
             if (Cloud)
             {
@@ -64,11 +59,12 @@ namespace
         }
         void Stop() override
         {
+            bStarted = false;
             AccountChanged = nullptr;
             if (Pending) { Pending->bCancelled = true; Pending->ReadComplete = nullptr; Pending->WriteComplete = nullptr; }
             if (Identity)
             {
-                Identity->ClearOnLoginStatusChangedDelegate_Handle(0, LoginStatusHandle);
+                if (BoundLocalUser >= 0) { Identity->ClearOnLoginStatusChangedDelegate_Handle(BoundLocalUser, LoginStatusHandle); }
                 Identity->ClearOnLoginChangedDelegate_Handle(LoginChangedHandle);
             }
             if (Cloud)
@@ -79,23 +75,36 @@ namespace
                 Cloud->ClearOnWriteUserFileCanceledDelegate_Handle(CancelHandle);
             }
             Pending.Reset(); Identity.Reset(); Cloud.Reset();
+            BoundSubsystem = nullptr; BoundLocalUser = INDEX_NONE; LastKnownStableId.Reset(); Provider = NAME_None;
         }
-        FSovObservedPlatformAccount GetAccount() const override
+        FSovObservedPlatformAccount GetAccount() override
         {
             FSovObservedPlatformAccount Result;
-            if (!Identity || Provider == FName(TEXT("NULL"))) { return Result; }
-            const auto Id = Identity->GetUniquePlayerId(0);
-            const auto Status = Identity->GetLoginStatus(0);
+            Result.bRequiresKnownStorageOwner = !PLATFORM_DESKTOP;
+            Result.bUsesPlatformManagedCloud = !PLATFORM_DESKTOP;
+            const int32 LocalUser = ResolveLocalUser();
+            const bool ProviderReady = LocalUser >= 0 && EnsureWorldProvider();
+            SynchronizeUserBinding(LocalUser);
+            Result.LocalUser = LocalUser;
+            Result.StableId = LastKnownStableId;
+            if (LocalUser < 0) { return Result; }
+            if (!ProviderReady || !Identity || Provider == FName(TEXT("NULL"))) { return Result; }
+            const auto Id = Identity->GetUniquePlayerId(LocalUser);
+            const auto Status = Identity->GetLoginStatus(LocalUser);
             if (Id.IsValid() && Id->IsValid())
             {
                 Result.bIdentityKnown = true;
                 LastKnownStableId = Provider.ToString() + TEXT("|") + Id->GetType().ToString() + TEXT("|") + Id->ToString();
                 Result.bSignedIn = Status == ELoginStatus::LoggedIn;
-                Result.bCloudAvailable = Result.bSignedIn && Cloud.IsValid();
+                Result.bStorageAccessAuthorized = SovPlatformServicesPolicy::CanAuthorizeStorage(
+                    Result.bRequiresKnownStorageOwner, true, Status != ELoginStatus::NotLoggedIn,
+                    PLATFORM_DESKTOP || Identity->GetPlatformUserIdFromUniqueNetId(*Id) == ResolvePlatformUser(), LocalUser);
+                Result.bCloudAvailable = SovPlatformServicesPolicy::CanUseGenericCloud(PLATFORM_DESKTOP,
+                    Result.bSignedIn, Cloud.IsValid(), LocalUser);
             }
-            // NotLoggedIn/invalid network ID can mean an outage, not a different OS user. Do not make
-            // local campaign saves depend on connectivity. Only a positively observed different ID
-            // changes ownership; an unknown identity keeps the last known owner and disables cloud.
+            // Desktop offline restart retains the last confirmed namespace. On devices requiring
+            // account ownership, an unknown/NotLoggedIn identity fences storage; UsingLocalProfile
+            // is sufficient for offline local saves and does not require network connectivity.
             Result.StableId = LastKnownStableId;
             return Result;
         }
@@ -120,10 +129,61 @@ namespace
             // Issued writes are immutable new revisions, so allowing them to drain cannot replace old data.
         }
     private:
+        bool EnsureWorldProvider()
+        {
+            const UGameInstance* Game = Instance.Get();
+            const UWorld* World = Game ? Game->GetWorld() : nullptr;
+            if (!bStarted || !World) { return false; }
+            // GI subsystems may initialize before a world, local player or platform interfaces exist.
+            // Resolve against the eventual world (including PIE scope), and retry deferred interfaces.
+            IOnlineSubsystem* Candidate = Online::GetSubsystem(World);
+            const IOnlineIdentityPtr CandidateIdentity = Candidate ? Candidate->GetIdentityInterface() : nullptr;
+            const IOnlineUserCloudPtr CandidateCloud = Candidate ? Candidate->GetUserCloudInterface() : nullptr;
+            if (Candidate == BoundSubsystem && CandidateIdentity == Identity && CandidateCloud == Cloud)
+            { return Identity.IsValid(); }
+            // OSS terminal delegates have no request IDs. A draining request retains its exact old
+            // interfaces and listeners; no replacement provider can consume or complete that request.
+            if (Pending) { return false; }
+            FAccountChanged Callback = MoveTemp(AccountChanged);
+            Stop();
+            BoundSubsystem = Candidate; Provider = Candidate ? Candidate->GetSubsystemName() : NAME_None;
+            Identity = CandidateIdentity; Cloud = CandidateCloud;
+            Start(MoveTemp(Callback));
+            return Identity.IsValid();
+        }
+        FPlatformUserId ResolvePlatformUser() const
+        {
+            const UGameInstance* Game = Instance.Get();
+            const ULocalPlayer* Player = Game ? Game->GetFirstGamePlayer() : nullptr;
+            return Player ? Player->GetPlatformUserId() : PLATFORMUSERID_NONE;
+        }
+        int32 ResolveLocalUser() const
+        {
+            const FPlatformUserId User = ResolvePlatformUser();
+            if (!User.IsValid()) { return INDEX_NONE; }
+            return IPlatformInputDeviceMapper::Get().GetUserIndexForPlatformUser(User);
+        }
+        void SynchronizeUserBinding(int32 LocalUser)
+        {
+            if (BoundLocalUser == LocalUser) { return; }
+            if (Identity && BoundLocalUser >= 0)
+            { Identity->ClearOnLoginStatusChangedDelegate_Handle(BoundLocalUser, LoginStatusHandle); }
+            BoundLocalUser = LocalUser;
+            LastKnownStableId = PLATFORM_DESKTOP && LocalUser >= 0
+                ? FString::Printf(TEXT("Offline.LocalProfile.%d"), LocalUser) : FString();
+            LoginStatusHandle.Reset();
+            if (Identity && LocalUser >= 0)
+            {
+                const TWeakPtr<FSovOnlinePlatformServicesAdapter> Weak = AsShared();
+                LoginStatusHandle = Identity->AddOnLoginStatusChangedDelegate_Handle(LocalUser,
+                    FOnLoginStatusChangedDelegate::CreateLambda([Weak](int32 ChangedUser, ELoginStatus::Type, ELoginStatus::Type, const FUniqueNetId&)
+                    { if (!IsInGameThread()) { return; } if (const auto Self = Weak.Pin(); Self && ChangedUser == Self->BoundLocalUser && Self->AccountChanged) { Self->AccountChanged(); } }));
+            }
+        }
         bool Begin(FGuid Request, const FString& Prefix)
         {
             if (Pending || !Cloud || !Identity || !GetAccount().bCloudAvailable || !Request.IsValid()) { return false; }
-            const auto User = Identity->GetUniquePlayerId(0);
+            const auto User = Identity->GetUniquePlayerId(BoundLocalUser);
             if (!User.IsValid() || !User->IsValid()) { return false; }
             Pending = MakeUnique<FRequest>(); Pending->Id = Request; Pending->User = User; Pending->Prefix = Prefix;
             return true;
@@ -207,7 +267,11 @@ namespace
             else if (Finished->WriteComplete) { Finished->WriteComplete(Good, MoveTemp(Error)); }
         }
         FName Provider;
-        mutable FString LastKnownStableId = TEXT("Offline.LocalProfile.0");
+        IOnlineSubsystem* BoundSubsystem = nullptr;
+        bool bStarted = false;
+        TWeakObjectPtr<UGameInstance> Instance;
+        FString LastKnownStableId;
+        int32 BoundLocalUser = INDEX_NONE;
         IOnlineIdentityPtr Identity;
         IOnlineUserCloudPtr Cloud;
         FAccountChanged AccountChanged;
@@ -215,5 +279,5 @@ namespace
         FDelegateHandle LoginStatusHandle, LoginChangedHandle, EnumerateHandle, ReadHandle, WriteHandle, CancelHandle;
     };
 }
-TSharedPtr<ISovPlatformServicesAdapter> MakeSovConfiguredPlatformAdapter(UWorld* World)
-{ return MakeShared<FSovOnlinePlatformServicesAdapter>(World ? Online::GetSubsystem(World) : nullptr); }
+TSharedPtr<ISovPlatformServicesAdapter> MakeSovConfiguredPlatformAdapter(UGameInstance* Instance)
+{ return MakeShared<FSovOnlinePlatformServicesAdapter>(Instance); }

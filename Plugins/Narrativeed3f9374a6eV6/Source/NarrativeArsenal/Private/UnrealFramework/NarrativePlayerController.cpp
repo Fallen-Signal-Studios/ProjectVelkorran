@@ -940,7 +940,7 @@ void ANarrativePlayerController::ReleaseSemanticInput(FGameplayTag EffectiveTag)
 }
 void ANarrativePlayerController::AbilityInputPressed(FGameplayTag InputTag)
 {
-	if (!InputTag.IsValid()) { return; }
+	if (!InputTag.IsValid() || IsGameplayAbilityInputSuppressed()) { return; }
 	FGameplayTag EffectiveTag = InputTag;
 	if (AbilityInputMappings)
 	{
@@ -956,6 +956,7 @@ void ANarrativePlayerController::AbilityInputPressed(FGameplayTag InputTag)
 }
 void ANarrativePlayerController::PressSemanticInput(FGameplayTag EffectiveTag, bool bAllowToggle)
 {
+	if (IsGameplayAbilityInputSuppressed()) { return; }
 	if (SovLatchedInputTags.Contains(EffectiveTag))
 	{
 		bool bStillActive = EffectiveTag == FSovGameplayTags::Get().Input_AbilityModifier;

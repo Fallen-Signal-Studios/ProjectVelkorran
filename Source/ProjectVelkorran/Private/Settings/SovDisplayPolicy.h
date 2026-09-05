@@ -5,6 +5,11 @@
 
 namespace SovDisplayPolicy
 {
+// Use engine capabilities, not guessed restricted console platform names.
+constexpr bool UsesSystemManagedOutput(bool SupportsWindowedMode, bool HasFixedResolution)
+{ return !SupportsWindowedMode || HasFixedResolution; }
+constexpr bool CanPreviewOutput(bool SystemManaged, bool RenderAvailable, bool DisplayKnown)
+{ return !SystemManaged && RenderAvailable && DisplayKnown; }
 inline bool ValidCalibration(double Black, double White, double UI)
 {
     return std::isfinite(Black) && Black >= .000001 && Black <= 1.

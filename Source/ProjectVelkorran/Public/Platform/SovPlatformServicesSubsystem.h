@@ -45,6 +45,8 @@ public:
     UFUNCTION(BlueprintCallable, Category="Campaign|Platform") bool SetCloudEnabled(bool bEnabled, FString& Error);
     UFUNCTION(BlueprintPure, Category="Campaign|Platform") bool IsCloudEnabled() const { return bCloudEnabled; }
     UFUNCTION(BlueprintPure, Category="Campaign|Platform") bool IsCloudAvailable() const;
+    /** Console cloud ownership belongs to the platform save backend; manual OSS file sync is disabled. */
+    UFUNCTION(BlueprintPure, Category="Campaign|Platform") bool IsCloudManagedByPlatform() const { return bObservedPlatformManagedCloud; }
     UFUNCTION(BlueprintPure, Category="Campaign|Platform") bool IsAccountSelectionDeferred() const { return bAccountSelectionDeferred; }
     UFUNCTION(BlueprintPure, Category="Campaign|Platform") FSovCloudReview GetCloudReview() const { return Review; }
     /** Explicit frontend action: stage local and latest published cloud revision without overwriting either. */
@@ -75,6 +77,8 @@ private:
     int32 ObservedLocalUser = 0;
     bool bObservedSignedIn = false;
     bool bObservedCloudAvailable = false;
+    bool bObservedPlatformManagedCloud = false;
+    bool bObservedStorageAuthorized = false;
     bool bCloudEnabled = false;
     bool bAccountSelectionDeferred = false;
     bool bObservingAccount = false;

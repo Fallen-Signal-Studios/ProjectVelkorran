@@ -6,6 +6,19 @@ int main()
 {
     using namespace SovDisplayPolicy;
     unsigned Checks = 0;
+    // A console may report a display, renderer and HDR support but still own its output policy.
+    for (bool Windowed : {false, true})
+    for (bool Fixed : {false, true})
+    for (bool Render : {false, true})
+    for (bool Identity : {false, true})
+    {
+        const bool Managed = UsesSystemManagedOutput(Windowed, Fixed);
+        assert(Managed == (!Windowed || Fixed));
+        const bool Preview = CanPreviewOutput(Managed, Render, Identity);
+        if (!Windowed || Fixed || !Render || !Identity) { assert(!Preview); }
+        else { assert(Preview); }
+        Checks += 2;
+    }
     for (double Black : {.000001, .0001, .01, 1.})
     for (int White = 80; White <= 500; ++White)
     {

@@ -16,6 +16,7 @@ public class ProjectVelkorran : ModuleRules
 				"Engine",
 				"AIModule",
 				"InputCore",
+				"ApplicationCore",
 				"EnhancedInput",
 				"GameplayAbilities",
 				"GameplayTags",
@@ -36,7 +37,7 @@ public class ProjectVelkorran : ModuleRules
 			}
 		);
 
-		PrivateDependencyModuleNames.AddRange(new string[] { "AnimGraphRuntime", "NavigationSystem", "AssetRegistry", "LevelSequence", "MovieScene", "MovieSceneTracks", "Slate", "SlateCore", "ApplicationCore", "OnlineSubsystem", "OnlineSubsystemUtils" });
+		PrivateDependencyModuleNames.AddRange(new string[] { "AnimGraphRuntime", "NavigationSystem", "AssetRegistry", "LevelSequence", "MovieScene", "MovieSceneTracks", "Slate", "SlateCore", "OnlineSubsystem", "OnlineSubsystemUtils" });
 		if (Target.Platform == UnrealTargetPlatform.Win64)
 		{
 			PrivateDependencyModuleNames.Add("TextToSpeech");

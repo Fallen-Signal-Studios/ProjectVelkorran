@@ -2,6 +2,7 @@
 #include "UI/SovAccessibleRecordMenu.h"
 #include "UI/SovAccessibilitySettingsMenu.h"
 #include "UI/SovAccessibilityPresentation.h"
+#include "UI/SovConsoleUIPolicy.h"
 #include "UI/SovFrontendComponent.h"
 #include "Accessibility/SovAccessibleNarrationSubsystem.h"
 #include "Campaign/SovCampaignStateComponent.h"
@@ -10,14 +11,19 @@
 #include "Components/Border.h"
 #include "Components/SafeZone.h"
 #include "Components/ScrollBox.h"
+#include "Components/HorizontalBox.h"
+#include "Components/HorizontalBoxSlot.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
+#include "Components/VerticalBoxSlot.h"
+#include "Framework/Application/SlateApplication.h"
+#include "InputCoreTypes.h"
 #include "Engine/LocalPlayer.h"
 #include "GameFramework/PlayerController.h"
 #include "Styling/CoreStyle.h"
 
 #define LOCTEXT_NAMESPACE "SovAccessibleRecords"
-USovAccessibleRecordMenu::USovAccessibleRecordMenu() { InputConfig=ENarrativeWidgetInputMode::Menu; }
+USovAccessibleRecordMenu::USovAccessibleRecordMenu() { InputConfig=ENarrativeWidgetInputMode::Menu; bIsBackHandler=true; }
 void USovAccessibleRecordMenu::SetSceneHistoryMode(bool bValue) { if(bRetiring) { return; } ++ViewGeneration; bSceneHistory=bValue; Selection=0; RebuildRecords(); ShowRecord(true); }
 FText USovAccessibleRecordMenu::DescribeEvidence(const USovEvidenceDefinition* Definition,ESovEvidenceStage Stage)
 {
@@ -33,18 +39,24 @@ TSharedRef<SWidget> USovAccessibleRecordMenu::RebuildWidget()
 	if (!Body)
 	{
 		USafeZone* Safe=WidgetTree->ConstructWidget<USafeZone>(); UBorder* Background=WidgetTree->ConstructWidget<UBorder>(); Background->SetBrushColor(FLinearColor(.015f,.02f,.025f,.99f)); Background->SetPadding(FMargin(30));
-		UScrollBox* Scroll=WidgetTree->ConstructWidget<UScrollBox>(); UVerticalBox* Box=WidgetTree->ConstructWidget<UVerticalBox>();
+		UVerticalBox* Box=WidgetTree->ConstructWidget<UVerticalBox>();
 		Heading=WidgetTree->ConstructWidget<UTextBlock>(); Heading->SetAutoWrapText(true); Box->AddChild(Heading);
-		Body=WidgetTree->ConstructWidget<UTextBlock>(); Body->SetAutoWrapText(true); Body->SetMargin(FMargin(10,20)); Box->AddChild(Body);
+		ScrollHint=WidgetTree->ConstructWidget<UTextBlock>(); ScrollHint->SetAutoWrapText(true);
+		ScrollHint->SetText(LOCTEXT("ScrollHint", "Scroll the summary with the right stick or Page Up / Page Down.")); Box->AddChild(ScrollHint);
+		UHorizontalBox* Controls=WidgetTree->ConstructWidget<UHorizontalBox>(); Box->AddChild(Controls);
 		auto AddButton=[&](const FText& Text)
 		{
 			auto* Button=WidgetTree->ConstructWidget<USovAccessibilityNativeButton>(); auto* Label=WidgetTree->ConstructWidget<UTextBlock>(); Label->SetText(Text); Label->SetAutoWrapText(true); Label->SetMargin(FMargin(10,12));
-			Button->AddChild(Label); Button->SetAccessibleLabel(Text); Box->AddChild(Button); return Button;
+			Button->AddChild(Label); Button->SetAccessibleLabel(Text);
+			Controls->AddChildToHorizontalBox(Button)->SetSize(FSlateChildSize(ESlateSizeRule::Fill)); return Button;
 		};
 		PreviousButton=AddButton(LOCTEXT("Previous","Previous record")); NextButton=AddButton(LOCTEXT("Next","Next record"));
 		ReadButton=AddButton(LOCTEXT("Read","Read current summary")); CloseButton=AddButton(LOCTEXT("Close","Close review"));
 		PreviousButton->OnClicked.AddDynamic(this,&ThisClass::Previous); NextButton->OnClicked.AddDynamic(this,&ThisClass::Next); ReadButton->OnClicked.AddDynamic(this,&ThisClass::Read); CloseButton->OnClicked.AddDynamic(this,&ThisClass::Close);
-		Scroll->AddChild(Box); Background->AddChild(Scroll); Safe->AddChild(Background); WidgetTree->RootWidget=Safe;
+		RecordScroll=WidgetTree->ConstructWidget<UScrollBox>();
+		Body=WidgetTree->ConstructWidget<UTextBlock>(); Body->SetAutoWrapText(true); Body->SetMargin(FMargin(10,20)); RecordScroll->AddChild(Body);
+		Box->AddChildToVerticalBox(RecordScroll)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+		Background->AddChild(Box); Safe->AddChild(Background); WidgetTree->RootWidget=Safe;
 	}
 	ShowRecord(false); return Super::RebuildWidget();
 }
@@ -87,6 +99,26 @@ void USovAccessibleRecordMenu::NativeOnDeactivated()
 	if(GetOwningLocalPlayer()) { if(auto* Narrator=GetOwningLocalPlayer()->GetSubsystem<USovAccessibleNarrationSubsystem>()) { Narrator->Cancel(this); } }
 }
 UWidget* USovAccessibleRecordMenu::NativeGetDesiredFocusTarget() const { return Records.Num()>1 ? NextButton.Get() : CloseButton.Get(); }
+FReply USovAccessibleRecordMenu::NativeOnAnalogValueChanged(const FGeometry& Geometry, const FAnalogInputEvent& Event)
+{
+	if (!bRetiring && IsActivated() && RecordScroll && Event.GetKey() == EKeys::Gamepad_RightY && FSlateApplication::IsInitialized())
+	{
+		RecordScroll->SetScrollOffset(SovConsoleUIPolicy::ScrollOffset(RecordScroll->GetScrollOffset(),
+			RecordScroll->GetScrollOffsetOfEnd(), Event.GetAnalogValue(), FSlateApplication::Get().GetDeltaTime()));
+		return FReply::Handled();
+	}
+	return Super::NativeOnAnalogValueChanged(Geometry, Event);
+}
+FReply USovAccessibleRecordMenu::NativeOnKeyDown(const FGeometry& Geometry, const FKeyEvent& Event)
+{
+	if (!bRetiring && IsActivated() && RecordScroll && (Event.GetKey() == EKeys::PageUp || Event.GetKey() == EKeys::PageDown))
+	{
+		const float Page = FMath::Max(1.f, float(RecordScroll->GetCachedGeometry().GetLocalSize().Y) * .85f);
+		RecordScroll->SetScrollOffset(FMath::Clamp(RecordScroll->GetScrollOffset() + (Event.GetKey() == EKeys::PageUp ? -Page : Page), 0.f, RecordScroll->GetScrollOffsetOfEnd()));
+		return FReply::Handled();
+	}
+	return Super::NativeOnKeyDown(Geometry, Event);
+}
 void USovAccessibleRecordMenu::RebuildRecords()
 {
 	Records.Reset(); APlayerController* PC=GetOwningPlayer(); if(!PC) { return; }
@@ -115,10 +147,14 @@ void USovAccessibleRecordMenu::ShowRecord(bool bAnnounce)
 	if(bRetiring || !Body || !Heading || !PreviousButton || !NextButton || !ReadButton || !CloseButton) { return; } const auto Settings=BoundSettings ? BoundSettings->GetSettingsSnapshot() : FSovUserSettingsSnapshot();
 	SetMenuNavigationWrap(Settings.bMenuNavigationWrap); const auto Font=FCoreStyle::GetDefaultFontStyle("Regular",FMath::RoundToInt(22*Settings.UIScale));
 	Body->SetFont(Font); Heading->SetFont(Font); Body->SetColorAndOpacity(FSlateColor(FLinearColor::White)); Heading->SetColorAndOpacity(FSlateColor(FLinearColor::White));
+	if (ScrollHint) { ScrollHint->SetFont(Font); ScrollHint->SetColorAndOpacity(FSlateColor(FLinearColor::White)); }
 	for(auto* Button:{PreviousButton.Get(),NextButton.Get(),ReadButton.Get(),CloseButton.Get()})
 	{ if(auto* Label=Cast<UTextBlock>(Button->GetContent())) { Label->SetFont(Font); Label->SetColorAndOpacity(FSlateColor(FLinearColor::White)); } Button->SetBackgroundColor(FLinearColor::Black); }
 	Heading->SetText(FText::Format(LOCTEXT("Heading","{0} — {1} of {2}"),bSceneHistory ? LOCTEXT("SceneHistory","Current scene history") : LOCTEXT("Evidence","Acquired evidence"),FText::AsNumber(Records.Num() ? Selection+1 : 0),FText::AsNumber(Records.Num())));
-	Body->SetText(Records.IsValidIndex(Selection) ? Records[Selection] : LOCTEXT("Empty","No records available to the current protagonist in this view."));
+	const FText NewBody = Records.IsValidIndex(Selection) ? Records[Selection] : LOCTEXT("Empty","No records available to the current protagonist in this view.");
+	const bool bNewRecord = !Body->GetText().EqualTo(NewBody);
+	Body->SetText(NewBody);
+	if (bNewRecord && RecordScroll) { RecordScroll->ScrollToStart(); }
 	PreviousButton->SetIsEnabled(Records.Num()>1); NextButton->SetIsEnabled(Records.Num()>1); ReadButton->SetIsEnabled(!Records.IsEmpty());
 	if(bAnnounce && Settings.bMenuNarration) { Read(); }
 }

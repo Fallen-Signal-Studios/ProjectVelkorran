@@ -1,0 +1,183 @@
+{
+  "scope": "source descriptor preflight",
+  "target": null,
+  "descriptor_blocked": true,
+  "compiled": false,
+  "certified": false,
+  "findings": [
+    {
+      "severity": "blocker",
+      "code": "plugin-unresolved",
+      "subject": "OnlineSubsystem",
+      "message": "Enabled plugin descriptor is absent from the supplied project/engine plugin roots."
+    },
+    {
+      "severity": "blocker",
+      "code": "plugin-unresolved",
+      "subject": "OnlineSubsystemUtils",
+      "message": "Enabled plugin descriptor is absent from the supplied project/engine plugin roots."
+    },
+    {
+      "severity": "blocker",
+      "code": "plugin-unresolved",
+      "subject": "TextToSpeech",
+      "message": "Enabled plugin descriptor is absent from the supplied project/engine plugin roots."
+    },
+    {
+      "severity": "blocker",
+      "code": "required-module-platform-review",
+      "subject": "NarrativePro",
+      "message": "Console target support is not established; current allow-list: Win64, Android, Linux"
+    },
+    {
+      "severity": "blocker",
+      "code": "required-module-platform-review",
+      "subject": "NarrativeCommonUI",
+      "message": "Console target support is not established; current allow-list: Win64, Android, Linux"
+    },
+    {
+      "severity": "blocker",
+      "code": "required-module-platform-review",
+      "subject": "NarrativeArsenal",
+      "message": "Console target support is not established; current allow-list: Win64, Android, Linux"
+    },
+    {
+      "severity": "blocker",
+      "code": "required-module-platform-review",
+      "subject": "NarrativeSaveSystem",
+      "message": "Console target support is not established; current allow-list: Win64, Android, Linux"
+    },
+    {
+      "severity": "blocker",
+      "code": "plugin-unresolved",
+      "subject": "GameplayAbilities",
+      "message": "Enabled plugin descriptor is absent from the supplied project/engine plugin roots."
+    },
+    {
+      "severity": "blocker",
+      "code": "plugin-unresolved",
+      "subject": "RigLogic",
+      "message": "Enabled plugin descriptor is absent from the supplied project/engine plugin roots."
+    },
+    {
+      "severity": "blocker",
+      "code": "plugin-unresolved",
+      "subject": "ZenDyn",
+      "message": "Enabled plugin descriptor is absent from the supplied project/engine plugin roots."
+    },
+    {
+      "severity": "blocker",
+      "code": "plugin-unresolved",
+      "subject": "MotionWarping",
+      "message": "Enabled plugin descriptor is absent from the supplied project/engine plugin roots."
+    },
+    {
+      "severity": "blocker",
+      "code": "plugin-unresolved",
+      "subject": "CommonUI",
+      "message": "Enabled plugin descriptor is absent from the supplied project/engine plugin roots."
+    },
+    {
+      "severity": "blocker",
+      "code": "plugin-unresolved",
+      "subject": "EnhancedInput",
+      "message": "Enabled plugin descriptor is absent from the supplied project/engine plugin roots."
+    },
+    {
+      "severity": "blocker",
+      "code": "plugin-unresolved",
+      "subject": "AnimationWarping",
+      "message": "Enabled plugin descriptor is absent from the supplied project/engine plugin roots."
+    },
+    {
+      "severity": "blocker",
+      "code": "plugin-unresolved",
+      "subject": "AnimToTexture",
+      "message": "Enabled plugin descriptor is absent from the supplied project/engine plugin roots."
+    },
+    {
+      "severity": "blocker",
+      "code": "plugin-unresolved",
+      "subject": "AnimationLocomotionLibrary",
+      "message": "Enabled plugin descriptor is absent from the supplied project/engine plugin roots."
+    },
+    {
+      "severity": "blocker",
+      "code": "plugin-unresolved",
+      "subject": "PoseSearch",
+      "message": "Enabled plugin descriptor is absent from the supplied project/engine plugin roots."
+    },
+    {
+      "severity": "blocker",
+      "code": "plugin-unresolved",
+      "subject": "HairStrands",
+      "message": "Enabled plugin descriptor is absent from the supplied project/engine plugin roots."
+    },
+    {
+      "severity": "blocker",
+      "code": "plugin-unresolved",
+      "subject": "GameplayCameras",
+      "message": "Enabled plugin descriptor is absent from the supplied project/engine plugin roots."
+    },
+    {
+      "severity": "blocker",
+      "code": "plugin-unresolved",
+      "subject": "ContextualAnimation",
+      "message": "Enabled plugin descriptor is absent from the supplied project/engine plugin roots."
+    },
+    {
+      "severity": "blocker",
+      "code": "plugin-unresolved",
+      "subject": "Chooser",
+      "message": "Enabled plugin descriptor is absent from the supplied project/engine plugin roots."
+    },
+    {
+      "severity": "blocker",
+      "code": "plugin-unresolved",
+      "subject": "Mover",
+      "message": "Enabled plugin descriptor is absent from the supplied project/engine plugin roots."
+    },
+    {
+      "severity": "blocker",
+      "code": "plugin-unresolved",
+      "subject": "NetworkPrediction",
+      "message": "Enabled plugin descriptor is absent from the supplied project/engine plugin roots."
+    },
+    {
+      "severity": "blocker",
+      "code": "plugin-unresolved",
+      "subject": "ChaosVehiclesPlugin",
+      "message": "Enabled plugin descriptor is absent from the supplied project/engine plugin roots."
+    },
+    {
+      "severity": "blocker",
+      "code": "plugin-unresolved",
+      "subject": "MassGameplay",
+      "message": "Enabled plugin descriptor is absent from the supplied project/engine plugin roots."
+    },
+    {
+      "severity": "blocker",
+      "code": "plugin-unresolved",
+      "subject": "MassCrowd",
+      "message": "Enabled plugin descriptor is absent from the supplied project/engine plugin roots."
+    },
+    {
+      "severity": "blocker",
+      "code": "plugin-unresolved",
+      "subject": "MassAI",
+      "message": "Enabled plugin descriptor is absent from the supplied project/engine plugin roots."
+    },
+    {
+      "severity": "blocker",
+      "code": "plugin-unresolved",
+      "subject": "CustomizableSequencerTracks",
+      "message": "Enabled plugin descriptor is absent from the supplied project/engine plugin roots."
+    },
+    {
+      "severity": "review",
+      "code": "licensed-build-required",
+      "subject": "Unreal Engine 5.7",
+      "message": "This reads descriptors only. Licensed platform extensions, SDK availability, UHT/UBT, cooking, staging, signing, device startup and certification remain unverified."
+    }
+  ]
+}

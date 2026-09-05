@@ -67,8 +67,8 @@ void USovFrontendComponent::RefreshFrontend()
     if (Settings && !Settings->HasCompletedAccessibilitySetup() && PC->GetNarrativeGameplayHUD())
     {
         if ((!SetupMenu || !SetupMenu->IsActivated()) && OpenAccessibilitySettings()) { SetupMenu->SetFirstBoot(true); }
-        if (SetupMenu && SetupMenu->IsActivated() && GetWorld() && !GetWorld()->IsPaused())
-        { PausedController = PC; bOwnSetupPause = PC->SetPause(true); }
+        if (SetupMenu && SetupMenu->IsActivated() && !bOwnSetupPause)
+        { PausedController = PC; bOwnSetupPause = PC->AcquireSystemPause(TEXT("AccessibilitySetup")); }
     }
     else { ReleaseSetupPause(); }
 }
@@ -119,7 +119,7 @@ void USovFrontendComponent::ReleaseSetupPause()
     const TWeakObjectPtr<ASovPlayerController> PC = PausedController;
     const bool bRelease = bOwnSetupPause;
     bOwnSetupPause = false; PausedController.Reset();
-    if (bRelease && PC.IsValid()) { PC->SetPause(false); }
+    if (bRelease && PC.IsValid()) { PC->ReleaseSystemPause(TEXT("AccessibilitySetup")); }
 }
 void USovFrontendComponent::TickComponent(float Delta, ELevelTick TickType, FActorComponentTickFunction* Tick)
 {

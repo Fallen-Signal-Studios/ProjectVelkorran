@@ -74,6 +74,7 @@ bool FSovNarrativePlayerSlotPreservesSubclassTest::RunTest(const FString& Parame
 	const FString Slot = TEXT("SovAutomationPlayerSlot_") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
 	ON_SCOPE_EXIT
 	{
+		USovTravelOwnerFenceTestSave::OnTravelSerialization = {};
 		UGameplayStatics::DeleteGameInSlot(Slot, 0);
 		World->DestroyWorld(false);
 		GEngine->DestroyWorldContext(World);
@@ -91,7 +92,7 @@ bool FSovNarrativePlayerSlotPreservesSubclassTest::RunTest(const FString& Parame
 	if (!TestTrue(TEXT("Create independent live world save"), Save->UpdateSaveObject(true))) { return false; }
 	UNarrativeSave* WorldSave = Save->GetSaveObject();
 	WorldSave->LevelName = TEXT("LiveWorldMustRemain");
-	auto* Seed = Cast<UNarrativeSaveWithCreatorData>(UGameplayStatics::CreateSaveGameObject(UNarrativeSaveWithCreatorData::StaticClass()));
+	auto* Seed = Cast<USovTravelOwnerFenceTestSave>(UGameplayStatics::CreateSaveGameObject(USovTravelOwnerFenceTestSave::StaticClass()));
 	if (!TestNotNull(TEXT("Configured save subclass"), Seed)) { return false; }
 	Seed->CharacterCreatorUsername = TEXT("ExistingCreatorName");
 	Seed->LevelName = TEXT("ExistingSlotMetadata");
@@ -106,6 +107,41 @@ bool FSovNarrativePlayerSlotPreservesSubclassTest::RunTest(const FString& Parame
 	TestEqual(TEXT("Player record belongs to current pawn"), Loaded->PlayerData.PawnData.ActorName, Pawn->GetFName());
 	TestTrue(TEXT("Player-only save never replaces the live world save"), Save->GetSaveObject() == WorldSave);
 	TestEqual(TEXT("Live world metadata is untouched"), WorldSave->LevelName, FString(TEXT("LiveWorldMustRemain")));
+	TestFalse(TEXT("Unresolved platform user cannot write a travel record"), Save->CreatePlayerOnlySaveInSlot(PC, Slot, INDEX_NONE));
+	FNarrativeSavePlayer ReadBack = Loaded->PlayerData;
+	TestFalse(TEXT("Unresolved platform user cannot read a travel record"), Save->ReadPlayerOnlySave(Slot, ReadBack, INDEX_NONE));
+	TestFalse(TEXT("A failed read cannot leave another user's stale records in the output"), ReadBack.IsValid());
+	TestTrue(TEXT("Explicit resolved user reads the existing record"), Save->ReadPlayerOnlySave(Slot, ReadBack, 0));
+	TestEqual(TEXT("Explicit user read retains the pawn identity"), ReadBack.PawnData.ActorName, Pawn->GetFName());
+	TArray<uint8> BeforeRevocation, AfterRevocation;
+	if (!TestTrue(TEXT("Capture exact existing travel slot bytes"), UGameplayStatics::LoadDataFromSlot(BeforeRevocation, Slot, 0))) { return false; }
+	bool bOwnerCurrent = true; bool bPrepareCallbackRan = false;
+	PC->OnPrepareTravelSave = [&bOwnerCurrent, &bPrepareCallbackRan]() { bPrepareCallbackRan = true; bOwnerCurrent = false; };
+	const bool bRevokedWrite = Save->CreatePlayerOnlySaveInSlot(PC, Slot, 0, [&bOwnerCurrent]() { return bOwnerCurrent; });
+	PC->OnPrepareTravelSave = {};
+	TestTrue(TEXT("Real PrepareForSave callback revoked the owner"), bPrepareCallbackRan);
+	TestFalse(TEXT("Capture-time owner revocation prevents travel write"), bRevokedWrite);
+	TestTrue(TEXT("Previous travel slot remains readable"), UGameplayStatics::LoadDataFromSlot(AfterRevocation, Slot, 0));
+	TestTrue(TEXT("Owner revocation preserves the existing bytes exactly"), BeforeRevocation == AfterRevocation);
+	bOwnerCurrent = true; bool bSerializeCallbackRan = false;
+	USovTravelOwnerFenceTestSave::OnTravelSerialization = [&bOwnerCurrent, &bSerializeCallbackRan](bool bSaving)
+	{ if (bSaving) { bSerializeCallbackRan = true; bOwnerCurrent = false; } };
+	const bool bSerializedAfterRevocation = Save->CreatePlayerOnlySaveInSlot(PC, Slot, 0, [&bOwnerCurrent]() { return bOwnerCurrent; });
+	USovTravelOwnerFenceTestSave::OnTravelSerialization = {};
+	TestTrue(TEXT("Real SaveGame serialization revoked the owner"), bSerializeCallbackRan);
+	TestFalse(TEXT("Serialization-time owner revocation prevents platform write"), bSerializedAfterRevocation);
+	TestTrue(TEXT("Slot remains readable after serialization veto"), UGameplayStatics::LoadDataFromSlot(AfterRevocation, Slot, 0));
+	TestTrue(TEXT("Serialization-time owner revocation preserves exact bytes"), BeforeRevocation == AfterRevocation);
+	TestFalse(TEXT("Unowned read refuses before publishing prior records"), Save->ReadPlayerOnlySave(Slot, ReadBack, 0, []() { return false; }));
+	TestFalse(TEXT("Unowned read clears prior records"), ReadBack.IsValid());
+	bOwnerCurrent = true; bool bDeserializeCallbackRan = false;
+	USovTravelOwnerFenceTestSave::OnTravelSerialization = [&bOwnerCurrent, &bDeserializeCallbackRan](bool bSaving)
+	{ if (!bSaving) { bDeserializeCallbackRan = true; bOwnerCurrent = false; } };
+	const bool bReadAfterRevocation = Save->ReadPlayerOnlySave(Slot, ReadBack, 0, [&bOwnerCurrent]() { return bOwnerCurrent; });
+	USovTravelOwnerFenceTestSave::OnTravelSerialization = {};
+	TestTrue(TEXT("Real SaveGame deserialization revoked the owner"), bDeserializeCallbackRan);
+	TestFalse(TEXT("Owner lost across loading refuses the completed read"), bReadAfterRevocation);
+	TestFalse(TEXT("A read crossing owner loss exposes no records"), ReadBack.IsValid());
 	return true;
 }
 #endif

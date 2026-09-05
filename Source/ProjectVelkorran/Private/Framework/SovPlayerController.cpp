@@ -1,5 +1,6 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Framework/SovPlayerController.h"
+#include "Framework/SovApplicationLifecycleComponent.h"
 #include "Narrative/SovNarrativeCueComponent.h"
 #include "Feedback/SovHapticFeedbackComponent.h"
 #include "UI/SovFrontendComponent.h"
@@ -44,6 +45,7 @@ ASovPlayerController::ASovPlayerController(const FObjectInitializer& ObjectIniti
 	HapticFeedback = CreateDefaultSubobject<USovHapticFeedbackComponent>(TEXT("HapticFeedback"));
 	Frontend = CreateDefaultSubobject<USovFrontendComponent>(TEXT("NativeFrontend"));
 	DialoguePresentation = CreateDefaultSubobject<USovDialoguePresentationComponent>(TEXT("DialoguePresentation"));
+	ApplicationLifecycle = CreateDefaultSubobject<USovApplicationLifecycleComponent>(TEXT("ApplicationLifecycle"));
 	GameplayHUDClass = USovNativeGameplayHUD::StaticClass();
 }
 
@@ -57,6 +59,33 @@ bool ASovPlayerController::OpenAccessibilitySettings()
 {
 	EnsureGameplayHUDCreated();
 	return Frontend && Frontend->OpenAccessibilitySettings();
+}
+
+bool ASovPlayerController::CanReleaseSystemPause() const { return SystemPauseOwners.IsEmpty() && !bExternalPauseRequested; }
+bool ASovPlayerController::IsGameplayAbilityInputSuppressed() const
+{ return ApplicationLifecycle && ApplicationLifecycle->IsGameplayInterrupted(); }
+bool ASovPlayerController::SetPause(bool bPause, FCanUnpause CanUnpauseDelegate)
+{
+	// A menu/Blueprint pause remains owned after a platform interruption ends.
+	const bool bPreviousExternalPause = bExternalPauseRequested;
+	bExternalPauseRequested = bPause;
+	if (!bPause && !SystemPauseOwners.IsEmpty()) { return false; }
+	const bool bSucceeded = Super::SetPause(bPause, CanUnpauseDelegate);
+	if (bPause && !bSucceeded) { bExternalPauseRequested = bPreviousExternalPause; }
+	return bSucceeded;
+}
+bool ASovPlayerController::AcquireSystemPause(FName Owner)
+{
+	if (Owner.IsNone() || !HasAuthority() || GetNetMode() != NM_Standalone || !GetWorld()) { return false; }
+	if (SystemPauseOwners.Contains(Owner)) { return true; }
+	if (SystemPauseOwners.IsEmpty() && GetWorld()->IsPaused()) { bExternalPauseRequested = true; }
+	SystemPauseOwners.Add(Owner);
+	if (Super::SetPause(true, FCanUnpause::CreateUObject(this, &ThisClass::CanReleaseSystemPause))) { return true; }
+	SystemPauseOwners.Remove(Owner); return false;
+}
+void ASovPlayerController::ReleaseSystemPause(FName Owner)
+{
+	if (SystemPauseOwners.Remove(Owner) && CanReleaseSystemPause()) { Super::SetPause(false); }
 }
 
 FGuid ASovPlayerController::GetActorGUID_Implementation() const
@@ -92,6 +121,8 @@ bool ASovPlayerController::ValidateMissionPawn(USovCampaignDefinition* Mission, 
 
 bool ASovPlayerController::CanTransitionTo(USovCampaignDefinition* Destination, FString& OutError, bool bRequireDifferentProtagonist) const
 {
+	if (ApplicationLifecycle && ApplicationLifecycle->IsGameplayInterrupted())
+	{ OutError = TEXT("Resume the game before changing mission."); return false; }
 	const ASovPlayerCharacterBase* Source = Cast<ASovPlayerCharacterBase>(GetPawn());
 	USovCampaignDefinition* Current = CampaignState ? CampaignState->GetActiveMission() : nullptr;
 	const UNarrativeAbilitySystemComponent* ASC = Cast<UNarrativeAbilitySystemComponent>(GetAbilitySystemComponent());
@@ -585,6 +616,12 @@ bool ASovPlayerController::TravelToMission(USovCampaignDefinition* Destination, 
 	if (!PrepareTransitionCheckpoint(Destination->MissionId, OutError)) { return false; }
 	UNarrativeSaveSubsystem* Save = GetWorld()->GetSubsystem<UNarrativeSaveSubsystem>();
 	if (!Save) { OutError = TEXT("Narrative save subsystem is unavailable."); return false; }
+	USovSaveSubsystem* Slots = GetGameInstance() ? GetGameInstance()->GetSubsystem<USovSaveSubsystem>() : nullptr;
+	if (!Slots || !Slots->IsPlatformStorageOwnerAvailable() || Slots->IsPlatformStorageSuspended())
+	{ OutError = TEXT("Reconnect the campaign's storage owner before travelling."); return false; }
+	const FString TravelOwner = Slots->GetAccountNamespace();
+	const int32 TravelUser = Slots->GetLocalSaveUserIndex();
+	const FString OwnedTravelSlot = FString(TravelSaveSlot()) + TEXT("_") + TravelOwner;
 	const uint64 ExpectedEpoch = ++TransitionEpoch;
 	APawn* Source = GetPawn();
 	TransitionState = ESovCampaignTransitionState::Travelling;
@@ -599,8 +636,15 @@ bool ASovPlayerController::TravelToMission(USovCampaignDefinition* Destination, 
 		if (OutError.IsEmpty()) { OutError = TEXT("Current protagonist could not be retained for travel."); }
 		return false;
 	}
-	const bool bSaved = Save->CreatePlayerOnlySaveInSlot(this, TravelSaveSlot());
-	if (!bSaved || TransitionEpoch != ExpectedEpoch || GetPawn() != Source || PendingTravelMission != Destination)
+	const TWeakObjectPtr<USovSaveSubsystem> TravelStorage(Slots);
+	const auto OwnsTravelStorage = [TravelStorage, TravelOwner, TravelUser]()
+	{
+		const auto* Current = TravelStorage.Get();
+		return Current && Current->IsPlatformStorageOwnerAvailable() && !Current->IsPlatformStorageSuspended() && Current->GetAccountNamespace() == TravelOwner
+			&& Current->GetLocalSaveUserIndex() == TravelUser;
+	};
+	const bool bSaved = OwnsTravelStorage() && Save->CreatePlayerOnlySaveInSlot(this, OwnedTravelSlot, TravelUser, OwnsTravelStorage);
+	if (!bSaved || !OwnsTravelStorage() || TransitionEpoch != ExpectedEpoch || GetPawn() != Source || PendingTravelMission != Destination)
 	{
 		if (TransitionEpoch == ExpectedEpoch)
 		{ PendingTravelMission = nullptr; TransitionState = ESovCampaignTransitionState::Idle; }

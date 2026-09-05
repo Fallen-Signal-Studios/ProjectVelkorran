@@ -86,7 +86,6 @@ public class NarrativeArsenal : ModuleRules
 				"MassEntity",
 				"MassMovement",
 				"MassNavigation", 
-				"SequencerScripting",
 				"MovieScene",
 				"ChaosVehicles",
 				"MassGameplayExternalTraits",
