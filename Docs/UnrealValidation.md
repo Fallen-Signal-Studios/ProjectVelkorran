@@ -1,6 +1,6 @@
 # Unreal validation
 
-`Scripts/Validate-Unreal.ps1` builds the real `ProjectVelkorranEditor` target for Win64 Development, then runs `ProjectVelkorran.Campaign` automation in Unreal Engine 5.7. It does not substitute static checks for compilation or manufacture an automation result.
+`Scripts/Validate-Unreal.ps1` builds the real `ProjectVelkorranEditor` target for Win64 Development, then runs all `ProjectVelkorran` automation in Unreal Engine 5.7, including Campaign and World suites. A narrower `-TestFilter` remains available for diagnosis. It does not substitute static checks for compilation or manufacture an automation result.
 
 ## Prerequisites
 

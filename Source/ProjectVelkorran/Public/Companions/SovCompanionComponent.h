@@ -3,6 +3,11 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "NarrativeSavableComponent.h"
+#include "GameplayAbilitySpecHandle.h"
+#include "AITypes.h"
+#include "GameplayEffectTypes.h"
+#include "Campaign/SovEncounterDirector.h"
+#include "GAS/SovDamageSourcePolicy.h"
 #include "SovCompanionComponent.generated.h"
 
 class ASovCoActionAnchor;
@@ -12,6 +17,13 @@ class UNarrativeAbilitySystemComponent;
 class UNPCActivityComponent;
 class USovCoActionGoal;
 class USovCoActionActivity;
+class USovCompanionCommandGoal;
+class UGameplayAbility;
+class UPrimitiveComponent;
+struct FSovDamageResult;
+
+UENUM(BlueprintType)
+enum class ESovCompanionCommand : uint8 { FocusTarget, HoldPosition, DefendPerson, MoveToAnchor, Interact, ExecuteCoAction, Regroup };
 
 UENUM(BlueprintType)
 enum class ESovCompanionCommandState : uint8 { Idle, MovingToAnchor, Succeeded, Failed };
@@ -19,14 +31,35 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FSovCompanionCommandChanged, ESovCo
 
 /** Mission-scoped co-action coordinator over Narrative goals/activities, not a replacement companion brain. */
 UCLASS(ClassGroup = (Sovereign), meta = (BlueprintSpawnableComponent))
-class PROJECTVELKORRAN_API USovCompanionComponent : public UActorComponent, public INarrativeSavableComponent
+class PROJECTVELKORRAN_API USovCompanionComponent : public UActorComponent, public INarrativeSavableComponent, public ISovDamageSourcePolicy
 {
 	GENERATED_BODY()
 public:
 	USovCompanionComponent();
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Companion") FName CompanionId;
+	/** Already-unlocked ability classes the authored AI is permitted to select. Empty means movement only. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Companion|Combat") TArray<TSubclassOf<UGameplayAbility>> CuratedAbilities;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Companion|Combat", meta=(ClampMin="0.15",ClampMax="0.25")) float ContributionFraction = .2f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Companion|Rescue") bool bMayRescue = true;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Companion|Rescue", meta=(ClampMin="100",ClampMax="2500")) float RescueRange = 1000.f;
+	/** Explicit mission mark used only for hidden recovery at 25 m separation. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Companion|Recovery") TObjectPtr<AActor> RecoveryAnchor;
+	/** Authored split phases retain separation instead of pulling a protagonist through a locked route. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Companion|Recovery") bool bInAuthoredSplitPhase = false;
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Companion") bool SetLeader(ASovPlayerCharacterBase* Player, FString& Reason);
+	UFUNCTION(BlueprintPure, Category="Companion") bool CanRequestCommand(ASovPlayerCharacterBase* Player, ESovCompanionCommand Command, AActor* Target, FString& Reason) const;
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Companion") bool RequestCommand(ASovPlayerCharacterBase* Player, ESovCompanionCommand Command, AActor* Target, FString& Reason);
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Companion") void CancelContextCommand();
+	UFUNCTION(BlueprintPure, Category="Companion|Rescue") bool CanProvideRescue(ASovPlayerCharacterBase* Player, FString& Reason) const;
+	virtual bool LimitSovDamage(AActor* Target, const FGameplayEffectContextHandle& Context, float& ShieldDamage, float& HealthDamage, float& PoiseDamage) const override;
+	bool IsCommandCurrent(const USovCompanionCommandGoal* Goal) const;
+	void TickContextCommand(USovCompanionCommandGoal* Goal);
+	void NotifyCommandInterrupted(USovCompanionCommandGoal* Goal);
 	/** Defeat during a required action fails this active encounter; no resurrection or damage immunity is invented. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Companion") TObjectPtr<ASovEncounterDirector> RequiredEncounter;
+	/** Optional ordinary-companion recovery owner. RequiredEncounter retains its fail/retry meaning. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Companion|Recovery") TObjectPtr<ASovEncounterDirector> RecoveryEncounter;
+	UFUNCTION(BlueprintPure, Category="Companion|Recovery") bool IsDisabled() const { return bDisabled; }
 	UFUNCTION(BlueprintPure, Category = "Companion") bool CanRequestCoAction(ASovPlayerCharacterBase* Player, ASovCoActionAnchor* Anchor, FString& Reason) const;
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Companion") bool RequestCoAction(ASovPlayerCharacterBase* Player, ASovCoActionAnchor* Anchor, FString& Reason);
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Companion") void CancelCoAction();
@@ -48,10 +81,36 @@ private:
 	friend struct FSovCoActionTestAccess;
 	bool ValidateRequest(ASovPlayerCharacterBase* Player, ASovCoActionAnchor* Anchor, bool bExisting, FString& Reason) const;
 	void FinishCommand(bool bSucceeded, const FString& Reason);
+	bool HasMissionPermission(ASovPlayerCharacterBase* Player) const;
+	void ReleaseLeaderOwnership();
+	bool TryRecoverSeparation();
+	UFUNCTION() void ObserveContribution(const FSovDamageResult& Result);
+	UFUNCTION() void ResetContribution(bool bStarted);
+	UPROPERTY(Transient) TObjectPtr<ASovPlayerCharacterBase> Leader;
+	UPROPERTY(Transient) TObjectPtr<UNarrativeAbilitySystemComponent> LeaderASC;
+	UPROPERTY(Transient) TObjectPtr<USovCompanionCommandGoal> CommandGoal;
+	FGameplayAbilitySpecHandle OwnedCommandAttack;
+	float PlayerContribution = 0.f;
+	float CompanionContribution = 0.f;
+	float CommandAttackStarted = 0.f;
+	float NextCommandAttack = 0.f;
+	bool bCommandInterrupted = false;
+	FAIRequestID CommandMoveId;
+	TWeakObjectPtr<AActor> OwnedFocus;
+	TWeakObjectPtr<AActor> PreviousFocus;
+	TWeakObjectPtr<UPrimitiveComponent> LeaderMovementPrimitive;
+	TWeakObjectPtr<UPrimitiveComponent> CompanionMovementPrimitive;
+	TWeakObjectPtr<AActor> CollisionLeader;
+	bool bOwnsLeaderIgnore = false;
+	bool bOwnsCompanionIgnore = false;
+	float NextMoveAttempt = 0.f;
 	void TryFinishArrival();
 	bool TryHiddenFallback();
 	bool IsFallbackHiddenFromAllPlayers(const FVector& Destination) const;
 	UFUNCTION() void HandleDeath(AActor* Actor, UNarrativeAbilitySystemComponent* ASC, bool bIsDead);
+	UFUNCTION() void HandleRecoveryEncounter(ESovEncounterState Previous, ESovEncounterState Current);
+	UPROPERTY(Replicated) bool bDisabled = false;
+	FActiveGameplayEffectHandle RecoveryProtection;
 	UPROPERTY(Transient) TObjectPtr<ASovCoActionAnchor> ActiveAnchor;
 	UPROPERTY(Transient) TObjectPtr<ASovPlayerCharacterBase> RequestingPlayer;
 	UPROPERTY(Transient) TObjectPtr<USovCoActionGoal> ActiveGoal;

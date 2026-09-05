@@ -220,6 +220,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnNarrativeTaskCompleted, const UN
 
 //Dialogue
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDialogueBegan, class UDialogue*, Dialogue);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnDialogueSuspensionChanged, class UDialogue*, Dialogue, bool, bSuspended);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnDialogueFinished, class UDialogue*, Dialogue, const bool, bStartingNewDialogue, const EExitDialogueReason, Reason);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FDialogueOptionSelected, class UDialogue*, Dialogue, class UDialogueNode_Player*, PlayerReply);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FDialogueRepliesAvailable, class UDialogue*, Dialogue, const TArray<UDialogueNode_Player*>&, PlayerReplies);
@@ -245,6 +246,9 @@ public:
 
 	friend class UQuest;
 	friend class UNarrativePartyComponent;
+	/** End notifications may queue later dialogue; synchronous replacement cannot tear down a new instance. */
+	bool bDialogueMutationInProgress = false;
+	bool bDialogueOwnerEndingPlay = false;
 
 	// Sets default values for this component's properties
 	UTalesComponent();
@@ -337,6 +341,8 @@ public:
 	/**Called when a dialogue starts*/
 	UPROPERTY(BlueprintAssignable, Category = "Dialogues")
 	FOnDialogueBegan OnDialogueBegan;
+	/** Hide/restore the same current subtitle and choice context without ending the dialogue. */
+	UPROPERTY(BlueprintAssignable, Category="Dialogue") FOnDialogueSuspensionChanged OnDialogueSuspensionChanged;
 
 	/**Called when a dialogue has been finished for any reason*/
 	UPROPERTY(BlueprintAssignable, Category = "Dialogues")

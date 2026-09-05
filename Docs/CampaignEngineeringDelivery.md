@@ -1,5 +1,7 @@
 # Campaign engineering delivery
 
+**Historical delivery:** the subsequent [TDD native completion audit](TDDNativeCompletion.md) supersedes this document's remaining-engineering list and next-slice recommendations. This file retains the preceding branch's scope and validation evidence.
+
 This is the authorized engineering follow-through after the audit and native Axiom slice. The authoritative design remains the August 2026 TDD v2 plus the later approved roster/resource decisions in `CampaignV2ChangeLog.md`. The December attachment is superseded. [GameplayAudit-2026-09-04.md](GameplayAudit-2026-09-04.md) preserves the original 33-gap analysis and eight-slice roadmap; it is a baseline audit, not a claim that subsequent source work is absent.
 
 The result is a substantially broader native campaign implementation over Narrative. It is **not a certified playable build or a claim that the entire TDD is finished**. The working repository excludes gameplay assets, maps and Narrative content; Unreal 5.7, UHT/UBT, the Windows toolchain and ZenDyn are unavailable here. Native source and authored tests can be delivered; compilation, Blueprint migration, content integration, animation/readability, packaged playthrough and performance remain real gates.

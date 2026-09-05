@@ -75,14 +75,12 @@ void UTalesComponent::TickComponent(float DeltaTime, enum ELevelTick TickType, F
 
 void UTalesComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-
+	bDialogueOwnerEndingPlay = true;
+	bDialogueMutationInProgress = true;
 	Super::EndPlay(EndPlayReason);
-
-	if (CurrentDialogue)
-	{
-		CurrentDialogue->Deinitialize();
-	}
-
+	UDialogue* const EndingDialogue=CurrentDialogue;
+	CurrentDialogue=nullptr;
+	if (IsValid(EndingDialogue)) { EndingDialogue->Deinitialize(); }
 }
 
 void UTalesComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -321,6 +319,8 @@ bool UTalesComponent::HasDialogueAvailable(TSubclassOf<class UDialogue> Dialogue
 
 bool UTalesComponent::SetCurrentDialogue(TSubclassOf<class UDialogue> Dialogue, const FDialoguePlayParams PlayParams)
 {
+	if (bDialogueMutationInProgress || bDialogueOwnerEndingPlay || !IsValid(GetOwner()) || GetOwner()->IsActorBeingDestroyed()) { return false; }
+	TGuardValue<bool> Mutation(bDialogueMutationInProgress, true);
 
 	if (Dialogue)
 	{
@@ -328,6 +328,7 @@ bool UTalesComponent::SetCurrentDialogue(TSubclassOf<class UDialogue> Dialogue, 
 		if (CurrentDialogue)
 		{
 			//Check that our CurrentDialogue's priority isn't lower than the new one
+			if (CurrentDialogue->PreservesInterruptedPlayback()) { return false; }
 			if (UDialogue* NewDialogue = Dialogue->GetDefaultObject<UDialogue>())
 			{
 				const int32 NewPriority = PlayParams.Priority != -1 ? PlayParams.Priority : NewDialogue->Priority;
@@ -338,10 +339,11 @@ bool UTalesComponent::SetCurrentDialogue(TSubclassOf<class UDialogue> Dialogue, 
 				}
 			}
 
-			OnDialogueFinished.Broadcast(CurrentDialogue, true, EExitDialogueReason::EDR_NewDialogueStarted);
-
-			CurrentDialogue->Deinitialize();
-			CurrentDialogue = nullptr;
+			UDialogue* const EndingDialogue=CurrentDialogue;
+			OnDialogueFinished.Broadcast(EndingDialogue, true, EExitDialogueReason::EDR_NewDialogueStarted);
+			if (IsValid(EndingDialogue)) { EndingDialogue->Deinitialize(); }
+			if (CurrentDialogue==EndingDialogue) { CurrentDialogue = nullptr; }
+			if (bDialogueOwnerEndingPlay || !IsValid(GetOwner()) || GetOwner()->IsActorBeingDestroyed() || CurrentDialogue) { return false; }
 		}
 
 		CurrentDialogue = MakeDialogueInstance(Dialogue, PlayParams);
@@ -359,7 +361,9 @@ bool UTalesComponent::BeginDialogue(TSubclassOf<class UDialogue> DialogueClass, 
 		//Server constructs the dialogue, grabs the authoritative dialogue lines, and passes them to the client for it to begin dialogue 
 		if (SetCurrentDialogue(DialogueClass, PlayParams))
 		{
-			OnDialogueBegan.Broadcast(CurrentDialogue);
+			UDialogue* const StartedDialogue = CurrentDialogue;
+			OnDialogueBegan.Broadcast(StartedDialogue);
+			if (!IsValid(StartedDialogue) || CurrentDialogue != StartedDialogue || !StartedDialogue->OwningComp) { return false; }
 
 			if (GetNetMode() != NM_Standalone)
 			{
@@ -370,8 +374,8 @@ bool UTalesComponent::BeginDialogue(TSubclassOf<class UDialogue> DialogueClass, 
 			{
 				// notify external listeners
 				FDialogueDelegates::OnDialogueStarted.Broadcast(this, CurrentDialogue, PlayParams.StartFromID);
-				
-				CurrentDialogue->Play();
+				if (!IsValid(StartedDialogue) || CurrentDialogue != StartedDialogue || !StartedDialogue->OwningComp) { return false; }
+				StartedDialogue->Play();
 			}
 
 			return true;
@@ -431,12 +435,14 @@ void UTalesComponent::ClientBeginPartyDialogue_Implementation(TSubclassOf<class 
 
 void UTalesComponent::ClientExitDialogue_Implementation(const EExitDialogueReason Reason)
 {
+	if (bDialogueMutationInProgress) { return; }
+	TGuardValue<bool> Mutation(bDialogueMutationInProgress, true);
 	if (CurrentDialogue)
 	{
-		OnDialogueFinished.Broadcast(CurrentDialogue, false, Reason);
-
-		CurrentDialogue->Deinitialize();
-		CurrentDialogue = nullptr;
+		UDialogue* const EndingDialogue=CurrentDialogue;
+		OnDialogueFinished.Broadcast(EndingDialogue, false, Reason);
+		if (IsValid(EndingDialogue)) { EndingDialogue->Deinitialize(); }
+		if (CurrentDialogue==EndingDialogue) { CurrentDialogue = nullptr; }
 	}
 
 }
@@ -489,17 +495,22 @@ bool UTalesComponent::TryExitDialogue(const EExitDialogueReason Reason)
 
 void UTalesComponent::ExitDialogue(const EExitDialogueReason Reason)
 {
+	if (bDialogueMutationInProgress) { return; }
+	TGuardValue<bool> Mutation(bDialogueMutationInProgress, true);
 	if (HasAuthority())
 	{
+		if (GetNetMode() == NM_Standalone && CurrentDialogue && CurrentDialogue->PreservesInterruptedPlayback()
+			&& Reason != EExitDialogueReason::EDR_NoLines && CurrentDialogue->SetPlaybackSuspended(true)) { return; }
+		if (bDialogueOwnerEndingPlay || !IsValid(GetOwner()) || GetOwner()->IsActorBeingDestroyed()) { return; }
 		ClientExitDialogue(Reason);
 
 		//Server wants to wrap its own dialogue up 
 		if (CurrentDialogue)
 		{
-			OnDialogueFinished.Broadcast(CurrentDialogue, false, Reason);
-
-			CurrentDialogue->Deinitialize();
-			CurrentDialogue = nullptr;
+			UDialogue* const EndingDialogue=CurrentDialogue;
+			OnDialogueFinished.Broadcast(EndingDialogue, false, Reason);
+			if (IsValid(EndingDialogue)) { EndingDialogue->Deinitialize(); }
+			if (CurrentDialogue==EndingDialogue) { CurrentDialogue = nullptr; }
 		}
 	}
 }

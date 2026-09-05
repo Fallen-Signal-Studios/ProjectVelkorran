@@ -2,6 +2,9 @@
 #include "Companions/SovCompanionComponent.h"
 #include "Companions/SovCoActionAnchor.h"
 #include "Companions/SovCoActionActivity.h"
+#include "Companions/SovProtagonistCompanionCharacter.h"
+#include "Recovery/SovFatalRecoveryComponent.h"
+#include "Resonance/SovResonanceComponent.h"
 #include "Campaign/SovEncounterDirector.h"
 #include "Characters/SovPlayerCharacterBase.h"
 #include "AI/Activities/NPCActivityComponent.h"
@@ -13,6 +16,7 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
+#include "GAS/NarrativeAttributeSetBase.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "NavigationSystem.h"
@@ -35,13 +39,19 @@ void USovCompanionComponent::BeginPlay()
 	{
 		BoundASC = Cast<UNarrativeAbilitySystemComponent>(UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner()));
 		if (BoundASC) { BoundASC->OnDeathStateChanged.AddUniqueDynamic(this, &ThisClass::HandleDeath); }
+		if (IsValid(RecoveryEncounter)) { RecoveryEncounter->OnEncounterStateChanged.AddUniqueDynamic(this, &ThisClass::HandleRecoveryEncounter); }
 	}
 }
 
 void USovCompanionComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	CancelContextCommand();
+	ReleaseLeaderOwnership();
+	if (IsValid(BoundASC)) { BoundASC->OnDamageResolvedAsSource.RemoveDynamic(this, &ThisClass::ObserveContribution); }
 	CancelCoAction();
 	if (IsValid(BoundASC)) { BoundASC->OnDeathStateChanged.RemoveDynamic(this, &ThisClass::HandleDeath); }
+	if (IsValid(BoundASC) && RecoveryProtection.IsValid()) { BoundASC->RemoveActiveGameplayEffect(RecoveryProtection); }
+	if (IsValid(RecoveryEncounter)) { RecoveryEncounter->OnEncounterStateChanged.RemoveDynamic(this, &ThisClass::HandleRecoveryEncounter); }
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -49,6 +59,7 @@ void USovCompanionComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(USovCompanionComponent, CommandState);
+	DOREPLIFETIME(USovCompanionComponent, bDisabled);
 }
 
 void USovCompanionComponent::OnRep_CommandState()
@@ -115,6 +126,7 @@ bool USovCompanionComponent::CanRequestCoAction(ASovPlayerCharacterBase* Player,
 bool USovCompanionComponent::RequestCoAction(ASovPlayerCharacterBase* Player, ASovCoActionAnchor* Anchor, FString& Reason)
 {
 	if (!CanRequestCoAction(Player, Anchor, Reason)) { return false; }
+	CancelContextCommand();
 	TGuardValue<bool> Mutation(bMutation, true);
 	ANarrativeNPCCharacter* NPC = CastChecked<ANarrativeNPCCharacter>(GetOwner());
 	ANarrativeNPCController* Controller = CastChecked<ANarrativeNPCController>(NPC->GetController());
@@ -179,6 +191,7 @@ void USovCompanionComponent::NotifyActivityInterrupted(USovCoActionGoal* Goal)
 void USovCompanionComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+	if (bCommandInterrupted && !bMutation) { CancelContextCommand(); }
 	if (!GetOwner() || !GetOwner()->HasAuthority() || bMutation || CommandState != ESovCompanionCommandState::MovingToAnchor) { return; }
 	TGuardValue<bool> Mutation(bMutation, true);
 	FString Reason;
@@ -312,15 +325,42 @@ void USovCompanionComponent::CancelCoAction()
 
 void USovCompanionComponent::HandleDeath(AActor* Actor, UNarrativeAbilitySystemComponent* ASC, bool bIsDead)
 {
-	if (!bIsDead || Actor != GetOwner() || ASC != BoundASC || !GetOwner() || !GetOwner()->HasAuthority()) { return; }
+	if (Actor != GetOwner() || ASC != BoundASC || !GetOwner() || !GetOwner()->HasAuthority()) { return; }
+	bDisabled = bIsDead; GetOwner()->ForceNetUpdate();
+	if (!bIsDead) { return; }
 	CancelCoAction();
+	CancelContextCommand();
+	if (GetOwner()->IsA<ASovProtagonistCompanionCharacter>() || IsValid(RequiredEncounter))
+	{
+		if (auto* ActivePlayer = USovResonanceComponent::FindActive(GetWorld()))
+		{ if (auto* Recovery = ActivePlayer->GetOwner()->FindComponentByClass<USovFatalRecoveryComponent>()) { if (Recovery->RequestCompanionFailure(this)) { return; } } }
+	}
 	if (IsValid(RequiredEncounter)) { RequiredEncounter->FailEncounter(); }
+}
+
+void USovCompanionComponent::HandleRecoveryEncounter(ESovEncounterState Previous, ESovEncounterState Current)
+{
+	if (Current != ESovEncounterState::Succeeded || !bDisabled || IsValid(RequiredEncounter)
+		|| !IsValid(GetOwner()) || !GetOwner()->HasAuthority() || GetOwner()->IsA<ASovProtagonistCompanionCharacter>()
+		|| !IsValid(BoundASC) || BoundASC->GetAvatarActor() != GetOwner() || !BoundASC->IsDead()) { return; }
+	if (!Cast<ANarrativeNPCCharacter>(GetOwner())) { return; }
+	// Ordinary allies recover between combat segments. Required protagonists instead use the checkpoint owner.
+	BoundASC->Revive();
+	if (!IsValid(GetOwner()) || !IsValid(BoundASC) || BoundASC->GetAvatarActor() != GetOwner() || BoundASC->IsDead()) { return; }
+	BoundASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetHealthAttribute(),
+		FMath::Max(1.f, BoundASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetMaxHealthAttribute()) * .5f));
+	auto Spec = BoundASC->MakeOutgoingSpec(USovGameplayEffect_RecoveryProtection::StaticClass(), 1.f, BoundASC->MakeEffectContext());
+	if (Spec.IsValid())
+	{ Spec.Data->SetDuration(1.f, true); Spec.Data->DynamicGrantedTags.AddTag(FNarrativeGameplayTags::Get().State_Invulnerable); RecoveryProtection = BoundASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get()); }
+	FString Reason;
+	if (IsValid(Leader) && Leader->IsAlive()) { RequestCommand(Leader, ESovCompanionCommand::Regroup, Leader, Reason); }
 }
 
 void USovCompanionComponent::Load_Implementation()
 {
 	if (!GetOwner() || !GetOwner()->HasAuthority()) { return; }
 	CancelCoAction();
+	CancelContextCommand();
 	CommandState = ESovCompanionCommandState::Idle;
 	bActivityInterrupted = false;
 	bPathFailed = false;

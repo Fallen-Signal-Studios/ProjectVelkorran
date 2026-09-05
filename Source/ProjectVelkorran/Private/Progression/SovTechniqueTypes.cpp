@@ -7,6 +7,7 @@
 #include "GameplayEffect.h"
 #include "GameFramework/Actor.h"
 #include "SkillTrees/SkillTreeComponent.h"
+#include "Sovereign/SovGameplayTags.h"
 
 bool USovTechniquePerk::HasValidNativeGrantPolicy() const
 {
@@ -14,6 +15,10 @@ bool USovTechniquePerk::HasValidNativeGrantPolicy() const
 	if (!LevelFunction || LevelFunction->GetOuterUClass() != UTreePerk::StaticClass()
 		|| MaxLevels < 1 || MaxLevels > 5 || RequiredBranchInvestment < 0
 		|| (PersistentEffects.IsEmpty() && GrantedAbilities.IsEmpty())) { return false; }
+	// Augments retain the core input/ability. Their persistent modifiers or granted semantic
+	// tags alter that ability; direct new active-ability grants are not loadout replacements.
+	if (AugmentedAbility.IsValid() && (!AugmentedAbility.MatchesTag(FSovGameplayTags::Get().Ability_Echo)
+		|| AugmentedAbility==FSovGameplayTags::Get().Ability_Echo || !GrantedAbilities.IsEmpty())) { return false; }
 	for (TSubclassOf<UGameplayEffect> Class : PersistentEffects)
 	{
 		const UGameplayEffect* Effect = Class.Get() ? Class->GetDefaultObject<UGameplayEffect>() : nullptr;
@@ -48,6 +53,11 @@ void USovTechniquePerk::SetPerkLevel_Implementation(int32 NewPerkLevel)
 	if (!Policy->IsGrantContextCurrent(this)) { return; }
 	bLastGrantSucceeded = true;
 	if (NewPerkLevel < 0) { Super::SetPerkLevel_Implementation(-1); return; }
+	if (!Policy->ShouldEnablePerkGrant(this))
+	{
+		// Unlock/rank stays in Narrative's purchased ledger, but an unselected augment owns no GAS effects.
+		Super::SetPerkLevel_Implementation(NewPerkLevel); return;
+	}
 	UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Owner);
 	if (!ASC || !HasValidNativeGrantPolicy() || NewPerkLevel >= MaxLevels)
 	{

@@ -1,0 +1,306 @@
+// Copyright Fallen Signal Studios. All Rights Reserved.
+#include "Tests/SovCinematicLifecycleRuntimeTestFixtures.h"
+#include "Tests/SovAxiomRuntimeTestFixtures.h"
+#include "Tests/SovHandoffRuntimeTestFixtures.h"
+#include "Cinematics/SovCampaignCinematicComponent.h"
+#include "Campaign/SovCampaignDefinition.h"
+#include "Campaign/SovCampaignStateComponent.h"
+#include "Character/PlayerDefinition.h"
+#include "Framework/SovPlayerState.h"
+#include "Tracks/MovieSceneEventTrack.h"
+#include "Engine/Engine.h"
+#include "Engine/World.h"
+#include "GAS/NarrativeAbilitySystemComponent.h"
+#include "LevelSequence.h"
+#include "MovieScene.h"
+#include "Misc/AutomationTest.h"
+#include "NarrativeGameplayTags.h"
+#include "TimerManager.h"
+
+#if WITH_DEV_AUTOMATION_TESTS
+struct FNarrativeSequenceLifecycleTestAccess
+{
+	static void Play(ANarrativeLevelSequenceActor* Actor) { Actor->OnPlay(); }
+	static void Stop(ANarrativeLevelSequenceActor* Actor) { Actor->OnStop(); }
+	static bool Active(const ANarrativeLevelSequenceActor* Actor) { return Actor->bSessionActive; }
+	static bool Pending(const ANarrativeLevelSequenceActor* Actor) { return Actor->bPendingPlayback; }
+	static int32 LeaseCount(const ANarrativeLevelSequenceActor* Actor) { return Actor->OwnedParticipantTags.Num(); }
+};
+struct FSovCinematicTestAccess
+{
+	static bool ValidateSequence(USovCampaignCinematicComponent* C, ULevelSequence* Sequence, FString& Error)
+	{ return C->ValidatePresentationSequence(Sequence, Error); }
+	static void StageOwnedSession(USovCampaignCinematicComponent* C, ASovHandoffRuntimeTestController* PC,
+		ASovHandoffRuntimeTestPawn* Pawn, UAbilitySystemComponent* ASC)
+	{
+		C->Controller = PC; C->PlayerPawn = Pawn; C->PlayerASC = ASC;
+		C->OriginalViewTarget = PC->GetViewTarget(); C->OriginalControlRotation = PC->GetControlRotation();
+		FSovCinematicParticipantSnapshot Entry; Entry.Character = Pawn; Entry.ASC = ASC;
+		Entry.Transform = Pawn->GetActorTransform(); Entry.Wield = Pawn->GetWeaponWieldState();
+		C->Snapshot = {Entry}; C->Phase = ESovCinematicPhase::Loading; ++C->RequestEpoch;
+		C->ReservedPlaybackGeneration = CastChecked<ANarrativeLevelSequenceActor>(C->GetOwner())->GetPlaybackGeneration();
+		C->SessionId = FGuid::NewGuid(); C->bOwnInput = true;
+		PC->SetIgnoreMoveInput(true); PC->SetIgnoreLookInput(true);
+		C->bOwnSequenceTag = true; ASC->AddLooseGameplayTag(FNarrativeGameplayTags::Get().State_SequencerControlled);
+	}
+	static void FinishSupersededSession(USovCampaignCinematicComponent* C, uint64 CurrentGeneration)
+	{
+		C->Phase = ESovCinematicPhase::Playing; C->ExpectedPlaybackGeneration = CurrentGeneration - 1;
+		C->PlayedSeconds = 100.0; C->DurationSeconds = .01; C->bFullViewEligible = true;
+		C->HandleFinished();
+	}
+	static void StagePlaying(USovCampaignCinematicComponent* C, uint64 Generation)
+	{ C->Phase = ESovCinematicPhase::Playing; C->ExpectedPlaybackGeneration = Generation; }
+	static void RestartDuringCommit(USovCampaignCinematicComponent* C, ANarrativeLevelSequenceActor* Actor)
+	{
+		C->ExpectedPlaybackGeneration = Actor->GetPlaybackGeneration(); C->Phase = ESovCinematicPhase::Committing;
+		C->bFinishing = true;
+		Actor->GetSequencePlayer()->OnPlay.AddUniqueDynamic(C, &USovCampaignCinematicComponent::HandleStarted);
+		Actor->GetSequencePlayer()->Play();
+		C->bFinishing = false;
+	}
+	static bool OwnsAnything(const USovCampaignCinematicComponent* C) { return C->bOwnInput || C->bOwnSequenceTag || C->bReceiptAvailable; }
+	static void LeaveWorld(USovCampaignCinematicComponent* C) { C->EndPlay(EEndPlayReason::Destroyed); }
+};
+namespace
+{
+	struct FSequenceWorld
+	{
+		UWorld* World = nullptr;
+		ASovSequenceLifecycleTestActor* Actor = nullptr;
+		ASovAxiomRuntimeTestCharacter* Participant = nullptr;
+		ULevelSequence* Sequence = nullptr;
+		UNarrativeAbilitySystemComponent* ASC = nullptr;
+		USovSequenceLifecycleProbe* Probe = nullptr;
+		FSequenceWorld()
+		{
+			World = UWorld::CreateWorld(EWorldType::Game, false);
+			if (!World) { return; }
+			if (GEngine) { GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World); }
+			World->InitializeNewWorld(UWorld::InitializationValues().AllowAudioPlayback(false).CreatePhysicsScene(false).CreateNavigation(false).CreateAISystem(false));
+			Actor = World->SpawnActor<ASovSequenceLifecycleTestActor>();
+			Participant = World->SpawnActor<ASovAxiomRuntimeTestCharacter>();
+			if (!Actor || !Participant) { return; }
+			Participant->InitializeTestCombat(0); ASC = Participant->GetNarrativeAbilitySystemComponent();
+			Sequence = NewObject<ULevelSequence>(Actor); Sequence->Initialize();
+			Sequence->GetMovieScene()->SetPlaybackRange(0, 240000);
+			Actor->InitializeTestSequence(Sequence);
+			FNarrativeSequencePlaybackSettings Settings; Settings.bAutoPlay = false;
+			Actor->UpdateSequence(Sequence, Settings);
+			Actor->TestParticipants.Add(Participant); Actor->TestParticipants.Add(Participant);
+			Probe = NewObject<USovSequenceLifecycleProbe>(Actor);
+			Actor->OnPlaybackFailed.AddDynamic(Probe, &USovSequenceLifecycleProbe::Failed);
+			Actor->OnBlendOutFinished.AddDynamic(Probe, &USovSequenceLifecycleProbe::Blended);
+		}
+		~FSequenceWorld()
+		{ if (World) { World->DestroyWorld(false); if (GEngine) { GEngine->DestroyWorldContext(World); } } }
+	};
+	struct FManagedSequenceWorld
+	{
+		FSequenceWorld Base;
+		ASovHandoffRuntimeTestController* PC = nullptr;
+		ASovHandoffRuntimeTestPawn* Pawn = nullptr;
+		UNarrativeAbilitySystemComponent* ASC = nullptr;
+		USovCampaignCinematicComponent* Component = nullptr;
+		FManagedSequenceWorld()
+		{
+			if (!Base.World || !Base.Actor) { return; }
+			PC = Base.World->SpawnActor<ASovHandoffRuntimeTestController>();
+			Pawn = Base.World->SpawnActor<ASovHandoffRuntimeTestPawn>();
+			auto* PS = Base.World->SpawnActor<ASovPlayerState>();
+			if (!PC || !Pawn || !PS) { return; }
+			auto* Definition = NewObject<UPlayerDefinition>(PC); PC->KeepAlive.Add(Definition);
+			Pawn->PrepareCampaignInitialization(Definition); PC->SetTestPlayerState(PS); PC->Possess(Pawn);
+			if (!Pawn->StageTestReadiness(PS, true) || !Pawn->CompleteCampaignDataInitialization(false)) { return; }
+			ASC = Cast<UNarrativeAbilitySystemComponent>(PS->GetAbilitySystemComponent());
+			PC->SetViewTarget(Pawn);
+			auto* Mission = NewObject<USovCampaignDefinition>(PC); PC->KeepAlive.Add(Mission);
+			Mission->MissionId = TEXT("CinematicRuntime"); Mission->Protagonist = Pawn->GetProtagonistIdentityTag();
+			Mission->PawnClass = Pawn->GetClass(); Mission->PlayerDefinition = Definition;
+			FSovCampaignBeatDefinition Beat; Beat.BeatId = TEXT("Scene"); Beat.CinematicId = TEXT("FirstView"); Beat.bRequiresCinematicProof = true;
+			Mission->Beats.Add(Beat);
+			if (PC->GetCampaignState()->BeginMission(Mission) != ESovCampaignResult::Applied) { return; }
+			Component = NewObject<USovCampaignCinematicComponent>(Base.Actor); Base.Actor->AddInstanceComponent(Component); Component->RegisterComponent();
+			Component->MissionId = Mission->MissionId; Component->BeatId = Beat.BeatId; Component->Sequence = Base.Sequence;
+			FSovCinematicParticipant Participant; Participant.BindingTag = TEXT("Player"); Participant.bControlledProtagonist = true;
+			Component->Participants.Add(Participant);
+		}
+	};
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCinematicOwnershipTest, "ProjectVelkorran.Campaign.Cinematic.ExactOwnershipAndResume",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCinematicOwnershipTest::RunTest(const FString& Parameters)
+{
+	FSequenceWorld F; if (!TestNotNull(TEXT("Native cinematic test ASC"), F.ASC)) { return false; }
+	const FGameplayTag Protected = FNarrativeGameplayTags::Get().State_Invulnerable;
+	const FGameplayTag Controlled = FNarrativeGameplayTags::Get().State_SequencerControlled;
+	F.ASC->AddLooseGameplayTag(Protected);
+	FNarrativeSequenceLifecycleTestAccess::Play(F.Actor);
+	TestEqual(TEXT("Duplicate bound objects acquire one ASC lease"), FNarrativeSequenceLifecycleTestAccess::LeaseCount(F.Actor), 1);
+	TestEqual(TEXT("Sequence adds exactly one protection count"), F.ASC->GetGameplayTagCount(Protected), 2);
+	FNarrativeSequenceLifecycleTestAccess::Play(F.Actor);
+	TestEqual(TEXT("Resume cannot stack the same tag ownership"), F.ASC->GetGameplayTagCount(Protected), 2);
+	TestEqual(TEXT("Resume cannot stack controller state ownership"), F.ASC->GetGameplayTagCount(Controlled), 1);
+	FNarrativeSequenceLifecycleTestAccess::Stop(F.Actor);
+	TestEqual(TEXT("Stop preserves unrelated protection"), F.ASC->GetGameplayTagCount(Protected), 1);
+	TestFalse(TEXT("Stop removes this sequence's control tag"), F.ASC->HasMatchingGameplayTag(Controlled));
+	FNarrativeSequenceLifecycleTestAccess::Stop(F.Actor);
+	TestEqual(TEXT("Repeated terminal callbacks do not over-release another owner"), F.ASC->GetGameplayTagCount(Protected), 1);
+	return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCinematicReentryTest, "ProjectVelkorran.Campaign.Cinematic.ReentrantTagStopAndDirectPlay",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCinematicReentryTest::RunTest(const FString& Parameters)
+{
+	FSequenceWorld F; if (!TestNotNull(TEXT("Native cinematic test ASC"), F.ASC)) { return false; }
+	const auto& Tags = FNarrativeGameplayTags::Get();
+	F.ASC->AddLooseGameplayTag(Tags.State_Invulnerable);
+	bool bStopOnce = true;
+	const FDelegateHandle StopHandle = F.ASC->RegisterGameplayTagEvent(Tags.State_SequencerControlled, EGameplayTagEventType::NewOrRemoved)
+		.AddLambda([&](FGameplayTag Tag, int32 Count)
+		{ if (Count > 0 && bStopOnce) { bStopOnce = false; FNarrativeSequenceLifecycleTestAccess::Stop(F.Actor); } });
+	FNarrativeSequenceLifecycleTestAccess::Play(F.Actor);
+	TestFalse(TEXT("Tag callback can retire the session before controller notifications"), FNarrativeSequenceLifecycleTestAccess::Active(F.Actor));
+	TestEqual(TEXT("Reentrant stop leaves no participant leases"), FNarrativeSequenceLifecycleTestAccess::LeaseCount(F.Actor), 0);
+	TestEqual(TEXT("Unrelated protection remains after partial tag acquisition"), F.ASC->GetGameplayTagCount(Tags.State_Invulnerable), 1);
+	TestFalse(TEXT("No late acquisition leaks after stop"), F.ASC->HasMatchingGameplayTag(Tags.State_SequencerControlled));
+	F.ASC->RegisterGameplayTagEvent(Tags.State_SequencerControlled, EGameplayTagEventType::NewOrRemoved).Remove(StopHandle);
+	FNarrativeSequenceLifecycleTestAccess::Play(F.Actor);
+	bool bPlayOnce = true;
+	const FDelegateHandle PlayHandle = F.ASC->RegisterGameplayTagEvent(Tags.State_SequencerControlled, EGameplayTagEventType::NewOrRemoved)
+		.AddLambda([&](FGameplayTag Tag, int32 Count)
+		{ if (Count == 0 && bPlayOnce) { bPlayOnce = false; F.Actor->GetSequencePlayer()->Play(); } });
+	FNarrativeSequenceLifecycleTestAccess::Stop(F.Actor);
+	TestFalse(TEXT("Direct engine Play from teardown cannot leave unowned playback running"), F.Actor->GetSequencePlayer()->IsPlaying());
+	TestFalse(TEXT("Direct Play during teardown cannot reacquire the retired session"), FNarrativeSequenceLifecycleTestAccess::Active(F.Actor));
+	F.ASC->RegisterGameplayTagEvent(Tags.State_SequencerControlled, EGameplayTagEventType::NewOrRemoved).Remove(PlayHandle);
+	return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCinematicTimeoutAndGenerationTest, "ProjectVelkorran.Campaign.Cinematic.TimeoutAndRequestIsolation",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCinematicTimeoutAndGenerationTest::RunTest(const FString& Parameters)
+{
+	FSequenceWorld F; if (!TestNotNull(TEXT("Native cinematic test actor"), F.Actor)) { return false; }
+	FNarrativeSequencePlaybackSettings Missing; Missing.bAutoPlay = true; Missing.RequiredParticipantBindingTags.Add(TEXT("RequiredMissingActor"));
+	Missing.ParticipantReadyTimeoutSeconds = .1f;
+	F.Actor->UpdateSequence(F.Sequence, Missing);
+	TestTrue(TEXT("Missing required actor enters bounded pending state"), FNarrativeSequenceLifecycleTestAccess::Pending(F.Actor));
+	F.Actor->Tick(.11f);
+	TestFalse(TEXT("Readiness timeout clears pending state"), FNarrativeSequenceLifecycleTestAccess::Pending(F.Actor));
+	TestEqual(TEXT("Readiness timeout reports failure once"), F.Probe->FailedCount, 1);
+	F.Actor->Tick(.11f); TestEqual(TEXT("Timeout cannot refire every tick"), F.Probe->FailedCount, 1);
+	FNarrativeSequencePlaybackSettings Manual; Manual.bAutoPlay = false;
+	auto* Action = UAsyncAction_PlayNarrativeSequence::PlayNarrativeSequence(F.Actor, F.Sequence, Manual);
+	if (!TestNotNull(TEXT("Existing async node created"), Action)) { return false; }
+	Action->OnFinished.AddDynamic(F.Probe, &USovSequenceLifecycleProbe::Finished);
+	Action->OnInterrupted.AddDynamic(F.Probe, &USovSequenceLifecycleProbe::Interrupted);
+	Action->Activate();
+	F.Actor->UpdateSequence(F.Sequence, Manual); // Another request supersedes the same shared engine player.
+	F.Actor->GetSequencePlayer()->OnFinished.Broadcast();
+	TestEqual(TEXT("New request completion cannot complete the old async action"), F.Probe->FinishedCount, 0);
+	TestEqual(TEXT("Old action reports interruption once"), F.Probe->InterruptedCount, 1);
+	F.Actor->GetSequencePlayer()->OnFinished.Broadcast();
+	TestEqual(TEXT("Repeated completion cannot refire a retired action"), F.Probe->InterruptedCount, 1);
+	F.Actor->BlendOutSeconds = 0.f; F.Actor->BlendOutAndStop();
+	TestEqual(TEXT("Explicit zero-duration blend has a finite terminal notification"), F.Probe->BlendCount, 1);
+	return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCampaignCinematicValidationTest, "ProjectVelkorran.Campaign.Cinematic.ManifestAndPresentationValidation",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCampaignCinematicValidationTest::RunTest(const FString& Parameters)
+{
+	FManagedSequenceWorld F; if (!TestNotNull(TEXT("Managed cinematic component"), F.Component)) { return false; }
+	FString Error;
+	TestTrue(TEXT("One controlled protagonist and finite presentation is valid"), F.Component->ValidateConfiguration(Error));
+	F.Component->Participants.Add(F.Component->Participants[0]);
+	TestFalse(TEXT("Duplicate participant binding is rejected"), F.Component->ValidateConfiguration(Error));
+	F.Component->Participants.SetNum(1);
+	F.Component->Participants[0].ExitWield = ESovCinematicExitWield::DrawRequiredWeapon;
+	TestFalse(TEXT("Draw cannot invent an unowned unconfigured weapon"), F.Component->ValidateConfiguration(Error));
+	F.Component->Participants[0].ExitWield = ESovCinematicExitWield::Keep;
+	F.Component->PreloadAssets.SetNum(129);
+	TestFalse(TEXT("Unbounded preload manifest is rejected"), F.Component->ValidateConfiguration(Error));
+	F.Component->PreloadAssets.Reset();
+	TestTrue(TEXT("Finite presentation-only sequence is accepted"), FSovCinematicTestAccess::ValidateSequence(F.Component, F.Base.Sequence, Error));
+	F.Base.Sequence->GetMovieScene()->AddTrack<UMovieSceneEventTrack>();
+	TestFalse(TEXT("Arbitrary event tracks cannot become managed campaign postconditions"), FSovCinematicTestAccess::ValidateSequence(F.Component, F.Base.Sequence, Error));
+	return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCampaignCinematicProofTest, "ProjectVelkorran.Campaign.Cinematic.NativeProofAndSupersededFinish",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCampaignCinematicProofTest::RunTest(const FString& Parameters)
+{
+	FManagedSequenceWorld F; if (!TestNotNull(TEXT("Managed cinematic component"), F.Component)) { return false; }
+	auto* State = F.PC->GetCampaignState();
+	TestEqual(TEXT("Generic beat completion cannot bypass the native presentation"), State->CompleteBeat(TEXT("Scene")), ESovCampaignResult::Invalid);
+	TestFalse(TEXT("Legacy viewed setter cannot mint a managed scene's first-view proof"), State->RecordCinematicViewed(TEXT("Scene")));
+	TestFalse(TEXT("First viewing cannot be skipped"), State->CanSkipCinematic(TEXT("Scene")));
+	FSovCinematicTestAccess::StageOwnedSession(F.Component, F.PC, F.Pawn, F.ASC);
+	FNarrativeSequencePlaybackSettings Manual; Manual.bAutoPlay = false;
+	F.Base.Actor->UpdateSequence(F.Base.Sequence, Manual); F.Base.Actor->GetSequencePlayer()->Play();
+	const FVector NewOwnerPosition(300, 0, 100); F.Pawn->SetActorLocation(NewOwnerPosition); F.PC->SetViewTarget(F.Base.Actor);
+	FSovCinematicTestAccess::FinishSupersededSession(F.Component, F.Base.Actor->GetPlaybackGeneration());
+	TestTrue(TEXT("Retiring a superseded request cannot stop the newer engine playback"), F.Base.Actor->GetSequencePlayer()->IsPlaying());
+	TestTrue(TEXT("Old rollback cannot overwrite the newer participant placement"), F.Pawn->GetActorLocation().Equals(NewOwnerPosition));
+	TestTrue(TEXT("Old camera restoration cannot overwrite the newer view target"), F.PC->GetViewTarget() == F.Base.Actor);
+	TestFalse(TEXT("Another playback generation cannot commit this scene"), State->IsBeatComplete(F.Component->MissionId, TEXT("Scene")));
+	TestEqual(TEXT("Superseded finish terminates the invalid request"), F.Component->GetPhase(), ESovCinematicPhase::Failed);
+	TestFalse(TEXT("Superseded request leaves no component leases"), FSovCinematicTestAccess::OwnsAnything(F.Component));
+	return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCampaignCinematicAbortTest, "ProjectVelkorran.Campaign.Cinematic.AbortOwnershipAndEndPlay",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCampaignCinematicAbortTest::RunTest(const FString& Parameters)
+{
+	FManagedSequenceWorld F; if (!TestNotNull(TEXT("Managed cinematic component"), F.Component)) { return false; }
+	const FGameplayTag Controlled = FNarrativeGameplayTags::Get().State_SequencerControlled;
+	F.PC->SetIgnoreMoveInput(true); F.PC->SetIgnoreLookInput(true); F.ASC->AddLooseGameplayTag(Controlled);
+	FSovCinematicTestAccess::StageOwnedSession(F.Component, F.PC, F.Pawn, F.ASC);
+	F.Component->Abort(TEXT("Test interrupted loading"));
+	TestEqual(TEXT("Abort removes only the component's sequence tag contribution"), F.ASC->GetGameplayTagCount(Controlled), 1);
+	TestTrue(TEXT("Abort preserves unrelated movement suppression"), F.PC->IsMoveInputIgnored());
+	TestTrue(TEXT("Abort preserves unrelated look suppression"), F.PC->IsLookInputIgnored());
+	TestFalse(TEXT("Abort retires all component ownership"), FSovCinematicTestAccess::OwnsAnything(F.Component));
+	F.Component->Abort(TEXT("Late duplicate"));
+	TestEqual(TEXT("Duplicate abort does not over-release another owner"), F.ASC->GetGameplayTagCount(Controlled), 1);
+	F.PC->SetIgnoreMoveInput(false); F.PC->SetIgnoreLookInput(false); F.ASC->RemoveLooseGameplayTag(Controlled);
+	TestFalse(TEXT("No hidden movement lease remains after the external owner releases"), F.PC->IsMoveInputIgnored());
+	TestFalse(TEXT("No hidden look lease remains after the external owner releases"), F.PC->IsLookInputIgnored());
+	FSovCinematicTestAccess::LeaveWorld(F.Component); FString Error;
+	TestFalse(TEXT("An ended component cannot accept another request"), F.Component->RequestPlay(F.PC, Error));
+	TestFalse(TEXT("Aborting presentation never commits its campaign beat"), F.PC->GetCampaignState()->IsBeatComplete(F.Component->MissionId, TEXT("Scene")));
+	return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCampaignCinematicPauseReentryTest, "ProjectVelkorran.Campaign.Cinematic.PauseCallbackCannotResurrectAbort",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCampaignCinematicPauseReentryTest::RunTest(const FString& Parameters)
+{
+	FManagedSequenceWorld F; if (!TestNotNull(TEXT("Managed cinematic component"), F.Component)) { return false; }
+	FSovCinematicTestAccess::StageOwnedSession(F.Component, F.PC, F.Pawn, F.ASC);
+	F.Base.Actor->GetSequencePlayer()->Play();
+	FSovCinematicTestAccess::StagePlaying(F.Component, F.Base.Actor->GetPlaybackGeneration());
+	F.Base.Probe->Managed = F.Component;
+	F.Base.Actor->GetSequencePlayer()->OnPause.AddDynamic(F.Base.Probe, &USovSequenceLifecycleProbe::AbortManaged);
+	TestFalse(TEXT("Pause cannot succeed after its callback aborts the request"), F.Component->SetCinematicPaused(true));
+	TestEqual(TEXT("Outer pause cannot resurrect a retired phase"), F.Component->GetPhase(), ESovCinematicPhase::Failed);
+	TestFalse(TEXT("Reentrant pause interruption releases component ownership"), FSovCinematicTestAccess::OwnsAnything(F.Component));
+	TestFalse(TEXT("Matching interrupted sequence is stopped"), F.Base.Actor->GetSequencePlayer()->IsPlaying());
+	return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCampaignCinematicDirectRestartTest, "ProjectVelkorran.Campaign.Cinematic.DirectRestartDuringCommitRetiresOwnership",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCampaignCinematicDirectRestartTest::RunTest(const FString& Parameters)
+{
+	FManagedSequenceWorld F; if (!TestNotNull(TEXT("Managed cinematic component"), F.Component)) { return false; }
+	FSovCinematicTestAccess::StageOwnedSession(F.Component, F.PC, F.Pawn, F.ASC);
+	FSovCinematicTestAccess::RestartDuringCommit(F.Component, F.Base.Actor);
+	const FVector NewPosition(400, 0, 100); F.Pawn->SetActorLocation(NewPosition); F.PC->SetViewTarget(F.Base.Actor);
+	F.Component->Abort(TEXT("Retire interrupted commit"));
+	TestTrue(TEXT("Direct restart during commit cannot be stopped by retired cleanup"), F.Base.Actor->GetSequencePlayer()->IsPlaying());
+	TestTrue(TEXT("Retired cleanup cannot restore old placement over the restarted scene"), F.Pawn->GetActorLocation().Equals(NewPosition));
+	TestTrue(TEXT("Retired cleanup cannot restore old camera over the restarted scene"), F.PC->GetViewTarget() == F.Base.Actor);
+	TestFalse(TEXT("Retired component releases its own leases"), FSovCinematicTestAccess::OwnsAnything(F.Component));
+	TestFalse(TEXT("Direct restart cannot supply first-view proof"), F.PC->GetCampaignState()->IsBeatComplete(F.Component->MissionId, TEXT("Scene")));
+	return true;
+}
+#endif

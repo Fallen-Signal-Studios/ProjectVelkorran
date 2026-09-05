@@ -653,12 +653,14 @@ void ANarrativePlayerCharacter::Move(const FInputActionValue& Value)
 		// add movement 
 		AddMovementInput(ForwardDirection, MovementVector.Y);
 		AddMovementInput(RightDirection, MovementVector.X);
+		if (auto* PC = Cast<ANarrativePlayerController>(Controller)) { PC->UpdateAutomaticSprintInput(static_cast<float>(MovementVector.Size())); }
 	}
 }
 
 void ANarrativePlayerCharacter::CompletedMove()
 {
-	MovementVector = FVector2D::ZeroVector;	
+	MovementVector = FVector2D::ZeroVector;
+	if (auto* PC = Cast<ANarrativePlayerController>(Controller)) { PC->UpdateAutomaticSprintInput(0.f); }
 }
 
 void ANarrativePlayerCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent)
@@ -670,6 +672,7 @@ void ANarrativePlayerCharacter::SetupPlayerInputComponent(class UInputComponent*
 		//Moving
 		EnhancedInput->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ANarrativePlayerCharacter::Move);
 		EnhancedInput->BindAction(MoveAction, ETriggerEvent::Completed, this, &ANarrativePlayerCharacter::CompletedMove);
+		EnhancedInput->BindAction(MoveAction, ETriggerEvent::Canceled, this, &ANarrativePlayerCharacter::CompletedMove);
 	}
 }
 

@@ -5,6 +5,11 @@
 #include "Character/CharacterDefinition.h"
 #include "Character/PlayerDefinition.h"
 #include "Components/SovEchoComponent.h"
+#include "Exertion/SovExertionComponent.h"
+#include "FieldRecovery/SovFieldRecoveryComponent.h"
+#include "Resonance/SovResonanceComponent.h"
+#include "Recovery/SovFatalRecoveryComponent.h"
+#include "Targeting/SovTargetingComponent.h"
 #include "Components/SovCorruptionComponent.h"
 #include "Components/SovHealthRechargeComponent.h"
 #include "Components/SovPoiseComponent.h"
@@ -16,6 +21,11 @@ ASovPlayerCharacterBase::ASovPlayerCharacterBase(const FObjectInitializer& Objec
 	: Super(ObjectInitializer)
 {
 	EchoComponent = CreateDefaultSubobject<USovEchoComponent>(TEXT("SovEchoComponent"));
+	ExertionComponent = CreateDefaultSubobject<USovExertionComponent>(TEXT("SovExertionComponent"));
+	FieldRecoveryComponent = CreateDefaultSubobject<USovFieldRecoveryComponent>(TEXT("SovFieldRecoveryComponent"));
+	ResonanceComponent = CreateDefaultSubobject<USovResonanceComponent>(TEXT("SovResonanceComponent"));
+	RecoveryComponent = CreateDefaultSubobject<USovFatalRecoveryComponent>(TEXT("SovRecoveryComponent"));
+	TargetingComponent = CreateDefaultSubobject<USovTargetingComponent>(TEXT("SovTargetingComponent"));
 	CorruptionComponent = CreateDefaultSubobject<USovCorruptionComponent>(TEXT("SovCorruptionComponent"));
 	ShieldComponent = CreateDefaultSubobject<USovShieldComponent>(TEXT("SovShieldComponent"));
 	HealthRechargeComponent = CreateDefaultSubobject<USovHealthRechargeComponent>(
@@ -97,6 +107,9 @@ void ASovPlayerCharacterBase::HandleAbilitySystemReady(
 	{
 		EchoComponent->InitializeWithAbilitySystem(ReadyAbilitySystem);
 	}
+	if (ExertionComponent) { ExertionComponent->InitializeWithAbilitySystem(ReadyAbilitySystem); }
+	if (FieldRecoveryComponent) { FieldRecoveryComponent->InitializeWithAbilitySystem(ReadyAbilitySystem); }
+	if (RecoveryComponent) { RecoveryComponent->InitializeWithAbilitySystem(ReadyAbilitySystem); }
 	if (ShieldComponent)
 	{
 		ShieldComponent->InitializeWithAbilitySystem(ReadyAbilitySystem);
@@ -120,6 +133,8 @@ bool ASovPlayerCharacterBase::AreAdditionalCharacterSystemsReady() const
 {
 	return !bCampaignInitializationFailed && Super::AreAdditionalCharacterSystemsReady()
 		&& IsValid(EchoComponent) && EchoComponent->IsInitialized()
+		&& IsValid(ExertionComponent) && ExertionComponent->IsInitialized()
+		&& IsValid(FieldRecoveryComponent) && FieldRecoveryComponent->IsInitialized()
 		&& IsValid(ShieldComponent) && ShieldComponent->IsInitialized()
 		&& IsValid(HealthRechargeComponent) && HealthRechargeComponent->IsInitialized()
 		&& IsValid(PoiseComponent) && PoiseComponent->IsInitialized();

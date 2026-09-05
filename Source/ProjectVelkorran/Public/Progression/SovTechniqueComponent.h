@@ -29,6 +29,11 @@ public:
 	bool InitializeNewProtagonist(FGameplayTag Protagonist);
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Technique") bool ClaimReward(USovTechniqueRewardSource* Source);
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Technique") bool RespecAtSafePoint(ASovTechniqueSafePoint* SafePoint);
+	/** Select one purchased augment for an existing core ability, or pass no perk to clear that slot. */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Technique|Augment")
+	bool SelectAugmentAtSafePoint(ASovTechniqueSafePoint* SafePoint,FGameplayTag Ability,TSubclassOf<USovTechniquePerk> Augment,FText& FailureReason);
+	UFUNCTION(BlueprintPure, Category="Technique|Augment") USovTechniquePerk* GetSelectedAugment(FGameplayTag Ability) const;
+	UFUNCTION(BlueprintPure, Category="Technique|Augment") TArray<USovTechniquePerk*> GetUnlockedAugments(FGameplayTag Ability) const;
 	UFUNCTION(BlueprintPure, Category="Technique") bool CanModifyTechniques() const;
 	UFUNCTION(BlueprintPure, Category="Technique") int32 GetAvailableTechniquePoints() const { return SkillTreePoints; }
 	UFUNCTION(BlueprintPure, Category="Technique") int32 GetEarnedTechniquePoints() const;
@@ -50,12 +55,16 @@ private:
 	void RebuildBranchLevels();
 	void BroadcastChanged();
 	bool MayApplyPerkGrant(const USovTechniquePerk* Perk, int32 Level) const;
+	bool ShouldEnablePerkGrant(const USovTechniquePerk* Perk) const;
+	bool HasAugmentAbilityContext(FGameplayTag Ability) const;
 	bool IsGrantContextCurrent(const USovTechniquePerk* Perk) const;
 	bool IsMutationOwnershipCurrent() const;
 	bool IsMutationContextCurrent() const;
 	void CaptureMutationContext();
 	UPROPERTY(SaveGame) FGameplayTag LedgerProtagonist;
 	UPROPERTY(SaveGame) TMap<FName, int32> ClaimedRewards;
+	/** Stored with the existing LedgerProtagonist record in each protagonist snapshot. */
+	UPROPERTY(SaveGame) TMap<FGameplayTag,TSubclassOf<USovTechniquePerk>> SelectedAugments;
 	bool bStateValid = true;
 	bool bMutating = false;
 	bool bAllowParentPurchaseCheck = false;

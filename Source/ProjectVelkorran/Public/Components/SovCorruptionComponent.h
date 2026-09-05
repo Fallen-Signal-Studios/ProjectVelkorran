@@ -8,6 +8,8 @@
 #include "SovCorruptionComponent.generated.h"
 
 class ASovCorruptionSourceVolume;
+class USovCorruptionSourceComponent;
+class USovCorruptionInteractableComponent;
 class UAbilitySystemComponent;
 class USovCampaignStateComponent;
 class USovCampaignDefinition;
@@ -27,6 +29,8 @@ struct FSovCorruptionExposureRecord
 	UPROPERTY(SaveGame) FName MissionId;
 	UPROPERTY(SaveGame) float Exposure = 0.0f;
 	UPROPERTY(SaveGame) bool bContactAtCheckpoint = false;
+	UPROPERTY(SaveGame) float OverwriteElapsed = 0.0f;
+	UPROPERTY(SaveGame) bool bOverwriteTriggered = false;
 };
 USTRUCT(BlueprintType)
 struct PROJECTVELKORRAN_API FSovCorruptionReplicatedState
@@ -35,6 +39,8 @@ struct PROJECTVELKORRAN_API FSovCorruptionReplicatedState
 	UPROPERTY(BlueprintReadOnly) float Exposure = 0.0f;
 	UPROPERTY(BlueprintReadOnly) ESovCorruptionBand Band = ESovCorruptionBand::Clear;
 	UPROPERTY(BlueprintReadOnly) TArray<TObjectPtr<USovCorruptionProfile>> Profiles;
+	UPROPERTY(BlueprintReadOnly) bool bOverwriteClockActive = false;
+	UPROPERTY(BlueprintReadOnly) float OverwriteSecondsRemaining = 0.0f;
 };
 /** Mechanical information is identical in reduced-effects mode; presentation never drives input. */
 USTRUCT(BlueprintType)
@@ -45,6 +51,8 @@ struct PROJECTVELKORRAN_API FSovCorruptionPresentationRequest
 	UPROPERTY(BlueprintReadOnly) float Exposure = 0.0f;
 	UPROPERTY(BlueprintReadOnly) bool bReducedEffects = false;
 	UPROPERTY(BlueprintReadOnly) float SuggestedIntensity = 0.0f;
+	UPROPERTY(BlueprintReadOnly) bool bOverwriteClockActive = false;
+	UPROPERTY(BlueprintReadOnly) float OverwriteSecondsRemaining = 0.0f;
 	UPROPERTY(BlueprintReadOnly) TArray<FName> ProfileIds;
 	UPROPERTY(BlueprintReadOnly) TArray<FText> RemedyTexts;
 	UPROPERTY(BlueprintReadOnly) TArray<FText> InformationTexts;
@@ -61,10 +69,11 @@ public:
 	USovCorruptionComponent();
 	FSovCorruptionSourceHandle AcquireSource(ASovCorruptionSourceVolume* Source);
 	void ReleaseSource(FSovCorruptionSourceHandle Handle, ASovCorruptionSourceVolume* Source);
-	/** Explicit remedy removes gameplay exposure only. SourceId None targets all current profiles. */
-	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Corruption")
+	/** Native reset primitive retained for trusted checkpoint/tests. Gameplay remedies use verified source/interaction paths. */
 	bool CleanseExposure(float Amount, FName SourceId = NAME_None);
 	UFUNCTION(BlueprintCallable, Category="Corruption|Accessibility") void SetReducedEffects(bool bEnabled);
+	/** Apply only to an accepted incoming harmful status; immunity and beneficial durations must not use this adapter. */
+	UFUNCTION(BlueprintPure, Category="Corruption|Combat") static float ResolveIncomingStatusDuration(AActor* Target, float AuthoredDuration);
 	UFUNCTION(BlueprintPure, Category="Corruption") FSovCorruptionReplicatedState GetCorruptionState() const { return State; }
 	UFUNCTION(BlueprintPure, Category="Corruption|Accessibility") FSovCorruptionPresentationRequest GetPresentationRequest() const;
 	UFUNCTION(BlueprintPure, Category="Corruption") bool HasExposureSource() const { return !Sources.IsEmpty(); }
@@ -86,9 +95,20 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Corruption|Bands") float BandHysteresis = 5.0f;
 private:
 	friend struct FSovCorruptionTestAccess;
+	friend class USovCorruptionSourceComponent;
+	friend class USovCorruptionInteractableComponent;
+	bool ValidateProfilePermission(const USovCorruptionProfile* Profile, ESovCorruptionBand& OutCap, FName& OutMission) const;
+	bool HasCompatibleProfile(const USovCorruptionProfile* Profile) const;
+	FSovCorruptionSourceHandle AcquireProducer(USovCorruptionSourceComponent* Producer);
+	void ReleaseProducer(FSovCorruptionSourceHandle Handle, USovCorruptionSourceComponent* Producer);
+	bool ApplyVerifiedPulse(USovCorruptionProfile* Profile, AActor* Source, float Falloff);
+	bool ApplyVerifiedRemedy(USovCorruptionProfile* Profile, ESovCorruptionEscape Remedy);
+	void AdvanceOverwrite(float DeltaSeconds);
+	bool IsCombatPressureImmune() const;
 	struct FSourceEntry
 	{
 		TWeakObjectPtr<ASovCorruptionSourceVolume> Source;
+		TWeakObjectPtr<USovCorruptionSourceComponent> Producer;
 		TWeakObjectPtr<USovCorruptionProfile> Profile;
 		FName MissionId;
 	};
@@ -114,6 +134,8 @@ private:
 	TWeakObjectPtr<UAbilitySystemComponent> EffectASC;
 	FActiveGameplayEffectHandle BandEffect;
 	ESovCorruptionBand AppliedEffectBand = ESovCorruptionBand::Clear;
+	float AppliedResistance = 0.0f;
+	float AppliedRegenScale = 1.0f;
 	bool bReducedEffects = false;
 	bool bMutating = false;
 	bool bEnding = false;

@@ -4,6 +4,7 @@
 #include "AbilitySystemComponent.h"
 #include "Character/NarrativeCharacterVisual.h"
 #include "Effects/SovGameplayEffect_SeleneControl.h"
+#include "Components/SovCorruptionComponent.h"
 #include "Engine/World.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
 #include "GAS/NarrativeAttributeSetBase.h"
@@ -195,17 +196,22 @@ bool SovSelenePayload::Control(const FSovSelenePayloadContext& Context, AActor* 
 	ASC->GetOwnedGameplayTags(Owned);
 	if (Owned.HasTagExact(Tags.Status_Immunity)) { return false; }
 	const bool bFreeze = bRequestFreeze && !ASC->HasMatchingGameplayTag(Tags.Status_Immunity_Freeze)
-		&& !ASC->HasMatchingGameplayTag(Tags.Character_Enemy_Boss);
+		&& !ASC->HasMatchingGameplayTag(Tags.Character_Enemy_Boss)
+		&& !ASC->HasMatchingGameplayTag(Tags.State_InterruptProtected)
+		&& !ASC->HasMatchingGameplayTag(Tags.State_Poise_Recovering)
+		&& !ASC->HasMatchingGameplayTag(Tags.State_Poise_SuperArmor)
+		&& !ASC->HasMatchingGameplayTag(Tags.State_Status_Frozen);
 	FGameplayTagContainer Grants;
 	Grants.AddTag(bFreeze ? Tags.State_Status_Frozen : Tags.State_Status_Chilled);
 	Grants.AddTag(bFreeze ? Narrative.State_Movement_Lock : Narrative.State_Movement_SlowWalking);
 	if (bFreeze) { Grants.AddTag(Narrative.State_Busy); }
-	if (!GrantDuration(Context, ASC, Grants, Duration)) { return false; }
+	const float ResolvedDuration = USovCorruptionComponent::ResolveIncomingStatusDuration(Target, Duration);
+	if (!GrantDuration(Context, ASC, Grants, ResolvedDuration)) { return false; }
 	if (bFreeze && EligibleTarget(Context, Target))
 	{
 		// Separate owned count survives thaw; overlapping casts never reset another cast's duration.
 		FGameplayTagContainer Lockout(Tags.Status_Immunity_Freeze);
-		GrantDuration(Context, ASC, Lockout, Duration + RefreezeLockout);
+		GrantDuration(Context, ASC, Lockout, ResolvedDuration + RefreezeLockout);
 		FGameplayTagContainer Cancel;
 		Cancel.AddTag(Narrative.Ability_WeaponFire);
 		Cancel.AddTag(Narrative.Ability_MeleeAttack);

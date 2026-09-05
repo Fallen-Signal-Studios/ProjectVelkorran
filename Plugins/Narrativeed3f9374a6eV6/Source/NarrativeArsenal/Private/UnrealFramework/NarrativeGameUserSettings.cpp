@@ -149,7 +149,9 @@ void UNarrativeGameUserSettings::ApplyMonitorSelection()
 
 void UNarrativeGameUserSettings::SetOverallAudioVolume(const float NewOverallAudioVolume)
 {
-	OverallAudioVolume = NewOverallAudioVolume;
+	OverallAudioVolume = FMath::IsFinite(NewOverallAudioVolume) ? FMath::Clamp(NewOverallAudioVolume, 0.f, 1.f) : 1.f;
+	SaveSettings();
+	ApplySoundSettings();
 }
 
 float UNarrativeGameUserSettings::GetOverallAudioVolume() const
@@ -159,7 +161,9 @@ float UNarrativeGameUserSettings::GetOverallAudioVolume() const
 
 void UNarrativeGameUserSettings::SetDialogueAudioVolume(const float NewDialogueAudioVolume)
 {
-	DialogueAudioVolume = NewDialogueAudioVolume;
+	DialogueAudioVolume = FMath::IsFinite(NewDialogueAudioVolume) ? FMath::Clamp(NewDialogueAudioVolume, 0.f, 1.f) : 1.f;
+	SaveSettings();
+	ApplySoundSettings();
 }
 
 float UNarrativeGameUserSettings::GetDialogueAudioVolume() const
@@ -169,7 +173,9 @@ float UNarrativeGameUserSettings::GetDialogueAudioVolume() const
 
 void UNarrativeGameUserSettings::SetUIAudioVolume(const float NewUIAudioVolume)
 {
-	UIAudioVolume = NewUIAudioVolume;
+	UIAudioVolume = FMath::IsFinite(NewUIAudioVolume) ? FMath::Clamp(NewUIAudioVolume, 0.f, 1.f) : 1.f;
+	SaveSettings();
+	ApplySoundSettings();
 }
 
 float UNarrativeGameUserSettings::GetUIAudioVolume() const
@@ -179,7 +185,9 @@ float UNarrativeGameUserSettings::GetUIAudioVolume() const
 
 void UNarrativeGameUserSettings::SetSFXAudioVolume(const float NewSFXAudioVolume)
 {
-	SFXAudioVolume = NewSFXAudioVolume;
+	SFXAudioVolume = FMath::IsFinite(NewSFXAudioVolume) ? FMath::Clamp(NewSFXAudioVolume, 0.f, 1.f) : 1.f;
+	SaveSettings();
+	ApplySoundSettings();
 }
 
 float UNarrativeGameUserSettings::GetSFXAudioVolume() const
@@ -189,7 +197,9 @@ float UNarrativeGameUserSettings::GetSFXAudioVolume() const
 
 void UNarrativeGameUserSettings::SetMusicAudioVolume(const float NewMusicAudioVolume)
 {
-	MusicAudioVolume = NewMusicAudioVolume;
+	MusicAudioVolume = FMath::IsFinite(NewMusicAudioVolume) ? FMath::Clamp(NewMusicAudioVolume, 0.f, 1.f) : 1.f;
+	SaveSettings();
+	ApplySoundSettings();
 }
 
 float UNarrativeGameUserSettings::GetMusicAudioVolume() const
@@ -199,7 +209,8 @@ float UNarrativeGameUserSettings::GetMusicAudioVolume() const
 
 void UNarrativeGameUserSettings::SetShouldCrouchToggle(const bool bNewCrouchToggles)
 {
-	bCrouchToggles =  bNewCrouchToggles;
+	bCrouchToggles = bNewCrouchToggles;
+	SaveSettings();
 }
 
 bool UNarrativeGameUserSettings::ShouldCrouchToggle()
@@ -220,6 +231,7 @@ bool UNarrativeGameUserSettings::InventoryWantsTile()
 void UNarrativeGameUserSettings::SetEnableBloom(const bool bNewEnableBloom)
 {
 	bEnableBloom = bNewEnableBloom;
+	SaveSettings();
 }
 
 bool UNarrativeGameUserSettings::WantsEnableBloom()
@@ -230,6 +242,7 @@ bool UNarrativeGameUserSettings::WantsEnableBloom()
 void UNarrativeGameUserSettings::SetEnableMotionBlur(const bool bNewEnableMotionBlur)
 {
 	bEnableMotionBlur = bNewEnableMotionBlur;
+	SaveSettings();
 }
 
 bool UNarrativeGameUserSettings::WantsEnableMotionBlur()
@@ -250,6 +263,7 @@ ENarrativeGameplayDifficulty UNarrativeGameUserSettings::GetGameplayDifficulty()
 void UNarrativeGameUserSettings::SetSubtitleLevel(const ENarrativeSubtitleLevel NewLevel)
 {
 	SubtitleLevel = NewLevel;
+	SaveSettings();
 }
 
 ENarrativeSubtitleLevel UNarrativeGameUserSettings::GetSubtitleLevel()
@@ -274,7 +288,8 @@ float UNarrativeGameUserSettings::GetFieldOfView()
 
 void UNarrativeGameUserSettings::SetFieldOfView(const float NewFieldOfView)
 {
-	FieldOfView = NewFieldOfView;
+	FieldOfView = FMath::IsFinite(NewFieldOfView) ? FMath::Clamp(NewFieldOfView, 60.f, 120.f) : 90.f;
+	SaveSettings();
 }
 
 float UNarrativeGameUserSettings::GetWeaponFieldOfView()
@@ -284,7 +299,8 @@ float UNarrativeGameUserSettings::GetWeaponFieldOfView()
 
 void UNarrativeGameUserSettings::SetWeaponFieldOfView(const float NewWeaponFieldOfView)
 {
-	WeaponFieldOfView = NewWeaponFieldOfView;
+	WeaponFieldOfView = FMath::IsFinite(NewWeaponFieldOfView) ? FMath::Clamp(NewWeaponFieldOfView, 60.f, 120.f) : 90.f;
+	SaveSettings();
 }
 
 float UNarrativeGameUserSettings::GetGamma()
@@ -305,4 +321,9 @@ FString UNarrativeGameUserSettings::GetOnlineUsername()
 void UNarrativeGameUserSettings::SetOnlineUsername(const FString Username)
 {
 	OnlineUsername = Username;
+}
+
+const UNarrativeGameUserSettings* UNarrativeGameUserSettings::GetSovSettings()
+{
+	return GEngine ? Cast<UNarrativeGameUserSettings>(GEngine->GetGameUserSettings()) : nullptr;
 }

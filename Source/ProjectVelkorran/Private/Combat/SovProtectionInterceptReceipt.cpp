@@ -1,5 +1,6 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Combat/SovProtectionInterceptReceipt.h"
+#include "Resonance/SovResonanceComponent.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
 #include "AIController.h"
@@ -140,6 +141,8 @@ void USovProtectionInterceptReceipt::ReceiveResult(const FSovDamageResult& Resul
 	const bool bAcceptedDamage = Result.AppliedHealthDamage > KINDA_SMALL_NUMBER || Result.AppliedShieldDamage > KINDA_SMALL_NUMBER;
 	if (!bAcceptedDefense && !bAcceptedDamage) { return; }
 	bDelivered = true; CommittedTransaction = Result.TransactionId;
+	if (auto* Resonance = USovResonanceComponent::FindActive(ProtectorActor->GetWorld()))
+	{ Resonance->NotifyProtectionIntercept(this, Result); }
 	if (auto* Generator = ProtectorActor->FindComponentByClass<USovTarrikEchoGenerationComponent>())
 	{
 		Generator->ConsumeProtectionIntercept(this, Result);
@@ -157,4 +160,13 @@ bool USovProtectionInterceptReceipt::ConsumeForProtector(AActor* Protector, cons
 void USovProtectionInterceptReceipt::Disarm()
 {
 	bConsumed = true; ExpectedContext = FGameplayEffectContextHandle();
+}
+
+bool USovProtectionInterceptReceipt::MatchesCommittedForProtector(AActor* Protector,
+	const FSovDamageResult& Result, AActor*& OutProtected) const
+{
+	OutProtected = nullptr;
+	if (!bDelivered || !Matches(Result) || Result.TransactionId != CommittedTransaction
+		|| Protector != ProtectorActor.Get() || !IsValid(Protector) || !Protector->HasAuthority() || !ProtectedActor.IsValid()) { return false; }
+	OutProtected = ProtectedActor.Get(); return true;
 }

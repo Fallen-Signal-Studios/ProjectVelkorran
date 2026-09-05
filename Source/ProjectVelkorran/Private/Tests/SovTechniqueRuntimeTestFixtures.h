@@ -5,9 +5,16 @@
 #include "Campaign/SovEncounterDirector.h"
 #include "GameplayEffect.h"
 #include "Abilities/GameplayAbility.h"
+#include "Abilities/SovGameplayAbility_Echo.h"
 #include "Campaign/SovEncounterSnapshotLibrary.h"
 #include "SovTechniqueRuntimeTestFixtures.generated.h"
 class USovTechniqueComponent;
+UCLASS(Transient, NotBlueprintable)
+class USovTechniqueCoreTestAbility : public USovGameplayAbility_EchoBase
+{
+	GENERATED_BODY()
+public: USovTechniqueCoreTestAbility();
+};
 UCLASS(Transient, NotBlueprintable)
 class USovTechniqueOwnedTestAbility : public UGameplayAbility
 {

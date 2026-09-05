@@ -3,16 +3,20 @@
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
 #include "Campaign/SovEncounterDirector.h"
+#include "Characters/SovPlayerCharacterBase.h"
 #include "Components/BoxComponent.h"
 #include "Engine/OverlapResult.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Framework/SovPlayerState.h"
+#include "Framework/SovPlayerController.h"
 #include "GAS/NarrativeAttributeSetBase.h"
 #include "GameFramework/Pawn.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "NarrativeGameplayTags.h"
 #include "Sovereign/SovGameplayTags.h"
 #include "UnrealFramework/NarrativeTeamAgentInterface.h"
+#include "Tales/TalesComponent.h"
 
 ASovTechniqueSafePoint::ASovTechniqueSafePoint()
 {
@@ -30,6 +34,13 @@ bool ASovTechniqueSafePoint::AllowsModification(const ASovPlayerState* Player) c
 	if (!HasAuthority() || !IsValid(Player) || !Player->HasAuthority() || !IsValid(Pawn) || !SafeBounds
 		|| GetWorld() != Player->GetWorld() || SafePointId.IsNone() || IsActorBeingDestroyed()
 		|| !FMath::IsFinite(HostileExclusionRadius) || HostileExclusionRadius < 100.f) { return false; }
+	const auto* CampaignPawn=Cast<ASovPlayerCharacterBase>(Pawn);
+	const auto* Controller=CampaignPawn ? Cast<ASovPlayerController>(CampaignPawn->GetController()) : nullptr;
+	if (!CampaignPawn || !CampaignPawn->IsCharacterReady() || !CampaignPawn->IsAlive() || !Controller
+		|| Controller->GetPawn()!=Pawn || Controller->GetCampaignTransitionState()!=ESovCampaignTransitionState::Idle
+		|| !CampaignPawn->GetCharacterMovement() || !CampaignPawn->GetCharacterMovement()->IsMovingOnGround()
+		|| GetWorld()->IsPaused()) { return false; }
+	if (auto* Tales=Controller->FindComponentByClass<UTalesComponent>()) { if (Tales->IsInDialogue()) { return false; } }
 	const FVector Local = SafeBounds->GetComponentTransform().InverseTransformPosition(Pawn->GetActorLocation());
 	const FVector Extent = SafeBounds->GetUnscaledBoxExtent();
 	if (Local.ContainsNaN() || FMath::Abs(Local.X) > Extent.X || FMath::Abs(Local.Y) > Extent.Y || FMath::Abs(Local.Z) > Extent.Z) { return false; }
@@ -41,6 +52,8 @@ bool ASovTechniqueSafePoint::AllowsModification(const ASovPlayerState* Player) c
 	Blocked.AddTag(N.State_Interacting); Blocked.AddTag(N.State_Weapon_Equipping); Blocked.AddTag(N.State_Movement_Ragdoll);
 	Blocked.AddTag(S.State_Fatal); Blocked.AddTag(S.State_EchoAbility_Active); Blocked.AddTag(S.State_Guarding);
 	Blocked.AddTag(S.State_Deflecting); Blocked.AddTag(S.State_Guard_Broken); Blocked.AddTag(S.State_Poise_Broken);
+	Blocked.AddTag(S.State_Invulnerable_Respawn); Blocked.AddTag(S.State_Recovery_Rescue); Blocked.AddTag(S.State_FieldRecovery);
+	Blocked.AddTag(S.State_Traversal); Blocked.AddTag(S.State_Choice_Unresolved);
 	if (ASC->HasAnyMatchingGameplayTags(Blocked)) { return false; }
 	for (TActorIterator<ASovEncounterDirector> It(GetWorld()); It; ++It)
 	{

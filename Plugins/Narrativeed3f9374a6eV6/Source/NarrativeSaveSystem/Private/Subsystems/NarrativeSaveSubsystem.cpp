@@ -3,6 +3,7 @@
 
 #include "Subsystems/NarrativeSaveSubsystem.h"
 #include "NarrativeSave.h"
+#include "UObject/StrongObjectPtr.h"
 #include "Kismet/GameplayStatics.h"
 #include <EngineUtils.h>
 #include "NarrativeSavableActor.h"
@@ -27,24 +28,38 @@ UNarrativeSaveSubsystem::UNarrativeSaveSubsystem()
 	CurrentSaveSlot = -1;
 }
 
+FNarrativeInitialSaveRequested UNarrativeSaveSubsystem::OnInitialSaveRequested;
+
 bool UNarrativeSaveSubsystem::UpdateSaveObject(const bool bSkipRecordCreation)
 {
-	if (!NarrativeSaveGame)
-	{
-		NarrativeSaveGame = Cast<UNarrativeSave>(UGameplayStatics::CreateSaveGameObject(GetSaveGameClass()));
-	}
-
 	if (bSkipRecordCreation)
 	{
-		return true;
+		if (!NarrativeSaveGame)
+		{ NarrativeSaveGame = Cast<UNarrativeSave>(UGameplayStatics::CreateSaveGameObject(GetSaveGameClass())); }
+		return NarrativeSaveGame != nullptr;
 	}
+	UNarrativeSave* Candidate = nullptr;
+	if (!CaptureSaveObject(Candidate)) { return false; }
+	NarrativeSaveGame = Candidate;
+	return true;
+}
 
-	if (NarrativeSaveGame)
+bool UNarrativeSaveSubsystem::CaptureSaveObject(UNarrativeSave*& OutSnapshot)
+{
+	OutSnapshot = nullptr;
+	if (!GetWorld() || bIsCurrentlyLoading || bIsCapturingSnapshot) { return false; }
+	TGuardValue<bool> CaptureGuard(bIsCapturingSnapshot, true);
+	UNarrativeSave* Candidate = NarrativeSaveGame
+		? DuplicateObject<UNarrativeSave>(NarrativeSaveGame, this)
+		: Cast<UNarrativeSave>(UGameplayStatics::CreateSaveGameObject(GetSaveGameClass()));
+	TStrongObjectPtr<UNarrativeSave> KeepCandidate(Candidate);
+	if (Candidate)
 	{
 		//Main menu logic uses this to remember which map we had loaded
-		NarrativeSaveGame->LevelName = UGameplayStatics::GetCurrentLevelName(GetWorld(), true);
+		Candidate->LevelName = UGameplayStatics::GetCurrentLevelName(GetWorld(), true);
 
 		TSet<AActor*> SkipActors;
+		TSet<FGuid> CapturedGuids;
 
 		//Players are saved differently - we use their player id as storage and roll their different actors into one save object 
 		for (FConstPlayerControllerIterator PCIt = GetWorld()->GetPlayerControllerIterator(); PCIt; ++PCIt)
@@ -66,6 +81,11 @@ bool UNarrativeSaveSubsystem::UpdateSaveObject(const bool bSkipRecordCreation)
 						|| !CreateActorRecord(PC, PlayerData.ControllerData)
 						|| !CreateActorRecord(Pawn, PlayerData.PawnData)) { return false; }
 
+					for (const FGuid Guid : { PlayerData.PlayerStateData.ActorGUID, PlayerData.ControllerData.ActorGUID, PlayerData.PawnData.ActorGUID })
+					{
+						if (Guid.IsValid())
+						{ if (CapturedGuids.Contains(Guid)) { return false; } CapturedGuids.Add(Guid); }
+					}
 					SkipActors.Add(PS);
 					SkipActors.Add(PC);
 					SkipActors.Add(PC->GetPawn());
@@ -74,7 +94,7 @@ bool UNarrativeSaveSubsystem::UpdateSaveObject(const bool bSkipRecordCreation)
 					PlayerData.PlayerStateData.Transform = FTransform::Identity;
 					PlayerData.ControllerData.Transform = FTransform::Identity;
 
-					NarrativeSaveGame->PlayerData = PlayerData;
+					Candidate->PlayerData = PlayerData;
 
 					//Breaking for now, you could add more if you wanted to support splitscreen 
 					break;
@@ -100,18 +120,25 @@ bool UNarrativeSaveSubsystem::UpdateSaveObject(const bool bSkipRecordCreation)
 						//Returning none guid means we don't want saved. 
 						if (ActorGUID.IsValid())
 						{
+							if (const auto* OwnerPolicy = Cast<INarrativeSavableActor>(Actor); OwnerPolicy && !OwnerPolicy->ShouldSaveWorldRecord())
+							{ Candidate->RecordMap.Remove(ActorGUID); continue; }
+							if (CapturedGuids.Contains(ActorGUID)) { return false; }
+							CapturedGuids.Add(ActorGUID);
 							//Create a record of the actor and any components its needs saved 
 							FNarrativeActorRecord SaveActor;
 							if (!CreateActorRecord(Actor, SaveActor)) { return false; }
 
-							NarrativeSaveGame->RecordMap.Add(ActorGUID, SaveActor);
+							Candidate->RecordMap.Add(ActorGUID, SaveActor);
+							FailedUnloadedRecords.Remove(ActorGUID);
 						}
 					}
 				}
 			}
 		}
 
-		return true; 
+		if (!FailedUnloadedRecords.IsEmpty()) { return false; }
+		OutSnapshot = Candidate;
+		return true;
 	}
 
 	return false;
@@ -148,91 +175,75 @@ bool UNarrativeSaveSubsystem::Save(const FString& SaveName /*= "NarrativeSave"*/
 
 }
 
-bool UNarrativeSaveSubsystem::Load(const FString& SaveName /*= "NarrativeSave"*/, const int32 Slot /*= 0*/)
+bool UNarrativeSaveSubsystem::Load(const FString& SaveName, const int32 Slot)
 {
-	if (!UGameplayStatics::DoesSaveGameExist(SaveName, Slot))
-	{
-		return false;
-	}
-
-	OnBeginLoad.Broadcast();
-	bIsCurrentlyLoading = true; 
-
-	NarrativeSaveGame = Cast<UNarrativeSave>(UGameplayStatics::LoadGameFromSlot(SaveName, Slot));
-
-	if (NarrativeSaveGame)
-	{
-		CurrentSaveName = SaveName;
-		CurrentSaveSlot = Slot;
-
-		TSet<FGuid> FoundRecords;
-
-		// Iterate the entire world of actors
-		for (FActorIterator It(GetWorld()); It; ++It)
-		{
-			AActor* Actor = *It;
-
-			if (Actor)
-			{
-				//Cast method doesn't work with BP interfaces 
-				if (Actor->Implements<UNarrativeStableActor>())
-				{
-					const FGuid ActorGUID = INarrativeStableActor::Execute_GetActorGUID(Actor);
-					
-					if (ActorGUID.IsValid())
-					{
-						if (NarrativeSaveGame->RecordMap.Contains(ActorGUID))
-						{
-							LoadActorFromRecord(Actor, NarrativeSaveGame->RecordMap[ActorGUID]);
-							FoundRecords.Add(ActorGUID);
-						}
-					}
-				}
-			}
-		}
-
-		/*In Narrative Pro, dynamic respawns are kept to a minimum. Dynamic actors are actors that aren't placed in the level - they were spawned via game code.
-		For example if you drop a pickup on the ground and save, we need to respawn that pickup where you dropped it. 
-
-		These are somewhat problematic - if the player drops an item 5km away from where we are that part of the map won't be loaded in - we could remember what grid cell 
-		it was in and load it when that cell is loaded back in via WP, but this is out of the scope of the save subsystem at present.
-
-		For this reason, we just dynamically respawn dropped pickups
-		*/
-		TArray<FNarrativeActorRecord> DynamicActors;
-
-		for (auto& RecordKVP : NarrativeSaveGame->RecordMap)
-		{
-			FNarrativeActorRecord Record = RecordKVP.Value;
-
-			if (!FoundRecords.Contains(Record.ActorGUID))
-			{
-				//Don't netstartups, only dynamic - WP will spawn them when they become relevant 
-				if (!Record.bNetStartup && Record.bNeedsDynamicSpawn)
-				{
-					DynamicActors.Add(Record);
-				}
-			}
-		}
-
-		//Disable dynamic actors for now until we have a good system in place with non-dynamics 
-		for (auto& Record : DynamicActors)
-		{
-			LoadDynamicRecord(Record);
-		}
-		
-	}
-	else
-	{
-		CurrentSaveName = "";
-		CurrentSaveSlot = -1;
-	}
-
-	bIsCurrentlyLoading = false; 
-	OnFinishedLoad.Broadcast();
-
-
+	UNarrativeSave* Candidate = Cast<UNarrativeSave>(UGameplayStatics::LoadGameFromSlot(SaveName, Slot));
+	if (!LoadFromSnapshot(Candidate)) { return false; }
+	CurrentSaveName = SaveName;
+	CurrentSaveSlot = Slot;
 	return true;
+}
+
+bool UNarrativeSaveSubsystem::LoadFromSnapshot(UNarrativeSave* Snapshot)
+{
+    if (!Snapshot || !GetWorld() || bIsCurrentlyLoading || bIsCapturingSnapshot) { return false; }
+    TGuardValue<bool> LoadingGuard(bIsCurrentlyLoading, true);
+    TStrongObjectPtr<UNarrativeSave> KeepSnapshot(Snapshot), Previous(NarrativeSaveGame);
+    struct FRestoreJob
+    {
+        TWeakObjectPtr<AActor> Actor;
+        FNarrativeActorRecord Record;
+        ENarrativeRestorePhase Phase = ENarrativeRestorePhase::Interactables;
+        bool bSpawn = false;
+    };
+    TArray<FRestoreJob> Jobs;
+    TSet<FGuid> FoundRecords;
+    for (FActorIterator It(GetWorld()); It; ++It)
+    {
+        AActor* Actor = *It;
+        if (!IsValid(Actor) || !Actor->Implements<UNarrativeStableActor>()) { continue; }
+        const auto* OwnerPolicy = Cast<INarrativeSavableActor>(Actor);
+        if (OwnerPolicy && !OwnerPolicy->ShouldSaveWorldRecord()) { continue; }
+        const FGuid Guid = INarrativeStableActor::Execute_GetActorGUID(Actor);
+        if (const FNarrativeActorRecord* Record = Snapshot->RecordMap.Find(Guid))
+        {
+            if (FoundRecords.Contains(Guid) || !ValidateRecordForActor(Actor, *Record)) { return false; }
+            FoundRecords.Add(Guid);
+            auto& Job = Jobs.AddDefaulted_GetRef(); Job.Actor = Actor; Job.Record = *Record;
+            Job.Phase = OwnerPolicy ? OwnerPolicy->GetSaveRestorePhase() : Record->RestorePhase;
+        }
+    }
+    // Copy before callbacks: destruction/load delegates may change the live record map.
+    for (const auto& Pair : Snapshot->RecordMap)
+    {
+        const auto& Record = Pair.Value;
+        if (!Pair.Key.IsValid() || Pair.Key != Record.ActorGUID || !Record.IsValid()
+            || static_cast<uint8>(Record.RestorePhase) > static_cast<uint8>(ENarrativeRestorePhase::MissionResume)) { return false; }
+        if (!FoundRecords.Contains(Record.ActorGUID) && !Record.bNetStartup && Record.bNeedsDynamicSpawn && !Record.bDestroyed)
+        {
+            UClass* Class = Record.ActorSoftClass.LoadSynchronous();
+            if (!Class || Class->HasAnyClassFlags(CLASS_Abstract))
+            { if (Record.bOptional) { UE_LOG(LogSaveSystem, Warning, TEXT("Skipping unavailable optional actor %s"), *Record.ActorName.ToString()); continue; } return false; }
+            const auto* DefaultActor = Cast<AActor>(Class->GetDefaultObject());
+            auto& Job = Jobs.AddDefaulted_GetRef(); Job.Record = Record; Job.bSpawn = true;
+            const auto* Policy = Cast<INarrativeSavableActor>(DefaultActor);
+            Job.Phase = Policy ? Policy->GetSaveRestorePhase() : Record.RestorePhase;
+        }
+    }
+    Jobs.Sort([](const FRestoreJob& A, const FRestoreJob& B)
+    {
+        if (A.Phase != B.Phase) { return A.Phase < B.Phase; }
+        return A.Record.ActorGUID.ToString(EGuidFormats::Digits) < B.Record.ActorGUID.ToString(EGuidFormats::Digits);
+    });
+    NarrativeSaveGame = Snapshot;
+    OnBeginLoad.Broadcast();
+    for (const FRestoreJob& Job : Jobs)
+    {
+        if (!(Job.bSpawn ? LoadDynamicRecord(Job.Record) : LoadActorFromRecord(Job.Actor.Get(), Job.Record)))
+        { NarrativeSaveGame = Previous.Get(); return false; }
+    }
+    OnFinishedLoad.Broadcast();
+    return true;
 }
 
 bool UNarrativeSaveSubsystem::DeleteSave(const FString& SaveName /*= "NarrativeSaveData"*/, const int32 Slot /*= 0*/)
@@ -504,6 +515,7 @@ bool UNarrativeSaveSubsystem::SaveSingleActor(class AActor* Actor)
 
 				if (!CreateActorRecord(Actor, NewRecord)) { return false; }
 				NarrativeSaveGame->RecordMap.Add(NewRecord.ActorGUID, NewRecord);
+				FailedUnloadedRecords.Remove(ActorGUID);
 				return true;
 			}
 		}
@@ -670,11 +682,15 @@ bool UNarrativeSaveSubsystem::CreateActorRecord(AActor* Actor, FNarrativeActorRe
 		Candidate.ActorGUID = INarrativeStableActor::Execute_GetActorGUID(Actor);
 		if (!Candidate.ActorGUID.IsValid()) { return false; }
 		Candidate.bNeedsDynamicSpawn = INarrativeSavableActor::Execute_ShouldRespawn(Actor);
+		if (!IsValid(Actor)) { return false; }
+		Candidate.bOptional = INarrativeSavableActor::Execute_IsOptionalSaveRecord(Actor);
+		if (!IsValid(Actor)) { return false; }
 		INarrativeSavableActor::Execute_PrepareForSave(Actor);
 		if (!IsValid(Actor)) { return false; }
 	}
 	Candidate.ActorName = Actor->GetFName();
 	Candidate.ActorSoftClass = Actor->GetClass();
+    if (const auto* Policy = Cast<INarrativeSavableActor>(Actor)) { Candidate.RestorePhase = Policy->GetSaveRestorePhase(); }
 	Candidate.bNetStartup = Actor->IsNetStartupActor();
 	Candidate.Transform = FTransform::Identity;
 	if (Actor->GetRootComponent() && Actor->GetRootComponent()->Mobility == EComponentMobility::Movable)
@@ -692,6 +708,10 @@ bool UNarrativeSaveSubsystem::CreateActorRecord(AActor* Actor, FNarrativeActorRe
 		if (!IsValid(Actor) || !IsValid(Component)) { return false; }
 		FNarrativeSaveComponent Record;
 		Record.ComponentName = Component->GetFName();
+		Record.ComponentClass = Component->GetClass();
+        if (const auto* Policy = Cast<INarrativeSavableComponent>(Component)) { Record.RestorePhase = Policy->GetSaveRestorePhase(); }
+		Record.bOptional = INarrativeSavableComponent::Execute_IsOptionalSaveRecord(Component);
+		if (!IsValid(Actor) || !IsValid(Component)) { return false; }
 		FMemoryWriter Writer(Record.ByteData);
 		FObjectAndNameAsStringProxyArchive ComponentAr(Writer, true);
 		ComponentAr.ArIsSaveGame = true;
@@ -703,9 +723,34 @@ bool UNarrativeSaveSubsystem::CreateActorRecord(AActor* Actor, FNarrativeActorRe
 	return true;
 }
 
+bool UNarrativeSaveSubsystem::ValidateRecordForActor(const AActor* Actor, const FNarrativeActorRecord& Record) const
+{
+    if (!IsValid(Actor) || !Record.IsValid() || static_cast<uint8>(Record.RestorePhase) > static_cast<uint8>(ENarrativeRestorePhase::MissionResume)
+        || Record.Transform.ContainsNaN()) { return false; }
+    if (!Record.ActorSoftClass.IsNull())
+    {
+        UClass* Class = Record.ActorSoftClass.LoadSynchronous();
+        if (!Class || !Actor->IsA(Class)) { return false; }
+    }
+    TSet<FName> SeenNames;
+    TInlineComponentArray<UActorComponent*> Components(Actor);
+    for (const auto& Saved : Record.SavedComponents)
+    {
+        if (Saved.ComponentName.IsNone() || SeenNames.Contains(Saved.ComponentName)
+            || static_cast<uint8>(Saved.RestorePhase) > static_cast<uint8>(ENarrativeRestorePhase::MissionResume)) { return false; }
+        SeenNames.Add(Saved.ComponentName);
+        const UActorComponent* Found = nullptr;
+        for (UActorComponent* Component : Components)
+        { if (IsValid(Component) && Component->GetFName() == Saved.ComponentName && Component->Implements<UNarrativeSavableComponent>()) { Found = Component; break; } }
+        UClass* SavedClass = Saved.ComponentClass.IsNull() ? nullptr : Saved.ComponentClass.LoadSynchronous();
+        if ((!Found || (!Saved.ComponentClass.IsNull() && (!SavedClass || !Found->IsA(SavedClass)))) && !Saved.bOptional) { return false; }
+    }
+    return true;
+}
+
 bool UNarrativeSaveSubsystem::LoadActorFromRecord(AActor* Actor, const FNarrativeActorRecord& ActorRecord) const
 {
-	if (!IsValid(Actor) || !ActorRecord.IsValid()) { return false; }
+	if (!ValidateRecordForActor(Actor, ActorRecord)) { return false; }
 	if (ActorRecord.bNetStartup && ActorRecord.bDestroyed) { return Actor->Destroy(); }
 	if (!ActorRecord.Transform.Equals(FTransform::Identity)
 		&& Actor->GetRootComponent() && Actor->GetRootComponent()->Mobility == EComponentMobility::Movable)
@@ -724,13 +769,36 @@ bool UNarrativeSaveSubsystem::LoadActorFromRecord(AActor* Actor, const FNarrativ
 		INarrativeSavableActor::Execute_Load(Actor);
 		if (!IsValid(Actor)) { return false; }
 	}
-	for (const FNarrativeSaveComponent& Record : ActorRecord.SavedComponents)
-	{
+	TArray<FNarrativeSaveComponent> OrderedComponents = ActorRecord.SavedComponents;
+    const auto CurrentPhase = [Actor](const FNarrativeSaveComponent& Record)
+    {
+        TInlineComponentArray<UActorComponent*> Components(Actor);
+        for (UActorComponent* Component : Components)
+        {
+            if (IsValid(Component) && Component->GetFName() == Record.ComponentName)
+            { if (const auto* Policy = Cast<INarrativeSavableComponent>(Component)) { return Policy->GetSaveRestorePhase(); } }
+        }
+        return Record.RestorePhase;
+    };
+    OrderedComponents.StableSort([&CurrentPhase](const FNarrativeSaveComponent& A, const FNarrativeSaveComponent& B)
+    {
+        return CurrentPhase(A) < CurrentPhase(B); // Neutral legacy components preserve their previous relative order.
+    });
+    for (const FNarrativeSaveComponent& Record : OrderedComponents)
+    {
+		bool bFoundComponent = false;
 		TInlineComponentArray<UActorComponent*> Components(Actor);
 		for (UActorComponent* Component : Components)
 		{
 			if (!IsValid(Component) || Component->GetFName() != Record.ComponentName
 				|| !Component->Implements<UNarrativeSavableComponent>()) { continue; }
+			bFoundComponent = true;
+			if (!Record.ComponentClass.IsNull())
+			{
+				UClass* SavedClass = Record.ComponentClass.LoadSynchronous();
+				if (!SavedClass || !Component->IsA(SavedClass))
+				{ if (Record.bOptional) { break; } return false; }
+			}
 			FMemoryReader ComponentReader(Record.ByteData);
 			FObjectAndNameAsStringProxyArchive ComponentAr(ComponentReader, true);
 			ComponentAr.ArIsSaveGame = true;
@@ -739,6 +807,11 @@ bool UNarrativeSaveSubsystem::LoadActorFromRecord(AActor* Actor, const FNarrativ
 			INarrativeSavableComponent::Execute_Load(Component);
 			if (!IsValid(Actor) || !IsValid(Component)) { return false; }
 			break;
+		}
+		if (!bFoundComponent)
+		{
+			if (!Record.bOptional) { return false; }
+			UE_LOG(LogSaveSystem, Warning, TEXT("Skipping missing optional save component %s"), *Record.ComponentName.ToString());
 		}
 	}
 	return true;
@@ -772,6 +845,15 @@ void UNarrativeSaveSubsystem::InitializeSaveSystem(UWorld& InWorld)
 				}
 			}
 
+
+            UNarrativeSave* InitialSnapshot = nullptr;
+            bool bOverrideRequested = false;
+            OnInitialSaveRequested.Broadcast(InWorld, InitialSnapshot, bOverrideRequested);
+            if (bOverrideRequested)
+            {
+                bInitialLoadFailed = !LoadFromSnapshot(InitialSnapshot);
+                return;
+            }
 
 			FString SlotString = "";
 
@@ -807,7 +889,7 @@ void UNarrativeSaveSubsystem::InitializeSaveSystem(UWorld& InWorld)
 			if (UGameplayStatics::DoesSaveGameExist(SlotString, Slot))
 			{
 				//If we're came here from transitioning levels, we need to load everything back as it was, with the exception of our characters transform, since the new map will want us placed somewhere else. 
-				Load(SlotString, Slot);
+				bInitialLoadFailed = !Load(SlotString, Slot);
 			}
 			else //If we don't have a save to load we're a new game and should make an object, but not put anything in it yet
 			{	
@@ -859,6 +941,22 @@ void UNarrativeSaveSubsystem::OnActorSpawned(AActor* SpawnedActor)
 
 void UNarrativeSaveSubsystem::OnActorDestroyed(class AActor* DestroyedActor)
 {
+	if (DestroyedActor && NarrativeSaveGame && !bIsCurrentlyLoading && GetWorld() && !GetWorld()->bIsTearingDown
+		&& DestroyedActor->Implements<UNarrativeSavableActor>())
+	{
+		const FGuid Guid = INarrativeStableActor::Execute_GetActorGUID(DestroyedActor);
+		if (Guid.IsValid())
+		{
+			if (DestroyedActor->IsNetStartupActor())
+			{
+				// A destroyed placed actor needs only an identity tombstone, not serialization of a dying UObject.
+				auto& Record = NarrativeSaveGame->RecordMap.FindOrAdd(Guid);
+				Record.ActorGUID = Guid; Record.ActorName = DestroyedActor->GetFName();
+				Record.ActorSoftClass = DestroyedActor->GetClass(); Record.bNetStartup = true; Record.bDestroyed = true;
+			}
+			else { NarrativeSaveGame->RecordMap.Remove(Guid); }
+		}
+	}
 	if (DestroyedActor)
 	{
 		if (DestroyedActor->Implements<UNarrativeStableActor>())
@@ -931,7 +1029,7 @@ void UNarrativeSaveSubsystem::OnActorDestroyed(class AActor* DestroyedActor)
 
 void UNarrativeSaveSubsystem::PreLevelRemovedFromWorld(ULevel* InLevel, UWorld* InWorld)
 {
-	if (InLevel && NarrativeSaveGame)
+	if (InLevel && NarrativeSaveGame && InWorld == GetWorld())
 	{
 		for (auto& DestroyedActor : InLevel->Actors)
 		{
@@ -940,7 +1038,10 @@ void UNarrativeSaveSubsystem::PreLevelRemovedFromWorld(ULevel* InLevel, UWorld* 
 				if (DestroyedActor->Implements<UNarrativeStableActor>())
 				{
 					const FGuid ActorGUID = INarrativeStableActor::Execute_GetActorGUID(DestroyedActor);
-
+					const auto* OwnerPolicy = Cast<INarrativeSavableActor>(DestroyedActor);
+					if (!bIsCurrentlyLoading && DestroyedActor->Implements<UNarrativeSavableActor>()
+						&& (!OwnerPolicy || OwnerPolicy->ShouldSaveWorldRecord()) && !SaveSingleActor(DestroyedActor))
+					{ FailedUnloadedRecords.Add(ActorGUID); UE_LOG(LogSaveSystem, Error, TEXT("Could not capture unloaded actor %s; save blocked until the actor recaptures or the checkpoint reloads."), *GetNameSafe(DestroyedActor)); }
 					QuickLookupMap.Remove(ActorGUID);
 				}
 			}
@@ -951,7 +1052,7 @@ void UNarrativeSaveSubsystem::PreLevelRemovedFromWorld(ULevel* InLevel, UWorld* 
 void UNarrativeSaveSubsystem::LevelAddedToWorld(ULevel* InLevel, UWorld* InWorld)
 {
 	//OnWorldBeginPlay doesn't work as world partition actors dont seem to be loaded yet, so we also cache in here. 
-	if (InLevel && NarrativeSaveGame)
+	if (InLevel && NarrativeSaveGame && InWorld == GetWorld())
 	{
 		for(int32 i = InLevel->Actors.Num() - 1; i >= 0; --i)
 		{

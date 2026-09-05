@@ -25,6 +25,9 @@ public:
 	/** Shared transaction gate, also used by direct meta-attribute effects. */
 	static bool ShouldRejectTransaction(const UAbilitySystemComponent* SourceASC, const UAbilitySystemComponent* TargetASC, const FGameplayEffectSpec& Spec);
 
+	/** Channel tags double as optional SetByCaller weights. Unspecified declared portions default to one. */
+	static float GetAcceptedChannelFraction(const UAbilitySystemComponent* TargetASC, const FGameplayEffectSpec& Spec, FGameplayTagContainer* OutRejectedChannels = nullptr);
+
 	UNarrativeDamageExecCalc();
 
 	virtual void Execute_Implementation(

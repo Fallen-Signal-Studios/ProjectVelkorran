@@ -176,8 +176,10 @@ protected:
 	UFUNCTION(BlueprintPure, Category = "Tree Skill")
 	bool HasPerk(TSubclassOf<UTreePerk> PerkClass) const;
 
-private:
+protected:
+	/** Derived campaign policies may refresh a validated purchased rank while retaining exact grant ownership. */
 	void ApplyPurchasedPerkLevel(UTreePerk* Perk, int32 Level);
+private:
 	struct FOwnedPerkGrants
 	{
 		TArray<FGameplayAbilitySpecHandle> Abilities;

@@ -6,6 +6,10 @@
 #include "Characters/SovPlayerCharacterBase.h"
 #include "Corruption/SovCorruptionMath.h"
 #include "Corruption/SovCorruptionSourceVolume.h"
+#include "Corruption/SovCorruptionSourceComponent.h"
+#include "Campaign/SovEncounterDirector.h"
+#include "EngineUtils.h"
+#include "UnrealFramework/NarrativeGameUserSettings.h"
 #include "Effects/SovGameplayEffect_CorruptionBand.h"
 #include "GAS/NarrativeAttributeSetBase.h"
 #include "GameFramework/Pawn.h"
@@ -45,25 +49,26 @@ USovCampaignStateComponent* USovCorruptionComponent::Campaign() const
 	const auto* Pawn = Cast<APawn>(GetOwner());
 	return Pawn && Pawn->GetController() ? Pawn->GetController()->FindComponentByClass<USovCampaignStateComponent>() : nullptr;
 }
-bool USovCorruptionComponent::ValidateSourcePermission(ASovCorruptionSourceVolume* Source,
+bool USovCorruptionComponent::IsCombatPressureImmune() const
+{
+	const auto* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner());
+	return ASC && (ASC->HasMatchingGameplayTag(FSovGameplayTags::Get().State_Damage_Immune)
+		|| ASC->HasMatchingGameplayTag(FSovGameplayTags::Get().Damage_Immunity_Corruption));
+}
+bool USovCorruptionComponent::ValidateProfilePermission(const USovCorruptionProfile* Profile,
 	ESovCorruptionBand& OutCap, FName& OutMission) const
 {
 	OutCap = ESovCorruptionBand::Clear; OutMission = NAME_None;
-	if (bWaitingForMissionRestore || !ValidOwner() || !ValidBandTuning() || !IsValid(Source) || Source->GetWorld() != GetWorld()) { return false; }
-	const USovCorruptionProfile* Profile = Source->GetCorruptionProfile();
+	if (bWaitingForMissionRestore || !ValidOwner() || !ValidBandTuning()) { return false; }
 	const auto* StateComponent = Campaign();
 	const auto* Mission = StateComponent && StateComponent->IsStateValid() ? StateComponent->GetActiveMission() : nullptr;
 	if (!IsValid(Profile) || !IsValid(Mission) || !Profile->PermissionForMission(Mission->MissionId, OutCap)) { return false; }
 	if (!Profile->EscapeBeatId.IsNone() && (!Mission->FindBeat(Profile->EscapeBeatId)
 		|| StateComponent->IsBeatComplete(Mission->MissionId, Profile->EscapeBeatId))) { return false; }
 	const auto* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner());
-	FGameplayTagContainer Owned;
-	ASC->GetOwnedGameplayTags(Owned);
-	bool bAllowed = false;
-	for (const auto& Identity : Profile->AllowedProtagonists) { bAllowed |= Owned.HasTagExact(Identity); }
-	if (!bAllowed || !Owned.HasTagExact(Mission->Protagonist)) { return false; }
-	float Falloff;
-	if (!Source->ValidateContact(GetOwner(), Falloff)) { return false; }
+	FGameplayTagContainer Owned; ASC->GetOwnedGameplayTags(Owned);
+	const auto ActiveIdentity = StateComponent->GetActiveProtagonist();
+	if (!Profile->AllowedProtagonists.HasTagExact(ActiveIdentity) || !Owned.HasTagExact(ActiveIdentity)) { return false; }
 	if (Profile->bCanonPersistent)
 	{
 		const FSovCampaignBeatDefinition* Beat = Mission->FindBeat(Profile->ConsequenceBeatId);
@@ -71,6 +76,75 @@ bool USovCorruptionComponent::ValidateSourcePermission(ASovCorruptionSourceVolum
 	}
 	OutMission = Mission->MissionId;
 	return true;
+}
+bool USovCorruptionComponent::ValidateSourcePermission(ASovCorruptionSourceVolume* Source,
+	ESovCorruptionBand& OutCap, FName& OutMission) const
+{
+	OutCap = ESovCorruptionBand::Clear; OutMission = NAME_None;
+	float Falloff;
+	return IsValid(Source) && Source->GetWorld() == GetWorld() && !IsCombatPressureImmune()
+		&& ValidateProfilePermission(Source->GetCorruptionProfile(), OutCap, OutMission)
+		&& Source->ValidateContact(GetOwner(), Falloff);
+}
+bool USovCorruptionComponent::HasCompatibleProfile(const USovCorruptionProfile* Profile) const
+{
+	if (!IsValid(Profile)) { return false; }
+	for (const auto& Pair : Sources)
+	{
+		const auto* Other = Pair.Value.Profile.Get();
+		if (Other && Other != Profile && Other->SourceId == Profile->SourceId) { return false; }
+	}
+	return !Records.ContainsByPredicate([Profile](const auto& Record)
+		{ return IsValid(Record.Profile) && Record.Profile != Profile && Record.Profile->SourceId == Profile->SourceId; });
+}
+FSovCorruptionSourceHandle USovCorruptionComponent::AcquireProducer(USovCorruptionSourceComponent* Producer)
+{
+	FSovCorruptionSourceHandle Handle;
+	ESovCorruptionBand Cap; FName Mission; float Falloff;
+	if (bMutating || !IsValid(Producer) || Producer->GetWorld() != GetWorld() || IsCombatPressureImmune()
+		|| !ValidateProfilePermission(Producer->Profile, Cap, Mission) || !HasCompatibleProfile(Producer->Profile)
+		|| !Producer->ValidateContact(GetOwner(), Falloff)) { return Handle; }
+	bool bSameContact = false;
+	for (const auto& Pair : Sources)
+	{
+		if (Pair.Value.Producer.Get() == Producer && Pair.Value.Profile.Get() == Producer->Profile.Get() && Pair.Value.MissionId == Mission)
+		{
+			Handle.Id = Pair.Key; return Handle;
+		}
+		bSameContact |= Pair.Value.Profile.Get() == Producer->Profile.Get();
+	}
+	TGuardValue<bool> Guard(bMutating, true);
+	Handle.Id = FGuid::NewGuid();
+	FSourceEntry Entry; Entry.Producer = Producer; Entry.Profile = Producer->Profile; Entry.MissionId = Mission;
+	Sources.Add(Handle.Id, Entry);
+	const bool bRestored = RestoredContactProfiles.Remove(Producer->Profile->SourceId) > 0;
+	if (!bSameContact && !bRestored) { Accumulate(Producer->Profile, Mission, Producer->Profile->ContactExposure * Falloff, Cap); }
+	RefreshState(true);
+	if (bEnding || !IsValid(Producer)) { Sources.Remove(Handle.Id); Handle.Id.Invalidate(); }
+	return Handle;
+}
+void USovCorruptionComponent::ReleaseProducer(FSovCorruptionSourceHandle Handle, USovCorruptionSourceComponent* Producer)
+{
+	if (!GetOwner() || !GetOwner()->HasAuthority()) { return; }
+	const auto* Entry = Sources.Find(Handle.Id);
+	if (Entry && Entry->Producer.Get() == Producer) { Sources.Remove(Handle.Id); }
+}
+bool USovCorruptionComponent::ApplyVerifiedPulse(USovCorruptionProfile* Profile, AActor* Source, float Falloff)
+{
+	ESovCorruptionBand Cap; FName Mission;
+	if (bMutating || !IsValid(Source) || Source->GetWorld() != GetWorld() || IsCombatPressureImmune()
+		|| !FMath::IsFinite(Falloff) || Falloff <= 0.0f || Falloff > 1.0f
+		|| !ValidateProfilePermission(Profile, Cap, Mission) || !HasCompatibleProfile(Profile)) { return false; }
+	TGuardValue<bool> Guard(bMutating, true);
+	Records.RemoveAll([Mission](const auto& Record) { return Record.MissionId != Mission; });
+	Accumulate(Profile, Mission, Profile->ContactExposure * Falloff, Cap);
+	RefreshState(true); return !bEnding;
+}
+bool USovCorruptionComponent::ApplyVerifiedRemedy(USovCorruptionProfile* Profile, ESovCorruptionEscape Remedy)
+{
+	ESovCorruptionBand Cap; FName Mission;
+	return IsValid(Profile) && Profile->Escape == Remedy && HasCompatibleProfile(Profile)
+		&& ValidateProfilePermission(Profile, Cap, Mission) && CleanseExposure(100.0f, Profile->SourceId);
 }
 float USovCorruptionComponent::ExposureCap(ESovCorruptionBand Cap) const
 {
@@ -182,15 +256,17 @@ void USovCorruptionComponent::TickComponent(float DeltaTime, ELevelTick TickType
 	TSet<USovCorruptionProfile*> ContactProfiles;
 	for (auto It = Sources.CreateIterator(); It; ++It)
 	{
-		ESovCorruptionBand Cap;
-		FName SourceMission;
+		ESovCorruptionBand Cap; FName SourceMission; float Falloff = 0.0f;
+		auto* Profile = It.Value().Profile.Get();
 		auto* Source = It.Value().Source.Get();
-		if (!ValidateSourcePermission(Source, Cap, SourceMission) || It.Value().MissionId != SourceMission
-			|| It.Value().Profile.Get() != Source->GetCorruptionProfile()) { It.RemoveCurrent(); continue; }
-		auto* Profile = Source->GetCorruptionProfile();
+		auto* Producer = It.Value().Producer.Get();
+		const bool bValidContact = Source
+			? ValidateSourcePermission(Source, Cap, SourceMission) && Source->GetCorruptionProfile() == Profile && Source->ValidateContact(GetOwner(), Falloff)
+			: IsValid(Producer) && Producer->Profile == Profile && !IsCombatPressureImmune()
+				&& ValidateProfilePermission(Profile, Cap, SourceMission) && Producer->ValidateContact(GetOwner(), Falloff);
+		if (!bValidContact || It.Value().MissionId != SourceMission) { It.RemoveCurrent(); continue; }
 		ContactProfiles.Add(Profile);
-		float Falloff;
-		if (Source->ValidateContact(GetOwner(), Falloff)) { Accumulate(Profile, MissionId, Profile->ExposurePerSecond * Elapsed * Falloff, Cap); }
+		Accumulate(Profile, MissionId, Profile->ExposurePerSecond * Elapsed * Falloff, Cap);
 	}
 	for (auto& Record : Records)
 	{
@@ -201,6 +277,59 @@ void USovCorruptionComponent::TickComponent(float DeltaTime, ELevelTick TickType
 	}
 	Records.RemoveAll([](const auto& Record) { return Record.Exposure <= 0.0f; });
 	RefreshState(true);
+	if (!bEnding) { AdvanceOverwrite(Elapsed); }
+}
+void USovCorruptionComponent::AdvanceOverwrite(float DeltaSeconds)
+{
+	if (!ValidOwner() || bWaitingForMissionRestore) { return; }
+	const auto* CurrentCampaign = Campaign();
+	const auto* Mission = CurrentCampaign ? CurrentCampaign->GetActiveMission() : nullptr;
+	if (!Mission) { return; }
+	const auto Previous = State;
+	State.bOverwriteClockActive = false;
+	State.OverwriteSecondsRemaining = 0.0f;
+	for (auto& Record : Records)
+	{
+		const auto* Profile = Record.Profile.Get();
+		if (!IsValid(Profile) || Record.MissionId != Mission->MissionId) { continue; }
+		const auto* Permission = Profile->MissionPermissions.FindByPredicate([Mission](const auto& Item) { return Item.MissionId == Mission->MissionId; });
+		if (!Permission || !Permission->bAllowOverwriteEncounterFailure || Record.bOverwriteTriggered) { continue; }
+		const bool bEligible = Record.Exposure >= OverwriteThreshold && State.Band == ESovCorruptionBand::OverwriteRisk;
+		if (!bEligible) { Record.OverwriteElapsed = 0.0f; continue; }
+		if (IsCombatPressureImmune()) { continue; } // Immunity pauses a valid clock; it never silently cleanses a story fact.
+		ASovEncounterDirector* Director = nullptr;
+		for (TActorIterator<ASovEncounterDirector> It(GetWorld()); It; ++It)
+		{
+			if (It->EncounterId == Permission->OverwriteEncounterId && It->GetEncounterState() == ESovEncounterState::Active
+				&& It->HasEncounterPlayer(GetOwner()))
+			{
+				if (Director) { Director = nullptr; break; } // Ambiguous authored identity fails closed.
+				Director = *It;
+			}
+		}
+		if (!Director) { continue; }
+		Record.OverwriteElapsed = SovCorruptionMath::AdvanceOverwrite(Record.OverwriteElapsed, DeltaSeconds, Permission->OverwriteSeconds, true);
+		const float Remaining = FMath::Max(0.0f, Permission->OverwriteSeconds - Record.OverwriteElapsed);
+		State.OverwriteSecondsRemaining = State.bOverwriteClockActive ? FMath::Min(State.OverwriteSecondsRemaining, Remaining) : Remaining;
+		State.bOverwriteClockActive = true;
+		if (Remaining <= 0.0f)
+		{
+			Record.bOverwriteTriggered = true;
+			RefreshSavedSnapshot(); // Save observers see the committed clock and cannot resurrect an expired timer.
+			OnRep_State(Previous); // Explicit zero-time mechanical feedback precedes encounter failure.
+			if (ValidOwner() && Campaign() == CurrentCampaign && CurrentCampaign->GetActiveMission() == Mission
+				&& IsValid(Director) && Director->HasEncounterPlayer(GetOwner()) && !IsCombatPressureImmune())
+			{
+				Director->FailEncounter();
+			}
+			return;
+		}
+	}
+	RefreshSavedSnapshot();
+	if (Previous.bOverwriteClockActive != State.bOverwriteClockActive || Previous.OverwriteSecondsRemaining != State.OverwriteSecondsRemaining)
+	{
+		OnRep_State(Previous);
+	}
 }
 bool USovCorruptionComponent::CleanseExposure(float Amount, FName SourceId)
 {
@@ -230,6 +359,8 @@ void USovCorruptionComponent::RefreshState(bool bCommitConsequences)
 {
 	if (bWaitingForMissionRestore) { return; }
 	FSovCorruptionReplicatedState Next;
+	Next.bOverwriteClockActive = State.bOverwriteClockActive;
+	Next.OverwriteSecondsRemaining = State.OverwriteSecondsRemaining;
 	const auto* StateComponent = Campaign();
 	const auto* Mission = StateComponent && StateComponent->IsStateValid() ? StateComponent->GetActiveMission() : nullptr;
 	ESovCorruptionBand AllowedCap = ESovCorruptionBand::Clear;
@@ -257,6 +388,11 @@ void USovCorruptionComponent::RefreshState(bool bCommitConsequences)
 		Next.Band = static_cast<ESovCorruptionBand>(FMath::Min(static_cast<int32>(AllowedCap), SovCorruptionMath::Band(
 			Next.Exposure, static_cast<int32>(PreviousBand), TraceThreshold, IntrusionThreshold, ContestThreshold, OverwriteThreshold, BandHysteresis)));
 	}
+	if (Next.Band != ESovCorruptionBand::OverwriteRisk)
+	{
+		Next.bOverwriteClockActive = false; Next.OverwriteSecondsRemaining = 0.0f;
+		for (auto& Record : Records) { Record.OverwriteElapsed = 0.0f; Record.bOverwriteTriggered = false; }
+	}
 	const FSovCorruptionReplicatedState Previous = State;
 	State = Next;
 	// Publish complete SaveGame fields before GAS/tag/Blueprint notifications can request a checkpoint.
@@ -279,14 +415,25 @@ void USovCorruptionComponent::RefreshState(bool bCommitConsequences)
 	auto* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner());
 	const bool bBandEffectMissing = !BandEffect.IsValid() || !EffectASC.IsValid()
 		|| !EffectASC->GetActiveGameplayEffect(BandEffect);
-	if (bForceBandEffectRefresh || AppliedEffectBand != State.Band || EffectASC.Get() != ASC || (bBandEffectMissing && State.Band != ESovCorruptionBand::Clear))
+	float Resistance = 0.0f, RegenScale = 1.0f;
+	for (const auto& Profile : State.Profiles)
+	{
+		ESovCorruptionBand ProfileCap;
+		if (!Mission || !Profile->PermissionForMission(Mission->MissionId, ProfileCap)) { continue; }
+		if (State.Band >= ESovCorruptionBand::Intrusion && ProfileCap >= ESovCorruptionBand::Intrusion) { Resistance = FMath::Min(Resistance, -Profile->IntrusionVulnerability); }
+		if (State.Band >= ESovCorruptionBand::Contest && ProfileCap >= ESovCorruptionBand::Contest) { RegenScale = FMath::Min(RegenScale, Profile->ContestStaminaRegenScale); }
+	}
+	const bool bImmune = IsCombatPressureImmune();
+	if (bForceBandEffectRefresh || AppliedEffectBand != State.Band || EffectASC.Get() != ASC
+		|| AppliedResistance != Resistance || AppliedRegenScale != RegenScale || (bImmune && BandEffect.IsValid())
+		|| (bBandEffectMissing && State.Band != ESovCorruptionBand::Clear && !bImmune))
 	{
 		bForceBandEffectRefresh = false;
 		RemoveOwnedBandEffect();
 		if (bEnding) { return; }
 		if (IsValid(ASC) && ValidOwner() && ASC->GetAvatarActor() == GetOwner()
 			&& UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner()) == ASC
-			&& State.Band != ESovCorruptionBand::Clear)
+			&& State.Band != ESovCorruptionBand::Clear && !bImmune)
 		{
 			const auto& Tags = FSovGameplayTags::Get();
 			const FGameplayTag BandTags[] = {FGameplayTag(), Tags.State_Corruption_Trace, Tags.State_Corruption_Intrusion,
@@ -295,6 +442,8 @@ void USovCorruptionComponent::RefreshState(bool bCommitConsequences)
 			if (Spec.IsValid())
 			{
 				Spec.Data->DynamicGrantedTags.AddTag(BandTags[static_cast<uint8>(State.Band)]);
+				Spec.Data->SetSetByCallerMagnitude(FName(TEXT("Corruption.Resistance")), Resistance);
+				Spec.Data->SetSetByCallerMagnitude(FName(TEXT("Corruption.StaminaRegenScale")), RegenScale);
 				const auto Applied = ASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
 				if (bEnding || !ValidOwner() || UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner()) != ASC)
 				{
@@ -302,6 +451,7 @@ void USovCorruptionComponent::RefreshState(bool bCommitConsequences)
 					return;
 				}
 				BandEffect = Applied; EffectASC = ASC; AppliedEffectBand = State.Band;
+				AppliedResistance = Resistance; AppliedRegenScale = RegenScale;
 			}
 		}
 	}
@@ -331,17 +481,32 @@ void USovCorruptionComponent::CommitAuthoredConsequences()
 		}
 	}
 }
+float USovCorruptionComponent::ResolveIncomingStatusDuration(AActor* Target, float AuthoredDuration)
+{
+	if (!FMath::IsFinite(AuthoredDuration) || AuthoredDuration <= 0.0f) { return 0.0f; }
+	const auto* Component = IsValid(Target) ? Target->FindComponentByClass<USovCorruptionComponent>() : nullptr;
+	if (!Component || Component->bEnding || Component->bWaitingForMissionRestore || Component->IsCombatPressureImmune()
+		|| !Component->EffectASC.IsValid() || Component->EffectASC->GetAvatarActor() != Target
+		|| Component->EffectASC.Get() != UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Target)
+		|| !Component->BandEffect.IsValid() || !Component->EffectASC->GetActiveGameplayEffect(Component->BandEffect)) { return AuthoredDuration; }
+	return static_cast<float>(FMath::Min(static_cast<double>(MAX_flt), static_cast<double>(AuthoredDuration)
+		* SovCorruptionMath::StatusDurationScale(static_cast<int>(Component->AppliedEffectBand))));
+}
 FSovCorruptionPresentationRequest USovCorruptionComponent::GetPresentationRequest() const
 {
 	FSovCorruptionPresentationRequest Request;
-	Request.Band = State.Band; Request.Exposure = State.Exposure; Request.bReducedEffects = bReducedEffects;
+	Request.Band = State.Band; Request.Exposure = State.Exposure;
+	const auto* Settings = UNarrativeGameUserSettings::GetSovSettings();
+	Request.bReducedEffects = bReducedEffects || (Settings && Settings->IsReducedCorruptionEffectsEnabled());
+	Request.bOverwriteClockActive = State.bOverwriteClockActive;
+	Request.OverwriteSecondsRemaining = State.OverwriteSecondsRemaining;
 	for (const auto& Profile : State.Profiles)
 	{
 		if (!IsValid(Profile)) { continue; }
 		Request.ProfileIds.Add(Profile->PresentationProfileId);
 		Request.RemedyTexts.Add(Profile->RemedyText);
-		Request.InformationTexts.Add(bReducedEffects ? Profile->ReducedEffectsSubstitute : Profile->InformationText);
-		if (!bReducedEffects) { Request.SuggestedIntensity = FMath::Max(Request.SuggestedIntensity, Profile->PresentationIntensity); }
+		Request.InformationTexts.Add(Request.bReducedEffects ? Profile->ReducedEffectsSubstitute : Profile->InformationText);
+		if (!Request.bReducedEffects) { Request.SuggestedIntensity = FMath::Max(Request.SuggestedIntensity, Profile->PresentationIntensity); }
 	}
 	return Request;
 }
@@ -389,6 +554,16 @@ void USovCorruptionComponent::PruneRestoredContacts()
 			ActualContacts.Add(Source->GetCorruptionProfile()->SourceId);
 		}
 	}
+	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+	{
+		TInlineComponentArray<USovCorruptionSourceComponent*> Producers;
+		It->GetComponents(Producers);
+		for (const auto* Producer : Producers)
+		{
+			float Falloff;
+			if (IsValid(Producer->Profile) && Producer->ValidateContact(GetOwner(), Falloff)) { ActualContacts.Add(Producer->Profile->SourceId); }
+		}
+	}
 	for (auto It = RestoredContactProfiles.CreateIterator(); It; ++It)
 	{
 		const FName SourceId = *It;
@@ -410,7 +585,7 @@ bool USovCorruptionComponent::FinishCampaignRestore(const USovCampaignDefinition
 	const auto* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner());
 	FGameplayTagContainer OwnerTags;
 	ASC->GetOwnedGameplayTags(OwnerTags);
-	if (!OwnerTags.HasTagExact(Destination->Protagonist))
+	if (!OwnerTags.HasTagExact(StateComponent->GetActiveProtagonist()))
 	{
 		OutError = TEXT("Corruption restore protagonist does not match the destination mission."); return false;
 	}
@@ -421,7 +596,7 @@ bool USovCorruptionComponent::FinishCampaignRestore(const USovCampaignDefinition
 	for (const auto& Record : Records)
 	{
 		if (Record.MissionId == Destination->MissionId
-			&& (!IsValid(Record.Profile) || !Record.Profile->AllowedProtagonists.HasTagExact(Destination->Protagonist)))
+			&& (!IsValid(Record.Profile) || !Record.Profile->AllowedProtagonists.HasTagExact(StateComponent->GetActiveProtagonist())))
 		{
 			OutError = TEXT("Corruption snapshot contains a source that does not permit this protagonist."); return false;
 		}
@@ -438,11 +613,12 @@ bool USovCorruptionComponent::FinishCampaignRestore(const USovCampaignDefinition
 	bWaitingForMissionRestore = false;
 	PruneRestoredContacts(); // Suppression belongs to continuing physical contact, never a later re-entry.
 	RefreshState(false); // Load restores mechanics; it never replays a canon consequence.
+	if (!bEnding) { AdvanceOverwrite(0.0f); }
 	if (!ValidOwner() || Campaign() != StateComponent || StateComponent->GetActiveMission() != Destination)
 	{
 		OutError = TEXT("Corruption ownership changed during restored band notification."); return false;
 	}
-	if (State.Band != ESovCorruptionBand::Clear && (!BandEffect.IsValid() || !EffectASC.IsValid()
+	if (State.Band != ESovCorruptionBand::Clear && !IsCombatPressureImmune() && (!BandEffect.IsValid() || !EffectASC.IsValid()
 		|| !EffectASC->GetActiveGameplayEffect(BandEffect)))
 	{
 		OutError = TEXT("Corruption could not restore its owned gameplay band effect."); return false;
@@ -463,7 +639,15 @@ void USovCorruptionComponent::Load_Implementation()
 			ESovCorruptionBand Cap;
 			if (!IsValid(Record.Profile) || !Record.Profile->bPersistExposureAtCheckpoint
 				|| !Record.Profile->PermissionForMission(Record.MissionId, Cap) || Seen.Contains(Record.Profile->SourceId)
-				|| !FMath::IsFinite(Record.Exposure) || Record.Exposure <= 0.0f || Record.Exposure > 100.0f)
+				|| !FMath::IsFinite(Record.Exposure) || Record.Exposure <= 0.0f || Record.Exposure > 100.0f
+				|| !FMath::IsFinite(Record.OverwriteElapsed) || Record.OverwriteElapsed < 0.0f || Record.OverwriteElapsed > 600.0f)
+			{
+				bValid = false; break;
+			}
+			const auto* Permission = Record.Profile->MissionPermissions.FindByPredicate([&Record](const auto& Item) { return Item.MissionId == Record.MissionId; });
+			if (!Permission || (Permission->bAllowOverwriteEncounterFailure
+				? Record.OverwriteElapsed > Permission->OverwriteSeconds || (Record.bOverwriteTriggered && Record.OverwriteElapsed < Permission->OverwriteSeconds)
+				: Record.OverwriteElapsed != 0.0f || Record.bOverwriteTriggered))
 			{
 				bValid = false; break;
 			}

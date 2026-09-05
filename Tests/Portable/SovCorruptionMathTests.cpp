@@ -23,4 +23,26 @@ int main()
 	assert(Falloff(250, 500, false) == 1.0);
 	assert(Falloff(501, 500, false) == 0.0);
 	assert(Falloff(0, 0, false) == 0.0);
+	assert(StatusDurationScale(0) == 1.0);
+	assert(StatusDurationScale(1) == 1.0);
+	assert(StatusDurationScale(2) == 1.1);
+	assert(StatusDurationScale(3) == 1.25);
+	assert(StatusDurationScale(4) == 1.25);
+	assert(StatusDurationScale(-1) == 1.0);
+	assert(StatusDurationScale(5) == 1.0);
+	assert(AcceptedHit(false, false, 1, 0, false));
+	assert(AcceptedHit(false, false, 0, 0, true));
+	assert(!AcceptedHit(true, false, 1, 0, true));
+	assert(!AcceptedHit(false, true, 1, 0, true));
+	assert(!AcceptedHit(false, false, 0, 0, false));
+	assert(!AcceptedHit(false, false, -1, 3, true));
+	assert(!AcceptedHit(false, false, std::numeric_limits<double>::infinity(), 0, true));
+	assert(AdvanceProtection(2, 1, 5, false) == 3);
+	assert(AdvanceProtection(2, 1, 5, true) == 0);
+	assert(AdvanceProtection(4, 100, 5, false) == 5);
+	assert(AdvanceProtection(1, -1, 5, false) == 0);
+	assert(AdvanceOverwrite(2, 1, 5, true) == 3);
+	assert(AdvanceOverwrite(2, 1, 5, false) == 0);
+	assert(AdvanceOverwrite(4, 100, 5, true) == 5);
+	assert(AdvanceOverwrite(1, std::numeric_limits<double>::quiet_NaN(), 5, true) == 0);
 }

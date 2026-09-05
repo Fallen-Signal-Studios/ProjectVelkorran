@@ -2,6 +2,7 @@
 #include "Combat/SovEchoAttackReceipt.h"
 #include "GAS/NarrativeCombatAbility.h"
 #include "Sovereign/SovGameplayTags.h"
+#include "Melee/SovGameplayAbility_Melee.h"
 
 USovEchoAttackReceipt* USovEchoAttackReceipt::CreateForActiveAbility(UNarrativeCombatAbility* Ability)
 {
@@ -16,6 +17,7 @@ USovEchoAttackReceipt* USovEchoAttackReceipt::CreateForActiveAbility(UNarrativeC
 	Receipt->CapturedAttackId = AttackId;
 	Receipt->bHeavyAttack = Ability->GetAssetTags().HasTag(FSovGameplayTags::Get().Damage_Heavy)
 		&& !Ability->GetAssetTags().HasTag(FSovGameplayTags::Get().Ability_Echo);
+	if (const auto* Melee = Cast<USovGameplayAbility_Melee>(Ability)) { Receipt->bHeavyAttack = Melee->IsCurrentNodeHeavy(); }
 	return Receipt;
 }
 

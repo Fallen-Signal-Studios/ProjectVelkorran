@@ -57,4 +57,6 @@ struct FNarrativeBotAttackLease
 	TWeakObjectPtr<UNarrativeAbilitySystemComponent> Target;
 	uint64 Serial = 0;
 	bool bNewlyAcquired = false;
+	TWeakObjectPtr<UObject> Coordinator;
+	FGuid CoordinationReservation;
 };

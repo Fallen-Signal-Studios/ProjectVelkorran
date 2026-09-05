@@ -24,6 +24,7 @@
 #include "Presentation/SovCinderJudgementPresentation.h"
 #include "Projectiles/SovCinderStickyGrenadeProjectile.h"
 #include "Projectiles/SovVelkorransHungerProjectile.h"
+#include "Targeting/SovAimAssist.h"
 #include "Sovereign/SovGameplayTags.h"
 #include "UnrealFramework/NarrativeCharacter.h"
 #include "UnrealFramework/NarrativeTeamAgentInterface.h"
@@ -358,6 +359,12 @@ USovGameplayAbility_TarrikVelkorransHunger::ReleaseVelkorransHungerFromAim()
 	if (LaunchDirection.IsNearlyZero())
 	{
 		LaunchDirection = AimRotation.Vector().GetSafeNormal();
+	}
+	if (FMath::IsNearlyZero(HungerProjectileGravityScale))
+	{
+		FVector AssistedDirection;
+		if (SovAimAssist::GetProjectileLead(Avatar, SpawnTransform.GetLocation(), LaunchDirection,
+			HungerProjectileSpeed, HungerAimTraceDistance, AssistedDirection)) { LaunchDirection = AssistedDirection; }
 	}
 	SpawnTransform.SetRotation(LaunchDirection.ToOrientationQuat());
 	SpawnTransform.SetScale3D(FVector::OneVector);

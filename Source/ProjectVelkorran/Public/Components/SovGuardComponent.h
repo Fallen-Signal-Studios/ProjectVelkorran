@@ -52,6 +52,8 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Guard")
 	bool IsCounterWindowOpen() const;
+	/** Extends only this component's currently open native window; never fabricates one. */
+	bool ExtendCounterWindow(float AdditionalSeconds);
 
 	UPROPERTY(BlueprintAssignable, Category = "Sovereign|Guard")
 	FSovGuardStateSignature OnGuardStarted;

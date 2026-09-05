@@ -5,6 +5,12 @@
 #include "Components/SphereComponent.h"
 #include "Components/SovCorruptionComponent.h"
 #include "Corruption/SovCorruptionSourceVolume.h"
+#include "Corruption/SovCorruptionSourceComponent.h"
+#include "Corruption/SovCorruptionInteractableComponent.h"
+#include "GAS/NarrativeAttributeSetBase.h"
+#include "Tests/SovCombatRoutingTestFixtures.h"
+#include "Interaction/PlayerInteractionComponent.h"
+#include "NarrativeGameplayTags.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
@@ -18,6 +24,12 @@ struct FSovCorruptionTestAccess
 	static float SavedExposure(const USovCorruptionComponent& Component)
 	{
 		float Total = 0.0f; for (const auto& Record : Component.SavedRecords) { Total += Record.Exposure; } return Total;
+	}
+	static void Bind(USovCorruptionSourceComponent& Producer) { Producer.BindOwner(); }
+	static void SetNode(ASovCorruptionSourceVolume& Source, AActor* Node) { Source.SourceNode = Node; }
+	static void Interact(USovCorruptionInteractableComponent& Source, APawn* Player, UNarrativeInteractionComponent* Interaction)
+	{
+		Source.Interact(Player, Interaction);
 	}
 	static void CorruptSave(USovCorruptionComponent& Component) { Component.SavedSchemaVersion = -1; }
 	static void CopySave(const USovCorruptionComponent& Source, USovCorruptionComponent& Destination)
@@ -283,6 +295,175 @@ bool FSovCorruptionMissionIsolationTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("New mission completes its explicit restore barrier"), Component->FinishCampaignRestore(Next, Error));
 	TestEqual(TEXT("Exposure from a previous mission never crosses into the next"), Component->GetCorruptionState().Exposure, 0.0f);
 	TestEqual(TEXT("Checkpoint now contains no previous-mission exposure"), FSovCorruptionTestAccess::SavedExposure(*Component), 0.0f);
+	return true;
+}
+
+namespace
+{
+	USovCorruptionSourceComponent* AttachProducer(ASovCorruptionRuntimeTestPawn* Source, USovCorruptionProfile* Profile)
+	{
+		auto* Producer = NewObject<USovCorruptionSourceComponent>(Source);
+		Producer->Profile = Profile; Source->AddInstanceComponent(Producer); Producer->RegisterComponent();
+		FSovCorruptionTestAccess::Bind(*Producer); return Producer;
+	}
+	void CorruptionHit(ASovCorruptionRuntimeTestPawn* Source, ASovCorruptionRuntimeTestPawn* Target, float Damage = 1.0f, bool bMixed = false)
+	{
+		auto* ASC = Source->GetNarrativeAbilitySystemComponent();
+		auto Context = ASC->MakeEffectContext(); Context.AddInstigator(Source, Source);
+		FGameplayEffectSpec Spec(GetDefault<USovCombatRoutingTestEffect>(), Context, 1.0f);
+		Spec.SetSetByCallerMagnitude(FNarrativeGameplayTags::Get().SetByCaller_Damage, Damage);
+		Spec.AddDynamicAssetTag(FSovGameplayTags::Get().Damage_Channel_Corruption);
+		if (bMixed) { Spec.AddDynamicAssetTag(FSovGameplayTags::Get().Damage_Channel_Kinetic); }
+		ASC->ApplyGameplayEffectSpecToTarget(Spec, Target->GetNarrativeAbilitySystemComponent());
+	}
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCorruptionAttackProducerTest, "ProjectVelkorran.Campaign.Corruption.NativeAttackProducer",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCorruptionAttackProducerTest::RunTest(const FString& Parameters)
+{
+	FCorruptionWorld F; if (!F.Pawn || !F.PC) { AddError(TEXT("Fixture failed")); return false; }
+	F.PC->State->BeginMission(F.Mission());
+	auto* Enemy = F.World->SpawnActor<ASovCorruptionRuntimeTestPawn>(); Enemy->InitializeCombat();
+	auto* Profile = F.Profile(TEXT("EnemyHit"), 12.0f); Profile->SourceKind = ESovCorruptionSourceKind::EnemyAttack;
+	AttachProducer(Enemy, Profile);
+	auto* ASC = F.Pawn->GetNarrativeAbilitySystemComponent();
+	ASC->OnDamageResolvedAsTarget.AddDynamic(F.Pawn, &ASovCorruptionRuntimeTestPawn::ObserveDamage);
+	CorruptionHit(Enemy, F.Pawn);
+	TestEqual(TEXT("Real accepted Corruption damage delivers profile exposure"), F.Pawn->GetCorruptionComponent()->GetCorruptionState().Exposure, 12.0f);
+	Enemy->GetNarrativeAbilitySystemComponent()->DamageResolvedAsSource(F.Pawn->LastDamage);
+	TestEqual(TEXT("Replayed transaction cannot expose twice"), F.Pawn->GetCorruptionComponent()->GetCorruptionState().Exposure, 12.0f);
+	CorruptionHit(Enemy, F.Pawn);
+	TestEqual(TEXT("A separate actual hit adds exposure"), F.Pawn->GetCorruptionComponent()->GetCorruptionState().Exposure, 24.0f);
+	ASC->AddLooseGameplayTag(FSovGameplayTags::Get().Damage_Immunity_Corruption);
+	CorruptionHit(Enemy, F.Pawn, 1.0f, true);
+	TestEqual(TEXT("Rejected Corruption channel does not borrow mixed Kinetic acceptance"), F.Pawn->GetCorruptionComponent()->GetCorruptionState().Exposure, 24.0f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCorruptionLinkProducerTest, "ProjectVelkorran.Campaign.Corruption.NativeLinkAndRemedy",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCorruptionLinkProducerTest::RunTest(const FString& Parameters)
+{
+	FCorruptionWorld F; if (!F.Pawn || !F.PC) { AddError(TEXT("Fixture failed")); return false; }
+	F.PC->State->BeginMission(F.Mission());
+	auto* Enemy = F.World->SpawnActor<ASovCorruptionRuntimeTestPawn>(); Enemy->InitializeCombat();
+	auto* Profile = F.Profile(TEXT("EnemyLink"), 30.0f); Profile->SourceKind = ESovCorruptionSourceKind::CommandLink;
+	Profile->Escape = ESovCorruptionEscape::BreakLink;
+	auto* Producer = AttachProducer(Enemy, Profile);
+	auto* Link = NewObject<USovCorruptionRuntimeTestLink>(Enemy); Enemy->AddInstanceComponent(Link); Link->RegisterComponent();
+	Link->RegisterLinkedActor(F.Pawn); TestTrue(TEXT("Native command link activates"), Link->ActivateCommandLink(Enemy));
+	Producer->TickComponent(0.1f, LEVELTICK_All, nullptr);
+	TestEqual(TEXT("Only actual membership exposes"), F.Pawn->GetCorruptionComponent()->GetCorruptionState().Exposure, 30.0f);
+	FSovCommandLinkSeverResult Sever;
+	TestTrue(TEXT("Actual sever resolves the registered link"), Link->TrySeverCommandLink(F.Pawn, Sever) == ESovCommandLinkSeverResolution::NewlySevered);
+	Producer->TickComponent(0.1f, LEVELTICK_All, nullptr);
+	TestEqual(TEXT("Real sever clears that profile and disables its source"), F.Pawn->GetCorruptionComponent()->GetCorruptionState().Exposure, 0.0f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCorruptionBandPressureTest, "ProjectVelkorran.Campaign.Corruption.NativeBandPressure",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCorruptionBandPressureTest::RunTest(const FString& Parameters)
+{
+	FCorruptionWorld F; if (!F.Pawn || !F.PC) { AddError(TEXT("Fixture failed")); return false; }
+	F.PC->State->BeginMission(F.Mission());
+	auto* ASC = F.Pawn->GetNarrativeAbilitySystemComponent();
+	ASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetStaminaRegenRateAttribute(), 20.0f);
+	auto* Profile = F.Profile(TEXT("Pressure"), 60.0f); F.Source(Profile);
+	TestEqual(TEXT("Contest owned GAS effect adds documented vulnerability"), ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetDamageResistanceAttribute()), -5.0f);
+	TestEqual(TEXT("Contest scales the existing Stamina recovery attribute"), ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetStaminaRegenRateAttribute()), 10.0f);
+	TestEqual(TEXT("Owned Contest effect extends an accepted harmful status by 25 percent"), USovCorruptionComponent::ResolveIncomingStatusDuration(F.Pawn, 4.0f), 5.0f);
+	F.Pawn->GetCorruptionComponent()->CleanseExposure(100.0f);
+	TestEqual(TEXT("Cleanse removes only the owned vulnerability"), ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetDamageResistanceAttribute()), 0.0f);
+	TestEqual(TEXT("Cleanse restores the original recovery rate"), ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetStaminaRegenRateAttribute()), 20.0f);
+	TestEqual(TEXT("Cleanse removes status vulnerability"), USovCorruptionComponent::ResolveIncomingStatusDuration(F.Pawn, 4.0f), 4.0f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCorruptionMachineryTest, "ProjectVelkorran.Campaign.Corruption.NativeMachineryAndProtection",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCorruptionMachineryTest::RunTest(const FString& Parameters)
+{
+	FCorruptionWorld F; if (!F.Pawn || !F.PC) { AddError(TEXT("Fixture failed")); return false; }
+	F.PC->State->BeginMission(F.Mission());
+	auto* Machine = F.World->SpawnActor<AActor>();
+	auto* Profile = F.Profile(TEXT("Machinery"), 30.0f); Profile->SourceKind = ESovCorruptionSourceKind::Machinery;
+	auto* Interactable = NewObject<USovCorruptionInteractableComponent>(Machine);
+	Interactable->Profile = Profile; Machine->AddInstanceComponent(Interactable); Interactable->RegisterComponent(); Interactable->Activate();
+	auto* Interaction = NewObject<UPlayerInteractionComponent>(F.PC); F.PC->AddInstanceComponent(Interaction); Interaction->RegisterComponent();
+	FSovCorruptionTestAccess::Interact(*Interactable, F.Pawn, Interaction);
+	TestEqual(TEXT("Actual Narrative interaction exposes once"), F.Pawn->GetCorruptionComponent()->GetCorruptionState().Exposure, 30.0f);
+	FSovCorruptionTestAccess::Interact(*Interactable, F.Pawn, Interaction);
+	TestEqual(TEXT("Repeated machine interaction cannot duplicate its mission receipt"), F.Pawn->GetCorruptionComponent()->GetCorruptionState().Exposure, 30.0f);
+	F.Pawn->GetCorruptionComponent()->CleanseExposure(100.0f);
+	auto* Ally = F.World->SpawnActor<ASovCorruptionRuntimeTestPawn>(); Ally->InitializeCombat(); F.Pawn->Attitude = ETeamAttitude::Friendly;
+	auto* AllyProfile = F.Profile(TEXT("DistinctSignal"), 40.0f); AllyProfile->SourceKind = ESovCorruptionSourceKind::ContaminatedAlly;
+	AllyProfile->Escape = ESovCorruptionEscape::ProtectSignal; AllyProfile->ContaminatedAllyState = FSovGameplayTags::Get().State_Corruption_Intrusion;
+	Ally->GetNarrativeAbilitySystemComponent()->AddLooseGameplayTag(AllyProfile->ContaminatedAllyState);
+	auto* Producer = AttachProducer(Ally, AllyProfile); Producer->TickComponent(0.1f, LEVELTICK_All, nullptr);
+	TestEqual(TEXT("Actual contaminated friendly signal exposes"), F.Pawn->GetCorruptionComponent()->GetCorruptionState().Exposure, 40.0f);
+	auto* Anchor = NewObject<USovCorruptionInteractableComponent>(Machine); Anchor->Action = ESovCorruptionInteraction::ProtectSignal;
+	Anchor->Profile = AllyProfile; Anchor->SourceActor = Ally; Anchor->ProtectionSeconds = 1.0f;
+	Machine->AddInstanceComponent(Anchor); Anchor->RegisterComponent(); Anchor->Activate();
+	FSovCorruptionTestAccess::Interact(*Anchor, F.Pawn, Interaction);
+	Anchor->TickComponent(0.5f, LEVELTICK_All, nullptr);
+	auto* Attacker = F.World->SpawnActor<ASovCorruptionRuntimeTestPawn>(); Attacker->InitializeCombat();
+	CorruptionHit(Attacker, Ally); // Authoritative incoming damage interrupts a continuous protection interval.
+	Anchor->TickComponent(0.5f, LEVELTICK_All, nullptr);
+	TestEqual(TEXT("Damage resets protection progress"), Anchor->GetProtectionProgress(), 0.0f);
+	Anchor->TickComponent(1.0f, LEVELTICK_All, nullptr);
+	TestEqual(TEXT("Uninterrupted protection clears exposure"), F.Pawn->GetCorruptionComponent()->GetCorruptionState().Exposure, 0.0f);
+	Producer->TickComponent(0.1f, LEVELTICK_All, nullptr);
+	TestEqual(TEXT("Resolved signal cannot immediately expose again"), F.Pawn->GetCorruptionComponent()->GetCorruptionState().Exposure, 0.0f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCorruptionOverwriteTest, "ProjectVelkorran.Campaign.Corruption.NativeOverwriteClock",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCorruptionOverwriteTest::RunTest(const FString& Parameters)
+{
+	FCorruptionWorld F; if (!F.Pawn || !F.PC) { AddError(TEXT("Fixture failed")); return false; }
+	F.PC->State->BeginMission(F.Mission());
+	auto* Director = F.World->SpawnActor<ASovCorruptionRuntimeTestDirector>(); Director->Arm();
+	TestTrue(TEXT("Fixture director owns the actual possessed player"), Director->HasEncounterPlayer(F.Pawn));
+	auto* Profile = F.Profile(TEXT("Overwrite"), 90.0f); Profile->bPersistExposureAtCheckpoint = true;
+	Profile->Escape = ESovCorruptionEscape::AuthoredCountermeasure;
+	Profile->MissionPermissions[0].bAllowOverwriteEncounterFailure = true;
+	Profile->MissionPermissions[0].OverwriteEncounterId = TEXT("CorruptionClock"); Profile->MissionPermissions[0].OverwriteSeconds = 5.0f;
+	F.Source(Profile); auto* Component = F.Pawn->GetCorruptionComponent();
+	Component->TickComponent(1.0f, LEVELTICK_All, nullptr);
+	const auto Normal = Component->GetPresentationRequest(); Component->SetReducedEffects(true);
+	const auto Reduced = Component->GetPresentationRequest();
+	TestTrue(TEXT("Permissioned active encounter starts a visible clock"), Normal.bOverwriteClockActive);
+	TestEqual(TEXT("First elapsed second retained"), Normal.OverwriteSecondsRemaining, 4.0f);
+	TestEqual(TEXT("Reduced effects preserve exact deadline"), Reduced.OverwriteSecondsRemaining, Normal.OverwriteSecondsRemaining);
+	F.Pawn->GetNarrativeAbilitySystemComponent()->AddLooseGameplayTag(FSovGameplayTags::Get().Damage_Immunity_Corruption);
+	Component->TickComponent(2.0f, LEVELTICK_All, nullptr);
+	TestTrue(TEXT("Corruption immunity prevents overwrite failure"), Director->GetEncounterState() == ESovEncounterState::Active);
+	F.Pawn->GetNarrativeAbilitySystemComponent()->RemoveLooseGameplayTag(FSovGameplayTags::Get().Damage_Immunity_Corruption);
+	Component->TickComponent(4.0f, LEVELTICK_All, nullptr);
+	TestTrue(TEXT("Expiry routes through actual EncounterDirector failure"), Director->GetEncounterState() == ESovEncounterState::Failed);
+	TestTrue(TEXT("Native clock cannot invent campaign facts"), !F.PC->State->IsBeatComplete(F.PC->State->GetActiveMission()->MissionId, TEXT("Exposed")));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCorruptionNodeRemedyTest, "ProjectVelkorran.Campaign.Corruption.NativeDestroyNode",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCorruptionNodeRemedyTest::RunTest(const FString& Parameters)
+{
+	FCorruptionWorld F; if (!F.Pawn || !F.PC) { AddError(TEXT("Fixture failed")); return false; }
+	F.PC->State->BeginMission(F.Mission());
+	auto* Node = F.World->SpawnActor<ASovCorruptionRuntimeTestPawn>(); Node->InitializeCombat();
+	auto* Profile = F.Profile(TEXT("DestructibleField"), 30.0f); Profile->Escape = ESovCorruptionEscape::DestroyNode;
+	AttachProducer(Node, Profile);
+	auto* Field = F.World->SpawnActor<ASovCorruptionSourceVolume>(); FSovCorruptionTestAccess::SetNode(*Field, Node);
+	Field->SetCorruptionProfile(Profile); FSovCorruptionTestAccess::Refresh(*Field);
+	TestEqual(TEXT("Owned environmental field exposes"), F.Pawn->GetCorruptionComponent()->GetCorruptionState().Exposure, 30.0f);
+	CorruptionHit(F.Pawn, Node, 200.0f);
+	TestEqual(TEXT("Actual node death applies its documented remedy"), F.Pawn->GetCorruptionComponent()->GetCorruptionState().Exposure, 0.0f);
+	FSovCorruptionTestAccess::Refresh(*Field);
+	TestEqual(TEXT("Dead resolved node cannot reactivate its field"), F.Pawn->GetCorruptionComponent()->GetCorruptionState().Exposure, 0.0f);
 	return true;
 }
 #endif

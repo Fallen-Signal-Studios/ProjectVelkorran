@@ -6,7 +6,12 @@ bool USovCorruptionProfile::ValidateProfile(FString& OutError) const
 {
 	const auto NonNegative = [](float Value) { return FMath::IsFinite(Value) && Value >= 0.0f; };
 	const auto ValidBand = [](ESovCorruptionBand Band) { return Band >= ESovCorruptionBand::Trace && Band <= ESovCorruptionBand::OverwriteRisk; };
-	if (SourceId.IsNone() || !NonNegative(ExposurePerSecond) || !NonNegative(ContactExposure)
+	if (SourceKind > ESovCorruptionSourceKind::Machinery
+		|| (SourceKind == ESovCorruptionSourceKind::ContaminatedAlly && !ContaminatedAllyState.IsValid())
+		|| !NonNegative(IntrusionVulnerability) || IntrusionVulnerability > 25.0f
+		|| !FMath::IsFinite(ContestStaminaRegenScale) || ContestStaminaRegenScale < 0.1f || ContestStaminaRegenScale > 1.0f
+		|| ((SourceKind == ESovCorruptionSourceKind::EnemyAttack || SourceKind == ESovCorruptionSourceKind::Machinery) && ContactExposure <= 0.0f)
+		|| SourceId.IsNone() || !NonNegative(ExposurePerSecond) || !NonNegative(ContactExposure)
 		|| (ExposurePerSecond <= 0.0f && ContactExposure <= 0.0f)
 		|| ExposurePerSecond > 100.0f || ContactExposure > 100.0f || !FMath::IsFinite(Radius) || Radius <= 0.0f || Radius > 100000.0f
 		|| !ValidBand(MaximumBand) || !NonNegative(EscapeRecoveryPerSecond) || EscapeRecoveryPerSecond > 100.0f
@@ -33,6 +38,12 @@ bool USovCorruptionProfile::ValidateProfile(FString& OutError) const
 		if (Permission.MissionId.IsNone() || Missions.Contains(Permission.MissionId) || !ValidBand(Permission.MaximumBand))
 		{
 			OutError = TEXT("Mission permissions require unique mission IDs and valid non-clear caps."); return false;
+		}
+		if (Permission.bAllowOverwriteEncounterFailure && (Permission.MaximumBand != ESovCorruptionBand::OverwriteRisk
+			|| MaximumBand != ESovCorruptionBand::OverwriteRisk || Permission.OverwriteEncounterId.IsNone()
+			|| !FMath::IsFinite(Permission.OverwriteSeconds) || Permission.OverwriteSeconds < 1.0f || Permission.OverwriteSeconds > 600.0f))
+		{
+			OutError = TEXT("Overwrite failure requires a reachable band, explicit encounter and a finite 1-600 second clock."); return false;
 		}
 		Missions.Add(Permission.MissionId);
 	}

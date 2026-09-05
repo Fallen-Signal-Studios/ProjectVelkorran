@@ -77,8 +77,9 @@ int32 UNarrativeAbilitySystemComponent::HandleGameplayEvent(FGameplayTag EventTa
 	return TriggeredCount;
 }
 
-void UNarrativeAbilitySystemComponent::InitAbilityActorInfo(AActor* InOwnerActor, AActor* InAvatarActor) 
+void UNarrativeAbilitySystemComponent::InitAbilityActorInfo(AActor* InOwnerActor, AActor* InAvatarActor)
 {
+	if (GetAvatarActor() != InAvatarActor) { ClearCombatInputBuffer(); }
 
 	/*In Narrative Pro, we don't really want to reassign actor info when a pawn like a vehicle or horse gets possessed. 
 	This is because certain abilities like wield weapon want to work whilst occupying vehicles, and might want to play a montage, 
@@ -252,6 +253,7 @@ void UNarrativeAbilitySystemComponent::SetCharacterReadyEpoch(const int32 NewRea
 {
 	if (GetOwnerRole() >= ROLE_Authority && NewReadyEpoch > CharacterReadyEpoch)
 	{
+		ClearCombatInputBuffer();
 		CharacterReadyEpoch = NewReadyEpoch;
 		if (AActor* ASCOwnerActor = GetOwnerActor())
 		{
@@ -342,7 +344,8 @@ void UNarrativeAbilitySystemComponent::AbilityInputTagPressed(const FGameplayTag
 		return;
 	}
 
-	// ---------------------------------------------------------
+	// Native combo nodes consume queued semantic input only inside their authored window.
+	const bool bBufferedForCombat = BufferCombatInput(InputTag);
 
 	ABILITYLIST_SCOPE_LOCK();
 	for (FGameplayAbilitySpec& Spec : ActivatableAbilities.Items)
@@ -354,12 +357,17 @@ void UNarrativeAbilitySystemComponent::AbilityInputTagPressed(const FGameplayTag
 				Spec.InputPressed = true;
 				if (Spec.IsActive())
 				{
+					const uint64 InputSerial = InputActivationSerial;
+					const TWeakObjectPtr<AActor> InputAvatar = GetAvatarActor();
+					const int32 ReadyEpoch = CharacterReadyEpoch;
 					if (Spec.Ability->bReplicateInputDirectly && IsOwnerActorAuthoritative() == false)
 					{
 						ServerSetInputPressed(Spec.Handle);
 					}
 
 					AbilitySpecInputPressed(Spec);
+					if (InputSerial != InputActivationSerial || InputAvatar.Get() != GetAvatarActor() || ReadyEpoch != CharacterReadyEpoch
+						|| Spec.PendingRemove || !Spec.IsActive() || !Spec.InputPressed) { continue; }
 
 PRAGMA_DISABLE_DEPRECATION_WARNINGS
 					// Fixing this up to use the instance activation, but this function should be deprecated as it cannot work with InstancedPerExecution
@@ -370,9 +378,9 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 					// Invoke the InputPressed event. This is not replicated here. If someone is listening, they may replicate the InputPressed event to the server.
 					InvokeReplicatedEvent(EAbilityGenericReplicatedEvent::InputPressed, Spec.Handle, ActivationInfo.GetActivationPredictionKey());					
 				}
-				else
+				else if (!bBufferedForCombat)
 				{
-					// Ability is not active, so try to activate it
+					// Outside an authored buffer, retain Narrative's immediate activation behavior.
 					TryActivateAbility(Spec.Handle);
 				}
 			}
@@ -382,6 +390,7 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 void UNarrativeAbilitySystemComponent::AbilityInputTagReleased(const FGameplayTag& InputTag)
 {
+	if (BufferedCombatInput == InputTag) { bBufferedCombatInputHeld = false; }
 	// Logic is similar to AbilityLocalInputReleased
 	
 	ABILITYLIST_SCOPE_LOCK();
@@ -394,12 +403,17 @@ void UNarrativeAbilitySystemComponent::AbilityInputTagReleased(const FGameplayTa
 				Spec.InputPressed = false;
 				if (Spec.IsActive())
 				{
+					const uint64 InputSerial = InputActivationSerial;
+					const TWeakObjectPtr<AActor> InputAvatar = GetAvatarActor();
+					const int32 ReadyEpoch = CharacterReadyEpoch;
 					if (Spec.Ability->bReplicateInputDirectly && IsOwnerActorAuthoritative() == false)
 					{
 						ServerSetInputReleased(Spec.Handle);
 					}
 
 					AbilitySpecInputReleased(Spec);
+					if (InputSerial != InputActivationSerial || InputAvatar.Get() != GetAvatarActor() || ReadyEpoch != CharacterReadyEpoch
+						|| Spec.PendingRemove || !Spec.IsActive() || Spec.InputPressed) { continue; }
 
 PRAGMA_DISABLE_DEPRECATION_WARNINGS
 					// Fixing this up to use the instance activation, but this function should be deprecated as it cannot work with InstancedPerExecution

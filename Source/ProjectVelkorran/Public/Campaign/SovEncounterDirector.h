@@ -75,8 +75,15 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Encounter", meta = (ClampMin = "0")) float CompletionEchoReserve = 25.f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Encounter", meta = (ClampMin = "1")) float RestoreTimeoutSeconds = 30.f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Encounter") bool bCompleteWhenRequiredParticipantsDefeated = true;
+	/** Disable for authored duels and canonical failure segments. Environmental fatal hits never allow rescue. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Encounter|Recovery") bool bAllowCompanionRescue = true;
 
 	UFUNCTION(BlueprintPure, Category = "Encounter") ESovEncounterState GetEncounterState() const { return State; }
+	UFUNCTION(BlueprintPure, Category = "Encounter") bool HasEncounterPlayer(const AActor* Actor) const;
+	ASovPlayerCharacterBase* GetEncounterPlayer() const { return EncounterPlayer; }
+	UFUNCTION(BlueprintPure, Category="Encounter") class USovEncounterCoordinationComponent* GetCoordinationComponent() const { return Coordination; }
+	/** Save admission may ignore only these registered, frozen entry participants. */
+	bool IsEntryCheckpointQuiescentForSave(const ASovPlayerCharacterBase* Player) const;
 	UFUNCTION(BlueprintPure, Category = "Encounter") FGuid GetAttemptId() const { return AttemptId; }
 	UFUNCTION(BlueprintPure, Category = "Encounter") ASovNPCCharacterBase* GetParticipant(FName ParticipantId) const;
 	UFUNCTION(BlueprintPure, Category = "Encounter") FName FindParticipantId(const AActor* Actor) const;
@@ -100,6 +107,7 @@ public:
 	virtual bool ShouldRespawn_Implementation() const override { return false; }
 	virtual void PrepareForSave_Implementation() override;
 	virtual void Load_Implementation() override;
+	virtual ENarrativeRestorePhase GetSaveRestorePhase() const override { return ENarrativeRestorePhase::Encounters; }
 
 protected:
 	virtual void BeginPlay() override;
@@ -120,6 +128,10 @@ protected:
 	UPROPERTY(SaveGame) TArray<FGuid> AttemptActorGuids;
 
 private:
+	friend struct FSovEncounterCallbackTestAccess;
+	friend struct FSovCoordinationTestAccess;
+	UPROPERTY(VisibleAnywhere, Category="Encounter") TObjectPtr<class USovEncounterCoordinationComponent> Coordination;
+	bool bPlayerAndControllerRestored = false;
 	void SetState(ESovEncounterState NewState);
 	ASovPlayerCharacterBase* ResolvePlayer() const;
 	bool ValidateEntry(FString& Error) const;
@@ -127,10 +139,13 @@ private:
 	void FinishRestore();
 	void AbortRestore(const FString& Error);
 	void CleanupAttemptActors();
+	bool CleanupAttemptActors(TFunctionRef<bool()> CanContinue);
 	void HandleActorSpawned(AActor* Actor);
 	void SuspendActor(AActor* Actor);
 	void ReleaseSuspensions();
+	bool ReleaseSuspensions(TFunctionRef<bool()> CanContinue);
 	void RemoveTimedEffects(UAbilitySystemComponent* ASC);
+	bool RemoveTimedEffects(UAbilitySystemComponent* ASC, TFunctionRef<bool()> CanContinue);
 	UFUNCTION() void HandleDeath(AActor* KilledActor, UNarrativeAbilitySystemComponent* ASC, bool bIsDead);
 	void BindDeaths();
 	void UnbindDeaths();
@@ -139,6 +154,14 @@ private:
 	UPROPERTY(Transient) TArray<TObjectPtr<UAbilitySystemComponent>> SuspendedASCs;
 	UPROPERTY(Transient) TArray<TObjectPtr<UBrainComponent>> PausedBrains;
 	UPROPERTY(Transient) TArray<TObjectPtr<UNarrativeAbilitySystemComponent>> BoundDeathASCs;
+	TMap<TWeakObjectPtr<UAbilitySystemComponent>, TWeakObjectPtr<AActor>> SuspendedAvatars;
+	TSet<TWeakObjectPtr<UAbilitySystemComponent>> OwnedBusySuspensions;
+	TSet<TWeakObjectPtr<UAbilitySystemComponent>> OwnedProtectionSuspensions;
+	TMap<TWeakObjectPtr<UBrainComponent>, TWeakObjectPtr<APawn>> PausedBrainPawns;
+	uint64 RestoreGeneration = 0;
+	TWeakObjectPtr<AController> RestoreController;
+	TWeakObjectPtr<class ASovPlayerState> RestorePlayerState;
+	TWeakObjectPtr<UAbilitySystemComponent> RestorePlayerASC;
 	TSet<FName> RestoredParticipants;
 	FDelegateHandle ActorSpawnedHandle;
 	float RestoreStartedAt = 0.f;

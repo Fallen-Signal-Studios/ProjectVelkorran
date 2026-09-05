@@ -27,6 +27,6 @@ public class ProjectVelkorran : ModuleRules
 			}
 		);
 
-		PrivateDependencyModuleNames.AddRange(new string[] { "AnimGraphRuntime", "NavigationSystem" });
+		PrivateDependencyModuleNames.AddRange(new string[] { "AnimGraphRuntime", "NavigationSystem", "AssetRegistry", "LevelSequence", "MovieScene", "MovieSceneTracks" });
 	}
 }

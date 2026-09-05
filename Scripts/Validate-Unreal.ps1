@@ -13,8 +13,8 @@ param(
     [string] $EngineRoot,
     [string] $ProjectPath = (Join-Path $PSScriptRoot '..\ProjectVelkorran.uproject'),
     [string] $OutputDirectory,
-    [ValidatePattern('^ProjectVelkorran\.Campaign(?:\.[A-Za-z0-9_]+)*$')]
-    [string] $TestFilter = 'ProjectVelkorran.Campaign',
+    [ValidatePattern('^ProjectVelkorran(?:\.[A-Za-z0-9_]+)*$')]
+    [string] $TestFilter = 'ProjectVelkorran',
     [ValidateRange(30, 86400)]
     [int] $AutomationTimeoutSeconds = 1200,
     [switch] $BuildOnly,

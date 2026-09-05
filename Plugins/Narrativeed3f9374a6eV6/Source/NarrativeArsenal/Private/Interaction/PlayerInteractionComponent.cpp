@@ -3,6 +3,9 @@
 
 #include "Interaction/PlayerInteractionComponent.h"
 #include "Interaction/InteractableComponent.h"
+#include "Interaction/InteractionSubsystem.h"
+#include "UnrealFramework/NarrativeGameUserSettings.h"
+#include "Engine/World.h"
 #include "UnrealFramework/NarrativeCharacter.h"
 #include "GAS/NarrativeInteractAbility.h"
 #include <GameFramework/Controller.h>
@@ -61,73 +64,43 @@ UPlayerInteractionComponent::UPlayerInteractionComponent()
 //}
 
 
-void UPlayerInteractionComponent::TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
+void UPlayerInteractionComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-
-	//Server wasn't able to get this
-	if (!OwningPawn && OwningController)
+	if (!FMath::IsFinite(DeltaTime) || DeltaTime < 0.f || !GetWorld()) { return; }
+	ANarrativeCharacter* CurrentPawn = OwningController ? Cast<ANarrativeCharacter>(OwningController->GetPawn()) : nullptr;
+	if (CurrentPawn != OwningPawn) { ClearViewedInteractable(); OwningPawn = CurrentPawn; }
+	if (!IsActive() || !OwningPawn) { return; }
+	if (GetWorld()->TimeSince(LastInteractionCheckTime) >= InteractionCheckFrequency) { PerformInteractionCheck(DeltaTime); }
+	if (!bInteractHeld || !IsValid(ViewedInteractable) || GetOwnerRole() < ROLE_Authority || RemainingInteractTime <= -998.f) { return; }
+	if (!IsInteractableInReach(ViewedInteractable)) { EndInteract(); return; }
+	RemainingInteractTime -= DeltaTime;
+	if (RemainingInteractTime <= 0.f) { CompletePendingInteraction(); }
+}
+void UPlayerInteractionComponent::CompletePendingInteraction()
+{
+	if (!bInteractHeld || GetOwnerRole() < ROLE_Authority || !IsInteractableInReach(ViewedInteractable)
+		|| RemainingInteractTime > 0.f || RemainingInteractTime <= -998.f) { return; }
+	TWeakObjectPtr<UNarrativeInteractableComponent> Target = ViewedInteractable;
+	ANarrativeCharacter* Pawn = OwningPawn;
+	RemainingInteractTime = -999.f; // Consume before callbacks; no recursive or repeated completion.
+	FText Error;
+	if (!Target->CanInteract(Pawn, this, Error) || !Target.IsValid() || ViewedInteractable != Target.Get()
+		|| !OwningController || OwningController->GetPawn() != Pawn || !IsInteractableInReach(Target.Get())) { EndInteract(); return; }
+	if (!Target->InteractionSlots.IsEmpty())
 	{
-		OwningPawn = Cast<ANarrativeCharacter>(OwningController->GetPawn());
+		const int32 Slot = Target->GetBestAvailableSlot(this, Target->GetAvailableSlots(this, true));
+		if (Target.IsValid() && Target->SlotStatuses.IsValidIndex(Slot))
+		{
+			UNarrativeInteractionComponent* Previous = Target->SlotStatuses[Slot].SlotStatus == EInteractionSlotStatus::ISS_Occupied
+				? Target->SlotStatuses[Slot].SlotUser.Get() : nullptr;
+			if (ClaimInteractionSlot(Target.Get(), Slot)) { RunInteractBehavior(IsValid(Previous), Previous); }
+		}
 	}
-
-	if (IsActive())
+	else if (Target->Interact(Pawn, this) && Target.IsValid())
 	{
-		if (GetWorld()->TimeSince(LastInteractionCheckTime) > InteractionCheckFrequency)
-		{
-			PerformInteractionCheck(DeltaTime);
-
-		}
-
-		if (bInteractHeld && ViewedInteractable && GetOwnerRole() >= ROLE_Authority)
-		{
-			if (RemainingInteractTime > 0.f)
-			{
-				RemainingInteractTime -= DeltaTime;
-			}
-
-			if (RemainingInteractTime <= 0.f && RemainingInteractTime > -998.f)
-			{
-				//Since we added slots, we should check those, but if no slots are added just do old style instant interaction
-				if (ViewedInteractable->InteractionSlots.Num())
-				{
-					if (ANarrativeCharacter* OwnerChar = Cast<ANarrativeCharacter>(OwningPawn))
-					{
-						const int32 BestInteractionSlot = ViewedInteractable->GetBestAvailableSlot(this, ViewedInteractable->GetAvailableSlots(this, true));
-
-						if (BestInteractionSlot != -1)
-						{
-							UNarrativeInteractionComponent* StealingFrom = nullptr; 
-
-							//See if the slot we got is a steal
-							if (ViewedInteractable->SlotStatuses[BestInteractionSlot].SlotStatus == EInteractionSlotStatus::ISS_Occupied)
-							{
-								StealingFrom = ViewedInteractable->SlotStatuses[BestInteractionSlot].SlotUser;
-							}
-
-							//ClaimInteractionSlot will remove the existing occupant, telling them we removed us 
-							if (ClaimInteractionSlot(ViewedInteractable, BestInteractionSlot))
-							{
-								RunInteractBehavior(IsValid(StealingFrom), StealingFrom);
-							}
-						}
-
-					}
-				}
-				else // We still support this legacy style interaction where there aren't any slots and you just instant interact 
-				{
-					const bool bInteracted = ViewedInteractable->Interact(OwningPawn, this);
-
-					if (bInteracted && ViewedInteractable)
-					{
-						OnBeginUseInteractable.Broadcast(ViewedInteractable->GetOwner(), ViewedInteractable);
-						OnFinishUseInteractable.Broadcast(ViewedInteractable->GetOwner(), ViewedInteractable);
-					}
-				}
-
-				RemainingInteractTime = -999.f;
-			}
-		}
+		OnBeginUseInteractable.Broadcast(Target->GetOwner(), Target.Get());
+		if (Target.IsValid()) { OnFinishUseInteractable.Broadcast(Target->GetOwner(), Target.Get()); }
 	}
 }
 
@@ -169,122 +142,49 @@ void UPlayerInteractionComponent::Load_Implementation()
 	//}
 }
 
+bool UPlayerInteractionComponent::IsInteractableInReach(UNarrativeInteractableComponent* Target) const
+{
+	if (!IsValid(Target) || !Target->IsActive() || !IsValid(Target->GetOwner()) || !OwningController || !OwningPawn
+		|| OwningController->GetPawn() != OwningPawn || Target->GetWorld() != GetWorld()
+		|| !FMath::IsFinite(Target->InteractionDistance) || Target->InteractionDistance <= 0.f
+		|| !FMath::IsFinite(Target->MaxViewAngleDegrees)) { return false; }
+	const FBox Bounds = Target->GetInteractableBounds();
+	const FVector Focus = Bounds.GetCenter();
+	const FVector Closest = Bounds.GetClosestPoint(OwningPawn->GetActorLocation());
+	if (!Bounds.IsValid || Focus.ContainsNaN() || FVector::DistSquared(Closest, OwningPawn->GetActorLocation())
+		> FMath::Square(FMath::Min(Target->InteractionDistance, InteractionCheckDistance))) { return false; }
+	FVector Eye; FRotator Rotation; OwningController->GetPlayerViewPoint(Eye, Rotation);
+	const FVector ToTarget = Focus - Eye;
+	if (ToTarget.ContainsNaN() || FVector::DotProduct(Rotation.Vector(), ToTarget.GetSafeNormal())
+		< FMath::Cos(FMath::DegreesToRadians(FMath::Clamp(Target->MaxViewAngleDegrees, 1.f, 85.f)))) { return false; }
+	FCollisionQueryParams Query(SCENE_QUERY_STAT(NarrativeInteractReach), false, OwningPawn);
+	TArray<AActor*> Attached; OwningPawn->GetAttachedActors(Attached, true, true);
+	Query.AddIgnoredActors(Attached);
+	const UArsenalSettings* Settings = UArsenalStatics::GetNarrativeProSettings();
+	FHitResult Hit;
+	const bool Blocked = GetWorld()->LineTraceSingleByChannel(Hit, Eye, Focus,
+		Settings ? Settings->InteractionTraceChannel : ECC_Visibility, Query);
+	return !Blocked || Hit.GetActor() == Target->GetOwner();
+}
 void UPlayerInteractionComponent::PerformInteractionCheck(float DeltaTime)
 {
-	if (OwningController && OwningPawn)
+	LastInteractionCheckTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+	UInteractionSubsystem* Registry = GetWorld() ? GetWorld()->GetSubsystem<UInteractionSubsystem>() : nullptr;
+	if (!Registry || !OwningController || !OwningPawn) { ClearViewedInteractable(); return; }
+	FVector Eye; FRotator Rotation; OwningController->GetPlayerViewPoint(Eye, Rotation);
+	UNarrativeInteractableComponent* Best = nullptr; float BestScore = -FLT_MAX;
+	for (UNarrativeInteractableComponent* Candidate : Registry->GetInteractableActors())
 	{
-		FVector EyesLoc;
-		FRotator EyesRot;
-
-		OwningController->GetPlayerViewPoint(EyesLoc, EyesRot);
-
-		//Add camera dist from pawn as long camera arms shouldn't effect how far you can interact 
-
-
-		const FVector PawnLoc = OwningPawn->GetActorLocation();
-		const FVector AimDir = EyesRot.Vector();
-		const FVector FocalLoc = EyesLoc + (AimDir * 1024.f);
-
-		const FVector StartPoint = FocalLoc + (((PawnLoc - FocalLoc) | AimDir) * AimDir);
-		const FVector TraceStart = StartPoint;
-		const FVector TraceEnd = (EyesRot.Vector() * InteractionCheckDistance) + TraceStart;
-		FHitResult TraceHit;
-
-		FCollisionQueryParams QueryParams = FCollisionQueryParams();
-		QueryParams.TraceTag = "PlayerInteract";
-		QueryParams.AddIgnoredActor(OwningPawn);
-
-		/*When checking for interactables, we use a profile so walls and such block our path to the interactable, which is desired behavior.
-		However interactables themselves should block the interactable trace channel - that way we can differentiate interactables from
-		walls etc by checking if they block interactable channel. */
-		if (UArsenalSettings* Settings = UArsenalStatics::GetNarrativeProSettings())
-		{
-			if (FMath::IsNearlyZero(InteractionCheckSphereRadius))
-			{
-				GetWorld()->LineTraceSingleByChannel(TraceHit, TraceStart, TraceEnd, Settings->InteractionTraceChannel, QueryParams);
-				//GetWorld()->LineTraceSingleByProfile(TraceHit, TraceStart, TraceEnd, InteractTraceProfile, QueryParams);
-
-#if ENABLE_DRAW_DEBUG
-				if (CVarInteractionDebug.GetValueOnGameThread() && ViewedInteractable)
-				{
-					DrawDebugLineTraceSingle(GetWorld(), TraceStart, TraceEnd, EDrawDebugTrace::Type::ForDuration, TraceHit.bBlockingHit, TraceHit, FLinearColor::Green, FLinearColor::Red, 5.f);
-				}
-#endif
-
-			}
-			else
-			{
-				GetWorld()->LineTraceSingleByChannel(TraceHit, TraceStart, TraceEnd, Settings->InteractionTraceChannel, QueryParams);
-				//GetWorld()->LineTraceSingleByProfile(TraceHit, TraceStart, TraceEnd, InteractTraceProfile, QueryParams);
-
-#if ENABLE_DRAW_DEBUG
-				if (CVarInteractionDebug.GetValueOnGameThread())
-				{
-					DrawDebugLineTraceSingle(GetWorld(), TraceStart, TraceEnd, EDrawDebugTrace::Type::ForDuration, TraceHit.bBlockingHit, TraceHit, FLinearColor::Green, FLinearColor::Red, 5.f);
-				}
-#endif
-
-				// If our line trace didnt hit an interactable, try the sphere trace
-				if (!TraceHit.GetActor() || !TraceHit.GetActor()->GetComponentByClass<UNarrativeInteractableComponent>())
-				{
-					const FCollisionShape Sphere = FCollisionShape::MakeSphere(InteractionCheckSphereRadius);
-					FHitResult Hit;
-
-					const bool bMultiHit = GetWorld()->SweepSingleByChannel(Hit, TraceStart, TraceEnd, FQuat(), Settings->InteractionTraceChannel, Sphere, QueryParams);
-					//GetWorld()->SweepMultiByProfile(MultiHit, TraceStart, TraceEnd, FQuat::Identity, InteractTraceProfile, Sphere, QueryParams);
-#if ENABLE_DRAW_DEBUG
-					if (CVarInteractionDebug.GetValueOnGameThread())
-					{
-						DrawDebugSphereTraceSingle(GetWorld(), TraceStart, TraceEnd, Sphere.GetSphereRadius(), EDrawDebugTrace::Type::ForOneFrame, bMultiHit, Hit, FLinearColor::Green, FLinearColor::Red, 0.5f);
-					}
-#endif 
-
-					if(Hit.bBlockingHit)
-					{
-						if (Hit.GetComponent() && Hit.GetComponent()->GetCollisionResponseToChannel(Settings->InteractionTraceChannel) == ECollisionResponse::ECR_Block)
-						{
-							if (Hit.GetActor() && Hit.GetActor()->GetComponentByClass<UNarrativeInteractableComponent>())
-							{
-								TraceHit = Hit;
-							}
-						}
-					}
-				}
-			}
-		}
-
-
-
-
-		//Check if we hit an interactable object
-		if (TraceHit.GetActor())
-		{
-			if (UNarrativeInteractableComponent* InteractableComponent = Cast<UNarrativeInteractableComponent>(TraceHit.GetActor()->GetComponentByClass(UNarrativeInteractableComponent::StaticClass())))
-			{
-				if (InteractableComponent->IsActive())
-				{
-					const float Distance = (OwningPawn->GetActorLocation() - TraceHit.ImpactPoint).Size();
-
-					if (Distance <= InteractableComponent->InteractionDistance)
-					{
-						SetViewedInteractable(InteractableComponent);
-
-#if ENABLE_DRAW_DEBUG
-						if (CVarInteractionDebug.GetValueOnGameThread() && ViewedInteractable)
-						{
-							FString RoleStr = GetOwnerRole() == ROLE_Authority ? "Server" : "Client";
-							GEngine->AddOnScreenDebugMessage(-1, 0.001f, FColor::Red, FString::Printf(TEXT("%s: Interaction %s, hit comp %s"), *RoleStr, *GetNameSafe(ViewedInteractable), *GetNameSafe(TraceHit.GetComponent())));
-						}
-#endif
-
-						return;
-					}
-				}
-			}
-		}
+		if (!IsInteractableInReach(Candidate)) { continue; }
+		const FVector Focus = Candidate->GetInteractableBounds().GetCenter();
+		const float Facing = FVector::DotProduct(Rotation.Vector(), (Focus - Eye).GetSafeNormal());
+		const float Distance = FVector::Distance(Focus, OwningPawn->GetActorLocation());
+		const float Score = FMath::Clamp(Candidate->InteractionPriority, -100, 100) * 4.f + Facing * 2.f
+			- Distance / FMath::Max(1.f, Candidate->InteractionDistance);
+		if (!Best || Score > BestScore || (FMath::IsNearlyEqual(Score, BestScore) && Candidate->GetPathName() < Best->GetPathName()))
+		{ Best = Candidate; BestScore = Score; }
 	}
-
-	ClearViewedInteractable();
+	if (Best) { SetViewedInteractable(Best); } else { ClearViewedInteractable(); }
 }
 
 void UPlayerInteractionComponent::ClearViewedInteractable()
@@ -306,6 +206,7 @@ void UPlayerInteractionComponent::ClearViewedInteractable()
 
 void UPlayerInteractionComponent::SetViewedInteractable(UNarrativeInteractableComponent* Interactable)
 {
+	if (!IsValid(Interactable)) { ClearViewedInteractable(); return; }
 	if (Interactable != ViewedInteractable)
 	{
 		EndInteract();
@@ -333,21 +234,28 @@ void UPlayerInteractionComponent::ServerEndInteract_Implementation()
 
 void UPlayerInteractionComponent::BeginInteract()
 {
-	if (GetOwnerRole() < ROLE_Authority)
-	{
-		ServerBeginInteract();
-	}
-	
+	if (GetOwnerRole() < ROLE_Authority) { ServerBeginInteract(); }
+	ANarrativeCharacter* CurrentPawn = OwningController ? Cast<ANarrativeCharacter>(OwningController->GetPawn()) : nullptr;
+	if (CurrentPawn != OwningPawn) { ClearViewedInteractable(); OwningPawn = CurrentPawn; }
+	if (!IsActive() || !OwningPawn || bInteractHeld) { return; }
+	PerformInteractionCheck(0.f);
+	TWeakObjectPtr<UNarrativeInteractableComponent> Target = ViewedInteractable;
+	ANarrativeCharacter* Pawn = OwningPawn;
+	FText Error;
+	if (!IsInteractableInReach(Target.Get()) || !Target->CanInteract(Pawn, this, Error)
+		|| !Target.IsValid() || Target.Get() != ViewedInteractable || OwningController->GetPawn() != Pawn) { return; }
+	const UNarrativeGameUserSettings* Settings = UNarrativeGameUserSettings::GetSovSettings();
+	const float Scale = Settings ? FMath::Clamp(Settings->GetInteractionHoldScale(), 0.1f, 1.f) : 1.f;
+	RemainingInteractTime = Settings && Settings->UseTapInteractions() ? 0.f : FMath::Max(0.f, Target->InteractionTime) * Scale;
 	bInteractHeld = true;
-
 	OnInteractPressed.Broadcast(this);
-	
-	FText ErrorMessage;
-	if (ViewedInteractable && ViewedInteractable->CanInteract(OwningPawn, this, ErrorMessage))
+	if (bInteractHeld && Target.IsValid() && Target.Get() == ViewedInteractable && OwningController->GetPawn() == Pawn)
 	{
-		ViewedInteractable->BeginInteract(OwningPawn, this);
-		RemainingInteractTime = ViewedInteractable->InteractionTime;
+		Target->BeginInteract(Pawn, this);
+		if (Target.IsValid() && Target.Get() == ViewedInteractable && OwningController->GetPawn() == Pawn)
+		{ CompletePendingInteraction(); }
 	}
+	else { EndInteract(); }
 }
 
 void UPlayerInteractionComponent::EndInteract()

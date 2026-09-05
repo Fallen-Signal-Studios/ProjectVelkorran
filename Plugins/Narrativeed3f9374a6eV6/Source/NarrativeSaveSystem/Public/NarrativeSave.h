@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/SaveGame.h"
+#include "NarrativeSavePhases.h"
 #include "NarrativeSave.generated.h"
 
 USTRUCT()
@@ -16,6 +17,9 @@ public:
 	/* Which component this is */
 	UPROPERTY(SaveGame)
 	FName ComponentName;
+	UPROPERTY(SaveGame) TSoftClassPtr<class UActorComponent> ComponentClass;
+	UPROPERTY(SaveGame) bool bOptional = false;
+    UPROPERTY(SaveGame) ENarrativeRestorePhase RestorePhase = ENarrativeRestorePhase::Interactables;
 
     /* Contains all 'SaveGame' marked variables of the component  */
 	UPROPERTY(SaveGame)
@@ -45,6 +49,9 @@ public:
 	/* Whether the actor has been destroyed. This is only relevant for actors placed in the level - dynamic actors simply have their save record removed. */
 	UPROPERTY(SaveGame)
 	bool bDestroyed = false;
+	/** Only explicitly optional records may be skipped when their package is unavailable. */
+	UPROPERTY(SaveGame) bool bOptional = false;
+    UPROPERTY(SaveGame) ENarrativeRestorePhase RestorePhase = ENarrativeRestorePhase::Interactables;
 
 	/* Whether the actor is net startup or was spawned dynamically.  */
 	UPROPERTY(SaveGame)

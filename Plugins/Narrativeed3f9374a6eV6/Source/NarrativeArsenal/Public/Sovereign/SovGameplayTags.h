@@ -20,6 +20,36 @@ public:
 	static const FSovGameplayTags& Get() { return GameplayTags; }
 	static void InitializeNativeTags();
 
+	FGameplayTag Input_Evade;
+	FGameplayTag Input_FieldRecovery;
+	FGameplayTag Ability_FieldRecovery;
+	FGameplayTag State_FieldRecovery;
+	FGameplayTag Input_ThreatFocus;
+	FGameplayTag Input_CycleTargetLeft;
+	FGameplayTag Input_CycleTargetRight;
+	FGameplayTag Input_AbilityModifier;
+	FGameplayTag Ability_Evade;
+	FGameplayTag State_Evading;
+	FGameplayTag State_Exertion_Exhausted;
+	FGameplayTag Ability_Finisher;
+	FGameplayTag Input_Finisher;
+	FGameplayTag State_Finisher_Active;
+	FGameplayTag State_Finisher_Target;
+	FGameplayTag State_InterruptProtected;
+	FGameplayTag Event_Finisher_PhaseResolved;
+	FGameplayTag Event_Finisher_Strike;
+	FGameplayTag State_Resonance_Available;
+	FGameplayTag State_Resonance_Committed;
+	FGameplayTag Event_Resonance_Setup_PerfectGuard;
+	FGameplayTag Event_Resonance_Setup_CommandExposed;
+	FGameplayTag Event_Resonance_Setup_TerminalProtection;
+	FGameplayTag Event_Resonance_Setup_RoutedFire;
+	FGameplayTag State_Resonance_CounterWindow;
+	FGameplayTag State_Resonance_ProtectedTarget;
+	FGameplayTag State_Invulnerable_Respawn;
+	FGameplayTag State_Recovery_Rescue;
+	FGameplayTag State_Traversal;
+	FGameplayTag State_Choice_Unresolved;
 	FGameplayTag Character_Player;
 	FGameplayTag Character_Player_Tarrik;
 	FGameplayTag Character_Player_Selene;
