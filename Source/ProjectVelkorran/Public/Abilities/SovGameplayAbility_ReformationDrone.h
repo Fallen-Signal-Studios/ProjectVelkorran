@@ -15,6 +15,7 @@ class UAbilitySystemComponent;
 class UAbilityTask_PlayMontageAndWait;
 class UAnimMontage;
 class UGameplayEffect;
+class UPathFollowingComponent;
 class USovProtectionInterceptReceipt;
 
 /**
@@ -78,6 +79,11 @@ protected:
 
 	/** Returns whether the source is still allowed to release another shot. */
 	bool CanContinueWeaponPayload() const;
+	uint64 GetWeaponActivationEpoch() const { return WeaponActivationEpoch; }
+	bool IsWeaponActivationCurrent(uint64 Epoch) const;
+	bool ValidateWeaponActivation(uint64 Epoch);
+	bool IsWeaponEnding() const { return bEndingAbility || bPendingWeaponEnd; }
+	bool IsWeaponTeardownInProgress() const { return bEndingAbility; }
 
 	/** Lets concrete weapon implementations observe base lifecycle state safely. */
 	bool HasWeaponPayloadFinished() const { return bPayloadFinished; }
@@ -180,6 +186,9 @@ private:
 	void HandleMontageInterrupted();
 
 	void StartAttackMontage();
+	void BindInterruptionTags(UAbilitySystemComponent* ASC);
+	void UnbindInterruptionTags();
+	void HandleInterruptionTagChanged(FGameplayTag Tag, int32 NewCount);
 
 	UPROPERTY(Transient)
 	TObjectPtr<UAbilityTask_PlayMontageAndWait> MontageTask;
@@ -192,6 +201,11 @@ private:
 	bool bPayloadFinished = false;
 	bool bAbilityStarted = false;
 	bool bEndingAbility = false;
+	bool bPendingWeaponEnd = false;
+	uint64 WeaponActivationEpoch = 0;
+	TWeakObjectPtr<UAbilitySystemComponent> ActionAbilitySystem;
+	TWeakObjectPtr<AActor> ActionAvatar;
+	TMap<FGameplayTag, FDelegateHandle> InterruptionTagHandles;
 };
 
 /** Server-owned hitscan burst with replicated per-shot presentation. */
@@ -459,12 +473,13 @@ private:
 	void EnterDetonationWarning();
 	void CommitDetonation();
 	void AbortOwnedPursuitMove();
-	bool ApplyExplosionDamage(const FVector& ExplosionLocation) const;
+	bool ApplyExplosionDamage(UAbilitySystemComponent* SourceASC, AActor* SourceActor, UObject* SourceObject,
+		float EffectLevel, const FVector& ExplosionLocation, AActor* Presentation) const;
 	bool HasExplosionLineOfSight(
 		AActor* InSourceActor,
 		AActor* TargetActor,
 		UAbilitySystemComponent* TargetAbilitySystem,
-		const FVector& ExplosionLocation) const;
+		const FVector& ExplosionLocation, AActor* Presentation) const;
 	bool ApplyFatalSelfDamage(
 		UAbilitySystemComponent* InSourceAbilitySystem,
 		AActor* InSourceActor,
@@ -479,6 +494,7 @@ private:
 	TObjectPtr<ASovReformationDroneSelfDestructPresentation> ActivePresentation;
 
 	TWeakObjectPtr<AActor> PursuitTarget;
+	TWeakObjectPtr<UPathFollowingComponent> OwnedPursuitPathFollowing;
 	FTimerHandle PursuitUpdateTimerHandle;
 	FTimerHandle DetonationWarningTimerHandle;
 	FAIRequestID OwnedPursuitMoveRequestId = FAIRequestID::InvalidRequest;

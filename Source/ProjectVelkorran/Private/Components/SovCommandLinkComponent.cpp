@@ -15,6 +15,34 @@
 
 DEFINE_LOG_CATEGORY_STATIC(LogSovCommandLink, Log, All);
 
+struct FSovCommandLinkRewardReceipt
+{
+	TWeakObjectPtr<USovCommandLinkComponent> Issuer;
+	TWeakObjectPtr<AActor> Severer;
+	FGuid Transaction;
+	FGuid Instance;
+	bool bConsumed = false;
+};
+
+bool FSovCommandLinkSeverResult::ConsumeNativeReward(AActor* ExpectedSeverer) const
+{
+	const auto Receipt = NativeRewardReceipt;
+	if (!IsInGameThread() || !Receipt || Receipt->bConsumed || !Receipt->Issuer.IsValid()
+		|| !IsValid(ExpectedSeverer) || !ExpectedSeverer->HasAuthority()
+		|| Receipt->Severer.Get() != ExpectedSeverer || SeveredBy != ExpectedSeverer
+		|| Receipt->Transaction != TransactionId || Receipt->Instance != LinkInstanceId
+		|| Receipt->Issuer->GetOwner() != LinkOwner || Receipt->Issuer->GetLinkId() != LinkId
+		|| Receipt->Issuer->GetLinkInstanceId() != Receipt->Instance) { return false; }
+	Receipt->bConsumed = true;
+	return true;
+}
+
+void USovCommandLinkComponent::RetireNativeSeverReceipt()
+{
+	if (LastSeverRewardReceipt) { LastSeverRewardReceipt->bConsumed = true; }
+	LastSeverRewardReceipt.Reset();
+}
+
 USovCommandLinkComponent::USovCommandLinkComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
@@ -72,6 +100,7 @@ void USovCommandLinkComponent::BeginPlay()
 void USovCommandLinkComponent::EndPlay(
 	const EEndPlayReason::Type EndPlayReason)
 {
+	RetireNativeSeverReceipt();
 	if (GetOwner() && GetOwner()->HasAuthority())
 	{
 		ClearAllParticipantContributions();
@@ -205,6 +234,7 @@ bool USovCommandLinkComponent::ActivateCommandLink(AActor* InCommandSource)
 
 	const ESovCommandLinkState OldState = ReplicationState.State;
 	bCommandLinkMutationInProgress = true;
+	RetireNativeSeverReceipt();
 	AActor* PreviousSource = ReplicationState.CommandSource.Get();
 	ClearAllParticipantContributions();
 	ReplicationState.LinkId = LinkId;
@@ -261,6 +291,7 @@ bool USovCommandLinkComponent::RestoreCommandLinkState(const FSovCommandLinkSnap
 	}
 	const ESovCommandLinkState PreviousState = ReplicationState.State;
 	bCommandLinkMutationInProgress = true;
+	RetireNativeSeverReceipt();
 	ClearAllParticipantContributions();
 	UnbindAllParticipants();
 	LinkedActors.Reset();
@@ -301,6 +332,7 @@ void USovCommandLinkComponent::ResetCommandLink()
 	AActor* ExistingSource = ReplicationState.CommandSource.Get();
 	const ESovCommandLinkState OldState = ReplicationState.State;
 	bCommandLinkMutationInProgress = true;
+	RetireNativeSeverReceipt();
 	ReplicationState.State = ESovCommandLinkState::Inactive;
 	++ReplicationState.Revision;
 	ClearAllParticipantContributions();
@@ -368,6 +400,12 @@ ESovCommandLinkSeverResolution USovCommandLinkComponent::TrySeverCommandLink(
 	}
 
 	OutResult.TransactionId = FGuid::NewGuid();
+	LastSeverRewardReceipt = MakeShared<FSovCommandLinkRewardReceipt>();
+	LastSeverRewardReceipt->Issuer = this;
+	LastSeverRewardReceipt->Severer = SeveredBy;
+	LastSeverRewardReceipt->Transaction = OutResult.TransactionId;
+	LastSeverRewardReceipt->Instance = ReplicationState.LinkInstanceId;
+	OutResult.NativeRewardReceipt = LastSeverRewardReceipt;
 	OutResult.LinkInstanceId = ReplicationState.LinkInstanceId;
 	OutResult.LinkId = GetLinkId();
 	OutResult.LinkOwner = GetOwner();
@@ -947,6 +985,7 @@ void USovCommandLinkComponent::RevealParticipantWeakPoints(
 FSovCommandLinkSeverResult USovCommandLinkComponent::BuildLastSeverResult() const
 {
 	FSovCommandLinkSeverResult Result;
+	Result.NativeRewardReceipt = LastSeverRewardReceipt;
 	Result.TransactionId = ReplicationState.LastSeverTransactionId;
 	Result.LinkInstanceId = ReplicationState.LinkInstanceId;
 	Result.LinkId = GetLinkId();

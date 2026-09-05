@@ -256,15 +256,13 @@ bool USovSeleneEchoGenerationComponent::ConsumeCommandLinkSever(
 		|| SeverInstigator != GetOwner()
 		|| !IsValid(CommandNode)
 		|| CommandNode->GetWorld() != GetWorld()
-		|| ConsumedCommandLinkSeverTransactions.Contains(
-			SeverResult.TransactionId))
+		|| !SeverResult.ConsumeNativeReward(GetOwner()))
 	{
 		return false;
 	}
 
 	// Consume the transaction before any resource or target policy can discard
 	// its reward. A replay must never become payable after Echo later changes.
-	ConsumedCommandLinkSeverTransactions.Add(SeverResult.TransactionId);
 	if (!SeverResult.bEligibleForEchoReward)
 	{
 		return true;
@@ -321,18 +319,16 @@ void USovSeleneEchoGenerationComponent::HandleOwnerASCInitialized()
 void USovSeleneEchoGenerationComponent::HandlePerfectDeflection(
 	const FSovDamageResult& DamageResult)
 {
-	if (!CanGenerateSeleneEcho()
-		|| !DamageResult.TransactionId.IsValid()
-		|| ConsumedDeflectionTransactions.Contains(DamageResult.TransactionId)
+	if (!DamageResult.TransactionId.IsValid()
 		|| DamageResult.TargetActor.Get() != GetOwner()
 		|| !DamageResult.bPerfectDefense
 		|| !DamageResult.bDeflected
-		|| DamageResult.DefenseKind != ESovDefenseKind::Deflection)
+		|| DamageResult.DefenseKind != ESovDefenseKind::Deflection
+		|| !DamageResult.ConsumeNativeReceipt(this, 1) || !CanGenerateSeleneEcho())
 	{
 		return;
 	}
 
-	ConsumedDeflectionTransactions.Add(DamageResult.TransactionId);
 	// AddEcho records legitimate defense activity even when the meter is full.
 	AwardEcho(
 		GetPerfectDeflectionEchoReward(),
@@ -348,8 +344,7 @@ void USovSeleneEchoGenerationComponent::HandleDamageResolvedAsSource(
 	AActor* Target = DamageResult.TargetActor.Get();
 	if (!GetOwner() || !GetOwner()->HasAuthority() || DamageResult.SourceActor.Get() != GetOwner()
 		|| !IsValid(Target) || !DamageResult.TransactionId.IsValid()
-		|| ConsumedDamageTransactions.Contains(DamageResult.TransactionId)) return;
-	ConsumedDamageTransactions.Add(DamageResult.TransactionId);
+		|| !DamageResult.ConsumeNativeReceipt(this)) return;
 
 	FName BrokenWeakPointId = NAME_None;
 	USovWeakPointComponent* WeakPoints = Target->FindComponentByClass<USovWeakPointComponent>();
@@ -409,9 +404,7 @@ void USovSeleneEchoGenerationComponent::HandleDamageResolvedAsTarget(const FSovD
 void USovSeleneEchoGenerationComponent::ConsumeUndetectedBypass(ASovEchoBypassGate* Gate, const FGuid& ReceiptId)
 {
 	FGuid Attempt;
-	if (!IsValid(Gate) || !Gate->ConsumeReceipt(GetOwner(), ReceiptId, Attempt)
-		|| ConsumedBypassAttempts.Contains(Attempt)) return;
-	ConsumedBypassAttempts.Add(Attempt);
+	if (!IsValid(Gate) || !Gate->ConsumeReceipt(GetOwner(), ReceiptId, Attempt)) return;
 	AwardEcho(15.0f, FSovGameplayTags::Get().Echo_Source_UndetectedBypass,
 		ESovSeleneEchoAwardType::UndetectedBypass, NAME_None, Gate);
 }

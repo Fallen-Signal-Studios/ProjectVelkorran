@@ -4,10 +4,21 @@
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "Save/SovCampaignSaveGame.h"
 #include "Containers/Ticker.h"
+#include "Engine/EngineBaseTypes.h"
 #include "SovSaveSubsystem.generated.h"
 class UNarrativeSave;
 class ASovPlayerController;
 struct FSovObservedPlatformAccount;
+class USovCampaignDefinition;
+
+/** Immutable admission receipt. Namespace alone is insufficient after revoke/re-authorize cycles. */
+struct FSovStorageOwnerToken
+{
+    FString Namespace;
+    int32 User = INDEX_NONE;
+    uint64 Generation = 0;
+    bool bAuthorized = false;
+};
 
 /** Testable platform storage seam; production delegates to Unreal's platform save API. */
 class PROJECTVELKORRAN_API ISovSaveStorage
@@ -17,6 +28,7 @@ public:
     virtual bool Read(const FString& Slot, int32 User, TArray<uint8>& Bytes) = 0;
     virtual bool Write(const FString& Slot, int32 User, const TArray<uint8>& Bytes) = 0;
     virtual bool Exists(const FString& Slot, int32 User) = 0;
+    virtual bool Remove(const FString&, int32) { return false; }
 };
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FSovSaveCompleted, ESovSaveResult, Result, const FSovSaveSlotHeader&, Slot, const FString&, Message);
 
@@ -36,8 +48,15 @@ public:
     const FString& GetAccountNamespace() const { return AccountNamespace; }
     int32 GetLocalSaveUserIndex() const { return UserIndex; }
     UFUNCTION(BlueprintPure, Category="Campaign|Save")
-    bool IsPlatformStorageOwnerAvailable() const { return bPlatformStorageOwnerAvailable && !AccountNamespace.IsEmpty() && UserIndex >= 0; }
+    bool IsPlatformStorageOwnerAvailable() const { return !bSessionAbandoned && bPlatformStorageOwnerAvailable && !AccountNamespace.IsEmpty() && UserIndex >= 0; }
     bool IsPlatformStorageSuspended() const { return bPlatformSuspended; }
+    FSovStorageOwnerToken CaptureStorageOwner() const;
+    bool IsStorageOwnerCurrent(const FSovStorageOwnerToken& Token) const;
+    /** Tear down transient ownership without saving or granting a continue-without-save receipt. */
+    bool AbandonSessionForTitle(FString& Error);
+    bool BeginMissionTravel(USovCampaignDefinition* Destination, FString& Error);
+    void CancelMissionTravel();
+    void CompleteMissionTravel(USovCampaignDefinition* Destination);
     /** Suspend does not initiate I/O. It holds native save/load watchdog time until foreground ownership is revalidated. */
     void SetPlatformSuspended(bool bSuspended);
     /** Cloud transports never become save authorities: export only the verified native bank. */
@@ -59,6 +78,11 @@ public:
     ESovSaveResult LoadSlot(ESovSaveSlotKind Kind, int32 SlotIndex, FString& Error, bool bAcceptRecoveredBank = false);
     UFUNCTION(BlueprintCallable, Category="Campaign|Save")
     TArray<FSovSaveSlotHeader> ListSlots();
+    UFUNCTION(BlueprintCallable, Category="Campaign|Save")
+    TArray<FString> ListPreservedSaveArchives(ESovSaveSlotKind Kind, int32 SlotIndex);
+    /** Explicit confirmed retention action; never deletes a bank or the only recoverable campaign copy. */
+    UFUNCTION(BlueprintCallable, Category="Campaign|Save")
+    bool DeletePreservedSaveArchive(ESovSaveSlotKind Kind, int32 SlotIndex, const FString& ArchiveId, FString& Error);
     UFUNCTION(BlueprintCallable, Category="Campaign|Save")
     bool FindRecoveryAutosave(FSovSaveSlotHeader& Slot);
     /** Explicit informed continuation after a disk failure; releases only this subsystem's pause. */
@@ -88,6 +112,7 @@ private:
     friend struct FSovPlatformServicesTestAccess;
     /** Only the native provider observer can establish authorization; never exposed to Blueprint callers. */
     void ObserveNativePlatformAccount(const FSovObservedPlatformAccount& Account);
+    void FenceUnresolvedAccountChange();
     struct FQueuedBoundary { ESovSaveBoundary Kind; FName Id; };
     bool CanCaptureInternal(FString& Error, bool bAllowEntrySuspension) const;
     ESovSaveResult CaptureAndWrite(ESovSaveSlotKind Kind, int32 SlotIndex, FName BoundaryId, FString& Error, bool bAllowEntrySuspension = false, ESovSaveBoundary Boundary = ESovSaveBoundary::ExplicitCheckpoint);
@@ -100,12 +125,18 @@ private:
     bool ValidateEnvelope(USovCampaignSaveGame* Save, bool bValidateAssets, FString& Error) const;
     bool MatchesPendingLoadRequest(const FString& Options) const;
     void CompletePendingLoad(bool bSucceeded, const FString& Error);
+    void OnTravelFailure(UWorld* World, ETravelFailure::Type Failure, const FString& Error);
+    void FailMissionTravel(const FString& Error);
+    void PublishSettingsOwner();
     UNarrativeSave* DecodeNarrative(USovCampaignSaveGame* Save, FString& Error) const;
     FString BankName(ESovSaveSlotKind Kind, int32 Index, int32 Bank) const;
     void ResolveInitialSave(UWorld& World, UNarrativeSave*& Snapshot, bool& bOverride);
     void ReportSave(ESovSaveResult Result, const FSovSaveSlotHeader& Header, const FString& Error);
     bool Tick(float DeltaSeconds);
-    ASovPlayerController* Controller() const;
+protected:
+    /** Native owner lookup is overridable by isolated world tests without replacing storage/receipt logic. */
+    virtual ASovPlayerController* Controller() const;
+private:
     TUniquePtr<ISovSaveStorage> Storage;
     UPROPERTY(Transient) TObjectPtr<USovCampaignSaveGame> PendingSave;
     UPROPERTY(Transient) TObjectPtr<USovCampaignSaveGame> FailedWrite;
@@ -125,6 +156,15 @@ private:
     FGuid PendingLoadRequest;
     FString PendingLoadError;
     bool bBusy = false;
+    bool bEnding = false;
+    bool bSessionAbandoned = false;
+    uint64 StorageGeneration = 1;
+    FSovStorageOwnerToken PendingLoadOwner;
+    FSovStorageOwnerToken MissionTravelOwner;
+    UPROPERTY(Transient) TObjectPtr<USovCampaignDefinition> MissionTravelDestination;
+    double MissionTravelDeadline = 0;
+    bool bMissionTravelRecoveryAttempted = false;
+    FString MissionTravelFailure;
     bool bPlatformStorageOwnerAvailable = true;
     bool bPlatformSuspended = false;
     bool bDiscardPlatformResumeDelta = false;
@@ -137,5 +177,6 @@ private:
     TWeakObjectPtr<UWorld> AcknowledgedWorld;
     double AcknowledgmentExpiresAt = 0;
     FDelegateHandle InitialSaveHandle;
+    FDelegateHandle TravelFailureHandle;
     FTSTicker::FDelegateHandle TickHandle;
 };

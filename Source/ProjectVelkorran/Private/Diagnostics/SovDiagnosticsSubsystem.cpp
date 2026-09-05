@@ -14,6 +14,16 @@
 #include "Misc/Paths.h"
 #include "HAL/FileManager.h"
 
+bool USovDiagnosticsSubsystem::ShouldCreateSubsystem(UObject* Outer) const
+{
+#if UE_BUILD_SHIPPING
+	return false;
+#else
+	return Super::ShouldCreateSubsystem(Outer);
+#endif
+}
+bool USovDiagnosticsSubsystem::IsTickable() const
+{ return Super::IsTickable() && IsRecordingEnabled(); }
 bool USovDiagnosticsSubsystem::DoesSupportWorldType(EWorldType::Type WorldType) const
 { return WorldType == EWorldType::Game || WorldType == EWorldType::PIE; }
 void USovDiagnosticsSubsystem::Initialize(FSubsystemCollectionBase& Collection)
@@ -33,15 +43,15 @@ bool USovDiagnosticsSubsystem::IsRecordingEnabled() const
 #if UE_BUILD_SHIPPING
 	return false;
 #else
-	const USovGameUserSettings* Settings = USovGameUserSettings::Get();
+	const USovGameUserSettings* Settings = BoundSettings.Get();
 	return Settings && Settings->IsLocalDiagnosticsEnabled();
 #endif
 }
 void USovDiagnosticsSubsystem::Tick(float DeltaTime)
 {
+	if (!IsRecordingEnabled()) { UnbindPlayer(); ClearRecords(); return; }
 	BindingElapsed += DeltaTime;
 	if (BindingElapsed >= .25f) { BindingElapsed = 0.f; RefreshBindings(); }
-	if (!IsRecordingEnabled() && !Records.IsEmpty()) { ClearRecords(); }
 }
 bool USovDiagnosticsSubsystem::IsSafeDebugId(FName Id)
 {
@@ -95,6 +105,7 @@ void USovDiagnosticsSubsystem::UnbindPlayer()
 }
 void USovDiagnosticsSubsystem::RefreshBindings()
 {
+	if (!IsRecordingEnabled()) { UnbindPlayer(); return; }
 	APlayerController* PC = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr;
 	APawn* Pawn = PC ? PC->GetPawn() : nullptr;
 	UNarrativeAbilitySystemComponent* ASC = Pawn ? Cast<UNarrativeAbilitySystemComponent>(UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Pawn)) : nullptr;
@@ -145,7 +156,8 @@ void USovDiagnosticsSubsystem::HandleEchoThreshold(bool bActive, float Current)
 { Record(GetWorld(), ESovDiagnosticKind::EchoThreshold, TEXT("Resonant"), NAME_None, Current, 0.f, bActive); }
 void USovDiagnosticsSubsystem::HandleSettings(const FSovUserSettingsSnapshot& Value)
 {
-	if (!IsRecordingEnabled()) { ClearRecords(); return; }
+	if (!IsRecordingEnabled()) { UnbindPlayer(); ClearRecords(); BindingElapsed = 0.f; return; }
+	RefreshBindings();
 	Record(GetWorld(), ESovDiagnosticKind::Settings, USovGameUserSettings::Get()->GetDifficultyId(), TEXT("Damage.Recovery"), Value.IncomingDamageScale, Value.EnemyRecoveryScale, true);
 	Record(GetWorld(), ESovDiagnosticKind::Settings, TEXT("Assists"), TEXT("Defense.Exertion"), Value.DefenseWindowScale, Value.ExertionCostScale, true);
 }

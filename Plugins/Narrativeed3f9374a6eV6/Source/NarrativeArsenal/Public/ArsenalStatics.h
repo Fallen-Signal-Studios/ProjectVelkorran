@@ -38,11 +38,16 @@ struct FGPUInfo
 {
 	GENERATED_BODY()
 
+	/** Physical dedicated video memory, MiB. This is not the process residency budget. */
 	UPROPERTY(BlueprintReadOnly, Category = "GPU Info")
 	int32 TotalVRAM = 0;
 
 	UPROPERTY(BlueprintReadOnly, Category = "GPU Info")
 	int32 CurrentVRAM = 0;
+
+	/** Current OS process budget for local video memory, MiB. */
+	UPROPERTY(BlueprintReadOnly, Category = "GPU Info")
+	int32 BudgetVRAM = 0;
 
 	UPROPERTY(BlueprintReadOnly, Category = "GPU Info")
 	FString GPUBrand = "";

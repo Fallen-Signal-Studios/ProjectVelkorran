@@ -9,6 +9,8 @@
 #include "Engine/LocalPlayer.h"
 #include "Engine/World.h"
 #include "GenericPlatform/GenericPlatformInputDeviceMapper.h"
+#include "Async/Async.h"
+#include "HAL/PlatformTime.h"
 
 namespace
 {
@@ -16,9 +18,9 @@ namespace
      * OSS callbacks contain user/file, not request IDs: dropping that ownership would let a delayed callback
      * satisfy a newer request for the same slot. There is deliberately no timeout-based unlock here. */
     class FSovOnlinePlatformServicesAdapter final : public ISovPlatformServicesAdapter,
-        public TSharedFromThis<FSovOnlinePlatformServicesAdapter>
+        public TSharedFromThis<FSovOnlinePlatformServicesAdapter, ESPMode::ThreadSafe>
     {
-        enum class EStage : uint8 { EnumerateRead, EnumerateWrite, Read, Write, Verify };
+        enum class EStage : uint8 { EnumerateRead, EnumerateWrite, EnumerateList, Read, Write, Verify, Delete };
         struct FRequest
         {
             FGuid Id;
@@ -28,40 +30,51 @@ namespace
             EStage Stage = EStage::EnumerateRead;
             TArray<uint8> Upload;
             FReadComplete ReadComplete;
+            FListComplete ListComplete;
             FWriteComplete WriteComplete;
             bool bCancelled = false;
+            double CancelledAt = 0;
         };
     public:
         explicit FSovOnlinePlatformServicesAdapter(UGameInstance* InInstance) : Instance(InInstance) {}
         ~FSovOnlinePlatformServicesAdapter() override { Stop(); }
         void Start(FAccountChanged Changed) override
         {
-            bStarted = true;
+            bStarted = true; const uint64 Generation = ++CallbackGeneration;
             AccountChanged = MoveTemp(Changed);
-            const TWeakPtr<FSovOnlinePlatformServicesAdapter> Weak = AsShared();
+            const TWeakPtr<FSovOnlinePlatformServicesAdapter, ESPMode::ThreadSafe> Weak = AsShared();
             if (Identity)
             {
-                LoginChangedHandle = Identity->AddOnLoginChangedDelegate_Handle(FOnLoginChangedDelegate::CreateLambda([Weak](int32 LocalUser)
-                    { if (!IsInGameThread()) { return; } if (const auto Self = Weak.Pin(); Self && (LocalUser == Self->ResolveLocalUser() || LocalUser == INDEX_NONE) && Self->AccountChanged) { Self->AccountChanged(); } }));
+                LoginChangedHandle = Identity->AddOnLoginChangedDelegate_Handle(FOnLoginChangedDelegate::CreateLambda([Weak, Generation](int32 LocalUser)
+                { Dispatch(Weak, Generation, [LocalUser](auto& Self)
+                  { if ((LocalUser == Self.ResolveLocalUser() || LocalUser == INDEX_NONE) && Self.AccountChanged) { Self.AccountChanged(); } }); }));
             }
             if (Cloud)
             {
                 EnumerateHandle = Cloud->AddOnEnumerateUserFilesCompleteDelegate_Handle(FOnEnumerateUserFilesCompleteDelegate::CreateLambda(
-                    [Weak](bool Good, const FUniqueNetId& User) { if (!IsInGameThread()) { return; } if (auto Self = Weak.Pin()) { Self->Enumerated(Good, User); } }));
+                    [Weak, Generation](bool Good, const FUniqueNetId& User)
+                    { DispatchUser(Weak, Generation, User, [Good](auto& Self, const auto& Owner) { Self.Enumerated(Good, Owner); }); }));
                 ReadHandle = Cloud->AddOnReadUserFileCompleteDelegate_Handle(FOnReadUserFileCompleteDelegate::CreateLambda(
-                    [Weak](bool Good, const FUniqueNetId& User, const FString& File) { if (!IsInGameThread()) { return; } if (auto Self = Weak.Pin()) { Self->Read(Good, User, File); } }));
+                    [Weak, Generation](bool Good, const FUniqueNetId& User, const FString& File)
+                    { DispatchUser(Weak, Generation, User, [Good, File](auto& Self, const auto& Owner) { Self.Read(Good, Owner, File); }); }));
                 WriteHandle = Cloud->AddOnWriteUserFileCompleteDelegate_Handle(FOnWriteUserFileCompleteDelegate::CreateLambda(
-                    [Weak](bool Good, const FUniqueNetId& User, const FString& File) { if (!IsInGameThread()) { return; } if (auto Self = Weak.Pin()) { Self->Written(Good, User, File); } }));
+                    [Weak, Generation](bool Good, const FUniqueNetId& User, const FString& File)
+                    { DispatchUser(Weak, Generation, User, [Good, File](auto& Self, const auto& Owner) { Self.Written(Good, Owner, File); }); }));
                 CancelHandle = Cloud->AddOnWriteUserFileCanceledDelegate_Handle(FOnWriteUserFileCanceledDelegate::CreateLambda(
-                    [Weak](bool Good, const FUniqueNetId& User, const FString& File)
-                    { if (!IsInGameThread()) { return; } if (auto Self = Weak.Pin(); Self && Good && Self->Matches(User, File, EStage::Write)) { Self->Finish(false, false, {}, TEXT("Provider cancelled upload.")); } }));
+                    [Weak, Generation](bool Good, const FUniqueNetId& User, const FString& File)
+                    { DispatchUser(Weak, Generation, User, [Good, File](auto& Self, const auto& Owner)
+                      { if (Good && Self.Matches(Owner, File, EStage::Write)) { Self.Finish(false, false, {}, TEXT("Provider cancelled upload.")); } }); }));
+                DeleteHandle = Cloud->AddOnDeleteUserFileCompleteDelegate_Handle(FOnDeleteUserFileCompleteDelegate::CreateLambda(
+                    [Weak, Generation](bool Good, const FUniqueNetId& User, const FString& File)
+                    { DispatchUser(Weak, Generation, User, [Good, File](auto& Self, const auto& Owner)
+                      { if (Self.Matches(Owner, File, EStage::Delete)) { Self.Finish(Good, false, {}, Good ? FString() : TEXT("Provider did not confirm revision deletion.")); } }); }));
             }
         }
         void Stop() override
         {
-            bStarted = false;
+            bStarted = false; ++CallbackGeneration;
             AccountChanged = nullptr;
-            if (Pending) { Pending->bCancelled = true; Pending->ReadComplete = nullptr; Pending->WriteComplete = nullptr; }
+            if (Pending) { Pending->bCancelled = true; Pending->ReadComplete = nullptr; Pending->WriteComplete = nullptr; Pending->ListComplete = nullptr; }
             if (Identity)
             {
                 if (BoundLocalUser >= 0) { Identity->ClearOnLoginStatusChangedDelegate_Handle(BoundLocalUser, LoginStatusHandle); }
@@ -73,6 +86,7 @@ namespace
                 Cloud->ClearOnReadUserFileCompleteDelegate_Handle(ReadHandle);
                 Cloud->ClearOnWriteUserFileCompleteDelegate_Handle(WriteHandle);
                 Cloud->ClearOnWriteUserFileCanceledDelegate_Handle(CancelHandle);
+                Cloud->ClearOnDeleteUserFileCompleteDelegate_Handle(DeleteHandle);
             }
             Pending.Reset(); Identity.Reset(); Cloud.Reset();
             BoundSubsystem = nullptr; BoundLocalUser = INDEX_NONE; LastKnownStableId.Reset(); Provider = NAME_None;
@@ -100,7 +114,7 @@ namespace
                     Result.bRequiresKnownStorageOwner, true, Status != ELoginStatus::NotLoggedIn,
                     PLATFORM_DESKTOP || Identity->GetPlatformUserIdFromUniqueNetId(*Id) == ResolvePlatformUser(), LocalUser);
                 Result.bCloudAvailable = SovPlatformServicesPolicy::CanUseGenericCloud(PLATFORM_DESKTOP,
-                    Result.bSignedIn, Cloud.IsValid(), LocalUser);
+                    Result.bSignedIn, Cloud.IsValid(), LocalUser) && GetRecoveryMessage().IsEmpty();
             }
             // Desktop offline restart retains the last confirmed namespace. On devices requiring
             // account ownership, an unknown/NotLoggedIn identity fences storage; UsingLocalProfile
@@ -120,15 +134,64 @@ namespace
             Pending->Stage = EStage::EnumerateWrite; Pending->Upload = Bytes; Pending->WriteComplete = MoveTemp(Complete);
             const auto User = Pending->User; Cloud->EnumerateUserFiles(*User); return true;
         }
+        bool SupportsRevisionHistory() const override { return true; }
+        FString GetRecoveryMessage() const override
+        {
+            return Pending && Pending->bCancelled && Pending->CancelledAt > 0
+                && FPlatformTime::Seconds() - Pending->CancelledAt >= SovPlatformServicesPolicy::OperationTimeoutSeconds
+                ? TEXT("Cloud provider has not completed its cancelled request. Cloud is quarantined until the provider completes or the game restarts. Local saves remain available.")
+                : FString();
+        }
+        bool ListRevisions(FGuid Request, const FString& Prefix, FListComplete Complete) override
+        {
+            if (!Begin(Request, Prefix)) { return false; }
+            Pending->Stage = EStage::EnumerateList; Pending->ListComplete = MoveTemp(Complete);
+            const auto User = Pending->User; Cloud->EnumerateUserFiles(*User); return true;
+        }
+        bool ReadRevision(FGuid Request, const FString& Prefix, const FString& Revision, FReadComplete Complete) override
+        {
+            if (!IsRevision(Revision, Prefix) || !Begin(Request, Prefix)) { return false; }
+            Pending->Stage = EStage::Read; Pending->File = Revision; Pending->ReadComplete = MoveTemp(Complete);
+            StartRead(); return true;
+        }
+        bool DeleteRevision(FGuid Request, const FString& Prefix, const FString& Revision, FWriteComplete Complete) override
+        {
+            if (!IsRevision(Revision, Prefix) || !Begin(Request, Prefix)) { return false; }
+            Pending->Stage = EStage::Delete; Pending->File = Revision; Pending->WriteComplete = MoveTemp(Complete);
+            const auto User = Pending->User;
+            if (!Cloud->DeleteUserFile(*User, Revision, true, true) && Pending && Pending->Id == Request)
+            { Finish(false, false, {}, TEXT("Provider rejected revision deletion.")); }
+            return true;
+        }
         void Cancel(FGuid Request) override
         {
             if (!Pending || Pending->Id != Request) { return; }
-            Pending->bCancelled = true; Pending->ReadComplete = nullptr; Pending->WriteComplete = nullptr;
+            if (!Pending->bCancelled) { Pending->CancelledAt = FPlatformTime::Seconds(); }
+            Pending->bCancelled = true; Pending->ReadComplete = nullptr; Pending->WriteComplete = nullptr; Pending->ListComplete = nullptr;
             // Do not call CancelWriteUserFile: several OSS providers issue both cancellation and write
             // completion delegates. Waiting for the original terminal delegate keeps ownership exact.
             // Issued writes are immutable new revisions, so allowing them to drain cannot replace old data.
         }
     private:
+        template<typename WorkType> static void Dispatch(TWeakPtr<FSovOnlinePlatformServicesAdapter, ESPMode::ThreadSafe> Weak, uint64 Generation, WorkType Work)
+        {
+            auto Run = [Weak, Generation, Work = MoveTemp(Work)]() mutable
+            { if (const auto Self = Weak.Pin(); Self && Self->bStarted && Self->CallbackGeneration == Generation) { Work(*Self); } };
+            if (IsInGameThread()) { Run(); } else { AsyncTask(ENamedThreads::GameThread, MoveTemp(Run)); }
+        }
+        template<typename WorkType> static void DispatchUser(TWeakPtr<FSovOnlinePlatformServicesAdapter, ESPMode::ThreadSafe> Weak, uint64 Generation,
+            const FUniqueNetId& User, WorkType Work)
+        {
+            // Delegate references expire on the callback thread. Copy identity values, then retain
+            // the matching pending provider ID while dispatching its completion on the game thread.
+            const FString Key = User.GetType().ToString() + TEXT("|") + User.ToString();
+            Dispatch(Weak, Generation, [Key, Work = MoveTemp(Work)](auto& Self) mutable
+            {
+                if (!Self.Pending || !Self.Pending->User.IsValid()) { return; }
+                const auto Owner = Self.Pending->User;
+                if (Owner->GetType().ToString() + TEXT("|") + Owner->ToString() == Key) { Work(Self, *Owner); }
+            });
+        }
         bool EnsureWorldProvider()
         {
             const UGameInstance* Game = Instance.Get();
@@ -174,10 +237,12 @@ namespace
             LoginStatusHandle.Reset();
             if (Identity && LocalUser >= 0)
             {
-                const TWeakPtr<FSovOnlinePlatformServicesAdapter> Weak = AsShared();
+                const TWeakPtr<FSovOnlinePlatformServicesAdapter, ESPMode::ThreadSafe> Weak = AsShared();
+                const uint64 Generation = CallbackGeneration;
                 LoginStatusHandle = Identity->AddOnLoginStatusChangedDelegate_Handle(LocalUser,
-                    FOnLoginStatusChangedDelegate::CreateLambda([Weak](int32 ChangedUser, ELoginStatus::Type, ELoginStatus::Type, const FUniqueNetId&)
-                    { if (!IsInGameThread()) { return; } if (const auto Self = Weak.Pin(); Self && ChangedUser == Self->BoundLocalUser && Self->AccountChanged) { Self->AccountChanged(); } }));
+                    FOnLoginStatusChangedDelegate::CreateLambda([Weak, Generation](int32 ChangedUser, ELoginStatus::Type, ELoginStatus::Type, const FUniqueNetId&)
+                    { Dispatch(Weak, Generation, [ChangedUser](auto& Self)
+                      { if (ChangedUser == Self.BoundLocalUser && Self.AccountChanged) { Self.AccountChanged(); } }); }));
             }
         }
         bool Begin(FGuid Request, const FString& Prefix)
@@ -201,10 +266,26 @@ namespace
         void Enumerated(bool Good, const FUniqueNetId& User)
         {
             if (!Pending || !Pending->User.IsValid() || *Pending->User != User
-                || (Pending->Stage != EStage::EnumerateRead && Pending->Stage != EStage::EnumerateWrite)) { return; }
+                || (Pending->Stage != EStage::EnumerateRead && Pending->Stage != EStage::EnumerateWrite
+                    && Pending->Stage != EStage::EnumerateList)) { return; }
             if (Pending->bCancelled) { Finish(false, false, {}, TEXT("Cancelled.")); return; }
             if (!Good) { Finish(false, false, {}, TEXT("Cloud enumeration failed; absence was not inferred from a network error.")); return; }
             TArray<FCloudFileHeader> Files; Cloud->GetUserFileList(User, Files);
+            if (Pending->Stage == EStage::EnumerateList)
+            {
+                TArray<FSovCloudRevisionFile> Revisions;
+                for (const auto& File : Files)
+                {
+                    if (!IsRevision(File.FileName, Pending->Prefix)) { continue; }
+                    if (Revisions.Num() >= 128) { Finish(false, false, {}, TEXT("More than 128 retained revisions require provider storage recovery before review.")); return; }
+                    Revisions.Add({ File.FileName, File.FileSize });
+                }
+                // This ordering is for stable presentation only. It never chooses a save for import.
+                Revisions.Sort([](const auto& A, const auto& B) { return A.RevisionId < B.RevisionId; });
+                auto Finished = MoveTemp(Pending);
+                if (Finished->ListComplete) { Finished->ListComplete(true, MoveTemp(Revisions), {}); }
+                return;
+            }
             int32 Count = 0; FString Latest; int64 LatestSize = 0;
             for (const auto& File : Files)
             {
@@ -227,6 +308,7 @@ namespace
                 return;
             }
             if (Latest.IsEmpty()) { Finish(true, false, {}, {}); return; }
+            if (Count > 1) { Finish(false, true, {}, TEXT("Multiple cloud revisions require explicit history selection; client clocks cannot choose the current save.")); return; }
             if (LatestSize <= 0 || LatestSize > SovPlatformServicesPolicy::MaximumEnvelopeBytes)
             { Finish(false, true, {}, TEXT("Cloud revision has an invalid or oversized envelope. It was not imported or overwritten.")); return; }
             Pending->File = Latest; Pending->Stage = EStage::Read; StartRead();
@@ -264,11 +346,13 @@ namespace
             auto Finished = MoveTemp(Pending); // Release ownership before callbacks allow another request.
             if (!Finished || Finished->bCancelled) { return; }
             if (Finished->ReadComplete) { Finished->ReadComplete(Good, Exists, MoveTemp(Bytes), MoveTemp(Error)); }
+            else if (Finished->ListComplete) { Finished->ListComplete(Good, {}, MoveTemp(Error)); }
             else if (Finished->WriteComplete) { Finished->WriteComplete(Good, MoveTemp(Error)); }
         }
         FName Provider;
         IOnlineSubsystem* BoundSubsystem = nullptr;
         bool bStarted = false;
+        uint64 CallbackGeneration = 0;
         TWeakObjectPtr<UGameInstance> Instance;
         FString LastKnownStableId;
         int32 BoundLocalUser = INDEX_NONE;
@@ -276,8 +360,8 @@ namespace
         IOnlineUserCloudPtr Cloud;
         FAccountChanged AccountChanged;
         TUniquePtr<FRequest> Pending;
-        FDelegateHandle LoginStatusHandle, LoginChangedHandle, EnumerateHandle, ReadHandle, WriteHandle, CancelHandle;
+        FDelegateHandle LoginStatusHandle, LoginChangedHandle, EnumerateHandle, ReadHandle, WriteHandle, CancelHandle, DeleteHandle;
     };
 }
-TSharedPtr<ISovPlatformServicesAdapter> MakeSovConfiguredPlatformAdapter(UGameInstance* Instance)
-{ return MakeShared<FSovOnlinePlatformServicesAdapter>(Instance); }
+TSharedPtr<ISovPlatformServicesAdapter, ESPMode::ThreadSafe> MakeSovConfiguredPlatformAdapter(UGameInstance* Instance)
+{ return MakeShared<FSovOnlinePlatformServicesAdapter, ESPMode::ThreadSafe>(Instance); }

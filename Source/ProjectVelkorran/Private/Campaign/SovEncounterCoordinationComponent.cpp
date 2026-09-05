@@ -523,6 +523,7 @@ void USovEncounterCoordinationComponent::TickComponent(float Delta, ELevelTick T
 	Super::TickComponent(Delta, TickType, TickFunction);
 	if (!Director.IsValid() || !Director->HasAuthority() || !bValidComposition || bRefreshing
 		|| Director->GetEncounterState() != ESovEncounterState::Active || BoundAttempt != Director->GetAttemptId()) { return; }
+	if (!Director->ReconcileEncounterState()) { return; }
 	for (auto It = Reservations.CreateIterator(); It; ++It)
 	{
 		const auto& Lease = It.Value();
@@ -539,7 +540,12 @@ void USovEncounterCoordinationComponent::TickComponent(float Delta, ELevelTick T
 			if (Member(Participant.ParticipantId).Wave == CurrentWave && Participant.bRequiredForVictory) { bRequiredAlive = true; }
 			continue;
 		}
-		if (!IsValid(Participant.Character) || !Participant.Character->IsAlive()) { continue; }
+		if (!IsValid(Participant.Character) || !Participant.Character->IsAlive())
+		{
+			if (Member(Participant.ParticipantId).Wave == CurrentWave && Participant.bRequiredForVictory
+				&& !Director->IsParticipantDefeatConfirmed(Participant.ParticipantId)) { bRequiredAlive = true; }
+			continue;
+		}
 		const auto Entry = Member(Participant.ParticipantId);
 		if (Entry.Wave == CurrentWave && Participant.bRequiredForVictory) { bRequiredAlive = true; }
 		if (Entry.Wave == CurrentWave + 1) { bHasNext = true; }

@@ -15,9 +15,13 @@ class PROJECTVELKORRAN_API ASovCampaignMassProxy : public AActor
 	GENERATED_BODY()
 public:
 	ASovCampaignMassProxy();
-	bool RestoreVisuals(const TArray<FSovCampaignMassMesh>& Meshes);
+	bool RestoreVisuals(const TArray<FSovCampaignMassMesh>& Meshes, bool bAnimated = false);
+	static bool ValidateAnimationProfile(const TArray<FSovCampaignMassMesh>& Meshes, FString& Error);
+	void SetRouteMotion(bool bMoving, float Speed);
+	void CaptureVisualState(TArray<FSovCampaignMassMesh>& Meshes) const;
 private:
 	UPROPERTY(Transient) TArray<TObjectPtr<class UMeshComponent>> PoseMeshes;
+	TArray<float> ReferenceSpeeds;
 };
 
 /** Uses the existing Narrative crowd representation subsystem/actor management, without ped randomization. */

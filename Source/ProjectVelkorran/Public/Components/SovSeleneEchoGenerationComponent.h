@@ -162,10 +162,6 @@ private:
 	TObjectPtr<USovDeflectionComponent> DeflectionComponent;
 
 	/** Server-only replay fence for command-link transactions. */
-	TSet<FGuid> ConsumedCommandLinkSeverTransactions;
-	TSet<FGuid> ConsumedDamageTransactions;
-	TSet<FGuid> ConsumedDeflectionTransactions;
-	TSet<FGuid> ConsumedBypassAttempts;
 	SovEchoAwardPolicy::TPrecisionChain<TWeakObjectPtr<AActor>> PrecisionChain;
 	uint32 ResourceScopeEpoch = 0;
 };

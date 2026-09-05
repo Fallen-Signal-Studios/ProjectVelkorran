@@ -15,6 +15,7 @@
 #include <Serialization/MemoryReader.h>
 #include <Serialization/MemoryWriter.h>
 #include "NarrativeLogChannels.h"
+#include "UObject/StrongObjectPtr.h"
 
 #define LOCTEXT_NAMESPACE "Inventory"
 
@@ -339,6 +340,35 @@ int32 UNarrativeInventoryComponent::ConsumeItem(class UNarrativeItem* Item, cons
 	}
 
 	return 0;
+}
+
+int32 UNarrativeInventoryComponent::ConsumeItemExact(UNarrativeItem* Item, int32 Quantity,
+	uint64 ExpectedQuantityRevision, TFunction<bool()> IsOwnerCurrent)
+{
+	if (Quantity <= 0 || !IsValid(Item) || !GetOwner() || !GetOwner()->HasAuthority() || !IsOwnerCurrent) { return 0; }
+	TStrongObjectPtr<UNarrativeItem> PinnedItem(Item);
+	TStrongObjectPtr<UNarrativeInventoryComponent> PinnedInventory(this);
+	const uint64 Membership = Item->GetInventoryMembershipRevision();
+	const auto CanCommit = [this, Item, Quantity, ExpectedQuantityRevision, Membership, &IsOwnerCurrent]()
+	{
+		return IsOwnerCurrent() && IsValid(Item) && Item->OwningInventory == this && Items.Contains(Item)
+			&& Item->GetInventoryMembershipRevision() == Membership
+			&& Item->GetQuantityRevision() == ExpectedQuantityRevision && Item->GetQuantity() >= Quantity;
+	};
+	if (!CanCommit() || !Item->CanBeRemoved() || !CanCommit()) { return 0; }
+	const int32 After = Item->GetQuantity() - Quantity;
+	Item->SetQuantity(After);
+	// The exact debit is already committed. Never remove a replacement/refilled stack
+	// after its quantity notification changed membership or wrote a new quantity.
+	if (After == 0 && IsValid(Item) && Item->OwningInventory == this && Items.Contains(Item)
+		&& Item->GetInventoryMembershipRevision() == Membership
+		&& Item->GetQuantityRevision() == ExpectedQuantityRevision + 1 && Item->GetQuantity() == 0)
+	{
+		RemoveItem(Item);
+	}
+	if (IsValid(this) && IsValid(GetOwner()) && !GetOwner()->IsActorBeingDestroyed())
+	{ OnItemRemoved.Broadcast(Item, Quantity); }
+	return Quantity;
 }
 
 int32 UNarrativeInventoryComponent::GetTotalQuantityOfItem(TSubclassOf<UNarrativeItem> ItemClass, const bool bCheckVisibility) const

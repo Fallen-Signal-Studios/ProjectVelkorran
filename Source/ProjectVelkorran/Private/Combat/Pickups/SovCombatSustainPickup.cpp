@@ -14,6 +14,7 @@
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraSystem.h"
 #include "Sound/SoundBase.h"
+#include "UObject/StrongObjectPtr.h"
 
 ASovCombatSustainPickup::ASovCombatSustainPickup()
 {
@@ -149,7 +150,7 @@ void ASovCombatSustainPickup::HandlePickupOverlap(
 	const bool bFromSweep,
 	const FHitResult& SweepResult)
 {
-	if (!HasAuthority() || bClaimed)
+	if (!HasAuthority() || bClaimed || bGrantInProgress || IsActorBeingDestroyed())
 	{
 		return;
 	}
@@ -163,17 +164,25 @@ void ASovCombatSustainPickup::HandlePickupOverlap(
 	if (!IsValid(CollectingPlayer)
 		|| CollectingPlayer->GetPlayerController() == nullptr
 		|| !IsValid(PlayerAbilitySystem)
-		|| PlayerAbilitySystem->IsDead()
-		|| !TryGrantTo(CollectingPlayer))
+		|| PlayerAbilitySystem->GetAvatarActor() != CollectingPlayer
+		|| PlayerAbilitySystem->IsDead())
 	{
 		return;
 	}
+	// Reserve before the derived grant: both Echo and inventory dispatch synchronous
+	// callbacks. A failed/partial grant releases the reservation without consuming
+	// the pack; a committed grant remains spent even if its recipient dies in a callback.
+	TStrongObjectPtr<ASovCombatSustainPickup> PickupLifetime(this);
+	TStrongObjectPtr<ASovPlayerCharacterBase> RecipientLifetime(CollectingPlayer);
+	TGuardValue<bool> GrantScope(bGrantInProgress, true);
+	const bool bFullyGranted = TryGrantTo(CollectingPlayer);
+	if (!bFullyGranted || IsActorBeingDestroyed()) { return; }
 
 	bClaimed = true;
-	PickupSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	if (IsValid(PickupSphere)) { PickupSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision); }
 	ForceNetUpdate();
 	MulticastPlayCollectionPresentation();
-	SetLifeSpan(FMath::Max(CollectionCleanupDelay, 0.05f));
+	if (!IsActorBeingDestroyed()) { SetLifeSpan(FMath::Max(CollectionCleanupDelay, 0.05f)); }
 }
 
 void ASovCombatSustainPickup::OnRep_Claimed()

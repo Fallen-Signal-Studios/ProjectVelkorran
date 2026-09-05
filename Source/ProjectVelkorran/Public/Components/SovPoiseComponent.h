@@ -150,6 +150,21 @@ protected:
 	float RecoveryImmunityDuration = 1.5f;
 
 private:
+	void BindOwnerLifecycle();
+	void UnbindOwnerLifecycle();
+	void RefreshOwnerLifecycle();
+	void RetireOwnerLifecycle();
+	void HandleOwnerHealthChanged(const FOnAttributeChangeData& Change);
+	void HandleOwnerLifeTagChanged(FGameplayTag Tag, int32 Count);
+	FDelegateHandle OwnerHealthChangedHandle;
+	TMap<FGameplayTag, FDelegateHandle> OwnerLifeTagHandles;
+	uint64 LifecycleEpoch = 0;
+	uint64 ResourceChangeEpoch = 0;
+	uint64 StateEpoch = 0;
+	bool bOwnerLifecycleRetired = false;
+	bool bChangingOwnerLifecycle = false;
+	bool bUninitializing = false;
+	bool bResettingLifecycle = false;
 	bool bRestoringCheckpoint = false;
 	void TryInitializeFromOwner();
 

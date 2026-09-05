@@ -1,0 +1,55 @@
+name: Unreal 5.7 validation
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Candidate requires authored route and capture configuration
+        type: choice
+        options: [diagnostic, candidate]
+        default: diagnostic
+      build_only:
+        description: Compile only (diagnostic mode)
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: velkorran-ue57-worker
+  cancel-in-progress: false
+jobs:
+  validate:
+    # This logical label must be attached to a studio-managed, licensed worker.
+    # No Unreal/console SDK, content download or external service is implied.
+    runs-on: [self-hosted, Windows, X64, velkorran-ue57]
+    timeout-minutes: 360
+    env:
+      SOV_ENGINE_ROOT: ${{ vars.SOV_UE57_ENGINE_ROOT }}
+      SOV_PROJECT_PATH: ${{ vars.SOV_UE57_PROJECT_PATH }}
+      SOV_VALIDATION_CONFIG: ${{ vars.SOV_VALIDATION_CONFIG }}
+      SOV_VALIDATION_MODE: ${{ inputs.mode }}
+      SOV_BUILD_ONLY: ${{ inputs.build_only }}
+    steps:
+      - name: Validate the provisioned checkout and execute its stage runner
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not $env:SOV_ENGINE_ROOT -or -not $env:SOV_PROJECT_PATH) {
+            throw 'Configure SOV_UE57_ENGINE_ROOT and SOV_UE57_PROJECT_PATH on a hydrated licensed worker.'
+          }
+          $project = (Resolve-Path -LiteralPath $env:SOV_PROJECT_PATH).Path
+          $root = Split-Path -Parent $project
+          $revision = & git -C $root rev-parse HEAD
+          if ($LASTEXITCODE -ne 0 -or $revision.Trim() -ne $env:GITHUB_SHA) {
+            throw 'Provision the hydrated working copy at this exact workflow revision before dispatch.'
+          }
+          $dirty = & git -C $root status --porcelain --untracked-files=no
+          if ($LASTEXITCODE -ne 0 -or $dirty) { throw 'Tracked source/content must be clean for the dispatched revision.' }
+          $untracked = & git -C $root ls-files --others --exclude-standard -- Source Plugins Config Scripts
+          if ($LASTEXITCODE -ne 0 -or @($untracked | Where-Object { $_ -match '\.(cpp|h|inl|cs|ini|uplugin|py|ps1|json|usf|ush)$' }).Count -gt 0) {
+            throw 'Untracked native source/config/tooling prevents exact-revision CI qualification.'
+          }
+          $parameters = @{ EngineRoot = $env:SOV_ENGINE_ROOT; ProjectPath = $project; Mode = $env:SOV_VALIDATION_MODE }
+          if ($env:SOV_VALIDATION_CONFIG) { $parameters.ConfigPath = $env:SOV_VALIDATION_CONFIG }
+          if ($env:SOV_BUILD_ONLY -eq 'true') { $parameters.BuildOnly = $true }
+          & (Join-Path $root 'Scripts\Validate-Unreal.ps1') @parameters
+          exit $LASTEXITCODE

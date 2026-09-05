@@ -186,6 +186,8 @@ public:
     UFUNCTION(BlueprintPure, Category="Campaign Cinematic") ESovCinematicPhase GetPhase() const { return Phase; }
     UPROPERTY(BlueprintAssignable, Category="Campaign Cinematic") FSovCinematicPhaseChanged OnPhaseChanged;
     bool ValidateConfiguration(FString& OutError) const;
+    /** Reuses the runtime presentation-only sequence contract without starting a session. */
+    bool ValidateAuthoredSequence(ULevelSequence* Asset, FString& OutError) const { return ValidatePresentationSequence(Asset, OutError); }
 protected:
     virtual void OnRegister() override;
     virtual void OnUnregister() override;

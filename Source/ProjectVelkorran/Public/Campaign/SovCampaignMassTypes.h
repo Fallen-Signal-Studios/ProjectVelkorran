@@ -10,9 +10,27 @@ class UStaticMesh;
 class UMaterialInterface;
 class UGameplayEffect;
 class UGameplayAbility;
+class UAnimSequence;
 
 UENUM(BlueprintType)
 enum class ESovCampaignRepresentationTier : uint8 { Actor, Mass, Presentation };
+
+/** Authored locomotion assets for each captured skeletal component of a Tier C participant. */
+USTRUCT(BlueprintType)
+struct FSovCampaignMassAnimationProfile
+{
+	GENERATED_BODY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) TMap<FName, TSoftObjectPtr<UAnimSequence>> ComponentAnimations;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="1", ClampMax="1200")) float ReferenceSpeed = 300.f;
+};
+
+/** Transient strong references belong to the director, including while no visual proxy exists. */
+USTRUCT()
+struct FSovCampaignMassAssetResidency
+{
+	GENERATED_BODY()
+	UPROPERTY(Transient) TArray<TObjectPtr<UObject>> Assets;
+};
 
 /** Exact mesh-space pose, including modular appearance and visible equipment. No live actor references. */
 USTRUCT()
@@ -29,6 +47,9 @@ struct FSovCampaignMassMesh
 	UPROPERTY(SaveGame) FName ComponentName;
 	UPROPERTY(SaveGame) bool bRequiresSnapshotBlend = false;
 	UPROPERTY(SaveGame) TArray<FName> HiddenBones;
+	UPROPERTY(SaveGame) TSoftObjectPtr<UAnimSequence> RouteAnimation;
+	UPROPERTY(SaveGame) float AnimationReferenceSpeed = 300.f;
+	UPROPERTY(SaveGame) float AnimationTime = 0.f;
 };
 
 USTRUCT()
@@ -75,7 +96,7 @@ struct FSovCampaignMassState
 
 /** Explicit corridor route. No navigation, perception, combat, damage or missions run on a proxy. */
 USTRUCT()
-struct FSovCampaignMassRouteFragment : public FMassFragment
+struct PROJECTVELKORRAN_API FSovCampaignMassRouteFragment : public FMassFragment
 {
 	GENERATED_BODY()
 	UPROPERTY() TArray<FVector> Points;

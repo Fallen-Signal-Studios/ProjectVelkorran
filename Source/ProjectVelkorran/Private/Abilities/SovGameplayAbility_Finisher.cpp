@@ -43,7 +43,7 @@ USovGameplayAbility_Finisher::USovGameplayAbility_Finisher()
 bool USovGameplayAbility_Finisher::CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* Info,
     const FGameplayTagContainer* SourceTags, const FGameplayTagContainer* TargetTags, FGameplayTagContainer* Relevant) const
 {
-    return FMath::IsFinite(SequenceDuration) && SequenceDuration>=.8f && SequenceDuration<=1.8f
+    return !bEnding && FMath::IsFinite(SequenceDuration) && SequenceDuration>=.8f && SequenceDuration<=1.8f
         && FMath::IsFinite(MaximumDistance) && MaximumDistance>=50.f && MaximumDistance<=300.f
         && FMath::IsFinite(MaximumFacingAngle) && MaximumFacingAngle>=0.f && MaximumFacingAngle<=75.f
         && FMath::IsFinite(FallbackStrikeDamage) && FallbackStrikeDamage>=0.f
@@ -54,7 +54,7 @@ bool USovGameplayAbility_Finisher::CanActivateAbility(const FGameplayAbilitySpec
 }
 bool USovGameplayAbility_Finisher::SourceValid() const
 {
-    return IsActive() && ActionAvatar.IsValid() && ActionASC.IsValid() && !ActionAvatar->IsActorBeingDestroyed()
+    return !bEndPending && !bEnding && IsActive() && ActionAvatar.IsValid() && ActionASC.IsValid() && !ActionAvatar->IsActorBeingDestroyed()
         && CurrentActorInfo && CurrentActorInfo->IsNetAuthority() && CurrentActorInfo->AvatarActor.Get()==ActionAvatar.Get()
         && CurrentActorInfo->AbilitySystemComponent.Get()==ActionASC.Get() && ActionASC->GetAvatarActor()==ActionAvatar.Get()
         && UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(ActionAvatar.Get())==ActionASC.Get()
@@ -63,6 +63,8 @@ bool USovGameplayAbility_Finisher::SourceValid() const
         && !ActionASC->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_SequencerControlled)
         && ActionASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute())>0.f;
 }
+bool USovGameplayAbility_Finisher::IsFinisherActivationCurrent(uint64 Epoch, const AActor* Attacker) const
+{ return ActionEpoch==Epoch && SourceValid() && ActionAvatar.Get()==Attacker; }
 bool USovGameplayAbility_Finisher::OwnsAction(const FGuid& ExpectedLease) const
 { return ExpectedLease.IsValid() && Lease==ExpectedLease && SourceValid() && TargetComponent && TargetComponent->OwnsLease(this,ExpectedLease); }
 void USovGameplayAbility_Finisher::FinishReservedAction(const FGuid& ExpectedLease)
@@ -141,17 +143,45 @@ bool USovGameplayAbility_Finisher::ApplyProtection()
 void USovGameplayAbility_Finisher::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* Info,
     const FGameplayAbilityActivationInfo Activation, const FGameplayEventData* Event)
 {
+    TStrongObjectPtr<USovGameplayAbility_Finisher> ActionLifetime(this);
+    const uint64 Epoch=++ActionEpoch; bEndPending=false;
+    const TWeakObjectPtr<AActor> Avatar=Info?Info->AvatarActor.Get():nullptr;
+    const TWeakObjectPtr<UAbilitySystemComponent> ASC=Info?Info->AbilitySystemComponent.Get():nullptr;
+    const auto ContinueActivation=[this,Epoch,Handle,Avatar,ASC]()
+    {
+        if (ActionEpoch==Epoch&&!bEndPending&&!bEnding&&IsActive()&&CurrentActorInfo&&CurrentSpecHandle==Handle
+            &&CurrentActorInfo->IsNetAuthority()&&Avatar.IsValid()&&!Avatar->IsActorBeingDestroyed()&&ASC.IsValid()
+            &&CurrentActorInfo->AvatarActor==Avatar&&CurrentActorInfo->AbilitySystemComponent==ASC
+            &&ASC->GetAvatarActor()==Avatar.Get()) { return true; }
+        if (ActionEpoch==Epoch&&IsActive()) { FinishAction(); }
+        return false;
+    };
     Super::ActivateAbility(Handle,Info,Activation,Event);
-    if (!IsActive() || !Info || !Info->IsNetAuthority()) { return; }
-    ActionAvatar=Info->AvatarActor; ActionASC=Info->AbilitySystemComponent; bStruck=false; bAligned=false;
+    if (!ContinueActivation()) { return; }
+    ActionAvatar=Avatar; ActionASC=ASC; bStruck=false; bAligned=false;
     AActor* Target=Event && Event->Target ? const_cast<AActor*>(Event->Target.Get()) : FindFinisherTarget();
-    TargetComponent=IsValid(Target)?Target->FindComponentByClass<USovFinisherTargetComponent>():nullptr;
-    TargetASC=UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Target);
-    if (!SourceValid() || !TargetComponent || !TargetASC.IsValid() || !TargetInReach(Target)
-        || !TargetComponent->Reserve(this,ActionAvatar.Get(),Lease)) { FinishAction(); return; }
+    if (!ContinueActivation()) { return; }
+    const TWeakObjectPtr<USovFinisherTargetComponent> Candidate=IsValid(Target)?Target->FindComponentByClass<USovFinisherTargetComponent>():nullptr;
+    const TWeakObjectPtr<UAbilitySystemComponent> CandidateASC=UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Target);
+    const bool bInReach=SourceValid()&&Candidate.IsValid()&&CandidateASC.IsValid()&&TargetInReach(Target);
+    if (!ContinueActivation()) { return; }
+    if (!bInReach) { FinishAction(); return; }
+    FGuid NewLease;
+    const bool bReserved=Candidate->Reserve(this,Avatar.Get(),NewLease);
+    if (!ContinueActivation())
+    {
+        if (bReserved&&Candidate.IsValid()) { Candidate->Release(this,NewLease); }
+        return;
+    }
+    if (!bReserved) { FinishAction(); return; }
+    Lease=NewLease; TargetComponent=Candidate.Get(); TargetASC=CandidateASC;
     const FGuid ExpectedLease=Lease;
-    bAligned=AlignmentSafe(Target);
-    if (!CommitAbility(Handle,Info,Activation) || !OwnsAction(ExpectedLease)
+    const bool bAlignmentSafe=AlignmentSafe(Target);
+    if (!ContinueActivation()||!OwnsAction(ExpectedLease)) { return; }
+    bAligned=bAlignmentSafe;
+    const bool bCommitted=CommitAbility(Handle,Info,Activation);
+    if (!ContinueActivation()) { return; }
+    if (!bCommitted || !OwnsAction(ExpectedLease)
         || !ApplyProtection()) { FinishReservedAction(ExpectedLease); return; }
     // Only cancel live combat actions on the reserved opponent; unrelated passives remain granted.
     TArray<FGameplayAbilitySpecHandle> Attacks;
@@ -163,11 +193,18 @@ void USovGameplayAbility_Finisher::ActivateAbility(const FGameplayAbilitySpecHan
         if (!OwnsAction(ExpectedLease)) { FinishReservedAction(ExpectedLease); return; }
     }
     const float Duration=static_cast<float>(SovFinisher::Duration(SequenceDuration,bAligned));
-    GetWorld()->GetTimerManager().SetTimer(StrikeTimer,this,&ThisClass::Strike,Duration-.2f,false);
-    GetWorld()->GetTimerManager().SetTimer(FinishTimer,this,&ThisClass::FinishAction,Duration,false);
-    GetWorld()->GetTimerManager().SetTimer(CheckTimer,this,&ThisClass::CheckAction,.025f,true);
+    const auto StrikeCurrent=FTimerDelegate::CreateWeakLambda(this,[this,Epoch,ExpectedLease]()
+        { if (ActionEpoch==Epoch&&OwnsAction(ExpectedLease)) { Strike(); } });
+    const auto FinishCurrent=FTimerDelegate::CreateWeakLambda(this,[this,Epoch,ExpectedLease]()
+        { if (ActionEpoch==Epoch) { FinishReservedAction(ExpectedLease); } });
+    const auto CheckCurrent=FTimerDelegate::CreateWeakLambda(this,[this,Epoch]()
+        { if (ActionEpoch==Epoch) { CheckAction(); } });
+    GetWorld()->GetTimerManager().SetTimer(StrikeTimer,StrikeCurrent,Duration-.2f,false);
+    GetWorld()->GetTimerManager().SetTimer(FinishTimer,FinishCurrent,Duration,false);
+    GetWorld()->GetTimerManager().SetTimer(CheckTimer,CheckCurrent,.025f,true);
     StrikeTask=UAbilityTask_WaitGameplayEvent::WaitGameplayEvent(this,FSovGameplayTags::Get().Event_Finisher_Strike,nullptr,true,true);
     StrikeTask->EventReceived.AddDynamic(this,&ThisClass::OnStrikeEvent); StrikeTask->ReadyForActivation();
+    if (!ContinueActivation()||!OwnsAction(ExpectedLease)) { return; }
     if (bAligned)
     {
         const float Rate=FMath::Max(FinisherMontage->GetPlayLength()/Duration,.01f);
@@ -176,8 +213,8 @@ void USovGameplayAbility_Finisher::ActivateAbility(const FGameplayAbilitySpecHan
         if (MontageResult<=0.f)
         {
             bAligned=false;
-            GetWorld()->GetTimerManager().SetTimer(StrikeTimer,this,&ThisClass::Strike,.15f,false);
-            GetWorld()->GetTimerManager().SetTimer(FinishTimer,this,&ThisClass::FinishAction,.35f,false);
+            GetWorld()->GetTimerManager().SetTimer(StrikeTimer,StrikeCurrent,.15f,false);
+            GetWorld()->GetTimerManager().SetTimer(FinishTimer,FinishCurrent,.35f,false);
         }
     }
     if (OwnsAction(ExpectedLease)) { OnFinisherStarted(Target,bAligned); }
@@ -186,37 +223,59 @@ void USovGameplayAbility_Finisher::OnStrikeEvent(FGameplayEventData Payload)
 { if (Payload.Instigator.Get()==ActionAvatar.Get() && (!Payload.Target || Payload.Target.Get()==(TargetComponent?TargetComponent->GetOwner():nullptr))) { Strike(); } }
 void USovGameplayAbility_Finisher::CheckAction()
 {
-    if (!SourceValid() || !TargetComponent || !TargetASC.IsValid() || TargetASC->GetAvatarActor()!=TargetComponent->GetOwner()
-        || !TargetComponent->OwnsLease(this,Lease)
-        || (!bStruck && !TargetComponent->IsReservedTargetValid(this,Lease,ActionAvatar.Get()))
-        || (!bStruck && !TargetInReach(TargetComponent->GetOwner()))) { FinishAction(); }
+    const FGuid ExpectedLease=Lease;
+    const TWeakObjectPtr<USovFinisherTargetComponent> Target=TargetComponent;
+    const TWeakObjectPtr<UAbilitySystemComponent> ExpectedTargetASC=TargetASC;
+    const bool bValid=SourceValid() && Target.IsValid() && ExpectedTargetASC.IsValid()
+        && ExpectedTargetASC->GetAvatarActor()==Target->GetOwner() && Target->OwnsLease(this,ExpectedLease)
+        && (bStruck || Target->IsReservedTargetValid(this,ExpectedLease,ActionAvatar.Get()))
+        && (bStruck || (OwnsAction(ExpectedLease) && TargetInReach(Target->GetOwner())));
+    if (!bValid) { FinishReservedAction(ExpectedLease); }
 }
 void USovGameplayAbility_Finisher::Strike()
 {
     if (bStruck) { return; }
+    TStrongObjectPtr<USovGameplayAbility_Finisher> ActionLifetime(this);
     const FGuid CapturedLease=Lease; CheckAction();
     if (!OwnsAction(CapturedLease)) { return; }
     bStruck=true;
-    AActor* Target=TargetComponent->GetOwner(); const auto& T=FSovGameplayTags::Get();
-    const bool bNormal=TargetComponent->TargetKind==ESovFinisherTargetKind::Normal && !TargetASC->HasMatchingGameplayTag(T.Character_Enemy_Boss);
-    const float Damage=static_cast<float>(SovFinisher::StrikeDamage(TargetASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()),
-        bAligned?TargetComponent->PhaseDamage:FallbackStrikeDamage,bNormal,bAligned));
-    FGameplayEffectContextHandle Context=ActionASC->MakeEffectContext(); Context.AddInstigator(ActionAvatar.Get(),ActionAvatar.Get()); Context.AddSourceObject(this);
+    const uint64 Epoch=ActionEpoch;
+    TStrongObjectPtr<UAbilitySystemComponent> SourceLifetime(ActionASC.Get()), TargetSystemLifetime(TargetASC.Get());
+    TStrongObjectPtr<USovFinisherTargetComponent> OutcomeLifetime(TargetComponent);
+    TStrongObjectPtr<AActor> TargetLifetime(OutcomeLifetime->GetOwner());
+    const TWeakObjectPtr<AActor> CommittedInstigator=ActionAvatar;
+    auto* Source=SourceLifetime.Get(); auto* TargetSystem=TargetSystemLifetime.Get();
+    auto* CommittedTarget=OutcomeLifetime.Get(); AActor* Target=TargetLifetime.Get();
+    const auto& T=FSovGameplayTags::Get();
+    const ESovFinisherTargetKind Kind=CommittedTarget->TargetKind;
+    const FGameplayTag ResolvedPhase=CommittedTarget->RequiredPhaseTag;
+    const float PhaseDamage=CommittedTarget->PhaseDamage;
+    const bool bCinematic=bAligned;
+    const bool bNormal=Kind==ESovFinisherTargetKind::Normal && !TargetSystem->HasMatchingGameplayTag(T.Character_Enemy_Boss);
+    const float Damage=static_cast<float>(SovFinisher::StrikeDamage(TargetSystem->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()),
+        bCinematic?PhaseDamage:FallbackStrikeDamage,bNormal,bCinematic));
+    FGameplayEffectContextHandle Context=Source->MakeEffectContext(); Context.AddInstigator(CommittedInstigator.Get(),CommittedInstigator.Get()); Context.AddSourceObject(this);
     FGameplayEffectSpec Spec(GetDefault<USovGameplayEffect_FinisherDamage>(),Context,GetAbilityLevel());
     Spec.AddDynamicAssetTag(T.Ability_Finisher); Spec.AddDynamicAssetTag(T.Damage_Channel_Edge); Spec.AddDynamicAssetTag(T.Damage_AlreadyResolved);
     Spec.AddDynamicAssetTag(T.Damage_BypassGuard); Spec.AddDynamicAssetTag(T.Damage_BypassDeflection); Spec.AddDynamicAssetTag(T.Damage_BypassShield);
     Spec.SetSetByCallerMagnitude(FNarrativeGameplayTags::Get().SetByCaller_Damage,Damage);
     Spec.SetSetByCallerMagnitude(T.SetByCaller_Damage_PoiseDamage,0.f);
-    if (UNarrativeDamageExecCalc::ShouldRejectTransaction(ActionASC.Get(),TargetASC.Get(),Spec)) { FinishAction(); return; }
-    const bool bPhaseOutcome=!bNormal && bAligned && TargetComponent->CommitPhase(this,Lease);
-    const FGameplayTag ResolvedPhase=TargetComponent->RequiredPhaseTag;
-    if (Damage>0.f) { ActionASC->ApplyGameplayEffectSpecToTarget(Spec,TargetASC.Get()); }
-    if (!OwnsAction(CapturedLease)) { return; }
-    if (bPhaseOutcome && IsValid(Target))
+    const bool bRejected=UNarrativeDamageExecCalc::ShouldRejectTransaction(Source,TargetSystem,Spec);
+    // Team policy can cancel/restart the action during rejection checks. Never
+    // read replacement member state or commit a phase on its behalf afterward.
+    if (ActionEpoch!=Epoch || !OwnsAction(CapturedLease)) { return; }
+    if (bRejected || ActionASC.Get()!=Source || TargetASC.Get()!=TargetSystem || TargetComponent!=CommittedTarget
+        || !IsValid(Target) || Target->IsActorBeingDestroyed() || TargetSystem->GetAvatarActor()!=Target
+        || CommittedTarget->TargetKind!=Kind || CommittedTarget->RequiredPhaseTag!=ResolvedPhase
+        || CommittedTarget->PhaseDamage!=PhaseDamage || bAligned!=bCinematic)
+    { FinishReservedAction(CapturedLease); return; }
+    const bool bNeedsPhase=!bNormal && bCinematic;
+    const bool bPhaseOutcome=bNeedsPhase && CommittedTarget->CommitPhase(this,CapturedLease);
+    if (bNeedsPhase && !bPhaseOutcome) { FinishReservedAction(CapturedLease); return; }
+    if (Damage>0.f) { Source->ApplyGameplayEffectSpecToTarget(Spec,TargetSystem); }
+    if (bPhaseOutcome && IsValid(CommittedTarget))
     {
-        FGameplayEventData Payload; Payload.EventTag=T.Event_Finisher_PhaseResolved; Payload.Instigator=ActionAvatar.Get(); Payload.Target=Target;
-        Payload.TargetTags.AddTag(ResolvedPhase); Payload.ContextHandle=Context;
-        UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(Target,Payload.EventTag,Payload);
+        CommittedTarget->PublishCommittedPhase(ResolvedPhase,CommittedInstigator.Get(),Context);
     }
     if (OwnsAction(CapturedLease)) { OnFinisherResolved(Target,bPhaseOutcome); }
 }
@@ -225,7 +284,16 @@ void USovGameplayAbility_Finisher::FinishAction()
 void USovGameplayAbility_Finisher::EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* Info,
     const FGameplayAbilityActivationInfo Activation, bool bReplicate, bool bCancelled)
 {
-    if (!IsEndAbilityValid(Handle,Info)) { return; }
+    if (bEnding||!IsEndAbilityValid(Handle,Info)) { return; }
+    ++ActionEpoch; bEndPending=true;
+    if (ScopeLockCount>0) { Super::EndAbility(Handle,Info,Activation,bReplicate,bCancelled); return; }
+    TStrongObjectPtr<USovGameplayAbility_Finisher> ActionLifetime(this);
+    TGuardValue<bool> Ending(bEnding,true);
+    if (StrikeTask)
+    {
+        StrikeTask->EventReceived.RemoveDynamic(this,&ThisClass::OnStrikeEvent);
+        StrikeTask->EndTask(); StrikeTask=nullptr;
+    }
     if (GetWorld()) { auto& Timers=GetWorld()->GetTimerManager(); Timers.ClearTimer(StrikeTimer); Timers.ClearTimer(FinishTimer); Timers.ClearTimer(CheckTimer); }
     const FGuid OldLease=Lease; Lease.Invalidate();
     if (TargetComponent) { TargetComponent->Release(this,OldLease); }

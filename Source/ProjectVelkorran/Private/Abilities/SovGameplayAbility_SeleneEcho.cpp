@@ -10,6 +10,53 @@
 #include "NarrativeGameplayTags.h"
 #include "Sovereign/SovGameplayTags.h"
 #include "Weapons/NarrativeProjectile.h"
+#include "Effects/SovGameplayEffect_SeleneControl.h"
+#include "UObject/UnrealType.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogSovSeleneConfiguration, Log, All);
+
+bool USovGameplayAbility_SeleneEchoBase::ValidateNativeEffectOverrides(FString& OutError) const
+{
+	OutError.Reset();
+	const TPair<FName, UClass*> RetiredFields[] = {
+		{TEXT("DetonationDamageEffectClass"), USovGameplayEffect_SeleneDamage::StaticClass()},
+		{TEXT("OutboundDamageEffectClass"), USovGameplayEffect_SeleneDamage::StaticClass()},
+		{TEXT("ReturnDamageEffectClass"), USovGameplayEffect_SeleneDamage::StaticClass()},
+		{TEXT("FrozenShatterEffectClass"), USovGameplayEffect_SeleneDamage::StaticClass()},
+		{TEXT("EmpoweredShotDamageEffectClass"), USovGameplayEffect_SeleneDamage::StaticClass()},
+		{TEXT("WaveDamageEffectClass"), USovGameplayEffect_SeleneDamage::StaticClass()},
+		{TEXT("ChillEffectClass"), USovGameplayEffect_SeleneControl::StaticClass()},
+		{TEXT("FreezeEffectClass"), USovGameplayEffect_SeleneControl::StaticClass()},
+		{TEXT("ResistantTargetChillEffectClass"), USovGameplayEffect_SeleneControl::StaticClass()},
+		{TEXT("FrozenDamageOverTimeEffectClass"), USovGameplayEffect_SeleneFrozenDOT::StaticClass()},
+		{TEXT("ResistantTargetDamageOverTimeEffectClass"), USovGameplayEffect_SeleneFrostDOT::StaticClass()},
+		{TEXT("FrostDamageOverTimeEffectClass"), USovGameplayEffect_SeleneFrostDOT::StaticClass()}
+	};
+	for (const auto& Entry : RetiredFields)
+	{
+		const FClassProperty* Property = FindFProperty<FClassProperty>(GetClass(), Entry.Key);
+		const UObject* Value = Property ? Property->GetObjectPropertyValue_InContainer(this) : nullptr;
+		if (Value && Value != Entry.Value)
+		{
+			OutError += FString::Printf(TEXT("%s uses retired effect override %s. Clear it or restore %s; tune the native damage/duration fields and presentation events. "),
+				*Entry.Key.ToString(), *Value->GetPathName(), *Entry.Value->GetPathName());
+		}
+	}
+	return OutError.IsEmpty();
+}
+
+bool USovGameplayAbility_SeleneEchoBase::CheckCost(const FGameplayAbilitySpecHandle Handle,
+	const FGameplayAbilityActorInfo* ActorInfo, FGameplayTagContainer* OptionalRelevantTags) const
+{
+	FString Error;
+	if (!ValidateNativeEffectOverrides(Error))
+	{
+		UE_LOG(LogSovSeleneConfiguration, Error, TEXT("%s: %s"), *GetPathName(), *Error);
+		if (OptionalRelevantTags) { OptionalRelevantTags->AddTag(FNarrativeGameplayTags::Get().Ability_ActivateFail_TagsBlocked); }
+		return false;
+	}
+	return Super::CheckCost(Handle, ActorInfo, OptionalRelevantTags);
+}
 
 USovGameplayAbility_SeleneEchoBase::USovGameplayAbility_SeleneEchoBase()
 {
@@ -59,6 +106,7 @@ void USovGameplayAbility_SeleneEchoBase::EndAbility(const FGameplayAbilitySpecHa
 	const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo,
 	bool bReplicateEndAbility, bool bWasCancelled)
 {
+	if (!IsEndAbilityValid(Handle, ActorInfo)) { return; }
 	++NativePayloadEpoch;
 	NativeSourceWeapon.Reset();
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
@@ -75,7 +123,7 @@ FSovSelenePayloadContext USovGameplayAbility_SeleneEchoBase::MakeNativePayloadCo
 }
 bool USovGameplayAbility_SeleneEchoBase::CanExecuteNativePayload(uint32 Epoch) const
 {
-	if (Epoch != NativePayloadEpoch || !IsActive() || !CurrentActorInfo || !GetWorld()
+	if (Epoch != NativePayloadEpoch || !IsCurrentEchoExecutionValid() || !CurrentActorInfo || !GetWorld()
 		|| !HasRequiredPayloadConfiguration() || !SovSelenePayload::ValidSource(MakeNativePayloadContext())
 		|| !MeetsWeaponRequirement(CurrentSpecHandle, CurrentActorInfo)) { return false; }
 	const UAbilitySystemComponent* ASC = CurrentActorInfo->AbilitySystemComponent.Get();

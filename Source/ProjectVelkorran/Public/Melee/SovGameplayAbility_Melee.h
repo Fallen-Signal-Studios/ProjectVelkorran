@@ -42,6 +42,9 @@ protected:
 private:
     friend struct FSovMeleeRuntimeTestAccess;
     bool ContextValid() const;
+    void BindInterruptions();
+    void UnbindInterruptions();
+    void HandleInterruption(FGameplayTag Tag, int32 Count);
     bool NodeGeometryValid() const;
     bool BeginNode(int32 Index);
     void ReleaseCharge();
@@ -61,6 +64,10 @@ private:
     TWeakObjectPtr<USkeletalMeshComponent> ActionMesh;
     FGuid InputWindow;
     FTimerHandle ChargeTimer;
+    TMap<FGameplayTag, FDelegateHandle> InterruptionHandles;
+    uint64 MeleeActivationEpoch=0;
+    bool bMeleeEndPending=false;
+    bool bEndingMelee=false;
     int32 NodeIndex=INDEX_NONE;
     float ChargeStarted=0.f;
     float ChargeScalar=1.f;

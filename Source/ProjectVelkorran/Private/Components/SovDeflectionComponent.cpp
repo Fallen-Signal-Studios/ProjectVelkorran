@@ -52,7 +52,10 @@ bool USovDeflectionComponent::InitializeWithAbilitySystem(
 	UAbilitySystemComponent* InAbilitySystemComponent)
 {
 	if (!IsValid(InAbilitySystemComponent)
+		|| bUninitializing || bClosingWindow
 		|| !IsValid(GetOwner())
+		|| InAbilitySystemComponent->GetAvatarActor() != GetOwner()
+		|| UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner()) != InAbilitySystemComponent
 		|| !InAbilitySystemComponent->GetSet<UNarrativeAttributeSetBase>())
 	{
 		return false;
@@ -78,6 +81,7 @@ bool USovDeflectionComponent::InitializeWithAbilitySystem(
 
 	UninitializeFromAbilitySystem();
 	AbilitySystemComponent = InAbilitySystemComponent;
+	BindInterruptionTags();
 	if (UNarrativeAbilitySystemComponent* NarrativeASC =
 		Cast<UNarrativeAbilitySystemComponent>(AbilitySystemComponent))
 	{
@@ -95,9 +99,16 @@ bool USovDeflectionComponent::IsInitialized() const
 
 bool USovDeflectionComponent::BeginDeflection()
 {
-	if (!IsInitialized()
+	return BeginDeflectionInternal(0);
+}
+
+bool USovDeflectionComponent::BeginDeflectionInternal(const int32 OwnedBusyContributions, uint64* OutWindowEpoch)
+{
+	if (!IsInitialized() || bClosingWindow || bUninitializing || !GetWorld()
 		|| !IsValid(GetOwner())
-		|| PerfectDeflectionWindow <= KINDA_SMALL_NUMBER)
+		|| HasInterruptionState(OwnedBusyContributions)
+		|| !FMath::IsFinite(PerfectDeflectionWindow) || PerfectDeflectionWindow <= KINDA_SMALL_NUMBER
+		|| !FMath::IsFinite(MinimumDeflectionStartStamina) || MinimumDeflectionStartStamina < 0.f)
 	{
 		return false;
 	}
@@ -116,6 +127,7 @@ bool USovDeflectionComponent::BeginDeflection()
 		|| AbilitySystemComponent->HasMatchingGameplayTag(NarrativeTags.State_Interacting)
 		|| AbilitySystemComponent->HasMatchingGameplayTag(NarrativeTags.State_SequencerControlled)
 		|| AbilitySystemComponent->HasMatchingGameplayTag(NarrativeTags.State_Movement_Ragdoll)
+		|| !FMath::IsFinite(CurrentStamina)
 		|| CurrentStamina + KINDA_SMALL_NUMBER < FMath::Max(MinimumDeflectionStartStamina, 0.f))
 	{
 		return false;
@@ -133,8 +145,11 @@ bool USovDeflectionComponent::BeginDeflection()
 		}
 	}
 
+	const uint64 Epoch = ++WindowEpoch;
+	if (OutWindowEpoch) { *OutWindowEpoch = Epoch; }
+	DeflectionOwnedBusyContributions = OwnedBusyContributions;
 	SetOwnedLooseTag(SovTags.State_Deflecting, true, bAppliedDeflectingTag);
-	if (!bAppliedDeflectingTag)
+	if (Epoch != WindowEpoch || !bAppliedDeflectingTag)
 	{
 		return false;
 	}
@@ -145,19 +160,23 @@ bool USovDeflectionComponent::BeginDeflection()
 		TimerManager.ClearTimer(DeflectionWindowTimerHandle);
 		TimerManager.SetTimer(
 			DeflectionWindowTimerHandle,
-			this,
-			&ThisClass::CloseDeflectionWindow,
+			FTimerDelegate::CreateWeakLambda(this, [this, Epoch]() { EndOwnedDeflectionWindow(Epoch); }),
 			PerfectDeflectionWindow,
 			false);
 	}
 
 	OnDeflectionStarted.Broadcast();
-	return true;
+	return Epoch == WindowEpoch && bAppliedDeflectingTag && !HasInterruptionState(OwnedBusyContributions);
 }
 
 void USovDeflectionComponent::EndDeflection()
 {
 	CloseDeflectionWindow();
+}
+
+void USovDeflectionComponent::EndOwnedDeflectionWindow(const uint64 Epoch)
+{
+	if (Epoch != 0 && Epoch == WindowEpoch) { CloseDeflectionWindow(); }
 }
 
 bool USovDeflectionComponent::IsDeflectionWindowOpen() const
@@ -191,6 +210,10 @@ void USovDeflectionComponent::HandleOwnerASCInitialized()
 
 void USovDeflectionComponent::UninitializeFromAbilitySystem()
 {
+	if (bUninitializing) { return; }
+	TGuardValue<bool> Guard(bUninitializing, true);
+	UnbindInterruptionTags();
+	CloseDeflectionWindow();
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(DeflectionWindowTimerHandle);
@@ -218,6 +241,9 @@ void USovDeflectionComponent::UninitializeFromAbilitySystem()
 
 void USovDeflectionComponent::CloseDeflectionWindow()
 {
+	if (bClosingWindow) { return; }
+	TGuardValue<bool> Closing(bClosingWindow, true);
+	++WindowEpoch;
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(DeflectionWindowTimerHandle);
@@ -228,6 +254,7 @@ void USovDeflectionComponent::CloseDeflectionWindow()
 		FSovGameplayTags::Get().State_Deflecting,
 		false,
 		bAppliedDeflectingTag);
+	DeflectionOwnedBusyContributions = 0;
 	if (bWasOpen)
 	{
 		OnDeflectionWindowClosed.Broadcast();
@@ -246,6 +273,8 @@ void USovDeflectionComponent::SetOwnedLooseTag(
 		return;
 	}
 
+	// Publish ownership before GAS invokes synchronous tag listeners.
+	bAppliedFlag = bShouldApply;
 	if (bShouldApply)
 	{
 		if (GetOwner() && GetOwner()->HasAuthority())
@@ -271,7 +300,54 @@ void USovDeflectionComponent::SetOwnedLooseTag(
 	{
 		AbilitySystemComponent->RemoveLooseGameplayTag(Tag);
 	}
-	bAppliedFlag = bShouldApply;
+}
+
+bool USovDeflectionComponent::HasInterruptionState(const int32 OwnedBusyContributions) const
+{
+	if (!IsInitialized() || !IsValid(GetOwner()) || GetOwner()->IsActorBeingDestroyed()
+		|| AbilitySystemComponent->GetAvatarActor() != GetOwner()
+		|| UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner()) != AbilitySystemComponent
+		|| AbilitySystemComponent->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()) <= 0.f)
+	{ return true; }
+	if (!FMath::IsFinite(AbilitySystemComponent->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()))) { return true; }
+	const auto& N = FNarrativeGameplayTags::Get(); const auto& S = FSovGameplayTags::Get();
+	FGameplayTagContainer Blocking;
+	const FGameplayTag Tags[] = {N.State_IsDead, N.State_Interacting, N.State_SequencerControlled,
+		N.State_Movement_Ragdoll, N.State_Weapon_Equipping, S.State_Fatal, S.State_Poise_Broken,
+		S.State_Guarding, S.State_Guard_Broken, S.State_EchoAbility_Active, S.State_Status_Frozen};
+	for (const auto& Tag : Tags) { Blocking.AddTag(Tag); }
+	return AbilitySystemComponent->HasAnyMatchingGameplayTags(Blocking)
+		|| AbilitySystemComponent->GetGameplayTagCount(N.State_Busy) > OwnedBusyContributions;
+}
+
+void USovDeflectionComponent::BindInterruptionTags()
+{
+	UnbindInterruptionTags();
+	if (!IsInitialized()) { return; }
+	const auto& N = FNarrativeGameplayTags::Get(); const auto& S = FSovGameplayTags::Get();
+	const FGameplayTag Tags[] = {N.State_IsDead, N.State_Interacting, N.State_SequencerControlled,
+		N.State_Movement_Ragdoll, N.State_Weapon_Equipping, N.State_Busy, S.State_Fatal, S.State_Poise_Broken,
+		S.State_Guarding, S.State_Guard_Broken, S.State_EchoAbility_Active, S.State_Status_Frozen};
+	for (const auto& Tag : Tags)
+	{
+		InterruptionTagHandles.Add(Tag, AbilitySystemComponent->RegisterGameplayTagEvent(Tag, EGameplayTagEventType::AnyCountChange)
+			.AddUObject(this, &ThisClass::HandleInterruptionTagChanged));
+	}
+}
+
+void USovDeflectionComponent::UnbindInterruptionTags()
+{
+	if (IsInitialized())
+	{
+		for (const auto& Pair : InterruptionTagHandles)
+		{ AbilitySystemComponent->RegisterGameplayTagEvent(Pair.Key, EGameplayTagEventType::AnyCountChange).Remove(Pair.Value); }
+	}
+	InterruptionTagHandles.Reset();
+}
+
+void USovDeflectionComponent::HandleInterruptionTagChanged(FGameplayTag Tag, const int32 NewCount)
+{
+	if (NewCount > 0 && HasInterruptionState(DeflectionOwnedBusyContributions)) { CloseDeflectionWindow(); }
 }
 
 void USovDeflectionComponent::HandleDamageResolvedAsTarget(

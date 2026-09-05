@@ -22,6 +22,7 @@
 #include "Weapons/WeaponVisual.h"
 #include "Subsystems/NarrativeSaveSubsystem.h"
 #include "Components/EquipmentComponent.h"
+#include "UObject/StrongObjectPtr.h"
 
 #define LOCTEXT_NAMESPACE "WeaponItem"
 
@@ -473,36 +474,55 @@ void UWeaponItem::RemoveWeaponAbilities()
 
 bool UWeaponItem::ConsumeAmmo_Implementation(const int32 Amount /*= 1*/)
 {
-	if (GetAmmoInClip() >= Amount && OwningInventory)// && HasAuthority())
+	if (Amount <= 0 || bAmmoCommitPending || !IsValid(OwningInventory)) { return false; }
+	TStrongObjectPtr<UWeaponItem> PinnedWeapon(this);
+	TGuardValue<bool> Pending(bAmmoCommitPending, true);
+	TWeakObjectPtr<UNarrativeInventoryComponent> Inventory = OwningInventory;
+	TWeakObjectPtr<APawn> Owner = Inventory->GetOwningPawn();
+	const uint64 Membership = GetInventoryMembershipRevision();
+	const auto OwnsTransaction = [this, Inventory, Owner, Membership]()
 	{
-		if (!bBotsConsumeAmmo)
-		{
-			if (ANarrativeCharacter* CharacterOwner = GetOwningNarrativeCharacter())
-			{
-				if (CharacterOwner->IsBotControlled())
-				{
-					return true; 
-				}
-			}
-		}
-
-		if (HasAuthority())
-		{
-			if (UNarrativeItem* Item = GetAmmoSource())
-			{
-				OwningInventory->ConsumeItem(Item, Amount);
-			}
-			WeaponClipState.AmmoInClip -= Amount;
-			MarkDirtyForReplication();
-		}
-		else
-		{
-			WeaponClipState.ClientAmmoInClip -= Amount;
-		}
-		
+		return Inventory.IsValid() && OwningInventory == Inventory.Get() && Owner.IsValid()
+			&& !Owner->IsActorBeingDestroyed() && Inventory->GetOwningPawn() == Owner.Get()
+			&& GetInventoryMembershipRevision() == Membership;
+	};
+	const uint64 ReadRevision = GetCinematicStateRevision();
+	const int32 Loaded = GetAmmoInClip();
+	const int32 Size = GetClipSize();
+	if (!OwnsTransaction() || GetCinematicStateRevision() != ReadRevision || Loaded < Amount || Size < Amount) { return false; }
+	if (!bBotsConsumeAmmo)
+		if (const ANarrativeCharacter* CharacterOwner = Cast<ANarrativeCharacter>(Owner.Get()))
+			if (CharacterOwner->IsBotControlled()) { return true; }
+	if (!HasAuthority())
+	{
+		WeaponClipState.ClientAmmoInClip = Loaded - Amount;
 		return true;
 	}
-	return false;
+	TStrongObjectPtr<UNarrativeItem> Ammo(GetAmmoSource());
+	if (!OwnsTransaction() || GetCinematicStateRevision() != ReadRevision || !Ammo.IsValid()
+		|| Ammo->OwningInventory != Inventory.Get() || Ammo->GetQuantity() < Amount) { return false; }
+	const uint64 AmmoMembership = Ammo->GetInventoryMembershipRevision();
+	const uint64 AmmoQuantityRevision = Ammo->GetQuantityRevision();
+	// Reserve loaded ammunition before SetQuantity/OnItemRemoved can run arbitrary listeners.
+	WeaponClipState.AmmoInClip = Loaded - Amount;
+	MarkDirtyForReplication();
+	const uint64 ReservedRevision = GetCinematicStateRevision();
+	const int32 Removed = Inventory->ConsumeItemExact(Ammo.Get(), Amount, AmmoQuantityRevision,
+		[this, &OwnsTransaction, ReservedRevision]()
+		{ return OwnsTransaction() && GetCinematicStateRevision() == ReservedRevision; });
+	if (Removed != Amount)
+	{
+		// A rejected removal is refundable only while nobody replaced either resource.
+		if (Removed == 0 && OwnsTransaction() && GetCinematicStateRevision() == ReservedRevision
+			&& Ammo->GetInventoryMembershipRevision() == AmmoMembership
+			&& Ammo->GetQuantityRevision() == AmmoQuantityRevision && GetAmmoSource() == Ammo.Get())
+		{
+			WeaponClipState.AmmoInClip = Loaded;
+			MarkDirtyForReplication();
+		}
+		return false;
+	}
+	return OwnsTransaction() && GetCinematicStateRevision() == ReservedRevision;
 }
 
 float UWeaponItem::GetWeaponSpread_Implementation() const
@@ -614,22 +634,30 @@ FText UWeaponItem::GetWeaponDisplayName_Implementation(const bool bShowAttachmen
 
 bool UWeaponItem::Reload_Implementation()
 {
-	if (IsValid(RequiredAmmo) && HasAuthority())
+	if (bAmmoCommitPending || !IsValid(OwningInventory) || !IsValid(RequiredAmmo) || !HasAuthority()) { return false; }
+	TStrongObjectPtr<UWeaponItem> PinnedWeapon(this);
+	TStrongObjectPtr<UNarrativeInventoryComponent> Inventory(OwningInventory);
+	TGuardValue<bool> Pending(bAmmoCommitPending, true);
+	const TWeakObjectPtr<APawn> Owner = Inventory->GetOwningPawn();
+	const uint64 Membership = GetInventoryMembershipRevision();
+	const auto OwnsReload = [this, &Inventory, Owner, Membership]()
 	{
-		InitAmmoSource();
-
-		//Reload whatever is lower, our spare ammo remaining, or the space left in our clip. 
-		const int32 Amount = FMath::Min(GetSpareAmmo(), GetClipSize() - GetAmmoInClip());
-
-		if (Amount > 0)
-		{
-			WeaponClipState.AmmoInClip += Amount;
-			MarkDirtyForReplication();
-			return true; 
-		}
-	}
-
-	return false;
+		return Inventory.IsValid() && OwningInventory == Inventory.Get() && Owner.IsValid()
+			&& !Owner->IsActorBeingDestroyed() && Inventory->GetOwningPawn() == Owner.Get()
+			&& GetInventoryMembershipRevision() == Membership;
+	};
+	InitAmmoSource();
+	if (!OwnsReload()) { return false; }
+	const uint64 ReadRevision = GetCinematicStateRevision();
+	const int32 Loaded = GetAmmoInClip();
+	const int32 Size = GetClipSize();
+	const int32 Spare = GetSpareAmmo();
+	if (!OwnsReload() || GetCinematicStateRevision() != ReadRevision || Loaded < 0 || Size < Loaded || Spare <= 0) { return false; }
+	const int32 Amount = FMath::Min(Spare, Size - Loaded);
+	if (Amount <= 0) { return false; }
+	WeaponClipState.AmmoInClip = Loaded + Amount;
+	MarkDirtyForReplication();
+	return true;
 }
 
 int32 UWeaponItem::GetAmmoInClip_Implementation()const
@@ -642,7 +670,8 @@ int32 UWeaponItem::GetAmmoInClip_Implementation()const
 		
 		if(UNarrativeItem* Item = GetAmmoSource())
 		{
-			return FMath::Min<int32>(Item->GetQuantity(), bLocal && !bAuth ? WeaponClipState.ClientAmmoInClip : WeaponClipState.AmmoInClip);
+			return FMath::Clamp(bLocal && !bAuth ? WeaponClipState.ClientAmmoInClip : WeaponClipState.AmmoInClip,
+				0, FMath::Max(0, FMath::Min(Item->GetQuantity(), GetClipSize())));
 		}
 	}
 
@@ -658,7 +687,7 @@ int32 UWeaponItem::GetAuthAmmoInClip_Implementation() const
 		
 		if(UNarrativeItem* Item = GetAmmoSource())
 		{
-			return FMath::Min<int32>(Item->GetQuantity(), WeaponClipState.AmmoInClip);
+			return FMath::Clamp(WeaponClipState.AmmoInClip, 0, FMath::Max(0, FMath::Min(Item->GetQuantity(), GetClipSize())));
 		}
 	}
 
@@ -689,7 +718,8 @@ int32 UWeaponItem::GetSpareAmmo_Implementation()const
 		}
 
 		//Spare ammo isn't predicted so we use GetAuthAmmoInClip. This is because ammo removal requires inventory to update which isnt predicted. 
-		return AmmoSourceItem->GetQuantity() - (GetAuthAmmoInClip() + OtherWeaponAmmo);
+		return static_cast<int32>(FMath::Clamp<int64>(static_cast<int64>(AmmoSourceItem->GetQuantity())
+			- GetAuthAmmoInClip() - OtherWeaponAmmo, 0, MAX_int32));
 	}
 
 	return 0;

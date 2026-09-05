@@ -39,6 +39,8 @@ class PROJECTVELKORRAN_API USovDiagnosticsSubsystem : public UTickableWorldSubsy
 {
 	GENERATED_BODY()
 public:
+	virtual bool ShouldCreateSubsystem(UObject* Outer) const override;
+	virtual bool IsTickable() const override;
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void Deinitialize() override;
 	virtual void Tick(float DeltaTime) override;
@@ -52,6 +54,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Sovereign|Diagnostics") void ClearRecords();
 	static bool IsSafeDebugId(FName Id);
 private:
+	friend struct FSovDiagnosticsTestAccess;
 	void RefreshBindings();
 	void UnbindPlayer();
 	void Append(FSovDiagnosticRecord Value);

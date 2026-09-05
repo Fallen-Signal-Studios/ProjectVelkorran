@@ -191,6 +191,13 @@ void USovGameplayAbility_SeleneDispatch::EndAbility(const FGameplayAbilitySpecHa
 	const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo,
 	bool bReplicateEndAbility, bool bWasCancelled)
 {
+	if (bEndingDispatch || !IsEndAbilityValid(Handle, ActorInfo)) { return; }
+	if (ScopeLockCount > 0)
+	{
+		Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
+		return;
+	}
+	TGuardValue<bool> Ending(bEndingDispatch, true);
 	// Invalidate callbacks and detach delegates before removal/destruction can broadcast synchronously.
 	DispatchTaskEpoch = 0;
 	bDispatchRecallPending = false;

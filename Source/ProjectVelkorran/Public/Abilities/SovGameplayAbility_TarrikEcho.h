@@ -483,7 +483,18 @@ private:
 	TSubclassOf<UGameplayEffect> ResolveJudgementExplosionEffectClass() const;
 	FTransform ResolveJudgementMuzzleTransform() const;
 	FVector ResolveJudgementAuthorityAimPoint();
+	struct FJudgementRelease
+	{
+		TWeakObjectPtr<UAbilitySystemComponent> SourceASC;
+		TWeakObjectPtr<AActor> Avatar;
+		TWeakObjectPtr<UObject> SourceObject;
+		FGameplayEffectContextHandle Context;
+		uint64 Activation = 0;
+		float Level = 1.f;
+	};
+	bool IsJudgementReleaseCurrent(const FJudgementRelease& Release) const;
 	bool ApplyJudgementDamage(
+		const FJudgementRelease& Release,
 		class UAbilitySystemComponent* TargetAbilitySystem,
 		const FGameplayEffectContextHandle& Context,
 		TSubclassOf<UGameplayEffect> EffectClass,
@@ -492,18 +503,22 @@ private:
 		float ShieldCoefficient,
 		float SourceModifier) const;
 	int32 ApplyJudgementExplosion(
+		const FJudgementRelease& Release,
 		const FVector& Origin,
 		const FVector& SurfaceNormal,
 		AActor* DirectHitActor,
 		AActor* ExplosionDamageCauser) const;
 	bool HasJudgementExplosionLineOfSight(
+		const FJudgementRelease& Release,
 		const FVector& Origin,
 		class UAbilitySystemComponent* TargetAbilitySystem,
 		AActor* DirectHitActor) const;
 	void ApplyJudgementPhysicsImpulse(
+		const FJudgementRelease& Release,
 		const FVector& Origin,
 		const FVector& SurfaceNormal) const;
 	bool HasJudgementPhysicsLineOfSight(
+		const FJudgementRelease& Release,
 		const FVector& Origin,
 		class UPrimitiveComponent* TargetComponent) const;
 	ASovCinderJudgementPresentation* SpawnDeferredJudgementPresentation(
@@ -517,7 +532,7 @@ private:
 		bool bBlastTriggered,
 		bool bDirectDamageResolved,
 		int32 RadialTargetsResolved) const;
-	void BeginJudgementRecovery();
+	void BeginJudgementRecovery(uint64 ExpectedActivation);
 
 	FTimerHandle JudgementReleaseTimerHandle;
 	FTimerHandle JudgementRecoveryTimerHandle;

@@ -3,6 +3,7 @@
 #include "GAS/NarrativeCombatAbility.h"
 #include "Sovereign/SovGameplayTags.h"
 #include "Melee/SovGameplayAbility_Melee.h"
+#include "GAS/SovCombatTypes.h"
 
 USovEchoAttackReceipt* USovEchoAttackReceipt::CreateForActiveAbility(UNarrativeCombatAbility* Ability)
 {
@@ -36,4 +37,20 @@ bool USovEchoAttackReceipt::MatchesCommittedHeavyAttack(const AActor* ExpectedSo
 {
 	return bHeavyAttack && SourceActor.IsValid() && SourceActor.Get() == ExpectedSource
 		&& CapturedAttackId.IsValid() && AttackId == CapturedAttackId;
+}
+
+bool USovEchoAttackReceipt::ConsumeHeavyMultiTargetReward(const UObject* Consumer, uint32 Scope, const FSovDamageResult& Result) const
+{
+	if (!IsValid(Consumer) || bHeavyRewardConsumed || !Result.HasNativeReceipt() || !IsValid(Result.TargetActor)
+		|| !MatchesCommittedHeavyAttack(Result.SourceActor.Get(), Result.AttackId)) { return false; }
+	if (!bHeavyRewardStarted)
+	{
+		bHeavyRewardStarted = true; HeavyRewardConsumer = Consumer; HeavyRewardScope = Scope;
+	}
+	if (HeavyRewardConsumer.Get() != Consumer || HeavyRewardScope != Scope) { return false; }
+	HeavyRewardTargets.Add(Result.TargetActor.Get());
+	if (HeavyRewardTargets.Num() < 3) { return false; }
+	bHeavyRewardConsumed = true;
+	HeavyRewardTargets.Reset();
+	return true;
 }

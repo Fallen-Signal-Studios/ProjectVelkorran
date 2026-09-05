@@ -7,6 +7,7 @@
 #include "Accessibility/SovAccessibleNarrationSubsystem.h"
 #include "Campaign/SovCampaignStateComponent.h"
 #include "Campaign/SovEvidenceDefinition.h"
+#include "Narrative/SovNarrativeCueComponent.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/Border.h"
 #include "Components/SafeZone.h"
@@ -51,7 +52,8 @@ TSharedRef<SWidget> USovAccessibleRecordMenu::RebuildWidget()
 			Controls->AddChildToHorizontalBox(Button)->SetSize(FSlateChildSize(ESlateSizeRule::Fill)); return Button;
 		};
 		PreviousButton=AddButton(LOCTEXT("Previous","Previous record")); NextButton=AddButton(LOCTEXT("Next","Next record"));
-		ReadButton=AddButton(LOCTEXT("Read","Read current summary")); CloseButton=AddButton(LOCTEXT("Close","Close review"));
+		ReadButton=AddButton(LOCTEXT("Read","Read current summary")); ReplayButton=AddButton(LOCTEXT("Replay","Replay recorded line")); CloseButton=AddButton(LOCTEXT("Close","Close review"));
+		ReplayButton->OnClicked.AddDynamic(this,&ThisClass::Replay);
 		PreviousButton->OnClicked.AddDynamic(this,&ThisClass::Previous); NextButton->OnClicked.AddDynamic(this,&ThisClass::Next); ReadButton->OnClicked.AddDynamic(this,&ThisClass::Read); CloseButton->OnClicked.AddDynamic(this,&ThisClass::Close);
 		RecordScroll=WidgetTree->ConstructWidget<UScrollBox>();
 		Body=WidgetTree->ConstructWidget<UTextBlock>(); Body->SetAutoWrapText(true); Body->SetMargin(FMargin(10,20)); RecordScroll->AddChild(Body);
@@ -81,7 +83,7 @@ void USovAccessibleRecordMenu::NativeDestruct()
 	if(BoundPresentation) { BoundPresentation->OnSceneHistoryChanged.RemoveDynamic(this,&ThisClass::HistoryChanged); }
 	if(BoundCampaign) { BoundCampaign->OnEvidenceRecorded.RemoveDynamic(this,&ThisClass::EvidenceChanged); BoundCampaign->OnCampaignStateRestored.RemoveDynamic(this,&ThisClass::CampaignRestored); BoundCampaign->OnMissionChanged.RemoveDynamic(this,&ThisClass::MissionChanged); }
 	BoundPresentation=nullptr; BoundCampaign=nullptr;
-	Records.Reset(); BoundSettings=nullptr; Super::NativeDestruct();
+	Records.Reset(); ReplayRecords.Reset(); BoundSettings=nullptr; Super::NativeDestruct();
 	if(Expected!=ViewGeneration || !bRetiring) { return; }
 	if(GetOwningLocalPlayer()) { if(auto* Narrator=GetOwningLocalPlayer()->GetSubsystem<USovAccessibleNarrationSubsystem>()) { Narrator->Cancel(this); } }
 }
@@ -94,7 +96,7 @@ void USovAccessibleRecordMenu::NativeOnActivated()
 void USovAccessibleRecordMenu::NativeOnDeactivated()
 {
 	const uint64 Expected=++ViewGeneration;
-	Records.Reset(); if(Body) { Body->SetText(FText::GetEmpty()); } Super::NativeOnDeactivated();
+	Records.Reset(); ReplayRecords.Reset(); if(Body) { Body->SetText(FText::GetEmpty()); } Super::NativeOnDeactivated();
 	if(Expected!=ViewGeneration || IsActivated()) { return; }
 	if(GetOwningLocalPlayer()) { if(auto* Narrator=GetOwningLocalPlayer()->GetSubsystem<USovAccessibleNarrationSubsystem>()) { Narrator->Cancel(this); } }
 }
@@ -121,7 +123,7 @@ FReply USovAccessibleRecordMenu::NativeOnKeyDown(const FGeometry& Geometry, cons
 }
 void USovAccessibleRecordMenu::RebuildRecords()
 {
-	Records.Reset(); APlayerController* PC=GetOwningPlayer(); if(!PC) { return; }
+	Records.Reset(); ReplayRecords.Reset(); APlayerController* PC=GetOwningPlayer(); if(!PC) { return; }
 	if(bSceneHistory)
 	{
 		if(auto* Frontend=PC->FindComponentByClass<USovFrontendComponent>())
@@ -140,22 +142,36 @@ void USovAccessibleRecordMenu::RebuildRecords()
 			Seen.Add(Acquisition.EvidenceId); Records.Add(DescribeEvidence(Acquisition.Definition,Campaign->GetEvidenceStage(Acquisition.EvidenceId,Protagonist)));
 		}
 	}
+	ReplayRecords.SetNum(Records.Num());
+	if (!bSceneHistory)
+	{
+		if (auto* Cues=PC->FindComponentByClass<USovNarrativeCueComponent>())
+		{
+			for (USovNarrativeCue* Cue:Cues->GetUnheardRecords())
+			{
+				if (!IsValid(Cue)) { continue; }
+				Records.Add(FText::Format(LOCTEXT("UnheardRecord","Interrupted critical line.\n\nRecord summary: {0}"),Cue->RecordSummary));
+				ReplayRecords.Add(Cue);
+			}
+		}
+	}
 	Selection=FMath::Clamp(Selection,0,FMath::Max(0,Records.Num()-1));
 }
 void USovAccessibleRecordMenu::ShowRecord(bool bAnnounce)
 {
-	if(bRetiring || !Body || !Heading || !PreviousButton || !NextButton || !ReadButton || !CloseButton) { return; } const auto Settings=BoundSettings ? BoundSettings->GetSettingsSnapshot() : FSovUserSettingsSnapshot();
+	if(bRetiring || !Body || !Heading || !PreviousButton || !NextButton || !ReadButton || !ReplayButton || !CloseButton) { return; } const auto Settings=BoundSettings ? BoundSettings->GetSettingsSnapshot() : FSovUserSettingsSnapshot();
 	SetMenuNavigationWrap(Settings.bMenuNavigationWrap); const auto Font=FCoreStyle::GetDefaultFontStyle("Regular",FMath::RoundToInt(22*Settings.UIScale));
 	Body->SetFont(Font); Heading->SetFont(Font); Body->SetColorAndOpacity(FSlateColor(FLinearColor::White)); Heading->SetColorAndOpacity(FSlateColor(FLinearColor::White));
 	if (ScrollHint) { ScrollHint->SetFont(Font); ScrollHint->SetColorAndOpacity(FSlateColor(FLinearColor::White)); }
-	for(auto* Button:{PreviousButton.Get(),NextButton.Get(),ReadButton.Get(),CloseButton.Get()})
+	for(auto* Button:{PreviousButton.Get(),NextButton.Get(),ReadButton.Get(),ReplayButton.Get(),CloseButton.Get()})
 	{ if(auto* Label=Cast<UTextBlock>(Button->GetContent())) { Label->SetFont(Font); Label->SetColorAndOpacity(FSlateColor(FLinearColor::White)); } Button->SetBackgroundColor(FLinearColor::Black); }
-	Heading->SetText(FText::Format(LOCTEXT("Heading","{0} — {1} of {2}"),bSceneHistory ? LOCTEXT("SceneHistory","Current scene history") : LOCTEXT("Evidence","Acquired evidence"),FText::AsNumber(Records.Num() ? Selection+1 : 0),FText::AsNumber(Records.Num())));
+	Heading->SetText(FText::Format(LOCTEXT("Heading","{0} — {1} of {2}"),bSceneHistory ? LOCTEXT("SceneHistory","Current scene history") : LOCTEXT("Evidence","Evidence and interrupted lines"),FText::AsNumber(Records.Num() ? Selection+1 : 0),FText::AsNumber(Records.Num())));
 	const FText NewBody = Records.IsValidIndex(Selection) ? Records[Selection] : LOCTEXT("Empty","No records available to the current protagonist in this view.");
 	const bool bNewRecord = !Body->GetText().EqualTo(NewBody);
 	Body->SetText(NewBody);
 	if (bNewRecord && RecordScroll) { RecordScroll->ScrollToStart(); }
 	PreviousButton->SetIsEnabled(Records.Num()>1); NextButton->SetIsEnabled(Records.Num()>1); ReadButton->SetIsEnabled(!Records.IsEmpty());
+	if (ReplayButton) { ReplayButton->SetIsEnabled(ReplayRecords.IsValidIndex(Selection) && ReplayRecords[Selection].IsValid()); }
 	if(bAnnounce && Settings.bMenuNarration) { Read(); }
 }
 void USovAccessibleRecordMenu::Previous() { if(bRetiring || !IsActivated()) { return; } ++ViewGeneration; RebuildRecords(); if(!Records.IsEmpty()) { Selection=(Selection+Records.Num()-1)%Records.Num(); } ShowRecord(true); }
@@ -170,6 +186,18 @@ void USovAccessibleRecordMenu::Read()
 	{ FGuid Request; if(!Narrator->Announce(this,FText::Format(LOCTEXT("Readout","{0}. {1}"),Heading->GetText(),Records[Selection]),Request) && Expected==ViewGeneration && !bRetiring && IsActivated() && Heading) { Heading->SetText(Narrator->GetUnavailableReason()); } }
 }
 void USovAccessibleRecordMenu::Close() { DeactivateWidget(); }
+void USovAccessibleRecordMenu::Replay()
+{
+	if (bRetiring || !IsActivated() || !GetOwningPlayer()) { return; }
+	RebuildRecords(); ShowRecord(false);
+	if (!ReplayRecords.IsValidIndex(Selection) || !ReplayRecords[Selection].IsValid()) { return; }
+	if (auto* Cues=GetOwningPlayer()->FindComponentByClass<USovNarrativeCueComponent>())
+	{
+		FString Error; const uint64 Expected=ViewGeneration;
+		if (Cues->ReplayUnheardRecord(ReplayRecords[Selection].Get(),Error)) { if(Expected==ViewGeneration && !bRetiring && IsActivated()) { Close(); } }
+		else if (Expected==ViewGeneration && Heading) { Heading->SetText(FText::FromString(Error)); }
+	}
+}
 void USovAccessibleRecordMenu::SettingsChanged(const FSovUserSettingsSnapshot& Value)
 {
 	if(bRetiring) { return; } const uint64 Expected=++ViewGeneration;

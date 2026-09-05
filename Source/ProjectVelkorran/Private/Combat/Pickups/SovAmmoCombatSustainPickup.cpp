@@ -6,12 +6,13 @@
 #include "Items/AmmoItem.h"
 #include "Items/InventoryComponent.h"
 #include "Net/UnrealNetwork.h"
+#include "UObject/StrongObjectPtr.h"
 
 void ASovAmmoCombatSustainPickup::InitializeAmmo(
 	const TSubclassOf<UAmmoItem> InAmmoItemClass,
 	const int32 InQuantity)
 {
-	if (!HasAuthority())
+	if (!HasAuthority() || bGrantInProgress || IsClaimed())
 	{
 		return;
 	}
@@ -23,7 +24,7 @@ void ASovAmmoCombatSustainPickup::InitializeAmmo(
 bool ASovAmmoCombatSustainPickup::TryGrantTo(
 	ASovPlayerCharacterBase* CollectingPlayer)
 {
-	if (!IsValid(CollectingPlayer) || !IsValid(AmmoItemClass))
+	if (!IsValid(CollectingPlayer) || !IsValid(AmmoItemClass) || AmmoQuantity <= 0)
 	{
 		return false;
 	}
@@ -34,6 +35,7 @@ bool ASovAmmoCombatSustainPickup::TryGrantTo(
 	{
 		return false;
 	}
+	TStrongObjectPtr<UNarrativeInventoryComponent> InventoryLifetime(Inventory);
 
 	const UAmmoItem* AmmoDefaults = GetDefault<UAmmoItem>(AmmoItemClass);
 	if (!IsValid(AmmoDefaults))
@@ -51,7 +53,7 @@ bool ASovAmmoCombatSustainPickup::TryGrantTo(
 		AmmoDefaults->GetMaxStackSize() - CarriedQuantity,
 		0);
 	const int32 RequestedQuantity = FMath::Min(
-		FMath::Max(AmmoQuantity, 1),
+		AmmoQuantity,
 		AvailableReserveSpace);
 	if (RequestedQuantity <= 0)
 	{

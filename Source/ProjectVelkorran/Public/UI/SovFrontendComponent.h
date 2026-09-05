@@ -31,6 +31,8 @@ protected:
     virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 private:
     friend struct FSovFrontendTestAccess;
+    TWeakObjectPtr<AActor> PresentationAvatar;
+    FName PresentationMission;
     void BindProducers(UTalesComponent* Tales, USovNarrativeCueComponent* Cues, UNarrativeAbilitySystemComponent* ASC);
     void RetirePreviousSpeech(UDialogue* NewDialogue);
     UFUNCTION() void OnNPCLine(UDialogue* Dialogue, UDialogueNode_NPC* Node, const FDialogueLine& Line, const FSpeakerInfo& Speaker);
@@ -38,8 +40,10 @@ private:
     UFUNCTION() void OnNPCLineFinished(UDialogue* Dialogue, UDialogueNode_NPC* Node, const FDialogueLine& Line, const FSpeakerInfo& Speaker);
     UFUNCTION() void OnPlayerLineFinished(UDialogue* Dialogue, UDialogueNode_Player* Node, const FDialogueLine& Line);
     UFUNCTION() void OnDialogueEnded(UDialogue* Dialogue, bool bStartingNew, EExitDialogueReason Reason);
+    UFUNCTION() void OnDialogueSuspended(UDialogue* Dialogue, bool bSuspended);
     UFUNCTION() void OnCueStarted(USovNarrativeCue* Cue, AActor* Speaker, const FText& Caption, float Seconds);
     UFUNCTION() void OnCueEnded(USovNarrativeCue* Cue, bool bInterrupted);
+    UFUNCTION() void OnCueAudioReady(USovNarrativeCue* Cue, float Seconds);
     UFUNCTION() void OnDamage(const FSovDamageResult& Result);
     void Unbind();
     void ReleaseSetupPause();
@@ -54,6 +58,9 @@ private:
     TWeakObjectPtr<UDialogue> SpeechDialogue;
     TWeakObjectPtr<UDialogueNode> SpeechNode;
     uint64 SpeechEpoch = 0;
+    FGuid SpeechReceipt;
+    FGuid CueReceipt;
+    bool bRetireSceneOnNextLine = false;
     TWeakObjectPtr<USovNarrativeCue> SpeechCue;
     UPROPERTY(Transient) TObjectPtr<USovAccessibilityPresentation> Presentation;
     UPROPERTY(Transient) TObjectPtr<USovAccessibilitySettingsMenu> SetupMenu;

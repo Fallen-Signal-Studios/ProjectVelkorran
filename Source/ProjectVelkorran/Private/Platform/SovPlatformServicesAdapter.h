@@ -18,6 +18,11 @@ struct FSovObservedPlatformAccount
     /** The generic immutable-file transport is not a console platform save synchronization adapter. */
     bool bUsesPlatformManagedCloud = false;
 };
+struct FSovCloudRevisionFile
+{
+    FString RevisionId;
+    int64 Size = 0;
+};
 /** Production uses the configured IOnlineIdentity/IOnlineUserCloud, not a filesystem pretending to be cloud. */
 class ISovPlatformServicesAdapter
 {
@@ -25,13 +30,19 @@ public:
     using FAccountChanged = TFunction<void()>;
     using FReadComplete = TFunction<void(bool, bool, TArray<uint8>, FString)>;
     using FWriteComplete = TFunction<void(bool, FString)>;
+    using FListComplete = TFunction<void(bool, TArray<FSovCloudRevisionFile>, FString)>;
     virtual ~ISovPlatformServicesAdapter() = default;
     virtual void Start(FAccountChanged Changed) = 0;
     virtual void Stop() = 0;
     virtual FSovObservedPlatformAccount GetAccount() = 0;
     virtual bool ReadLatest(FGuid Request, const FString& Prefix, FReadComplete Complete) = 0;
+    virtual bool SupportsRevisionHistory() const { return false; }
+    virtual FString GetRecoveryMessage() const { return {}; }
+    virtual bool ListRevisions(FGuid, const FString&, FListComplete) { return false; }
+    virtual bool ReadRevision(FGuid, const FString&, const FString&, FReadComplete) { return false; }
+    virtual bool DeleteRevision(FGuid, const FString&, const FString&, FWriteComplete) { return false; }
     virtual bool WriteRevision(FGuid Request, const FString& Prefix, const TArray<uint8>& Bytes, FWriteComplete Complete) = 0;
     /** Cancel consumption, not a promise that the provider can undo an already-issued request. */
     virtual void Cancel(FGuid Request) = 0;
 };
-TSharedPtr<ISovPlatformServicesAdapter> MakeSovConfiguredPlatformAdapter(UGameInstance* Instance);
+TSharedPtr<ISovPlatformServicesAdapter, ESPMode::ThreadSafe> MakeSovConfiguredPlatformAdapter(UGameInstance* Instance);

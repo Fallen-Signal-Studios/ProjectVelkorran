@@ -6,10 +6,11 @@
 #include "Components/SovEchoComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "Sovereign/SovGameplayTags.h"
+#include "UObject/StrongObjectPtr.h"
 
 void ASovEchoCombatSustainPickup::InitializeEcho(const float InEchoAmount)
 {
-	if (!HasAuthority())
+	if (!HasAuthority() || bGrantInProgress || IsClaimed())
 	{
 		return;
 	}
@@ -30,6 +31,7 @@ bool ASovEchoCombatSustainPickup::TryGrantTo(
 	{
 		return false;
 	}
+	TStrongObjectPtr<USovEchoComponent> EchoLifetime(EchoComponent);
 	if (EchoComponent->GetEcho()
 		>= EchoComponent->GetMaxEcho() - KINDA_SMALL_NUMBER)
 	{

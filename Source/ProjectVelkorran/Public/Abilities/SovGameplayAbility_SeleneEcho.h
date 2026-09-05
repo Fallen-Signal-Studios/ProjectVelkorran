@@ -33,6 +33,11 @@ class PROJECTVELKORRAN_API USovGameplayAbility_SeleneEchoBase : public USovGamep
 
 public:
 	USovGameplayAbility_SeleneEchoBase();
+	/** Legacy effect overrides never execute; unsupported serialized values fail admission explicitly. */
+	UFUNCTION(BlueprintPure, Category="Sovereign|Echo Ability|Validation")
+	bool ValidateNativeEffectOverrides(FString& OutError) const;
+	virtual bool CheckCost(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
+		FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
 	virtual bool CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
 		const FGameplayTagContainer* SourceTags = nullptr, const FGameplayTagContainer* TargetTags = nullptr,
 		FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
@@ -82,19 +87,19 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload")
 	TSubclassOf<ANarrativeProjectile> GrenadeClass;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload")
+	UPROPERTY(meta = (DeprecatedProperty, DeprecationMessage = "Retired effect override. Use native damage/duration tuning and presentation events; ValidateNativeEffectOverrides reports incompatible legacy values."))
 	TSubclassOf<UGameplayEffect> DetonationDamageEffectClass;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload")
+	UPROPERTY(meta = (DeprecatedProperty, DeprecationMessage = "Retired effect override. Use native damage/duration tuning and presentation events; ValidateNativeEffectOverrides reports incompatible legacy values."))
 	TSubclassOf<UGameplayEffect> ChillEffectClass;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload")
+	UPROPERTY(meta = (DeprecatedProperty, DeprecationMessage = "Retired effect override. Use native damage/duration tuning and presentation events; ValidateNativeEffectOverrides reports incompatible legacy values."))
 	TSubclassOf<UGameplayEffect> FreezeEffectClass;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload")
+	UPROPERTY(meta = (DeprecatedProperty, DeprecationMessage = "Retired effect override. Use native damage/duration tuning and presentation events; ValidateNativeEffectOverrides reports incompatible legacy values."))
 	TSubclassOf<UGameplayEffect> FrozenDamageOverTimeEffectClass;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload")
+	UPROPERTY(meta = (DeprecatedProperty, DeprecationMessage = "Retired effect override. Use native damage/duration tuning and presentation events; ValidateNativeEffectOverrides reports incompatible legacy values."))
 	TSubclassOf<UGameplayEffect> ResistantTargetDamageOverTimeEffectClass;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload", meta = (ClampMin = "0.0", Units = "s"))
@@ -142,13 +147,13 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload")
 	TSubclassOf<ANarrativeProjectile> ReturningVerityClass;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload")
+	UPROPERTY(meta = (DeprecatedProperty, DeprecationMessage = "Retired effect override. Use native damage/duration tuning and presentation events; ValidateNativeEffectOverrides reports incompatible legacy values."))
 	TSubclassOf<UGameplayEffect> OutboundDamageEffectClass;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload")
+	UPROPERTY(meta = (DeprecatedProperty, DeprecationMessage = "Retired effect override. Use native damage/duration tuning and presentation events; ValidateNativeEffectOverrides reports incompatible legacy values."))
 	TSubclassOf<UGameplayEffect> ReturnDamageEffectClass;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload")
+	UPROPERTY(meta = (DeprecatedProperty, DeprecationMessage = "Retired effect override. Use native damage/duration tuning and presentation events; ValidateNativeEffectOverrides reports incompatible legacy values."))
 	TSubclassOf<UGameplayEffect> FrozenShatterEffectClass;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload", meta = (ClampMin = "0.0", Units = "s"))
@@ -185,6 +190,7 @@ private:
 	FTimerHandle DispatchWatchdog;
 	uint32 DispatchTaskEpoch = 0;
 	bool bDispatchRecallPending = false;
+	bool bEndingDispatch = false;
 
 };
 
@@ -212,14 +218,14 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload", meta = (ClampMin = "0.0"))
 	float RefreezeLockout = 3.0f;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload")
+	UPROPERTY(meta = (DeprecatedProperty, DeprecationMessage = "Retired effect override. Use native damage/duration tuning and presentation events; ValidateNativeEffectOverrides reports incompatible legacy values."))
 	TSubclassOf<UGameplayEffect> EmpoweredShotDamageEffectClass;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload")
+	UPROPERTY(meta = (DeprecatedProperty, DeprecationMessage = "Retired effect override. Use native damage/duration tuning and presentation events; ValidateNativeEffectOverrides reports incompatible legacy values."))
 	TSubclassOf<UGameplayEffect> FreezeEffectClass;
 
 	/** Applied instead of hard Freeze when target immunity/CC tier rejects it. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload")
+	UPROPERTY(meta = (DeprecatedProperty, DeprecationMessage = "Retired effect override. Use native damage/duration tuning and presentation events; ValidateNativeEffectOverrides reports incompatible legacy values."))
 	TSubclassOf<UGameplayEffect> ResistantTargetChillEffectClass;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload", meta = (ClampMin = "0.0", Units = "cm"))
@@ -383,16 +389,16 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload")
 	TSubclassOf<ANarrativeProjectile> WaveClass;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload")
+	UPROPERTY(meta = (DeprecatedProperty, DeprecationMessage = "Retired effect override. Use native damage/duration tuning and presentation events; ValidateNativeEffectOverrides reports incompatible legacy values."))
 	TSubclassOf<UGameplayEffect> WaveDamageEffectClass;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload")
+	UPROPERTY(meta = (DeprecatedProperty, DeprecationMessage = "Retired effect override. Use native damage/duration tuning and presentation events; ValidateNativeEffectOverrides reports incompatible legacy values."))
 	TSubclassOf<UGameplayEffect> ChillEffectClass;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload")
+	UPROPERTY(meta = (DeprecatedProperty, DeprecationMessage = "Retired effect override. Use native damage/duration tuning and presentation events; ValidateNativeEffectOverrides reports incompatible legacy values."))
 	TSubclassOf<UGameplayEffect> FreezeEffectClass;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload")
+	UPROPERTY(meta = (DeprecatedProperty, DeprecationMessage = "Retired effect override. Use native damage/duration tuning and presentation events; ValidateNativeEffectOverrides reports incompatible legacy values."))
 	TSubclassOf<UGameplayEffect> FrostDamageOverTimeEffectClass;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload", meta = (ClampMin = "0.0", Units = "cm"))

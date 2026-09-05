@@ -202,6 +202,7 @@ void UDialogue::Deinitialize()
 	++ReplyPresentationRevision;
 	bPlaybackSuspended = false;
 	bPlaybackStartPending = false;
+	PendingLinePlayback.Unbind();
 	if (GetWorld())
 	{
 		GetWorld()->GetTimerManager().ClearTimer(TimerHandle_NPCReplyFinished);
@@ -421,7 +422,7 @@ bool UDialogue::SkipCurrentLine()
 
 bool UDialogue::CanSkipCurrentLine() const
 {
-	if (bPlaybackSuspended || bDeinitialized || bCurrentLineFinished || bLineCompletionInProgress) { return false; }
+	if (bPlaybackSuspended || (GetWorld() && GetWorld()->IsPaused()) || bDeinitialized || bCurrentLineFinished || bLineCompletionInProgress) { return false; }
 	if (OwningComp)
 	{
 		if (CurrentNode && CurrentNode->bIsSkippable)
@@ -435,7 +436,7 @@ bool UDialogue::CanSkipCurrentLine() const
 
 void UDialogue::EndCurrentLine()
 {
-	if (bPlaybackSuspended || bDeinitialized || bCurrentLineFinished || bLineCompletionInProgress) { return; }
+	if (bDeinitialized || bCurrentLineFinished || bLineCompletionInProgress || DeferCompletionIfPaused()) { return; }
 	if (CurrentNode)
 	{		
 		//Unbind all listeners for line ending, they need to be reset up when the next line plays 
@@ -472,6 +473,25 @@ void UDialogue::EndCurrentLine()
 	}
 }
 
+bool UDialogue::DeferCompletionIfPaused()
+{
+	if (!bPlaybackSuspended && (!GetWorld() || !GetWorld()->IsPaused())) { return false; }
+	if (IsValid(CurrentNode) && IsValid(OwningComp) && OwningComp->GetCurrentDialogue() == this)
+	{ DeferredCompletionNode = CurrentNode; DeferredCompletionRevision = ReplyPresentationRevision; }
+	return true;
+}
+
+void UDialogue::PumpDeferredLineCompletion()
+{
+	if (bDeinitialized || !IsValid(OwningComp) || OwningComp->GetCurrentDialogue() != this)
+	{ DeferredCompletionNode.Reset(); DeferredCompletionRevision = INDEX_NONE; return; }
+	if (bPlaybackSuspended || (GetWorld() && GetWorld()->IsPaused())) { return; }
+	const bool bCurrent = DeferredCompletionNode.IsValid() && DeferredCompletionNode.Get() == CurrentNode
+		&& DeferredCompletionRevision == ReplyPresentationRevision;
+	DeferredCompletionNode.Reset(); DeferredCompletionRevision = INDEX_NONE;
+	if (bCurrent) { EndCurrentLine(); }
+}
+
 bool UDialogue::CanSuspendPlayback() const
 {
 	if (!bFreeMovement || bShowCinematicBars || bAdjustPlayerTransform || DefaultDialogueShot || DialogueCameraShake
@@ -480,9 +500,9 @@ bool UDialogue::CanSuspendPlayback() const
 	{ if (!Speaker.OwnedTags.IsEmpty() || Speaker.DefaultSpeakerShot) { return false; } }
 	for (const UDialogueNode* Node : GetNodes())
 	{
-		if (!Node || Node->Line.Shot || Node->Line.DialogueMontage) { return false; }
+		if (!Node || Node->Line.Shot || Node->Line.DialogueMontage || Node->Line.FacialAnimation) { return false; }
 		for (const FDialogueLine& Alternative : Node->AlternativeLines)
-		{ if (Alternative.Shot || Alternative.DialogueMontage) { return false; } }
+		{ if (Alternative.Shot || Alternative.DialogueMontage || Alternative.FacialAnimation) { return false; } }
 	}
 	return true;
 }
@@ -494,6 +514,14 @@ bool UDialogue::SetPlaybackSuspended(bool bSuspend)
 		|| !OwningComp->HasAuthority() || !CanSuspendPlayback()) { return false; }
 	if (bPlaybackSuspended == bSuspend) { return true; }
 	UTalesComponent* const ExpectedOwner = OwningComp;
+	const TWeakObjectPtr<UDialogueNode> ExpectedNode = CurrentNode;
+	const int64 ExpectedRevision = ReplyPresentationRevision;
+	const auto IsCurrentChange = [this, ExpectedOwner, ExpectedNode, ExpectedRevision, bSuspend]()
+	{
+		return !bDeinitialized && IsValid(ExpectedOwner) && OwningComp == ExpectedOwner
+			&& ExpectedOwner->GetCurrentDialogue() == this && CurrentNode == ExpectedNode.Get()
+			&& ReplyPresentationRevision == ExpectedRevision && bPlaybackSuspended == bSuspend;
+	};
 	bPlaybackSuspended = bSuspend;
 	if (bSuspend)
 	{
@@ -502,20 +530,30 @@ bool UDialogue::SetPlaybackSuspended(bool bSuspend)
 	}
 	else
 	{
+		// Consume before designer media callbacks so nested suspend/exit/restart cannot replay this start.
+		FSimpleDelegate ResumeLine = MoveTemp(PendingLinePlayback);
+		ResumeLine.ExecuteIfBound();
+		if (!IsCurrentChange()) { return false; }
 		GetWorld()->GetTimerManager().UnPauseTimer(TimerHandle_NPCReplyFinished);
 		GetWorld()->GetTimerManager().UnPauseTimer(TimerHandle_PlayerReplyFinished);
 	}
 	if (DialogueAudio) { DialogueAudio->SetPaused(bSuspend); }
-	if (OwningComp != ExpectedOwner || bDeinitialized || bPlaybackSuspended != bSuspend) { return false; }
+	if (!IsCurrentChange()) { return false; }
 	ExpectedOwner->OnDialogueSuspensionChanged.Broadcast(this, bSuspend);
-	if (OwningComp == ExpectedOwner && !bDeinitialized && !bPlaybackSuspended && bPlaybackStartPending)
-	{ bPlaybackStartPending=false; Play(); }
-	return OwningComp == ExpectedOwner && !bDeinitialized && bPlaybackSuspended == bSuspend;
+	if (!IsCurrentChange()) { return false; }
+	if (!bPlaybackSuspended && bPlaybackStartPending)
+	{
+		// This explicit pending initial Play may intentionally publish its first line after the receipt is checked.
+		bPlaybackStartPending=false; Play();
+		return !bDeinitialized && IsValid(ExpectedOwner) && OwningComp == ExpectedOwner
+			&& ExpectedOwner->GetCurrentDialogue() == this && bPlaybackSuspended == bSuspend;
+	}
+	return true;
 }
 
 bool UDialogue::CanSelectDialogueOption(UDialogueNode_Player* PlayerNode) const
 {
-	return !bPlaybackSuspended && !bDeinitialized && IsValid(PlayerNode) && AvailableResponses.Contains(PlayerNode);
+	return !bPlaybackSuspended && !(GetWorld() && GetWorld()->IsPaused()) && !bDeinitialized && IsValid(PlayerNode) && AvailableResponses.Contains(PlayerNode);
 }
 
 bool UDialogue::SelectDialogueOption(UDialogueNode_Player* Option)
@@ -666,7 +704,7 @@ void UDialogue::ExitDialogue(const EExitDialogueReason Reason)
 
 void UDialogue::TickDialogue_Implementation(const float DeltaTime)
 {
-	if (bPlaybackSuspended || bDeinitialized) { return; }
+	if (bPlaybackSuspended || bDeinitialized || (GetWorld() && GetWorld()->IsPaused())) { return; }
 	if (CurrentDialogueSequence)
 	{
 		CurrentDialogueSequence->Tick(DeltaTime);
@@ -1195,6 +1233,7 @@ void UDialogue::NPCFinishedTalking()
 void UDialogue::PlayNPCDialogueNode(class UDialogueNode_NPC* NPCReply)
 {
 	check(OwningComp && NPCReply);
+	if (bDeinitialized || !IsValid(OwningComp) || OwningComp->GetCurrentDialogue() != this) { return; }
 
 	//FString RoleString = OwningComp && OwningComp->HasAuthority() ? "Server" : "Client";
 	//UE_LOG(LogNarrative, Warning, TEXT("PlayNPCDialogueNode called on %s with node %s"), *RoleString, *GetNameSafe(NPCReply));
@@ -1205,18 +1244,33 @@ void UDialogue::PlayNPCDialogueNode(class UDialogueNode_NPC* NPCReply)
 		++ReplyPresentationRevision;
 		CurrentNode = NPCReply;
 		bCurrentLineFinished=false;
-		CurrentLine = NPCReply->GetRandomLine(OwningComp->GetNetMode() == NM_Standalone);
-		ReplaceStringVariables(NPCReply, CurrentLine, CurrentLine.Text);
+		PendingLinePlayback.Unbind();
+		const TWeakObjectPtr<UTalesComponent> StartingOwner = OwningComp;
+		const TWeakObjectPtr<UDialogueNode_NPC> StartingNode = NPCReply;
+		const int64 StartingRevision = ReplyPresentationRevision;
+		const auto IsCurrentStart = [this, StartingOwner, StartingNode, StartingRevision]()
+		{
+			return !bDeinitialized && !bCurrentLineFinished && StartingOwner.IsValid() && StartingNode.IsValid()
+				&& OwningComp == StartingOwner.Get() && StartingOwner->GetCurrentDialogue() == this
+				&& CurrentNode == StartingNode.Get() && ReplyPresentationRevision == StartingRevision;
+		};
+		if (UWorld* World = GetWorld())
+		{
+			World->GetTimerManager().ClearTimer(TimerHandle_NPCReplyFinished);
+			World->GetTimerManager().ClearTimer(TimerHandle_PlayerReplyFinished);
+		}
+		// Variable providers can exit or replace this line. Do not let their output alias a successor's state.
+		FDialogueLine StartingLine = NPCReply->GetRandomLine(OwningComp->GetNetMode() == NM_Standalone);
+		if (!IsCurrentStart()) { return; }
+		ReplaceStringVariables(NPCReply, StartingLine, StartingLine.Text);
+		if (!IsCurrentStart()) { return; }
+		CurrentLine = MoveTemp(StartingLine);
 
 		CurrentSpeaker = GetSpeaker(NPCReply->GetSpeakerID());
 
 		ProcessNodeEvents(NPCReply, true);
 
-		//ProcessNodeEvents can result in a call to deinit, nulling out owning comp. Check if this occured
-		if (!OwningComp)
-		{
-			return;
-		}
+		if (!IsCurrentStart()) { return; }
 
 		//If a node has no text, just finish it, firing its events 
 		if (NPCReply->IsRoutingNode())
@@ -1226,25 +1280,33 @@ void UDialogue::PlayNPCDialogueNode(class UDialogueNode_NPC* NPCReply)
 		}
 
 		//Actual playing of the node is inside a BlueprintNativeEvent so designers can override how NPC dialogues are played 
-		PlayNPCDialogue(NPCReply, CurrentLine, CurrentSpeaker);
+		const FDialogueLine PublishedLine = CurrentLine;
+		const FSpeakerInfo PublishedSpeaker = CurrentSpeaker;
+		FSimpleDelegate StartMedia = FSimpleDelegate::CreateWeakLambda(this, [this, IsCurrentStart, StartingNode, PublishedLine, PublishedSpeaker]()
+		{ if (IsCurrentStart()) { PlayNPCDialogue(StartingNode.Get(), PublishedLine, PublishedSpeaker); } });
+		if (bPlaybackSuspended) { PendingLinePlayback = MoveTemp(StartMedia); }
+		else { StartMedia.ExecuteIfBound(); }
+		if (!IsCurrentStart()) { return; }
 
-		if (OwningComp)
-		{
-			//Call delegates and BPNativeEvents
-			OwningComp->OnNPCDialogueLineStarted.Broadcast(this, NPCReply, CurrentLine, CurrentSpeaker);
-		}
+		// Every designer callback can synchronously finish, restart the same node, or replace the dialogue.
+		OwningComp->OnNPCDialogueLineStarted.Broadcast(this, NPCReply, PublishedLine, PublishedSpeaker);
+		if (!IsCurrentStart()) { return; }
 
-		OnNPCDialogueLineStarted(NPCReply, CurrentLine, CurrentSpeaker);
+		OnNPCDialogueLineStarted(NPCReply, PublishedLine, PublishedSpeaker);
+		if (!IsCurrentStart()) { return; }
 
-		const float Duration = GetLineDuration(CurrentNode, CurrentLine);
+		const float Duration = GetLineDuration(NPCReply, PublishedLine);
+		if (!IsCurrentStart()) { return; }
 
 		if (!FMath::IsNearlyEqual(Duration, -1.f))
 		{
 			if (Duration > 0.01f && GetWorld())
 			{
-				GetWorld()->GetTimerManager().ClearTimer(TimerHandle_NPCReplyFinished);
-				//Give the reply time to play, then play the next one! 
-				GetWorld()->GetTimerManager().SetTimer(TimerHandle_NPCReplyFinished, this, &UDialogue::FinishNPCDialogue, Duration, false);
+				// A queued timer belongs to this exact line revision, including when a node is replayed.
+				GetWorld()->GetTimerManager().SetTimer(TimerHandle_NPCReplyFinished,
+					FTimerDelegate::CreateWeakLambda(this, [this, IsCurrentStart]()
+					{ if (IsCurrentStart()) { FinishNPCDialogue(); } }), Duration, false);
+				if (bPlaybackSuspended) { GetWorld()->GetTimerManager().PauseTimer(TimerHandle_NPCReplyFinished); }
 			}
 			else
 			{
@@ -1264,6 +1326,7 @@ void UDialogue::PlayPlayerDialogueNode(class UDialogueNode_Player* PlayerReply)
 	//NPC replies should be fully gone before we play a player response
 	check(!NPCReplyChain.Num());
 	check(OwningComp && PlayerReply);
+	if (bDeinitialized || !IsValid(OwningComp) || OwningComp->GetCurrentDialogue() != this) { return; }
 
 	if (OwningComp && PlayerReply)
 	{
@@ -1274,14 +1337,25 @@ void UDialogue::PlayPlayerDialogueNode(class UDialogueNode_Player* PlayerReply)
 
 		CurrentNode = PlayerReply;
 		bCurrentLineFinished=false;
+		PendingLinePlayback.Unbind();
+		const TWeakObjectPtr<UTalesComponent> StartingOwner = OwningComp;
+		const TWeakObjectPtr<UDialogueNode_Player> StartingNode = PlayerReply;
+		const int64 StartingRevision = ReplyPresentationRevision;
+		const auto IsCurrentStart = [this, StartingOwner, StartingNode, StartingRevision]()
+		{
+			return !bDeinitialized && !bCurrentLineFinished && StartingOwner.IsValid() && StartingNode.IsValid()
+				&& OwningComp == StartingOwner.Get() && StartingOwner->GetCurrentDialogue() == this
+				&& CurrentNode == StartingNode.Get() && ReplyPresentationRevision == StartingRevision;
+		};
+		if (UWorld* World = GetWorld())
+		{
+			World->GetTimerManager().ClearTimer(TimerHandle_NPCReplyFinished);
+			World->GetTimerManager().ClearTimer(TimerHandle_PlayerReplyFinished);
+		}
 		
 		ProcessNodeEvents(PlayerReply, true);
 
-		//ProcessNodeEvents can result in a call to deinit, nulling out owning comp. Check if this occured
-		if (!OwningComp)
-		{
-			return;
-		}
+		if (!IsCurrentStart()) { return; }
 
 		//If a node has no text, just process events then go to the next line 
 		if (PlayerReply->IsRoutingNode())
@@ -1290,27 +1364,49 @@ void UDialogue::PlayPlayerDialogueNode(class UDialogueNode_Player* PlayerReply)
 			return;
 		}
 
-		CurrentLine = PlayerReply->GetRandomLine(OwningComp->GetNetMode() == NM_Standalone);
-		ReplaceStringVariables(PlayerReply, CurrentLine, CurrentLine.Text);
+		FDialogueLine StartingLine = PlayerReply->GetRandomLine(OwningComp->GetNetMode() == NM_Standalone);
+		if (!IsCurrentStart()) { return; }
+		ReplaceStringVariables(PlayerReply, StartingLine, StartingLine.Text);
+		if (!IsCurrentStart()) { return; }
+		CurrentLine = MoveTemp(StartingLine);
+		const FDialogueLine PublishedLine = CurrentLine;
 
 		//Call delegates and BPNativeEvents
-		OwningComp->OnPlayerDialogueLineStarted.Broadcast(this, PlayerReply, CurrentLine);
+		OwningComp->OnPlayerDialogueLineStarted.Broadcast(this, PlayerReply, PublishedLine);
+		if (!IsCurrentStart()) { return; }
 
-		OnPlayerDialogueLineStarted(PlayerReply, CurrentLine);
+		OnPlayerDialogueLineStarted(PlayerReply, PublishedLine);
+		if (!IsCurrentStart()) { return; }
 
 		//Actual playing of the node is inside a BlueprintNativeEvent so designers can override how NPC dialogues are played 
-		PlayPlayerDialogue(PlayerReply, CurrentLine);
+		const FSpeakerInfo PreviousSpeaker = CurrentSpeaker;
+		FSimpleDelegate StartMedia = FSimpleDelegate::CreateWeakLambda(this, [this, IsCurrentStart, StartingNode, PublishedLine, PreviousSpeaker]()
+		{
+			if (IsCurrentStart())
+			{
+				// Player listener resolution uses the previous NPC speaker, even when media was delayed by pause.
+				CurrentSpeaker = PreviousSpeaker;
+				PlayPlayerDialogue(StartingNode.Get(), PublishedLine);
+				if (IsCurrentStart()) { CurrentSpeaker = PlayerSpeakerInfo; }
+			}
+		});
+		if (bPlaybackSuspended) { PendingLinePlayback = MoveTemp(StartMedia); }
+		else { StartMedia.ExecuteIfBound(); }
+		if (!IsCurrentStart()) { return; }
 
 		CurrentSpeaker = PlayerSpeakerInfo;
 
-		const float Duration = GetLineDuration(CurrentNode, CurrentLine);
+		const float Duration = GetLineDuration(PlayerReply, PublishedLine);
+		if (!IsCurrentStart()) { return; }
 
 		if (!FMath::IsNearlyEqual(Duration, -1.f))
 		{
 			if (Duration > 0.01f && GetWorld())
 			{
-				//Give the reply time to play, then play the next one! 
-				GetWorld()->GetTimerManager().SetTimer(TimerHandle_PlayerReplyFinished, this, &UDialogue::FinishPlayerDialogue, Duration, false);
+				GetWorld()->GetTimerManager().SetTimer(TimerHandle_PlayerReplyFinished,
+					FTimerDelegate::CreateWeakLambda(this, [this, IsCurrentStart]()
+					{ if (IsCurrentStart()) { FinishPlayerDialogue(); } }), Duration, false);
+				if (bPlaybackSuspended) { GetWorld()->GetTimerManager().PauseTimer(TimerHandle_PlayerReplyFinished); }
 			}
 			else
 			{
@@ -1323,35 +1419,40 @@ void UDialogue::PlayPlayerDialogueNode(class UDialogueNode_Player* PlayerReply)
 
 void UDialogue::ReplaceStringVariables(const class UDialogueNode* Node, const FDialogueLine& Line, FText& OutLine)
 {
-	OutLine = UArsenalStatics::ReplaceInputVariables(Cast<ANarrativePlayerController>(OwningController), OutLine);
-
-	//Replace variables in dialogue line
-	FString LineString = OutLine.ToString();
-
-	int32 OpenBraceIdx = -1;
-	int32 CloseBraceIdx = -1;
-	bool bFoundOpenBrace = LineString.FindChar('{', OpenBraceIdx);
-	bool bFoundCloseBrace = LineString.FindChar('}', CloseBraceIdx);
-	uint32 Iters = 0; // More than 50 wildcard replaces and something has probably gone wrong, so safeguard against that
-
-	// a list of each named string variable and the user provided string
-	FFormatNamedArguments VarArguments;
-	
-	while (bFoundOpenBrace && bFoundCloseBrace && OpenBraceIdx < CloseBraceIdx && Iters < 50)
+	const TWeakObjectPtr<UTalesComponent> FormattingOwner = OwningComp;
+	const bool bHadOwner = FormattingOwner.IsValid();
+	const TWeakObjectPtr<UDialogue> FormattingDialogue = bHadOwner ? FormattingOwner->GetCurrentDialogue() : nullptr;
+	const TWeakObjectPtr<UDialogueNode> FormattingNode = CurrentNode;
+	const int64 FormattingRevision = ReplyPresentationRevision;
+	const bool bWasDeinitialized = bDeinitialized;
+	const auto IsCurrentFormatting = [this, FormattingOwner, bHadOwner, FormattingDialogue, FormattingNode, FormattingRevision, bWasDeinitialized]()
 	{
+		// Option labels format a candidate node while another node is current. Unowned editor previews also remain valid.
+		return bDeinitialized == bWasDeinitialized && ReplyPresentationRevision == FormattingRevision
+			&& CurrentNode == FormattingNode.Get() && OwningComp == FormattingOwner.Get()
+			&& (!bHadOwner || (FormattingOwner.IsValid() && FormattingOwner->GetCurrentDialogue() == FormattingDialogue.Get()));
+	};
+	const FText Template = UArsenalStatics::ReplaceInputVariables(Cast<ANarrativePlayerController>(OwningController), OutLine);
+	if (!IsCurrentFormatting()) { return; }
+	const FString LineString = Template.ToString();
+	FFormatNamedArguments VarArguments;
+	int32 SearchFrom = 0;
+	for (uint32 Iters = 0; Iters < 50; ++Iters)
+	{
+		const int32 OpenBraceIdx = LineString.Find(TEXT("{"), ESearchCase::CaseSensitive, ESearchDir::FromStart, SearchFrom);
+		if (OpenBraceIdx == INDEX_NONE) { break; }
+		const int32 CloseBraceIdx = LineString.Find(TEXT("}"), ESearchCase::CaseSensitive, ESearchDir::FromStart, OpenBraceIdx + 1);
+		if (CloseBraceIdx == INDEX_NONE) { break; }
+		SearchFrom = CloseBraceIdx + 1;
 		const FString VariableName = LineString.Mid(OpenBraceIdx + 1, CloseBraceIdx - OpenBraceIdx - 1);
-		const FString VariableVal = GetStringVariable(Node, Line, VariableName);
-
-		VarArguments.Add(VariableName, FText::FromString(VariableVal));
-
-		bFoundOpenBrace = LineString.FindChar('{', OpenBraceIdx);
-		bFoundCloseBrace = LineString.FindChar('}', CloseBraceIdx);
-
-		Iters++;
+		if (!VariableName.IsEmpty() && !VarArguments.Contains(VariableName))
+		{
+			const FString VariableVal = GetStringVariable(Node, Line, VariableName);
+			if (!IsCurrentFormatting()) { return; }
+			VarArguments.Add(VariableName, FText::FromString(VariableVal));
+		}
 	}
-
-	// build final formatted output
-	OutLine = FText::Format(OutLine, VarArguments);
+	OutLine = FText::Format(Template, VarArguments);
 }
 
 AActor* UDialogue::GetPlayerAvatar() const
@@ -1441,7 +1542,7 @@ void UDialogue::PlayNextNPCReply()
 
 void UDialogue::FinishNPCDialogue()
 {
-	if (bPlaybackSuspended || bDeinitialized || bLineCompletionInProgress || bCurrentLineFinished) { return; }
+	if (bDeinitialized || bLineCompletionInProgress || bCurrentLineFinished || DeferCompletionIfPaused()) { return; }
 	TGuardValue<bool> Completing(bLineCompletionInProgress,true);
 	if (UDialogueNode_NPC* NPCNode = Cast<UDialogueNode_NPC>(CurrentNode))
 	{
@@ -1476,7 +1577,7 @@ void UDialogue::FinishNPCDialogue()
 
 void UDialogue::FinishPlayerDialogue()
 {
-	if (bPlaybackSuspended || bDeinitialized || bLineCompletionInProgress || bCurrentLineFinished) { return; }
+	if (bDeinitialized || bLineCompletionInProgress || bCurrentLineFinished || DeferCompletionIfPaused()) { return; }
 	TGuardValue<bool> Completing(bLineCompletionInProgress,true);
 	//FString RoleString = OwningComp && OwningComp->HasAuthority() ? "Server" : "Client";
 	//UE_LOG(LogNarrative, Warning, TEXT("FinishPlayerDialogue called on %s with node %s"), *RoleString, *GetNameSafe(CurrentNode));
@@ -1826,6 +1927,8 @@ void UDialogue::PlayDialogueSound_Implementation(const FDialogueLine& Line, clas
 			DialogueAudio->OnAudioFinished.AddDynamic(this, &UDialogue::EndCurrentLine);
 		}
 		if (DialogueAudio && !Speaker) { DialogueAudio->Play(); }
+		// A media callback may suspend before this native implementation creates its component.
+		if (DialogueAudio && bPlaybackSuspended) { DialogueAudio->SetPaused(true); }
 	}
 }
 

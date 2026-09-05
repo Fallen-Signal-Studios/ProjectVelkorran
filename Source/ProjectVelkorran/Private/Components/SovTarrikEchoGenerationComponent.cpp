@@ -218,7 +218,6 @@ void USovTarrikEchoGenerationComponent::UninitializeFromAbilitySystem()
 {
 	++ResourceScopeEpoch;
 	ProtectionSourceAwardTimes.Reset();
-	HeavyAttacks.Reset();
 	if (GetOwner() && GetOwner()->HasAuthority())
 	{
 		ResetCinderlineCadenceInternal();
@@ -861,7 +860,6 @@ void USovTarrikEchoGenerationComponent::HandleEncounterScopeChanged(bool bStarte
 {
 	++ResourceScopeEpoch;
 	ProtectionSourceAwardTimes.Reset();
-	HeavyAttacks.Reset();
 	ResetCinderlineCadence();
 	LastCadenceAwardWorldTime = -BIG_NUMBER;
 }
@@ -897,8 +895,7 @@ void USovTarrikEchoGenerationComponent::HandleDamageResolvedAsSource(const FSovD
 	AActor* Target = Result.TargetActor.Get();
 	if (!GetOwner() || !GetOwner()->HasAuthority() || Result.SourceActor.Get() != GetOwner()
 		|| !IsValid(Target) || !Result.TransactionId.IsValid()
-		|| ConsumedCombatTransactions.Contains(Result.TransactionId)) return;
-	ConsumedCombatTransactions.Add(Result.TransactionId);
+		|| !Result.ConsumeNativeReceipt(this)) return;
 	const FSovGameplayTags& Tags = FSovGameplayTags::Get();
 	const UGameplayAbility* SourceAbility = Result.EffectContext.GetAbility();
 	if (Result.bFromEchoAbility || (SourceAbility && SourceAbility->GetAssetTags().HasTag(Tags.Ability_Echo))
@@ -907,18 +904,11 @@ void USovTarrikEchoGenerationComponent::HandleDamageResolvedAsSource(const FSovD
 	const uint32 ExpectedScope = ResourceScopeEpoch;
 	bool bHeavyReward = false;
 	const USovEchoAttackReceipt* Receipt = Cast<USovEchoAttackReceipt>(Result.EffectContext.GetSourceObject());
-	if (!Result.bPeriodicDamage && Result.AttackId.IsValid() && !ConsumedHeavyAttacks.Contains(Result.AttackId) && Receipt && Receipt->MatchesCommittedHeavyAttack(GetOwner(), Result.AttackId)
+	if (!Result.bPeriodicDamage && Result.AttackId.IsValid() && Receipt && Receipt->MatchesCommittedHeavyAttack(GetOwner(), Result.AttackId)
 		&& Result.AttackClassifications.HasTag(Tags.Damage_Heavy)
 		&& Result.AppliedHealthDamage + Result.AppliedShieldDamage + Result.AppliedPoiseDamage > 0.0f)
 	{
-		FHeavyAttackProgress& Progress = HeavyAttacks.FindOrAdd(Result.AttackId);
-		Progress.Targets.Add(Target);
-		bHeavyReward = !Progress.bConsumed && Progress.Targets.Num() >= 3;
-		if (bHeavyReward)
-		{
-			Progress.bConsumed = true;
-			ConsumedHeavyAttacks.Add(Result.AttackId);
-		}
+		bHeavyReward = Receipt->ConsumeHeavyMultiTargetReward(this, ResourceScopeEpoch, Result);
 	}
 	// All reward eligibility is captured before delegates can cause reentrant damage.
 	if (bHeavyReward) AwardTarrikEcho(8.0f, Tags.Echo_Source_HeavyMultiHit, ESovTarrikEchoAwardType::HeavyMultiHit, Target);
@@ -943,8 +933,7 @@ void USovTarrikEchoGenerationComponent::ConsumeProtectionIntercept(USovProtectio
 	AActor* Protected = nullptr;
 	if (!IsValid(Receipt) || !GetOwner() || !GetOwner()->HasAuthority()
 		|| !Receipt->ConsumeForProtector(GetOwner(), Result, Threat, Protected)
-		|| !Result.TransactionId.IsValid() || ConsumedProtectionTransactions.Contains(Result.TransactionId)) return;
-	ConsumedProtectionTransactions.Add(Result.TransactionId);
+		|| !Result.TransactionId.IsValid()) return;
 	if (!CanGenerateTarrikEcho() || !IsValid(Threat) || !IsValid(Protected)
 		|| !FMath::IsFinite(ProtectionInterceptSourceCooldown)) return;
 	const FGameplayTag Tag = FSovGameplayTags::Get().Echo_Source_ProtectionIntercept;

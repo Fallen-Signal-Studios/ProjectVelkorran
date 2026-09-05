@@ -11,6 +11,7 @@ class USovAccessibilityNativeButton;
 class USovEvidenceDefinition;
 class USovAccessibilityPresentation;
 class UScrollBox;
+class USovNarrativeCue;
 
 /** Acquired evidence/current-scene review, using the existing campaign journal, never a second evidence store. */
 UCLASS()
@@ -37,6 +38,7 @@ private:
 	UFUNCTION() void Previous();
 	UFUNCTION() void Next();
 	UFUNCTION() void Read();
+	UFUNCTION() void Replay();
 	UFUNCTION() void Close();
 	UFUNCTION() void SettingsChanged(const FSovUserSettingsSnapshot& Value);
 	UFUNCTION() void HistoryChanged();
@@ -50,11 +52,13 @@ private:
 	UPROPERTY(Transient) TObjectPtr<USovAccessibilityNativeButton> PreviousButton;
 	UPROPERTY(Transient) TObjectPtr<USovAccessibilityNativeButton> NextButton;
 	UPROPERTY(Transient) TObjectPtr<USovAccessibilityNativeButton> ReadButton;
+	UPROPERTY(Transient) TObjectPtr<USovAccessibilityNativeButton> ReplayButton;
 	UPROPERTY(Transient) TObjectPtr<USovAccessibilityNativeButton> CloseButton;
 	UPROPERTY(Transient) TObjectPtr<USovGameUserSettings> BoundSettings;
 	UPROPERTY(Transient) TObjectPtr<USovAccessibilityPresentation> BoundPresentation;
 	UPROPERTY(Transient) TObjectPtr<USovCampaignStateComponent> BoundCampaign;
 	TArray<FText> Records;
+	TArray<TWeakObjectPtr<USovNarrativeCue>> ReplayRecords;
 	bool bSceneHistory = false;
 	int32 Selection = 0;
 	uint64 ViewGeneration = 0;

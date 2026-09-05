@@ -1,6 +1,7 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Validation/SovValidateCampaignCommandlet.h"
 #include "Validation/SovCampaignDependencyPolicy.h"
+#include "Validation/SovCampaignWorldValidation.h"
 #include "Campaign/SovCampaignDefinition.h"
 #include "Framework/SovPlayerController.h"
 #include "Misc/PackageName.h"
@@ -17,6 +18,11 @@
 #include "Narrative/SovNarrativeValidationLibrary.h"
 #include "Tales/Dialogue.h"
 #include "Engine/Blueprint.h"
+#include "Engine/World.h"
+#include "Items/VendorInventoryComponent.h"
+#include "Progression/SovTechniqueTypes.h"
+#include "Abilities/SovGameplayAbility_Echo.h"
+#include "Abilities/SovGameplayAbility_SeleneEcho.h"
 #include "UObject/StrongObjectPtr.h"
 
 namespace
@@ -68,6 +74,21 @@ namespace
 		else if (auto* Dialogue = Cast<UDialogue>(Asset)) { CheckDialogue(Dialogue, nullptr); }
 		else if (auto* Blueprint = Cast<UBlueprint>(Asset))
 		{
+			if (!Blueprint->GeneratedClass) { Fail(TEXT("[ASSET.BLUEPRINT_CLASS] Blueprint has no generated class; run CompileAllBlueprints.")); }
+			else if (bShippingValidation && Blueprint->GeneratedClass->IsChildOf(UVendorInventoryComponent::StaticClass()))
+			{ Fail(TEXT("[ASSET.PROHIBITED_VENDOR] Vendor class is excluded regardless of package directory.")); }
+			if (Blueprint->GeneratedClass && !Blueprint->GeneratedClass->HasAnyClassFlags(CLASS_Abstract)
+				&& Blueprint->GeneratedClass->IsChildOf(USovTechniquePerk::StaticClass())
+				&& !Blueprint->GeneratedClass->GetDefaultObject<USovTechniquePerk>()->HasValidNativeGrantPolicy())
+			{ Fail(TEXT("[ASSET.TECHNIQUE_POLICY] Technique perk violates the native grant policy.")); }
+			if (Blueprint->GeneratedClass && !Blueprint->GeneratedClass->HasAnyClassFlags(CLASS_Abstract)
+				&& Blueprint->GeneratedClass->IsChildOf(USovGameplayAbility_EchoBase::StaticClass()))
+			{
+				const auto* Echo = Blueprint->GeneratedClass->GetDefaultObject<USovGameplayAbility_EchoBase>();
+				if (!Echo->ValidateAuthoredConfiguration(Error)) { Fail(TEXT("[ASSET.ECHO_CONFIG] ") + Error); }
+				if (const auto* Selene = Cast<USovGameplayAbility_SeleneEchoBase>(Echo))
+				{ if (!Selene->ValidateNativeEffectOverrides(Error)) { Fail(TEXT("[ASSET.SELENE_EFFECT_OVERRIDE] ") + Error); } }
+			}
 			if (Blueprint->GeneratedClass && Blueprint->GeneratedClass->IsChildOf(UDialogue::StaticClass()))
 			{ CheckDialogue(Blueprint->GeneratedClass->GetDefaultObject<UDialogue>(), nullptr); }
 		}
@@ -156,6 +177,12 @@ int32 USovValidateCampaignCommandlet::Main(const FString& Params)
 	TSet<FName> ConsequenceIds, MemoryIds;
 	int32 Errors = 0;
 	const bool bShippingValidation = FParse::Param(*Params, TEXT("ShippingValidation"));
+	const bool bValidateWorlds = FParse::Param(*Params, TEXT("ValidateWorlds"));
+	if (bShippingValidation && !bValidateWorlds)
+	{
+		UE_LOG(LogSovMission, Error, TEXT("[WORLD.COVERAGE_REQUIRED] -ShippingValidation requires -ValidateWorlds; asset-only validation cannot qualify a campaign."));
+		++Errors;
+	}
 	TArray<FName> RootPackages;
 	for (FString& Path : Paths)
 	{
@@ -261,6 +288,23 @@ int32 USovValidateCampaignCommandlet::Main(const FString& Params)
 		}
 	}
 	Errors += ValidateDependencyClosure(RootPackages, Missions, bShippingValidation);
-	UE_LOG(LogSovMission, Display, TEXT("Native mission preflight: %d assets, %d errors. Melee, corruption, evidence, cue and Narrative dialogue graph validators ran over dependency assets. Use -ShippingValidation for string-table IDs and excluded dependency roots; -AdditionalAssets includes dynamic-only content. Map actors, Blueprint compilation, translation coverage and playthroughs require separate gates."), Missions.Num(), Errors);
+	if (bValidateWorlds)
+	{
+		TMap<FName, FString> GlobalEncounterOwners;
+		for (const auto& Item : Missions)
+		{
+			UWorld* World = Item.Value->Map.LoadSynchronous();
+			TStrongObjectPtr<UWorld> RetainedWorld(World);
+			Errors += SovCampaignWorldValidation::Validate(World, Item.Value, bShippingValidation, &GlobalEncounterOwners);
+		}
+	}
+	else { UE_LOG(LogSovMission, Display, TEXT("[WORLD.COVERAGE_SKIPPED] Diagnostic asset-only run; placed worlds were not validated.")); }
+	UE_LOG(LogSovMission, Display, TEXT("[VALIDATION.COVERAGE_INCOMPLETE] status_cleanup_declarations=missing; prohibited_runtime_class_closure=partial. Neither required category was fully evaluated."));
+	if (FParse::Param(*Params, TEXT("RequireCompleteCoverage")))
+	{
+		UE_LOG(LogSovMission, Error, TEXT("[VALIDATION.REQUIRED_CATEGORIES] Full candidate validation is unavailable until generalized status/cleanup declarations and exhaustive prohibited runtime type validation are implemented and tested."));
+		++Errors;
+	}
+	UE_LOG(LogSovMission, Display, TEXT("Native mission preflight: %d assets, %d errors. Dependency asset and requested placed-world validators completed. Blueprint compilation, runtime ability/status cleanup, translation coverage and packaged playthroughs remain separate required gates."), Missions.Num(), Errors);
 	return Errors == 0 ? 0 : 1;
 }

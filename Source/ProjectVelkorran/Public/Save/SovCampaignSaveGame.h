@@ -58,6 +58,12 @@ public:
     UPROPERTY() TArray<FSoftObjectPath> RequiredAssets;
     UPROPERTY() TArray<uint8> PortableSettings;
     UPROPERTY() uint32 IntegrityChecksum = 0;
+    UPROPERTY(Transient) bool bReadLegacyUnframed = false;
     uint32 CalculateChecksum() const;
     bool HasValidIntegrity() const;
+    /** Framed raw bytes are checked before UObject construction. Legacy current-product banks are read, never rewritten in place. */
+    static bool EncodeFramed(USovCampaignSaveGame* Save, TArray<uint8>& Bytes, FString& Error);
+    static USovCampaignSaveGame* DecodeFramed(const TArray<uint8>& Bytes, FString& Error, bool* bLegacy = nullptr);
+    /** Decode into the already configured class rather than trusting a class path supplied by a file. */
+    static class USaveGame* DecodeKnownSave(const TArray<uint8>& Bytes, UClass* ExpectedClass, UObject* Outer, FString& Error);
 };

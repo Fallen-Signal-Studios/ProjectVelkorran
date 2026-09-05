@@ -47,6 +47,12 @@ public:
 	/** Writes a Narrative player record before non-seamless authored map travel. */
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Campaign")
 	bool TravelToMission(USovCampaignDefinition* Destination, FString& OutError);
+	/** Native interruption recovery: abandon this campaign without writing outgoing state. */
+	bool ReturnToCampaignTitle(FString& OutError);
+	/** Called by the GameInstance travel owner after retiring its failed request. */
+	void NotifyMissionTravelFailed(const FString& Error);
+	/** Title abandonment remains fenced when Unreal rejects an already accepted return asynchronously. */
+	void NotifyTitleTravelFailed(const FString& Error);
 	UPROPERTY(BlueprintAssignable, Category="Campaign") FSovCampaignTransitionChanged OnCampaignTransitionChanged;
 
 	/** GameMode-only staging: actor bytes first; quest/component records after the matching pawn exists. */
@@ -84,6 +90,7 @@ private:
 	bool ClearOutgoingCombatState();
 	void PollCampaignInitialization(uint64 ExpectedEpoch);
 	void FailCampaignInitialization(const FString& Message);
+	void RetireCampaignTransition();
 	void SetTransitionInputLock(bool bLock);
 	void SetTransitionState(ESovCampaignTransitionState State, const FString& Message = FString());
 	UPROPERTY(SaveGame) FGuid CampaignControllerGuid;
@@ -107,4 +114,5 @@ private:
 	bool bOwnInputLock = false;
 	bool bWasSavingDisabled = false;
 	bool bFailureInProgress = false;
+	bool bTitleReturnInProgress = false;
 };

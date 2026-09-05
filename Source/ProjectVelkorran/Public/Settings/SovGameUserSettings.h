@@ -80,6 +80,9 @@ class PROJECTVELKORRAN_API USovGameUserSettings : public UNarrativeGameUserSetti
 	GENERATED_BODY()
 public:
 	static USovGameUserSettings* Get();
+	virtual bool UsesVerifiedAccountPreferences() const override { return true; }
+	virtual void RegisterOwnedInputSettings(UNarrativeInputSettings* Input) override;
+	virtual bool PersistOwnedInputSettings(UNarrativeInputSettings* Input) override;
 	virtual void LoadSettings(bool bForceReload = false) override;
 	virtual void SaveSettings() override;
 	virtual void ApplySettings(bool bCheckForCommandLineOverrides) override;
@@ -101,6 +104,8 @@ public:
 	virtual void SetGameplayDifficulty(const ENarrativeGameplayDifficulty NewDifficulty) override;
 	UFUNCTION(BlueprintPure, Category="Sovereign|Settings") FSovUserSettingsSnapshot GetSettingsSnapshot() const { return Settings; }
 	UFUNCTION(BlueprintPure, Category="Sovereign|Settings") bool HasCompletedAccessibilitySetup() const { return bAccessibilitySetupCompleted; }
+	UFUNCTION(BlueprintPure, Category="Sovereign|Settings") bool DidLastPreferenceSaveSucceed() const { return bLastPreferenceSaveSucceeded; }
+	UFUNCTION(BlueprintPure, Category="Sovereign|Settings") bool AreAccountPreferencesReady() const { return !bAccountPreferencesManaged || bAccountPreferencesLoaded; }
 	/** Explicit Continue in the native first-boot menu, never inferred from a gameplay save. */
 	UFUNCTION(BlueprintCallable, Category="Sovereign|Settings") bool CompleteAccessibilitySetup();
 	/** Validates the complete transaction before mutation, then persists immediately and emits one typed event. */
@@ -153,8 +158,36 @@ protected:
 	virtual float DisplayUIBaseNits() const;
 	virtual bool CanApplyDisplayCalibration() const;
 	virtual void PersistSettings();
+	virtual bool ReadPreferenceBank(const FString& Slot, int32 User, TArray<uint8>& Bytes);
+	virtual bool WritePreferenceBank(const FString& Slot, int32 User, const TArray<uint8>& Bytes);
 private:
 	friend struct FSovPlatformOutputTestAccess;
+	friend struct FSovAccountSettingsTestAccess;
+	friend class USovSaveSubsystem;
+	void ObserveVerifiedSettingsOwner(const FString& Namespace, int32 UserIndex, bool bAuthorized);
+	void SetPlatformSettingsSuspended(bool bSuspended);
+	bool IsVerifiedSettingsOwnerCurrent(const FString& Namespace, int32 UserIndex, uint64 Generation) const;
+	bool SaveAccountPreferences();
+	void LoadAccountPreferences();
+	void ScheduleAccountPreferenceLoad();
+	FTSTicker::FDelegateHandle AccountPreferenceLoadTicker;
+	void ResetAccountPreferences();
+	void CaptureAccountPreferences(TArray<uint8>& Bytes) const;
+	bool ApplyAccountPreferences(const TArray<uint8>& Bytes);
+	void PersistDeviceSettings();
+	FString AccountSettingsNamespace;
+	int32 AccountSettingsUserIndex = INDEX_NONE;
+	uint64 AccountSettingsOwnerGeneration = 0;
+	uint64 AccountSettingsFileGeneration = 0;
+	bool bAccountPreferencesManaged = false;
+	bool bAccountPreferencesLoaded = false;
+	bool bAccountSettingsSuspended = false;
+	bool bAccountSettingsIO = false;
+	bool bLastPreferenceSaveSucceeded = true;
+	TArray<uint8> CommittedAccountPreferences;
+	TArray<uint8> AccountInputProfile;
+	TWeakObjectPtr<UNarrativeInputSettings> AccountInputSettings;
+	bool ApplyOwnedInputProfile();
 	bool TickHDRPreview(float DeltaTime);
 	bool BeginHDRPreview(bool bEnable, int32 PeakNits, const FSovHDRCalibration* Calibration, FGuid& Receipt, FString& Error);
 	void BeginDisplayObservation();

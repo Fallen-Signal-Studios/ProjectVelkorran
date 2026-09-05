@@ -65,6 +65,7 @@ protected:
 	void ReceivePerfectDeflection(const FSovDamageResult& Result);
 
 private:
+	bool OwnsActivation(uint64 Epoch) const;
 	void BindDeflectionComponent(USovDeflectionComponent* NewDeflectionComponent);
 	void UnbindDeflectionComponent();
 	bool ShouldRunLocalPresentation() const;
@@ -99,5 +100,12 @@ private:
 	FDelegateHandle PoiseBrokenTagChangedHandle;
 	FDelegateHandle RagdollTagChangedHandle;
 	FDelegateHandle SequencerTagChangedHandle;
+	TMap<FGameplayTag, FDelegateHandle> AdditionalCancellationHandles;
+	TWeakObjectPtr<AActor> ActionAvatar;
+	TWeakObjectPtr<USovDeflectionComponent> ActiveDeflectionComponent;
+	TWeakObjectPtr<UAbilitySystemComponent> ActionASC;
+	uint64 ActivationEpoch = 0;
+	uint64 OwnedDeflectionWindowEpoch = 0;
+	bool bEndingDeflection = false;
 	bool bDeflectionStarted = false;
 };

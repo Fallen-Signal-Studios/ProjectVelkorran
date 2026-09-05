@@ -168,7 +168,6 @@ protected:
 private:
 	bool CanGenerateTarrikEcho() const;
 	TMap<TWeakObjectPtr<AActor>, float> ProtectionSourceAwardTimes;
-	TSet<FGuid> ConsumedProtectionTransactions;
 	UFUNCTION()
 	void HandleDamageResolvedAsSource(const FSovDamageResult& Result);
 	UFUNCTION()
@@ -176,14 +175,6 @@ private:
 	void AwardTarrikEcho(float Amount, FGameplayTag Tag, ESovTarrikEchoAwardType Type, AActor* Target);
 	UFUNCTION(Client, Unreliable)
 	void ClientNotifyTarrikEchoAwarded(float Amount, float NewEcho, ESovTarrikEchoAwardType Type, AActor* Target);
-	struct FHeavyAttackProgress
-	{
-		TSet<TWeakObjectPtr<AActor>> Targets;
-		bool bConsumed = false;
-	};
-	TMap<FGuid, FHeavyAttackProgress> HeavyAttacks;
-	TSet<FGuid> ConsumedCombatTransactions;
-	TSet<FGuid> ConsumedHeavyAttacks;
 	uint32 ResourceScopeEpoch = 0;
 	void TryInitializeFromOwner();
 	void UninitializeFromAbilitySystem();

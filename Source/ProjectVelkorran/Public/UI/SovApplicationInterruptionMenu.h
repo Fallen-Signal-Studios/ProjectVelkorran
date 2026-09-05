@@ -23,7 +23,11 @@ protected:
 private:
     void RefreshMessage(bool bAnnounce);
     UFUNCTION() void Resume();
+    UFUNCTION() void ReturnToTitle();
     UPROPERTY(Transient) TObjectPtr<UTextBlock> Message;
     UPROPERTY(Transient) TObjectPtr<USovAccessibilityNativeButton> ResumeButton;
+    UPROPERTY(Transient) TObjectPtr<USovAccessibilityNativeButton> TitleButton;
     FText LastMessage;
+    FText RecoveryError;
+    bool bConfirmTitle = false;
 };

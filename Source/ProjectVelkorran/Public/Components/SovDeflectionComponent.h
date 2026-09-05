@@ -82,6 +82,13 @@ protected:
 	float MinimumDeflectionStartStamina = 8.0f;
 
 private:
+	friend class USovGameplayAbility_SeleneDeflection;
+	bool BeginDeflectionInternal(int32 OwnedBusyContributions, uint64* OutWindowEpoch = nullptr);
+	void EndOwnedDeflectionWindow(uint64 Epoch);
+	bool HasInterruptionState(int32 OwnedBusyContributions) const;
+	void BindInterruptionTags();
+	void UnbindInterruptionTags();
+	void HandleInterruptionTagChanged(FGameplayTag Tag, int32 NewCount);
 	void TryInitializeFromOwner();
 
 	UFUNCTION()
@@ -101,5 +108,10 @@ private:
 	TObjectPtr<UAbilitySystemComponent> AbilitySystemComponent;
 
 	FTimerHandle DeflectionWindowTimerHandle;
+	TMap<FGameplayTag, FDelegateHandle> InterruptionTagHandles;
+	uint64 WindowEpoch = 0;
+	int32 DeflectionOwnedBusyContributions = 0;
+	bool bClosingWindow = false;
+	bool bUninitializing = false;
 	bool bAppliedDeflectingTag = false;
 };

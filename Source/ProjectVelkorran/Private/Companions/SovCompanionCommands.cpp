@@ -181,8 +181,13 @@ void USovCompanionComponent::TickContextCommand(USovCompanionCommandGoal* Goal)
 	if (Abilities->HasMatchingGameplayTag(N.State_Busy)) { return; }
 	if (TryRecoverSeparation()) { return; }
 	AActor* Focus = Goal->Command == ESovCompanionCommand::FocusTarget ? Goal->Target.Get() : nullptr;
-	const FVector Destination = Goal->Command == ESovCompanionCommand::HoldPosition ? Goal->HoldLocation
+	if (Goal->Command == ESovCompanionCommand::FocusTarget && (!IsValid(Focus) || !HostileCompanionTarget(NPC, Focus)
+		|| FVector::DistSquared(Leader->GetActorLocation(), Focus->GetActorLocation()) > FMath::Square(2500.f)))
+	{ CancelContextCommand(); return; }
+	FVector Destination = Goal->Command == ESovCompanionCommand::HoldPosition ? Goal->HoldLocation
 		: Goal->Command == ESovCompanionCommand::DefendPerson && IsValid(Goal->Target) ? Goal->Target->GetActorLocation() : Leader->GetActorLocation();
+	float AcceptanceRadius = 150.f;
+	AActor* PursuitTarget = nullptr;
 	if (!Focus && Goal->Command != ESovCompanionCommand::HoldPosition)
 	{
 		float Best = FMath::Square(1000.f);
@@ -194,6 +199,37 @@ void USovCompanionComponent::TickContextCommand(USovCompanionCommandGoal* Goal)
 	}
 	if (IsValid(Focus) && HostileCompanionTarget(NPC, Focus))
 	{
+		const auto Candidates = Abilities->GetBotAttackCandidates(Focus, FGameplayTag());
+		if (!IsCommandCurrent(Goal) || !IsValid(Focus) || !IsValid(Controller) || !IsValid(Abilities)
+			|| Abilities->GetAvatarActor() != NPC) { return; }
+		if (Goal->Command == ESovCompanionCommand::FocusTarget)
+		{
+			// The same curated attack descriptors govern pursuit and firing. Cooldowns do not erase reach.
+			float PreferredReach = 0.f;
+			float MinimumReach = 0.f;
+			for (const auto& Candidate : Candidates)
+			{
+				const auto* Spec = Abilities->FindAbilitySpecFromHandle(Candidate.Handle);
+				if (!Spec || !Spec->Ability || !CuratedAbilities.Contains(Spec->Ability->GetClass()) || Candidate.MinimumRange >= 2000.f) { continue; }
+				const float Band = FMath::Min(2000.f, Candidate.MaximumRange) - Candidate.MinimumRange;
+				const float Reach = FMath::Clamp(Candidate.PreferredRange,
+					Candidate.MinimumRange + Band * .25f, Candidate.MinimumRange + Band * .8f);
+				if (Reach > PreferredReach) { PreferredReach = Reach; MinimumReach = Candidate.MinimumRange; }
+			}
+			if (PreferredReach <= 0.f) { CancelContextCommand(); return; }
+			PursuitTarget = Focus; Destination = Focus->GetActorLocation();
+			AcceptanceRadius = FMath::Clamp(PreferredReach, 25.f, 2000.f);
+			if (FVector::DistSquared(NPC->GetActorLocation(), Destination) < FMath::Square(MinimumReach))
+			{
+				FVector Away = (NPC->GetActorLocation() - Destination).GetSafeNormal2D();
+				if (Away.IsNearlyZero()) { Away = -NPC->GetActorForwardVector(); }
+				Destination += Away * PreferredReach; PursuitTarget = nullptr;
+				AcceptanceRadius = FMath::Min(25.f, FMath::Max(.1f, (PreferredReach - MinimumReach) * .25f));
+				if (FVector::DistSquared(Destination, Leader->GetActorLocation()) > FMath::Square(2500.f))
+				{ CancelContextCommand(); return; }
+			}
+			else if (!Controller->LineOfSightTo(Focus)) { AcceptanceRadius = FMath::Max(MinimumReach, FMath::Min(AcceptanceRadius, 100.f)); }
+		}
 		if (!OwnedFocus.IsValid()) { PreviousFocus = Controller->GetFocusActor(); }
 		Controller->SetFocus(Focus); OwnedFocus = Focus;
 		auto* TargetASC = CompanionASC(Focus);
@@ -218,21 +254,28 @@ void USovCompanionComponent::TickContextCommand(USovCompanionCommandGoal* Goal)
 		if (!bProtected && GetWorld()->GetTimeSeconds() >= NextCommandAttack
 			&& SovResonancePolicy::WithinContributionBudget(CompanionContribution, PlayerContribution, FMath::Clamp(ContributionFraction, .15f, .25f)))
 		{
-			for (const auto& Candidate : Abilities->GetBotAttackCandidates(Focus, FGameplayTag()))
+			for (const auto& Candidate : Candidates)
 			{
 				const auto* Spec = Abilities->FindAbilitySpecFromHandle(Candidate.Handle);
 				if (!Candidate.bAvailable || !Spec || !Spec->Ability || !CuratedAbilities.Contains(Spec->Ability->GetClass())) { continue; }
+				if (Controller->GetPathFollowingComponent() && Controller->GetPathFollowingComponent()->GetCurrentRequestId() == CommandMoveId)
+				{ Controller->StopMovement(); CommandMoveId = FAIRequestID::InvalidRequest; }
+				if (!IsCommandCurrent(Goal)) { return; }
 				OwnedCommandAttack = Candidate.Handle; CommandAttackStarted = GetWorld()->GetTimeSeconds(); NextCommandAttack = CommandAttackStarted + 2.f;
 				if (!Abilities->TryActivateBotAttack(Focus, Candidate.Handle)) { OwnedCommandAttack = {}; }
 				return;
 			}
 		}
 	}
-	if (FVector::DistSquared(NPC->GetActorLocation(), Destination) > FMath::Square(250.f)
+	const float MoveSlop = Goal->Command == ESovCompanionCommand::FocusTarget ? 1.f : 25.f;
+	if (FVector::DistSquared(NPC->GetActorLocation(), Destination) > FMath::Square(AcceptanceRadius + MoveSlop)
 		&& Controller->GetMoveStatus() != EPathFollowingStatus::Moving && GetWorld()->GetTimeSeconds() >= NextMoveAttempt)
 	{
 		NextMoveAttempt = GetWorld()->GetTimeSeconds() + 1.f;
-		FAIMoveRequest Request(Destination); Request.SetAcceptanceRadius(150.f); Request.SetAllowPartialPath(false); Request.SetUsePathfinding(true);
+		FAIMoveRequest Request(Destination);
+		if (PursuitTarget) { Request.SetGoalActor(PursuitTarget); }
+		Request.SetAcceptanceRadius(AcceptanceRadius); Request.SetAllowPartialPath(false); Request.SetUsePathfinding(true);
+		Request.SetReachTestIncludesAgentRadius(false); Request.SetReachTestIncludesGoalRadius(false);
 		const auto Move = Controller->MoveTo(Request); CommandMoveId = Move.MoveId;
 		// Retain authored intent and retry at a bounded cadence. Hidden recovery has its own stricter gate.
 		if (Move.Code == EPathFollowingRequestResult::Failed) { CommandMoveId = FAIRequestID::InvalidRequest; }

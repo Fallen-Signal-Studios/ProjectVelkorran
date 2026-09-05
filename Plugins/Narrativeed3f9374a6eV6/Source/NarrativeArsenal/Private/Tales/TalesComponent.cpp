@@ -69,7 +69,10 @@ void UTalesComponent::TickComponent(float DeltaTime, enum ELevelTick TickType, F
 
 	if (CurrentDialogue)
 	{
-		CurrentDialogue->TickDialogue(DeltaTime);
+		UDialogue* const TickingDialogue = CurrentDialogue;
+		TickingDialogue->PumpDeferredLineCompletion();
+		if (CurrentDialogue == TickingDialogue && IsValid(TickingDialogue))
+		{ TickingDialogue->TickDialogue(DeltaTime); }
 	}
 }
 

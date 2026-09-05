@@ -23,6 +23,10 @@ struct FSovSceneSubtitleEntry
 	float Duration = 5.f;
 	bool bCinematic = false;
 	bool bFinished = false;
+	FGuid Receipt;
+	bool bHasDirection = true;
+	FName CueKey;
+	int32 Priority = 0;
 };
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSovSceneHistoryChanged);
 
@@ -35,6 +39,13 @@ public:
 	USovAccessibilityPresentation(const FObjectInitializer& Initializer);
 	UFUNCTION(BlueprintCallable, Category="Sovereign|Accessibility") void PresentSpeech(const FText& Speaker, const FText& Text, float Duration, const FVector& SpeakerLocation, bool bCinematic);
 	UFUNCTION(BlueprintCallable, Category="Sovereign|Accessibility") void PresentCaption(const FText& Text, float Duration, const FVector& SourceLocation);
+	FGuid PresentOwnedSpeech(const FText& Speaker, const FText& Text, float Duration, const FVector& Location, bool bCinematic, bool bHasDirection);
+	void FinishOwnedSpeech(FGuid Receipt);
+	void RestartOwnedSpeech(FGuid Receipt, float Duration);
+	void SuspendDialogueSpeech();
+	void ResumeDialogueSpeech();
+	bool HasUnreadSpeech(FGuid Receipt) const;
+	void PresentPrioritizedCaption(const FText& Text, float Duration, const FVector& SourceLocation, FName CueKey, int32 Priority, bool bHasDirection);
 	/** Line-end does not erase a page before its readable interval. Scene-end force-clears below. */
 	UFUNCTION(BlueprintCallable, Category="Sovereign|Accessibility") void ClearSpeech();
 	UFUNCTION(BlueprintCallable, Category="Sovereign|Accessibility") void ClearSceneHistory();
@@ -55,9 +66,11 @@ private:
 	friend struct FSovFrontendTestAccess;
 	friend struct FSovAccessibilityFrontendTestAccess;
 	void BeginEntry(const FSovSceneSubtitleEntry& Entry);
+	void BeginCaption(const FSovSceneSubtitleEntry& Entry);
+	void AdvancePresentation(float DeltaSeconds);
 	void RefreshText();
 	float GetSafeTextWidth() const;
-	FText DirectionText(const FVector& Location) const;
+	FText DirectionText(const FVector& Location, bool bHasDirection = true) const;
 	UFUNCTION() void SettingsChanged(const FSovUserSettingsSnapshot& Value);
 	UFUNCTION() void FoundInteractable(UNarrativeInteractableComponent* Value);
 	UFUNCTION() void LostInteractable(UNarrativeInteractableComponent* Value);
@@ -75,6 +88,14 @@ private:
 	FSovUserSettingsSnapshot Settings;
 	FSovSceneSubtitleEntry ActiveSpeech;
 	FSovSceneSubtitleEntry ActiveCaption;
+	TArray<FSovSceneSubtitleEntry> PendingCaptions;
+	FSovSceneSubtitleEntry SuspendedSpeech;
+	TArray<FSovSceneSubtitleEntry> SuspendedPendingSpeech;
+	TArray<FString> SuspendedSpeechPages;
+	int32 SuspendedPageIndex = 0;
+	float SuspendedPageRemaining = 0.f;
+	bool bDialogueSpeechSuspended = false;
+	bool bSuspendedSpeechLayoutDirty = false;
 	TArray<FString> SpeechPages;
 	TArray<FString> CaptionPages;
 	int32 CaptionPageIndex = 0;
@@ -84,6 +105,7 @@ private:
 	float CaptionRemaining = 0.f;
 	float MarkerRefreshRemaining = 0.f;
 	float LastLayoutWidth = 0.f;
+	float TextRefreshRemaining = 0.f;
 	struct FMarker { FVector Location; FText Text; bool bThreat = false; bool bNavigation = false; };
 	TArray<FMarker> Markers;
 };

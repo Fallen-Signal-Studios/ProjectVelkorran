@@ -1,5 +1,6 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Campaign/SovEncounterDirector.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "Campaign/SovEncounterPolicy.h"
 #include "Campaign/SovEncounterSnapshotLibrary.h"
 #include "Campaign/SovEncounterCoordinationComponent.h"
@@ -108,6 +109,7 @@ void ASovEncounterDirector::SetActorGUID_Implementation(const FGuid& SavedGUID)
 
 void ASovEncounterDirector::BeginPlay()
 {
+	bEndingPlay = false;
 	Super::BeginPlay();
 	if (!HasAuthority()) { return; }
 	bInvalidEncounterIdentity = EncounterId.IsNone();
@@ -124,6 +126,7 @@ void ASovEncounterDirector::BeginPlay()
 
 void ASovEncounterDirector::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	bEndingPlay = true;
 	++RestoreGeneration;
 	ClearMassRepresentations(true);
 	UnbindDeaths();
@@ -150,6 +153,8 @@ void ASovEncounterDirector::SetState(ESovEncounterState NewState)
 	if (State == NewState) { return; }
 	const ESovEncounterState Previous = State;
 	State = NewState;
+	SetActorTickInterval(NewState == ESovEncounterState::Restoring ? 0.f : .1f);
+	SetActorTickEnabled(NewState == ESovEncounterState::Active || NewState == ESovEncounterState::Restoring || !MassAssetLoads.IsEmpty());
 	RefreshMassProcessingState();
 	USovDiagnosticsSubsystem::Record(GetWorld(), ESovDiagnosticKind::EncounterState,
 		EncounterId, NAME_None, static_cast<float>(NewState), 0.f, NewState == ESovEncounterState::Succeeded);
@@ -460,6 +465,9 @@ void ASovEncounterDirector::BindDeaths()
 	for (const FSovEncounterParticipant& Participant : Participants) { Actors.Add(Participant.Character); }
 	for (AActor* Actor : Actors)
 	{
+		if (!IsValid(Actor)) { continue; }
+		Actor->OnEndPlay.AddUniqueDynamic(this, &ThisClass::HandleParticipantEndPlay);
+		BoundParticipantActors.AddUnique(Actor);
 		if (UNarrativeAbilitySystemComponent* ASC = Cast<UNarrativeAbilitySystemComponent>(UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Actor)))
 		{
 			ASC->OnDeathStateChanged.AddUniqueDynamic(this, &ThisClass::HandleDeath);
@@ -475,31 +483,81 @@ void ASovEncounterDirector::UnbindDeaths()
 		if (IsValid(ASC)) { ASC->OnDeathStateChanged.RemoveDynamic(this, &ThisClass::HandleDeath); }
 	}
 	BoundDeathASCs.Reset();
+	for (const auto& Actor : BoundParticipantActors)
+	{ if (Actor.IsValid()) { Actor->OnEndPlay.RemoveDynamic(this, &ThisClass::HandleParticipantEndPlay); } }
+	BoundParticipantActors.Reset();
 }
 
 void ASovEncounterDirector::HandleDeath(AActor* KilledActor, UNarrativeAbilitySystemComponent* ASC, bool bIsDead)
 {
-	if (!HasAuthority() || !bIsDead || State != ESovEncounterState::Active || bMutationInProgress) { return; }
+	if (!HasAuthority() || !bIsDead || State != ESovEncounterState::Active || !IsValid(ASC)
+		|| ASC->GetAvatarActor() != KilledActor
+		|| UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(KilledActor) != ASC) { return; }
 	if (KilledActor == ResolvePlayer())
 	{
 		USovFatalRecoveryComponent* Recovery = ResolvePlayer()->GetRecoveryComponent();
-		if (!Recovery || !Recovery->OwnsFatalRecovery()) { FailEncounter(); }
+		if ((!Recovery || !Recovery->OwnsFatalRecovery()) && !bMutationInProgress) { FailEncounter(); }
 		return;
 	}
 	const FName DefeatedId = FindParticipantId(KilledActor);
 	if (DefeatedId.IsNone()) { return; }
 	DefeatedParticipants.Add(DefeatedId);
-	if (!bCompleteWhenRequiredParticipantsDefeated) { return; }
+	ReconcileEncounterState();
+}
+
+void ASovEncounterDirector::HandleParticipantEndPlay(AActor* Actor, EEndPlayReason::Type Reason)
+{
+	// Demotion transfers the participant to its Mass record before destroying the
+	// actor. Retry unbinds this observer. Neither is a combat defeat or actor loss.
+	if (!HasAuthority() || bEndingPlay || State != ESovEncounterState::Active || IsActorBeingDestroyed()
+		|| Reason == EEndPlayReason::Quit || Reason == EEndPlayReason::EndPlayInEditor
+		|| FindParticipantId(Actor).IsNone()) { return; }
+	SetActorTickEnabled(true); // Resolve outside the destruction/callback stack.
+}
+
+bool ASovEncounterDirector::ReconcileEncounterState()
+{
+	if (!HasAuthority() || bEndingPlay || IsActorBeingDestroyed() || bMutationInProgress || State != ESovEncounterState::Active) { return false; }
+	if (ASovPlayerCharacterBase* Player = ResolvePlayer(); Player && !Player->IsAlive())
+	{
+		const auto* Recovery = Player->GetRecoveryComponent();
+		if (!Recovery || !Recovery->OwnsFatalRecovery()) { FailEncounter(); }
+		return false;
+	}
 	bool bHasRequired = false;
+	bool bAllDefeated = true;
+	FName LostParticipant;
+	TSet<FName> MassIdentities;
+	for (const auto& Record : MassParticipants) { MassIdentities.Add(Record.NPC.ParticipantId); }
 	for (const FSovEncounterParticipant& Participant : Participants)
 	{
 		if (!Participant.bRequiredForVictory) { continue; }
 		bHasRequired = true;
-		// A confirmed kill remains valid after corpse cleanup; arbitrary actor
-		// destruction is never silently counted as a kill.
-		if (!DefeatedParticipants.Contains(Participant.ParticipantId)) { return; }
+		if (DefeatedParticipants.Contains(Participant.ParticipantId)) { continue; }
+		bAllDefeated = false;
+		if (MassIdentities.Contains(Participant.ParticipantId))
+		{
+			if (!HasLiveMassIdentity(Participant.ParticipantId)) { LostParticipant = Participant.ParticipantId; break; }
+		}
+		else if (!IsValid(Participant.Character) || Participant.Character->IsActorBeingDestroyed() || !Participant.Character->IsAlive())
+		{ LostParticipant = Participant.ParticipantId; break; }
 	}
-	if (bHasRequired) { CompleteEncounter(); }
+	if (!LostParticipant.IsNone())
+	{
+		const FGuid FailedAttempt = AttemptId;
+		const FString Error = FString::Printf(TEXT("Required encounter participant '%s' became unavailable without a confirmed defeat. Restoring the encounter checkpoint."), *LostParticipant.ToString());
+		if (FailEncounter() && IsValid(this) && !IsActorBeingDestroyed() && State == ESovEncounterState::Failed && AttemptId == FailedAttempt)
+		{
+			OnEncounterRestoreFailed.Broadcast(Error);
+			if (IsValid(this) && !IsActorBeingDestroyed() && !bEndingPlay && State == ESovEncounterState::Failed && AttemptId == FailedAttempt)
+			{ if (auto* Player = ResolvePlayer()) { if (auto* Recovery = Player->GetRecoveryComponent()) { Recovery->RequestEncounterFailure(this, Error); } } }
+		}
+		return false;
+	}
+	// A kill receipt is never discarded because a different participant is still
+	// promoting. Every stabilization point evaluates the same idempotent rule.
+	if (bCompleteWhenRequiredParticipantsDefeated && bHasRequired && bAllDefeated && MassPromotions.IsEmpty()) { CompleteEncounter(); }
+	return State == ESovEncounterState::Active;
 }
 
 void ASovEncounterDirector::SuspendActor(AActor* Actor)
@@ -819,9 +877,12 @@ bool ASovEncounterDirector::RetryEncounter(FString& Error)
 
 void ASovEncounterDirector::Tick(float DeltaSeconds)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(SovEncounter_ReconcileAndRestore);
 	Super::Tick(DeltaSeconds);
+	TickMassAssetLoads();
 	TickMassPromotions();
-	if (!HasAuthority() || State != ESovEncounterState::Restoring || bMutationInProgress) { return; }
+	if (State == ESovEncounterState::Active) { ReconcileEncounterState(); }
+	if (!HasAuthority() || bEndingPlay || IsActorBeingDestroyed() || State != ESovEncounterState::Restoring || bMutationInProgress) { return; }
 	TGuardValue<bool> Mutation(bMutationInProgress, true);
 	UNarrativeSaveSubsystem* Save = GetWorld()->GetSubsystem<UNarrativeSaveSubsystem>();
 	if (!Save || !IsValid(ResolvePlayer())) { AbortRestore(TEXT("Player or Narrative save subsystem disappeared during restore.")); return; }
@@ -1084,6 +1145,12 @@ void ASovEncounterDirector::Load_Implementation()
 		}
 		Participant->Character = nullptr;
 		FString Error;
+		if (!EnsureMassAssets(Record, Error))
+		{
+			if (MassAssetLoads.Contains(Record.NPC.ParticipantId)) { PendingMassRestores.Add(Record.NPC.ParticipantId); }
+			else { OnEncounterRestoreFailed.Broadcast(Error); }
+			continue;
+		}
 		if (!CreateMassEntity(Record, Error)) { SetState(ESovEncounterState::Failed); OnEncounterRestoreFailed.Broadcast(Error); }
 	}
 	if (State == ESovEncounterState::Failed)

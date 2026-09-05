@@ -222,9 +222,19 @@ TSharedRef<SWidget> USovAccessibilitySettingsMenu::RebuildWidget()
 		AddRow("Cloud.Enabled", LOCTEXT("CloudEnable", "Optional cloud saves for this signed-in session"));
 		AddRow("Cloud.Slot", LOCTEXT("CloudSlot", "Cloud review manual slot"), 0, 9, 1);
 		AddRow("Cloud.Inspect", LOCTEXT("CloudInspect", "Review local and cloud copies"));
+		AddRow("Cloud.Revision", LOCTEXT("CloudRevision", "Cloud revision"), 0, 127, 1);
+		AddRow("Cloud.SelectRevision", LOCTEXT("CloudSelectRevision", "Select revision for import"));
+		AddRow("Cloud.Delete", LOCTEXT("CloudDelete", "Review deletion of this cloud revision"));
+		AddRow("Cloud.ConfirmDelete", LOCTEXT("CloudConfirmDelete", "Confirm permanent deletion of reviewed cloud revision"));
 		AddRow("Cloud.KeepLocal", LOCTEXT("CloudKeep", "Publish reviewed local copy to cloud"));
 		AddRow("Cloud.UseCloud", LOCTEXT("CloudUse", "Import reviewed cloud copy locally"));
 		AddRow("Cloud.Cancel", LOCTEXT("CloudCancel", "Cancel cloud review"));
+		AddRow("Storage.Kind", LOCTEXT("ArchiveKind", "Preserved archive slot type"), 0, 2, 1);
+		AddRow("Storage.Slot", LOCTEXT("ArchiveSlot", "Preserved archive slot"), 0, 9, 1);
+		AddRow("Storage.Inspect", LOCTEXT("ArchiveInspect", "List preserved local archives"));
+		AddRow("Storage.Archive", LOCTEXT("ArchiveSelect", "Preserved archive"), 0, 31, 1);
+		AddRow("Storage.Delete", LOCTEXT("ArchiveDelete", "Review deletion of this archive"));
+		AddRow("Storage.ConfirmDelete", LOCTEXT("ArchiveConfirm", "Confirm permanent deletion of reviewed archive"));
 		AddRow("Continue", LOCTEXT("Continue", "Continue / close settings"));
 	}
 	RefreshRows(); return Super::RebuildWidget();
@@ -245,6 +255,7 @@ void USovAccessibilitySettingsMenu::NativeDestruct()
 	if(OldSettings) { OldSettings->OnUserSettingsChanged.RemoveDynamic(this,&ThisClass::SettingsChanged); }
 	if(OldPlatform) { OldPlatform->OnCloudReviewChanged.RemoveDynamic(this,&ThisClass::CloudChanged); }
 	BoundSettings=nullptr; PlatformServices=nullptr; HDRReceipt.Invalidate(); CloudRequest.Invalidate();
+	DeleteCloudRequest.Invalidate(); DeleteCloudRevision.Reset(); DeleteArchiveId.Reset(); ArchiveIds.Reset();
 	Super::NativeDestruct();
 	if(IsValid(OldSettings) && OldHDR.IsValid()) { OldSettings->RevertHDRCalibration(OldHDR); }
 	if(IsValid(OldPlatform) && OldCloud.IsValid() && OldPlatform->GetCloudReview().RequestId==OldCloud) { OldPlatform->CancelCloudOperation(); }
@@ -254,6 +265,7 @@ void USovAccessibilitySettingsMenu::NativeDestruct()
 void USovAccessibilitySettingsMenu::NativeOnDeactivated()
 {
 	const uint64 Expected=++MenuGeneration;
+	DeleteCloudRequest.Invalidate(); DeleteCloudRevision.Reset(); DeleteArchiveId.Reset(); ArchiveIds.Reset();
 	Super::NativeOnDeactivated(); if(Expected!=MenuGeneration || IsActivated()) { return; }
 	if (BoundSettings && HDRReceipt.IsValid()) { const FGuid Receipt=HDRReceipt; HDRReceipt.Invalidate(); BoundSettings->RevertHDRCalibration(Receipt); }
 	if(Expected!=MenuGeneration || IsActivated()) { return; }
@@ -279,11 +291,13 @@ void USovAccessibilitySettingsMenu::SettingsChanged(const FSovUserSettingsSnapsh
 }
 void USovAccessibilitySettingsMenu::CloudChanged(const FSovCloudReview& Review)
 {
+	if (Review.RequestId != DeleteCloudRequest || Review.Phase != ESovCloudPhase::AwaitingChoice)
+	{ DeleteCloudRequest.Invalidate(); DeleteCloudRevision.Reset(); }
 	RefreshRows(); if (!Status) { return; }
 	const FText Missing = LOCTEXT("NoCopy","No copy");
 	auto Describe = [&](bool bHas,const FSovSaveSlotHeader& Header)
 	{ return bHas ? FText::Format(LOCTEXT("CopyMetadata","{0}; {1}; {2} minutes; generation {3}"),Header.MissionLabel,FText::AsDateTime(Header.TimestampUtc),FText::AsNumber(FMath::RoundToInt(Header.PlaySeconds/60.)),FText::AsNumber(Header.Generation)) : Missing; };
-	Status->SetText(FText::Format(LOCTEXT("CloudReview","Cloud review: {0}\nLocal: {1}\nCloud: {2}\nSelect publish local, import cloud, or cancel. Neither copy is changed by review."),FText::FromString(Review.Message),Describe(Review.bHasLocal,Review.Local),Describe(Review.bHasCloud,Review.Cloud)));
+	Status->SetText(FText::Format(LOCTEXT("CloudReview","Cloud review: {0}\nLocal: {1}\nCloud: {2}\nSelect a revision before import when several copies exist. Publish local, import selected cloud, or cancel. Deletion requires separate confirmation."),FText::FromString(Review.Message),Describe(Review.bHasLocal,Review.Local),Describe(Review.bHasCloud,Review.Cloud)));
 }
 void USovAccessibilitySettingsMenu::RefreshRows()
 {
@@ -323,12 +337,26 @@ FText USovAccessibilitySettingsMenu::ValueText(const USovAccessibilitySettingRow
 		return FText::AsNumber(Value);
 	}
 	if (Key == "HDR.Preview" && BoundSettings && bHDREnabled && !BoundSettings->GetHDROutputStatus().bSupported) { return LOCTEXT("HDRUnavailable","Unavailable on current display"); }
+	if (Name.StartsWith(TEXT("Storage.")))
+	{
+		if (Key=="Storage.Kind") { static const FText Names[]={LOCTEXT("ManualArchive","Manual"),LOCTEXT("AutoArchive","Automatic"),LOCTEXT("CheckpointArchive","Checkpoint")}; return Names[FMath::Clamp(ArchiveKind,0,2)]; }
+		if (Key=="Storage.Slot") { return FText::AsNumber(ArchiveSlot+1); }
+		if (Key=="Storage.Archive") { return ArchiveIds.IsValidIndex(ArchiveCursor) ? FText::Format(LOCTEXT("ArchivePosition","{0} of {1}: {2}"),FText::AsNumber(ArchiveCursor+1),FText::AsNumber(ArchiveIds.Num()),FText::FromString(ArchiveIds[ArchiveCursor])) : LOCTEXT("NoArchives","No reviewed archives"); }
+		return LOCTEXT("Activate","activate");
+	}
 	if (Name.StartsWith(TEXT("Cloud.")))
 	{
 		if (PlatformServices && PlatformServices->IsCloudManagedByPlatform()) { return LOCTEXT("CloudSystemManaged","Managed by platform save system"); }
 		if (!PlatformServices || !PlatformServices->IsCloudAvailable()) { return LOCTEXT("CloudUnavailable","Unavailable: signed-in cloud provider and frontend required"); }
 		if (Key == "Cloud.Enabled") { return PlatformServices->IsCloudEnabled() ? LOCTEXT("On","On") : LOCTEXT("Off","Off"); }
 		if (Key == "Cloud.Slot") { return FText::AsNumber(CloudManualSlot + 1); }
+		if (Key == "Cloud.Revision")
+		{
+			const auto Revisions=PlatformServices->GetCloudRevisions();
+			if (!Revisions.IsValidIndex(CloudRevisionCursor)) { return LOCTEXT("NoRevisions","No reviewed revisions"); }
+			const auto& Revision=Revisions[CloudRevisionCursor];
+			return FText::Format(LOCTEXT("RevisionMetadata","{0} of {1}; {2}; {3}; generation {4}; {5}"), FText::AsNumber(CloudRevisionCursor+1),FText::AsNumber(Revisions.Num()),Revision.Header.MissionLabel,FText::AsDateTime(Revision.Header.TimestampUtc),FText::AsNumber(Revision.Header.Generation),Revision.bValid?LOCTEXT("ValidRevision","Valid"):FText::FromString(Revision.Message));
+		}
 		return LOCTEXT("Activate","activate");
 	}
 	if (Key == "Continue" || Name.StartsWith(TEXT("Review.")) || Key == "HDR.Preview" || Key == "HDR.Confirm" || Key == "HDR.Revert") { return LOCTEXT("Activate", "activate"); }
@@ -359,13 +387,28 @@ bool USovAccessibilitySettingsMenu::IsRowEnabled(const USovAccessibilitySettingR
 		}
 		if (Key == "HDR.Confirm" || Key == "HDR.Revert") { return HDRReceipt.IsValid(); }
 	}
-	if (!Key.ToString().StartsWith(TEXT("Cloud."))) { return true; }
+	if (Key.ToString().StartsWith(TEXT("Storage.")))
+	{
+		auto* Save=GetGameInstance()?GetGameInstance()->GetSubsystem<USovSaveSubsystem>():nullptr; FString Error;
+		if(!Save || !Save->CanManagePlatformSaves(Error)) { return false; }
+		if(Key=="Storage.Archive" || Key=="Storage.Delete") { return Save->IsStorageOwnerCurrent(ArchiveOwner) && ArchiveIds.IsValidIndex(ArchiveCursor); }
+		if(Key=="Storage.ConfirmDelete") { return Save->IsStorageOwnerCurrent(ArchiveOwner) && !DeleteArchiveId.IsEmpty(); }
+		return true;
+	}
+	if (!Key.ToString().StartsWith(TEXT("Cloud."))) { return !BoundSettings || BoundSettings->AreAccountPreferencesReady(); }
 	if (!PlatformServices || !PlatformServices->IsCloudAvailable()) { return false; }
 	if (Key == "Cloud.Enabled") { return true; }
 	if (!PlatformServices->IsCloudEnabled()) { return false; }
 	const auto Review = PlatformServices->GetCloudReview();
 	if (Key == "Cloud.KeepLocal" || Key == "Cloud.UseCloud")
-	{ return CloudRequest.IsValid() && Review.RequestId == CloudRequest && Review.Phase == ESovCloudPhase::AwaitingChoice && (Key == "Cloud.KeepLocal" ? Review.bHasLocal : Review.bHasCloud); }
+	{ return CloudRequest.IsValid() && Review.RequestId == CloudRequest && Review.Phase == ESovCloudPhase::AwaitingChoice && (Key == "Cloud.KeepLocal" ? Review.bHasLocal : Review.bHasCloud && !Review.bRevisionSelectionRequired); }
+	if(Key=="Cloud.Revision" || Key=="Cloud.SelectRevision" || Key=="Cloud.Delete" || Key=="Cloud.ConfirmDelete")
+	{
+		const auto Revisions=PlatformServices->GetCloudRevisions();
+		return Review.RequestId==CloudRequest && Review.Phase==ESovCloudPhase::AwaitingChoice && Revisions.IsValidIndex(CloudRevisionCursor)
+			&& (Key!="Cloud.SelectRevision" || Revisions[CloudRevisionCursor].bValid)
+			&& (Key!="Cloud.ConfirmDelete" || (DeleteCloudRequest==CloudRequest && !DeleteCloudRevision.IsEmpty()));
+	}
 	return true;
 }
 bool USovAccessibilitySettingsMenu::CanAdjustValue(const USovAccessibilitySettingRow* Row) const
@@ -374,7 +417,8 @@ bool USovAccessibilitySettingsMenu::CanAdjustValue(const USovAccessibilitySettin
 	const FName Key = Row->SettingKey; const FString Name = Key.ToString();
 	return Key != "Continue" && !Name.StartsWith(TEXT("Review.")) &&
 		Key != "HDR.Preview" && Key != "HDR.Confirm" && Key != "HDR.Revert" &&
-		(!Name.StartsWith(TEXT("Cloud.")) || Key == "Cloud.Enabled" || Key == "Cloud.Slot");
+		(!Name.StartsWith(TEXT("Cloud.")) || Key == "Cloud.Enabled" || Key == "Cloud.Slot" || Key == "Cloud.Revision")
+		&& (!Name.StartsWith(TEXT("Storage.")) || Key=="Storage.Kind" || Key=="Storage.Slot" || Key=="Storage.Archive");
 }
 void USovAccessibilitySettingsMenu::Adjust(USovAccessibilitySettingRow* Row, int32 Direction)
 {
@@ -382,7 +426,7 @@ void USovAccessibilitySettingsMenu::Adjust(USovAccessibilitySettingRow* Row, int
 	const uint64 Expected=MenuGeneration; const bool bWasActive=IsActivated();
 	const auto IsCurrent=[&]() { return Expected==MenuGeneration && (!bWasActive || IsActivated()); };
 	const FName Key = Row->SettingKey; const FString Name = Key.ToString(); FString Error;
-	if (Key == "Continue") { if ((!bFirstBoot || BoundSettings->CompleteAccessibilitySetup()) && IsCurrent()) { DeactivateWidget(); } return; }
+	if (Key == "Continue") { if ((!bFirstBoot || BoundSettings->CompleteAccessibilitySetup()) && IsCurrent()) { DeactivateWidget(); } else if(IsCurrent() && Status) { Status->SetText(LOCTEXT("SetupSaveFailed","Accessibility setup could not be saved for the current account. Restore account storage, then try Continue again.")); } return; }
 	if(Key=="Difficulty")
 	{
 		BoundSettings->ApplyDifficultyPreset(static_cast<ESovDifficultyPreset>(int32(ChangedValue(int32(BoundSettings->GetSettingsSnapshot().Preset),Row,Direction))),Error);
@@ -410,13 +454,34 @@ void USovAccessibilitySettingsMenu::Adjust(USovAccessibilitySettingRow* Row, int
 			else if(Key=="Audio.Music") { BoundSettings->SetMusicAudioVolume(Value); } else if(Key=="Audio.SFX") { BoundSettings->SetSFXAudioVolume(Value); }
 			else if(Key=="Audio.Ambience") { BoundSettings->SetAmbienceAudioVolume(Value); } else if(Key=="Audio.Tinnitus") { BoundSettings->SetTinnitusAudioVolume(Value); }
 		}
-		if(!IsCurrent()) { return; } RefreshRows(); if(!Error.IsEmpty() && Status) { Status->SetText(FText::FromString(Error)); } FocusRow(Row,Row->GetLabel()); return;
+		if(!IsCurrent()) { return; } if(Error.IsEmpty() && !BoundSettings->DidLastPreferenceSaveSucceed()) { Error=TEXT("Audio preferences could not be saved for this account; previous values were restored."); } RefreshRows(); if(!Error.IsEmpty() && Status) { Status->SetText(FText::FromString(Error)); } FocusRow(Row,Row->GetLabel()); return;
+	}
+	if (Name.StartsWith(TEXT("Storage.")))
+	{
+		auto* Save=GetGameInstance()?GetGameInstance()->GetSubsystem<USovSaveSubsystem>():nullptr; if(!Save) { return; }
+		if(Key=="Storage.Kind" || Key=="Storage.Slot")
+		{ if(Key=="Storage.Kind") { ArchiveKind=int32(ChangedValue(ArchiveKind,Row,Direction)); } else { ArchiveSlot=int32(ChangedValue(ArchiveSlot,Row,Direction)); } ArchiveIds.Reset(); DeleteArchiveId.Reset(); ArchiveCursor=0; }
+		else if(Key=="Storage.Inspect")
+		{ ArchiveOwner=Save->CaptureStorageOwner(); auto Found=Save->ListPreservedSaveArchives(static_cast<ESovSaveSlotKind>(ArchiveKind),ArchiveSlot); if(!IsCurrent() || !Save->IsStorageOwnerCurrent(ArchiveOwner)) { return; } ArchiveIds=MoveTemp(Found); ArchiveCursor=0; DeleteArchiveId.Reset(); }
+		else if(Key=="Storage.Archive" && !ArchiveIds.IsEmpty()) { ArchiveCursor=(ArchiveCursor+(Direction<0?-1:1)+ArchiveIds.Num())%ArchiveIds.Num(); DeleteArchiveId.Reset(); }
+		else if(Key=="Storage.Delete" && ArchiveIds.IsValidIndex(ArchiveCursor)) { DeleteArchiveId=ArchiveIds[ArchiveCursor]; Error=TEXT("Review archive: ")+DeleteArchiveId+TEXT(". Activate Confirm permanent deletion to delete this preserved copy. Current save banks are retained."); }
+		else if(Key=="Storage.ConfirmDelete" && Save->IsStorageOwnerCurrent(ArchiveOwner))
+		{ const FString Id=MoveTemp(DeleteArchiveId); DeleteArchiveId.Reset(); Save->DeletePreservedSaveArchive(static_cast<ESovSaveSlotKind>(ArchiveKind),ArchiveSlot,Id,Error); if(!IsCurrent()) { return; } ArchiveIds.Reset(); ArchiveCursor=0; if(Error.IsEmpty()) { Error=TEXT("Archive deleted. List archives to refresh."); } }
+		if(!IsCurrent()) { return; } RefreshRows(); if(!Error.IsEmpty() && Status) { Status->SetText(FText::FromString(Error)); } return;
 	}
 	if (Name.StartsWith(TEXT("Cloud.")) && PlatformServices)
 	{
 		if (Key == "Cloud.Enabled") { PlatformServices->SetCloudEnabled(!PlatformServices->IsCloudEnabled(),Error); }
-		else if (Key == "Cloud.Slot") { CloudManualSlot = int32(ChangedValue(CloudManualSlot,Row,Direction)); }
-		else if (Key == "Cloud.Inspect") { if (PlatformServices->InspectCloudSlot(ESovSaveSlotKind::Manual,CloudManualSlot,Error) && IsCurrent() && PlatformServices) { CloudRequest = PlatformServices->GetCloudReview().RequestId; } }
+		else if (Key == "Cloud.Slot") { CloudManualSlot = int32(ChangedValue(CloudManualSlot,Row,Direction)); DeleteCloudRequest.Invalidate(); DeleteCloudRevision.Reset(); }
+		else if (Key == "Cloud.Revision") { const int32 Count=PlatformServices->GetCloudRevisions().Num(); if(Count>0) { CloudRevisionCursor=(CloudRevisionCursor+(Direction<0?-1:1)+Count)%Count; } DeleteCloudRequest.Invalidate(); DeleteCloudRevision.Reset(); }
+		else if (Key == "Cloud.SelectRevision" || Key=="Cloud.Delete")
+		{
+			const auto Revisions=PlatformServices->GetCloudRevisions(); if(!Revisions.IsValidIndex(CloudRevisionCursor)) { return; }
+			if(Key=="Cloud.SelectRevision") { PlatformServices->SelectCloudRevision(CloudRequest,Revisions[CloudRevisionCursor].RevisionId,Error); }
+			else { DeleteCloudRequest=CloudRequest; DeleteCloudRevision=Revisions[CloudRevisionCursor].RevisionId; Error=TEXT("Review permanent deletion of cloud revision ")+DeleteCloudRevision+TEXT(". Activate Confirm permanent deletion to proceed. The provider verifies another recoverable copy exists."); }
+		}
+		else if (Key=="Cloud.ConfirmDelete") { const FGuid Request=DeleteCloudRequest; const FString Revision=MoveTemp(DeleteCloudRevision); DeleteCloudRequest.Invalidate(); DeleteCloudRevision.Reset(); PlatformServices->DeleteCloudRevision(Request,Revision,Error); }
+		else if (Key == "Cloud.Inspect") { if (PlatformServices->InspectCloudSlot(ESovSaveSlotKind::Manual,CloudManualSlot,Error) && IsCurrent() && PlatformServices) { CloudRequest = PlatformServices->GetCloudReview().RequestId; CloudRevisionCursor=0; DeleteCloudRequest.Invalidate(); DeleteCloudRevision.Reset(); } }
 		else if (Key == "Cloud.KeepLocal" || Key == "Cloud.UseCloud") { PlatformServices->ResolveCloudReview(CloudRequest,Key == "Cloud.KeepLocal" ? ESovCloudChoice::KeepLocal : ESovCloudChoice::UseCloud,Error); }
 		else if (Key == "Cloud.Cancel" && PlatformServices->GetCloudReview().RequestId == CloudRequest) { CloudRequest.Invalidate(); PlatformServices->CancelCloudOperation(); }
 		if(!IsCurrent() || !PlatformServices) { return; } CloudChanged(PlatformServices->GetCloudReview()); if (!Error.IsEmpty() && Status) { Status->SetText(FText::FromString(Error)); } return;

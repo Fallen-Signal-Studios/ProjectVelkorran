@@ -1,6 +1,7 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 
 #include "Components/SovShieldComponent.h"
+#include "Components/SovResourceOwnerPolicy.h"
 
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
@@ -69,7 +70,7 @@ void USovShieldComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 bool USovShieldComponent::InitializeWithAbilitySystem(UAbilitySystemComponent* InAbilitySystemComponent)
 {
-	if (!IsValid(InAbilitySystemComponent))
+	if (bUninitializing || bChangingOwnerLifecycle || !SovResourceOwner::IsCurrent(InAbilitySystemComponent, GetOwner()))
 	{
 		return false;
 	}
@@ -97,6 +98,9 @@ bool USovShieldComponent::InitializeWithAbilitySystem(UAbilitySystemComponent* I
 
 	UninitializeFromAbilitySystem();
 	AbilitySystemComponent = InAbilitySystemComponent;
+	++LifecycleEpoch;
+	bOwnerLifecycleRetired = false;
+	BindOwnerLifecycle();
 	bWarnedMissingAttributeSet = false;
 
 	ShieldBrokenTag = FSovGameplayTags::Get().State_Shield_Broken;
@@ -132,21 +136,28 @@ bool USovShieldComponent::InitializeWithAbilitySystem(UAbilitySystemComponent* I
 	RefreshShieldVisuals();
 
 	TryStartRecharge();
+	RefreshOwnerLifecycle();
 	return true;
 }
 
 void USovShieldComponent::ResetForCheckpoint()
 {
-	if (!CanWriteShield()) { return; }
+	if (bResettingLifecycle || !CanWriteShield()) { return; }
+	TGuardValue<bool> Resetting(bResettingLifecycle, true);
+	const uint64 Epoch = ++LifecycleEpoch;
+	bOwnerLifecycleRetired = false;
 	ClearLifecycleTimers();
 	RemoveShieldBrokenTag();
+	if (Epoch != LifecycleEpoch || !CanWriteShield()) { return; }
 	bShieldBroken = false;
 	bHasRecordedShieldDamage = false;
 	bRechargeDelayElapsed = true;
 	LastShieldDamageWorldTime = GetWorldTimeSeconds();
 	LastRechargeUpdateWorldTime = LastShieldDamageWorldTime;
 	RefreshShieldBrokenState(GetShield(), false);
+	if (Epoch != LifecycleEpoch || !CanWriteShield()) { return; }
 	RefreshShieldVisuals();
+	if (Epoch != LifecycleEpoch || !CanWriteShield()) { return; }
 	if (GetShield() + KINDA_SMALL_NUMBER < GetMaxShield()) { RecordShieldDamage(); }
 }
 
@@ -357,6 +368,7 @@ void USovShieldComponent::TryInitializeFromOwner()
 void USovShieldComponent::HandleOwnerASCInitialized()
 {
 	TryInitializeFromOwner();
+	RefreshOwnerLifecycle();
 }
 
 void USovShieldComponent::HandleCharacterVisualInitialized(ANarrativeCharacter* Character)
@@ -379,6 +391,10 @@ void USovShieldComponent::HandleBaseAppearanceApplied()
 
 void USovShieldComponent::UninitializeFromAbilitySystem()
 {
+	if (bUninitializing) { return; }
+	TGuardValue<bool> Uninitializing(bUninitializing, true);
+	++LifecycleEpoch;
+	UnbindOwnerLifecycle();
 	StopRecharge();
 
 	if (UWorld* World = GetWorld())
@@ -458,6 +474,10 @@ void USovShieldComponent::ClearLifecycleTimers()
 
 void USovShieldComponent::HandleShieldAttributeChanged(const FOnAttributeChangeData& ChangeData)
 {
+	if (!SovResourceOwner::IsCurrent(AbilitySystemComponent, GetOwner())
+		|| (GetOwner()->HasAuthority() && !CanWriteShield())) { RetireOwnerLifecycle(); return; }
+	const uint64 Epoch = LifecycleEpoch;
+	const uint64 ChangeEpoch = ++ResourceChangeEpoch;
 	const float OldShield = FMath::Max(ChangeData.OldValue, 0.0f);
 	const float NewShield = FMath::Clamp(ChangeData.NewValue, 0.0f, GetMaxShield());
 
@@ -467,8 +487,11 @@ void USovShieldComponent::HandleShieldAttributeChanged(const FOnAttributeChangeD
 	}
 
 	UpdateShieldVisualScalar();
+	if (Epoch != LifecycleEpoch || ChangeEpoch != ResourceChangeEpoch) { return; }
 	RefreshShieldBrokenState(NewShield, !bRestoringCheckpoint);
+	if (Epoch != LifecycleEpoch || ChangeEpoch != ResourceChangeEpoch || !SovResourceOwner::IsCurrent(AbilitySystemComponent, GetOwner())) { return; }
 	OnShieldChanged.Broadcast(OldShield, NewShield, GetMaxShield());
+	if (Epoch != LifecycleEpoch || ChangeEpoch != ResourceChangeEpoch) { return; }
 
 	if (!CanWriteShield())
 	{
@@ -487,12 +510,18 @@ void USovShieldComponent::HandleShieldAttributeChanged(const FOnAttributeChangeD
 
 void USovShieldComponent::HandleMaxShieldAttributeChanged(const FOnAttributeChangeData& ChangeData)
 {
+	if (!SovResourceOwner::IsCurrent(AbilitySystemComponent, GetOwner())
+		|| (GetOwner()->HasAuthority() && !CanWriteShield())) { RetireOwnerLifecycle(); return; }
+	const uint64 Epoch = LifecycleEpoch;
+	const uint64 ChangeEpoch = ++ResourceChangeEpoch;
 	const float CurrentShield = GetShield();
 	const float CurrentMaxShield = FMath::Max(ChangeData.NewValue, 0.0f);
 
 	RefreshShieldBrokenState(CurrentShield, false);
 	UpdateShieldVisualScalar();
+	if (Epoch != LifecycleEpoch || ChangeEpoch != ResourceChangeEpoch) { return; }
 	OnShieldChanged.Broadcast(CurrentShield, CurrentShield, CurrentMaxShield);
+	if (Epoch != LifecycleEpoch || ChangeEpoch != ResourceChangeEpoch) { return; }
 
 	if (!CanWriteShield() || CurrentShield + KINDA_SMALL_NUMBER >= CurrentMaxShield)
 	{
@@ -587,6 +616,7 @@ void USovShieldComponent::HandleRechargeDelayElapsed()
 
 void USovShieldComponent::TryStartRecharge()
 {
+	if (GetOwner() && GetOwner()->HasAuthority() && !CanWriteShield()) { RetireOwnerLifecycle(); return; }
 	if (!CanWriteShield()
 		|| IsRechargeBlocked()
 		|| RechargePercentPerSecond <= 0.0f
@@ -642,6 +672,7 @@ void USovShieldComponent::TryStartRecharge()
 
 void USovShieldComponent::HandleRechargeTimerElapsed()
 {
+	if (!CanWriteShield()) { RetireOwnerLifecycle(); return; }
 	if (!CanWriteShield() || IsRechargeBlocked())
 	{
 		StopRecharge();
@@ -673,11 +704,13 @@ void USovShieldComponent::HandleRechargeTimerElapsed()
 		* RechargeSeconds;
 	const float NewShield = FMath::Min(CurrentShield + RechargeAmount, CurrentMaxShield);
 
+	const uint64 Epoch = LifecycleEpoch;
 	AbilitySystemComponent->SetNumericAttributeBase(
 		UNarrativeAttributeSetBase::GetShieldAttribute(),
 		NewShield);
+	if (Epoch != LifecycleEpoch || !CanWriteShield()) { return; }
 
-	if (NewShield + KINDA_SMALL_NUMBER >= CurrentMaxShield)
+	if (GetShield() + KINDA_SMALL_NUMBER >= CurrentMaxShield)
 	{
 		StopRecharge();
 	}
@@ -704,10 +737,12 @@ void USovShieldComponent::RefreshShieldBrokenState(
 		return;
 	}
 
+	const uint64 Epoch = LifecycleEpoch;
 	bShieldBroken = bNewShieldBroken;
 	if (bShieldBroken)
 	{
 		ApplyShieldBrokenTag();
+		if (Epoch != LifecycleEpoch || !bShieldBroken) { return; }
 		if (bBroadcastBreak)
 		{
 			SpawnShieldBreakSystem();
@@ -1111,11 +1146,11 @@ void USovShieldComponent::ApplyShieldBrokenTag()
 		return;
 	}
 
+	bAppliedShieldBrokenTag = true;
 	AbilitySystemComponent->AddLooseGameplayTag(
 		ShieldBrokenTag,
 		1,
 		EGameplayTagReplicationState::TagAndCountToAll);
-	bAppliedShieldBrokenTag = true;
 }
 
 void USovShieldComponent::RemoveShieldBrokenTag()
@@ -1127,17 +1162,64 @@ void USovShieldComponent::RemoveShieldBrokenTag()
 		return;
 	}
 
+	bAppliedShieldBrokenTag = false;
 	AbilitySystemComponent->RemoveLooseGameplayTag(
 		ShieldBrokenTag,
 		1,
 		EGameplayTagReplicationState::TagAndCountToAll);
-	bAppliedShieldBrokenTag = false;
 }
 
 bool USovShieldComponent::CanWriteShield() const
 {
-	return IsInitialized() && IsValid(GetOwner()) && GetOwner()->HasAuthority();
+	return !bUninitializing && !bChangingOwnerLifecycle && SovResourceOwner::CanSimulate(AbilitySystemComponent, GetOwner());
 }
+
+void USovShieldComponent::BindOwnerLifecycle()
+{
+	UnbindOwnerLifecycle();
+	if (!AbilitySystemComponent) { return; }
+	OwnerHealthChangedHandle = AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(UNarrativeAttributeSetBase::GetHealthAttribute())
+		.AddUObject(this, &ThisClass::HandleOwnerHealthChanged);
+	const FGameplayTag Tags[] = {FNarrativeGameplayTags::Get().State_IsDead, FSovGameplayTags::Get().State_Fatal};
+	for (const auto& Tag : Tags)
+	{ OwnerLifeTagHandles.Add(Tag, AbilitySystemComponent->RegisterGameplayTagEvent(Tag, EGameplayTagEventType::NewOrRemoved)
+		.AddUObject(this, &ThisClass::HandleOwnerLifeTagChanged)); }
+}
+
+void USovShieldComponent::UnbindOwnerLifecycle()
+{
+	if (IsInitialized())
+	{
+		AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(UNarrativeAttributeSetBase::GetHealthAttribute()).Remove(OwnerHealthChangedHandle);
+		for (const auto& Pair : OwnerLifeTagHandles)
+		{ AbilitySystemComponent->RegisterGameplayTagEvent(Pair.Key, EGameplayTagEventType::NewOrRemoved).Remove(Pair.Value); }
+	}
+	OwnerHealthChangedHandle.Reset(); OwnerLifeTagHandles.Reset();
+}
+
+void USovShieldComponent::RefreshOwnerLifecycle()
+{
+	if (bChangingOwnerLifecycle || bUninitializing || !GetOwner() || !GetOwner()->HasAuthority()) { return; }
+	if (!CanWriteShield()) { RetireOwnerLifecycle(); return; }
+	if (bOwnerLifecycleRetired && !bRestoringCheckpoint)
+	{ bOwnerLifecycleRetired = false; ResetForCheckpoint(); }
+}
+
+void USovShieldComponent::RetireOwnerLifecycle()
+{
+	if (bChangingOwnerLifecycle || bUninitializing || bOwnerLifecycleRetired) { return; }
+	{
+		TGuardValue<bool> Changing(bChangingOwnerLifecycle, true);
+		bOwnerLifecycleRetired = true; ++LifecycleEpoch;
+		ClearLifecycleTimers(); RemoveShieldBrokenTag();
+		bShieldBroken = false; bHasRecordedShieldDamage = false; bRechargeDelayElapsed = false;
+	}
+	// A cleanup callback may have revived the same owner; resume from a fresh delay.
+	if (CanWriteShield()) { RefreshOwnerLifecycle(); }
+}
+
+void USovShieldComponent::HandleOwnerHealthChanged(const FOnAttributeChangeData& Change) { RefreshOwnerLifecycle(); }
+void USovShieldComponent::HandleOwnerLifeTagChanged(FGameplayTag Tag, int32 Count) { RefreshOwnerLifecycle(); }
 
 float USovShieldComponent::GetWorldTimeSeconds() const
 {
