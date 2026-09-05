@@ -285,6 +285,12 @@ void UNarrativeAbilitySystemComponent::DamageResolvedAsSource(const FSovDamageRe
 	OnDamageResolvedAsSource.Broadcast(Result);
 }
 
+void UNarrativeAbilitySystemComponent::StatusApplicationRequested(
+	const FSovStatusApplicationRequest& Request)
+{
+	OnStatusApplicationRequested.Broadcast(Request);
+}
+
 bool UNarrativeAbilitySystemComponent::GameplayEffectSpecHasAssetTag(
 	const FGameplayEffectSpec& Spec,
 	const FGameplayTag AssetTag)

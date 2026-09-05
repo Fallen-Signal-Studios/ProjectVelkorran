@@ -90,6 +90,8 @@ private:
 	void UninitializeFromAbilitySystem();
 	void CloseDeflectionWindow();
 	void SetOwnedLooseTag(const FGameplayTag& Tag, bool bShouldApply, bool& bAppliedFlag);
+	AActor* ResolveLogicalAttacker(const FSovDamageResult& Result) const;
+	void TryExposeDeflectedAttacker(const FSovDamageResult& Result) const;
 
 	UFUNCTION()
 	void HandleDamageResolvedAsTarget(const FSovDamageResult& Result);

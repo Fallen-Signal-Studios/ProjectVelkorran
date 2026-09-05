@@ -14,6 +14,7 @@ class PROJECTVELKORRAN_API ASovNPCCharacterBase : public ANarrativeNPCCharacter
 
 public:
 	ASovNPCCharacterBase(const FObjectInitializer& ObjectInitializer);
+	virtual void BeginPlay() override;
 
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Components")
 	class USovDismembermentComponent* GetDismembermentComponent() const
@@ -27,10 +28,17 @@ public:
 		return CombatSustainDropComponent;
 	}
 
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Components")
+	class USovStatusComponent* GetStatusComponent() const { return StatusComponent; }
+
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sovereign|Components")
 	TObjectPtr<class USovDismembermentComponent> DismembermentComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sovereign|Components")
 	TObjectPtr<class USovCombatSustainDropComponent> CombatSustainDropComponent;
+
+	/** Authoritative transient status owner inherited by all campaign NPCs. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sovereign|Components")
+	TObjectPtr<class USovStatusComponent> StatusComponent;
 };

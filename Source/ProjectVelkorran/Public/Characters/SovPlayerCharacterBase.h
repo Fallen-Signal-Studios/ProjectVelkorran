@@ -35,6 +35,15 @@ public:
 	class USovPoiseComponent* GetPoiseComponent() const { return PoiseComponent; }
 
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Components")
+	class USovStatusComponent* GetStatusComponent() const { return StatusComponent; }
+
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Components")
+	class USovCorruptionComponent* GetCorruptionComponent() const
+	{
+		return CorruptionComponent;
+	}
+
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Components")
 	class USovGuardComponent* GetGuardComponent() const { return GuardComponent; }
 
 	/** Exact project identity owned by the concrete protagonist class. */
@@ -73,6 +82,14 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sovereign|Components")
 	TObjectPtr<class USovPoiseComponent> PoiseComponent;
+
+	/** Authoritative transient combat-status owner shared by both protagonists. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sovereign|Components")
+	TObjectPtr<class USovStatusComponent> StatusComponent;
+
+	/** Player-only Eclipse exposure, source, remedy, and band-transition owner. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sovereign|Components")
+	TObjectPtr<class USovCorruptionComponent> CorruptionComponent;
 
 	/** Optional compatibility slot owned only by ASovTarrikCharacter. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sovereign|Components")

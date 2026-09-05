@@ -287,6 +287,24 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 				Result.RequestedStatusTags.AddTag(Tag);
 			}
 		}
+		FGameplayTagContainer SourceAbilityTags;
+		for (const FGameplayTag& Tag : EffectAssetTags)
+		{
+			if (Tag.MatchesTag(Tags.Ability))
+			{
+				SourceAbilityTags.AddTag(Tag);
+			}
+		}
+		if (const UGameplayAbility* SourceAbility = Context.GetAbility())
+		{
+			for (const FGameplayTag& Tag : SourceAbility->GetAssetTags())
+			{
+				if (Tag.MatchesTag(Tags.Ability))
+				{
+					SourceAbilityTags.AddTag(Tag);
+				}
+			}
+		}
 
 		const auto SendSovEvent = [TargetActor, DamageInstigator, &Context](
 			const FGameplayTag& EventTag,
@@ -588,12 +606,58 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 				Result.AppliedPoiseDamage);
 			SendSovEvent(Tags.Event_Poise_Broken, Result.AppliedPoiseDamage, nullptr);
 		}
-		if (!Result.RequestedStatusTags.IsEmpty()
-			&& AppliedDamage + Result.AppliedPoiseDamage > KINDA_SMALL_NUMBER)
+		const bool bAppliedDamageOrPoise =
+			AppliedDamage + Result.AppliedPoiseDamage > KINDA_SMALL_NUMBER;
+		if (!Result.bFatal
+			&& bAppliedDamageOrPoise
+			&& !Result.RequestedStatusTags.IsEmpty())
 		{
+			const float RawStatusMagnitude = Data.EffectSpec.GetSetByCallerMagnitude(
+				Tags.SetByCaller_Status_Magnitude,
+				false,
+				1.f);
+			const float StatusMagnitude = FMath::IsFinite(RawStatusMagnitude)
+				? FMath::Max(RawStatusMagnitude, 0.f)
+				: 0.f;
+			const float RawStatusDuration = Data.EffectSpec.GetSetByCallerMagnitude(
+				Tags.SetByCaller_Status_Duration,
+				false,
+				0.f);
+			const float StatusDuration = FMath::IsFinite(RawStatusDuration)
+				? FMath::Max(RawStatusDuration, 0.f)
+				: 0.f;
+			const float RawEffectLevel = Data.EffectSpec.GetLevel();
+			const float StatusEffectLevel = FMath::IsFinite(RawEffectLevel)
+				? FMath::Max(RawEffectLevel, 0.f)
+				: 1.f;
+
+			if (TargetASC && TargetActor)
+			{
+				// The container stores only explicitly authored descendants of
+				// Sov.Status.Apply. Emit each exact leaf as its own typed request;
+				// consumers deduplicate with (RequestId, StatusTag).
+				for (const FGameplayTag& RequestedStatusTag : Result.RequestedStatusTags)
+				{
+					FSovStatusApplicationRequest Request;
+					Request.RequestId = Result.TransactionId;
+					Request.StatusTag = RequestedStatusTag;
+					Request.SourceActor = DamageInstigator;
+					Request.TargetActor = TargetActor;
+					Request.Magnitude = StatusMagnitude;
+					Request.Duration = StatusDuration;
+					Request.EffectLevel = StatusEffectLevel;
+					Request.Context = Context;
+					Request.SourceAbilityTags = SourceAbilityTags;
+					Request.bRequiresAppliedDamage = true;
+					TargetASC->StatusApplicationRequested(Request);
+				}
+			}
+
+			// Preserve the original aggregate gameplay-event contract while
+			// project listeners migrate to the lossless typed delegate.
 			SendSovEvent(
 				Tags.Event_Status_ApplicationRequested,
-				FMath::Max(Data.EffectSpec.GetSetByCallerMagnitude(Tags.SetByCaller_Status_Magnitude, false, 1.f), 0.f),
+				StatusMagnitude,
 				&Result.RequestedStatusTags);
 		}
 

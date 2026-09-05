@@ -26,8 +26,8 @@ public:
  * Duration/periodic damage shell used by Cinder Sticky Grenade Burn.
  *
  * Duration and tick damage are supplied by SetByCaller magnitudes. Burn ticks
- * once per second, do not execute immediately on application, and refresh
- * rather than stack when reapplied by the same source.
+ * once per second and does not execute immediately on application. The target's
+ * status component owns global stronger/equal/weaker reapplication policy.
  */
 UCLASS(Blueprintable, meta = (DisplayName = "Sovereign Cinder Grenade Burn"))
 class PROJECTVELKORRAN_API USovGameplayEffect_CinderGrenadeBurn : public UGameplayEffect

@@ -6,9 +6,11 @@
 #include "Components/SovCommandLinkComponent.h"
 #include "Components/SovDeflectionComponent.h"
 #include "Components/SovEchoComponent.h"
+#include "Components/SovStatusComponent.h"
 #include "Components/SovWeakPointComponent.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
 #include "GAS/NarrativeGameplayAbility.h"
+#include "GameFramework/Controller.h"
 #include "NarrativeGameplayTags.h"
 #include "Sovereign/SovGameplayTags.h"
 #include "UnrealFramework/NarrativeCharacter.h"
@@ -224,7 +226,7 @@ bool USovSeleneEchoGenerationComponent::IsEchoAbilityDamage(
 			FSovGameplayTags::Get().Ability_Echo);
 }
 
-bool USovSeleneEchoGenerationComponent::IsHostileWeakPointTarget(
+bool USovSeleneEchoGenerationComponent::IsHostileTarget(
 	const AActor* TargetActor) const
 {
 	const INarrativeTeamAgentInterface* SourceTeam =
@@ -233,6 +235,53 @@ bool USovSeleneEchoGenerationComponent::IsHostileWeakPointTarget(
 		&& SourceTeam
 		&& SourceTeam->GetTeamAttitudeTowards(*TargetActor)
 			== ETeamAttitude::Hostile;
+}
+
+AActor* USovSeleneEchoGenerationComponent::ResolveLogicalDamageSource(
+	const FSovDamageResult& DamageResult) const
+{
+	AActor* ResultSource = DamageResult.SourceActor.Get();
+	UAbilitySystemComponent* ContextSourceAbilitySystem =
+		DamageResult.EffectContext.GetOriginalInstigatorAbilitySystemComponent();
+	AActor* ContextAvatar = IsValid(ContextSourceAbilitySystem)
+		? ContextSourceAbilitySystem->GetAvatarActor()
+		: nullptr;
+	if (!IsValid(ContextAvatar))
+	{
+		return nullptr;
+	}
+
+	if (!IsValid(ResultSource) || ResultSource == ContextAvatar)
+	{
+		return ContextAvatar;
+	}
+
+	const AController* SourceController = Cast<AController>(ResultSource);
+	return IsValid(SourceController)
+		&& SourceController->GetPawn() == ContextAvatar
+			? ContextAvatar
+			: nullptr;
+}
+
+bool USovSeleneEchoGenerationComponent::ConsumeDamageRewardTransaction(
+	const FGuid& TransactionId,
+	TSet<FGuid>& ConsumedTransactions,
+	TArray<FGuid>& TransactionOrder)
+{
+	if (!TransactionId.IsValid() || ConsumedTransactions.Contains(TransactionId))
+	{
+		return false;
+	}
+
+	ConsumedTransactions.Add(TransactionId);
+	TransactionOrder.Add(TransactionId);
+	const int32 Capacity = FMath::Clamp(DamageReplayLedgerCapacity, 16, 2048);
+	while (TransactionOrder.Num() > Capacity)
+	{
+		ConsumedTransactions.Remove(TransactionOrder[0]);
+		TransactionOrder.RemoveAt(0, 1, EAllowShrinking::No);
+	}
+	return true;
 }
 
 bool USovSeleneEchoGenerationComponent::ConsumeCommandLinkSever(
@@ -309,11 +358,33 @@ void USovSeleneEchoGenerationComponent::HandleOwnerASCInitialized()
 void USovSeleneEchoGenerationComponent::HandlePerfectDeflection(
 	const FSovDamageResult& DamageResult)
 {
-	if (!CanGenerateSeleneEcho()
+	AActor* Owner = GetOwner();
+	if (!IsValid(Owner)
+		|| !Owner->HasAuthority()
+		|| !DamageResult.TransactionId.IsValid()
 		|| DamageResult.TargetActor.Get() != GetOwner()
 		|| !DamageResult.bPerfectDefense
 		|| !DamageResult.bDeflected
 		|| DamageResult.DefenseKind != ESovDefenseKind::Deflection)
+	{
+		return;
+	}
+
+	// Consume before any mutable reward policy. Replaying a result after Echo or
+	// team state changes must never turn an earlier transaction into a new award.
+	if (!ConsumeDamageRewardTransaction(
+			DamageResult.TransactionId,
+			ConsumedPerfectDeflectionTransactions,
+			PerfectDeflectionTransactionOrder))
+	{
+		return;
+	}
+
+	AActor* LogicalAttacker = ResolveLogicalDamageSource(DamageResult);
+	if (!CanGenerateSeleneEcho()
+		|| !IsValid(LogicalAttacker)
+		|| LogicalAttacker->GetWorld() != GetWorld()
+		|| !IsHostileTarget(LogicalAttacker))
 	{
 		return;
 	}
@@ -323,47 +394,81 @@ void USovSeleneEchoGenerationComponent::HandlePerfectDeflection(
 		FSovGameplayTags::Get().Echo_Source_PerfectDeflection,
 		ESovSeleneEchoAwardType::PerfectDeflection,
 		NAME_None,
-		DamageResult.SourceActor.Get());
+		LogicalAttacker);
 }
 
 void USovSeleneEchoGenerationComponent::HandleDamageResolvedAsSource(
 	const FSovDamageResult& DamageResult)
 {
-	if (DamageResult.SourceActor.Get() != GetOwner()
-		|| !IsValid(DamageResult.TargetActor.Get()))
+	AActor* Owner = GetOwner();
+	AActor* TargetActor = DamageResult.TargetActor.Get();
+	if (!IsValid(Owner)
+		|| !Owner->HasAuthority()
+		|| ResolveLogicalDamageSource(DamageResult) != Owner
+		|| !IsValid(TargetActor)
+		|| TargetActor == Owner
+		|| TargetActor->GetWorld() != GetWorld())
 	{
 		return;
 	}
 
 	USovWeakPointComponent* WeakPointComponent =
-		DamageResult.TargetActor->FindComponentByClass<USovWeakPointComponent>();
-	if (!IsValid(WeakPointComponent))
+		TargetActor->FindComponentByClass<USovWeakPointComponent>();
+	if (IsValid(WeakPointComponent))
 	{
-		return;
+		// Consume the target-owned transaction before any resource, identity, or
+		// source policy can discard it. This branch is deliberately independent
+		// from the exposure-kill reward below.
+		FName BrokenWeakPointId = NAME_None;
+		if (WeakPointComponent->ConsumeWeakPointBreak(
+				DamageResult,
+				BrokenWeakPointId)
+			&& IsHostileTarget(TargetActor)
+			&& !IsEchoAbilityDamage(DamageResult))
+		{
+			AwardEcho(
+				GetWeakPointBreakEchoReward(),
+				FSovGameplayTags::Get().Echo_Source_WeakPointBreak,
+				ESovSeleneEchoAwardType::WeakPointBreak,
+				BrokenWeakPointId,
+				TargetActor);
+		}
 	}
 
-	// Consume the target-owned transaction before any resource/identity/source
-	// policy can discard the award. Full Echo, death, an Echo ability, or a
-	// friendly target must not leave an exact break claim pending indefinitely.
-	FName BrokenWeakPointId = NAME_None;
-	if (!WeakPointComponent->ConsumeWeakPointBreak(
-		DamageResult,
-		BrokenWeakPointId))
+	if (!DamageResult.bFatal || !DamageResult.TransactionId.IsValid())
 	{
 		return;
 	}
-	if (!IsHostileWeakPointTarget(DamageResult.TargetActor.Get())
-		|| IsEchoAbilityDamage(DamageResult))
+	if (!ConsumeDamageRewardTransaction(
+			DamageResult.TransactionId,
+			ConsumedExposureKillTransactions,
+			ExposureKillTransactionOrder))
+	{
+		return;
+	}
+	// Consume before mutable status, team, identity, and Echo-cap checks. A fatal
+	// transaction may never become payable later if its callback is replayed.
+
+	USovStatusComponent* TargetStatus =
+		TargetActor->FindComponentByClass<USovStatusComponent>();
+	const FGameplayTag ExposedStatus =
+		FSovGameplayTags::Get().Status_Apply_Exposed;
+	if (!CanGenerateSeleneEcho()
+		|| IsEchoAbilityDamage(DamageResult)
+		|| !IsHostileTarget(TargetActor)
+		|| !IsValid(TargetStatus)
+		|| !TargetStatus->HasActiveStatus(ExposedStatus)
+		|| !TargetStatus->WasStatusAppliedBy(ExposedStatus, Owner))
 	{
 		return;
 	}
 
 	AwardEcho(
-		GetWeakPointBreakEchoReward(),
-		FSovGameplayTags::Get().Echo_Source_WeakPointBreak,
-		ESovSeleneEchoAwardType::WeakPointBreak,
-		BrokenWeakPointId,
-		DamageResult.TargetActor.Get());
+		GetExposureKillEchoReward(),
+		FSovGameplayTags::Get().Echo_Source_ExposureKill,
+		ESovSeleneEchoAwardType::ExposureKill,
+		NAME_None,
+		TargetActor);
 }
 
 void USovSeleneEchoGenerationComponent::ClientNotifySeleneEchoAwarded_Implementation(

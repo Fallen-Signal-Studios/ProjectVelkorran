@@ -18,7 +18,8 @@ enum class ESovSeleneEchoAwardType : uint8
 {
 	PerfectDeflection UMETA(DisplayName = "Perfect Deflection"),
 	WeakPointBreak UMETA(DisplayName = "Weak Point Break"),
-	CommandLinkSever UMETA(DisplayName = "Command Link Sever")
+	CommandLinkSever UMETA(DisplayName = "Command Link Sever"),
+	ExposureKill UMETA(DisplayName = "Exposure Kill")
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(
@@ -69,6 +70,12 @@ public:
 		return FMath::Max(CommandLinkSeverEchoReward, 0.0f);
 	}
 
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Echo|Selene")
+	float GetExposureKillEchoReward() const
+	{
+		return FMath::Max(ExposureKillEchoReward, 0.0f);
+	}
+
 	/**
 	 * Consumes one authoritative command-link Sever transaction. The Axiom
 	 * ability routes a successful target-owned transaction here; it never
@@ -93,12 +100,25 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo|Selene|Tuning", meta = (ClampMin = "0.0"))
 	float CommandLinkSeverEchoReward = 12.0f;
 
+	/** Defeating a hostile target during Selene's active Exposed window. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo|Selene|Tuning", meta = (ClampMin = "0.0"))
+	float ExposureKillEchoReward = 6.0f;
+
+	/** Small server-only FIFO fence; damage transaction GUIDs never need campaign-lifetime retention. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo|Selene|Replay", meta = (ClampMin = "16", ClampMax = "2048"))
+	int32 DamageReplayLedgerCapacity = 256;
+
 private:
 	void TryInitializeFromOwner();
 	void UninitializeFromAbilitySystem();
 	bool CanGenerateSeleneEcho(bool bAllowDuringEchoAbility = false) const;
 	bool IsEchoAbilityDamage(const FSovDamageResult& DamageResult) const;
-	bool IsHostileWeakPointTarget(const AActor* TargetActor) const;
+	AActor* ResolveLogicalDamageSource(const FSovDamageResult& DamageResult) const;
+	bool IsHostileTarget(const AActor* TargetActor) const;
+	bool ConsumeDamageRewardTransaction(
+		const FGuid& TransactionId,
+		TSet<FGuid>& ConsumedTransactions,
+		TArray<FGuid>& TransactionOrder);
 	void AwardEcho(
 		float RequestedEcho,
 		const FGameplayTag& SourceTag,
@@ -135,4 +155,10 @@ private:
 
 	/** Server-only replay fence for command-link transactions. */
 	TSet<FGuid> ConsumedCommandLinkSeverTransactions;
+
+	/** Server-only replay fences for damage-result-driven rewards. */
+	TSet<FGuid> ConsumedPerfectDeflectionTransactions;
+	TArray<FGuid> PerfectDeflectionTransactionOrder;
+	TSet<FGuid> ConsumedExposureKillTransactions;
+	TArray<FGuid> ExposureKillTransactionOrder;
 };

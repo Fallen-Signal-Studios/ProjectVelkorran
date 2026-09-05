@@ -9,6 +9,7 @@ FSovGameplayTags FSovGameplayTags::GameplayTags;
 void FSovGameplayTags::InitializeNativeTags()
 {
 	if (GameplayTags.Character_Player_Tarrik.IsValid()
+		&& GameplayTags.Ability.IsValid()
 		&& GameplayTags.Ability_Defense_Selene_Deflection.IsValid()
 		&& GameplayTags.Ability_Weapon_Cinderline_PrimaryFire.IsValid()
 		&& GameplayTags.Ability_NPC_ReformationDrone_Gunfire.IsValid()
@@ -19,16 +20,26 @@ void FSovGameplayTags::InitializeNativeTags()
 		&& GameplayTags.Ability_NPC_DominionHound_Pounce.IsValid()
 		&& GameplayTags.Ability_NPC_DominionHandler_CommandHound.IsValid()
 		&& GameplayTags.Ability_Echo_Selene_StillpointGrenade.IsValid()
+		&& GameplayTags.Status_Apply_Corruption.IsValid()
+		&& GameplayTags.Status_Immunity_All.IsValid()
 		&& GameplayTags.Status_Immunity_Burn.IsValid()
 		&& GameplayTags.Status_Immunity_DeviceDisable.IsValid()
+		&& GameplayTags.Status_Cleanse_All.IsValid()
 		&& GameplayTags.State_Deflecting.IsValid()
+		&& GameplayTags.State_Status_Exposed.IsValid()
+		&& GameplayTags.State_Status_Corrupted.IsValid()
+		&& GameplayTags.State_Corruption_OverwriteRisk.IsValid()
 		&& GameplayTags.State_CommandLink_Active.IsValid()
 		&& GameplayTags.State_CommandLink_Severed.IsValid()
 		&& GameplayTags.State_CommandLink_HoundChargeAuthorized.IsValid()
 		&& GameplayTags.Echo_Source_PerfectDeflection.IsValid()
 		&& GameplayTags.Echo_Source_WeakPointBreak.IsValid()
 		&& GameplayTags.Echo_Source_CommandLinkSever.IsValid()
-		&& GameplayTags.Echo_Source_CombatSustainPickup.IsValid())
+		&& GameplayTags.Echo_Source_CombatSustainPickup.IsValid()
+		&& GameplayTags.Echo_Source_ExposureKill.IsValid()
+		&& GameplayTags.Event_Status_Applied.IsValid()
+		&& GameplayTags.Event_Corruption_BandChanged.IsValid()
+		&& GameplayTags.SetByCaller_Status_Duration.IsValid())
 	{
 		return;
 	}
@@ -43,6 +54,7 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 	AddTag(Character_Player_Selene, "Sov.Character.Player.Selene", "Selene Veyne player character.");
 	AddTag(Character_Enemy_Boss, "Sov.Character.Enemy.Boss", "Boss identity tag used by reduced-reward combat loops.");
 
+	AddTag(Ability, "Sov.Ability", "Parent classification for project-owned Sovereign abilities.");
 	AddTag(Ability_ActivateFail_Echo, "Sov.Ability.ActivateFail.Echo", "Ability activation failed its Echo threshold or spend check.");
 	AddTag(Ability_Echo, "Sov.Ability.Echo", "Parent classification for every Echo-spending ability.");
 	AddTag(Ability_Defense_Selene_Deflection, "Sov.Ability.Defense.Selene.Deflection", "Selene's short precision-deflection action.");
@@ -94,9 +106,18 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 	AddTag(State_Poise_Recovering, "Sov.State.Poise.Recovering", "Post-break re-break protection is active.");
 	AddTag(State_Poise_RegenBlocked, "Sov.State.Poise.RegenBlocked", "Poise regeneration is paused.");
 	AddTag(State_Poise_SuperArmor, "Sov.State.Poise.SuperArmor", "Poise cannot break during an authored super-armor window.");
+	AddTag(State_Status, "Sov.State.Status", "Parent tag for active project-owned status state.");
+	AddTag(State_Status_Burning, "Sov.State.Status.Burning", "The target is taking periodic damage from Burn.");
 	AddTag(State_Status_Chilled, "Sov.State.Status.Chilled", "Movement and control resistance are reduced by cryothermal pressure.");
 	AddTag(State_Status_Frozen, "Sov.State.Status.Frozen", "The target is held by an authored hard-Freeze effect.");
 	AddTag(State_Status_DeviceDisabled, "Sov.State.Status.DeviceDisabled", "Eligible combat systems are disabled by Disruption.");
+	AddTag(State_Status_Exposed, "Sov.State.Status.Exposed", "The target is temporarily vulnerable to an authored exposure payoff.");
+	AddTag(State_Status_Corrupted, "Sov.State.Status.Corrupted", "The target has nonzero persistent Eclipse corruption exposure.");
+	AddTag(State_Corruption, "Sov.State.Corruption", "Parent tag for the target's exact corruption-pressure band.");
+	AddTag(State_Corruption_Trace, "Sov.State.Corruption.Trace", "Corruption exposure is in the Trace band.");
+	AddTag(State_Corruption_Intrusion, "Sov.State.Corruption.Intrusion", "Corruption exposure is in the Intrusion band.");
+	AddTag(State_Corruption_Contest, "Sov.State.Corruption.Contest", "Corruption exposure is in the Contest band.");
+	AddTag(State_Corruption_OverwriteRisk, "Sov.State.Corruption.OverwriteRisk", "Corruption exposure has reached the non-terminal Overwrite Risk band.");
 
 	AddTag(Damage_BypassShield, "Sov.Damage.BypassShield", "All resolved health damage bypasses Shield.");
 	AddTag(Damage_BypassShield_Partial, "Sov.Damage.BypassShield.Partial", "Uses the authored partial Shield bypass ratio.");
@@ -137,10 +158,24 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 	AddTag(Status_Apply_Chill, "Sov.Status.Apply.Chill", "A resolved hit requests the project-owned Chill status.");
 	AddTag(Status_Apply_Freeze, "Sov.Status.Apply.Freeze", "A resolved hit requests the project-owned hard-Freeze status.");
 	AddTag(Status_Apply_DeviceDisabled, "Sov.Status.Apply.DeviceDisabled", "A resolved hit requests a device-disable status on eligible targets.");
+	AddTag(Status_Apply_Exposed, "Sov.Status.Apply.Exposed", "A resolved hit requests the project-owned Exposed status.");
+	AddTag(Status_Apply_Corruption, "Sov.Status.Apply.Corruption", "A resolved hit requests persistent corruption exposure.");
 	AddTag(Status_Immunity, "Sov.Status.Immunity", "Parent tag for project-owned status immunities.");
+	AddTag(Status_Immunity_All, "Sov.Status.Immunity.All", "The target rejects every project-owned status application.");
 	AddTag(Status_Immunity_Burn, "Sov.Status.Immunity.Burn", "The target rejects project-owned Burn effects.");
+	AddTag(Status_Immunity_Chill, "Sov.Status.Immunity.Chill", "The target rejects project-owned Chill effects.");
 	AddTag(Status_Immunity_Freeze, "Sov.Status.Immunity.Freeze", "The target rejects hard Freeze and should receive its authored fallback.");
 	AddTag(Status_Immunity_DeviceDisable, "Sov.Status.Immunity.DeviceDisable", "The target rejects device-disable effects.");
+	AddTag(Status_Immunity_Exposed, "Sov.Status.Immunity.Exposed", "The target rejects project-owned Exposed effects.");
+	AddTag(Status_Immunity_Corruption, "Sov.Status.Immunity.Corruption", "The target rejects corruption exposure requests.");
+	AddTag(Status_Cleanse, "Sov.Status.Cleanse", "Parent tag for project-owned status-removal requests.");
+	AddTag(Status_Cleanse_All, "Sov.Status.Cleanse.All", "Remove every cleansable project-owned status.");
+	AddTag(Status_Cleanse_Burn, "Sov.Status.Cleanse.Burn", "Remove active Burn.");
+	AddTag(Status_Cleanse_Chill, "Sov.Status.Cleanse.Chill", "Remove active Chill.");
+	AddTag(Status_Cleanse_Freeze, "Sov.Status.Cleanse.Freeze", "Remove active Freeze.");
+	AddTag(Status_Cleanse_DeviceDisabled, "Sov.Status.Cleanse.DeviceDisabled", "Remove active device disable.");
+	AddTag(Status_Cleanse_Exposed, "Sov.Status.Cleanse.Exposed", "Remove active Exposed.");
+	AddTag(Status_Cleanse_Corruption, "Sov.Status.Cleanse.Corruption", "Request the authored corruption remedy instead of erasing exposure directly.");
 
 	AddTag(SetByCaller_Damage_AbilityScalar, "Sov.SetByCaller.Damage.AbilityScalar", "Ability-specific damage scalar.");
 	AddTag(SetByCaller_Damage_SourceModifier, "Sov.SetByCaller.Damage.SourceModifier", "Authored source damage multiplier.");
@@ -154,6 +189,7 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 	AddTag(SetByCaller_Damage_PoiseCoefficient, "Sov.SetByCaller.Damage.PoiseCoefficient", "Poise pressure derived from resolved damage.");
 	AddTag(SetByCaller_Damage_GuardStaminaDamage, "Sov.SetByCaller.Damage.GuardStaminaDamage", "Explicit guard impact Stamina cost.");
 	AddTag(SetByCaller_Status_Magnitude, "Sov.SetByCaller.Status.Magnitude", "Status-system payload magnitude.");
+	AddTag(SetByCaller_Status_Duration, "Sov.SetByCaller.Status.Duration", "Status duration override in seconds; zero selects the definition default.");
 
 	AddTag(Event_Character_Ready, "Sov.Event.Character.Ready", "Character initialization completed idempotently.");
 	AddTag(Event_Damage_Resolved, "Sov.Event.Combat.DamageResolved", "Damage finished authoritative routing.");
@@ -168,6 +204,16 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 	AddTag(Event_CommandLink_Severed, "Sov.Event.CommandLink.Severed", "An active authored command link completed one authoritative Active-to-Severed transition.");
 	AddTag(Event_Echo_Gained_PerfectGuard, "Sov.Event.Echo.Gained.PerfectGuard", "Echo was granted for a perfect guard.");
 	AddTag(Event_Status_ApplicationRequested, "Sov.Event.Status.ApplicationRequested", "A resolved hit requested project-owned status application.");
+	AddTag(Event_Status_Applied, "Sov.Event.Status.Applied", "A project-owned status was applied for the first time.");
+	AddTag(Event_Status_Refreshed, "Sov.Event.Status.Refreshed", "An active project-owned status accepted a refresh.");
+	AddTag(Event_Status_StackChanged, "Sov.Event.Status.StackChanged", "An active project-owned status changed its authoritative stack count.");
+	AddTag(Event_Status_Removed, "Sov.Event.Status.Removed", "A project-owned status ended or was removed.");
+	AddTag(Event_Status_Cleansed, "Sov.Event.Status.Cleansed", "A project-owned status was removed by an accepted cleanse request.");
+	AddTag(Event_Status_Rejected, "Sov.Event.Status.Rejected", "A project-owned status application was rejected by authoritative policy.");
+	AddTag(Event_Corruption_ExposureChanged, "Sov.Event.Corruption.ExposureChanged", "Persistent corruption exposure changed.");
+	AddTag(Event_Corruption_BandChanged, "Sov.Event.Corruption.BandChanged", "Corruption crossed into a different exact pressure band.");
+	AddTag(Event_Corruption_RemedyChanged, "Sov.Event.Corruption.RemedyChanged", "An authored corruption remedy changed persistent exposure.");
+	AddTag(Event_Corruption_OverwriteRiskReached, "Sov.Event.Corruption.OverwriteRiskReached", "Corruption entered the Overwrite Risk band; this is not an automatic fail state.");
 
 	AddTag(Echo_Source_PerfectGuard, "Sov.Echo.Source.PerfectGuard", "Echo source for Tarrik perfect guard.");
 	AddTag(Echo_Source_PerfectDeflection, "Sov.Echo.Source.PerfectDeflection", "Echo source for Selene's correctly timed Deflection.");
@@ -178,6 +224,7 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 	AddTag(Echo_Source_CinderlineCadence, "Sov.Echo.Source.CinderlineCadence", "Echo source for completing Tarrik's Cinderline firing cadence.");
 	AddTag(Echo_Source_CinderlinePrecisionKill, "Sov.Echo.Source.CinderlinePrecisionKill", "Echo source for a Cinderline precision kill.");
 	AddTag(Echo_Source_CombatSustainPickup, "Sov.Echo.Source.CombatSustainPickup", "Echo source for collecting a transient combat-sustain mote.");
+	AddTag(Echo_Source_ExposureKill, "Sov.Echo.Source.ExposureKill", "Echo source for defeating an enemy while its Exposed status is active.");
 }
 
 void FSovGameplayTags::AddTag(FGameplayTag& OutTag, const ANSICHAR* TagName, const ANSICHAR* TagComment)

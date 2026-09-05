@@ -123,10 +123,11 @@ void ASovCinderStickyGrenadeProjectile::BeginPlay()
 			|| !SourceAbilitySystem.IsValid()
 			|| !SourceAvatar.IsValid()
 			|| !ExplosionDamageEffectClass.Get()
-			|| !BurnEffectClass.Get()
 			|| FuseDuration <= KINDA_SMALL_NUMBER
 			|| ExplosionRadius <= KINDA_SMALL_NUMBER
-			|| ExplosionDamage <= KINDA_SMALL_NUMBER)
+			|| ExplosionDamage <= KINDA_SMALL_NUMBER
+			|| BurnDamagePerTick <= KINDA_SMALL_NUMBER
+			|| BurnDuration <= KINDA_SMALL_NUMBER)
 		{
 			UE_LOG(
 				LogSovCinderStickyGrenade,
@@ -359,6 +360,7 @@ void ASovCinderStickyGrenadeProjectile::ApplyExplosion()
 		DamageSpec->AddDynamicAssetTag(SovTags.Damage_Channel_Kinetic);
 		DamageSpec->AddDynamicAssetTag(SovTags.Damage_Channel_Thermal);
 		DamageSpec->AddDynamicAssetTag(SovTags.Damage_GuardClass_Standard);
+		DamageSpec->AddDynamicAssetTag(SovTags.Status_Apply_Burn);
 		DamageSpec->SetSetByCallerMagnitude(
 			FNarrativeGameplayTags::Get().SetByCaller_Damage,
 			ExplosionDamage);
@@ -377,74 +379,15 @@ void ASovCinderStickyGrenadeProjectile::ApplyExplosion()
 				SovTags.SetByCaller_Damage_PoiseDamage,
 				ExplosionPoiseDamage * FalloffScalar);
 		}
-
-		const float OldShield = TargetASC->GetNumericAttribute(
-			UNarrativeAttributeSetBase::GetShieldAttribute());
-		const float OldHealth = TargetASC->GetNumericAttribute(
-			UNarrativeAttributeSetBase::GetHealthAttribute());
-		const float OldPoise = TargetASC->GetNumericAttribute(
-			UNarrativeAttributeSetBase::GetPoiseAttribute());
+		DamageSpec->SetSetByCallerMagnitude(
+			SovTags.SetByCaller_Status_Magnitude,
+			BurnDamagePerTick);
+		DamageSpec->SetSetByCallerMagnitude(
+			SovTags.SetByCaller_Status_Duration,
+			BurnDuration);
 
 		SourceASC->ApplyGameplayEffectSpecToTarget(*DamageSpec, TargetASC);
-
-		const bool bExplosionResolved =
-			TargetASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetShieldAttribute())
-				< OldShield - KINDA_SMALL_NUMBER
-			|| TargetASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute())
-				< OldHealth - KINDA_SMALL_NUMBER
-			|| TargetASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetPoiseAttribute())
-				< OldPoise - KINDA_SMALL_NUMBER;
-		if (bExplosionResolved && IsTargetAlive(TargetASC))
-		{
-			ApplyBurn(TargetASC, Context);
-		}
 	}
-}
-
-void ASovCinderStickyGrenadeProjectile::ApplyBurn(
-	UAbilitySystemComponent* TargetAbilitySystem,
-	const FGameplayEffectContextHandle& Context)
-{
-	UAbilitySystemComponent* SourceASC = SourceAbilitySystem.Get();
-	if (!IsValid(SourceASC)
-		|| !IsValid(TargetAbilitySystem)
-		|| !BurnEffectClass.Get()
-		|| BurnDamagePerTick <= KINDA_SMALL_NUMBER
-		|| BurnDuration <= KINDA_SMALL_NUMBER)
-	{
-		return;
-	}
-
-	const FSovGameplayTags& SovTags = FSovGameplayTags::Get();
-	FGameplayTagContainer TargetTags;
-	TargetAbilitySystem->GetOwnedGameplayTags(TargetTags);
-	if (TargetTags.HasTagExact(SovTags.Status_Immunity)
-		|| TargetTags.HasTag(SovTags.Status_Immunity_Burn))
-	{
-		return;
-	}
-
-	FGameplayEffectSpecHandle BurnSpecHandle = SourceASC->MakeOutgoingSpec(
-		BurnEffectClass,
-		EffectLevel,
-		Context);
-	FGameplayEffectSpec* BurnSpec = BurnSpecHandle.Data.Get();
-	if (!BurnSpec)
-	{
-		return;
-	}
-
-	BurnSpec->AddDynamicAssetTag(AbilityIdentityTag);
-	BurnSpec->AddDynamicAssetTag(SovTags.Damage_Channel_Thermal);
-	BurnSpec->AddDynamicAssetTag(SovTags.Damage_BypassGuard);
-	BurnSpec->AddDynamicAssetTag(SovTags.Damage_BypassDeflection);
-	BurnSpec->SetSetByCallerMagnitude(
-		FNarrativeGameplayTags::Get().SetByCaller_Damage,
-		BurnDamagePerTick);
-	BurnSpec->SetSetByCallerMagnitude(
-		FNarrativeGameplayTags::Get().SetByCaller_Duration,
-		BurnDuration);
-	SourceASC->ApplyGameplayEffectSpecToTarget(*BurnSpec, TargetAbilitySystem);
 }
 
 bool ASovCinderStickyGrenadeProjectile::IsTargetAlive(

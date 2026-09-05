@@ -2,13 +2,16 @@
 
 #include "Components/SovDeflectionComponent.h"
 
+#include "ArsenalStatics.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/GameplayAbilityTypes.h"
+#include "Components/SovStatusComponent.h"
 #include "Engine/World.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
 #include "GAS/NarrativeAttributeSetBase.h"
 #include "GameFramework/Actor.h"
+#include "GameFramework/Controller.h"
 #include "NarrativeGameplayTags.h"
 #include "Sovereign/SovGameplayTags.h"
 #include "UnrealFramework/NarrativeCharacter.h"
@@ -274,6 +277,115 @@ void USovDeflectionComponent::SetOwnedLooseTag(
 	bAppliedFlag = bShouldApply;
 }
 
+AActor* USovDeflectionComponent::ResolveLogicalAttacker(
+	const FSovDamageResult& Result) const
+{
+	AActor* ResultSource = Result.SourceActor.Get();
+	UAbilitySystemComponent* ContextSourceAbilitySystem =
+		Result.EffectContext.GetOriginalInstigatorAbilitySystemComponent();
+	AActor* ContextAvatar = IsValid(ContextSourceAbilitySystem)
+		? ContextSourceAbilitySystem->GetAvatarActor()
+		: nullptr;
+	if (!IsValid(ContextAvatar))
+	{
+		return nullptr;
+	}
+
+	bool bResultSourceMatches = !IsValid(ResultSource)
+		|| ResultSource == ContextAvatar;
+	if (!bResultSourceMatches)
+	{
+		const AController* SourceController = Cast<AController>(ResultSource);
+		bResultSourceMatches = IsValid(SourceController)
+			&& SourceController->GetPawn() == ContextAvatar;
+	}
+
+	if (!bResultSourceMatches)
+	{
+		UE_LOG(
+			LogSovDeflection,
+			Warning,
+			TEXT("%s rejected Deflection exposure because damage source %s did not match context avatar %s."),
+			*GetNameSafe(GetOwner()),
+			*GetNameSafe(ResultSource),
+			*GetNameSafe(ContextAvatar));
+		return nullptr;
+	}
+	return ContextAvatar;
+}
+
+void USovDeflectionComponent::TryExposeDeflectedAttacker(
+	const FSovDamageResult& Result) const
+{
+	AActor* Owner = GetOwner();
+	if (!IsValid(Owner)
+		|| !Owner->HasAuthority()
+		|| !Result.TransactionId.IsValid())
+	{
+		return;
+	}
+
+	AActor* Attacker = ResolveLogicalAttacker(Result);
+	if (!IsValid(Attacker)
+		|| Attacker == Owner
+		|| Attacker->GetWorld() != GetWorld()
+		|| UArsenalStatics::GetAttitude(Owner, Attacker)
+			!= ETeamAttitude::Hostile)
+	{
+		return;
+	}
+
+	UAbilitySystemComponent* AttackerAbilitySystem =
+		UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Attacker);
+	if (!IsValid(AttackerAbilitySystem)
+		|| AttackerAbilitySystem == AbilitySystemComponent
+		|| AttackerAbilitySystem->HasMatchingGameplayTag(
+			FNarrativeGameplayTags::Get().State_IsDead)
+		|| AttackerAbilitySystem->HasMatchingGameplayTag(
+			FSovGameplayTags::Get().State_Fatal))
+	{
+		return;
+	}
+
+	if (UAbilitySystemComponent* ContextSourceAbilitySystem =
+		Result.EffectContext.GetOriginalInstigatorAbilitySystemComponent();
+		IsValid(ContextSourceAbilitySystem)
+		&& ContextSourceAbilitySystem != AttackerAbilitySystem)
+	{
+		return;
+	}
+
+	UNarrativeAbilitySystemComponent* NarrativeAttackerAbilitySystem =
+		Cast<UNarrativeAbilitySystemComponent>(AttackerAbilitySystem);
+	if (IsValid(NarrativeAttackerAbilitySystem)
+		&& NarrativeAttackerAbilitySystem->IsDead())
+	{
+		return;
+	}
+
+	USovStatusComponent* AttackerStatus =
+		Attacker->FindComponentByClass<USovStatusComponent>();
+	if (!IsValid(AttackerStatus))
+	{
+		return;
+	}
+
+	FSovStatusApplicationRequest Request;
+	Request.RequestId = Result.TransactionId;
+	Request.StatusTag = FSovGameplayTags::Get().Status_Apply_Exposed;
+	Request.SourceActor = Owner;
+	Request.TargetActor = Attacker;
+	Request.Magnitude = 1.0f;
+	// Zero delegates duration ownership to the Exposed status definition.
+	Request.Duration = 0.0f;
+	Request.EffectLevel = 1.0f;
+	// This is audit/trigger context only. The Status component builds a fresh
+	// outgoing context from Selene so the attacker cannot become its own source.
+	Request.Context = Result.EffectContext;
+	Request.bRequiresAppliedDamage = false;
+	AttackerStatus->ApplyStatus(Request);
+}
+
 void USovDeflectionComponent::HandleDamageResolvedAsTarget(
 	const FSovDamageResult& Result)
 {
@@ -292,6 +404,7 @@ void USovDeflectionComponent::HandleDamageResolvedAsTarget(
 	// Consume the authoritative tag before presentation or reward callbacks. A
 	// second hit in the same frame therefore cannot reuse the successful window.
 	CloseDeflectionWindow();
+	TryExposeDeflectedAttacker(Result);
 
 	FGameplayEventData Payload;
 	Payload.EventTag = FSovGameplayTags::Get().Event_Deflection_Perfect;
