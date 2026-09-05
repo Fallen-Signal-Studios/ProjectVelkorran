@@ -7,6 +7,9 @@
 #include "GameplayTagContainer.h"
 #include "SovCombatTypes.generated.h"
 
+class UNarrativeAttributeSetBase;
+struct FSovDamageConsumptionReceipt;
+
 /** The action-state defense that intercepted a Sovereign damage transaction. */
 UENUM(BlueprintType)
 enum class ESovDefenseKind : uint8
@@ -21,6 +24,18 @@ USTRUCT(BlueprintType)
 struct NARRATIVEARSENAL_API FSovDamageResult
 {
 	GENERATED_BODY()
+
+	/** Native proof is shared by copies of this result. Channel 0..7 separates one consumer's uses.
+	 * No lifetime GUID cache: keeping/replaying a result keeps its already-consumed receipt. */
+	bool ConsumeNativeReceipt(const UObject* Consumer, uint8 Channel = 0) const;
+	bool HasNativeReceipt() const;
+
+private:
+	friend class UNarrativeAttributeSetBase;
+	/** Only the canonical authoritative publisher mints a receipt for the finalized transaction. */
+	void InitializeNativeReceipt();
+	TSharedPtr<FSovDamageConsumptionReceipt> NativeConsumptionReceipt;
+public:
 
 	/** Unique identity for this resolved application, even when an Effect Context is reused. */
 	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Damage")
@@ -149,3 +164,7 @@ struct NARRATIVEARSENAL_API FSovDamageResult
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
 	FSovDamageResolvedSignature,
 	const FSovDamageResult&, Result);
+
+/** Blueprint/UScriptStruct copies must share the native consumption state as well as reflected fields. */
+template<> struct TStructOpsTypeTraits<FSovDamageResult> : TStructOpsTypeTraitsBase2<FSovDamageResult>
+{ enum { WithCopy = true }; };

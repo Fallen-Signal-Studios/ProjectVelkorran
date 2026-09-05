@@ -34,6 +34,8 @@
 #include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/PackageName.h"
+#include "Misc/ConfigCacheIni.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "TimerManager.h"
 
 ASovPlayerController::ASovPlayerController(const FObjectInitializer& ObjectInitializer)
@@ -514,6 +516,8 @@ void ASovPlayerController::PollCampaignInitialization(uint64 ExpectedEpoch)
 	if (!StillCompleting(ESovCampaignTransitionState::Idle)) { return; }
 	if (USovSaveSubsystem* Slots = GetGameInstance() ? GetGameInstance()->GetSubsystem<USovSaveSubsystem>() : nullptr)
 	{
+		Slots->CompleteMissionTravel(RestoringMission);
+		if (!StillCompleting(ESovCampaignTransitionState::Idle)) { return; }
 		Slots->NotifyCampaignReady(this, true);
 		if (!StillCompleting(ESovCampaignTransitionState::Idle)) { return; }
 		if (Started == ESovCampaignResult::Applied)
@@ -605,6 +609,7 @@ void ASovPlayerController::FailCampaignInitialization(const FString& Message)
 
 bool ASovPlayerController::TravelToMission(USovCampaignDefinition* Destination, FString& OutError)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(SovCampaign_MissionTravel);
 	OutError.Reset();
 	if (!CanTransitionTo(Destination, OutError, false)) { return false; }
 	const ASovCampaignGameMode* CampaignMode = GetWorld()->GetAuthGameMode<ASovCampaignGameMode>();
@@ -621,6 +626,7 @@ bool ASovPlayerController::TravelToMission(USovCampaignDefinition* Destination, 
 	{ OutError = TEXT("Reconnect the campaign's storage owner before travelling."); return false; }
 	const FString TravelOwner = Slots->GetAccountNamespace();
 	const int32 TravelUser = Slots->GetLocalSaveUserIndex();
+	const FSovStorageOwnerToken TravelToken = Slots->CaptureStorageOwner();
 	const FString OwnedTravelSlot = FString(TravelSaveSlot()) + TEXT("_") + TravelOwner;
 	const uint64 ExpectedEpoch = ++TransitionEpoch;
 	APawn* Source = GetPawn();
@@ -637,11 +643,10 @@ bool ASovPlayerController::TravelToMission(USovCampaignDefinition* Destination, 
 		return false;
 	}
 	const TWeakObjectPtr<USovSaveSubsystem> TravelStorage(Slots);
-	const auto OwnsTravelStorage = [TravelStorage, TravelOwner, TravelUser]()
+	const auto OwnsTravelStorage = [TravelStorage, TravelToken]()
 	{
 		const auto* Current = TravelStorage.Get();
-		return Current && Current->IsPlatformStorageOwnerAvailable() && !Current->IsPlatformStorageSuspended() && Current->GetAccountNamespace() == TravelOwner
-			&& Current->GetLocalSaveUserIndex() == TravelUser;
+		return Current && Current->IsStorageOwnerCurrent(TravelToken);
 	};
 	const bool bSaved = OwnsTravelStorage() && Save->CreatePlayerOnlySaveInSlot(this, OwnedTravelSlot, TravelUser, OwnsTravelStorage);
 	if (!bSaved || !OwnsTravelStorage() || TransitionEpoch != ExpectedEpoch || GetPawn() != Source || PendingTravelMission != Destination)
@@ -652,14 +657,101 @@ bool ASovPlayerController::TravelToMission(USovCampaignDefinition* Destination, 
 		return false;
 	}
 	SetTransitionInputLock(true);
+	if (!Slots->BeginMissionTravel(Destination, OutError))
+	{
+		if (TransitionEpoch == ExpectedEpoch)
+		{ PendingTravelMission = nullptr; SetTransitionInputLock(false); SetTransitionState(ESovCampaignTransitionState::Idle); }
+		return false;
+	}
+	if (TransitionEpoch != ExpectedEpoch || GetPawn() != Source || PendingTravelMission != Destination || !OwnsTravelStorage())
+	{
+		Slots->CancelMissionTravel(); OutError = TEXT("Campaign ownership changed before map travel.");
+		if (TransitionEpoch == ExpectedEpoch)
+		{ PendingTravelMission = nullptr; SetTransitionInputLock(false); SetTransitionState(ESovCampaignTransitionState::Idle); }
+		return false;
+	}
 	// Our record is already committed; do not invoke Narrative's display-name LevelTransition slot path.
 	if (!GetWorld()->ServerTravel(MapPackage + TEXT("?SovCampaignTransition=1"), true))
 	{
+		Slots->CancelMissionTravel();
 		PendingTravelMission = nullptr;
 		SetTransitionInputLock(false);
 		SetTransitionState(ESovCampaignTransitionState::Idle);
 		OutError = TEXT("Unreal rejected the destination travel request.");
 		return false;
+	}
+	OnCampaignTransitionChanged.Broadcast(TransitionState, FString());
+	return true;
+}
+
+void ASovPlayerController::RetireCampaignTransition()
+{
+	++TransitionEpoch;
+	GetWorldTimerManager().ClearTimer(InitializationTimer);
+	PendingTravelMission = nullptr; PendingMission = nullptr; PendingPawn = nullptr;
+	PendingRecords = FNarrativeSavePlayer(); bHasPendingRecords = false; bFromLevelTravel = false;
+	PendingProtagonist = FGameplayTag(); PendingHandoffBeat = NAME_None; PendingHandoffRequest.Invalidate();
+	bHasOriginSnapshot = false; OriginMission = nullptr;
+	OriginSnapshot = FSovProtagonistSnapshot(); OriginControllerRecord = FNarrativeActorRecord();
+}
+
+void ASovPlayerController::NotifyMissionTravelFailed(const FString& Error)
+{
+	if (!IsValid(this) || IsActorBeingDestroyed()) { return; }
+	RetireCampaignTransition();
+	const uint64 RetiredEpoch = TransitionEpoch;
+	TransitionState = ESovCampaignTransitionState::Failed;
+	SetTransitionInputLock(false);
+	if (TransitionEpoch != RetiredEpoch || IsActorBeingDestroyed()) { return; }
+	ConvergenceCompanionState->RollbackStaged();
+	if (TransitionEpoch != RetiredEpoch || IsActorBeingDestroyed()) { return; }
+	OnCampaignTransitionChanged.Broadcast(TransitionState, Error);
+}
+
+void ASovPlayerController::NotifyTitleTravelFailed(const FString& Error)
+{
+	if (!IsValid(this) || IsActorBeingDestroyed() || !SystemPauseOwners.Contains(TEXT("Campaign.TitleReturn"))) { return; }
+	RetireCampaignTransition();
+	TransitionState = ESovCampaignTransitionState::Failed;
+	// Do not use mission failure/unlock: the old account's campaign and underlying save writer remain abandoned.
+	OnCampaignTransitionChanged.Broadcast(TransitionState, Error);
+}
+
+bool ASovPlayerController::ReturnToCampaignTitle(FString& OutError)
+{
+	TRACE_CPUPROFILER_EVENT_SCOPE(SovCampaign_ReturnToTitle);
+	OutError.Reset();
+	if (bTitleReturnInProgress || !HasAuthority() || GetNetMode() != NM_Standalone || !GetWorld() || !GConfig)
+	{ OutError = TEXT("Returning to title requires the standalone campaign owner."); return false; }
+	TGuardValue<bool> TitleGuard(bTitleReturnInProgress, true);
+	FString TitlePath;
+	GConfig->GetString(TEXT("/Script/EngineSettings.GameMapsSettings"), TEXT("GameDefaultMap"), TitlePath, GEngineIni);
+	const FString Package = FPackageName::ObjectPathToPackageName(TitlePath);
+	const FString CurrentPackage = UGameplayStatics::GetCurrentLevelName(this, true);
+	if (Package.IsEmpty() || !FPackageName::DoesPackageExist(Package)
+		|| FPackageName::GetShortName(Package) == CurrentPackage)
+	{ OutError = TEXT("A separate, cooked GameDefaultMap is required for title recovery."); return false; }
+	USovSaveSubsystem* Slots = GetGameInstance() ? GetGameInstance()->GetSubsystem<USovSaveSubsystem>() : nullptr;
+	if (!Slots || !Slots->AbandonSessionForTitle(OutError)) { return false; }
+	// The persistent owner is now fenced. Retire pawn initialization before cancellation delegates can run.
+	RetireCampaignTransition();
+	TransitionState = ESovCampaignTransitionState::Travelling;
+	SetTransitionInputLock(true);
+	const uint64 TitleEpoch = TransitionEpoch;
+	AcquireSystemPause(TEXT("Campaign.TitleReturn"));
+	ConvergenceCompanionState->RollbackStaged();
+	if (TransitionEpoch != TitleEpoch || IsActorBeingDestroyed())
+	{ OutError = TEXT("Title recovery was superseded during companion teardown."); return false; }
+	ReleaseHeldAbilityInputs();
+	if (TransitionEpoch != TitleEpoch || IsActorBeingDestroyed())
+	{ OutError = TEXT("Title recovery was superseded."); return false; }
+	if (auto* ASC = Cast<UNarrativeAbilitySystemComponent>(GetAbilitySystemComponent())) { ASC->CancelAllAbilities(); }
+	if (TransitionEpoch != TitleEpoch || IsActorBeingDestroyed())
+	{ OutError = TEXT("Title recovery was superseded during ability teardown."); return false; }
+	if (!GetWorld()->ServerTravel(Package, true))
+	{
+		OutError = TEXT("Unreal rejected title travel. The abandoned campaign remains fenced; retry returning to title.");
+		SetTransitionState(ESovCampaignTransitionState::Failed, OutError); return false;
 	}
 	OnCampaignTransitionChanged.Broadcast(TransitionState, FString());
 	return true;

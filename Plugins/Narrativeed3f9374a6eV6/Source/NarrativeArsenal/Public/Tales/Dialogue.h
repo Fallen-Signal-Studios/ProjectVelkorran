@@ -673,6 +673,11 @@ protected:
 	bool bLineCompletionInProgress = false;
 	bool bCurrentLineFinished = false;
 	bool bPlaybackStartPending = false;
+	// A mid-start suspension delays media only; node events/start notifications must never be replayed.
+	FSimpleDelegate PendingLinePlayback;
+	TWeakObjectPtr<UDialogueNode> DeferredCompletionNode;
+	int64 DeferredCompletionRevision = INDEX_NONE;
+	bool DeferCompletionIfPaused();
 	bool bPreserveOnInterruption = false;
 
 	//The dialogue may be initialized, but has it began playing yet?
@@ -680,6 +685,8 @@ protected:
 
 public:
 	
+	/** Native pump runs before Blueprint tick. A terminal audio/sequence callback is never discarded by pause. */
+	void PumpDeferredLineCompletion();
 #if WITH_EDITORONLY_DATA
 
 	// editor only ref to quest that directly uses this dialogue.

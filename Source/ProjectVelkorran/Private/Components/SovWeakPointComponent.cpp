@@ -517,7 +517,7 @@ ESovWeakPointHitResolution USovWeakPointComponent::ResolveWeakPointHit(
 		|| !DamageResult.TransactionId.IsValid()
 		|| DamageResult.TargetActor.Get() != GetOwner()
 		|| DamageResult.SourceActor.Get() == GetOwner()
-		|| ResolvedHitTransactions.Contains(DamageResult.TransactionId)
+		|| !DamageResult.HasNativeReceipt()
 		|| DamageResult.bGuarded || DamageResult.bDeflected
 		|| !FMath::IsFinite(DamageResult.AppliedShieldDamage + DamageResult.AppliedHealthDamage)
 		|| DamageResult.AppliedShieldDamage + DamageResult.AppliedHealthDamage <= 0.0f)
@@ -530,6 +530,9 @@ ESovWeakPointHitResolution USovWeakPointComponent::ResolveWeakPointHit(
 	{
 		return ESovWeakPointHitResolution::NotWeakPoint;
 	}
+	// Even a hit received while this zone is already broken must be retired.
+	// Otherwise a retained copy could break it later after reset/recovery.
+	if (!DamageResult.ConsumeNativeReceipt(this)) { return ESovWeakPointHitResolution::NotWeakPoint; }
 
 	OutWeakPointId = MatchingZone->ZoneId;
 	if (IsWeakPointBroken(MatchingZone->ZoneId))
@@ -539,7 +542,6 @@ ESovWeakPointHitResolution USovWeakPointComponent::ResolveWeakPointHit(
 
 	const uint32 Epoch = StateEpoch;
 	const FName ZoneId = MatchingZone->ZoneId;
-	ResolvedHitTransactions.Add(DamageResult.TransactionId);
 	// Periodic contexts can retain the original bone, but are not another precision impact.
 	if (!DamageResult.bPeriodicDamage)
 	{

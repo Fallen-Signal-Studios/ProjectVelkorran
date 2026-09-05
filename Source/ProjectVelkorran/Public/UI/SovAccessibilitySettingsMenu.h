@@ -5,6 +5,7 @@
 #include "Settings/SovGameUserSettings.h"
 #include "Components/Button.h"
 #include "Platform/SovPlatformServicesSubsystem.h"
+#include "Save/SovSaveSubsystem.h"
 #include "SovAccessibilitySettingsMenu.generated.h"
 
 class UButton;
@@ -82,6 +83,13 @@ private:
 	UPROPERTY(Transient) TObjectPtr<USovPlatformServicesSubsystem> PlatformServices;
 	FGuid CloudRequest;
 	int32 CloudManualSlot = 0;
+	int32 CloudRevisionCursor = 0;
+	FGuid DeleteCloudRequest;
+	FString DeleteCloudRevision;
+	int32 ArchiveKind = 0, ArchiveSlot = 0, ArchiveCursor = 0;
+	TArray<FString> ArchiveIds;
+	FSovStorageOwnerToken ArchiveOwner;
+	FString DeleteArchiveId;
 	bool bFirstBoot = false;
 	bool bHDREnabled = true;
 	int32 HDRPeakNits = 1000;

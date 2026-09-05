@@ -164,10 +164,11 @@ void USovApplicationLifecycleComponent::ApplyInterruption()
         if (PC->PlayerInput) { PC->PlayerInput->FlushPressedKeys(); }
     }
     if (auto* Haptics = PC->GetHapticFeedback()) { Haptics->CancelAllFeedback(); }
-    // Campaign initialization needs its world timers. It already locks input and has no
-    // ready protagonist to resume. Acquire our simulation pause when it reaches Idle.
+    // Only pawn initialization/restore orchestration needs world timers. The source world
+    // remains a playable simulation during accepted map travel and must stay paused.
     const auto Transition = PC->GetCampaignTransitionState();
-    const bool bCanPause = Transition == ESovCampaignTransitionState::Idle || Transition == ESovCampaignTransitionState::Failed;
+    const bool bCanPause = Transition == ESovCampaignTransitionState::Idle || Transition == ESovCampaignTransitionState::Failed
+        || Transition == ESovCampaignTransitionState::Travelling;
     if (bCanPause && !bOwnPause) { bOwnPause = PC->AcquireSystemPause(LifecyclePause); }
     else if (!bCanPause && bOwnPause) { bOwnPause = false; PC->ReleaseSystemPause(LifecyclePause); }
     if (!IsApplicationUnavailable() && bCanPause && PC->GetNarrativeGameplayHUD()

@@ -48,6 +48,8 @@ protected:
 
 	/** Derived pickups perform their authoritative resource transaction here. */
 	virtual bool TryGrantTo(ASovPlayerCharacterBase* CollectingPlayer);
+	/** Same-stack reservation covers inventory/attribute delegates, including partial grants. */
+	bool bGrantInProgress = false;
 
 	UFUNCTION()
 	void HandlePickupOverlap(

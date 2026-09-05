@@ -58,6 +58,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Echo Ability")
 	float GetEchoCost() const { return FMath::Max(EchoCost, 0.0f); }
 
+	/** Pure authored-default validation; reads raw values before runtime clamping. */
+	bool ValidateAuthoredConfiguration(FString& OutError) const;
+
 	/** Read-only shared weapon rule for resource feedback; activation still validates every other gate. */
 	bool CanUseEchoWeaponContext(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo) const
 	{
@@ -92,6 +95,8 @@ public:
 	void FinishEchoAbility(bool bWasCancelled = false);
 
 protected:
+	/** Deferred native releases must still own this exact paid Echo execution. */
+	bool IsCurrentEchoExecutionValid() const { return IsEchoActivationCurrent(EchoActivationEpoch); }
 	virtual void ActivateAbility(
 		const FGameplayAbilitySpecHandle Handle,
 		const FGameplayAbilityActorInfo* ActorInfo,
@@ -171,6 +176,7 @@ protected:
 	float MaximumActiveDuration = 5.0f;
 
 private:
+	bool IsEchoActivationCurrent(uint64 Epoch) const;
 	USovEchoComponent* ResolveEchoComponent(const FGameplayAbilityActorInfo* ActorInfo) const;
 	bool MeetsCharacterRequirement(const FGameplayAbilityActorInfo* ActorInfo) const;
 	void AddEchoFailureTags(FGameplayTagContainer* OptionalRelevantTags) const;
@@ -186,6 +192,12 @@ private:
 	FDelegateHandle BusyTagChangedHandle;
 	FTimerHandle MaximumDurationTimerHandle;
 	bool bEchoAbilityStarted = false;
+	uint64 EchoActivationEpoch = 0;
+	TWeakObjectPtr<AActor> EchoActivationAvatar;
+	TWeakObjectPtr<UAbilitySystemComponent> EchoActivationASC;
+	FGameplayAbilitySpecHandle EchoActivationSpec;
+	bool bEchoEndPending = false;
+	bool bEndingEcho = false;
 	mutable bool bAuthorityEchoSpendAttempted = false;
 	mutable bool bAuthorityEchoSpendSucceeded = false;
 	mutable FString LastActivationFailureReason;

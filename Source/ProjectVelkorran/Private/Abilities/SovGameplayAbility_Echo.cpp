@@ -13,8 +13,32 @@
 #include "Sovereign/SovGameplayTags.h"
 #include "TimerManager.h"
 #include "UnrealFramework/NarrativeCharacter.h"
+#include "UObject/StrongObjectPtr.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogSovEchoAbility, Log, All);
+
+bool USovGameplayAbility_EchoBase::ValidateAuthoredConfiguration(FString& OutError) const
+{
+	OutError.Reset();
+	if (!FMath::IsFinite(EchoCost) || EchoCost < 0.f || !FMath::IsFinite(MinimumEchoRequired) || MinimumEchoRequired < 0.f
+		|| !FMath::IsFinite(MaximumActiveDuration) || MaximumActiveDuration < 0.f)
+	{ OutError = TEXT("Echo cost, threshold and lifetime must be finite and nonnegative before clamping."); return false; }
+	const auto& Tags = FSovGameplayTags::Get();
+	if (!EchoSpendTag.IsValid() || (RequiredCharacterTag != Tags.Character_Player_Tarrik && RequiredCharacterTag != Tags.Character_Player_Selene))
+	{ OutError = TEXT("Echo ability requires a semantic spending tag and one canonical protagonist identity."); return false; }
+	if (bRequiresAllowedWeapon && AllowedWeaponClasses.IsEmpty())
+	{ OutError = TEXT("Weapon-gated Echo ability requires its concrete authored weapon allowlist."); return false; }
+	TSet<const UClass*> Seen;
+	for (const auto& WeaponClass : AllowedWeaponClasses)
+	{
+		if (!WeaponClass || Seen.Contains(WeaponClass.Get()))
+		{ OutError = TEXT("Echo weapon allowlist contains a missing or duplicate class."); return false; }
+		Seen.Add(WeaponClass.Get());
+	}
+	if (!HasRequiredPayloadConfiguration())
+	{ OutError = TEXT("Echo ability is missing or has invalid native payload configuration."); return false; }
+	return true;
+}
 
 USovGameplayAbility_EchoBase::USovGameplayAbility_EchoBase()
 {
@@ -47,6 +71,7 @@ bool USovGameplayAbility_EchoBase::CanActivateAbility(
 	FGameplayTagContainer* OptionalRelevantTags) const
 {
 	LastActivationFailureReason.Reset();
+	if (bEndingEcho) { return false; }
 	FGameplayTagContainer LocalRelevantTags;
 	FGameplayTagContainer* RelevantTags = OptionalRelevantTags
 		? OptionalRelevantTags
@@ -201,8 +226,13 @@ void USovGameplayAbility_EchoBase::ApplyCost(
 
 	USovEchoComponent* EchoComponent = ResolveEchoComponent(ActorInfo);
 	const float Cost = GetEchoCost();
-	bAuthorityEchoSpendSucceeded = IsValid(EchoComponent)
-		&& EchoComponent->TrySpendEcho(Cost, EchoSpendTag);
+	const uint64 Epoch = EchoActivationEpoch;
+	if (!IsEchoActivationCurrent(Epoch)) { return; }
+	const bool bSpent = IsValid(EchoComponent) && EchoComponent->TrySpendEcho(Cost, EchoSpendTag);
+	// A debit notification can cancel, replace or reactivate this instance. An old
+	// write result must never mutate the replacement's payment or registration state.
+	if (!IsEchoActivationCurrent(Epoch)) { return; }
+	bAuthorityEchoSpendSucceeded = bSpent;
 	if (!bAuthorityEchoSpendSucceeded)
 	{
 		UE_LOG(
@@ -216,6 +246,16 @@ void USovGameplayAbility_EchoBase::ApplyCost(
 	}
 
 	Super::ApplyCost(Handle, ActorInfo, ActivationInfo);
+}
+
+bool USovGameplayAbility_EchoBase::IsEchoActivationCurrent(uint64 Epoch) const
+{
+	return EchoActivationEpoch == Epoch && !bEchoEndPending && !bEndingEcho && IsActive()
+		&& CurrentActorInfo && CurrentSpecHandle == EchoActivationSpec
+		&& EchoActivationAvatar.IsValid() && !EchoActivationAvatar->IsActorBeingDestroyed()
+		&& EchoActivationASC.IsValid() && CurrentActorInfo->AvatarActor == EchoActivationAvatar
+		&& CurrentActorInfo->AbilitySystemComponent == EchoActivationASC
+		&& EchoActivationASC->GetAvatarActor() == EchoActivationAvatar.Get();
 }
 
 float USovGameplayAbility_EchoBase::GetCurrentEcho() const
@@ -286,10 +326,24 @@ void USovGameplayAbility_EchoBase::ActivateAbility(
 	const FGameplayAbilityActivationInfo ActivationInfo,
 	const FGameplayEventData* TriggerEventData)
 {
+	TStrongObjectPtr<USovGameplayAbility_EchoBase> ActionLifetime(this);
+	const uint64 Epoch = ++EchoActivationEpoch;
+	bEchoEndPending = false;
+	EchoActivationAvatar = ActorInfo ? ActorInfo->AvatarActor.Get() : nullptr;
+	EchoActivationASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
+	EchoActivationSpec = Handle;
 	bEchoAbilityStarted = false;
 	bAuthorityEchoSpendAttempted = false;
 	bAuthorityEchoSpendSucceeded = ActorInfo && !ActorInfo->IsNetAuthority();
-	if (!ActorInfo || !CommitAbility(Handle, ActorInfo, ActivationInfo))
+	const auto ContinueActivation = [this, Epoch]()
+	{
+		if (IsEchoActivationCurrent(Epoch)) { return true; }
+		if (EchoActivationEpoch == Epoch && IsActive()) { FinishEchoAbility(true); }
+		return false;
+	};
+	const bool bCommitted = ActorInfo && CommitAbility(Handle, ActorInfo, ActivationInfo);
+	if (!ContinueActivation()) { return; }
+	if (!bCommitted)
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
@@ -304,15 +358,9 @@ void USovGameplayAbility_EchoBase::ActivateAbility(
 	// ActivateAbility event here. Payment has already succeeded, so even an
 	// accidentally implemented K2 event cannot execute an unpaid payload.
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
-	if (!IsActive())
-	{
-		return;
-	}
+	if (!ContinueActivation()) { return; }
 	BindCancellationTags(ActorInfo->AbilitySystemComponent.Get());
-	if (!IsActive())
-	{
-		return;
-	}
+	if (!ContinueActivation()) { return; }
 
 	bEchoAbilityStarted = true;
 	if (MaximumActiveDuration > KINDA_SMALL_NUMBER)
@@ -321,8 +369,8 @@ void USovGameplayAbility_EchoBase::ActivateAbility(
 		{
 			World->GetTimerManager().SetTimer(
 				MaximumDurationTimerHandle,
-				this,
-				&ThisClass::HandleMaximumDurationExpired,
+				FTimerDelegate::CreateWeakLambda(this, [this, Epoch]()
+				{ if (IsEchoActivationCurrent(Epoch)) { HandleMaximumDurationExpired(); } }),
 				MaximumActiveDuration,
 				false);
 		}
@@ -332,21 +380,16 @@ void USovGameplayAbility_EchoBase::ActivateAbility(
 	{
 		ReceiveEchoAbilityStarted(ActorInfo->IsNetAuthority());
 	}
-	if (!IsActive())
-	{
-		return;
-	}
+	if (!ContinueActivation()) { return; }
 	if (ActorInfo->IsLocallyControlled())
 	{
 		ReceiveEchoAbilityLocalPresentation();
 	}
-	if (!IsActive())
-	{
-		return;
-	}
+	if (!ContinueActivation()) { return; }
 	if (ActorInfo->IsNetAuthority())
 	{
 		ReceiveEchoAbilityAuthorityCommitted(GetEchoCost());
+		ContinueActivation();
 	}
 }
 
@@ -357,6 +400,17 @@ void USovGameplayAbility_EchoBase::EndAbility(
 	const bool bReplicateEndAbility,
 	const bool bWasCancelled)
 {
+	if (bEndingEcho || !IsEndAbilityValid(Handle, ActorInfo)) { return; }
+	++EchoActivationEpoch;
+	bEchoEndPending = true;
+	if (ScopeLockCount > 0)
+	{
+		// Narrative marks dispatch unavailable and queues this virtual EndAbility.
+		Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
+		return;
+	}
+	TStrongObjectPtr<USovGameplayAbility_EchoBase> ActionLifetime(this);
+	TGuardValue<bool> Ending(bEndingEcho, true);
 	UnbindCancellationTags();
 	if (UWorld* World = GetWorld())
 	{
@@ -369,6 +423,9 @@ void USovGameplayAbility_EchoBase::EndAbility(
 	bEchoAbilityStarted = false;
 	bAuthorityEchoSpendAttempted = false;
 	bAuthorityEchoSpendSucceeded = false;
+	EchoActivationAvatar.Reset();
+	EchoActivationASC.Reset();
+	EchoActivationSpec = FGameplayAbilitySpecHandle();
 	if (bShouldBroadcastEnd)
 	{
 		ReceiveEchoAbilityEnded(bWasCancelled);
@@ -418,7 +475,7 @@ bool USovGameplayAbility_EchoBase::MeetsWeaponRequirement(
 
 	const auto IsAllowedWeapon = [this](const UWeaponItem* Weapon)
 	{
-		if (!IsValid(Weapon))
+		if (!IsValid(Weapon) || !Weapon->IsWielded())
 		{
 			return false;
 		}

@@ -3,6 +3,8 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "GameplayTagContainer.h"
+#include "GameplayEffectTypes.h"
+#include "TimerManager.h"
 #include "NarrativeSavableComponent.h"
 #include "SovFinisherTargetComponent.generated.h"
 class USovGameplayAbility_Finisher;
@@ -33,13 +35,20 @@ public:
 protected:
     virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 private:
+    friend struct FSovFinisherOutcomeTestAccess;
     friend class USovGameplayAbility_Finisher;
     bool Reserve(USovGameplayAbility_Finisher* Ability, AActor* Attacker, FGuid& OutLease);
     bool OwnsLease(const USovGameplayAbility_Finisher* Ability, const FGuid& Lease) const;
     bool IsReservedTargetValid(const USovGameplayAbility_Finisher* Ability, const FGuid& Lease, AActor* Attacker) const;
     void Release(const USovGameplayAbility_Finisher* Ability, const FGuid& Lease);
     bool CommitPhase(const USovGameplayAbility_Finisher* Ability, const FGuid& Lease);
+    void PublishCommittedPhase(FGameplayTag Phase, AActor* Instigator, const FGameplayEffectContextHandle& Context);
+    void PublishPendingPhases();
+    UFUNCTION() void HandleOutcomeASCInitialized();
     UPROPERTY(SaveGame) FGameplayTagContainer ResolvedPhases;
+    /** Outbox survives a checkpoint taken by a damage callback before phase delivery. */
+    UPROPERTY(SaveGame) FGameplayTagContainer PendingPhaseOutcomes;
+    FTimerHandle PendingPhaseTimer;
     TWeakObjectPtr<USovGameplayAbility_Finisher> ReservedBy;
     FGuid Reservation;
     FGameplayTag ReservedPhase;

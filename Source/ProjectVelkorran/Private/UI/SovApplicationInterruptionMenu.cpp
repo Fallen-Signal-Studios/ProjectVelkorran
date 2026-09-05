@@ -2,6 +2,7 @@
 #include "UI/SovApplicationInterruptionMenu.h"
 #include "UI/SovAccessibilitySettingsMenu.h"
 #include "Framework/SovApplicationLifecycleComponent.h"
+#include "Framework/SovPlayerController.h"
 #include "Accessibility/SovAccessibleNarrationSubsystem.h"
 #include "Settings/SovGameUserSettings.h"
 #include "Blueprint/WidgetTree.h"
@@ -15,7 +16,7 @@
 #include "Styling/CoreStyle.h"
 
 #define LOCTEXT_NAMESPACE "SovInterruptionMenu"
-USovApplicationInterruptionMenu::USovApplicationInterruptionMenu() { InputConfig = ENarrativeWidgetInputMode::Menu; }
+USovApplicationInterruptionMenu::USovApplicationInterruptionMenu() { InputConfig = ENarrativeWidgetInputMode::Menu; bIsBackHandler = true; }
 TSharedRef<SWidget> USovApplicationInterruptionMenu::RebuildWidget()
 {
     if (!WidgetTree) { WidgetTree = NewObject<UWidgetTree>(this, TEXT("WidgetTree")); }
@@ -32,7 +33,11 @@ TSharedRef<SWidget> USovApplicationInterruptionMenu::RebuildWidget()
         auto* Label = WidgetTree->ConstructWidget<UTextBlock>(); Label->SetText(LOCTEXT("Resume", "Resume game"));
         Label->SetAutoWrapText(true); Label->SetMargin(FMargin(16)); ResumeButton->AddChild(Label);
         ResumeButton->SetAccessibleLabel(Label->GetText()); ResumeButton->OnClicked.AddDynamic(this, &ThisClass::Resume);
-        Box->AddChild(ResumeButton); Scroll->AddChild(Box); Background->AddChild(Scroll); Safe->AddChild(Background);
+        Box->AddChild(ResumeButton);
+        TitleButton = WidgetTree->ConstructWidget<USovAccessibilityNativeButton>();
+        auto* TitleLabel = WidgetTree->ConstructWidget<UTextBlock>(); TitleLabel->SetAutoWrapText(true); TitleLabel->SetMargin(FMargin(16));
+        TitleButton->AddChild(TitleLabel); TitleButton->OnClicked.AddDynamic(this, &ThisClass::ReturnToTitle);
+        Box->AddChild(TitleButton); Scroll->AddChild(Box); Background->AddChild(Scroll); Safe->AddChild(Background);
         WidgetTree->RootWidget = Safe;
     }
     RefreshMessage(false); return Super::RebuildWidget();
@@ -44,7 +49,10 @@ void USovApplicationInterruptionMenu::RefreshMessage(bool bAnnounce)
     if (!Lifecycle || !Message || !ResumeButton) { return; }
     const auto* Settings = USovGameUserSettings::Get();
     const auto Snapshot = Settings ? Settings->GetSettingsSnapshot() : FSovUserSettingsSnapshot();
-    const FText Current = Lifecycle->GetInterruptionMessage(); const bool bChanged = !Current.EqualTo(LastMessage);
+    const FText Current = !RecoveryError.IsEmpty() ? RecoveryError : bConfirmTitle
+        ? LOCTEXT("ConfirmTitle", "Return to title? Progress since your last checkpoint will be discarded. Existing saves are retained.")
+        : Lifecycle->GetInterruptionMessage();
+    const bool bChanged = !Current.EqualTo(LastMessage);
     LastMessage = Current; Message->SetText(Current);
     const auto Font = FCoreStyle::GetDefaultFontStyle("Regular", FMath::RoundToInt(22 * Snapshot.UIScale));
     Message->SetFont(Font); Message->SetColorAndOpacity(FSlateColor(FLinearColor::White));
@@ -52,7 +60,19 @@ void USovApplicationInterruptionMenu::RefreshMessage(bool bAnnounce)
     // Retain an accessible focus target while input/account recovery is pending.
     // The click boundary revalidates availability and does not dismiss on failure.
     if (auto* Label = Cast<UTextBlock>(ResumeButton->GetContent()))
-    { Label->SetFont(Font); Label->SetColorAndOpacity(FSlateColor(FLinearColor::White)); }
+    {
+        Label->SetText(bConfirmTitle ? LOCTEXT("CancelTitle", "Cancel return to title") : LOCTEXT("Resume", "Resume game"));
+        ResumeButton->SetAccessibleLabel(Label->GetText()); Label->SetFont(Font); Label->SetColorAndOpacity(FSlateColor(FLinearColor::White));
+    }
+    if (TitleButton)
+    {
+        TitleButton->SetBackgroundColor(FLinearColor::Black);
+        if (auto* Label = Cast<UTextBlock>(TitleButton->GetContent()))
+        {
+            Label->SetText(bConfirmTitle ? LOCTEXT("ReturnConfirmed", "Confirm return to title") : LOCTEXT("ReturnTitle", "Return to title"));
+            Label->SetFont(Font); Label->SetColorAndOpacity(FSlateColor(FLinearColor::White)); TitleButton->SetAccessibleLabel(Label->GetText());
+        }
+    }
     if ((bAnnounce || bChanged) && IsActivated() && Snapshot.bMenuNarration && GetOwningLocalPlayer())
     {
         if (auto* Narrator = GetOwningLocalPlayer()->GetSubsystem<USovAccessibleNarrationSubsystem>())
@@ -72,8 +92,20 @@ UWidget* USovApplicationInterruptionMenu::NativeGetDesiredFocusTarget() const { 
 void USovApplicationInterruptionMenu::Resume()
 {
     if (!IsActivated()) { return; }
+    if (bConfirmTitle) { bConfirmTitle = false; RecoveryError = FText(); RefreshMessage(true); return; }
     if (const auto* PC = GetOwningPlayer())
     { if (auto* Lifecycle = PC->FindComponentByClass<USovApplicationLifecycleComponent>()) { Lifecycle->ResumeGameplay(); } }
     if (IsActivated()) { RefreshMessage(true); }
+}
+void USovApplicationInterruptionMenu::ReturnToTitle()
+{
+    if (!IsActivated()) { return; }
+    RecoveryError = FText();
+    if (!bConfirmTitle) { bConfirmTitle = true; RefreshMessage(true); return; }
+    if (auto* PC = Cast<ASovPlayerController>(GetOwningPlayer()))
+    {
+        FString Error;
+        if (!PC->ReturnToCampaignTitle(Error)) { RecoveryError = FText::FromString(Error); bConfirmTitle = false; RefreshMessage(true); }
+    }
 }
 #undef LOCTEXT_NAMESPACE

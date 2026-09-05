@@ -20,7 +20,7 @@ struct FNarrativePedProperties : public FMassConstSharedFragment
 
 // Defines entity-specific information for pedestrians
 USTRUCT()
-struct FNarrativePedFragment : public FMassFragment
+struct NARRATIVEARSENAL_API FNarrativePedFragment : public FMassFragment
 {
 	GENERATED_BODY()
 

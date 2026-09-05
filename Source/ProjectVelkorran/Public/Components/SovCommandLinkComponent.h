@@ -39,6 +39,11 @@ USTRUCT(BlueprintType)
 struct PROJECTVELKORRAN_API FSovCommandLinkSeverResult
 {
 	GENERATED_BODY()
+	bool ConsumeNativeReward(AActor* ExpectedSeverer) const;
+private:
+	friend class USovCommandLinkComponent;
+	TSharedPtr<struct FSovCommandLinkRewardReceipt> NativeRewardReceipt;
+public:
 
 	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Command Link")
 	FGuid TransactionId;
@@ -66,6 +71,10 @@ struct PROJECTVELKORRAN_API FSovCommandLinkSeverResult
 	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Command Link")
 	TArray<TObjectPtr<AActor>> AffectedActors;
 };
+
+/** Preserve the shared reward latch when reflection copies a sever result. */
+template<> struct TStructOpsTypeTraits<FSovCommandLinkSeverResult> : TStructOpsTypeTraitsBase2<FSovCommandLinkSeverResult>
+{ enum { WithCopy = true }; };
 
 /** Durable link state. Actor references are resolved by the encounter's stable participant IDs. */
 USTRUCT(BlueprintType)
@@ -275,6 +284,7 @@ protected:
 	float WeakPointRevealDuration = 5.0f;
 
 private:
+	void RetireNativeSeverReceipt();
 	TArray<AActor*> BuildParticipantSnapshot() const;
 	int32 PruneInvalidLinkedActors();
 	UAbilitySystemComponent* ResolveAbilitySystem(AActor* Actor) const;
@@ -318,6 +328,7 @@ private:
 
 	UPROPERTY(ReplicatedUsing = OnRep_ReplicationState, Transient)
 	FSovCommandLinkReplicationState ReplicationState;
+	TSharedPtr<struct FSovCommandLinkRewardReceipt> LastSeverRewardReceipt;
 
 	TSet<TWeakObjectPtr<AActor>> ActiveTagRecipients;
 	TSet<TWeakObjectPtr<AActor>> SeveredTagRecipients;

@@ -1,0 +1,55 @@
+# Campaign and world adversarial repairs
+
+5 September 2026. Baseline audit: `6225c68`; repair branch: `codex/adversarial-engineering-repairs`. Source changes preserve the existing Narrative campaign, save, ability, activity and Mass ownership. No campaign assets or editor configuration were fabricated. “Source complete” below means the repair is implemented and has been reviewed; Unreal compilation, native automation and platform execution remain unperformed.
+
+| Finding | Source status | Repair and remaining acceptance gate |
+|---|---|---|
+| C01 — accepted mission travel had no persistent failure recovery | Source complete, coordinated with Save/platform owner | Controller transfer writes and GameMode transfer reads now use immutable storage-generation tokens. The existing GameInstance Save subsystem owns destination, watchdog and engine travel failure handling beyond controller destruction. The controller acquires that transaction before ServerTravel, retires it on rejection, and reports success only after readiness. Failed initialization retires pending controller epochs and triggers bounded recovery. A native ReturnToCampaignTitle action abandons outgoing save ownership, cancels transient gameplay, retains a title pause, and travels to the existing configured GameDefaultMap. Early login failure without a controller falls back once to that frontend through the GameInstance owner. Cooked frontend/map presence, actual failed-travel events and controller recreation need UE acceptance. |
+| C02 — the last required defeat could be lost behind an optional Mass promotion | Source complete | The director records confirmed defeat independently of its mutation latch, then reconciles victory after pending promotions settle and before the coordinator advances waves. Completion remains idempotent and waits for all promotions. Native tests exercise the real ASC death delegate, deferred completion and reward replay; the existing roundtrip test separately exercises real promotion restoration. |
+| C03 — required actor destruction without death left impossible progression | Source complete | Required participant availability is reconciled every 0.1 seconds and before wave progression. EndPlay observation requests deferred reconciliation; failed live actor/Mass identity causes encounter failure without forging a kill or reward. Demotion first transfers identity, retry removes listeners, and optional actors do not cause mandatory failure. The existing FatalRecovery component receives a verified failed encounter and starts an owned living-player retry. Native tests cover optional/required destruction, no forged reward, duplicate retry admission and exact Busy/input cleanup. Real streaming teardown and fall-out-of-world are engine acceptance gates. |
+| C04 — continue-without-save repeatedly retried the cinematic checkpoint write | Source complete | RequestPlay consumes the exact CanonGate/beat acknowledgement before attempting another write, then rechecks its request epoch, playback generation and pawn context. Receipt matching, lifetime and one-use ownership remain exclusively in SaveSubsystem. The actual low-storage UI-to-RequestPlay flow still requires native/engine validation. |
+| C05 — FocusTarget attacked at range but kept moving toward the leader | Source complete | FocusTarget now follows the selected live enemy using the same curated attack descriptors that govern firing. Acceptance lies inside usable attack range, movement tracks the goal actor, failures retry at bounded cadence, owned movement is stopped before attack, and leaving the leader's 25m command leash retires the command. A native owner test captures the actual AI MoveTo request and checks goal identity, range, retry cadence and leash cancellation. Real navigation/obstacles and attack execution remain engine gates. |
+| C06 — source and proxy destruction could release assets needed by active Mass callbacks | Source complete for explicit transfer assets | Director-owned strong leases retain class, definition, mesh, materials and animation independently of the original actor and LOD proxy. Active promotion/proxy restoration no longer call LoadSynchronous. Cold assets use bounded asynchronous requests; source actors/records survive admission failure. Retry/EndPlay cancels pending requests. Native tests force actual garbage collection between source/proxy destruction and promotion. Indirect asset loads inside opaque Narrative restoration remain subject to engine profiling. |
+| C07 — moving Tier C bodies were frozen pose snapshots | Source complete with required authored animation inputs; visual acceptance blocked on assets/engine | The existing proxy supports sequence-driven skeletal parts from an optional per-participant profile, phase capture, route-speed playback, frozen Tier D and current-pose promotion. Skeletal Tier C admission refuses absent, empty, root-motion-enabled or mismatched profiles while preserving the source actor. No locomotion assets were invented. Real in-place loops, modular-part alignment, transition pose quality and Xbox/PlayStation performance remain explicit gates. |
+
+## Systems and dependencies
+
+`ASovPlayerController` and `ASovCampaignGameMode` depend on the existing `USovSaveSubsystem` travel/title transaction and native account provider. The configured `GameDefaultMap` must be a separate cooked frontend with a usable controller; the checked-in config currently points to the Narrative main menu. A failed title request keeps the abandoned campaign paused and fenced for an explicit retry. It does not resume gameplay with discarded save authority.
+
+`ASovEncounterDirector`, `USovEncounterCoordinationComponent` and `USovFatalRecoveryComponent` share the entry checkpoint and confirmed-defeat ledger. Recovery never derives victory from “missing” or health polling. Coordinator future-wave release depends on confirmed defeat or a still-owned required representation. Reconciliation stays bounded to a 0.1-second active cadence; restore readiness retains its existing frame polling.
+
+Mass assets are pinned by participant ID on the director. Existing source capture, Narrative actor/component records, ASC restoration, faction, weak-point/sever state and replacement readiness remain authoritative. Loading a saved active attempt still produces Failed until an explicit encounter retry. New animation fields are additive SaveGame properties; old skeletal Mass records without a valid animation profile cannot silently create moving frozen bodies and may require entry-checkpoint retry.
+
+## Risk and regression requirements
+
+Travel changes are high risk because the controller and world are destroyed during accepted travel. Validate synchronous rejection, asynchronous map failure, bad destination PlayerStart/definition, null login controller, owner revocation/re-authorization during transfer serialization, suspend/resume, duplicate failure events, and failure of the single recovery attempt. Old timers and callbacks must never overwrite a replacement transition. No outgoing save write may follow title abandonment.
+
+Encounter changes are medium risk because callback ordering and representation transfer share the same participant identities. Kill the final required actor while an optional replacement initializes, destroy/stream out a living required actor, destroy only an optional actor, demote a required actor intentionally, delete its Mass entity unexpectedly, and retry after each failure. Require exactly one terminal state, no forged kill/reward, no released future wave, no leaked Busy/protection/input lease, and preserved checkpoint recovery.
+
+Companion movement changes are medium risk. Verify melee and ranged curated kits approach the selected target, moving targets update the path goal, temporary cooldowns retain valid reach, protected/boss targets retain player-finish rules, blocked paths do not spin requests, and scripted activities/Resonance/cancellation still own their movement. The native move-request test uses a controller capture seam rather than pretending to have a cooked navigation mesh.
+
+Mass changes are medium/high risk. Validate cold/warm profile assets, missing loads and timeouts, forced GC at LOD None, malformed profiles, static equipment, modular skeletal equipment, C↔D↔actor loops, route exhaustion, pause/failure, promotion pose blending and streamed save/retry. Root-motion flags are rejected, but authors still need genuinely in-place loops; source cannot certify visual foot placement. Measure the 30 Hz visible skeletal proxy policy and residency footprint on target hardware before choosing crowd budgets.
+
+## Tests and source checks
+
+Added/extended native automation (authored, not run):
+
+- `ProjectVelkorran.Campaign.Encounter.DeferredVictorySurvivesOptionalPromotion`
+- `ProjectVelkorran.Campaign.Encounter.UnexpectedActorLossFailsWithoutForgedDefeat`
+- `ProjectVelkorran.Campaign.Recovery.RequiredActorLossUsesOwnedLivingRetry`
+- `ProjectVelkorran.Campaign.Companion.FocusPursuesTargetWithinLeaderLeash`
+- `ProjectVelkorran.Campaign.Mass.RealNPCSnapshotDemotionPromotion` — added original-actor preservation and actual-GC residency checks.
+
+Executed on this host: `python Scripts/Test-NativePolicies.py` passed 40 portable production-policy suites; `git diff --check` passed. The full host Python discovery ran 50 tests with one expected interim failure because the build owner's editor test-module migration had not yet landed; the failing contract was `test_reflected_fixtures_are_editor_module_only`. The final integration report owns the post-migration rerun. These checks do not compile the Unreal source changed here.
+
+Added CPU trace scopes cover campaign travel/title, encounter reconciliation/restore, transfer capture, residency and Mass promotion. No measured frame-time improvement or console certification is asserted.
+
+## Source files changed
+
+- Campaign: `SovEncounterDirector.h/.cpp`, `SovEncounterDirectorMass.cpp`, `SovEncounterCoordinationComponent.cpp`, `SovCampaignMassTypes.h`, `SovCampaignMassProxy.h/.cpp`.
+- Controller/travel: `SovPlayerController.h/.cpp`, `SovCampaignGameMode.cpp`; companion dependencies in Save/platform repair notes.
+- Gameplay: `SovCampaignCinematicComponent.cpp`, `SovCompanionCommands.cpp`, `SovFatalRecoveryComponent.h/.cpp`.
+- Tests: `SovCampaignMassRuntimeTests.cpp`, `SovCoActionRuntimeTests.cpp`, `SovCoActionRuntimeTestFixtures.h`, `SovRecoveryRuntimeTests.cpp`, `SovEncounterRuntimeTestFixtures.h`; their final directory is determined by the editor test-module migration.
+- Documentation: this file and `Docs/CampaignMassEngineering.md`.
+
+Definition of done for source repair is all seven audit paths implemented without parallel gameplay/save authorities, exact ownership retained through callbacks, unsupported representation refused before actor destruction, meaningful native regressions authored and host gates passing after integration. Definition of done for shipping remains UE5.7 compilation/automation, real campaign route completion and measured console asset/runtime budgets.

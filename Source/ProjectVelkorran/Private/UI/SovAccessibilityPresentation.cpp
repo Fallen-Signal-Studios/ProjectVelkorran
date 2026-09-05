@@ -10,7 +10,7 @@
 #include "Components/TextBlock.h"
 #include "Components/SovWeakPointComponent.h"
 #include "Engine/World.h"
-#include "EngineUtils.h"
+#include "Engine/OverlapResult.h"
 #include "GameFramework/PlayerController.h"
 #include "Interaction/PlayerInteractionComponent.h"
 #include "Internationalization/BreakIterator.h"
@@ -25,6 +25,7 @@
 #include "Rendering/SlateRenderer.h"
 #include "Layout/Clipping.h"
 #include "Styling/CoreStyle.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "UnrealFramework/NarrativeCharacter.h"
 
 #define LOCTEXT_NAMESPACE "SovAccessibilityPresentation"
@@ -112,18 +113,59 @@ void USovAccessibilityPresentation::LostInteractable(UNarrativeInteractableCompo
 void USovAccessibilityPresentation::SettingsChanged(const FSovUserSettingsSnapshot& Value)
 {
 	Settings = Value;
+	if (bDialogueSpeechSuspended) { bSuspendedSpeechLayoutDirty=true; }
 	if (!ActiveSpeech.Text.IsEmpty()) { BeginEntry(ActiveSpeech); }
 	RefreshText();
 }
 void USovAccessibilityPresentation::PresentSpeech(const FText& Speaker, const FText& Text, float Duration, const FVector& Location, bool bCinematic)
 {
-	if (Text.IsEmpty() || !FMath::IsFinite(Duration) || Location.ContainsNaN()) { return; }
+	PresentOwnedSpeech(Speaker, Text, Duration, Location, bCinematic, true);
+}
+FGuid USovAccessibilityPresentation::PresentOwnedSpeech(const FText& Speaker, const FText& Text, float Duration, const FVector& Location, bool bCinematic, bool bHasDirection)
+{
+	TRACE_CPUPROFILER_EVENT_SCOPE(SovAccessibility_PresentSpeech);
+	if (Text.IsEmpty() || !FMath::IsFinite(Duration) || Location.ContainsNaN()) { return FGuid(); }
 	FSovSceneSubtitleEntry Entry; Entry.Speaker = Speaker; Entry.Text = Text; Entry.Location = Location; Entry.Duration = Duration < 0.f ? -1.f : FMath::Clamp(Duration,2.f,120.f); Entry.bCinematic = bCinematic;
+	Entry.Receipt = FGuid::NewGuid(); Entry.bHasDirection = bHasDirection;
 	History.Add(Entry); if (History.Num() > 64) { History.RemoveAt(0); }
-	if (!Settings.bSubtitles) { OnSceneHistoryChanged.Broadcast(); return; }
+	if (!Settings.bSubtitles) { OnSceneHistoryChanged.Broadcast(); return Entry.Receipt; }
 	if (!SpeechPages.IsEmpty()) { if (PendingSpeech.Num() >= 16) { PendingSpeech.RemoveAt(0); } PendingSpeech.Add(Entry); }
 	else { BeginEntry(Entry); }
 	OnSceneHistoryChanged.Broadcast();
+	return Entry.Receipt;
+}
+void USovAccessibilityPresentation::FinishOwnedSpeech(FGuid Receipt)
+{
+	if (!Receipt.IsValid()) { return; }
+	if (ActiveSpeech.Receipt == Receipt) { ActiveSpeech.bFinished = true; }
+	if (SuspendedSpeech.Receipt == Receipt) { SuspendedSpeech.bFinished = true; }
+	for (auto& Entry : PendingSpeech) { if (Entry.Receipt == Receipt) { Entry.bFinished = true; } }
+	for (auto& Entry : SuspendedPendingSpeech) { if (Entry.Receipt == Receipt) { Entry.bFinished = true; } }
+}
+void USovAccessibilityPresentation::RestartOwnedSpeech(FGuid Receipt, float Duration)
+{
+	if (!Receipt.IsValid() || !FMath::IsFinite(Duration)) { return; }
+	if (ActiveSpeech.Receipt == Receipt)
+	{ ActiveSpeech.Duration = FMath::Clamp(Duration,2.f,120.f); BeginEntry(ActiveSpeech); }
+	for (auto& Entry : PendingSpeech) { if (Entry.Receipt == Receipt) { Entry.Duration = FMath::Clamp(Duration,2.f,120.f); } }
+}
+void USovAccessibilityPresentation::SuspendDialogueSpeech()
+{
+	if (bDialogueSpeechSuspended) { return; }
+	bDialogueSpeechSuspended = true; bSuspendedSpeechLayoutDirty=false; SuspendedSpeech = ActiveSpeech;
+	SuspendedPendingSpeech = MoveTemp(PendingSpeech); SuspendedSpeechPages = MoveTemp(SpeechPages);
+	SuspendedPageIndex = PageIndex; SuspendedPageRemaining = PageRemaining;
+	ActiveSpeech = FSovSceneSubtitleEntry(); PageIndex = 0; PageRemaining = 0.f; RefreshText();
+}
+void USovAccessibilityPresentation::ResumeDialogueSpeech()
+{
+	if (!bDialogueSpeechSuspended) { return; }
+	bDialogueSpeechSuspended = false;
+	ActiveSpeech = SuspendedSpeech; SuspendedSpeech = FSovSceneSubtitleEntry();
+	PendingSpeech = MoveTemp(SuspendedPendingSpeech); SpeechPages = MoveTemp(SuspendedSpeechPages);
+	PageIndex = SuspendedPageIndex; PageRemaining = SuspendedPageRemaining;
+	if(bSuspendedSpeechLayoutDirty && !ActiveSpeech.Text.IsEmpty()) { BeginEntry(ActiveSpeech); }
+	bSuspendedSpeechLayoutDirty=false; RefreshText();
 }
 void USovAccessibilityPresentation::BeginEntry(const FSovSceneSubtitleEntry& Entry)
 {
@@ -134,16 +176,43 @@ void USovAccessibilityPresentation::BeginEntry(const FSovSceneSubtitleEntry& Ent
 	SpeechPages = PaginateText(Entry.Text.ToString(), Characters, Settings.SubtitleMaximumLines); PageIndex = 0;
 	PageRemaining = FMath::Max(2.f, Entry.Duration / FMath::Max(1,SpeechPages.Num())); RefreshText();
 }
+bool USovAccessibilityPresentation::HasUnreadSpeech(FGuid Receipt) const
+{
+	return Settings.bSubtitles && Receipt.IsValid() && ((ActiveSpeech.Receipt == Receipt && SpeechPages.IsValidIndex(PageIndex))
+		|| PendingSpeech.ContainsByPredicate([Receipt](const auto& Entry) { return Entry.Receipt == Receipt; }));
+}
 void USovAccessibilityPresentation::PresentCaption(const FText& Text, float Duration, const FVector& Location)
 {
+	PresentPrioritizedCaption(Text, Duration, Location, NAME_None, 0, true);
+}
+void USovAccessibilityPresentation::PresentPrioritizedCaption(const FText& Text, float Duration, const FVector& Location, FName CueKey, int32 Priority, bool bHasDirection)
+{
+	TRACE_CPUPROFILER_EVENT_SCOPE(SovAccessibility_PresentCaption);
 	if (Text.IsEmpty() || !FMath::IsFinite(Duration) || Location.ContainsNaN()) { return; }
-	ActiveCaption.Text = Text; ActiveCaption.Location = Location; ActiveCaption.bCaption = true;
+	FSovSceneSubtitleEntry Entry; Entry.Text = Text; Entry.Location = Location; Entry.bCaption = true;
+	Entry.Duration = FMath::Clamp(Duration,3.f,30.f); Entry.CueKey = CueKey; Entry.Priority = FMath::Clamp(Priority,0,100); Entry.bHasDirection = bHasDirection;
+	History.Add(Entry); if (History.Num() > 64) { History.RemoveAt(0); }
+	if (CaptionRemaining <= 0.f || (ActiveCaption.Priority == 0 && Entry.Priority > 0)) { BeginCaption(Entry); }
+	else if (Entry.Priority > 0 || ActiveCaption.Priority == 0)
+	{
+		// Repeated hits cannot continually restart a caption or monopolize the queue.
+		if (CueKey.IsNone() || ActiveCaption.CueKey != CueKey)
+		{
+			const int32 Existing = PendingCaptions.IndexOfByPredicate([&](const auto& Pending) { return !CueKey.IsNone() && Pending.CueKey == CueKey; });
+			if (Existing != INDEX_NONE) { PendingCaptions[Existing] = Entry; }
+			else if (PendingCaptions.Num() < 8) { PendingCaptions.Add(Entry); }
+		}
+	}
+	OnSceneHistoryChanged.Broadcast();
+}
+void USovAccessibilityPresentation::BeginCaption(const FSovSceneSubtitleEntry& Entry)
+{
+	ActiveCaption = Entry;
 	const float Width=GetSafeTextWidth();
 	const int32 Characters=Width>0 ? FMath::Min(Settings.SubtitleCharactersPerLine,FMath::Max(1,FMath::FloorToInt(Width*.8f/(27.f*Settings.SubtitleScale)))) : Settings.SubtitleCharactersPerLine;
-	CaptionPages=PaginateText(Text.ToString(),Characters,Settings.SubtitleMaximumLines); CaptionPageIndex=0;
-	CaptionPageDuration=FMath::Max(3.f,FMath::Clamp(Duration,3.f,30.f)/FMath::Max(1,CaptionPages.Num()));
-	CaptionRemaining=CaptionPageDuration; History.Add(ActiveCaption); if (History.Num() > 64) { History.RemoveAt(0); } RefreshText();
-	OnSceneHistoryChanged.Broadcast();
+	CaptionPages=PaginateText(Entry.Text.ToString(),Characters,Settings.SubtitleMaximumLines); CaptionPageIndex=0;
+	CaptionPageDuration=FMath::Max(3.f,Entry.Duration/FMath::Max(1,CaptionPages.Num()));
+	CaptionRemaining=CaptionPageDuration; RefreshText();
 }
 void USovAccessibilityPresentation::ClearSpeech()
 {
@@ -152,10 +221,10 @@ void USovAccessibilityPresentation::ClearSpeech()
 	else { ActiveSpeech.bFinished = true; }
 }
 void USovAccessibilityPresentation::ClearSceneHistory()
-{ History.Reset(); PendingSpeech.Reset(); SpeechPages.Reset(); CaptionPages.Reset(); Markers.Reset(); ActiveSpeech = FSovSceneSubtitleEntry(); ActiveCaption = FSovSceneSubtitleEntry(); CaptionRemaining = 0; RefreshText(); OnSceneHistoryChanged.Broadcast(); }
-FText USovAccessibilityPresentation::DirectionText(const FVector& Location) const
+{ History.Reset(); PendingSpeech.Reset(); SpeechPages.Reset(); CaptionPages.Reset(); PendingCaptions.Reset(); SuspendedSpeechPages.Reset(); SuspendedPendingSpeech.Reset(); SuspendedSpeech = FSovSceneSubtitleEntry(); bDialogueSpeechSuspended = false; Markers.Reset(); ActiveSpeech = FSovSceneSubtitleEntry(); ActiveCaption = FSovSceneSubtitleEntry(); CaptionRemaining = 0; RefreshText(); OnSceneHistoryChanged.Broadcast(); }
+FText USovAccessibilityPresentation::DirectionText(const FVector& Location, bool bHasDirection) const
 {
-	const APlayerController* PC = GetOwningPlayer(); if (!PC || !Settings.bSubtitleDirections) { return FText::GetEmpty(); }
+	const APlayerController* PC = GetOwningPlayer(); if (!bHasDirection || !PC || !Settings.bSubtitleDirections) { return FText::GetEmpty(); }
 	FVector View; FRotator Rotation; PC->GetPlayerViewPoint(View,Rotation);
 	const FVector Delta = Rotation.UnrotateVector(Location - View);
 	if (Delta.SizeSquared() < 1.) { return FText::GetEmpty(); }
@@ -179,11 +248,11 @@ void USovAccessibilityPresentation::RefreshText()
 		const TCHAR Patterns[]={TCHAR(0x25CF),TCHAR(0x25C6),TCHAR(0x25A0),TCHAR(0x25B2)};
 		const FText Pattern=ActiveSpeech.Speaker.IsEmpty() ? FText::GetEmpty() : FText::FromString(FString::Chr(Patterns[FCrc::StrCrc32(*ActiveSpeech.Speaker.ToString())%4]));
 		const FText Speaker = FText::Format(LOCTEXT("SpeakerPattern","{0} {1}"),Pattern,Settings.bSubtitleSpeakerNames ? ActiveSpeech.Speaker : FText::GetEmpty());
-		SubtitleText->SetText(FText::Format(LOCTEXT("SpeechLayout","{0} {1}\n{2}"),Speaker,DirectionText(ActiveSpeech.Location),FText::FromString(SpeechPages[PageIndex])));
+		SubtitleText->SetText(FText::Format(LOCTEXT("SpeechLayout","{0} {1}\n{2}"),Speaker,DirectionText(ActiveSpeech.Location,ActiveSpeech.bHasDirection),FText::FromString(SpeechPages[PageIndex])));
 		SubtitleSlot->SetAnchors(FAnchors(.5f,ActiveSpeech.bCinematic ? .9f : .8f));
 	}
 	CaptionText->SetWrapTextAt(FMath::Max(1.f,GetSafeTextWidth() * .8f));
-	CaptionText->SetText(FText::Format(LOCTEXT("CaptionLayout","[sound] {0}\n{1}"),DirectionText(ActiveCaption.Location),CaptionPages.IsValidIndex(CaptionPageIndex) ? FText::FromString(CaptionPages[CaptionPageIndex]) : FText::GetEmpty()));
+	CaptionText->SetText(FText::Format(LOCTEXT("CaptionLayout","[sound] {0}\n{1}"),DirectionText(ActiveCaption.Location,ActiveCaption.bHasDirection),CaptionPages.IsValidIndex(CaptionPageIndex) ? FText::FromString(CaptionPages[CaptionPageIndex]) : FText::GetEmpty()));
 }
 void USovAccessibilityPresentation::NativeTick(const FGeometry& Geometry, float DeltaSeconds)
 {
@@ -191,6 +260,7 @@ void USovAccessibilityPresentation::NativeTick(const FGeometry& Geometry, float 
 	if(!FMath::IsNearlyEqual(LastLayoutWidth,GetSafeTextWidth(),1.f))
 	{
 		LastLayoutWidth=GetSafeTextWidth();
+		if(bDialogueSpeechSuspended) { bSuspendedSpeechLayoutDirty=true; }
 		if(!ActiveSpeech.Text.IsEmpty()) { BeginEntry(ActiveSpeech); }
 		// Relayout a live caption without producing a duplicate scene-history record.
 		if(CaptionRemaining > 0.f)
@@ -202,30 +272,43 @@ void USovAccessibilityPresentation::NativeTick(const FGeometry& Geometry, float 
 		RefreshText();
 	}
 	if (!GetWorld() || GetWorld()->IsPaused()) { return; }
-	if (SpeechPages.IsValidIndex(PageIndex))
-	{
-		PageRemaining -= DeltaSeconds;
-		if (PageRemaining <= 0 && (PageIndex + 1 < SpeechPages.Num() || ActiveSpeech.Duration >= 0.f || ActiveSpeech.bFinished))
-		{
-			++PageIndex; PageRemaining = FMath::Max(2.f,ActiveSpeech.Duration / FMath::Max(1,SpeechPages.Num()));
-			if (!SpeechPages.IsValidIndex(PageIndex)) { SpeechPages.Reset(); ActiveSpeech = FSovSceneSubtitleEntry(); if (!PendingSpeech.IsEmpty()) { const auto Next = PendingSpeech[0]; PendingSpeech.RemoveAt(0); BeginEntry(Next); } }
-		}
-	}
-	if (CaptionRemaining>0.f)
-	{
-		CaptionRemaining=FMath::Max(0.f,CaptionRemaining-DeltaSeconds);
-		if (CaptionRemaining<=0.f && CaptionPages.IsValidIndex(CaptionPageIndex+1)) { ++CaptionPageIndex; CaptionRemaining=CaptionPageDuration; }
-	}
-	RefreshText();
+	AdvancePresentation(DeltaSeconds);
 	MarkerRefreshRemaining -= DeltaSeconds; if (MarkerRefreshRemaining > 0) { return; } MarkerRefreshRemaining = .25f; Markers.Reset();
 	APlayerController* PC = GetOwningPlayer(); if (!PC) { return; }
 	if (Settings.bWeakPointOutlines)
 	{
-		int32 Inspected = 0;
-		for (TActorIterator<ANarrativeCharacter> It(GetWorld()); It && Inspected++ < 256 && Markers.Num() < 32; ++It)
+		// Physics broadphase selects nearby actors before a work cap. A distant crowd can
+		// no longer consume the iterator budget ahead of the enemy the player is aiming at.
+		TArray<FOverlapResult> Overlaps;
+		FCollisionObjectQueryParams Objects; Objects.AddObjectTypesToQuery(ECC_Pawn);
+		FCollisionQueryParams Query(SCENE_QUERY_STAT(SovAccessibleWeakPoints), false, PC->GetPawn());
+		GetWorld()->OverlapMultiByObjectType(Overlaps, PC->GetFocalLocation(), FQuat::Identity, Objects, FCollisionShape::MakeSphere(5000.f), Query);
+		TSet<ANarrativeCharacter*> Seen;
+		TArray<ANarrativeCharacter*> Candidates;
+		const auto AddCandidate = [&](AActor* Actor)
 		{
-			if (*It == PC->GetPawn() || FVector::DistSquared(It->GetActorLocation(),PC->GetFocalLocation()) > FMath::Square(5000.f) || !PC->LineOfSightTo(*It)) { continue; }
-			if (const auto* Weak = It->FindComponentByClass<USovWeakPointComponent>())
+			auto* Character = Cast<ANarrativeCharacter>(Actor);
+			if (!Character && Actor) { Character = Cast<ANarrativeCharacter>(Actor->GetOwner()); }
+			if (!IsValid(Character) || Character == PC->GetPawn() || Seen.Contains(Character)) { return; }
+			const auto* Weak = Character->FindComponentByClass<USovWeakPointComponent>();
+			if (Weak && !Weak->GetRevealedWeakPointAnchors().IsEmpty()) { Seen.Add(Character); Candidates.Add(Character); }
+		};
+		FVector View; FRotator Rotation; PC->GetPlayerViewPoint(View, Rotation); FHitResult FocusHit;
+		GetWorld()->LineTraceSingleByChannel(FocusHit, View, View + Rotation.Vector() * 5000.f, ECC_Visibility, Query);
+		AddCandidate(FocusHit.GetActor());
+		ANarrativeCharacter* Focus = Candidates.IsEmpty() ? nullptr : Candidates[0];
+		for (const auto& Overlap : Overlaps) { AddCandidate(Overlap.GetActor()); }
+		Candidates.Sort([&](const ANarrativeCharacter& A, const ANarrativeCharacter& B)
+		{
+			if (&A == Focus || &B == Focus) { return &A == Focus && &B != Focus; }
+			return FVector::DistSquared(A.GetActorLocation(), View) < FVector::DistSquared(B.GetActorLocation(), View);
+		});
+		int32 Inspected = 0;
+		for (ANarrativeCharacter* Candidate : Candidates)
+		{
+			if (++Inspected > 256 || Markers.Num() >= 32) { break; }
+			if (!PC->LineOfSightTo(Candidate)) { continue; }
+			if (const auto* Weak = Candidate->FindComponentByClass<USovWeakPointComponent>())
 			{ for (const FVector& Anchor : Weak->GetRevealedWeakPointAnchors()) { if (Markers.Num() >= 32) { break; } Markers.Add({Anchor,LOCTEXT("WeakPoint","Weak point"),true,false}); } }
 		}
 	}
@@ -239,6 +322,34 @@ void USovAccessibilityPresentation::NativeTick(const FGeometry& Geometry, float 
 			Markers.Add({Marker->GetMarkerTransform().GetLocation(),Title,false,true});
 		}
 	}
+}
+void USovAccessibilityPresentation::AdvancePresentation(float DeltaSeconds)
+{
+	if (!FMath::IsFinite(DeltaSeconds) || DeltaSeconds <= 0.f) { return; }
+	bool bChanged = false;
+	if (SpeechPages.IsValidIndex(PageIndex))
+	{
+		PageRemaining -= DeltaSeconds;
+		if (PageRemaining <= 0 && (PageIndex + 1 < SpeechPages.Num() || ActiveSpeech.Duration >= 0.f || ActiveSpeech.bFinished))
+		{
+			bChanged = true;
+			++PageIndex; PageRemaining = FMath::Max(2.f,ActiveSpeech.Duration / FMath::Max(1,SpeechPages.Num()));
+			if (!SpeechPages.IsValidIndex(PageIndex)) { SpeechPages.Reset(); ActiveSpeech = FSovSceneSubtitleEntry(); if (!PendingSpeech.IsEmpty()) { const auto Next = PendingSpeech[0]; PendingSpeech.RemoveAt(0); BeginEntry(Next); } }
+		}
+	}
+	if (CaptionRemaining>0.f)
+	{
+		CaptionRemaining=FMath::Max(0.f,CaptionRemaining-DeltaSeconds);
+		if (CaptionRemaining<=0.f && CaptionPages.IsValidIndex(CaptionPageIndex+1)) { ++CaptionPageIndex; CaptionRemaining=CaptionPageDuration; }
+		if (CaptionRemaining <= 0.f && !PendingCaptions.IsEmpty())
+		{
+			PendingCaptions.StableSort([](const auto& A, const auto& B) { return A.Priority > B.Priority; });
+			const auto Next = PendingCaptions[0]; PendingCaptions.RemoveAt(0); BeginCaption(Next);
+		}
+		bChanged |= CaptionRemaining <= 0.f;
+	}
+	TextRefreshRemaining -= DeltaSeconds;
+	if (bChanged || TextRefreshRemaining <= 0.f) { TextRefreshRemaining = .1f; RefreshText(); }
 }
 int32 USovAccessibilityPresentation::NativePaint(const FPaintArgs& Args, const FGeometry& Geometry, const FSlateRect& CullingRect, FSlateWindowElementList& Elements, int32 Layer, const FWidgetStyle& Style, bool bParentEnabled) const
 {

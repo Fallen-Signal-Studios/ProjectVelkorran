@@ -133,6 +133,8 @@ public:
 
 
 protected:
+	/** Clips and reserve quantities are one transaction across inventory notifications. */
+	bool bAmmoCommitPending = false;
 
 	virtual void AddedToInventory(class UNarrativeInventoryComponent* Inventory, const bool bFromLoad) override; 
 	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;

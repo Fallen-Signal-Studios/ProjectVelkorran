@@ -156,6 +156,10 @@ public:
 	FNarrativeAttributeEvent OnGuardBroken;
 
 protected:
+	/** Fail closed on pathological recursive combat callbacks; ordinary nested hits stay synchronous. */
+	uint32 CombatResolutionDepth = 0;
+	/** An explicit zero-to-positive Health restore starts a new life even on the same ASC/avatar. */
+	uint64 CombatLifeEpoch = 0;
 	// Maintains the current percentage when a maximum attribute changes.
 	void AdjustAttributeForMaxChange(
 		FGameplayAttributeData& AffectedAttribute,

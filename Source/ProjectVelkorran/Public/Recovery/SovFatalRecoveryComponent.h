@@ -35,6 +35,8 @@ public:
 	bool OwnsFatalRecovery() const;
 	/** Verified defeat of a required companion retries the segment without inventing a player death. */
 	bool RequestCompanionFailure(USovCompanionComponent* Source);
+	/** A lost required participant retries its owning encounter without granting defeat rewards. */
+	bool RequestEncounterFailure(ASovEncounterDirector* Encounter, const FString& Reason);
 	/** Called before a restored entry releases its enemies. */
 	bool ProtectRestoredCheckpoint();
 	static bool IsSafeRecoveryPosition(const ASovPlayerCharacterBase* Player, const FVector& Position);
@@ -49,6 +51,7 @@ private:
 		const ASovPlayerCharacterBase* P, const APlayerController* PC) const;
 	void ResolveFatal(uint64 ExpectedEpoch);
 	void Retry(uint64 ExpectedEpoch);
+	bool BeginLivingFailureRecovery(ASovEncounterDirector* Encounter, const FString& Reason);
 	void SetState(ESovRecoveryState Value, const FString& Reason = FString());
 	bool ApplyProtection(float Seconds, bool bRescue);
 	void ReleaseInputLock();

@@ -108,8 +108,25 @@ bool USovFatalRecoveryComponent::RequestCompanionFailure(USovCompanionComponent*
 		|| ASC->GetAvatarActor() != P || bCanonicalCompanionFailure || !IsValid(Ally) || Ally->GetWorld() != GetWorld()
 		|| !AllyASC || !AllyASC->IsDead() || !Mission || !Mission->AllowedCompanionIds.Contains(Source->CompanionId)
 		|| (!Cast<ASovProtagonistCompanionCharacter>(Ally) && !IsValid(Source->RequiredEncounter))) { return false; }
+	return BeginLivingFailureRecovery(FindActiveEncounter(), TEXT("A required companion was defeated."));
+}
+bool USovFatalRecoveryComponent::RequestEncounterFailure(ASovEncounterDirector* Encounter, const FString& Reason)
+{
+	if (!IsValid(Encounter) || Encounter->GetWorld() != GetWorld() || !Encounter->HasEncounterPlayer(GetOwner())
+		|| Encounter->GetEncounterState() != ESovEncounterState::Failed) { return false; }
+	return BeginLivingFailureRecovery(Encounter, Reason);
+}
+bool USovFatalRecoveryComponent::BeginLivingFailureRecovery(ASovEncounterDirector* Encounter, const FString& Reason)
+{
+	ASovPlayerCharacterBase* P = Player();
+	ASovPlayerController* PC = P ? Cast<ASovPlayerController>(P->GetController()) : nullptr;
+	UNarrativeAbilitySystemComponent* ASC = BoundASC;
+	if (bEndingPlay || !P || !P->HasAuthority() || P->GetNetMode() != NM_Standalone || !P->IsCharacterReady()
+		|| !P->IsAlive() || !PC || PC->GetCampaignTransitionState() != ESovCampaignTransitionState::Idle
+		|| !IsValid(ASC) || ASC->GetAvatarActor() != P || bCanonicalCompanionFailure
+		|| State == ESovRecoveryState::Retrying || State == ESovRecoveryState::ResolvingFatal) { return false; }
 	const uint64 ExpectedEpoch = ++Epoch;
-	bCanonicalCompanionFailure = true; PendingEncounter = FindActiveEncounter();
+	bCanonicalCompanionFailure = true; PendingEncounter = Encounter;
 	if (!bOwnFailureBusy)
 	{
 		bOwnFailureBusy = true; ASC->AddLooseGameplayTag(FNarrativeGameplayTags::Get().State_Busy, 1);
@@ -122,7 +139,7 @@ bool USovFatalRecoveryComponent::RequestCompanionFailure(USovCompanionComponent*
 	if (!bOwnInputLock) { bOwnInputLock = true; LockedController = PC; PC->SetIgnoreMoveInput(true); PC->SetIgnoreLookInput(true); }
 	if (IsValid(PendingEncounter)) { PendingEncounter->FailEncounter(); }
 	if (!IsCurrentContext(ExpectedEpoch, ASC, P, PC)) { return false; }
-	SetState(ESovRecoveryState::Retrying, TEXT("A required companion was defeated."));
+	SetState(ESovRecoveryState::Retrying, Reason);
 	if (!IsCurrentContext(ExpectedEpoch, ASC, P, PC) || State != ESovRecoveryState::Retrying) { return false; }
 	GetWorld()->GetTimerManager().SetTimer(RetryTimer,
 		FTimerDelegate::CreateWeakLambda(this, [this, ExpectedEpoch]() { Retry(ExpectedEpoch); }),

@@ -61,6 +61,7 @@ public class NarrativeArsenal : ModuleRules
 			new string[]
 			{
 				"CoreUObject",
+				"RHI",
 				"Engine",
 				"Slate",
 				"SlateCore",
@@ -95,7 +96,6 @@ public class NarrativeArsenal : ModuleRules
 			}
 			);
 
-        PublicIncludePathModuleNames.AddRange(new string[] { "RHI" });
 
         if ((Target.IsInPlatformGroup(UnrealPlatformGroup.Windows)))
         {

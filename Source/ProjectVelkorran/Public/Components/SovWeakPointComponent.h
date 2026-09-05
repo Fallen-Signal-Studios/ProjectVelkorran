@@ -441,7 +441,6 @@ private:
 	 */
 	TArray<FPendingWeakPointBreak> PendingBreaks;
 	TArray<FPendingWeakPointBreak> PendingHits;
-	TSet<FGuid> ResolvedHitTransactions;
 	TArray<FDecalReceiverBinding> DecalReceiverBindings;
 	FTimerHandle WeakPointRevealExpiryTimerHandle;
 	FTimerHandle WeakPointRevealVisualRefreshTimerHandle;

@@ -1,6 +1,7 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 
 #include "Components/SovPoiseComponent.h"
+#include "Components/SovResourceOwnerPolicy.h"
 
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
@@ -44,7 +45,7 @@ void USovPoiseComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 bool USovPoiseComponent::InitializeWithAbilitySystem(UAbilitySystemComponent* InAbilitySystemComponent)
 {
-	if (!IsValid(InAbilitySystemComponent))
+	if (bUninitializing || bChangingOwnerLifecycle || !SovResourceOwner::IsCurrent(InAbilitySystemComponent, GetOwner()))
 	{
 		return false;
 	}
@@ -72,6 +73,9 @@ bool USovPoiseComponent::InitializeWithAbilitySystem(UAbilitySystemComponent* In
 
 	UninitializeFromAbilitySystem();
 	AbilitySystemComponent = InAbilitySystemComponent;
+	++LifecycleEpoch; ++StateEpoch;
+	bOwnerLifecycleRetired = false;
+	BindOwnerLifecycle();
 	bWarnedMissingAttributeSet = false;
 
 	const FSovGameplayTags& Tags = FSovGameplayTags::Get();
@@ -123,20 +127,26 @@ bool USovPoiseComponent::InitializeWithAbilitySystem(UAbilitySystemComponent* In
 	RefreshPoiseState(false);
 
 	TryStartRegeneration();
+	RefreshOwnerLifecycle();
 	return true;
 }
 
 void USovPoiseComponent::ResetForCheckpoint()
 {
-	if (!CanWritePoise()) { return; }
+	if (bResettingLifecycle || !CanWritePoise()) { return; }
+	TGuardValue<bool> Resetting(bResettingLifecycle, true);
+	const uint64 Epoch = ++LifecycleEpoch; ++StateEpoch;
+	bOwnerLifecycleRetired = false;
 	ClearLifecycleTimers();
 	RemoveOwnedStateTags();
+	if (Epoch != LifecycleEpoch || !CanWritePoise()) { return; }
 	PoiseState = ESovPoiseState::Stable;
 	bHasRecordedPoiseDamage = false;
 	bRegenerationDelayElapsed = true;
 	LastPoiseDamageWorldTime = GetWorldTimeSeconds();
 	LastRegenerationUpdateWorldTime = LastPoiseDamageWorldTime;
 	RefreshPoiseState(false);
+	if (Epoch != LifecycleEpoch || !CanWritePoise()) { return; }
 	if (GetPoise() > KINDA_SMALL_NUMBER && GetPoise() + KINDA_SMALL_NUMBER < GetMaxPoise()) { RecordPoiseDamage(); }
 }
 
@@ -202,6 +212,7 @@ float USovPoiseComponent::GetSecondsUntilRecoveryComplete() const
 
 bool USovPoiseComponent::RecoverFromPoiseBreak()
 {
+	if (!CanWritePoise()) { RetireOwnerLifecycle(); return false; }
 	if (!CanWritePoise() || PoiseState != ESovPoiseState::Broken)
 	{
 		return false;
@@ -217,7 +228,9 @@ bool USovPoiseComponent::RecoverFromPoiseBreak()
 	StopRegeneration();
 	bHasRecordedPoiseDamage = false;
 	bRegenerationDelayElapsed = true;
+	const uint64 Epoch = LifecycleEpoch;
 	SetPoiseInternal(GetMaxPoise());
+	if (Epoch != LifecycleEpoch || !CanWritePoise()) { return false; }
 	SetPoiseState(ESovPoiseState::Recovering, true);
 	ScheduleRecoveryEnd();
 	return true;
@@ -242,10 +255,15 @@ void USovPoiseComponent::TryInitializeFromOwner()
 void USovPoiseComponent::HandleOwnerASCInitialized()
 {
 	TryInitializeFromOwner();
+	RefreshOwnerLifecycle();
 }
 
 void USovPoiseComponent::UninitializeFromAbilitySystem()
 {
+	if (bUninitializing) { return; }
+	TGuardValue<bool> Uninitializing(bUninitializing, true);
+	++LifecycleEpoch; ++StateEpoch;
+	UnbindOwnerLifecycle();
 	StopRegeneration();
 
 	if (UWorld* World = GetWorld())
@@ -349,6 +367,10 @@ void USovPoiseComponent::ClearLifecycleTimers()
 
 void USovPoiseComponent::HandlePoiseAttributeChanged(const FOnAttributeChangeData& ChangeData)
 {
+	if (!SovResourceOwner::IsCurrent(AbilitySystemComponent, GetOwner())
+		|| (GetOwner()->HasAuthority() && !CanWritePoise())) { RetireOwnerLifecycle(); return; }
+	const uint64 Epoch = LifecycleEpoch;
+	const uint64 ChangeEpoch = ++ResourceChangeEpoch;
 	const float OldPoise = FMath::Max(ChangeData.OldValue, 0.0f);
 	const float NewPoise = FMath::Clamp(ChangeData.NewValue, 0.0f, GetMaxPoise());
 
@@ -368,7 +390,9 @@ void USovPoiseComponent::HandlePoiseAttributeChanged(const FOnAttributeChangeDat
 		RefreshPoiseState(!bRestoringCheckpoint);
 	}
 
+	if (Epoch != LifecycleEpoch || ChangeEpoch != ResourceChangeEpoch || !SovResourceOwner::IsCurrent(AbilitySystemComponent, GetOwner())) { return; }
 	OnPoiseChanged.Broadcast(OldPoise, NewPoise, GetMaxPoise());
+	if (Epoch != LifecycleEpoch || ChangeEpoch != ResourceChangeEpoch) { return; }
 
 	if (!CanWritePoise())
 	{
@@ -388,6 +412,10 @@ void USovPoiseComponent::HandlePoiseAttributeChanged(const FOnAttributeChangeDat
 
 void USovPoiseComponent::HandleMaxPoiseAttributeChanged(const FOnAttributeChangeData& ChangeData)
 {
+	if (!SovResourceOwner::IsCurrent(AbilitySystemComponent, GetOwner())
+		|| (GetOwner()->HasAuthority() && !CanWritePoise())) { RetireOwnerLifecycle(); return; }
+	const uint64 Epoch = LifecycleEpoch;
+	const uint64 ChangeEpoch = ++ResourceChangeEpoch;
 	const float CurrentPoise = GetPoise();
 	const float CurrentMaxPoise = FMath::Max(ChangeData.NewValue, 0.0f);
 
@@ -409,7 +437,9 @@ void USovPoiseComponent::HandleMaxPoiseAttributeChanged(const FOnAttributeChange
 		RefreshPoiseState(true);
 	}
 
+	if (Epoch != LifecycleEpoch || ChangeEpoch != ResourceChangeEpoch) { return; }
 	OnPoiseChanged.Broadcast(CurrentPoise, CurrentPoise, CurrentMaxPoise);
+	if (Epoch != LifecycleEpoch || ChangeEpoch != ResourceChangeEpoch) { return; }
 
 	if (!CanWritePoise()
 		|| PoiseState == ESovPoiseState::Broken
@@ -447,13 +477,16 @@ void USovPoiseComponent::HandleReplicatedStateTagChanged(
 	const FGameplayTag CallbackTag,
 	const int32 NewCount)
 {
+	if (bChangingOwnerLifecycle || bUninitializing) { return; }
 	static_cast<void>(CallbackTag);
 	static_cast<void>(NewCount);
 
-	if (!CanWritePoise())
+	if (GetOwner() && GetOwner()->HasAuthority())
 	{
-		RefreshPoiseState(true);
+		if (!CanWritePoise()) { RetireOwnerLifecycle(); }
+		return;
 	}
+	RefreshPoiseState(true);
 }
 
 void USovPoiseComponent::RecordPoiseDamage()
@@ -506,6 +539,7 @@ void USovPoiseComponent::HandleRegenerationDelayElapsed()
 
 void USovPoiseComponent::TryStartRegeneration()
 {
+	if (GetOwner() && GetOwner()->HasAuthority() && !CanWritePoise()) { RetireOwnerLifecycle(); return; }
 	if (!CanWritePoise()
 		|| PoiseState == ESovPoiseState::Broken
 		|| IsRegenerationBlocked()
@@ -562,6 +596,7 @@ void USovPoiseComponent::TryStartRegeneration()
 
 void USovPoiseComponent::HandleRegenerationTimerElapsed()
 {
+	if (!CanWritePoise()) { RetireOwnerLifecycle(); return; }
 	if (!CanWritePoise()
 		|| PoiseState == ESovPoiseState::Broken
 		|| IsRegenerationBlocked())
@@ -594,9 +629,11 @@ void USovPoiseComponent::HandleRegenerationTimerElapsed()
 		* FMath::Max(RegenerationPercentPerSecond, 0.0f)
 		* RegenerationSeconds;
 	const float NewPoise = FMath::Min(CurrentPoise + RegenerationAmount, CurrentMaxPoise);
+	const uint64 Epoch = LifecycleEpoch;
 	SetPoiseInternal(NewPoise);
+	if (Epoch != LifecycleEpoch || !CanWritePoise()) { return; }
 
-	if (NewPoise + KINDA_SMALL_NUMBER >= CurrentMaxPoise)
+	if (GetPoise() + KINDA_SMALL_NUMBER >= CurrentMaxPoise)
 	{
 		StopRegeneration();
 	}
@@ -696,6 +733,7 @@ void USovPoiseComponent::ScheduleRecoveryEnd()
 
 void USovPoiseComponent::HandleRecoveryElapsed()
 {
+	if (!CanWritePoise()) { RetireOwnerLifecycle(); return; }
 	if (!CanWritePoise() || PoiseState != ESovPoiseState::Recovering)
 	{
 		return;
@@ -773,18 +811,20 @@ void USovPoiseComponent::SetPoiseState(
 
 	const ESovPoiseState PreviousState = PoiseState;
 	PoiseState = NewState;
+	const uint64 Epoch = ++StateEpoch;
 
 	if (CanWritePoise())
 	{
 		UpdateOwnedStateTags(NewState);
 	}
 
-	if (!bBroadcastChanges)
+	if (!bBroadcastChanges || Epoch != StateEpoch)
 	{
 		return;
 	}
 
 	OnPoiseStateChanged.Broadcast(PreviousState, NewState);
+	if (Epoch != StateEpoch) { return; }
 
 	if (NewState == ESovPoiseState::Broken)
 	{
@@ -798,14 +838,17 @@ void USovPoiseComponent::SetPoiseState(
 
 void USovPoiseComponent::UpdateOwnedStateTags(const ESovPoiseState NewState)
 {
+	const uint64 Epoch = StateEpoch;
 	SetOwnedLooseTag(
 		PressuredTag,
 		NewState == ESovPoiseState::Pressured,
 		bAppliedPressuredTag);
+	if (Epoch != StateEpoch) { return; }
 	SetOwnedLooseTag(
 		BrokenTag,
 		NewState == ESovPoiseState::Broken,
 		bAppliedBrokenTag);
+	if (Epoch != StateEpoch) { return; }
 	SetOwnedLooseTag(
 		RecoveringTag,
 		NewState == ESovPoiseState::Recovering,
@@ -835,19 +878,20 @@ void USovPoiseComponent::SetOwnedLooseTag(
 
 	if (bShouldApply && !bAppliedFlag)
 	{
+		if (!CanWritePoise()) { return; }
+		bAppliedFlag = true;
 		AbilitySystemComponent->AddLooseGameplayTag(
 			Tag,
 			1,
 			EGameplayTagReplicationState::TagAndCountToAll);
-		bAppliedFlag = true;
 	}
 	else if (!bShouldApply && bAppliedFlag)
 	{
+		bAppliedFlag = false;
 		AbilitySystemComponent->RemoveLooseGameplayTag(
 			Tag,
 			1,
 			EGameplayTagReplicationState::TagAndCountToAll);
-		bAppliedFlag = false;
 	}
 }
 
@@ -865,8 +909,55 @@ void USovPoiseComponent::SetPoiseInternal(const float NewPoise)
 
 bool USovPoiseComponent::CanWritePoise() const
 {
-	return IsInitialized() && IsValid(GetOwner()) && GetOwner()->HasAuthority();
+	return !bUninitializing && !bChangingOwnerLifecycle && SovResourceOwner::CanSimulate(AbilitySystemComponent, GetOwner());
 }
+
+void USovPoiseComponent::BindOwnerLifecycle()
+{
+	UnbindOwnerLifecycle();
+	if (!AbilitySystemComponent) { return; }
+	OwnerHealthChangedHandle = AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(UNarrativeAttributeSetBase::GetHealthAttribute())
+		.AddUObject(this, &ThisClass::HandleOwnerHealthChanged);
+	const FGameplayTag Tags[] = {FNarrativeGameplayTags::Get().State_IsDead, FSovGameplayTags::Get().State_Fatal};
+	for (const auto& Tag : Tags)
+	{ OwnerLifeTagHandles.Add(Tag, AbilitySystemComponent->RegisterGameplayTagEvent(Tag, EGameplayTagEventType::NewOrRemoved)
+		.AddUObject(this, &ThisClass::HandleOwnerLifeTagChanged)); }
+}
+
+void USovPoiseComponent::UnbindOwnerLifecycle()
+{
+	if (IsInitialized())
+	{
+		AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(UNarrativeAttributeSetBase::GetHealthAttribute()).Remove(OwnerHealthChangedHandle);
+		for (const auto& Pair : OwnerLifeTagHandles)
+		{ AbilitySystemComponent->RegisterGameplayTagEvent(Pair.Key, EGameplayTagEventType::NewOrRemoved).Remove(Pair.Value); }
+	}
+	OwnerHealthChangedHandle.Reset(); OwnerLifeTagHandles.Reset();
+}
+
+void USovPoiseComponent::RefreshOwnerLifecycle()
+{
+	if (bChangingOwnerLifecycle || bUninitializing || !GetOwner() || !GetOwner()->HasAuthority()) { return; }
+	if (!CanWritePoise()) { RetireOwnerLifecycle(); return; }
+	if (bOwnerLifecycleRetired && !bRestoringCheckpoint)
+	{ bOwnerLifecycleRetired = false; ResetForCheckpoint(); }
+}
+
+void USovPoiseComponent::RetireOwnerLifecycle()
+{
+	if (bChangingOwnerLifecycle || bUninitializing || bOwnerLifecycleRetired) { return; }
+	{
+		TGuardValue<bool> Changing(bChangingOwnerLifecycle, true);
+		bOwnerLifecycleRetired = true; ++LifecycleEpoch; ++StateEpoch;
+		ClearLifecycleTimers(); RemoveOwnedStateTags();
+		PoiseState = ESovPoiseState::Stable; bHasRecordedPoiseDamage = false; bRegenerationDelayElapsed = false;
+	}
+	// A cleanup callback may have revived the same owner; resume from a fresh delay.
+	if (CanWritePoise()) { RefreshOwnerLifecycle(); }
+}
+
+void USovPoiseComponent::HandleOwnerHealthChanged(const FOnAttributeChangeData& Change) { RefreshOwnerLifecycle(); }
+void USovPoiseComponent::HandleOwnerLifeTagChanged(FGameplayTag Tag, int32 Count) { RefreshOwnerLifecycle(); }
 
 float USovPoiseComponent::GetWorldTimeSeconds() const
 {

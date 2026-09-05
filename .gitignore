@@ -26,6 +26,8 @@ StagedBuilds/
 *.sdf
 
 # Compiler and linker output
+__pycache__/
+*.py[cod]
 *.a
 *.app
 *.dll

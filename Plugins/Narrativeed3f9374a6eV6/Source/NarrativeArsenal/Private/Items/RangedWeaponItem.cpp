@@ -205,14 +205,16 @@ FTransform URangedWeaponItem::GetRecoilImpulse() const
 
 	if (ANarrativeCharacter* CharacterOwner = GetOwningNarrativeCharacter())
 	{
-		if (CharacterOwner->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_Weapon_IsAiming))
+		const FGameplayTag AimTag = CharacterOwner->IsLocallyControlled()
+			? FNarrativeGameplayTags::Get().State_Weapon_IsAiming_Local : FNarrativeGameplayTags::Get().State_Weapon_IsAiming;
+		if (CharacterOwner->HasMatchingGameplayTag(AimTag))
 		{
 			bIsAiming = true;
 		}
 	}
 
-	const FVector MinImpulse = bIsAiming ? HipRecoilImpulseTranslationMin : RecoilImpulseTranslationMin;
-	const FVector MaxImpulse = bIsAiming ? HipRecoilImpulseTranslationMax : RecoilImpulseTranslationMax;
+	const FVector MinImpulse = bIsAiming ? RecoilImpulseTranslationMin : HipRecoilImpulseTranslationMin;
+	const FVector MaxImpulse = bIsAiming ? RecoilImpulseTranslationMax : HipRecoilImpulseTranslationMax;
 
 	const float X = FMath::RandRange(FMath::Min(MinImpulse.X, MaxImpulse.X), FMath::Max(MinImpulse.X, MaxImpulse.X));
 	const float Y = FMath::RandRange(FMath::Min(MinImpulse.Y, MaxImpulse.Y), FMath::Max(MinImpulse.Y, MaxImpulse.Y));

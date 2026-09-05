@@ -3,6 +3,8 @@
 #include "UI/SovAccessibilityPresentation.h"
 #include "UI/SovAccessibilitySettingsMenu.h"
 #include "Framework/SovPlayerController.h"
+#include "Campaign/SovCampaignStateComponent.h"
+#include "Campaign/SovCampaignDefinition.h"
 #include "Narrative/SovNarrativeCueComponent.h"
 #include "Settings/SovGameUserSettings.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
@@ -39,6 +41,10 @@ void USovFrontendComponent::RefreshFrontend()
     auto* PC = Cast<ASovPlayerController>(GetOwner());
     if (bEnding || !IsActive() || !PC || !PC->IsLocalController() || !PC->GetLocalPlayer()
         || IsRunningCommandlet() || !FSlateApplication::IsInitialized()) { return; }
+    const auto* Campaign=PC->GetCampaignState();
+    const FName Mission=Campaign && Campaign->GetActiveMission()?Campaign->GetActiveMission()->MissionId:NAME_None;
+    if(PresentationAvatar.Get()!=PC->GetPawn() || PresentationMission!=Mission)
+    { Unbind(); if(bEnding || !IsValid(PC)) { return; } PresentationAvatar=PC->GetPawn(); PresentationMission=Mission; }
     if (!Presentation)
     {
         Presentation = CreateWidget<USovAccessibilityPresentation>(PC, USovAccessibilityPresentation::StaticClass());
@@ -64,6 +70,7 @@ void USovFrontendComponent::RefreshFrontend()
     }
     if (PC->GetCampaignTransitionState() != ESovCampaignTransitionState::Idle)
     { ReleaseSetupPause(); return; }
+    if (Settings && !Settings->AreAccountPreferencesReady()) { return; }
     if (Settings && !Settings->HasCompletedAccessibilitySetup() && PC->GetNarrativeGameplayHUD())
     {
         if ((!SetupMenu || !SetupMenu->IsActivated()) && OpenAccessibilitySettings()) { SetupMenu->SetFirstBoot(true); }
@@ -85,11 +92,13 @@ void USovFrontendComponent::BindProducers(UTalesComponent* Tales, USovNarrativeC
             BoundTales->OnNPCDialogueLineFinished.AddUniqueDynamic(this, &ThisClass::OnNPCLineFinished);
             BoundTales->OnPlayerDialogueLineFinished.AddUniqueDynamic(this, &ThisClass::OnPlayerLineFinished);
             BoundTales->OnDialogueFinished.AddUniqueDynamic(this, &ThisClass::OnDialogueEnded);
+            BoundTales->OnDialogueSuspensionChanged.AddUniqueDynamic(this, &ThisClass::OnDialogueSuspended);
         }
         if (BoundCues.IsValid())
         {
             BoundCues->OnCueStarted.AddUniqueDynamic(this, &ThisClass::OnCueStarted);
             BoundCues->OnCueEnded.AddUniqueDynamic(this, &ThisClass::OnCueEnded);
+            BoundCues->OnCueAudioReady.AddUniqueDynamic(this, &ThisClass::OnCueAudioReady);
         }
     }
     if (BoundASC.Get() != ASC)
@@ -124,13 +133,15 @@ void USovFrontendComponent::ReleaseSetupPause()
 void USovFrontendComponent::TickComponent(float Delta, ELevelTick TickType, FActorComponentTickFunction* Tick)
 {
     Super::TickComponent(Delta, TickType, Tick); RefreshFrontend();
+    if (BoundCues.IsValid() && SpeechCue.IsValid())
+    { BoundCues->SetBarkSubtitleHold(SpeechCue.Get(), Presentation, Presentation && Presentation->IsInViewport() && Presentation->HasUnreadSpeech(CueReceipt)); }
 }
 void USovFrontendComponent::OnNPCLine(UDialogue* Dialogue, UDialogueNode_NPC* Node, const FDialogueLine& Line, const FSpeakerInfo& Speaker)
 {
     if (bEnding || !Presentation || !IsValid(Dialogue) || !IsValid(Node) || Dialogue->GetCurrentNode() != Node
         || !BoundTales.IsValid() || BoundTales->GetCurrentDialogue() != Dialogue) { return; }
-    RetirePreviousSpeech(Dialogue);
-    const uint64 Epoch = ++SpeechEpoch;
+    const uint64 Epoch = ++SpeechEpoch; RetirePreviousSpeech(Dialogue);
+    if(bEnding || SpeechEpoch!=Epoch || !Presentation || !BoundTales.IsValid() || BoundTales->GetCurrentDialogue()!=Dialogue) { return; }
     SpeechDialogue = Dialogue; SpeechNode = Node; SpeechCue.Reset();
     FText Text = Line.Text; Dialogue->ReplaceStringVariables(Node, Line, Text);
     if (bEnding || SpeechEpoch != Epoch || !SpeechDialogue.IsValid() || !BoundTales.IsValid()
@@ -139,77 +150,105 @@ void USovFrontendComponent::OnNPCLine(UDialogue* Dialogue, UDialogueNode_NPC* No
     const auto* Character = Cast<ANarrativeCharacter>(Avatar);
     const FText Name = Character ? Character->GetCharacterName()
         : Speaker.NPCDataAsset ? Speaker.NPCDataAsset->NPCName : FText::FromName(Speaker.GetSpeakerID());
-    Presentation->PresentSpeech(Name, Text, -1.f, Avatar ? Avatar->GetActorLocation() : FVector::ZeroVector, true);
+    USovAccessibilityPresentation* View=Presentation; const FGuid Receipt=View->PresentOwnedSpeech(Name, Text, -1.f, Avatar ? Avatar->GetActorLocation() : FVector::ZeroVector, true, IsValid(Avatar));
+    if(!bEnding && SpeechEpoch==Epoch && Presentation==View) { SpeechReceipt=Receipt; }
 }
 void USovFrontendComponent::OnPlayerLine(UDialogue* Dialogue, UDialogueNode_Player* Node, const FDialogueLine& Line)
 {
     if (bEnding || !Presentation || !IsValid(Dialogue) || !IsValid(Node) || Dialogue->GetCurrentNode() != Node
         || !BoundTales.IsValid() || BoundTales->GetCurrentDialogue() != Dialogue) { return; }
-    RetirePreviousSpeech(Dialogue);
-    const uint64 Epoch = ++SpeechEpoch;
+    const uint64 Epoch = ++SpeechEpoch; RetirePreviousSpeech(Dialogue);
+    if(bEnding || SpeechEpoch!=Epoch || !Presentation || !BoundTales.IsValid() || BoundTales->GetCurrentDialogue()!=Dialogue) { return; }
     SpeechDialogue = Dialogue; SpeechNode = Node; SpeechCue.Reset();
     FText Text = Line.Text; Dialogue->ReplaceStringVariables(Node, Line, Text);
     if (bEnding || SpeechEpoch != Epoch || !SpeechDialogue.IsValid() || !BoundTales.IsValid()
         || BoundTales->GetCurrentDialogue() != Dialogue || !IsValid(Presentation)) { return; }
     AActor* Avatar = Dialogue->GetPlayerAvatar(); const auto* Character = Cast<ANarrativeCharacter>(Avatar);
-    Presentation->PresentSpeech(Character ? Character->GetCharacterName() : LOCTEXT("Player", "You"), Text,
-        -1.f, Avatar ? Avatar->GetActorLocation() : FVector::ZeroVector, true);
+    USovAccessibilityPresentation* View=Presentation; const FGuid Receipt=View->PresentOwnedSpeech(Character ? Character->GetCharacterName() : LOCTEXT("Player", "You"), Text,
+        -1.f, Avatar ? Avatar->GetActorLocation() : FVector::ZeroVector, true, IsValid(Avatar));
+    if(!bEnding && SpeechEpoch==Epoch && Presentation==View) { SpeechReceipt=Receipt; }
 }
 void USovFrontendComponent::OnNPCLineFinished(UDialogue* Dialogue, UDialogueNode_NPC* Node, const FDialogueLine& Line, const FSpeakerInfo& Speaker)
 {
     if (Presentation && SpeechDialogue.Get() == Dialogue && SpeechNode.Get() == Node)
-    { ++SpeechEpoch; SpeechNode.Reset(); Presentation->ClearSpeech(); }
+    { ++SpeechEpoch; SpeechNode.Reset(); Presentation->FinishOwnedSpeech(SpeechReceipt); }
 }
 void USovFrontendComponent::OnPlayerLineFinished(UDialogue* Dialogue, UDialogueNode_Player* Node, const FDialogueLine& Line)
 {
     if (Presentation && SpeechDialogue.Get() == Dialogue && SpeechNode.Get() == Node)
-    { ++SpeechEpoch; SpeechNode.Reset(); Presentation->ClearSpeech(); }
+    { ++SpeechEpoch; SpeechNode.Reset(); Presentation->FinishOwnedSpeech(SpeechReceipt); }
 }
 void USovFrontendComponent::OnDialogueEnded(UDialogue* Dialogue, bool bStartingNew, EExitDialogueReason Reason)
 {
     if (SpeechDialogue.Get() != Dialogue) { return; }
     ++SpeechEpoch; SpeechDialogue.Reset(); SpeechNode.Reset();
-    if (Presentation) { Presentation->ClearSpeech(); Presentation->ClearSceneHistory(); }
+    bRetireSceneOnNextLine = true; const FGuid FinishedReceipt=SpeechReceipt; SpeechReceipt.Invalidate();
+    if (Presentation)
+    {
+        Presentation->FinishOwnedSpeech(FinishedReceipt);
+        if (bStartingNew || Reason != EExitDialogueReason::EDR_NoLines) { Presentation->ClearSceneHistory(); }
+    }
+}
+void USovFrontendComponent::OnDialogueSuspended(UDialogue* Dialogue, bool bSuspended)
+{
+    if (!Presentation || SpeechDialogue.Get() != Dialogue) { return; }
+    if (bSuspended) { Presentation->SuspendDialogueSpeech(); }
+    else { Presentation->ResumeDialogueSpeech(); }
 }
 void USovFrontendComponent::OnCueStarted(USovNarrativeCue* Cue, AActor* Speaker, const FText& Caption, float Seconds)
 {
-    if (bEnding || !Presentation || !IsValid(Cue) || (BoundTales.IsValid() && BoundTales->GetCurrentDialogue())) { return; }
-    RetirePreviousSpeech(nullptr);
-    ++SpeechEpoch; SpeechDialogue.Reset(); SpeechNode.Reset(); SpeechCue = Cue;
+    UDialogue* Dialogue = BoundTales.IsValid() ? BoundTales->GetCurrentDialogue() : nullptr;
+    if (bEnding || !Presentation || !IsValid(Cue) || (Dialogue && !Dialogue->IsPlaybackSuspended())) { return; }
+    const uint64 Epoch=++SpeechEpoch; if (!Dialogue) { RetirePreviousSpeech(nullptr); }
+    if(bEnding || SpeechEpoch!=Epoch || !Presentation) { return; }
+    SpeechCue = Cue;
     const auto* Character = Cast<ANarrativeCharacter>(Speaker);
-    Presentation->PresentSpeech(Character ? Character->GetCharacterName() : FText::FromName(Cue->SpeakerId), Caption,
-        Seconds, IsValid(Speaker) ? Speaker->GetActorLocation() : FVector::ZeroVector, false);
+    USovAccessibilityPresentation* View=Presentation; const FGuid Receipt=View->PresentOwnedSpeech(Character ? Character->GetCharacterName() : FText::FromName(Cue->SpeakerId), Caption,
+        Seconds, IsValid(Speaker) ? Speaker->GetActorLocation() : FVector::ZeroVector, false, IsValid(Speaker));
+    if(bEnding || SpeechEpoch!=Epoch || Presentation!=View || SpeechCue.Get()!=Cue) { return; }
+    CueReceipt=Receipt;
+    if (BoundCues.IsValid()) { BoundCues->SetBarkSubtitleHold(Cue, View, View->IsInViewport() && View->HasUnreadSpeech(CueReceipt)); }
 }
 void USovFrontendComponent::OnCueEnded(USovNarrativeCue* Cue, bool bInterrupted)
 {
-    if (Presentation && SpeechCue.Get() == Cue) { ++SpeechEpoch; SpeechCue.Reset(); Presentation->ClearSpeech(); }
+    if (Presentation && SpeechCue.Get() == Cue) { ++SpeechEpoch; SpeechCue.Reset(); Presentation->FinishOwnedSpeech(CueReceipt); CueReceipt.Invalidate(); }
+}
+void USovFrontendComponent::OnCueAudioReady(USovNarrativeCue* Cue, float Seconds)
+{
+    if (!bEnding && Presentation && SpeechCue.Get() == Cue) { Presentation->RestartOwnedSpeech(CueReceipt, Seconds); }
 }
 void USovFrontendComponent::OnDamage(const FSovDamageResult& Result)
 {
     auto* PC = Cast<ASovPlayerController>(GetOwner());
     if (bEnding || !Presentation || !PC || !BoundASC.IsValid() || Result.TargetActor != PC->GetPawn()
         || BoundASC->GetAvatarActor() != PC->GetPawn()) { return; }
-    FText Caption;
-    if (Result.bPerfectDefense) { Caption = LOCTEXT("PerfectDefense", "Perfect defense"); }
-    else if (Result.bGuardBroken) { Caption = LOCTEXT("GuardBreak", "Guard broken"); }
-    else if (Result.bShieldBroken) { Caption = LOCTEXT("ShieldBreak", "Shield broken"); }
-    else if (Result.bPoiseBroken) { Caption = LOCTEXT("PoiseBreak", "Staggered"); }
-    else if (Result.bDeflected) { Caption = LOCTEXT("Deflected", "Attack deflected"); }
-    else if (Result.AppliedHealthDamage > 0.f || Result.AppliedShieldDamage > 0.f) { Caption = LOCTEXT("IncomingDamage", "Incoming damage"); }
-    if (!Caption.IsEmpty())
-    { Presentation->PresentCaption(Caption, 2.f, IsValid(Result.SourceActor) ? Result.SourceActor->GetActorLocation() : FVector::ZeroVector); }
+    const bool bDirection = IsValid(Result.SourceActor);
+    const FVector Location = bDirection ? Result.SourceActor->GetActorLocation() : FVector::ZeroVector;
+    USovAccessibilityPresentation* View=Presentation; const uint64 Epoch=SpeechEpoch;
+    const auto Caption = [&](bool bShow, FName Key, const FText& Text, int32 Priority)
+    { if (bShow && !bEnding && SpeechEpoch==Epoch && Presentation==View && IsValid(PC) && PC->GetPawn()==Result.TargetActor) { View->PresentPrioritizedCaption(Text, 3.f, Location, Key, Priority, bDirection); } };
+    Caption(Result.bPerfectDefense,"PerfectDefense",LOCTEXT("PerfectDefense","Perfect defense"),80);
+    Caption(Result.bGuardBroken,"GuardBreak",LOCTEXT("GuardBreak","Guard broken"),100);
+    Caption(Result.bShieldBroken,"ShieldBreak",LOCTEXT("ShieldBreak","Shield broken"),100);
+    Caption(Result.bPoiseBroken,"PoiseBreak",LOCTEXT("PoiseBreak","Staggered"),90);
+    Caption(Result.bDeflected,"Deflected",LOCTEXT("Deflected","Attack deflected"),80);
+    Caption(Result.AppliedHealthDamage > 0.f || Result.AppliedShieldDamage > 0.f,"IncomingDamage",LOCTEXT("IncomingDamage","Incoming damage"),0);
 }
 void USovFrontendComponent::RetirePreviousSpeech(UDialogue* NewDialogue)
 {
     if (!Presentation) { return; }
-    if (SpeechDialogue.IsValid() && SpeechDialogue.Get() != NewDialogue)
+    const bool Clear=(bRetireSceneOnNextLine && NewDialogue) || (SpeechDialogue.IsValid() && SpeechDialogue.Get() != NewDialogue);
+    bRetireSceneOnNextLine = false;
+    if (Clear)
     { Presentation->ClearSceneHistory(); }
     else if (SpeechNode.IsValid() || SpeechCue.IsValid())
-    { Presentation->ClearSpeech(); }
+    { Presentation->FinishOwnedSpeech(SpeechReceipt); Presentation->FinishOwnedSpeech(CueReceipt); }
 }
 void USovFrontendComponent::Unbind()
 {
     ++SpeechEpoch; SpeechDialogue.Reset(); SpeechNode.Reset(); SpeechCue.Reset();
+    if (BoundCues.IsValid()) { BoundCues->SetBarkSubtitleHold(nullptr, Presentation, false); }
+    SpeechReceipt.Invalidate(); CueReceipt.Invalidate(); bRetireSceneOnNextLine = false;
     if (BoundTales.IsValid())
     {
         BoundTales->OnNPCDialogueLineStarted.RemoveDynamic(this, &ThisClass::OnNPCLine);
@@ -217,11 +256,13 @@ void USovFrontendComponent::Unbind()
         BoundTales->OnNPCDialogueLineFinished.RemoveDynamic(this, &ThisClass::OnNPCLineFinished);
         BoundTales->OnPlayerDialogueLineFinished.RemoveDynamic(this, &ThisClass::OnPlayerLineFinished);
         BoundTales->OnDialogueFinished.RemoveDynamic(this, &ThisClass::OnDialogueEnded);
+        BoundTales->OnDialogueSuspensionChanged.RemoveDynamic(this, &ThisClass::OnDialogueSuspended);
     }
     if (BoundCues.IsValid())
     {
         BoundCues->OnCueStarted.RemoveDynamic(this, &ThisClass::OnCueStarted);
         BoundCues->OnCueEnded.RemoveDynamic(this, &ThisClass::OnCueEnded);
+        BoundCues->OnCueAudioReady.RemoveDynamic(this, &ThisClass::OnCueAudioReady);
     }
     if (BoundASC.IsValid()) { BoundASC->OnDamageResolvedAsTarget.RemoveDynamic(this, &ThisClass::OnDamage); }
     BoundTales.Reset(); BoundCues.Reset(); BoundASC.Reset();

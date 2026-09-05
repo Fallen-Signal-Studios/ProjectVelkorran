@@ -1,0 +1,209 @@
+HOST UNIT TESTS after required-category gate correction. Synthetic engine I/O; not Unreal results.
+
+.............................................Starting editor_unity_clean; log: /tmp/tmp_njk6qox/Runs/20260905T050022Z-964b687b91b4/editor_unity_clean.log
+Starting editor_unity; log: /tmp/tmp_njk6qox/Runs/20260905T050022Z-964b687b91b4/editor_unity.log
+Starting editor_nonunity_clean; log: /tmp/tmp_njk6qox/Runs/20260905T050022Z-964b687b91b4/editor_nonunity_clean.log
+Starting editor_nonunity; log: /tmp/tmp_njk6qox/Runs/20260905T050022Z-964b687b91b4/editor_nonunity.log
+Starting game_development_clean; log: /tmp/tmp_njk6qox/Runs/20260905T050022Z-964b687b91b4/game_development_clean.log
+Starting game_development; log: /tmp/tmp_njk6qox/Runs/20260905T050022Z-964b687b91b4/game_development.log
+Starting game_shipping_clean; log: /tmp/tmp_njk6qox/Runs/20260905T050022Z-964b687b91b4/game_shipping_clean.log
+Starting game_shipping; log: /tmp/tmp_njk6qox/Runs/20260905T050022Z-964b687b91b4/game_shipping.log
+Starting automation; log: /tmp/tmp_njk6qox/Runs/20260905T050022Z-964b687b91b4/automation.log
+Starting campaign_worlds; log: /tmp/tmp_njk6qox/Runs/20260905T050022Z-964b687b91b4/campaign_worlds.log
+Starting blueprints; log: /tmp/tmp_njk6qox/Runs/20260905T050022Z-964b687b91b4/blueprints.log
+Starting asset_validation; log: /tmp/tmp_njk6qox/Runs/20260905T050022Z-964b687b91b4/asset_validation.log
+Starting cook_package; log: /tmp/tmp_njk6qox/Runs/20260905T050022Z-964b687b91b4/cook_package.log
+Starting packaged_route; log: /tmp/tmp_njk6qox/Runs/20260905T050022Z-964b687b91b4/packaged_route.log
+Implemented stages passed, but incomplete required validator categories prevent qualification.
+..Validation manifest: /tmp/tmp_njk6qox/Runs/20260905T050022Z-964b687b91b4/summary.json
+Starting automation; log: /tmp/tmpcgcf4g8z/Runs/20260905T050022Z-df70694e7200/automation.log
+.Validation manifest: /tmp/tmpcgcf4g8z/Runs/20260905T050022Z-df70694e7200/summary.json
+Starting editor_unity_clean; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-1d2ca03e3b98/editor_unity_clean.log
+editor_unity_clean exited 9
+Validation manifest: /tmp/tmpei1m52o5/Runs/20260905T050022Z-1d2ca03e3b98/summary.json
+Starting editor_unity_clean; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-18e9a409274c/editor_unity_clean.log
+Starting editor_unity; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-18e9a409274c/editor_unity.log
+editor_unity exited 9
+Validation manifest: /tmp/tmpei1m52o5/Runs/20260905T050022Z-18e9a409274c/summary.json
+Starting editor_unity_clean; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-44403700362e/editor_unity_clean.log
+Starting editor_unity; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-44403700362e/editor_unity.log
+Starting editor_nonunity_clean; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-44403700362e/editor_nonunity_clean.log
+Starting editor_nonunity; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-44403700362e/editor_nonunity.log
+editor_nonunity exited 9
+Validation manifest: /tmp/tmpei1m52o5/Runs/20260905T050022Z-44403700362e/summary.json
+Starting editor_unity_clean; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-1e638537ed49/editor_unity_clean.log
+Starting editor_unity; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-1e638537ed49/editor_unity.log
+Starting editor_nonunity_clean; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-1e638537ed49/editor_nonunity_clean.log
+Starting editor_nonunity; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-1e638537ed49/editor_nonunity.log
+Starting game_development_clean; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-1e638537ed49/game_development_clean.log
+Starting game_development; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-1e638537ed49/game_development.log
+game_development exited 9
+Validation manifest: /tmp/tmpei1m52o5/Runs/20260905T050022Z-1e638537ed49/summary.json
+Starting editor_unity_clean; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-e371d06e32e3/editor_unity_clean.log
+Starting editor_unity; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-e371d06e32e3/editor_unity.log
+Starting editor_nonunity_clean; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-e371d06e32e3/editor_nonunity_clean.log
+Starting editor_nonunity; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-e371d06e32e3/editor_nonunity.log
+Starting game_development_clean; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-e371d06e32e3/game_development_clean.log
+Starting game_development; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-e371d06e32e3/game_development.log
+Starting game_shipping_clean; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-e371d06e32e3/game_shipping_clean.log
+Starting game_shipping; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-e371d06e32e3/game_shipping.log
+game_shipping exited 9
+Validation manifest: /tmp/tmpei1m52o5/Runs/20260905T050022Z-e371d06e32e3/summary.json
+Starting editor_unity_clean; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-b471bb0c033f/editor_unity_clean.log
+Starting editor_unity; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-b471bb0c033f/editor_unity.log
+Starting editor_nonunity_clean; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-b471bb0c033f/editor_nonunity_clean.log
+Starting editor_nonunity; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-b471bb0c033f/editor_nonunity.log
+Starting game_development_clean; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-b471bb0c033f/game_development_clean.log
+Starting game_development; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-b471bb0c033f/game_development.log
+Starting game_shipping_clean; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-b471bb0c033f/game_shipping_clean.log
+Starting game_shipping; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-b471bb0c033f/game_shipping.log
+Starting automation; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-b471bb0c033f/automation.log
+automation exited 9
+Validation manifest: /tmp/tmpei1m52o5/Runs/20260905T050022Z-b471bb0c033f/summary.json
+Starting editor_unity_clean; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-0f2543b5f838/editor_unity_clean.log
+Starting editor_unity; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-0f2543b5f838/editor_unity.log
+Starting editor_nonunity_clean; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-0f2543b5f838/editor_nonunity_clean.log
+Starting editor_nonunity; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-0f2543b5f838/editor_nonunity.log
+Starting game_development_clean; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-0f2543b5f838/game_development_clean.log
+Starting game_development; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-0f2543b5f838/game_development.log
+Starting game_shipping_clean; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-0f2543b5f838/game_shipping_clean.log
+Starting game_shipping; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-0f2543b5f838/game_shipping.log
+Starting automation; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-0f2543b5f838/automation.log
+Starting campaign_worlds; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-0f2543b5f838/campaign_worlds.log
+campaign_worlds exited 9
+Validation manifest: /tmp/tmpei1m52o5/Runs/20260905T050022Z-0f2543b5f838/summary.json
+Starting editor_unity_clean; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-ead477123071/editor_unity_clean.log
+Starting editor_unity; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-ead477123071/editor_unity.log
+Starting editor_nonunity_clean; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-ead477123071/editor_nonunity_clean.log
+Starting editor_nonunity; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-ead477123071/editor_nonunity.log
+Starting game_development_clean; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-ead477123071/game_development_clean.log
+Starting game_development; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-ead477123071/game_development.log
+Starting game_shipping_clean; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-ead477123071/game_shipping_clean.log
+Starting game_shipping; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-ead477123071/game_shipping.log
+Starting automation; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-ead477123071/automation.log
+Starting campaign_worlds; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-ead477123071/campaign_worlds.log
+Starting blueprints; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-ead477123071/blueprints.log
+blueprints exited 9
+Validation manifest: /tmp/tmpei1m52o5/Runs/20260905T050022Z-ead477123071/summary.json
+Starting editor_unity_clean; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-998a0793197a/editor_unity_clean.log
+Starting editor_unity; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-998a0793197a/editor_unity.log
+Starting editor_nonunity_clean; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-998a0793197a/editor_nonunity_clean.log
+Starting editor_nonunity; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-998a0793197a/editor_nonunity.log
+Starting game_development_clean; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-998a0793197a/game_development_clean.log
+Starting game_development; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-998a0793197a/game_development.log
+Starting game_shipping_clean; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-998a0793197a/game_shipping_clean.log
+Starting game_shipping; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-998a0793197a/game_shipping.log
+Starting automation; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-998a0793197a/automation.log
+Starting campaign_worlds; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-998a0793197a/campaign_worlds.log
+Starting blueprints; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-998a0793197a/blueprints.log
+Starting asset_validation; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-998a0793197a/asset_validation.log
+asset_validation exited 9
+Validation manifest: /tmp/tmpei1m52o5/Runs/20260905T050022Z-998a0793197a/summary.json
+Starting editor_unity_clean; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-7f8044b8b1f2/editor_unity_clean.log
+Starting editor_unity; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-7f8044b8b1f2/editor_unity.log
+Starting editor_nonunity_clean; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-7f8044b8b1f2/editor_nonunity_clean.log
+Starting editor_nonunity; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-7f8044b8b1f2/editor_nonunity.log
+Starting game_development_clean; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-7f8044b8b1f2/game_development_clean.log
+Starting game_development; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-7f8044b8b1f2/game_development.log
+Starting game_shipping_clean; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-7f8044b8b1f2/game_shipping_clean.log
+Starting game_shipping; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-7f8044b8b1f2/game_shipping.log
+Starting automation; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-7f8044b8b1f2/automation.log
+Starting campaign_worlds; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-7f8044b8b1f2/campaign_worlds.log
+Starting blueprints; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-7f8044b8b1f2/blueprints.log
+Starting asset_validation; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-7f8044b8b1f2/asset_validation.log
+Starting cook_package; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-7f8044b8b1f2/cook_package.log
+cook_package exited 9
+Validation manifest: /tmp/tmpei1m52o5/Runs/20260905T050022Z-7f8044b8b1f2/summary.json
+Starting editor_unity_clean; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-5b1529e82356/editor_unity_clean.log
+Starting editor_unity; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-5b1529e82356/editor_unity.log
+Starting editor_nonunity_clean; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-5b1529e82356/editor_nonunity_clean.log
+Starting editor_nonunity; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-5b1529e82356/editor_nonunity.log
+Starting game_development_clean; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-5b1529e82356/game_development_clean.log
+Starting game_development; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-5b1529e82356/game_development.log
+Starting game_shipping_clean; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-5b1529e82356/game_shipping_clean.log
+Starting game_shipping; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-5b1529e82356/game_shipping.log
+Starting automation; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-5b1529e82356/automation.log
+Starting campaign_worlds; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-5b1529e82356/campaign_worlds.log
+Starting blueprints; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-5b1529e82356/blueprints.log
+Starting asset_validation; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-5b1529e82356/asset_validation.log
+Starting cook_package; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-5b1529e82356/cook_package.log
+Starting packaged_route; log: /tmp/tmpei1m52o5/Runs/20260905T050022Z-5b1529e82356/packaged_route.log
+packaged_route exited 9
+.Validation manifest: /tmp/tmpei1m52o5/Runs/20260905T050022Z-5b1529e82356/summary.json
+Starting editor_unity_clean; log: /tmp/tmppt096gql/Runs/20260905T050022Z-0fd77f25c8e2/editor_unity_clean.log
+Starting editor_unity; log: /tmp/tmppt096gql/Runs/20260905T050022Z-0fd77f25c8e2/editor_unity.log
+Starting editor_nonunity_clean; log: /tmp/tmppt096gql/Runs/20260905T050022Z-0fd77f25c8e2/editor_nonunity_clean.log
+Starting editor_nonunity; log: /tmp/tmppt096gql/Runs/20260905T050022Z-0fd77f25c8e2/editor_nonunity.log
+Starting game_development_clean; log: /tmp/tmppt096gql/Runs/20260905T050022Z-0fd77f25c8e2/game_development_clean.log
+Starting game_development; log: /tmp/tmppt096gql/Runs/20260905T050022Z-0fd77f25c8e2/game_development.log
+Starting game_shipping_clean; log: /tmp/tmppt096gql/Runs/20260905T050022Z-0fd77f25c8e2/game_shipping_clean.log
+Starting game_shipping; log: /tmp/tmppt096gql/Runs/20260905T050022Z-0fd77f25c8e2/game_shipping.log
+Starting automation; log: /tmp/tmppt096gql/Runs/20260905T050022Z-0fd77f25c8e2/automation.log
+report.succeeded must be a nonnegative integer
+Validation manifest: /tmp/tmppt096gql/Runs/20260905T050022Z-0fd77f25c8e2/summary.json
+Starting editor_unity_clean; log: /tmp/tmppt096gql/Runs/20260905T050022Z-13cd42787ee8/editor_unity_clean.log
+Starting editor_unity; log: /tmp/tmppt096gql/Runs/20260905T050022Z-13cd42787ee8/editor_unity.log
+Starting editor_nonunity_clean; log: /tmp/tmppt096gql/Runs/20260905T050022Z-13cd42787ee8/editor_nonunity_clean.log
+Starting editor_nonunity; log: /tmp/tmppt096gql/Runs/20260905T050022Z-13cd42787ee8/editor_nonunity.log
+Starting game_development_clean; log: /tmp/tmppt096gql/Runs/20260905T050022Z-13cd42787ee8/game_development_clean.log
+Starting game_development; log: /tmp/tmppt096gql/Runs/20260905T050022Z-13cd42787ee8/game_development.log
+Starting game_shipping_clean; log: /tmp/tmppt096gql/Runs/20260905T050022Z-13cd42787ee8/game_shipping_clean.log
+Starting game_shipping; log: /tmp/tmppt096gql/Runs/20260905T050022Z-13cd42787ee8/game_shipping.log
+Starting automation; log: /tmp/tmppt096gql/Runs/20260905T050022Z-13cd42787ee8/automation.log
+Starting campaign_worlds; log: /tmp/tmppt096gql/Runs/20260905T050022Z-13cd42787ee8/campaign_worlds.log
+Starting blueprints; log: /tmp/tmppt096gql/Runs/20260905T050022Z-13cd42787ee8/blueprints.log
+Starting asset_validation; log: /tmp/tmppt096gql/Runs/20260905T050022Z-13cd42787ee8/asset_validation.log
+Starting cook_package; log: /tmp/tmppt096gql/Runs/20260905T050022Z-13cd42787ee8/cook_package.log
+Starting packaged_route; log: /tmp/tmppt096gql/Runs/20260905T050022Z-13cd42787ee8/packaged_route.log
+Source/config/scripts changed during validation; discard this candidate
+.Validation manifest: /tmp/tmppt096gql/Runs/20260905T050022Z-13cd42787ee8/summary.json
+Starting editor_unity; log: /tmp/tmpbsg0fyyr/Runs/20260905T050022Z-e3fda49a6805/editor_unity.log
+Starting editor_nonunity; log: /tmp/tmpbsg0fyyr/Runs/20260905T050022Z-e3fda49a6805/editor_nonunity.log
+Starting game_development; log: /tmp/tmpbsg0fyyr/Runs/20260905T050022Z-e3fda49a6805/game_development.log
+Starting game_shipping; log: /tmp/tmpbsg0fyyr/Runs/20260905T050022Z-e3fda49a6805/game_shipping.log
+Starting automation; log: /tmp/tmpbsg0fyyr/Runs/20260905T050022Z-e3fda49a6805/automation.log
+Starting campaign_worlds; log: /tmp/tmpbsg0fyyr/Runs/20260905T050022Z-e3fda49a6805/campaign_worlds.log
+Starting blueprints; log: /tmp/tmpbsg0fyyr/Runs/20260905T050022Z-e3fda49a6805/blueprints.log
+Starting asset_validation; log: /tmp/tmpbsg0fyyr/Runs/20260905T050022Z-e3fda49a6805/asset_validation.log
+Starting cook_package; log: /tmp/tmpbsg0fyyr/Runs/20260905T050022Z-e3fda49a6805/cook_package.log
+Starting packaged_route; log: /tmp/tmpbsg0fyyr/Runs/20260905T050022Z-e3fda49a6805/packaged_route.log
+..Config missions must contain real /Game asset paths
+.Validation manifest: /tmp/tmpbsg0fyyr/Runs/20260905T050022Z-e3fda49a6805/summary.json
+Validation manifest: /tmp/tmpsmpiqmw2/Runs/20260905T050022Z-4df258af3c5e/summary.json
+Starting editor_unity_clean; log: /tmp/tmpgzfxyoiz/Runs/20260905T050022Z-30a2f45f8f8a/editor_unity_clean.log
+Starting editor_unity; log: /tmp/tmpgzfxyoiz/Runs/20260905T050022Z-30a2f45f8f8a/editor_unity.log
+Starting editor_nonunity_clean; log: /tmp/tmpgzfxyoiz/Runs/20260905T050022Z-30a2f45f8f8a/editor_nonunity_clean.log
+Starting editor_nonunity; log: /tmp/tmpgzfxyoiz/Runs/20260905T050022Z-30a2f45f8f8a/editor_nonunity.log
+Starting game_development_clean; log: /tmp/tmpgzfxyoiz/Runs/20260905T050022Z-30a2f45f8f8a/game_development_clean.log
+Starting game_development; log: /tmp/tmpgzfxyoiz/Runs/20260905T050022Z-30a2f45f8f8a/game_development.log
+Starting game_shipping_clean; log: /tmp/tmpgzfxyoiz/Runs/20260905T050022Z-30a2f45f8f8a/game_shipping_clean.log
+Starting game_shipping; log: /tmp/tmpgzfxyoiz/Runs/20260905T050022Z-30a2f45f8f8a/game_shipping.log
+Starting automation; log: /tmp/tmpgzfxyoiz/Runs/20260905T050022Z-30a2f45f8f8a/automation.log
+Starting campaign_worlds; log: /tmp/tmpgzfxyoiz/Runs/20260905T050022Z-30a2f45f8f8a/campaign_worlds.log
+Starting blueprints; log: /tmp/tmpgzfxyoiz/Runs/20260905T050022Z-30a2f45f8f8a/blueprints.log
+Starting asset_validation; log: /tmp/tmpgzfxyoiz/Runs/20260905T050022Z-30a2f45f8f8a/asset_validation.log
+Starting cook_package; log: /tmp/tmpgzfxyoiz/Runs/20260905T050022Z-30a2f45f8f8a/cook_package.log
+Starting packaged_route; log: /tmp/tmpgzfxyoiz/Runs/20260905T050022Z-30a2f45f8f8a/packaged_route.log
+Implemented stages passed, but incomplete required validator categories prevent qualification.
+...Candidate mode requires full build/stages/test inventory
+Candidate mode requires full build/stages/test inventory
+Candidate mode requires full build/stages/test inventory
+.Validation manifest: /tmp/tmpgzfxyoiz/Runs/20260905T050022Z-30a2f45f8f8a/summary.json
+Validation manifest: /tmp/tmpwub6w3a8/Runs/20260905T050022Z-a135e73cc83e/summary.json
+Validation manifest: /tmp/tmpwub6w3a8/Runs/20260905T050022Z-f42d603b9007/summary.json
+Validation manifest: /tmp/tmpwub6w3a8/Runs/20260905T050022Z-be99833229b4/summary.json
+Starting editor_unity; log: /tmp/tmpq3uiwccj/Runs/20260905T050022Z-f20076e74fb7/editor_unity.log
+Starting editor_nonunity; log: /tmp/tmpq3uiwccj/Runs/20260905T050022Z-f20076e74fb7/editor_nonunity.log
+Starting game_development; log: /tmp/tmpq3uiwccj/Runs/20260905T050022Z-f20076e74fb7/game_development.log
+Starting game_shipping; log: /tmp/tmpq3uiwccj/Runs/20260905T050022Z-f20076e74fb7/game_shipping.log
+Validation manifest: /tmp/tmpq3uiwccj/Runs/20260905T050022Z-f20076e74fb7/summary.json
+Starting editor_unity; log: /tmp/tmpq3uiwccj/Runs/20260905T050022Z-16740bf7fd75/editor_unity.log
+Starting editor_nonunity; log: /tmp/tmpq3uiwccj/Runs/20260905T050022Z-16740bf7fd75/editor_nonunity.log
+Starting game_development; log: /tmp/tmpq3uiwccj/Runs/20260905T050022Z-16740bf7fd75/game_development.log
+Starting game_shipping; log: /tmp/tmpq3uiwccj/Runs/20260905T050022Z-16740bf7fd75/game_shipping.log
+.
+----------------------------------------------------------------------
+Ran 58 tests in 0.531s
+
+OK
+Validation manifest: /tmp/tmpq3uiwccj/Runs/20260905T050022Z-16740bf7fd75/summary.json

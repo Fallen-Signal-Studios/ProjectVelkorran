@@ -63,7 +63,7 @@ def verify(report, expected, prefix):
         raise ReportError("Report must contain a nonempty tests array")
     if sum(counts.values()) != len(rows):
         raise ReportError("Report totals do not match its test rows")
-    seen, matched = set(), set()
+    seen, matched, warning_rows = set(), set(), set()
     for row in rows:
         if not isinstance(row, dict) or not isinstance(row.get("fullTestPath"), str) or not row["fullTestPath"]:
             raise ReportError("Every test row needs a fullTestPath")
@@ -82,6 +82,10 @@ def verify(report, expected, prefix):
                 raise ReportError(f"Malformed event: {name}")
             if str(entry["event"].get("type", "")).casefold() in ("error", "fatal"):
                 raise ReportError(f"Error event hidden by successful aggregate: {name}")
+            if str(entry["event"].get("type", "")).casefold() == "warning":
+                warning_rows.add(key)
+        if "warnings" in row and nonnegative_int(row, "warnings", name):
+            warning_rows.add(key)
         if selected(name, prefix):
             matched.add(key)
     required = {name.casefold(): name for name in expected}
@@ -91,7 +95,7 @@ def verify(report, expected, prefix):
     if not matched or not expected:
         raise ReportError("No matching required native tests")
     return {"status": "passed", "test_filter": prefix, "source_tests": len(expected),
-            "reported_matching_tests": len(matched), "warnings": counts["succeededWithWarnings"]}
+            "reported_matching_tests": len(matched), "warnings": max(counts["succeededWithWarnings"], len(warning_rows))}
 
 
 def main():

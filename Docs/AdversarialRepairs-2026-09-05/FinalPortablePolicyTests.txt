@@ -1,0 +1,75 @@
+Compile and run: Scripts/Tests/AccessibilityPolicyTests.cpp
+PASS: accessibility finite/layout/timing/color boundaries and 10,000 slow-pulse samples
+Compile and run: Scripts/Tests/AxiomPulseMathTests.cpp
+PASS: 34 production Axiom charge/geometry checks
+Compile and run: Scripts/Tests/CampaignPolicyTests.cpp
+24 campaign policy assertions passed
+Compile and run: Scripts/Tests/CombatTransactionPolicyTests.cpp
+21 combat transaction policy assertions passed
+Compile and run: Scripts/Tests/EchoAwardPolicyTests.cpp
+Compile and run: Scripts/Tests/SovSettingsPolicyTests.cpp
+Settings/diagnostics/input policy: 10026 checks passed
+Compile and run: Tests/Portable/CombatInputPolicyTests.cpp
+Combat input policy: 1015 window, freshness, assistance and invalid-time checks passed
+Compile and run: Tests/Portable/ExertionPolicyTests.cpp
+Exertion policy: 2015 admission, exact-payment, delay, partition and exhaustion checks passed
+Compile and run: Tests/Portable/NarrativeAudioSettingsPolicyTests.cpp
+Compile and run: Tests/Portable/NarrativeThreatPolicyTests.cpp
+PASS: threat confidence, concealment, bounded strength and expiry, 36660 decay/share boundaries
+Compile and run: Tests/Portable/SovAccessibilityAssistPolicyTests.cpp
+Accessibility assistance: 6333 production-policy checks passed
+Compile and run: Tests/Portable/SovBallisticAssistPolicyTests.cpp
+Ballistic assistance: 28477 production-policy checks passed
+Compile and run: Tests/Portable/SovCampaignDependencyPolicyTests.cpp
+Campaign prerequisite graph: 15 assertions passed
+Compile and run: Tests/Portable/SovCampaignMassPolicyTests.cpp
+Campaign Mass: 5239 transition, receipt, route and effect boundary checks passed
+Compile and run: Tests/Portable/SovCarryPolicyTests.cpp
+PASS: 33778 carry geometry and rescue admission checks
+Compile and run: Tests/Portable/SovCinderLineMathTests.cpp
+2102 Cinder line production-math checks passed
+Compile and run: Tests/Portable/SovCinematicInventoryPolicyTests.cpp
+Cinematic inventory production policy: 33217 assertions passed
+Compile and run: Tests/Portable/SovCinematicPolicyTests.cpp
+Cinematic progress and capsule policy: 41878 assertions passed
+Compile and run: Tests/Portable/SovConsoleUIPolicyTests.cpp
+PASS: console record scrolling, dead zone, bounds, invalid input and resume delta
+Compile and run: Tests/Portable/SovCorruptionMathTests.cpp
+Compile and run: Tests/Portable/SovDialoguePressurePolicyTests.cpp
+Compile and run: Tests/Portable/SovDisplayPolicyTests.cpp
+PASS: 10096 display calibration and physical viewport overlap policy checks
+Compile and run: Tests/Portable/SovEncounterCoordinationPolicyTests.cpp
+Encounter coordination: 7819 budget, warning timing and relief boundary checks passed
+Compile and run: Tests/Portable/SovEncounterPolicyTests.cpp
+Encounter policy: transitions, load recovery, reward replay, invalid values, and 42,000 resource cases passed
+Compile and run: Tests/Portable/SovEvidenceNarrativePolicyTests.cpp
+Evidence and Narrative: 525072 exhaustive progression/graph checks plus malformed graph and bounded scan cases passed.
+Compile and run: Tests/Portable/SovFieldRecoveryPolicyTests.cpp
+Field recovery: 18391 charge admission, bounded healing and completion checks passed
+Compile and run: Tests/Portable/SovHapticPolicyTests.cpp
+PASS: haptic priority, exact cancellation, expiry, accessibility scales, fixed capacity and 5000 mixed requests
+Compile and run: Tests/Portable/SovLifecyclePolicyTests.cpp
+SovLifecyclePolicy: overlapping interruptions, duplicate events, explicit resume, invalid clocks and 80 reason-order cases passed
+Compile and run: Tests/Portable/SovMeleePolicyTests.cpp
+Native melee policies: 26 assertions passed
+Compile and run: Tests/Portable/SovNarrativeCuePolicyTests.cpp
+Narrative speech policy: 80 assertions passed
+Compile and run: Tests/Portable/SovPlatformServicesPolicyTests.cpp
+Compile and run: Tests/Portable/SovProtectionAwardPolicyTests.cpp
+Protection award cooldown: 13 assertions passed
+Compile and run: Tests/Portable/SovRecoveryPolicyTests.cpp
+Recovery policy: 517 assertions passed
+Compile and run: Tests/Portable/SovRemainingCombatPolicyTests.cpp
+Remaining combat policies: 29 assertions passed
+Compile and run: Tests/Portable/SovResonancePolicyTests.cpp
+PASS: 23032 Resonance/contribution policy checks plus expiry and hidden-recovery boundaries
+Compile and run: Tests/Portable/SovSaveFramePolicyTests.cpp
+PASS: raw save frame checksum, every truncation/byte mutation, lengths, and genuine GVAS recognition
+Compile and run: Tests/Portable/SovSavePolicyTests.cpp
+Save policy: 32768 admission combinations, 100 rotations, bank/schema/slot boundaries passed
+Compile and run: Tests/Portable/SovSelenePayloadMathTests.cpp
+Compile and run: Tests/Portable/SovTechniquePolicyTests.cpp
+3500 Technique production-policy checks passed
+Compile and run: Tests/Portable/SovWorldMotionPolicyTests.cpp
+PASS: 33783 production world-motion timing/admission checks
+PASS: 40 portable suites. Unreal build/automation not run.

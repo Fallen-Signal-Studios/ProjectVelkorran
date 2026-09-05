@@ -18,6 +18,7 @@ class ASovPlayerCharacterBase;
 class ASovPlayerState;
 class UAbilitySystemComponent;
 class UBrainComponent;
+struct FStreamableHandle;
 
 USTRUCT(BlueprintType)
 struct PROJECTVELKORRAN_API FSovEncounterParticipant
@@ -90,6 +91,8 @@ public:
 	/** Stable and globally unique (e.g. M01.Courtyard); never rename after shipping saves. */
 	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Encounter") FName EncounterId;
 	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Replicated, Category = "Encounter") TArray<FSovEncounterParticipant> Participants;
+	/** Tier C retains its actor unless every captured skeletal component has a compatible locomotion asset. */
+	UPROPERTY(EditInstanceOnly, Category="Encounter|Mass") TMap<FName, FSovCampaignMassAnimationProfile> MassAnimationProfiles;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Encounter", meta = (ClampMin = "0")) float CompletionEchoReserve = 25.f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Encounter", meta = (ClampMin = "1")) float RestoreTimeoutSeconds = 30.f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Encounter") bool bCompleteWhenRequiredParticipantsDefeated = true;
@@ -112,6 +115,9 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Encounter|Mass") bool SetParticipantMassRoute(FName ParticipantId, const TArray<FVector>& Points, float Speed, FString& Error);
 	UFUNCTION(BlueprintPure, Category="Encounter|Mass") bool IsParticipantMassRepresented(FName ParticipantId) const;
 	UFUNCTION(BlueprintPure, Category="Encounter|Mass") bool IsMassPromotionPending() const { return !MassPromotions.IsEmpty(); }
+	/** Reconcile confirmed defeats and unexpected ownership loss before advancing a wave. */
+	bool ReconcileEncounterState();
+	bool IsParticipantDefeatConfirmed(FName Id) const { return DefeatedParticipants.Contains(Id); }
 	virtual bool AcceptMassRepresentation(FMassEntityManager& Manager, FMassEntityHandle Entity, AActor& Actor, const FNarrativeMassParticipantFragment& Identity) override;
 	virtual bool IsMassRepresentationCurrent(FMassEntityManager& Manager, FMassEntityHandle Entity, const AActor& Actor, const FNarrativeMassParticipantFragment& Identity) const override;
 	virtual void ReleaseMassRepresentation(FMassEntityManager& Manager, FMassEntityHandle Entity, AActor& Actor, const FNarrativeMassParticipantFragment& Identity) override;
@@ -176,6 +182,7 @@ private:
 	void RemoveTimedEffects(UAbilitySystemComponent* ASC);
 	bool RemoveTimedEffects(UAbilitySystemComponent* ASC, TFunctionRef<bool()> CanContinue);
 	UFUNCTION() void HandleDeath(AActor* KilledActor, UNarrativeAbilitySystemComponent* ASC, bool bIsDead);
+	UFUNCTION() void HandleParticipantEndPlay(AActor* Actor, EEndPlayReason::Type Reason);
 	void BindDeaths();
 	void UnbindDeaths();
 	UPROPERTY(Transient) TObjectPtr<ASovPlayerCharacterBase> EncounterPlayer;
@@ -183,6 +190,7 @@ private:
 	UPROPERTY(Transient) TArray<TObjectPtr<UAbilitySystemComponent>> SuspendedASCs;
 	UPROPERTY(Transient) TArray<TObjectPtr<UBrainComponent>> PausedBrains;
 	UPROPERTY(Transient) TArray<TObjectPtr<UNarrativeAbilitySystemComponent>> BoundDeathASCs;
+	TArray<TWeakObjectPtr<AActor>> BoundParticipantActors;
 	TMap<TWeakObjectPtr<UAbilitySystemComponent>, TWeakObjectPtr<AActor>> SuspendedAvatars;
 	TSet<TWeakObjectPtr<UAbilitySystemComponent>> OwnedBusySuspensions;
 	TSet<TWeakObjectPtr<UAbilitySystemComponent>> OwnedProtectionSuspensions;
@@ -196,17 +204,24 @@ private:
 	FDelegateHandle ActorSpawnedHandle;
 	float RestoreStartedAt = 0.f;
 	bool bMutationInProgress = false;
+	bool bEndingPlay = false;
 	bool bInvalidEncounterIdentity = false;
 	/** Current C/D state shares this director's checkpoint record/serialization authority. Never saved on a proxy. */
 	UPROPERTY(SaveGame) TArray<FSovEncounterMassRecord> MassParticipants;
 	UPROPERTY(Transient) FMassEntityConfig MassConfig;
 	UPROPERTY(Transient) TMap<FName, TObjectPtr<ASovNPCCharacterBase>> MassPromotions;
+	UPROPERTY(Transient) TMap<FName, FSovCampaignMassAssetResidency> MassAssetResidency;
+	TMap<FName, TSharedPtr<FStreamableHandle>> MassAssetLoads;
+	TMap<FName, double> MassAssetLoadDeadlines;
+	TSet<FName> PendingMassRestores;
 	TMap<FName, FMassEntityHandle> MassEntities;
 	TMap<FName, TWeakObjectPtr<AActor>> MassProxies;
 	TMap<FName, uint64> MassEpochs;
 	TMap<FName, double> MassPromotionStarts;
 	uint64 NextMassEpoch = 0;
 	bool CreateMassEntity(FSovEncounterMassRecord& Record, FString& Error);
+	bool EnsureMassAssets(const FSovEncounterMassRecord& Record, FString& Error);
+	void TickMassAssetLoads();
 	void DestroyMassEntity(FName Id);
 	void ClearMassRepresentations(bool bDiscardRecords);
 	void CaptureMassTransforms();
@@ -214,4 +229,5 @@ private:
 	void TickMassPromotions();
 	bool CaptureMassTransfer(ASovNPCCharacterBase* NPC, FSovCampaignMassState& Transfer, FString& Error) const;
 	bool RestoreMassTransfer(ASovNPCCharacterBase* NPC, const FSovEncounterMassRecord& Record, FString& Error);
+	bool HasLiveMassIdentity(FName Id) const;
 };

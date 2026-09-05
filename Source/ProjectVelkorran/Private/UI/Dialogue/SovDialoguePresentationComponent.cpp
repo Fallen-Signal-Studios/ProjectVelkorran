@@ -110,11 +110,11 @@ void USovDialoguePresentationComponent::OnReplies(UDialogue* Dialogue, const TAr
 	{
 		if (!IsValid(Reply) || !Dialogue->AvailableResponses.Contains(Reply)) { continue; }
 		const FText Text = Reply->GetOptionText(Dialogue);
-		if (!IsCurrent()) { CancelPresentation(); return; }
+		if (Generation != ExpectedGeneration || !IsCurrent()) { if (Generation == ExpectedGeneration) { CancelPresentation(); } return; }
 		// Empty/invalid presentation cannot satisfy readiness and must not drive a silence timeout.
 		if (Text.IsEmpty()) { CancelPresentation(); return; }
 		const FText Hint = Reply->GetHintText(Dialogue);
-		if (!IsCurrent()) { CancelPresentation(); return; }
+		if (Generation != ExpectedGeneration || !IsCurrent()) { if (Generation == ExpectedGeneration) { CancelPresentation(); } return; }
 		State->Choices.Add(Hint.IsEmpty() ? Text : FText::Format(LOCTEXT("ChoiceHint", "{0} {1}"), Text, Hint));
 		PresentedReplies.Add(Reply);
 		if (NPC && !NPC->SilenceReplyID.IsNone() && Reply->GetID() == NPC->SilenceReplyID
@@ -134,7 +134,10 @@ void USovDialoguePresentationComponent::OnReplies(UDialogue* Dialogue, const TAr
 	UNarrativeGameplayHUD* HUD = PC ? PC->GetNarrativeGameplayHUD() : nullptr;
 	if (HUD)
 	{
-		ChoiceWidget = Cast<USovDialogueChoiceWidget>(HUD->OpenMenu(USovDialogueChoiceWidget::StaticClass(), FNarrativeGameplayTags::Get().UI_Layer_Game));
+		USovDialogueChoiceWidget* Created = Cast<USovDialogueChoiceWidget>(HUD->OpenMenu(USovDialogueChoiceWidget::StaticClass(), FNarrativeGameplayTags::Get().UI_Layer_Game));
+		if (Generation != ExpectedGeneration || !IsCurrent())
+		{ if (Created && Created != ChoiceWidget) { Created->Retire(); } return; }
+		ChoiceWidget = Created;
 	}
 	if (!ChoiceWidget)
 	{
@@ -166,7 +169,12 @@ void USovDialoguePresentationComponent::CancelPresentation()
 	if (OldWidget) { OldWidget->Retire(); }
 }
 
-void USovDialoguePresentationComponent::OnWidgetRemoved() { CancelPresentation(); }
+void USovDialoguePresentationComponent::OnWidgetRemoved()
+{
+	// A removed view is not a consumed Tales revision. The same legal replies must be recoverable.
+	SeenRevision = INDEX_NONE;
+	CancelPresentation();
+}
 void USovDialoguePresentationComponent::OnDialogueBegan(UDialogue* Dialogue)
 { if (PresentedDialogue.Get() != Dialogue) { CancelPresentation(); } }
 void USovDialoguePresentationComponent::OnDialogueFinished(UDialogue* Dialogue, bool, EExitDialogueReason)
@@ -218,7 +226,12 @@ void USovDialoguePresentationComponent::TickComponent(float DeltaTime, ELevelTic
 		if (PresentedDialogue.IsValid()) { CancelPresentation(); }
 		if (Tales && IsValid(Tales->GetCurrentDialogue()) && Tales->GetCurrentDialogue()->AreRepliesPresented()
 			&& (SeenDialogue != Tales->GetCurrentDialogue() || SeenRevision != Tales->GetCurrentDialogue()->GetReplyPresentationRevision()))
-		{ RefreshChoices(); }
+		{
+			const auto* PC = Cast<ANarrativePlayerController>(GetOwner()); auto* HUD = PC ? PC->GetNarrativeGameplayHUD() : nullptr;
+			auto* Layer = HUD ? HUD->GetLayerContainer(FNarrativeGameplayTags::Get().UI_Layer_Game) : nullptr;
+			// Do not reopen above another game-layer view during container replacement/recovery.
+			if (!Layer || !Layer->GetActiveWidget()) { RefreshChoices(); }
+		}
 		return;
 	}
 	if (IsPresentationPaused() || !ChoiceWidget || !ChoiceWidget->IsTextPresented())
@@ -233,8 +246,10 @@ void USovDialoguePresentationComponent::TickComponent(float DeltaTime, ELevelTic
 		ChoiceWidget->SetChoicesEnabled(true);
 	}
 	State->Pressure.TextReady = true;
+	const uint64 ExpectedGeneration = Generation;
 	if (State->bNarration && !State->bFullAnnouncementComplete && !State->bAnnouncementPending && !State->bUnsupported)
 	{ AnnounceChoices(); }
+	if (Generation != ExpectedGeneration || !IsCurrent() || !ChoiceWidget) { return; }
 	ChoiceWidget->SetTimerText(TimerDescription());
 	if (State->Pressure.Advance(Generation, DeltaTime, false))
 	{

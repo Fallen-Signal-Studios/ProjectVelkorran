@@ -1,0 +1,2 @@
+Production-used raw frame policy: strict C++17 and UBSan. Unreal not built.
+PASS: raw save frame checksum, every truncation/byte mutation, lengths, and genuine GVAS recognition

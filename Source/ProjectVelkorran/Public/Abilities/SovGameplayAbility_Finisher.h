@@ -32,6 +32,8 @@ public:
         const FGameplayTagContainer* SourceTags=nullptr, const FGameplayTagContainer* TargetTags=nullptr,
         FGameplayTagContainer* OptionalRelevantTags=nullptr) const override;
     UFUNCTION(BlueprintPure, Category="Finisher") AActor* FindFinisherTarget() const;
+    uint64 GetFinisherActivationEpoch() const { return ActionEpoch; }
+    bool IsFinisherActivationCurrent(uint64 Epoch, const AActor* Attacker) const;
 protected:
     virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
         const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
@@ -48,6 +50,8 @@ protected:
     UFUNCTION(BlueprintImplementableEvent, Category="Finisher") void OnFinisherStarted(AActor* Target, bool bCinematicAligned);
     UFUNCTION(BlueprintImplementableEvent, Category="Finisher") void OnFinisherResolved(AActor* Target, bool bPhaseOutcome);
 private:
+    friend struct FSovFinisherOutcomeTestAccess;
+    friend struct FSovPlayerCombatRepairTestAccess;
     bool SourceValid() const;
     bool OwnsAction(const FGuid& ExpectedLease) const;
     void FinishReservedAction(const FGuid& ExpectedLease);
@@ -67,6 +71,9 @@ private:
     FActiveGameplayEffectHandle PlayerProtection;
     FActiveGameplayEffectHandle TargetProtection;
     FTimerHandle StrikeTimer, FinishTimer, CheckTimer;
+    uint64 ActionEpoch=0;
+    bool bEndPending=false;
+    bool bEnding=false;
     bool bAligned=false;
     bool bStruck=false;
 };

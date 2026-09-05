@@ -10,6 +10,9 @@
 #include "Components/SovEchoComponent.h"
 #include "Diagnostics/SovDiagnosticsSubsystem.h"
 #include "Engine/World.h"
+#include "Engine/AssetManager.h"
+#include "Engine/StreamableManager.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "EngineUtils.h"
 #include "Framework/SovPlayerController.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
@@ -33,12 +36,12 @@ bool USovNarrativeCueComponent::ResolveOwner()
 	if (Tales != Current)
 	{
 		UTalesComponent* PreviousTales=Tales; UDialogue* PreviousDialogue=OwnedDialogue;
-		USovNarrativeCue* PreviousCue=CurrentConversation;
+		USovNarrativeCue* PreviousCue=CurrentConversation; const FSovQueuedCue PreviousRequest=ConversationRequest;
 		OwnedDialogue=nullptr; CurrentConversation=nullptr; ++Epoch;
 		if (IsValid(PreviousTales))
 		{ PreviousTales->OnDialogueFinished.RemoveDynamic(this, &ThisClass::HandleDialogueFinished); PreviousTales->OnDialogueBegan.RemoveDynamic(this, &ThisClass::HandleDialogueBegan); }
 		Tales = Current;
-		RememberUnheard(PreviousCue);
+		RememberUnheard(PreviousCue, &PreviousRequest);
 		if (IsValid(PreviousDialogue) && IsValid(PreviousTales) && PreviousTales->GetCurrentDialogue()==PreviousDialogue)
 		{ PreviousDialogue->SetPreserveOnInterruption(false); PreviousTales->ExitDialogue(EExitDialogueReason::EDR_PlayerExited); }
 		if (Tales)
@@ -53,6 +56,13 @@ bool USovNarrativeCueComponent::MatchesContext(const USovNarrativeCue* Cue) cons
 		&& (Cue->RequiredMission.IsNone() || Cue->RequiredMission == State->GetActiveMission()->MissionId)
 		&& (!Cue->RequiredProtagonist.IsValid() || Cue->RequiredProtagonist == State->GetActiveProtagonist())
 		&& State->HasKnowledge(State->GetActiveProtagonist(), Cue->RequiredKnowledge);
+}
+bool USovNarrativeCueComponent::MatchesRequestContext(const FSovQueuedCue& Request) const
+{
+    const auto* State=Controller?Controller->GetCampaignState():nullptr;
+    return MatchesContext(Request.Cue) && State && State->GetActiveMission()
+        && (!Request.Witness.IsValid() || Request.Witness==State->GetActiveProtagonist())
+        && (Request.Mission.IsNone() || Request.Mission==State->GetActiveMission()->MissionId);
 }
 bool USovNarrativeCueComponent::IsCombatRequired() const
 {
@@ -84,6 +94,8 @@ bool USovNarrativeCueComponent::RequestCue(USovNarrativeCue* Cue, AActor* Speake
 	if (NextAllowed.FindRef(Cue->CueId) > GetWorld()->GetTimeSeconds()) { Error = TEXT("The cue is cooling down."); return false; }
 	if (Pending.Num() >= 64) { Error = TEXT("The speech queue is full."); return false; }
 	FSovQueuedCue Request; Request.Cue = Cue; Request.Speaker = Speaker; Request.RemainingContextSeconds = Cue->ContextLifetimeSeconds;
+	Request.Witness = Controller->GetCampaignState()->GetActiveProtagonist();
+	Request.Mission = Controller->GetCampaignState()->GetActiveMission()->MissionId;
 	if (IsValid(Speaker) && Speaker->Implements<UNarrativeSavableActor>()) { Request.SpeakerGuid = INarrativeSavableActor::Execute_GetActorGUID(Speaker); }
 	if (!Cue->Dialogue && !ResolveSpeaker(Request)) { Error = TEXT("The bark's speaker is unavailable."); return false; }
 	if (Cue->bCritical && !Cue->Dialogue && !Cue->bPlayerSpeaker && !Request.SpeakerGuid.IsValid())
@@ -91,28 +103,69 @@ bool USovNarrativeCueComponent::RequestCue(USovNarrativeCue* Cue, AActor* Speake
 	Pending.Add(Request);
 	return true;
 }
-void USovNarrativeCueComponent::RememberUnheard(USovNarrativeCue* Cue)
-{ if (Cue && Cue->bCritical && Cue->bRecordUnheardSummary && !Cue->RecordSummary.IsEmpty() && UnheardRecords.Num() < 256) { UnheardRecords.AddUnique(Cue); } }
+void USovNarrativeCueComponent::RememberUnheard(USovNarrativeCue* Cue, const FSovQueuedCue* Context)
+{
+	if (!Cue || !Cue->bCritical || !Cue->bRecordUnheardSummary || Cue->RecordSummary.IsEmpty() || UnheardRecordContexts.Num() >= 256) { return; }
+	FSovQueuedCue Record = Context ? *Context : (Cue==CurrentConversation ? ConversationRequest : CurrentRequest); Record.Cue = Cue;
+	if (!Record.Witness.IsValid() && Controller && Controller->GetCampaignState()) { Record.Witness = Controller->GetCampaignState()->GetActiveProtagonist(); }
+	if (!Record.Witness.IsValid()) { return; }
+	if (!UnheardRecordContexts.ContainsByPredicate([&](const auto& Existing) { return Existing.Cue == Cue && Existing.Witness == Record.Witness; }))
+	{ UnheardRecordContexts.Add(Record); UnheardRecords.AddUnique(Cue); }
+}
 TArray<USovNarrativeCue*> USovNarrativeCueComponent::GetUnheardRecords() const
-{ TArray<USovNarrativeCue*> Result; for (auto* Cue : UnheardRecords) { if (IsValid(Cue)) { Result.Add(Cue); } } return Result; }
+{
+	TArray<USovNarrativeCue*> Result;
+	const auto* PC = Cast<ASovPlayerController>(GetOwner()); const auto* State = PC ? PC->GetCampaignState() : nullptr;
+	if (!State || !State->IsStateValid()) { return Result; }
+	for (const auto& Record : UnheardRecordContexts)
+	{
+		const auto* Cue = Record.Cue.Get();
+		if (IsValid(Cue) && Cue->bRecordUnheardSummary && !Cue->RecordSummary.IsEmpty() && Record.Witness == State->GetActiveProtagonist()
+			&& State->HasKnowledge(Record.Witness,Cue->RequiredKnowledge)) { Result.AddUnique(Record.Cue); }
+	}
+	return Result;
+}
+bool USovNarrativeCueComponent::ReplayUnheardRecord(USovNarrativeCue* Cue, FString& Error)
+{
+	if (!ResolveOwner() || !GetUnheardRecords().Contains(Cue) || !MatchesContext(Cue) || IsCombatRequired())
+	{ Error = TEXT("This record cannot be replayed in the current protagonist and mission context."); return false; }
+	const auto* Record = UnheardRecordContexts.FindByPredicate([&](const auto& Item) { return Item.Cue == Cue && Item.Witness == Controller->GetCampaignState()->GetActiveProtagonist(); });
+	if (!Record) { return false; }
+	FSovQueuedCue Copy = *Record;
+	return RequestCue(Cue, ResolveSpeaker(Copy), Error);
+}
+void USovNarrativeCueComponent::RetireHeardRecord(USovNarrativeCue* Cue, FGameplayTag Witness)
+{
+	UnheardRecordContexts.RemoveAll([&](const auto& Record) { return Record.Cue == Cue && Record.Witness == Witness; });
+	if (!UnheardRecordContexts.ContainsByPredicate([Cue](const auto& Record) { return Record.Cue == Cue; })) { UnheardRecords.Remove(Cue); }
+}
+void USovNarrativeCueComponent::SetBarkSubtitleHold(USovNarrativeCue* Cue, UObject* Owner, bool bHold)
+{
+	if (!bHold && SubtitleHoldOwner.Get() == Owner) { SubtitleHoldOwner.Reset(); bSubtitleHold = false; }
+	else if (bHold && Cue && Cue == CurrentBark && IsValid(Owner)) { SubtitleHoldOwner = Owner; bSubtitleHold = true; }
+}
 void USovNarrativeCueComponent::StopBark(bool bInterrupted, bool bPreserveCritical)
 {
 	USovNarrativeCue* Finished = CurrentBark; CurrentBark = nullptr; const uint64 ExpectedEpoch=++Epoch;
+	TSharedPtr<FStreamableHandle> RetiredLoad = MoveTemp(BarkLoad);
+	BarkLoadEpoch = 0; BarkVariantIndex = INDEX_NONE; bBarkAudioAttempted = false;
+	SubtitleHoldOwner.Reset(); bSubtitleHold = false;
 	const FSovQueuedCue InterruptedRequest = CurrentRequest;
 	UAudioComponent* Audio = BarkAudio; BarkAudio = nullptr;
 	bBarkUsesControllerOutput = false;
+	if (RetiredLoad) { RetiredLoad->CancelHandle(); }
 	if (IsValid(Audio)) { Audio->Stop(); Audio->DestroyComponent(); }
 	if (Epoch!=ExpectedEpoch || bOwnerEndingPlay) { return; }
 	if (Finished)
 	{
 		if (bInterrupted && bPreserveCritical)
 		{
-			RememberUnheard(Finished);
+			RememberUnheard(Finished, &InterruptedRequest);
 			if (Finished->bCritical && Pending.Num() < 64
 				&& !Pending.ContainsByPredicate([Finished](const auto& Item) { return Item.Cue == Finished; }))
 			{ Pending.Add(InterruptedRequest); }
 		}
-		else if (!bInterrupted) { UnheardRecords.Remove(Finished); }
+		else if (!bInterrupted) { RetireHeardRecord(Finished, InterruptedRequest.Witness); }
 		OnCueEnded.Broadcast(Finished, bInterrupted);
 	}
 }
@@ -129,14 +182,14 @@ bool USovNarrativeCueComponent::StartRequest(FSovQueuedCue Request)
 {
 	USovNarrativeCue* Cue = Request.Cue;
 	const uint64 ExpectedEpoch = ++Epoch;
-	if (!MatchesContext(Cue) || !IsValid(Tales) || (Cue->Dialogue && Tales->IsInDialogue())) { return false; }
+	if (!MatchesRequestContext(Request) || !IsValid(Tales) || (Cue->Dialogue && Tales->IsInDialogue())) { return false; }
 	AActor* Speaker = ResolveSpeaker(Request);
 	if (!Cue->Dialogue && !Speaker) { return false; }
 	CurrentRequest = Request;
 	if (Cue->Dialogue)
 	{
 		TWeakObjectPtr<UTalesComponent> StartingTales=Tales;
-		CurrentConversation = Cue;
+		CurrentConversation = Cue; ConversationRequest = Request;
 		FDialoguePlayParams Params; Params.Priority = static_cast<int32>(Cue->Priority);
 		TGuardValue<bool> Starting(bStartingConversation, true); bCompletedDuringStart = false;
 		const bool bStarted=StartingTales->BeginDialogue(Cue->Dialogue, Params);
@@ -149,49 +202,58 @@ bool USovNarrativeCueComponent::StartRequest(FSovQueuedCue Request)
 	}
 	else
 	{
-		const int32 Count = FMath::Max(0, RepetitionCounts.FindRef(Cue->CueId));
-		const auto& Variant = Cue->BarkVariants[Count % Cue->BarkVariants.Num()];
-		USoundBase* Sound = Variant.Sound.IsNull() ? nullptr : Variant.Sound.LoadSynchronous();
-		USoundClass* ControllerClass = Cue->ControllerAudioClass.IsNull() ? nullptr : Cue->ControllerAudioClass.LoadSynchronous();
-		if (bOwnerEndingPlay || ExpectedEpoch != Epoch || !IsValid(Speaker) || !MatchesContext(Cue)) { return false; }
-		if (!Variant.Sound.IsNull() && !Sound)
-		{ UE_LOG(LogTemp, Warning, TEXT("Narrative cue %s could not load voice audio; presenting its authored caption."), *Cue->CueId.ToString()); }
-		CurrentBark = Cue;
-		float Duration = Variant.CaptionSeconds;
-		if (Sound)
-		{
-			// Looping speech cannot monopolize the queue. Content duration is bounded to the caption contract.
-			if (IsValid(ControllerClass) && ControllerClass->Properties.OutputTarget == EAudioOutputTarget::ControllerFallbackToSpeaker)
-			{
-				const auto* Settings = USovGameUserSettings::Get();
-				BarkAudio = NewObject<UAudioComponent>(GetOwner());
-				BarkAudio->bAutoActivate = false; BarkAudio->bAutoDestroy = false; BarkAudio->bStopWhenOwnerDestroyed = true;
-				bBarkUsesControllerOutput = ConfigureControllerOutput(BarkAudio, ControllerClass,
-					Settings ? Settings->GetSettingsSnapshot().ControllerAudioVolume : 1.f);
-				BarkAudio->SetSound(Sound); BarkAudio->SetWorldLocation(Speaker->GetActorLocation());
-				BarkAudio->RegisterComponent();
-				if (ExpectedEpoch != Epoch || bOwnerEndingPlay || !IsValid(BarkAudio)) { return false; }
-				BarkAudio->Play();
-			}
-			else
-			{
-				bBarkUsesControllerOutput = false;
-				BarkAudio = UGameplayStatics::SpawnSoundAtLocation(this, Sound, Speaker->GetActorLocation(), FRotator::ZeroRotator,
-					1.f, 1.f, 0.f, nullptr, nullptr, false);
-			}
-			if (ExpectedEpoch != Epoch || bOwnerEndingPlay) { return false; }
-			// Missing audio devices still deliver the authored direction through the caption contract.
-			if (FMath::IsFinite(Sound->GetDuration()) && Sound->GetDuration() > 0.f && Sound->GetDuration() <= 30.f)
-			{ Duration = FMath::Max(Duration, Sound->GetDuration()); }
-		}
-		BarkEndsAt = GetWorld()->GetTimeSeconds() + Duration;
-		OnCueStarted.Broadcast(Cue, Speaker, Variant.Caption, Duration);
-		if (ExpectedEpoch != Epoch) { return false; }
+        TRACE_CPUPROFILER_EVENT_SCOPE(SovNarrativeCue_StartBark);
+        const int32 Count = FMath::Max(0, RepetitionCounts.FindRef(Cue->CueId));
+        BarkVariantIndex = Count % Cue->BarkVariants.Num();
+        const auto& Variant = Cue->BarkVariants[BarkVariantIndex];
+        CurrentBark = Cue; BarkLoadEpoch = ExpectedEpoch; bBarkAudioAttempted = false;
+        BarkEndsAt = GetWorld()->GetTimeSeconds() + FMath::Max(2.f, Variant.CaptionSeconds);
+        // Caption is available synchronously. Native voice/class residency never flushes async loading.
+        OnCueStarted.Broadcast(Cue, Speaker, Variant.Caption, FMath::Max(2.f, Variant.CaptionSeconds));
+        if (ExpectedEpoch != Epoch || bOwnerEndingPlay) { return false; }
+        TArray<FSoftObjectPath> Paths;
+        if (!Variant.Sound.IsNull()) { Paths.Add(Variant.Sound.ToSoftObjectPath()); }
+        if (!Cue->ControllerAudioClass.IsNull()) { Paths.AddUnique(Cue->ControllerAudioClass.ToSoftObjectPath()); }
+        if (!Paths.IsEmpty())
+        {
+            const auto Requested = UAssetManager::GetStreamableManager().RequestAsyncLoad(Paths);
+            if (ExpectedEpoch != Epoch || bOwnerEndingPlay) { if (Requested) { Requested->CancelHandle(); } return false; }
+            BarkLoad = Requested;
+        }
+        if (!BarkLoad || BarkLoad->HasLoadCompleted()) { StartResidentBarkAudio(); }
+        if (ExpectedEpoch != Epoch || bOwnerEndingPlay) { return false; }
 	}
 	int32& Count = RepetitionCounts.FindOrAdd(Cue->CueId); Count = FMath::Clamp(Count, 0, 999999) + 1;
 	NextAllowed.Add(Cue->CueId, GetWorld()->GetTimeSeconds() + SovNarrativeCuePolicy::Cooldown(Cue->CooldownSeconds, static_cast<unsigned>(Count - 1)));
 	USovDiagnosticsSubsystem::Record(GetWorld(), ESovDiagnosticKind::Cinematic, Cue->CueId, Cue->SpeakerId, static_cast<float>(Cue->Priority), 0.f, true);
 	return true;
+}
+void USovNarrativeCueComponent::StartResidentBarkAudio()
+{
+    TRACE_CPUPROFILER_EVENT_SCOPE(SovNarrativeCue_ResidentVoice);
+    if (bBarkAudioAttempted || !CurrentBark || BarkLoadEpoch != Epoch || bOwnerEndingPlay
+        || !CurrentBark->BarkVariants.IsValidIndex(BarkVariantIndex) || !MatchesRequestContext(CurrentRequest)) { return; }
+    bBarkAudioAttempted = true;
+    const uint64 Expected = Epoch;
+    USovNarrativeCue* Cue = CurrentBark;
+    AActor* Speaker = ResolveSpeaker(CurrentRequest);
+    USoundBase* Sound = Cue->BarkVariants[BarkVariantIndex].Sound.Get();
+    USoundClass* ControllerClass = Cue->ControllerAudioClass.Get();
+    if (!Sound || !Speaker) { return; } // Authored caption remains the fallback on an unavailable voice asset/device.
+    BarkAudio = NewObject<UAudioComponent>(GetOwner());
+    BarkAudio->bAutoActivate = false; BarkAudio->bAutoDestroy = false;
+    BarkAudio->bStopWhenOwnerDestroyed = true; BarkAudio->bIsUISound = false;
+    bBarkUsesControllerOutput = ControllerClass && ConfigureControllerOutput(BarkAudio, ControllerClass,
+        USovGameUserSettings::Get() ? USovGameUserSettings::Get()->GetSettingsSnapshot().ControllerAudioVolume : 1.f);
+    BarkAudio->SetSound(Sound); BarkAudio->SetWorldLocation(Speaker->GetActorLocation()); BarkAudio->RegisterComponent();
+    if (Expected != Epoch || bOwnerEndingPlay || !IsValid(BarkAudio)) { return; }
+    BarkAudio->Play();
+    if (Expected != Epoch || bOwnerEndingPlay) { return; }
+    const float VoiceDuration = Sound->GetDuration();
+    const float Duration = FMath::IsFinite(VoiceDuration) && VoiceDuration > 0.f && VoiceDuration <= 30.f
+        ? FMath::Max(Cue->BarkVariants[BarkVariantIndex].CaptionSeconds, VoiceDuration) : Cue->BarkVariants[BarkVariantIndex].CaptionSeconds;
+    BarkEndsAt = GetWorld()->GetTimeSeconds() + FMath::Max(2.f,Duration);
+    OnCueAudioReady.Broadcast(Cue,FMath::Max(2.f,Duration));
 }
 void USovNarrativeCueComponent::TickComponent(float Delta, ELevelTick Type, FActorComponentTickFunction* TickFunction)
 {
@@ -203,10 +265,17 @@ void USovNarrativeCueComponent::TickComponent(float Delta, ELevelTick Type, FAct
 		if (const auto* Settings = USovGameUserSettings::Get())
 		{ BarkAudio->SetVolumeMultiplier(Settings->GetSettingsSnapshot().ControllerAudioVolume); }
 	}
+	if (CurrentBark && !MatchesRequestContext(CurrentRequest)) { StopBark(true); }
+	if (!ResolveOwner()) { return; }
+	if (CurrentConversation && OwnedDialogue && !MatchesRequestContext(ConversationRequest))
+	{ OwnedDialogue->SetPreserveOnInterruption(false); Tales->ExitDialogue(EExitDialogueReason::EDR_PlayerExited); }
+	if (!ResolveOwner()) { return; }
+	if (CurrentBark && BarkLoad && BarkLoad->HasLoadCompleted()) { StartResidentBarkAudio(); }
+	if (!ResolveOwner()) { return; }
 	const bool Combat = IsCombatRequired();
 	if (CurrentBark && !ResolveSpeaker(CurrentRequest)) { StopBark(true); }
 	if (!ResolveOwner()) { return; }
-	if (CurrentBark && GetWorld()->GetTimeSeconds() >= BarkEndsAt) { StopBark(false); }
+	if (CurrentBark && GetWorld()->GetTimeSeconds() >= BarkEndsAt && !(bSubtitleHold && SubtitleHoldOwner.IsValid())) { StopBark(false); }
 	if (!ResolveOwner()) { return; }
 	if (OwnedDialogue && Tales->GetCurrentDialogue() == OwnedDialogue && CurrentConversation)
 	{
@@ -220,7 +289,7 @@ void USovNarrativeCueComponent::TickComponent(float Delta, ELevelTick Type, FAct
 	for (int32 Index = Pending.Num() - 1; Index >= 0; --Index)
 	{
 		auto& Request = Pending[Index];
-		if (!IsValid(Request.Cue) || !MatchesContext(Request.Cue)) { Pending.RemoveAt(Index); continue; }
+		if (!IsValid(Request.Cue) || !MatchesRequestContext(Request)) { Pending.RemoveAt(Index); continue; }
 		if (!Request.Cue->bCritical)
 		{
 			Request.RemainingContextSeconds -= Delta;
@@ -254,7 +323,7 @@ void USovNarrativeCueComponent::TickComponent(float Delta, ELevelTick Type, FAct
 	const uint64 ExpectedStartEpoch=Epoch+1;
 	if (!StartRequest(Request) && Epoch==ExpectedStartEpoch && ResolveOwner() && Request.Cue && Request.Cue->bCritical)
 	{
-		RememberUnheard(Request.Cue);
+		RememberUnheard(Request.Cue, &Request);
 		if (Pending.Num()<64 && !Pending.ContainsByPredicate([&Request](const auto& Item) { return Item.Cue==Request.Cue; })) { Pending.Add(Request); }
 	}
 }
@@ -273,12 +342,12 @@ void USovNarrativeCueComponent::HandleDialogueBegan(UDialogue* Dialogue)
 void USovNarrativeCueComponent::HandleDialogueFinished(UDialogue* Dialogue, bool bStartingNew, EExitDialogueReason Reason)
 {
 	if (Dialogue != OwnedDialogue) { return; }
-	++Epoch; USovNarrativeCue* Finished = CurrentConversation;
+	++Epoch; USovNarrativeCue* Finished = CurrentConversation; const FSovQueuedCue FinishedRequest=ConversationRequest;
 	CurrentConversation = nullptr; OwnedDialogue = nullptr;
 	const bool Interrupted = bStartingNew || Reason != EExitDialogueReason::EDR_NoLines;
 	if (bStartingConversation && !Interrupted) { bCompletedDuringStart = true; }
-	if (Interrupted) { RememberUnheard(Finished); }
-	else { UnheardRecords.Remove(Finished); }
+	if (Interrupted) { RememberUnheard(Finished, &FinishedRequest); }
+	else { RetireHeardRecord(Finished, FinishedRequest.Witness); }
 	if (Finished) { OnCueEnded.Broadcast(Finished, Interrupted); }
 }
 void USovNarrativeCueComponent::PrepareForSave_Implementation()
@@ -295,8 +364,8 @@ void USovNarrativeCueComponent::Load_Implementation()
 	if (IsValid(OldDialogue) && IsValid(Tales) && Tales->GetCurrentDialogue() == OldDialogue)
 	{ OldDialogue->SetPreserveOnInterruption(false); Tales->ExitDialogue(EExitDialogueReason::EDR_PlayerExited); }
 	if (bOwnerEndingPlay) { return; }
-	if (Pending.Num() > 64 || UnheardRecords.Num() > 256 || RepetitionCounts.Num() > 4096)
-	{ Pending.Reset(); UnheardRecords.Reset(); RepetitionCounts.Reset(); return; }
+	if (Pending.Num() > 64 || UnheardRecords.Num() > 256 || UnheardRecordContexts.Num() > 256 || RepetitionCounts.Num() > 4096)
+	{ Pending.Reset(); UnheardRecords.Reset(); UnheardRecordContexts.Reset(); RepetitionCounts.Reset(); return; }
 	TSet<USovNarrativeCue*> Seen;
 	for (int32 Index = Pending.Num() - 1; Index >= 0; --Index)
 	{
@@ -316,6 +385,12 @@ void USovNarrativeCueComponent::Load_Implementation()
 		FString Error;
 		return !IsValid(Cue) || !Cue->bCritical || !Cue->bRecordUnheardSummary || Cue->RecordSummary.IsEmpty() || !Cue->Validate(Error);
 	});
+    UnheardRecordContexts.RemoveAll([](const auto& Record)
+    {
+        FString Error;
+        return !IsValid(Record.Cue) || !Record.Witness.IsValid() || !Record.Cue->bCritical
+            || !Record.Cue->bRecordUnheardSummary || !Record.Cue->Validate(Error);
+    });
 	for (auto& Pair : RepetitionCounts) { Pair.Value = FMath::Clamp(Pair.Value, 0, 1000000); }
 	InFlightCriticalSave = FSovQueuedCue();
 }

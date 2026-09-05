@@ -9,6 +9,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Animation/PoseSnapshot.h"
+#include "Animation/AnimSequence.h"
 #include "UnrealFramework/NarrativeAnimInstance.h"
 #include "UnrealFramework/NarrativeTeamAgentInterface.h"
 #include "Components/SovDismembermentComponent.h"
@@ -40,6 +41,10 @@
 #include "Serialization/ObjectAndNameAsStringProxyArchive.h"
 #include "Engine/SkeletalMesh.h"
 #include "Engine/World.h"
+#include "Engine/AssetManager.h"
+#include "Engine/StreamableManager.h"
+#include "HAL/PlatformTime.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 
 namespace
 {
@@ -59,8 +64,15 @@ namespace
 bool ASovEncounterDirector::IsParticipantMassRepresented(FName Id) const
 { return MassParticipants.ContainsByPredicate([Id](const auto& Record) { return Record.NPC.ParticipantId == Id; }); }
 
+bool ASovEncounterDirector::HasLiveMassIdentity(FName Id) const
+{
+	auto* Entities = GetWorld() ? GetWorld()->GetSubsystem<UMassEntitySubsystem>() : nullptr;
+	return Entities && MassEntities.Contains(Id) && Entities->GetMutableEntityManager().IsEntityValid(MassEntities.FindRef(Id));
+}
+
 bool ASovEncounterDirector::CaptureMassTransfer(ASovNPCCharacterBase* NPC, FSovCampaignMassState& Out, FString& Error) const
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(SovEncounter_CaptureMassTransfer);
 	auto* ASC = NPC ? NPC->GetNarrativeAbilitySystemComponent() : nullptr;
 	if (!IsValid(NPC) || !ASC || ASC->GetAvatarActor() != NPC || NPC->IsHidden()
 		|| (NPC->GetCharacterMovement() && (NPC->GetCharacterMovement()->IsFalling() || !NPC->GetVelocity().IsNearlyZero(1.f))))
@@ -132,6 +144,11 @@ bool ASovEncounterDirector::CaptureMassTransfer(ASovNPCCharacterBase* NPC, FSovC
 			if (!Mesh->IsVisible() || Mesh->bHiddenInGame || !Mesh->GetSkeletalMeshAsset()) { continue; }
 			if (Mesh->IsSimulatingPhysics()) { Error = TEXT("Physics/ragdoll poses cannot convert during simulation."); return false; }
 			auto& Saved = Result.Meshes.AddDefaulted_GetRef(); Saved.Mesh = Mesh->GetSkeletalMeshAsset(); Saved.ComponentName = Mesh->GetFName();
+			if (const auto* Profile = MassAnimationProfiles.Find(FindParticipantId(NPC)))
+			{
+				Saved.RouteAnimation = Profile->ComponentAnimations.FindRef(Saved.ComponentName);
+				Saved.AnimationReferenceSpeed = Profile->ReferenceSpeed;
+			}
 			Saved.bRequiresSnapshotBlend = Mesh->GetAnimInstance() != nullptr;
 			if (Saved.bRequiresSnapshotBlend && !Cast<UNarrativeAnimInstance>(Mesh->GetAnimInstance()))
 			{ Error = TEXT("Animated visual must support Narrative's existing pose-snapshot blend contract."); return false; }
@@ -158,8 +175,86 @@ bool ASovEncounterDirector::CaptureMassTransfer(ASovNPCCharacterBase* NPC, FSovC
 	Out = MoveTemp(Result); return true;
 }
 
+bool ASovEncounterDirector::EnsureMassAssets(const FSovEncounterMassRecord& Record, FString& Error)
+{
+	if (bEndingPlay || Record.NPC.ParticipantId.IsNone()) { Error = TEXT("Mass residency requires a live participant owner."); return false; }
+	TArray<FSoftObjectPath> Paths;
+	const auto AddPath = [&Paths](const FSoftObjectPath& Path) { if (!Path.IsNull()) { Paths.AddUnique(Path); } };
+	AddPath(Record.NPC.Definition.ToSoftObjectPath()); AddPath(Record.NPC.ActorRecord.ActorSoftClass.ToSoftObjectPath());
+	if (Record.Transfer.Meshes.Num() > 32) { Error = TEXT("Mass asset residency exceeds the visual-part limit."); return false; }
+	for (const auto& Mesh : Record.Transfer.Meshes)
+	{
+		AddPath(Mesh.Mesh.ToSoftObjectPath()); AddPath(Mesh.StaticMesh.ToSoftObjectPath()); AddPath(Mesh.RouteAnimation.ToSoftObjectPath());
+		if (Mesh.Materials.Num() > 64) { Error = TEXT("Mass visual exceeds the material-slot limit."); return false; }
+		for (const auto& Material : Mesh.Materials) { AddPath(Material.ToSoftObjectPath()); }
+	}
+	if (Paths.Num() > 1024) { Error = TEXT("Mass asset residency exceeds the participant budget."); return false; }
+	FSovCampaignMassAssetResidency Lease;
+	bool bResident = true;
+	for (const auto& Path : Paths)
+	{
+		UObject* Asset = Path.ResolveObject();
+		if (!IsValid(Asset)) { bResident = false; } else { Lease.Assets.Add(Asset); }
+	}
+	const FName Id = Record.NPC.ParticipantId;
+	if (bResident)
+	{
+		// Acquire strong ownership before releasing the asynchronous handle or original actor.
+		MassAssetResidency.Add(Id, MoveTemp(Lease));
+		MassAssetLoads.Remove(Id); MassAssetLoadDeadlines.Remove(Id);
+		return true;
+	}
+	if (!MassAssetLoads.Contains(Id))
+	{
+		auto Handle = UAssetManager::GetStreamableManager().RequestAsyncLoad(Paths, FStreamableDelegate());
+		if (!Handle.IsValid()) { Error = TEXT("Mass assets could not be queued; the source actor/record is retained."); return false; }
+		MassAssetLoads.Add(Id, MoveTemp(Handle));
+		MassAssetLoadDeadlines.Add(Id, FPlatformTime::Seconds() + FMath::Clamp(RestoreTimeoutSeconds, 1.f, 120.f));
+		SetActorTickEnabled(true);
+	}
+	Error = TEXT("Mass assets are loading asynchronously; retry the authored boundary while the source actor remains authoritative.");
+	return false;
+}
+
+void ASovEncounterDirector::TickMassAssetLoads()
+{
+	TRACE_CPUPROFILER_EVENT_SCOPE(SovEncounter_MassAssetResidency);
+	if (!HasAuthority() || bEndingPlay || bMutationInProgress || MassAssetLoads.IsEmpty()) { return; }
+	const uint64 Generation = RestoreGeneration; const FGuid Attempt = AttemptId;
+	const auto Current = [this, Generation, Attempt]()
+	{ return IsValid(this) && !IsActorBeingDestroyed() && !bEndingPlay && RestoreGeneration == Generation && AttemptId == Attempt; };
+	TArray<FName> Ids; MassAssetLoads.GetKeys(Ids);
+	for (FName Id : Ids)
+	{
+		if (!Current()) { return; }
+		const auto Handle = MassAssetLoads.FindRef(Id);
+		const bool bTimedOut = FPlatformTime::Seconds() >= MassAssetLoadDeadlines.FindRef(Id);
+		if (!Handle.IsValid() || bTimedOut || Handle->WasCanceled())
+		{
+			if (Handle.IsValid()) { Handle->CancelHandle(); }
+			MassAssetLoads.Remove(Id); MassAssetLoadDeadlines.Remove(Id);
+			if (PendingMassRestores.Remove(Id))
+			{ OnEncounterRestoreFailed.Broadcast(TEXT("Mass asset loading failed or timed out; the saved record remains available for encounter retry.")); }
+			continue;
+		}
+		if (!PendingMassRestores.Contains(Id) || !Handle->HasLoadCompleted()) { continue; }
+		auto* Record = MassParticipants.FindByPredicate([Id](const auto& Value) { return Value.NPC.ParticipantId == Id; });
+		FString Error;
+		if (!Record || !EnsureMassAssets(*Record, Error))
+		{
+			Handle->CancelHandle(); MassAssetLoads.Remove(Id); MassAssetLoadDeadlines.Remove(Id); PendingMassRestores.Remove(Id);
+			OnEncounterRestoreFailed.Broadcast(TEXT("A saved Mass asset is missing; encounter retry retains the checkpoint.")); continue;
+		}
+		PendingMassRestores.Remove(Id);
+		if (!CreateMassEntity(*Record, Error)) { OnEncounterRestoreFailed.Broadcast(Error); }
+	}
+	if (Current() && MassAssetLoads.IsEmpty() && State != ESovEncounterState::Active && State != ESovEncounterState::Restoring)
+	{ SetActorTickEnabled(false); }
+}
+
 bool ASovEncounterDirector::CreateMassEntity(FSovEncounterMassRecord& Record, FString& Error)
 {
+	if (Record.Tier == ESovCampaignRepresentationTier::Mass && !ASovCampaignMassProxy::ValidateAnimationProfile(Record.Transfer.Meshes, Error)) { return false; }
 	auto* Spawner = GetWorld()->GetSubsystem<UMassSpawnerSubsystem>();
 	auto* Entities = GetWorld()->GetSubsystem<UMassEntitySubsystem>();
 	if (!Spawner || !Entities || Entities->GetMutableEntityManager().IsProcessing())
@@ -195,7 +290,9 @@ bool ASovEncounterDirector::CreateMassEntity(FSovEncounterMassRecord& Record, FS
 
 bool ASovEncounterDirector::SetParticipantRepresentation(FName Id, ESovCampaignRepresentationTier Tier, FName Boundary, FString& Error)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(SovEncounter_SetParticipantRepresentation);
 	Error.Reset();
+	if (bEndingPlay || IsActorBeingDestroyed()) { Error = TEXT("Encounter teardown owns its participants."); return false; }
 	FSovEncounterParticipant* Participant = Participants.FindByPredicate([Id](const auto& P) { return P.ParticipantId == Id; });
 	if (!SovCampaignMassPolicy::CanTransition(static_cast<unsigned>(State), HasAuthority(), RepresentationBoundaries.Contains(Boundary),
 		Participant && Participant->bAllowMassRepresentation, bMutationInProgress, !MassPromotions.IsEmpty(), DefeatedParticipants.Contains(Id), static_cast<unsigned>(Tier)))
@@ -209,6 +306,14 @@ bool ASovEncounterDirector::SetParticipantRepresentation(FName Id, ESovCampaignR
 	{
 		if (Existing)
 		{
+			if (!EnsureMassAssets(*Existing, Error) || (Tier == ESovCampaignRepresentationTier::Mass
+				&& !ASovCampaignMassProxy::ValidateAnimationProfile(Existing->Transfer.Meshes, Error))) { return false; }
+			if (auto* Proxy = Cast<ASovCampaignMassProxy>(MassProxies.FindRef(Id).Get()))
+			{
+				Proxy->CaptureVisualState(Existing->Transfer.Meshes);
+				if (!Proxy->RestoreVisuals(Existing->Transfer.Meshes, Tier == ESovCampaignRepresentationTier::Mass))
+				{ Error = TEXT("The existing visual could not change tier; its prior identity is retained."); return false; }
+			}
 			Existing->Tier = Tier;
 			if (auto* Entities = GetWorld()->GetSubsystem<UMassEntitySubsystem>())
 			{
@@ -245,9 +350,12 @@ bool ASovEncounterDirector::SetParticipantRepresentation(FName Id, ESovCampaignR
 			}
 		}
 		// The owner record must exist before creation observers can request a representation.
+		if (!EnsureMassAssets(Record, Error)) { return false; }
+		if (Tier == ESovCampaignRepresentationTier::Mass && !ASovCampaignMassProxy::ValidateAnimationProfile(Record.Transfer.Meshes, Error))
+		{ MassAssetResidency.Remove(Id); return false; }
 		MassParticipants.Add(MoveTemp(Record));
 		if (!CreateMassEntity(MassParticipants.Last(), Error))
-		{ MassParticipants.RemoveAll([Id](const auto& R) { return R.NPC.ParticipantId == Id; }); return false; }
+		{ MassParticipants.RemoveAll([Id](const auto& R) { return R.NPC.ParticipantId == Id; }); MassAssetResidency.Remove(Id); return false; }
 		// Commit null actor ownership before destruction callbacks; the same required participant is now the entity.
 		Participant = Participants.FindByPredicate([Id](const auto& P) { return P.ParticipantId == Id; });
 		Participant->Character = nullptr;
@@ -264,8 +372,9 @@ bool ASovEncounterDirector::SetParticipantRepresentation(FName Id, ESovCampaignR
 	{ Error = TEXT("Promotion would exceed the registered A/B wave budget."); return false; }
 	CaptureMassTransforms();
 	const FSovEncounterNPCRecord Record = Existing->NPC;
-	UNPCDefinition* Definition = Record.Definition.LoadSynchronous();
-	UClass* Class = Record.ActorRecord.ActorSoftClass.LoadSynchronous();
+	if (!EnsureMassAssets(*Existing, Error)) { return false; }
+	UNPCDefinition* Definition = Record.Definition.Get();
+	UClass* Class = Record.ActorRecord.ActorSoftClass.Get();
 	FNPCSpawnInfo SpawnInfo = Record.SpawnInfo;
 	FMemoryReader Reader(Record.SpawnInfoData); FObjectAndNameAsStringProxyArchive Archive(Reader, true);
 	FNPCSpawnInfo::StaticStruct()->SerializeItem(Archive, &SpawnInfo, nullptr); SpawnInfo.OwningSpawn.Reset();
@@ -302,6 +411,8 @@ bool ASovEncounterDirector::SetParticipantMassRoute(FName Id, const TArray<FVect
 	const FMassEntityHandle Entity = MassEntities.FindRef(Id);
 	if (!Record || !Entities || Entities->GetMutableEntityManager().IsProcessing() || !Entities->GetMutableEntityManager().IsEntityValid(Entity))
 	{ Error = TEXT("Participant has no current campaign Mass entity or Mass is processing."); return false; }
+	if (Speed > 0.f && Record->Tier == ESovCampaignRepresentationTier::Mass
+		&& !ASovCampaignMassProxy::ValidateAnimationProfile(Record->Transfer.Meshes, Error)) { return false; }
 	Record->Route = Points; Record->RouteSpeed = Speed; Record->NextRoutePoint = 0;
 	auto& Route = Entities->GetMutableEntityManager().GetFragmentDataChecked<FSovCampaignMassRouteFragment>(Entity);
 	Route.Points = Points; Route.Speed = Speed; Route.NextPoint = 0; return true;
@@ -319,7 +430,9 @@ bool ASovEncounterDirector::AcceptMassRepresentation(FMassEntityManager& Manager
 	const auto Prior = MassProxies.FindRef(Identity.ParticipantId);
 	if (Prior.IsValid() && Prior.Get() != &Actor) { return false; }
 	MassProxies.Add(Identity.ParticipantId, &Actor); Actor.SetOwner(this);
-	const bool bVisuals = Proxy->RestoreVisuals(Record->Transfer.Meshes);
+	const bool bVisuals = Proxy->RestoreVisuals(Record->Transfer.Meshes, Record->Tier == ESovCampaignRepresentationTier::Mass);
+	Proxy->SetRouteMotion(State == ESovEncounterState::Active && Record->Tier == ESovCampaignRepresentationTier::Mass
+		&& Record->Route.IsValidIndex(Record->NextRoutePoint) && !MassPromotions.Contains(Identity.ParticipantId), Record->RouteSpeed);
 	return bVisuals && IsMassRepresentationCurrent(Manager, Entity, Actor, Identity);
 }
 
@@ -349,6 +462,8 @@ void ASovEncounterDirector::CaptureMassTransforms()
 		if (!Manager.IsEntityValid(Entity)) { continue; }
 		Record.NPC.ActorRecord.Transform = Manager.GetFragmentDataChecked<FTransformFragment>(Entity).GetTransform();
 		Record.NextRoutePoint = Manager.GetFragmentDataChecked<FSovCampaignMassRouteFragment>(Entity).NextPoint;
+		if (auto* Proxy = Cast<ASovCampaignMassProxy>(MassProxies.FindRef(Record.NPC.ParticipantId).Get()))
+		{ Proxy->CaptureVisualState(Record.Transfer.Meshes); }
 	}
 }
 
@@ -364,6 +479,9 @@ void ASovEncounterDirector::RefreshMassProcessingState()
 		if (!Manager.IsEntityValid(Entity)) { continue; }
 		Manager.GetFragmentDataChecked<FSovCampaignMassRouteFragment>(Entity).bPresentationOnly =
 			State != ESovEncounterState::Active || Record.Tier == ESovCampaignRepresentationTier::Presentation || MassPromotions.Contains(Id);
+		if (auto* Proxy = Cast<ASovCampaignMassProxy>(MassProxies.FindRef(Id).Get()))
+		{ Proxy->SetRouteMotion(State == ESovEncounterState::Active && Record.Tier == ESovCampaignRepresentationTier::Mass
+			&& Record.Route.IsValidIndex(Record.NextRoutePoint) && !MassPromotions.Contains(Id), Record.RouteSpeed); }
 	}
 }
 
@@ -408,6 +526,8 @@ void ASovEncounterDirector::DestroyMassEntity(FName Id)
 
 void ASovEncounterDirector::ClearMassRepresentations(bool bDiscardRecords)
 {
+	for (auto& Pair : MassAssetLoads) { if (Pair.Value.IsValid()) { Pair.Value->CancelHandle(); } }
+	MassAssetLoads.Reset(); MassAssetLoadDeadlines.Reset(); PendingMassRestores.Reset(); MassAssetResidency.Reset();
 	TArray<FName> Ids; MassEntities.GetKeys(Ids);
 	for (FName Id : Ids) { DestroyMassEntity(Id); }
 	const auto Pending = MoveTemp(MassPromotions); MassPromotions.Reset(); MassPromotionStarts.Reset();
@@ -588,6 +708,7 @@ bool ASovEncounterDirector::RestoreMassTransfer(ASovNPCCharacterBase* NPC, const
 
 void ASovEncounterDirector::TickMassPromotions()
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(SovEncounter_MassPromotion);
 	if (!HasAuthority() || bMutationInProgress || MassPromotions.IsEmpty()) { return; }
 	TGuardValue<bool> Mutation(bMutationInProgress, true);
 	const auto Pending = MassPromotions;
@@ -640,6 +761,7 @@ void ASovEncounterDirector::TickMassPromotions()
 					|| GetParticipant(Id) != NPC || NPC->GetNarrativeAbilitySystemComponent() != PromotedASC || PromotedASC->GetAvatarActor() != NPC) { return; }
 				MassParticipants.RemoveAll([Id](const auto& R) { return R.NPC.ParticipantId == Id; });
 				MassPromotions.Remove(Id); MassPromotionStarts.Remove(Id);
+				MassAssetResidency.Remove(Id);
 				BindDeaths();
 				Coordination->RefreshRepresentationBindings(); ForceNetUpdate();
 				continue;
@@ -649,5 +771,6 @@ void ASovEncounterDirector::TickMassPromotions()
 		// Fail closed. Keep the saved C/D state and checkpoint for retry; never release a partially restored combatant.
 		SetState(ESovEncounterState::Failed); OnEncounterRestoreFailed.Broadcast(Error); return;
 	}
-	if (MassPromotions.IsEmpty() && State != ESovEncounterState::Restoring) { SetActorTickEnabled(false); }
+	// Active encounters retain reconciliation ticks even after the final promotion.
+	if (MassPromotions.IsEmpty() && State != ESovEncounterState::Restoring && State != ESovEncounterState::Active) { SetActorTickEnabled(false); }
 }

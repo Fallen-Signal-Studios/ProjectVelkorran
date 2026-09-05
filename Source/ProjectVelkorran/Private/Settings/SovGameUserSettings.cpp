@@ -56,7 +56,10 @@ void USovGameUserSettings::LoadSettings(bool bForceReload)
 {
 	if (bHDRTransaction) { return; }
 	if (HDRPreviewReceipt.IsValid()) { RevertHDRCalibration(HDRPreviewReceipt); }
+	const uint64 OwnerEpoch = AccountSettingsOwnerGeneration;
+	TArray<uint8> AccountValues; if (bAccountPreferencesManaged) { CaptureAccountPreferences(AccountValues); }
 	Super::LoadSettings(bForceReload);
+	if (bAccountPreferencesManaged && OwnerEpoch == AccountSettingsOwnerGeneration && !AccountValues.IsEmpty()) { ApplyAccountPreferences(AccountValues); }
 	if (!DisplayCalibration.IsValid()) { DisplayCalibration = FSovHDRCalibration(); bHasDisplayCalibration = false; }
 	if (!HapticSettings.IsValid()) { HapticSettings = FSovHapticSettings(); HapticSettings.Master = 0.f; SaveSettings(); }
 	FString Error;
@@ -72,6 +75,12 @@ void USovGameUserSettings::LoadSettings(bool bForceReload)
 
 void USovGameUserSettings::SaveSettings()
 {
+	if (bAccountPreferencesManaged && bAccountSettingsSuspended) { bLastPreferenceSaveSucceeded = false; ApplyAccountPreferences(CommittedAccountPreferences); return; }
+	const uint64 OwnerEpoch = AccountSettingsOwnerGeneration;
+	const bool Saved = !bAccountPreferencesManaged || SaveAccountPreferences();
+	if (OwnerEpoch != AccountSettingsOwnerGeneration) { return; }
+	bLastPreferenceSaveSucceeded = Saved;
+	if (!Saved) { ApplyAccountPreferences(CommittedAccountPreferences); }
 	TGuardValue<bool> Guard(bHDRTransaction, true);
 	// Narrative audio/input widgets save immediately. Never let an unrelated save commit an HDR preview.
 	if (HDRPreviewReceipt.IsValid())
@@ -79,10 +88,10 @@ void USovGameUserSettings::SaveSettings()
 		TGuardValue<bool> RestoreEnabled(bUseHDRDisplayOutput, bHDRBeforePreview);
 		TGuardValue<int32> RestoreNits(HDRDisplayOutputNits, HDRNitsBeforePreview);
 		TGuardValue<FSovHDRCalibration> RestoreCalibration(DisplayCalibration, BeforeDisplayCalibration);
-		PersistSettings();
+		PersistDeviceSettings();
 		return;
 	}
-	PersistSettings();
+	PersistDeviceSettings();
 }
 void USovGameUserSettings::PersistSettings() { Super::SaveSettings(); }
 bool USovGameUserSettings::CompleteAccessibilitySetup()
@@ -90,8 +99,10 @@ bool USovGameUserSettings::CompleteAccessibilitySetup()
 	if (bApplying) { return false; }
 	if (bAccessibilitySetupCompleted) { return true; }
 	TGuardValue<bool> Guard(bApplying, true);
+	const uint64 OwnerEpoch=AccountSettingsOwnerGeneration;
 	bAccessibilitySetupCompleted = true;
 	SaveSettings();
+	if (OwnerEpoch!=AccountSettingsOwnerGeneration || !bLastPreferenceSaveSucceeded || !bAccessibilitySetupCompleted) { return false; }
 	OnUserSettingsChanged.Broadcast(Settings);
 	return true;
 }
@@ -111,8 +122,10 @@ bool USovGameUserSettings::ApplyHapticSettings(const FSovHapticSettings& Value, 
 {
 	if (bApplying || !Value.IsValid()) { Error = TEXT("Feedback settings are invalid or a settings transaction is active."); return false; }
 	TGuardValue<bool> Guard(bApplying, true);
+	const uint64 OwnerEpoch=AccountSettingsOwnerGeneration;
 	HapticSettings = Value;
 	SaveSettings();
+	if (OwnerEpoch!=AccountSettingsOwnerGeneration || !bLastPreferenceSaveSucceeded) { Error = TEXT("Feedback preferences could not be saved for the current account."); return false; }
 	OnHapticSettingsChanged.Broadcast(HapticSettings);
 	Error.Reset(); return true;
 }
@@ -274,6 +287,7 @@ void USovGameUserSettings::BeginDestroy()
 {
 	if (HDRPreviewReceipt.IsValid()) { RevertHDRCalibration(HDRPreviewReceipt); }
 	RemoveHDRPreviewTicker();
+	if(AccountPreferenceLoadTicker.IsValid()) { FTSTicker::GetCoreTicker().RemoveTicker(AccountPreferenceLoadTicker); AccountPreferenceLoadTicker.Reset(); }
 	EndDisplayObservation();
 	Super::BeginDestroy();
 }
@@ -282,6 +296,7 @@ bool USovGameUserSettings::ApplySettingsSnapshot(const FSovUserSettingsSnapshot&
 	if (bApplying) { Error = TEXT("A settings transaction is already active."); return false; }
 	if (!ValidateSnapshot(NewSettings, bCampaignCompleted, Error)) { return false; }
 	TGuardValue<bool> Guard(bApplying, true);
+	const uint64 OwnerEpoch=AccountSettingsOwnerGeneration;
 	Settings = NewSettings;
 	SettingsSchemaVersion = 1;
 	// Keep existing Narrative widgets in sync without owning an independent difficulty variable.
@@ -289,7 +304,9 @@ bool USovGameUserSettings::ApplySettingsSnapshot(const FSovUserSettingsSnapshot&
 		: Settings.Preset == ESovDifficultyPreset::Veteran ? ENarrativeGameplayDifficulty::Hard
 		: Settings.Preset == ESovDifficultyPreset::Sovereign ? ENarrativeGameplayDifficulty::Insane : ENarrativeGameplayDifficulty::Medium;
 	SaveSettings();
-	OnUserSettingsChanged.Broadcast(Settings);
+	if (OwnerEpoch!=AccountSettingsOwnerGeneration) { Error=TEXT("The preferences owner changed during this transaction."); return false; }
+	const bool Saved=bLastPreferenceSaveSucceeded; OnUserSettingsChanged.Broadcast(Settings);
+	if (OwnerEpoch!=AccountSettingsOwnerGeneration || !Saved) { Error = TEXT("Preferences could not be saved for the current account; previous values were restored."); return false; }
 	return true;
 }
 bool USovGameUserSettings::ApplyDifficultyPreset(ESovDifficultyPreset Preset, FString& Error)
@@ -331,14 +348,16 @@ bool USovGameUserSettings::UnlockSovereignFromCampaign(const USovCampaignStateCo
 	if (bCampaignCompleted) { return true; }
 	if (bApplying) { return false; }
 	TGuardValue<bool> Guard(bApplying, true);
-	bCampaignCompleted = true; SaveSettings(); OnUserSettingsChanged.Broadcast(Settings); return true;
+	const uint64 Epoch=AccountSettingsOwnerGeneration; bCampaignCompleted = true; SaveSettings();
+	if(Epoch!=AccountSettingsOwnerGeneration || !bLastPreferenceSaveSucceeded || !bCampaignCompleted) { return false; }
+	OnUserSettingsChanged.Broadcast(Settings); return Epoch==AccountSettingsOwnerGeneration;
 }
 void USovGameUserSettings::SetLocalDiagnosticsEnabled(bool bEnabled)
 {
 	if (bApplying || bLocalDiagnosticsEnabled == bEnabled) { return; }
 	TGuardValue<bool> Guard(bApplying, true);
-	bLocalDiagnosticsEnabled = bEnabled; SaveSettings();
-	OnUserSettingsChanged.Broadcast(Settings);
+	const uint64 Epoch=AccountSettingsOwnerGeneration; bLocalDiagnosticsEnabled = bEnabled; SaveSettings();
+	if(Epoch==AccountSettingsOwnerGeneration) { OnUserSettingsChanged.Broadcast(Settings); }
 }
 bool USovGameUserSettings::CapturePortableSettings(TArray<uint8>& OutData) const
 {

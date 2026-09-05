@@ -10,6 +10,7 @@
 class UArsenalSettings;
 class USoundClass;
 class USoundMix;
+class UNarrativeInputSettings;
 
 UENUM(BlueprintType)
 enum class ENarrativeAudioDynamicRange : uint8 { Full, Reduced, Night };
@@ -46,6 +47,9 @@ public:
 
 	/** Project extension seam; neutral defaults preserve other Narrative consumers. */
 	static const UNarrativeGameUserSettings* GetSovSettings();
+	virtual bool UsesVerifiedAccountPreferences() const { return false; }
+	virtual void RegisterOwnedInputSettings(UNarrativeInputSettings* Input) {}
+	virtual bool PersistOwnedInputSettings(UNarrativeInputSettings* Input) { return false; }
 	virtual float GetIncomingDamageScale() const { return 1.f; }
 	virtual float GetEnemyRecoveryScale() const { return 1.f; }
 	virtual float GetDefenseWindowScale() const { return 1.f; }

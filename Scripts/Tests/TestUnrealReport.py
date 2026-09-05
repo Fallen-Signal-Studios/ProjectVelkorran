@@ -98,6 +98,15 @@ class ReportGateTests(unittest.TestCase):
         self.report["tests"][0]["entries"] = [{"event": {"type": "Warning"}}]
         self.assertEqual(self.check()["warnings"], 1)
 
+    def test_warning_cannot_be_hidden_by_successful_aggregate(self):
+        self.report["tests"][0]["entries"] = [{"event": {"type": "Warning"}}]
+        self.assertEqual(self.check()["warnings"], 1)
+
+    def test_malformed_warning_counter_rejected(self):
+        self.report["tests"][0]["warnings"] = -1
+        with self.assertRaises(GATE.ReportError):
+            self.check()
+
     def test_source_inventory_includes_plugin_and_ignores_comments(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory); (root / "Source").mkdir(); (root / "Plugins").mkdir()

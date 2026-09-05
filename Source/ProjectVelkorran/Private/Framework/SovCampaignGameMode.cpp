@@ -47,12 +47,12 @@ FString ASovCampaignGameMode::InitNewPlayer(APlayerController* NewPlayerControll
 		USovSaveSubsystem* Slots = GetGameInstance()->GetSubsystem<USovSaveSubsystem>();
 		if (!Slots || !Slots->IsPlatformStorageOwnerAvailable() || Slots->IsPlatformStorageSuspended()) { return TEXT("Campaign travel storage owner is unavailable."); }
 		const FString TravelOwner = Slots->GetAccountNamespace(); const int32 TravelUser = Slots->GetLocalSaveUserIndex();
+		const FSovStorageOwnerToken TravelToken = Slots->CaptureStorageOwner();
 		const TWeakObjectPtr<USovSaveSubsystem> TravelStorage(Slots);
-		OwnsTravelStorage = [TravelStorage, TravelOwner, TravelUser]()
+		OwnsTravelStorage = [TravelStorage, TravelToken]()
 		{
 			const auto* Current = TravelStorage.Get();
-			return Current && Current->IsPlatformStorageOwnerAvailable() && !Current->IsPlatformStorageSuspended() && Current->GetAccountNamespace() == TravelOwner
-				&& Current->GetLocalSaveUserIndex() == TravelUser;
+			return Current && Current->IsStorageOwnerCurrent(TravelToken);
 		};
 		const FString OwnedTravelSlot = FString(ASovPlayerController::TravelSaveSlot()) + TEXT("_") + TravelOwner;
 		bHasRecords = Save->ReadPlayerOnlySave(OwnedTravelSlot, Records, TravelUser, OwnsTravelStorage);
