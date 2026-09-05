@@ -5,6 +5,7 @@
 #include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
+#include "HAL/PlatformProperties.h"
 #include "Framework/SovCampaignGameMode.h"
 #include "Misc/AutomationTest.h"
 #include "Save/SovSaveSubsystem.h"
@@ -40,7 +41,10 @@ namespace
         FDelegateHandle InitialSaveHandle;
         UWorld* Create()
         {
-            UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+            const UWorld::InitializationValues WorldInitialization = UWorld::InitializationValues().AllowAudioPlayback(false).RequiresHitProxies(false)
+                .CreatePhysicsScene(false).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
+            UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true,
+                ERHIFeatureLevel::Num, &WorldInitialization, true);
             if (!World) { return nullptr; }
             Worlds.Add(World);
             World->SetGameInstance(Instance.Get());
@@ -49,8 +53,8 @@ namespace
                 auto& Context = GEngine->CreateNewWorldContext(EWorldType::Game);
                 Context.SetCurrentWorld(World); Context.OwningGameInstance = Instance.Get();
             }
-            World->InitializeNewWorld(UWorld::InitializationValues().AllowAudioPlayback(false).RequiresHitProxies(false)
-                .CreatePhysicsScene(false).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false));
+            World->InitWorld(WorldInitialization);
+            World->UpdateWorldComponents(!FPlatformProperties::RequiresCookedData(), false);
             FURL URL;
             URL.AddOption(TEXT("game=/Script/ProjectVelkorran.SovCampaignGameMode"));
             return World->SetGameMode(URL) ? World : nullptr;

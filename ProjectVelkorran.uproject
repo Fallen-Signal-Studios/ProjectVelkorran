@@ -88,6 +88,18 @@
 				"Win64",
 				"Linux"
 			]
+		},
+		{
+			"Name": "CommonUI",
+			"Enabled": true
+		},
+		{
+			"Name": "MassGameplay",
+			"Enabled": true
+		},
+		{
+			"Name": "MassCrowd",
+			"Enabled": true
 		}
 	]
 }

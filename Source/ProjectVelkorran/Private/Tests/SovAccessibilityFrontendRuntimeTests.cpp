@@ -28,7 +28,7 @@ struct FSovAccessibilityFrontendTestAccess
 	}
 };
 #if WITH_DEV_AUTOMATION_TESTS
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovConsoleMenuBackTest,"ProjectVelkorran.UI.Console.BackAndFirstBoot",EAutomationTestFlags::ApplicationContextMask|EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovConsoleMenuBackTest,"ProjectVelkorran.UI.Console.BackAndFirstBoot",EAutomationTestFlags_ApplicationContextMask|EAutomationTestFlags::EngineFilter)
 bool FSovConsoleMenuBackTest::RunTest(const FString& Parameters)
 {
 	auto* Menu=NewObject<USovAccessibilitySettingsMenu>(); Menu->SetFirstBoot(true); Menu->ActivateWidget();
@@ -48,7 +48,7 @@ bool FSovConsoleNativeLayoutTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("Evidence text has an independently scrollable viewport"),FSovAccessibilityFrontendTestAccess::RecordScroll(Review));
 	auto* Settings=NewObject<USovSettingsTestSettings>(); auto* Menu=NewObject<USovAccessibilitySettingsMenu>(); Menu->ActivateWidget();
 	auto* Row=FSovAccessibilityFrontendTestAccess::Row(Menu,Settings,"UIScale",1,2,.25f); Row->Initialize(); Row->TakeWidget();
-	TestEqual(TEXT("Directional rule is installed on the actual focused button"),Row->GetFocusTarget()->Navigation->GetNavigationRule(EUINavigation::Right),EUINavigationRule::Custom);
+	TestEqual(TEXT("Directional rule is installed on the actual focused button"),Row->GetFocusTarget()->Navigation->Right.Rule,EUINavigationRule::Custom);
 	TestNull(TEXT("Mapped right direction cannot steal focus from a callback's modal"),FSovAccessibilityFrontendTestAccess::Navigate(Row,EUINavigation::Right));
 	TestEqual(TEXT("Mapped direction commits the settings transaction"),Settings->GetSettingsSnapshot().UIScale,1.25f);
 	auto* Continue=FSovAccessibilityFrontendTestAccess::Row(Menu,Settings,"Continue",0,1,1);
@@ -58,7 +58,7 @@ bool FSovConsoleNativeLayoutTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Retired menu ignores stale navigation"),Settings->GetSettingsSnapshot().UIScale,1.25f);
 	return true;
 }
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovConsoleHDRRowsTest,"ProjectVelkorran.UI.Console.SystemManagedHDR",EAutomationTestFlags::ApplicationContextMask|EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovConsoleHDRRowsTest,"ProjectVelkorran.UI.Console.SystemManagedHDR",EAutomationTestFlags_ApplicationContextMask|EAutomationTestFlags::EngineFilter)
 bool FSovConsoleHDRRowsTest::RunTest(const FString& Parameters)
 {
 	auto* Settings=NewObject<USovPlatformOutputTestSettings>(); Settings->bSystemManaged=true;
@@ -73,7 +73,7 @@ bool FSovConsoleHDRRowsTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Disabled controls cannot write console HDR output"),Settings->Writes,0);
 	return true;
 }
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovRecordViewReentry,"ProjectVelkorran.UI.Accessibility.RecordViewReentry",EAutomationTestFlags::ApplicationContextMask|EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovRecordViewReentry,"ProjectVelkorran.UI.Accessibility.RecordViewReentry",EAutomationTestFlags_ApplicationContextMask|EAutomationTestFlags::EngineFilter)
 bool FSovRecordViewReentry::RunTest(const FString& Parameters)
 {
 	auto* Menu=NewObject<USovAccessibleRecordMenu>(); bool bReentered=false;
@@ -88,7 +88,7 @@ bool FSovRecordViewReentry::RunTest(const FString& Parameters)
 	Menu->OnRequestRefreshFocus().Clear(); Menu->DeactivateWidget();
 	return true;
 }
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAccessibilityTransaction,"ProjectVelkorran.UI.Accessibility.LocalSettingsAtomicPrivacy",EAutomationTestFlags::ApplicationContextMask|EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAccessibilityTransaction,"ProjectVelkorran.UI.Accessibility.LocalSettingsAtomicPrivacy",EAutomationTestFlags_ApplicationContextMask|EAutomationTestFlags::EngineFilter)
 bool FSovAccessibilityTransaction::RunTest(const FString& Parameters)
 {
 	auto* Settings = NewObject<USovSettingsTestSettings>(); FString Error; TArray<uint8> Bytes;
@@ -110,7 +110,7 @@ bool FSovAccessibilityTransaction::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Nonfinite independent color rejected"),Settings->ApplySettingsSnapshot(Value,Error)); TestEqual(TEXT("Rejected snapshot did not persist"),Settings->Saves,Saves);
 	return true;
 }
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAccessibilityNativeControl,"ProjectVelkorran.UI.Accessibility.NativeControlTransactions",EAutomationTestFlags::ApplicationContextMask|EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAccessibilityNativeControl,"ProjectVelkorran.UI.Accessibility.NativeControlTransactions",EAutomationTestFlags_ApplicationContextMask|EAutomationTestFlags::EngineFilter)
 bool FSovAccessibilityNativeControl::RunTest(const FString& Parameters)
 {
 	auto* Settings=NewObject<USovSettingsTestSettings>(); auto* Menu=NewObject<USovAccessibilitySettingsMenu>();
@@ -135,7 +135,7 @@ bool FSovAccessibilityNativeControl::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Confirmed SDR output persisted"),OutputSettings->bSavedEnabled);
 	return true;
 }
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAccessibilityTextPresentation,"ProjectVelkorran.UI.Accessibility.PagingPaletteAndScenePrivacy",EAutomationTestFlags::ApplicationContextMask|EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAccessibilityTextPresentation,"ProjectVelkorran.UI.Accessibility.PagingPaletteAndScenePrivacy",EAutomationTestFlags_ApplicationContextMask|EAutomationTestFlags::EngineFilter)
 bool FSovAccessibilityTextPresentation::RunTest(const FString& Parameters)
 {
 	const FString Original=TEXT("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789");
@@ -158,7 +158,7 @@ bool FSovAccessibilityTextPresentation::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Scene replacement retires captions"),Presentation->GetCurrentCaptionText().IsEmpty());
 	return true;
 }
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovEvidenceSummaryPresentation,"ProjectVelkorran.UI.Accessibility.EvidenceFactInterpretation",EAutomationTestFlags::ApplicationContextMask|EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovEvidenceSummaryPresentation,"ProjectVelkorran.UI.Accessibility.EvidenceFactInterpretation",EAutomationTestFlags_ApplicationContextMask|EAutomationTestFlags::EngineFilter)
 bool FSovEvidenceSummaryPresentation::RunTest(const FString& Parameters)
 {
 	auto* Evidence=NewObject<USovEvidenceDefinition>(); Evidence->Summary=FText::FromString(TEXT("A disputed record."));

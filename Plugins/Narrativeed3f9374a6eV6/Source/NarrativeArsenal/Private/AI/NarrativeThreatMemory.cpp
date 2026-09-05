@@ -1,4 +1,5 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
+#include "AI/NarrativeThreatMemory.h"
 #include "AI/NarrativeNPCController.h"
 #include "AI/NarrativeThreatPolicy.h"
 #include "AbilitySystemBlueprintLibrary.h"
@@ -43,7 +44,7 @@ namespace
 
 bool ANarrativeNPCController::IsThreatMemoryManaged() const
 {
-	return bRequireThreatMemoryForTargeting || bThreatMemoryManaged || IsValid(GetPerceptionComponent());
+	return bRequireThreatMemoryForTargeting || bThreatMemoryManaged || IsValid(GetAIPerceptionComponent());
 }
 
 bool ANarrativeNPCController::IsThreatTargetEligible(AActor* Target) const
@@ -76,7 +77,7 @@ bool ANarrativeNPCController::IsThreatTargetCloaked(AActor* Target) const
 
 bool ANarrativeNPCController::IsThreatPerceptionReady() const
 {
-	const UAIPerceptionComponent* Component = GetPerceptionComponent();
+	const UAIPerceptionComponent* Component = GetAIPerceptionComponent();
 	// AI Perception normally uses event-driven sensing. Tick-disabled only implies suspension
 	// for a subclass that actually declares a component tick; campaign holds an explicit lease.
 	return Component && Component->IsRegistered() && Component->IsActive()
@@ -249,7 +250,7 @@ bool ANarrativeNPCController::CanDirectlyTargetThreat(AActor* Target) const
 	const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : -1.0;
 	for (const FNarrativeThreatMemory& Memory : ThreatMemory)
 	{
-		if (Memory.Source == ENarrativeThreatSource::Sight && GetPerceptionComponent() && !IsThreatPerceptionReady()) { continue; }
+		if (Memory.Source == ENarrativeThreatSource::Sight && GetAIPerceptionComponent() && !IsThreatPerceptionReady()) { continue; }
 		if (Memory.Target.Get() == Target && NarrativeThreat::CanDirectTarget(
 			NarrativeThreat::ConfidenceAt(Memory.Confidence, Memory.ObservedAt, Memory.ExpiresAt, Now),
 			Memory.bDirectObservation, false)) { return true; }

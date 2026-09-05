@@ -42,6 +42,8 @@ public:
 	class ANarrativePlayerState* GetNarrativePlayerState() const;
 
 	virtual AController* GetOwningController() const override;
+	virtual class UAbilitySystemComponent* GetAbilitySystemComponent() const override;
+	virtual bool IsPlayerControlled() const override;
 
 	/** True after ASC, attributes, abilities, definition, visual/save load, and project extensions are ready. */
 	UFUNCTION(BlueprintPure, Category = "Narrative|Readiness")
@@ -77,7 +79,6 @@ protected:
 	virtual FGameplayTagContainer GetFactions() const override;
 	virtual void AddFaction(const FGameplayTag& Faction) override;
 	virtual void RemoveFaction(const FGameplayTag& Faction) override;
-	virtual class UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 
 	/** Single idempotent entry point for all legal PlayerState/definition arrival orders. */
 	void TryInitializePlayerCharacter();
@@ -92,7 +93,6 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category = "Debug")
 	bool bClientNotifiedVisualReady=false;
 
-	virtual bool IsPlayerControlled() const override;
 	virtual bool IsBotControlled() const override;
 
 	virtual FText GetCharacterName() const override;

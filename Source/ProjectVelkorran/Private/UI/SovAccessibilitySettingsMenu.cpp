@@ -17,6 +17,7 @@
 #include "UObject/UnrealType.h"
 #include "UnrealFramework/NarrativePlayerController.h"
 #include "Widgets/NarrativeGameplayHUD.h"
+#include "Widgets/SWidget.h"
 #include "NarrativeGameplayTags.h"
 
 #define LOCTEXT_NAMESPACE "SovAccessibilitySettings"
@@ -61,17 +62,20 @@ void USovAccessibilitySettingRow::Configure(USovAccessibilitySettingsMenu* Owner
 { Menu = Owner; SettingKey = Key; DisplayLabel = Label; Minimum = Min; Maximum = Max; Increment = Step; }
 void USovAccessibilityNativeButton::SetAccessibleLabel(const FText& Label)
 {
-#if WITH_EDITORONLY_DATA
-	bOverrideAccessibleDefaults = true;
-	AccessibleBehavior = ESlateAccessibleBehavior::Custom;
-	AccessibleText = Label;
-	bCanChildrenBeAccessible = false;
-#endif
-	if (!AccessibleWidgetData) { AccessibleWidgetData = NewObject<USlateAccessibleWidgetData>(this); }
-	AccessibleWidgetData->AccessibleBehavior = ESlateAccessibleBehavior::Custom;
-	AccessibleWidgetData->AccessibleText = Label;
-	AccessibleWidgetData->bCanChildrenBeAccessible = false;
+	NativeAccessibleLabel = Label;
 	SynchronizeProperties();
+}
+void USovAccessibilityNativeButton::SynchronizeProperties()
+{
+	Super::SynchronizeProperties();
+#if WITH_ACCESSIBILITY
+	if (const TSharedPtr<SWidget> AccessibleWidget = GetAccessibleWidget())
+	{
+		AccessibleWidget->SetAccessibleBehavior(EAccessibleBehavior::Custom, NativeAccessibleLabel, EAccessibleType::Main);
+		AccessibleWidget->SetAccessibleBehavior(EAccessibleBehavior::Custom, NativeAccessibleLabel, EAccessibleType::Summary);
+		AccessibleWidget->SetCanChildrenBeAccessible(false);
+	}
+#endif
 }
 TSharedRef<SWidget> USovAccessibilitySettingRow::RebuildWidget()
 {
@@ -293,11 +297,11 @@ void USovAccessibilitySettingsMenu::RefreshRows()
 		Status->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", FMath::RoundToInt(22 * Value.UIScale)));
 		Status->SetText(bFirstBoot ? LOCTEXT("FirstBoot", "Accessibility setup — settings save immediately. Activate or use left/right to change a value. Continue when ready.") : LOCTEXT("Instructions", "Accessibility — settings save immediately. Activate or use left/right to change a value."));
 	}
-	for (auto* Row : Rows) { if (Row) { Row->Refresh(); } }
+	for (USovAccessibilitySettingRow* Row : Rows) { if (Row) { Row->Refresh(); } }
 }
 UWidget* USovAccessibilitySettingsMenu::NativeGetDesiredFocusTarget() const
 {
-	for (const auto* Row : Rows) { if (Row && IsRowEnabled(Row)) { return Row->GetFocusTarget(); } }
+	for (const USovAccessibilitySettingRow* Row : Rows) { if (Row && IsRowEnabled(Row)) { return Row->GetFocusTarget(); } }
 	return nullptr;
 }
 void USovAccessibilitySettingsMenu::FocusRow(USovAccessibilitySettingRow* Row, const FText& Label)

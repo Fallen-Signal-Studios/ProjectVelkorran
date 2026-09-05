@@ -14,12 +14,14 @@
 #include "Widgets/NarrativeGameplayHUD.h"
 #include "Widgets/CommonActivatableWidgetContainer.h"
 
+void FSovDialoguePresentationStateDeleter::operator()(FSovDialoguePresentationState* State) const { delete State; }
+
 #define LOCTEXT_NAMESPACE "SovDialoguePresentation"
 USovDialoguePresentationComponent::USovDialoguePresentationComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
 	PrimaryComponentTick.bTickEvenWhenPaused = true;
-	State = MakeUnique<FSovDialoguePresentationState>();
+	State.Reset(new FSovDialoguePresentationState());
 }
 USovDialoguePresentationComponent::~USovDialoguePresentationComponent() = default;
 

@@ -32,10 +32,10 @@ namespace
 		UWorld* World; ASovHandoffRuntimeTestController* PC; ASovHandoffRuntimeTestPawn* Pawn;
 		FCueWorld()
 		{
-			World = UWorld::CreateWorld(EWorldType::Game, false);
+			const UWorld::InitializationValues IVS = UWorld::InitializationValues().AllowAudioPlayback(false).CreatePhysicsScene(true)
+				.RequiresHitProxies(false).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
+			World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &IVS);
 			if (GEngine) { GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World); }
-			World->InitializeNewWorld(UWorld::InitializationValues().AllowAudioPlayback(false).CreatePhysicsScene(true)
-				.RequiresHitProxies(false).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false));
 			PC = World->SpawnActor<ASovHandoffRuntimeTestController>(); Pawn = World->SpawnActor<ASovHandoffRuntimeTestPawn>();
 			auto* PS = World->SpawnActor<ASovPlayerState>(); auto* Definition = NewObject<UPlayerDefinition>(PC); PC->KeepAlive.Add(Definition);
 			Pawn->PrepareCampaignInitialization(Definition); PC->SetTestPlayerState(PS); PC->Possess(Pawn);
@@ -84,7 +84,7 @@ bool FSovDialogueSuspensionTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Actual Narrative line timer is paused"), Dialogue->IsNativeLineTimerPaused());
 	TestFalse(TEXT("Paused graph cannot accept a choice"), Dialogue->CanSelectDialogueOption(Dialogue->GetTestChoice()));
 	TestFalse(TEXT("Paused graph cannot send skip RPCs or finish a line"), Dialogue->CanSkipCurrentLine());
-	Dialogue->FinishNPCDialogue(); Dialogue->EndCurrentLine();
+	Dialogue->FinishNPCLineForTest(); Dialogue->EndCurrentLine();
 	TestTrue(TEXT("Late line callbacks retain current node"), Dialogue->GetCurrentNode() == Node);
 	TestEqual(TEXT("Suspended callbacks do not complete Narrative tasks"), Tales->MasterTaskList.Num(), TasksBefore);
 	TestTrue(TEXT("Graph resumes in place"), Dialogue->SetPlaybackSuspended(false));
@@ -121,8 +121,8 @@ bool FSovDialogueCompletionOwnershipTest::RunTest(const FString& Parameters)
 {
 	FCueWorld F; auto* Tales=F.PC->FindComponentByClass<UTalesComponent>();
 	auto* Dialogue=NewObject<USovNarrativeCueRuntimeDialogue>(F.PC); F.PC->KeepAlive.Add(Dialogue); Dialogue->Stage(Tales);
-	Dialogue->bReenterFinish=true; Dialogue->FinishNPCDialogue();
-	const int32 TasksAfter=Tales->MasterTaskList.Num(); Dialogue->FinishNPCDialogue(); Dialogue->EndCurrentLine();
+	Dialogue->bReenterFinish=true; Dialogue->FinishNPCLineForTest();
+	const int32 TasksAfter=Tales->MasterTaskList.Num(); Dialogue->FinishNPCLineForTest(); Dialogue->EndCurrentLine();
 	TestEqual(TEXT("Recursive audio/finish callbacks complete the actual line once"),Dialogue->FinishNotifications,1);
 	TestEqual(TEXT("Late callbacks do not replay Narrative tasks"),Tales->MasterTaskList.Num(),TasksAfter);
 	auto* Observer=NewObject<USovNarrativeCueRuntimeObserver>(F.PC); F.PC->KeepAlive.Add(Observer); Observer->Tales=Tales;

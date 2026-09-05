@@ -13,12 +13,22 @@
 
 FNarrativeGameplayTags FNarrativeGameplayTags::GameplayTags;
 
+const FNarrativeGameplayTags& FNarrativeGameplayTags::Get()
+{
+	// Unreal can construct native CDOs before this module's StartupModule.
+	InitializeNativeTags();
+	return GameplayTags;
+}
+
 void FNarrativeGameplayTags::InitializeNativeTags()
 {
-	UGameplayTagsManager& Manager = UGameplayTagsManager::Get();
-
-	GameplayTags.AddAllTags(Manager);
-
+	// Later startup calls must not register again after DoneAddingNativeTags.
+	static const bool bInitialized = []()
+	{
+		GameplayTags.AddAllTags(UGameplayTagsManager::Get());
+		return true;
+	}();
+	(void)bInitialized;
 }
 
 void FNarrativeGameplayTags::AddAllTags(UGameplayTagsManager& Manager)

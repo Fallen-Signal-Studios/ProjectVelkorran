@@ -24,12 +24,12 @@ namespace
 		ASovCampaignRuntimeTestPawn* Pawn = nullptr;
 		FCampaignWorld()
 		{
-			World = UWorld::CreateWorld(EWorldType::Game, false);
+			const UWorld::InitializationValues IVS = UWorld::InitializationValues().AllowAudioPlayback(false)
+				.RequiresHitProxies(false).CreatePhysicsScene(true).CreateNavigation(false)
+				.CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
+			World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &IVS);
 			if (!World) { return; }
 			if (GEngine) { GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World); }
-			World->InitializeNewWorld(UWorld::InitializationValues().AllowAudioPlayback(false)
-				.RequiresHitProxies(false).CreatePhysicsScene(true).CreateNavigation(false)
-				.CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false));
 			PC = World->SpawnActor<ASovCampaignRuntimeTestController>();
 			Pawn = World->SpawnActor<ASovCampaignRuntimeTestPawn>();
 			if (PC && Pawn)

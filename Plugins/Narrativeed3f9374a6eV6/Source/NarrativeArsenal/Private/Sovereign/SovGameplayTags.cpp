@@ -6,45 +6,22 @@
 
 FSovGameplayTags FSovGameplayTags::GameplayTags;
 
+const FSovGameplayTags& FSovGameplayTags::Get()
+{
+	// Unreal can construct native CDOs before this module's StartupModule.
+	InitializeNativeTags();
+	return GameplayTags;
+}
+
 void FSovGameplayTags::InitializeNativeTags()
 {
-	if (GameplayTags.Character_Player_Tarrik.IsValid()
-		&& GameplayTags.Ability.IsValid()
-		&& GameplayTags.Ability_Defense_Selene_Deflection.IsValid()
-		&& GameplayTags.Ability_Weapon_Cinderline_PrimaryFire.IsValid()
-		&& GameplayTags.Ability_NPC_ReformationDrone_Gunfire.IsValid()
-		&& GameplayTags.Ability_NPC_ReformationDrone_RocketLauncher.IsValid()
-		&& GameplayTags.Ability_NPC_ReformationDrone_SelfDestruct.IsValid()
-		&& GameplayTags.Ability_NPC_DominionHound_Bite.IsValid()
-		&& GameplayTags.Ability_NPC_DominionHound_HornCharge.IsValid()
-		&& GameplayTags.Ability_NPC_DominionHound_Pounce.IsValid()
-		&& GameplayTags.Ability_NPC_DominionHandler_CommandHound.IsValid()
-		&& GameplayTags.Ability_Echo_Selene_StillpointGrenade.IsValid()
-		&& GameplayTags.Status_Apply_Corruption.IsValid()
-		&& GameplayTags.Status_Immunity_All.IsValid()
-		&& GameplayTags.Status_Immunity_Burn.IsValid()
-		&& GameplayTags.Status_Immunity_DeviceDisable.IsValid()
-		&& GameplayTags.Status_Cleanse_All.IsValid()
-		&& GameplayTags.State_Deflecting.IsValid()
-		&& GameplayTags.State_Status_Exposed.IsValid()
-		&& GameplayTags.State_Status_Corrupted.IsValid()
-		&& GameplayTags.State_Corruption_OverwriteRisk.IsValid()
-		&& GameplayTags.State_CommandLink_Active.IsValid()
-		&& GameplayTags.State_CommandLink_Severed.IsValid()
-		&& GameplayTags.State_CommandLink_HoundChargeAuthorized.IsValid()
-		&& GameplayTags.Echo_Source_PerfectDeflection.IsValid()
-		&& GameplayTags.Echo_Source_WeakPointBreak.IsValid()
-		&& GameplayTags.Echo_Source_CommandLinkSever.IsValid()
-		&& GameplayTags.Echo_Source_CombatSustainPickup.IsValid()
-		&& GameplayTags.Echo_Source_ExposureKill.IsValid()
-		&& GameplayTags.Event_Status_Applied.IsValid()
-		&& GameplayTags.Event_Corruption_BandChanged.IsValid()
-		&& GameplayTags.SetByCaller_Status_Duration.IsValid())
+	// Later startup calls must not register again after DoneAddingNativeTags.
+	static const bool bInitialized = []()
 	{
-		return;
-	}
-
-	GameplayTags.AddAllTags(UGameplayTagsManager::Get());
+		GameplayTags.AddAllTags(UGameplayTagsManager::Get());
+		return true;
+	}();
+	(void)bInitialized;
 }
 
 void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)

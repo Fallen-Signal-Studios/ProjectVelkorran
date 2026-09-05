@@ -61,9 +61,9 @@ bool ASovSeleneCombatProjectile::InitializePayload(const FSovSeleneProjectilePar
 	SetLifeSpan(Tuning.MaximumLifetime + 0.1f);
 	return true;
 }
-void ASovSeleneCombatProjectile::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Props) const
+void ASovSeleneCombatProjectile::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
-	Super::GetLifetimeReplicatedProps(Props);
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(ASovSeleneCombatProjectile, Mode);
 	DOREPLIFETIME(ASovSeleneCombatProjectile, Phase);
 }
@@ -235,7 +235,7 @@ void ASovSeleneCombatProjectile::HitTarget(AActor* Target, const FHitResult& Hit
 {
 	const bool bReturn = Phase == ESovSeleneProjectilePhase::Recalling;
 	auto& Ledger = bReturn ? ReturnTargets : OutboundTargets;
-	const FVector HitPoint = Hit.bStartPenetrating && IsValid(Target) ? Target->GetActorLocation() : Hit.ImpactPoint;
+	const FVector HitPoint = Hit.bStartPenetrating && IsValid(Target) ? Target->GetActorLocation() : FVector(Hit.ImpactPoint);
 	if (!SovSelenePayload::EligibleTarget(Tuning.Context, Target) || Ledger.Contains(Target)
 		|| !SovSelenePayload::Visible(Tuning.Context, SegmentStart, Target, HitPoint)) { return; }
 	Ledger.Add(Target);

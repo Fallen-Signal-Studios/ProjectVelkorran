@@ -45,10 +45,10 @@ namespace
 		ASovExertionRuntimeTestCharacter* Player;
 		FCoordinationWorld()
 		{
-			World = UWorld::CreateWorld(EWorldType::Game, false);
+			const UWorld::InitializationValues IVS = UWorld::InitializationValues().AllowAudioPlayback(false).CreatePhysicsScene(true)
+				.CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false);
+			World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &IVS);
 			if (GEngine) { GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World); }
-			World->InitializeNewWorld(UWorld::InitializationValues().AllowAudioPlayback(false).CreatePhysicsScene(true)
-				.CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false));
 			Director = World->SpawnActor<ASovEncounterDirector>(); Director->EncounterId = TEXT("Test.Coordination");
 			FActorSpawnParameters Spawn; Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 			Player = World->SpawnActor<ASovExertionRuntimeTestCharacter>(ASovExertionRuntimeTestCharacter::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, Spawn);

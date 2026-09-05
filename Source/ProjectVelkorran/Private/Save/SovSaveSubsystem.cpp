@@ -52,7 +52,7 @@ namespace
     constexpr int32 ProfileHintBytes = 88;
     struct FProfileHint { FString Namespace; int64 Generation = 0; };
     FString ProfileHintSlot(int32 User, int32 Bank)
-    { return FString::Printf(TEXT("SovAccount_v1_%s_%d_%c"), FPlatformProperties::IniPlatformName(), User, Bank ? TCHAR('B') : TCHAR('A')); }
+    { return FString::Printf(TEXT("SovAccount_v1_%s_%d_%c"), ANSI_TO_TCHAR(FPlatformProperties::IniPlatformName()), User, Bank ? TCHAR('B') : TCHAR('A')); }
     bool IsOpaqueNamespace(const FString& Value)
     {
         if (Value.Len() != 32) { return false; }
@@ -72,13 +72,13 @@ namespace
         Hint.Namespace = ANSI_TO_TCHAR(Namespace); Hint.Generation = Generation;
         return !Reader.IsError() && Magic == ProfileHintMagic && Version == 1 && User == ExpectedUser && User >= 0
             && Generation > 0 && IsOpaqueNamespace(Hint.Namespace)
-            && FString(ANSI_TO_TCHAR(Platform)) == FMD5::HashAnsiString(FPlatformProperties::IniPlatformName());
+            && FString(ANSI_TO_TCHAR(Platform)) == FMD5::HashAnsiString(ANSI_TO_TCHAR(FPlatformProperties::IniPlatformName()));
     }
     TArray<uint8> EncodeProfileHint(const FString& Namespace, int32 User, int64 Generation)
     {
         TArray<uint8> Bytes; FMemoryWriter Writer(Bytes, true); uint32 Magic = ProfileHintMagic, Version = 1;
         Writer << Magic << Version << User << Generation;
-        ANSICHAR Hash[32], Platform[32]; const FString PlatformHash = FMD5::HashAnsiString(FPlatformProperties::IniPlatformName());
+        ANSICHAR Hash[32], Platform[32]; const FString PlatformHash = FMD5::HashAnsiString(ANSI_TO_TCHAR(FPlatformProperties::IniPlatformName()));
         for (int32 Index = 0; Index < 32; ++Index) { Hash[Index] = static_cast<ANSICHAR>(Namespace[Index]); Platform[Index] = static_cast<ANSICHAR>(PlatformHash[Index]); }
         Writer.Serialize(Hash, 32); Writer.Serialize(Platform, 32);
         uint32 CRC = FCrc::MemCrc32(Bytes.GetData(), Bytes.Num()); Writer << CRC; return Bytes;

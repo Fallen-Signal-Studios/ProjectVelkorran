@@ -14,10 +14,10 @@ namespace
         UNarrativeInventoryComponent* Inventory = nullptr;
         FInventoryWorld()
         {
-            World = UWorld::CreateWorld(EWorldType::Game, false);
+            const UWorld::InitializationValues IVS = UWorld::InitializationValues().AllowAudioPlayback(false).CreatePhysicsScene(false).CreateNavigation(false).CreateAISystem(false);
+            World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &IVS);
             if (!World) { return; }
             if (GEngine) { GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World); }
-            World->InitializeNewWorld(UWorld::InitializationValues().AllowAudioPlayback(false).CreatePhysicsScene(false).CreateNavigation(false).CreateAISystem(false));
             AActor* Owner = World->SpawnActor<AActor>(); if (!Owner) { return; }
             Inventory = NewObject<UNarrativeInventoryComponent>(Owner); Owner->AddInstanceComponent(Inventory); Inventory->RegisterComponent();
         }

@@ -42,11 +42,12 @@ struct FRestoreWorld
     UWorld* World = nullptr;
     FRestoreWorld()
     {
-        World = UWorld::CreateWorld(EWorldType::Game, false);
+        const UWorld::InitializationValues WorldInitialization = UWorld::InitializationValues().AllowAudioPlayback(false).RequiresHitProxies(false)
+            .CreatePhysicsScene(true).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
+        World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true,
+            ERHIFeatureLevel::Num, &WorldInitialization);
         if (!World) { return; }
         if (GEngine) { GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World); }
-        World->InitializeNewWorld(UWorld::InitializationValues().AllowAudioPlayback(false).RequiresHitProxies(false)
-            .CreatePhysicsScene(true).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false));
     }
     ~FRestoreWorld() { if (World) { World->DestroyWorld(false); if (GEngine) { GEngine->DestroyWorldContext(World); } } }
 };

@@ -4,6 +4,7 @@
 #include "GameplayTagContainer.h"
 #include "GameplayEffectTypes.h"
 #include "MassEntityTypes.h"
+#include "MassExternalSubsystemTraits.h"
 #include "SovCampaignMassTypes.generated.h"
 class USkeletalMesh;
 class UStaticMesh;
@@ -82,4 +83,14 @@ struct FSovCampaignMassRouteFragment : public FMassFragment
 	UPROPERTY() int32 NextPoint = 0;
 	UPROPERTY() float Speed = 0.f;
 	UPROPERTY() bool bPresentationOnly = false;
+};
+
+// Points deliberately owns a default-heap TArray. Mass copies fragment values through
+// UScriptStruct (deep-copying this UPROPERTY), and destructively relocates live fragment
+// storage without destroying the transferred source. There are no inline/self pointers.
+// Reevaluate this contract before adding an inline allocator or self-referential fields.
+template<>
+struct TMassFragmentTraits<FSovCampaignMassRouteFragment>
+{
+	enum { AuthorAcceptsItsNotTriviallyCopyable = true };
 };

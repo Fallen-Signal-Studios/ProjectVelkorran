@@ -164,6 +164,8 @@ public:
 
 	void AbilityInputPressed(FGameplayTag InputTag);
 	void AbilityInputReleased(FGameplayTag InputTag);
+	/** Native recovery and application lifecycle owners release input through the same cleanup path. */
+	void ReleaseHeldAbilityInputs();
 
 protected:
 
@@ -189,7 +191,6 @@ protected:
 	void RefreshGameplayReadiness();
 	void EnsureGameplayHUDCreated();
 	void RefreshGameplayMappingContext();
-	void ReleaseHeldAbilityInputs();
 	
 	/** Default MappingContext */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))

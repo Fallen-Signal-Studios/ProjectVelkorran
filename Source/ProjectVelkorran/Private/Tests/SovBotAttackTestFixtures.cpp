@@ -7,6 +7,7 @@
 ASovBotTestCharacter::ASovBotTestCharacter(const FObjectInitializer& Initializer)
 	: Super(Initializer.SetDefaultSubobjectClass<USovBotTestASC>(TEXT("AbilitySystemComponent")))
 {
+	TestActorGuid = FGuid::NewGuid();
 	PrimaryActorTick.bCanEverTick = false;
 	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	GetCapsuleComponent()->SetCollisionObjectType(ECC_Pawn);

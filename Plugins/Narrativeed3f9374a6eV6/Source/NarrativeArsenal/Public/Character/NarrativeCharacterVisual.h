@@ -91,6 +91,8 @@ public:
 		//Returns our weapon visual. This just a generic actor that each weapon item defines, and holds the weapons static mesh and FX assets. 
 	UFUNCTION(BlueprintPure, Category = "Narrative|Getters/Setters")
 	class AWeaponVisual* GetWeaponVisual(UPARAM(meta = (Categories = "Narrative.Equipment.Slot.Weapon"))const FGameplayTag& WeaponSlot) const;
+	/** Complete only an already-loaded, currently equipped native item. Does not synchronously load assets. */
+	bool CompletePreloadedWeaponVisual(class UWeaponItem* WeaponItem);
 
 	virtual void SetGroomAppearance(FGameplayTag Slot, const FCharacterCreatorAttribute_Groom& GroomData);
 	virtual void SetMeshAppearance(FGameplayTag Slot, const FCharacterCreatorAttribute_Mesh& MeshData);
@@ -217,8 +219,6 @@ protected:
 	//Spawn a weapon visual, attach to us 
 	UFUNCTION(BlueprintCallable, Category = "Character Visual")
 	bool AddWeaponVisual(class UWeaponItem* WeaponItem);
-	/** Complete only an already-loaded, currently equipped native item. Does not synchronously load assets. */
-	bool CompletePreloadedWeaponVisual(class UWeaponItem* WeaponItem);
 
 	UFUNCTION(BlueprintCallable, Category = "Character Visual")
 	void AttachWeaponVisual(class UWeaponItem* WeaponItem, const FGameplayTag& EquipSlot, const FGameplayTag& WieldSlot);

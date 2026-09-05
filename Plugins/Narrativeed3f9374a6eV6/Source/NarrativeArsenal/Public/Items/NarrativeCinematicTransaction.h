@@ -1,6 +1,7 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #pragma once
 #include "CoreMinimal.h"
+#include "Templates/SubclassOf.h"
 #include "NarrativeCinematicTransaction.generated.h"
 class UNarrativeItem;
 class UNarrativeInventoryComponent;

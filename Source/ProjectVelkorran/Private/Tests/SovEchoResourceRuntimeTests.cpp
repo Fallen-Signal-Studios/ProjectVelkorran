@@ -31,13 +31,13 @@ namespace
 		UWorld* World = nullptr;
 		FEchoWorld()
 		{
-			World = UWorld::CreateWorld(EWorldType::Game, false);
+			const UWorld::InitializationValues IVS = UWorld::InitializationValues().AllowAudioPlayback(false)
+				.RequiresHitProxies(false).CreatePhysicsScene(true).CreateNavigation(false)
+				.CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
+			World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &IVS);
 			if (World)
 			{
 				if (GEngine) GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
-				World->InitializeNewWorld(UWorld::InitializationValues().AllowAudioPlayback(false)
-					.RequiresHitProxies(false).CreatePhysicsScene(true).CreateNavigation(false)
-					.CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false));
 			}
 		}
 		~FEchoWorld()
@@ -72,7 +72,7 @@ namespace
 		if (Receipt) Spec.AddDynamicAssetTag(FSovGameplayTags::Get().Damage_Heavy);
 		ASC->ApplyGameplayEffectSpecToTarget(Spec, Target->GetNarrativeAbilitySystemComponent());
 	}
-	void AddWeakPoints(ASovAxiomRuntimeTestCharacter* Actor)
+	void AddEchoResourceWeakPoints(ASovAxiomRuntimeTestCharacter* Actor)
 	{
 		auto* C = NewObject<USovWeakPointRoutingTestComponent>(Actor);
 		Actor->AddInstanceComponent(C); C->RegisterComponent();
@@ -221,7 +221,7 @@ bool FSovEchoSelenePrecisionRuntimeTest::RunTest(const FString&)
 	auto* C = F.Character(600.f, 1);
 	if (!TestNotNull(TEXT("Player"), Player) || !TestNotNull(TEXT("A"), A)
 		|| !TestNotNull(TEXT("B"), B) || !TestNotNull(TEXT("C"), C)) return false;
-	AddWeakPoints(A); AddWeakPoints(B); AddWeakPoints(C);
+	AddEchoResourceWeakPoints(A); AddEchoResourceWeakPoints(B); AddEchoResourceWeakPoints(C);
 	Player->TestEcho->RestoreEchoFromCheckpoint(0.f);
 	Hit(Player, A, 1.f, 0.f, TEXT("weapon"));
 	TestEqual(TEXT("First precision target awards8"), Player->TestEcho->GetEcho(), 8.f);

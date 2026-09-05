@@ -36,10 +36,10 @@ namespace
 		USovFieldRecoveryComponent* Recovery;
 		FFieldRecoveryWorld(bool bSelene = false)
 		{
-			World = UWorld::CreateWorld(EWorldType::Game, false);
+			const UWorld::InitializationValues IVS = UWorld::InitializationValues().AllowAudioPlayback(false).CreatePhysicsScene(true)
+				.CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false);
+			World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &IVS);
 			if (GEngine) { GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World); }
-			World->InitializeNewWorld(UWorld::InitializationValues().AllowAudioPlayback(false).CreatePhysicsScene(true)
-				.CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false));
 			State = World->SpawnActor<ASovPlayerState>();
 			Player = World->SpawnActor<ASovFieldRecoveryTestCharacter>(); Player->InitializeSharedState(State, bSelene);
 			ASC = Player->GetNarrativeAbilitySystemComponent(); Recovery = Player->GetFieldRecoveryComponent();

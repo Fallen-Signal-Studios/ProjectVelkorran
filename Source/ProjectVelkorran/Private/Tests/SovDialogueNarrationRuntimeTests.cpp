@@ -46,10 +46,10 @@ namespace
 		UTalesComponent* Tales;
 		FDialogueWorld()
 		{
-			World = UWorld::CreateWorld(EWorldType::Game, false);
+			const UWorld::InitializationValues IVS = UWorld::InitializationValues().AllowAudioPlayback(false).CreatePhysicsScene(false)
+				.RequiresHitProxies(false).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
+			World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &IVS);
 			if (GEngine) { GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World); }
-			World->InitializeNewWorld(UWorld::InitializationValues().AllowAudioPlayback(false).CreatePhysicsScene(false)
-				.RequiresHitProxies(false).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false));
 			PC = World->SpawnActor<APlayerController>();
 			Tales = NewObject<UTalesComponent>(PC); Tales->RegisterComponent();
 		}
@@ -158,7 +158,7 @@ bool FSovNarrationApplicationSuspendTest::RunTest(const FString&)
 {
 	ULocalPlayer* Player = NewObject<ULocalPlayer>();
 	auto* Narration = NewObject<USovAccessibleNarrationSubsystem>(Player);
-	auto* Owner = NewObject<UObject>(); auto Backend = MakeShared<FTestSpeech>();
+	auto* Owner = NewObject<UObject>(); TSharedPtr<FTestSpeech> Backend = MakeShared<FTestSpeech>();
 	FSovNarrationTestAccess::SetFactory(Narration, [Backend]() { return StaticCastSharedPtr<ISovAccessibleSpeech>(Backend); });
 	int32 Completed = 0, Cancelled = 0; bool bRestartAccepted = false; FGuid Request;
 	Narration->Announce(Owner, FText::FromString(TEXT("Before suspend")), Request,

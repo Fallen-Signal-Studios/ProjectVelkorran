@@ -6,7 +6,7 @@
 
 #if WITH_AUTOMATION_TESTS
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovIndependentAudioBusRuntime, "ProjectVelkorran.Campaign.Audio.IndependentAmbienceAndTinnitusBuses",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
 bool FSovIndependentAudioBusRuntime::RunTest(const FString&)
 {
 	TStrongObjectPtr<USovAudioSettingsProbe> Settings(NewObject<USovAudioSettingsProbe>()); Settings->InitializeAudio();
@@ -33,7 +33,7 @@ bool FSovIndependentAudioBusRuntime::RunTest(const FString&)
 	return true;
 }
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAuthoredDynamicRangeRuntime, "ProjectVelkorran.Campaign.Audio.AuthoredRangeSelectionAndFallback",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
 bool FSovAuthoredDynamicRangeRuntime::RunTest(const FString&)
 {
 	TStrongObjectPtr<USovAudioSettingsProbe> Settings(NewObject<USovAudioSettingsProbe>()); Settings->InitializeAudio();

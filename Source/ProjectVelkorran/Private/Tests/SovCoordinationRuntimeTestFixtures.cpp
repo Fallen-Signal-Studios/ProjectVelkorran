@@ -19,7 +19,9 @@ void ASovCoordinationTestNPC::InitializeTestCombat()
 	AbilitySystemComponent->InitAbilityActorInfo(this, this);
 	AbilitySystemComponent->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetMaxHealthAttribute(), 100.f);
 	AbilitySystemComponent->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetHealthAttribute(), 100.f);
-	NativeSaveGuid = FGuid::NewGuid(); bEncounterSnapshotReady = true; bCharacterReady = true;
+	NativeSaveGuid = FGuid::NewGuid();
+	// NPC promotion waits on this readiness flag after the fixture initializes its ASC and attributes.
+	bEncounterSnapshotReady = true;
 }
 
 ETeamAttitude::Type ASovCoordinationTestNPC::GetTeamAttitudeTowards(const AActor& Other) const

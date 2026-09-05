@@ -94,7 +94,7 @@ bool USovNarrativeCueComponent::RequestCue(USovNarrativeCue* Cue, AActor* Speake
 void USovNarrativeCueComponent::RememberUnheard(USovNarrativeCue* Cue)
 { if (Cue && Cue->bCritical && Cue->bRecordUnheardSummary && !Cue->RecordSummary.IsEmpty() && UnheardRecords.Num() < 256) { UnheardRecords.AddUnique(Cue); } }
 TArray<USovNarrativeCue*> USovNarrativeCueComponent::GetUnheardRecords() const
-{ TArray<USovNarrativeCue*> Result; for (auto* Cue : UnheardRecords) { if (IsValid(Cue)) { Result.Add(Cue); } } return Result; }
+{ TArray<USovNarrativeCue*> Result; for (USovNarrativeCue* Cue : UnheardRecords) { if (IsValid(Cue)) { Result.Add(Cue); } } return Result; }
 void USovNarrativeCueComponent::StopBark(bool bInterrupted, bool bPreserveCritical)
 {
 	USovNarrativeCue* Finished = CurrentBark; CurrentBark = nullptr; const uint64 ExpectedEpoch=++Epoch;
@@ -230,7 +230,7 @@ void USovNarrativeCueComponent::TickComponent(float Delta, ELevelTick Type, FAct
 	int32 Best = INDEX_NONE;
 	for (int32 Index = 0; Index < Pending.Num(); ++Index)
 	{
-		const auto* Cue = Pending[Index].Cue;
+		const auto* Cue = Pending[Index].Cue.Get();
 		if ((Combat && !SovNarrativeCuePolicy::MayPlayInCombat(static_cast<unsigned>(Cue->Priority), Cue->Dialogue != nullptr))
 			|| NextAllowed.FindRef(Cue->CueId) > GetWorld()->GetTimeSeconds() || (Cue->Dialogue && Tales->IsInDialogue())) { continue; }
 		if (CurrentBark && !SovNarrativeCuePolicy::MayInterrupt(static_cast<unsigned>(Cue->Priority), static_cast<unsigned>(CurrentBark->Priority))) { continue; }

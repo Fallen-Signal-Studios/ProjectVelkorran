@@ -5,6 +5,7 @@
 #include "AI/Mass/Peds/MassPedSpawnerSubsystem.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "HAL/PlatformProperties.h"
 #include "MassAgentComponent.h"
 #include "MassCommandBuffer.h"
 #include "MassEntityManager.h"
@@ -34,12 +35,15 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNarrativeMassParticipantReceiptTest,
 
 bool FNarrativeMassParticipantReceiptTest::RunTest(const FString& Parameters)
 {
-	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+	const UWorld::InitializationValues WorldInitialization = UWorld::InitializationValues().AllowAudioPlayback(false)
+		.RequiresHitProxies(false).CreatePhysicsScene(true).CreateNavigation(false)
+		.CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true,
+		ERHIFeatureLevel::Num, &WorldInitialization, true);
 	if (!TestNotNull(TEXT("World"), World)) { return false; }
 	if (GEngine) { GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World); }
-	World->InitializeNewWorld(UWorld::InitializationValues().AllowAudioPlayback(false)
-		.RequiresHitProxies(false).CreatePhysicsScene(true).CreateNavigation(false)
-		.CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false));
+	World->InitWorld(WorldInitialization);
+	World->UpdateWorldComponents(!FPlatformProperties::RequiresCookedData(), false);
 	UMassEntitySubsystem* Mass = World->GetSubsystem<UMassEntitySubsystem>();
 	if (TestNotNull(TEXT("Real Mass entity subsystem"), Mass))
 	{

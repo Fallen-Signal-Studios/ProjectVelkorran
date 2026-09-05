@@ -53,7 +53,6 @@ public:
 	UFUNCTION(BlueprintPure, Category="Companion") FGameplayTag GetCompanionIdentity() const { return CompanionIdentity; }
 	UFUNCTION(BlueprintPure, Category="Companion") USovCompanionComponent* GetCompanionComponent() const { return Companion; }
 	virtual bool ShouldRespawn_Implementation() const override { return false; }
-	virtual bool ShouldSaveWorldRecord() const override { return false; }
 protected:
 	virtual void BeginPlay() override;
 	virtual void OnCharacterVisualInitialized() override;

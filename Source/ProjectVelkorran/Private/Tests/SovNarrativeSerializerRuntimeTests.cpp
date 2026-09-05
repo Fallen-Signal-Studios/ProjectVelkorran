@@ -13,13 +13,14 @@ namespace
 {
     struct FSerializerWorld
     {
-        UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+        UWorld* World = nullptr;
         FSerializerWorld()
         {
+            const UWorld::InitializationValues IVS = UWorld::InitializationValues().AllowAudioPlayback(false).RequiresHitProxies(false)
+                .CreatePhysicsScene(false).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
+            World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &IVS);
             if (!World) { return; }
             if (GEngine) { GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World); }
-            World->InitializeNewWorld(UWorld::InitializationValues().AllowAudioPlayback(false).RequiresHitProxies(false)
-                .CreatePhysicsScene(false).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false));
         }
         ~FSerializerWorld()
         {
@@ -67,6 +68,38 @@ bool FSovNarrativeIdentityTransformTest::RunTest(const FString& Parameters)
     Legacy.Transform = FTransform(FVector(25.f, 50.f, 75.f));
     TestTrue(TEXT("Legacy nonidentity transform still loads"), Serializer->LoadActorFromRecord(Actor, Legacy));
     TestTrue(TEXT("Legacy placement is preserved without the new presence field"), Actor->GetActorTransform().Equals(Legacy.Transform));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovNarrativeComponentDefaultsTest,
+    "ProjectVelkorran.Campaign.Save.ComponentDefaultsRestoreIntoExistingInstance",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovNarrativeComponentDefaultsTest::RunTest(const FString& Parameters)
+{
+    FSerializerWorld Fixture;
+    if (!Fixture.World) { AddError(TEXT("World creation failed")); return false; }
+    auto* Serializer = Fixture.World->GetSubsystem<UNarrativeSaveSubsystem>();
+    auto* Actor = Fixture.World->SpawnActor<ASovSerializerMovableActor>();
+    if (!Serializer || !Actor) { AddError(TEXT("Serializer or actor creation failed")); return false; }
+    auto* Component = NewObject<USovSerializerDefaultComponent>(Actor, TEXT("DefaultState"));
+    Actor->AddInstanceComponent(Component); Component->RegisterComponent();
+    FNarrativeActorRecord Record;
+    if (!TestTrue(TEXT("Actor captures its default-valued savable component"), Serializer->CreateActorRecord(Actor, Record))) { return false; }
+    if (!TestEqual(TEXT("Exactly the opted-in component is captured"), Record.SavedComponents.Num(), 1)) { return false; }
+
+    TStrongObjectPtr<UNarrativeSave> Snapshot(NewObject<UNarrativeSave>());
+    Snapshot->RecordMap.Add(Record.ActorGUID, Record);
+    TArray<uint8> Bytes;
+    if (!TestTrue(TEXT("Component snapshot serializes"), UGameplayStatics::SaveGameToMemory(Snapshot.Get(), Bytes))) { return false; }
+    TStrongObjectPtr<UNarrativeSave> Decoded(Cast<UNarrativeSave>(UGameplayStatics::LoadGameFromMemory(Bytes)));
+    const auto* Loaded = Decoded.IsValid() ? Decoded->RecordMap.Find(Record.ActorGUID) : nullptr;
+    if (!TestNotNull(TEXT("Component record survives serialized snapshot"), Loaded)) { return false; }
+
+    Component->SavedValue = 99; Component->SavedEntries = { 1, 2, 3 }; Component->RuntimeOnlyValue = 73;
+    if (!TestTrue(TEXT("Saved component restores into the existing instance"), Serializer->LoadActorFromRecord(Actor, *Loaded))) { return false; }
+    TestEqual(TEXT("Captured default scalar replaces later component state"), Component->SavedValue, 17);
+    TestTrue(TEXT("Captured empty collection clears later entries"), Component->SavedEntries.IsEmpty());
+    TestEqual(TEXT("Full save snapshots still exclude properties without SaveGame"), Component->RuntimeOnlyValue, 73);
     return true;
 }
 

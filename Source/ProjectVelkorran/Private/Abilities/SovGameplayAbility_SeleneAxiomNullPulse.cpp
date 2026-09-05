@@ -254,7 +254,7 @@ bool USovGameplayAbility_SeleneAxiomNullPulse::CanReleaseAxiomPulse() const
 	if (!CurrentActorInfo || !IsActive() || !bNativeLifecycleReady || !GetWorld()
 		|| !HasRequiredPayloadConfiguration()) { return false; }
 	const UAbilitySystemComponent* ASC = CurrentActorInfo->AbilitySystemComponent.Get();
-	const ANarrativeCharacter* Avatar = Cast<ANarrativeCharacter>(CurrentActorInfo->AvatarActor.Get());
+	ANarrativeCharacter* Avatar = Cast<ANarrativeCharacter>(CurrentActorInfo->AvatarActor.Get());
 	const UWeaponItem* Weapon = ExpectedWeapon.Get();
 	if (!IsValid(ASC) || !IsValid(Avatar) || !IsValid(Weapon) || !Weapon->IsWielded()
 		|| ASC->GetAvatarActor() != Avatar

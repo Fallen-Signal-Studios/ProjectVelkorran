@@ -13,11 +13,11 @@ class UGameplayTagsManager;
 /**
  * Navigator tags
  */
-struct FNavigatorGameplayTags
+struct NARRATIVEARSENAL_API FNavigatorGameplayTags
 {
 public:
 
-	static const FNavigatorGameplayTags& Get() { return GameplayTags; }
+	static const FNavigatorGameplayTags& Get();
 
 	static void InitializeNativeTags();
 
@@ -42,5 +42,5 @@ protected:
 
 private:
 
-	static NARRATIVEARSENAL_API FNavigatorGameplayTags GameplayTags;
+	static FNavigatorGameplayTags GameplayTags;
 };

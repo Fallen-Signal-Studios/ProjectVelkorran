@@ -3,6 +3,7 @@
 #include "Blueprint/WidgetTree.h"
 #include "Components/VerticalBox.h"
 #include "Components/SlateWrapperTypes.h"
+#include "Components/Spacer.h"
 
 UWidget* UNarrativeFrontendTestMenu::MakeRoot()
 {
@@ -37,18 +38,21 @@ UWidget* UNarrativeFrontendTestMenu::NativeGetDesiredFocusTarget() const
 
 void UNarrativeFrontendTestButton::BuildNativeButton()
 {
-	UCommonButtonInternalBase* InternalButton = NewObject<UCommonButtonInternalBase>(this);
-	RootButton = InternalButton;
-	InternalButton->TakeWidget();
+	if (!WidgetTree) { WidgetTree = NewObject<UWidgetTree>(this); }
+	WidgetTree->RootWidget = WidgetTree->ConstructWidget<USpacer>();
+	// CommonUI builds and owns its real internal button around this content.
+	Initialize();
+	NativeTestWidget = TakeWidget();
+}
+
+void UNarrativeFrontendTestButton::ReleaseSlateResources(bool bReleaseChildren)
+{
+	NativeTestWidget.Reset();
+	Super::ReleaseSlateResources(bReleaseChildren);
 }
 
 void UNarrativeFrontendTestButton::SetAuthoredAccessibleText(const FText& Text)
 {
-	AccessibleWidgetData = NewObject<USlateAccessibleWidgetData>(this);
-	AccessibleWidgetData->AccessibleBehavior = ESlateAccessibleBehavior::Custom;
-	AccessibleWidgetData->AccessibleSummaryBehavior = ESlateAccessibleBehavior::Custom;
-	AccessibleWidgetData->AccessibleText = Text;
-	AccessibleWidgetData->AccessibleSummaryText = Text;
 #if WITH_EDITORONLY_DATA
 	bOverrideAccessibleDefaults = true;
 	AccessibleBehavior = ESlateAccessibleBehavior::Custom;
@@ -57,5 +61,6 @@ void UNarrativeFrontendTestButton::SetAuthoredAccessibleText(const FText& Text)
 	AccessibleSummaryText = Text;
 	AccessibleTextDelegate.Unbind();
 	AccessibleSummaryTextDelegate.Unbind();
+	SynchronizeAccessibleData();
 #endif
 }

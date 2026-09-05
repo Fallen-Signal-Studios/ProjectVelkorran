@@ -11,6 +11,7 @@
 #include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
+#include "HAL/PlatformProperties.h"
 #include "Misc/AutomationTest.h"
 #include "UObject/StrongObjectPtr.h"
 
@@ -35,11 +36,15 @@ namespace
         ASovLifecycleTestGameMode* Mode = nullptr;
         FLifecycleWorld()
         {
-            World = UWorld::CreateWorld(EWorldType::Game, false); World->SetGameInstance(Instance.Get());
+            const UWorld::InitializationValues WorldInitialization = UWorld::InitializationValues().AllowAudioPlayback(false).CreatePhysicsScene(false)
+                .RequiresHitProxies(false).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
+            World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true,
+                ERHIFeatureLevel::Num, &WorldInitialization, true);
+            World->SetGameInstance(Instance.Get());
             if (GEngine)
             { auto& Context = GEngine->CreateNewWorldContext(EWorldType::Game); Context.SetCurrentWorld(World); Context.OwningGameInstance = Instance.Get(); }
-            World->InitializeNewWorld(UWorld::InitializationValues().AllowAudioPlayback(false).CreatePhysicsScene(false)
-                .RequiresHitProxies(false).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false));
+            World->InitWorld(WorldInitialization);
+            World->UpdateWorldComponents(!FPlatformProperties::RequiresCookedData(), false);
             FURL URL; URL.AddOption(TEXT("game=/Script/ProjectVelkorran.SovLifecycleTestGameMode"));
             if (World->SetGameMode(URL))
             {

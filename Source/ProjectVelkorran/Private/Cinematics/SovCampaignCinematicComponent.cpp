@@ -168,7 +168,8 @@ bool USovCampaignCinematicComponent::AcquirePartitionSources(FString& OutError)
         USceneComponent* Root = NewObject<USceneComponent>(Anchor); Anchor->AddInstanceComponent(Root); Anchor->SetRootComponent(Root); Root->RegisterComponent();
         Anchor->SetActorLocation(Region.Center); Anchor->SetActorHiddenInGame(true); Anchor->SetActorEnableCollision(false);
         auto* Source = NewObject<UWorldPartitionStreamingSourceComponent>(Anchor); Lease.Source = Source;
-        Source->DisableStreamingSource(); Source->TargetState = EStreamingSourceTargetState::Activated;
+        // Native UE 5.7 streaming sources default to Activated; configure while disabled.
+        Source->DisableStreamingSource();
         // No grid filter: a typo must never turn an empty cell query into readiness.
         Source->Priority = EStreamingSourcePriority::High;
         FStreamingSourceShape Shape; Shape.bUseGridLoadingRange = false; Shape.bIsSector = false;

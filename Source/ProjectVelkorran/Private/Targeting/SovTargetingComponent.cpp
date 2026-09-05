@@ -15,7 +15,10 @@
 #include "NavigationPath.h"
 #include "NavigationData.h"
 #include "Engine/World.h"
+#include "Engine/OverlapResult.h"
 #include "CollisionQueryParams.h"
+
+AActor* USovTargetingComponent::GetLockedTarget() const { return LockedTarget.Get(); }
 
 USovTargetingComponent::USovTargetingComponent()
 {

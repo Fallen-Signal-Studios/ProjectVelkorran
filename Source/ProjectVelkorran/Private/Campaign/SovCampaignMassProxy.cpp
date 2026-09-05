@@ -67,7 +67,9 @@ USovCampaignMassVisualizationTrait::USovCampaignMassVisualizationTrait()
 	LowResTemplateActor = ASovCampaignMassProxy::StaticClass();
 	bAllowServerSideVisualization = true;
 	bRegisterStaticMeshDesc = false;
+#if WITH_EDITORONLY_DATA
 	bRequireValidStaticMeshInstanceDesc = false;
+#endif
 	Params.LODRepresentation[0] = EMassRepresentationType::HighResSpawnedActor;
 	Params.LODRepresentation[1] = EMassRepresentationType::LowResSpawnedActor;
 	Params.LODRepresentation[2] = EMassRepresentationType::LowResSpawnedActor;

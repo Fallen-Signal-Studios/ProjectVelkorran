@@ -42,7 +42,8 @@ public:
 	bool bCancelPulseOnDamage = false;
 	FVector TestEyeOffset = FVector::ZeroVector;
 
-	UFUNCTION()
+	// These EditorContext tests observe damage without initializing actors for play.
+	UFUNCTION(CallInEditor)
 	void RecordDamage(const FSovDamageResult& Result);
 };
 

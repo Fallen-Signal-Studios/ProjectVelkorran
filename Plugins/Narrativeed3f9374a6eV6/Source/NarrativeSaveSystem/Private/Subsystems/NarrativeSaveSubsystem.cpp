@@ -721,6 +721,8 @@ bool UNarrativeSaveSubsystem::CreateActorRecord(AActor* Actor, FNarrativeActorRe
 	FMemoryWriter MemWriter(Candidate.ByteData);
 	FObjectAndNameAsStringProxyArchive Ar(MemWriter, true);
 	Ar.ArIsSaveGame = true;
+	// Full snapshots must overwrite existing state even when the captured value equals its archetype default.
+	Ar.ArNoDelta = true;
 	Actor->Serialize(Ar);
 	if (Ar.IsError() || !IsValid(Actor)) { return false; }
 	TInlineComponentArray<UActorComponent*> Components(Actor);
@@ -738,6 +740,7 @@ bool UNarrativeSaveSubsystem::CreateActorRecord(AActor* Actor, FNarrativeActorRe
 		FMemoryWriter Writer(Record.ByteData);
 		FObjectAndNameAsStringProxyArchive ComponentAr(Writer, true);
 		ComponentAr.ArIsSaveGame = true;
+		ComponentAr.ArNoDelta = true;
 		Component->Serialize(ComponentAr);
 		if (ComponentAr.IsError() || !IsValid(Actor) || !IsValid(Component)) { return false; }
 		Candidate.SavedComponents.Add(MoveTemp(Record));

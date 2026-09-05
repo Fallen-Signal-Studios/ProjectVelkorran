@@ -128,6 +128,10 @@ public:
 	/** Removes only the GAS grants created by owned perks; safe to repeat before protagonist restore. */
 	void ClearPurchasedPerksForRestore();
 
+	//Check if we have a given perk
+	UFUNCTION(BlueprintPure, Category = "Tree Skill")
+	bool HasPerk(TSubclassOf<UTreePerk> PerkClass) const;
+
 protected:
 
 	virtual void BeginPlay() override;
@@ -171,10 +175,6 @@ protected:
 	//Provided we own a perk, return the instance of it. 
 	UFUNCTION(BlueprintPure, Category = "Tree Skill")
 	UTreePerk* GetPerk(TSubclassOf<UTreePerk> PerkClass) const;
-
-	//Check if we have a given perk 
-	UFUNCTION(BlueprintPure, Category = "Tree Skill")
-	bool HasPerk(TSubclassOf<UTreePerk> PerkClass) const;
 
 protected:
 	/** Derived campaign policies may refresh a validated purchased rank while retaining exact grant ownership. */

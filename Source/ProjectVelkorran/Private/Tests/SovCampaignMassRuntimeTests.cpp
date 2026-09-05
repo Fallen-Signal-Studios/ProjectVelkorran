@@ -14,15 +14,18 @@
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "HAL/PlatformProperties.h"
 #include "MassAgentComponent.h"
 #include "MassCommandBuffer.h"
 #include "MassCommonFragments.h"
 #include "MassEntityManager.h"
 #include "MassEntitySubsystem.h"
+#include "MassRepresentationFragments.h"
 #include "Misc/AutomationTest.h"
 #include "Serialization/MemoryReader.h"
 #include "Serialization/MemoryWriter.h"
 #include "Serialization/ObjectAndNameAsStringProxyArchive.h"
+#include "StructUtils/InstancedStruct.h"
 #include <limits>
 
 #if WITH_DEV_AUTOMATION_TESTS
@@ -86,12 +89,15 @@ namespace
 		UWorld* World = nullptr;
 		FCampaignMassRuntimeWorld()
 		{
-			World = UWorld::CreateWorld(EWorldType::Game, false);
+			const UWorld::InitializationValues WorldInitialization = UWorld::InitializationValues().AllowAudioPlayback(false)
+				.RequiresHitProxies(false).CreatePhysicsScene(true).CreateNavigation(false)
+				.CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
+			World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true,
+				ERHIFeatureLevel::Num, &WorldInitialization, true);
 			if (!World) { return; }
 			if (GEngine) { GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World); }
-			World->InitializeNewWorld(UWorld::InitializationValues().AllowAudioPlayback(false)
-				.RequiresHitProxies(false).CreatePhysicsScene(true).CreateNavigation(false)
-				.CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false));
+			World->InitWorld(WorldInitialization);
+			World->UpdateWorldComponents(!FPlatformProperties::RequiresCookedData(), false);
 		}
 		~FCampaignMassRuntimeWorld()
 		{
@@ -106,6 +112,85 @@ namespace
 			return Result;
 		}
 	};
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCampaignMassRouteStorageTest,
+	"ProjectVelkorran.Campaign.Mass.RouteFragmentCopyRelocationAndDestruction",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+
+bool FSovCampaignMassRouteStorageTest::RunTest(const FString& Parameters)
+{
+	static_cast<void>(Parameters);
+	FCampaignMassRuntimeWorld Fixture;
+	if (!TestNotNull(TEXT("World"), Fixture.World)) { return false; }
+	auto* Entities = Fixture.World->GetSubsystem<UMassEntitySubsystem>();
+	if (!TestNotNull(TEXT("Real Mass subsystem"), Entities)) { return false; }
+	FMassEntityManager& Manager = Entities->GetMutableEntityManager();
+	const TArray<FVector> ExpectedPoints = { FVector(10.f, 20.f, 30.f), FVector(100.f, 20.f, 30.f), FVector(200.f, 40.f, 30.f) };
+	FInstancedStruct Source = FInstancedStruct::Make<FSovCampaignMassRouteFragment>();
+	auto& SourceRoute = Source.GetMutable<FSovCampaignMassRouteFragment>();
+	SourceRoute.Points = ExpectedPoints;
+	SourceRoute.NextPoint = 1;
+	SourceRoute.Speed = 125.f;
+	SourceRoute.bPresentationOnly = true;
+
+	// This overload initializes each fragment then calls SetFragmentsData, whose
+	// UScriptStruct::CopyScriptStruct must copy the reflected owning array by value.
+	const FMassEntityHandle First = Manager.CreateEntity(MakeArrayView(&Source, 1));
+	const FMassEntityHandle Survivor = Manager.CreateEntity(MakeArrayView(&Source, 1));
+	if (!TestTrue(TEXT("Both entities are live"), Manager.IsEntityValid(First) && Manager.IsEntityValid(Survivor))) { return false; }
+	const FMassArchetypeHandle OriginalArchetype = Manager.GetArchetypeForEntity(Survivor);
+	const UPTRINT FirstSlot = reinterpret_cast<UPTRINT>(Manager.GetFragmentDataPtr<FSovCampaignMassRouteFragment>(First));
+	const FVector* SurvivorAllocation = nullptr;
+	{
+		auto& FirstRoute = Manager.GetFragmentDataChecked<FSovCampaignMassRouteFragment>(First);
+		const auto& SurvivorRoute = Manager.GetFragmentDataChecked<FSovCampaignMassRouteFragment>(Survivor);
+		TestTrue(TEXT("Both reflected copies retain all route points"), FirstRoute.Points == ExpectedPoints && SurvivorRoute.Points == ExpectedPoints);
+		TestTrue(TEXT("Source and both entities own separate allocations"),
+			FirstRoute.Points.GetData() != SourceRoute.Points.GetData() &&
+			SurvivorRoute.Points.GetData() != SourceRoute.Points.GetData() &&
+			FirstRoute.Points.GetData() != SurvivorRoute.Points.GetData());
+		SourceRoute.Points[0] = FVector(-1.f, -2.f, -3.f);
+		TestTrue(TEXT("Editing the source cannot change either entity"), FirstRoute.Points == ExpectedPoints && SurvivorRoute.Points == ExpectedPoints);
+		FirstRoute.Points.Reset();
+		TestTrue(TEXT("Resetting one entity cannot change its sibling"), SurvivorRoute.Points == ExpectedPoints);
+		SurvivorAllocation = SurvivorRoute.Points.GetData();
+	}
+	Source.Reset();
+	TestTrue(TEXT("Destroying the source leaves the survivor's array intact"),
+		Manager.GetFragmentDataChecked<FSovCampaignMassRouteFragment>(Survivor).Points == ExpectedPoints);
+
+	// Removing the first slot must relocate the last entity in the same chunk.
+	Manager.DestroyEntity(First);
+	TestFalse(TEXT("First entity is destroyed"), Manager.IsEntityValid(First));
+	TestTrue(TEXT("Compaction relocates the surviving fragment into the removed slot"),
+		reinterpret_cast<UPTRINT>(Manager.GetFragmentDataPtr<FSovCampaignMassRouteFragment>(Survivor)) == FirstSlot);
+	{
+		const auto& Route = Manager.GetFragmentDataChecked<FSovCampaignMassRouteFragment>(Survivor);
+		TestTrue(TEXT("Compaction preserves the sole surviving route allocation and contents"),
+			Route.Points.GetData() == SurvivorAllocation && Route.Points == ExpectedPoints);
+	}
+
+	Manager.AddTagToEntity(Survivor, FMassStaticRepresentationTag::StaticStruct());
+	TestTrue(TEXT("Adding a tag migrates the entity to another archetype"), Manager.GetArchetypeForEntity(Survivor) != OriginalArchetype);
+	{
+		const auto& Route = Manager.GetFragmentDataChecked<FSovCampaignMassRouteFragment>(Survivor);
+		TestTrue(TEXT("Archetype migration transfers the route allocation without aliasing its retired source"),
+			Route.Points.GetData() == SurvivorAllocation && Route.Points == ExpectedPoints);
+		TestTrue(TEXT("Archetype migration retains progress, speed and dormancy"), Route.NextPoint == 1 && Route.Speed == 125.f && Route.bPresentationOnly);
+	}
+	Manager.RemoveTagFromEntity(Survivor, FMassStaticRepresentationTag::StaticStruct());
+	TestTrue(TEXT("Removing the tag restores the original archetype"), Manager.GetArchetypeForEntity(Survivor) == OriginalArchetype);
+	{
+		auto& Route = Manager.GetFragmentDataChecked<FSovCampaignMassRouteFragment>(Survivor);
+		TestTrue(TEXT("Returning to the original archetype retains the owning array"),
+			Route.Points.GetData() == SurvivorAllocation && Route.Points == ExpectedPoints);
+		Route.Points.Add(FVector(300.f, 40.f, 30.f));
+		TestEqual(TEXT("The relocated array remains writable"), Route.Points.Num(), ExpectedPoints.Num() + 1);
+	}
+	Manager.DestroyEntity(Survivor);
+	TestFalse(TEXT("The final array owner is destroyed without a stale entity"), Manager.IsEntityValid(Survivor));
+	return true;
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCampaignMassEntityOwnershipTest,

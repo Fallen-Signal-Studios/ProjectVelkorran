@@ -201,7 +201,7 @@ void USovCorruptionSourceComponent::TickComponent(float DeltaTime, ELevelTick Ti
 void USovCorruptionSourceComponent::ReleaseContacts()
 {
 	const auto Previous = MoveTemp(Contacts); Contacts.Empty();
-	for (const auto& Pair : Previous) { if (Pair.Key.IsValid()) { Pair.Key()->ReleaseProducer(Pair.Value, this); } }
+	for (const auto& Pair : Previous) { if (Pair.Key.IsValid()) { Pair.Key->ReleaseProducer(Pair.Value, this); } }
 }
 void USovCorruptionSourceComponent::Load_Implementation()
 {

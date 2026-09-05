@@ -27,12 +27,12 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovNarrativeTravelSaveVetoTest,
 bool FSovNarrativeTravelSaveVetoTest::RunTest(const FString& Parameters)
 {
 	if (!GEngine) { AddError(TEXT("Engine unavailable")); return false; }
-	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+	const UWorld::InitializationValues IVS = UWorld::InitializationValues().AllowAudioPlayback(false)
+		.RequiresHitProxies(false).CreatePhysicsScene(false).CreateNavigation(false)
+		.CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &IVS);
 	if (!TestNotNull(TEXT("World"), World)) { return false; }
 	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
-	World->InitializeNewWorld(UWorld::InitializationValues().AllowAudioPlayback(false)
-		.RequiresHitProxies(false).CreatePhysicsScene(false).CreateNavigation(false)
-		.CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false));
 	ANarrativeGameMode* Mode = World->SpawnActor<ANarrativeGameMode>();
 	APlayerController* Player = World->SpawnActor<APlayerController>();
 	UNarrativeSaveSubsystem* Save = World->GetSubsystem<UNarrativeSaveSubsystem>();
@@ -65,12 +65,12 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovNarrativePlayerSlotPreservesSubclassTest,
 bool FSovNarrativePlayerSlotPreservesSubclassTest::RunTest(const FString& Parameters)
 {
 	if (!GEngine) { AddError(TEXT("Engine unavailable")); return false; }
-	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+	const UWorld::InitializationValues IVS = UWorld::InitializationValues().AllowAudioPlayback(false)
+		.RequiresHitProxies(false).CreatePhysicsScene(true).CreateNavigation(false)
+		.CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &IVS);
 	if (!TestNotNull(TEXT("World"), World)) { return false; }
 	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
-	World->InitializeNewWorld(UWorld::InitializationValues().AllowAudioPlayback(false)
-		.RequiresHitProxies(false).CreatePhysicsScene(true).CreateNavigation(false)
-		.CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false));
 	const FString Slot = TEXT("SovAutomationPlayerSlot_") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
 	ON_SCOPE_EXIT
 	{

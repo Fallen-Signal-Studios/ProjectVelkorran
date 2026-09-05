@@ -7,7 +7,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovDisplayCVarOwnershipTest,
 	"ProjectVelkorran.Campaign.PlatformOutput.ProductionCVarOwnership",
-	EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
 bool FSovDisplayCVarOwnershipTest::RunTest(const FString& Parameters)
 {
 	const TCHAR* BlackName = TEXT("r.HDR.Display.MinLuminanceLog10");

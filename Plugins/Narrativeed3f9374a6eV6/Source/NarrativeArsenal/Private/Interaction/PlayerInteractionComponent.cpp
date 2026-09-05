@@ -150,7 +150,7 @@ bool UPlayerInteractionComponent::IsInteractableInReach(UNarrativeInteractableCo
 		|| !FMath::IsFinite(Target->MaxViewAngleDegrees)) { return false; }
 	const FBox Bounds = Target->GetInteractableBounds();
 	const FVector Focus = Bounds.GetCenter();
-	const FVector Closest = Bounds.GetClosestPoint(OwningPawn->GetActorLocation());
+	const FVector Closest = Bounds.GetClosestPointTo(OwningPawn->GetActorLocation());
 	if (!Bounds.IsValid || Focus.ContainsNaN() || FVector::DistSquared(Closest, OwningPawn->GetActorLocation())
 		> FMath::Square(FMath::Min(Target->InteractionDistance, InteractionCheckDistance))) { return false; }
 	FVector Eye; FRotator Rotation; OwningController->GetPlayerViewPoint(Eye, Rotation);
@@ -163,7 +163,7 @@ bool UPlayerInteractionComponent::IsInteractableInReach(UNarrativeInteractableCo
 	const UArsenalSettings* Settings = UArsenalStatics::GetNarrativeProSettings();
 	FHitResult Hit;
 	const bool Blocked = GetWorld()->LineTraceSingleByChannel(Hit, Eye, Focus,
-		Settings ? Settings->InteractionTraceChannel : ECC_Visibility, Query);
+		Settings ? Settings->InteractionTraceChannel.GetValue() : ECC_Visibility, Query);
 	return !Blocked || Hit.GetActor() == Target->GetOwner();
 }
 void UPlayerInteractionComponent::PerformInteractionCheck(float DeltaTime)

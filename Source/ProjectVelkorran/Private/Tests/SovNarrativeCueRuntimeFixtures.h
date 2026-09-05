@@ -15,6 +15,7 @@ public:
 	bool IsNativeLineTimerPaused() const;
 	bool IsNativeLineTimerActive() const;
 	UDialogueNode_Player* GetTestChoice() const { return TestChoice; }
+	void FinishNPCLineForTest() { FinishNPCDialogue(); }
 	bool bReenterFinish=false;
 	int32 FinishNotifications=0;
 	virtual void FinishDialogueNode_Implementation(UDialogueNode* Node,const FDialogueLine& Line,const FSpeakerInfo& Speaker,AActor* SpeakerActor,AActor* ListenerActor) override;

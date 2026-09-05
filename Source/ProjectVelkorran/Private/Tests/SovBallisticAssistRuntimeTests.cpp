@@ -47,11 +47,11 @@ struct FBallisticWorld
 		if (!SettingsProperty) { return; }
 		PreviousSettings.Reset(SettingsProperty->GetObjectPropertyValue_InContainer(GEngine));
 		SettingsProperty->SetObjectPropertyValue_InContainer(GEngine, Settings.Get());
-		World = UWorld::CreateWorld(EWorldType::Game, false);
+		const UWorld::InitializationValues IVS = UWorld::InitializationValues().AllowAudioPlayback(false).RequiresHitProxies(false)
+			.CreatePhysicsScene(true).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false);
+		World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &IVS);
 		if (!World) { return; }
 		GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
-		World->InitializeNewWorld(UWorld::InitializationValues().AllowAudioPlayback(false).RequiresHitProxies(false)
-			.CreatePhysicsScene(true).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false));
 		FActorSpawnParameters Spawn; Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 		Player = World->SpawnActor<ASovAxiomRuntimeTestCharacter>(ASovAxiomRuntimeTestCharacter::StaticClass(),
 			FVector::ZeroVector, FRotator::ZeroRotator, Spawn);

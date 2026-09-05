@@ -17,13 +17,13 @@ namespace
 		UWorld* World = nullptr;
 		FBotTestWorld()
 		{
-			World = UWorld::CreateWorld(EWorldType::Game, false);
+			const UWorld::InitializationValues IVS = UWorld::InitializationValues().AllowAudioPlayback(false)
+				.RequiresHitProxies(false).CreatePhysicsScene(true).CreateNavigation(false)
+				.CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
+			World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &IVS);
 			if (World)
 			{
 				if (GEngine) { GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World); }
-				World->InitializeNewWorld(UWorld::InitializationValues().AllowAudioPlayback(false)
-					.RequiresHitProxies(false).CreatePhysicsScene(true).CreateNavigation(false)
-					.CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false));
 			}
 		}
 		~FBotTestWorld()

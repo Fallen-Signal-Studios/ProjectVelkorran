@@ -4,7 +4,7 @@
 #include "Misc/AutomationTest.h"
 #include <limits>
 #if WITH_DEV_AUTOMATION_TESTS
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovSettingsAtomic, "ProjectVelkorran.Campaign.Settings.AtomicApplication", EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovSettingsAtomic, "ProjectVelkorran.Campaign.Settings.AtomicApplication", EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
 bool FSovSettingsAtomic::RunTest(const FString& Parameters)
 {
 	USovSettingsTestSettings* Settings = NewObject<USovSettingsTestSettings>();
@@ -22,7 +22,7 @@ bool FSovSettingsAtomic::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Previous valid assist remains"), Settings->GetDefenseWindowScale(), 1.7f);
 	return true;
 }
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovSettingsPreset, "ProjectVelkorran.Campaign.Settings.PresetsPreserveAssistance", EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovSettingsPreset, "ProjectVelkorran.Campaign.Settings.PresetsPreserveAssistance", EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
 bool FSovSettingsPreset::RunTest(const FString& Parameters)
 {
 	USovSettingsTestSettings* Settings = NewObject<USovSettingsTestSettings>(); FString Error;
@@ -37,7 +37,7 @@ bool FSovSettingsPreset::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Legacy Narrative setter routes to project consumer"), Settings->GetDifficultyId(), FName(TEXT("Story")));
 	return true;
 }
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovSettingsPortable, "ProjectVelkorran.Campaign.Settings.PortableSnapshotPrivacy", EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovSettingsPortable, "ProjectVelkorran.Campaign.Settings.PortableSnapshotPrivacy", EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
 bool FSovSettingsPortable::RunTest(const FString& Parameters)
 {
 	USovSettingsTestSettings* Settings = NewObject<USovSettingsTestSettings>(); FString Error;

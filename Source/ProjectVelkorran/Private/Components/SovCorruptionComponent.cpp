@@ -25,9 +25,9 @@ USovCorruptionComponent::USovCorruptionComponent()
 	PrimaryComponentTick.bCanEverTick = true;
 	PrimaryComponentTick.TickInterval = 0.1f;
 }
-void USovCorruptionComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Props) const
+void USovCorruptionComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
-	Super::GetLifetimeReplicatedProps(Props);
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(USovCorruptionComponent, State);
 }
 bool USovCorruptionComponent::ValidOwner() const

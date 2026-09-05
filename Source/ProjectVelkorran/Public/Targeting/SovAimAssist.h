@@ -17,7 +17,7 @@ struct PROJECTVELKORRAN_API FProjectileLeadRequest
 	float CollisionRadius = 0.f;
 	float MaximumFlightSpeed = 0.f; // Zero matches ProjectileMovement's unlimited-speed policy.
 	ECollisionChannel CollisionChannel = ECC_Visibility;
-	FCollisionResponseContainer CollisionResponses = FCollisionResponseContainer::DefaultResponseContainer;
+	FCollisionResponseContainer CollisionResponses = FCollisionResponseContainer::GetDefaultResponseContainer();
 	bool bPreferHighArc = false;
 };
 /** Visible living hostile nearest the supplied aim direction. No hard-lock eligibility or target damage changes. */

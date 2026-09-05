@@ -19,7 +19,7 @@ struct NARRATIVEARSENAL_API FNarrativeGameplayTags
 {
 public:
 
-	static const FNarrativeGameplayTags& Get() { return GameplayTags; }
+	static const FNarrativeGameplayTags& Get();
 
 	static void InitializeNativeTags();
 

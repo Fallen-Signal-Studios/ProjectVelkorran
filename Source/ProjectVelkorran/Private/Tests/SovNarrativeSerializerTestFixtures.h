@@ -4,8 +4,19 @@
 #include "Components/SceneComponent.h"
 #include "GameFramework/Actor.h"
 #include "NarrativeSavableActor.h"
+#include "NarrativeSavableComponent.h"
 #include "NarrativeStableActor.h"
 #include "SovNarrativeSerializerTestFixtures.generated.h"
+
+UCLASS()
+class USovSerializerDefaultComponent : public UActorComponent, public INarrativeSavableComponent
+{
+    GENERATED_BODY()
+public:
+    UPROPERTY(SaveGame) int32 SavedValue = 17;
+    UPROPERTY(SaveGame) TArray<int32> SavedEntries;
+    UPROPERTY() int32 RuntimeOnlyValue = 23;
+};
 
 UCLASS()
 class ASovSerializerMovableActor : public AActor, public INarrativeSavableActor

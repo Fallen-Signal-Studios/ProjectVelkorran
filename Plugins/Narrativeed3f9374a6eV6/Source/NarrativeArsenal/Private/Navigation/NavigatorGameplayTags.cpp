@@ -5,12 +5,22 @@
 
 FNavigatorGameplayTags FNavigatorGameplayTags::GameplayTags;
 
+const FNavigatorGameplayTags& FNavigatorGameplayTags::Get()
+{
+	// Unreal can construct native CDOs before this module's StartupModule.
+	InitializeNativeTags();
+	return GameplayTags;
+}
+
 void FNavigatorGameplayTags::InitializeNativeTags()
 {
-	UGameplayTagsManager& Manager = UGameplayTagsManager::Get();
-
-	GameplayTags.AddAllTags(Manager);
-
+	// Later startup calls must not register again after DoneAddingNativeTags.
+	static const bool bInitialized = []()
+	{
+		GameplayTags.AddAllTags(UGameplayTagsManager::Get());
+		return true;
+	}();
+	(void)bInitialized;
 }
 
 void FNavigatorGameplayTags::AddAllTags(UGameplayTagsManager& Manager)

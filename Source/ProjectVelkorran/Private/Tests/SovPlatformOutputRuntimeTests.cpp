@@ -13,7 +13,7 @@ struct FSovPlatformOutputTestAccess
 	static void DisplayMetricsChanged(USovGameUserSettings* Settings) { Settings->bDisplayMetricsInvalidated = true; }
 };
 #if WITH_DEV_AUTOMATION_TESTS
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovSystemDisplayOwnershipRuntime, "ProjectVelkorran.Campaign.PlatformOutput.SystemDisplayOwnership", EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovSystemDisplayOwnershipRuntime, "ProjectVelkorran.Campaign.PlatformOutput.SystemDisplayOwnership", EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
 bool FSovSystemDisplayOwnershipRuntime::RunTest(const FString& Parameters)
 {
 	auto* Settings = NewObject<USovPlatformOutputTestSettings>(); Settings->InitializeOutput(true, 2000);
@@ -56,7 +56,7 @@ bool FSovSystemDisplayOwnershipRuntime::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Repeated suspension does not touch output"), Settings->Writes, WritesAfterRollback);
 	return true;
 }
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovFullHDRCalibrationRuntime, "ProjectVelkorran.Campaign.PlatformOutput.FullCalibrationAndDisplayIdentity", EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovFullHDRCalibrationRuntime, "ProjectVelkorran.Campaign.PlatformOutput.FullCalibrationAndDisplayIdentity", EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
 bool FSovFullHDRCalibrationRuntime::RunTest(const FString& Parameters)
 {
 	auto* Settings = NewObject<USovPlatformOutputTestSettings>(); Settings->InitializeOutput(false, 1000);
@@ -96,7 +96,7 @@ bool FSovFullHDRCalibrationRuntime::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Malformed calibration cannot write"), Settings->PreviewHDRDisplay(true, 2000, Request, Receipt, Error));
 	return true;
 }
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovHDRPreviewRuntime, "ProjectVelkorran.Campaign.PlatformOutput.HDRPreviewTransaction", EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovHDRPreviewRuntime, "ProjectVelkorran.Campaign.PlatformOutput.HDRPreviewTransaction", EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
 bool FSovHDRPreviewRuntime::RunTest(const FString& Parameters)
 {
 	auto* Settings = NewObject<USovPlatformOutputTestSettings>(); Settings->InitializeOutput(false, 1000);
@@ -120,7 +120,7 @@ bool FSovHDRPreviewRuntime::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Rollback restores exact prior peak"), Settings->GetHDROutputStatus().PeakNits, 2000);
 	return true;
 }
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovHDRFailureRuntime, "ProjectVelkorran.Campaign.PlatformOutput.HDRFailureAndExpiry", EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovHDRFailureRuntime, "ProjectVelkorran.Campaign.PlatformOutput.HDRFailureAndExpiry", EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
 bool FSovHDRFailureRuntime::RunTest(const FString& Parameters)
 {
 	auto* Settings = NewObject<USovPlatformOutputTestSettings>(); Settings->InitializeOutput(false, 1000);
@@ -181,7 +181,7 @@ bool FSovHDRFailureRuntime::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Capability fallback does not overwrite confirmed preference"), Settings->bSavedEnabled);
 	return true;
 }
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovHapticOutputRuntime, "ProjectVelkorran.Campaign.PlatformOutput.HapticOwnershipAndAccessibility", EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovHapticOutputRuntime, "ProjectVelkorran.Campaign.PlatformOutput.HapticOwnershipAndAccessibility", EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
 bool FSovHapticOutputRuntime::RunTest(const FString& Parameters)
 {
 	auto* Feedback = NewObject<USovHapticOutputTestComponent>();
@@ -206,7 +206,7 @@ bool FSovHapticOutputRuntime::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Suppression rejects requests"), Feedback->PlayFeedback(ESovHapticChannel::UI, 1.f, 1.f), int64(0));
 	return true;
 }
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovHapticSettingsRuntime, "ProjectVelkorran.Campaign.PlatformOutput.LocalSettingsPrivacy", EAutomationTestFlags::ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovHapticSettingsRuntime, "ProjectVelkorran.Campaign.PlatformOutput.LocalSettingsPrivacy", EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
 bool FSovHapticSettingsRuntime::RunTest(const FString& Parameters)
 {
 	auto* Settings = NewObject<USovPlatformOutputTestSettings>(); FString Error;
@@ -225,10 +225,11 @@ bool FSovHapticSettingsRuntime::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovHapticEventRuntime, "ProjectVelkorran.Campaign.PlatformOutput.CommittedEventProducers", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FSovHapticEventRuntime::RunTest(const FString& Parameters)
 {
-	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+	const UWorld::InitializationValues WorldInitialization = UWorld::InitializationValues().AllowAudioPlayback(false).CreatePhysicsScene(false).CreateNavigation(false).CreateAISystem(false);
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true,
+		ERHIFeatureLevel::Num, &WorldInitialization);
 	if (!World) { return false; }
 	if (GEngine) { GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World); }
-	World->InitializeNewWorld(UWorld::InitializationValues().AllowAudioPlayback(false).CreatePhysicsScene(false).CreateNavigation(false).CreateAISystem(false));
 	auto* PC = World->SpawnActor<ASovInputRoutingTestController>();
 	auto* Pawn = World->SpawnActor<APawn>();
 	if (!PC || !Pawn) { World->DestroyWorld(false); if (GEngine) { GEngine->DestroyWorldContext(World); } return false; }

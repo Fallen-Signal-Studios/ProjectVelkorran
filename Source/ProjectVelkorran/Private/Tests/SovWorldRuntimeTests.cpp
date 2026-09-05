@@ -55,10 +55,11 @@ namespace
         FVector Origin;
         FWorldFixture()
         {
-            World=UWorld::CreateWorld(EWorldType::Game,false); if(!World) { return; }
+            const UWorld::InitializationValues WorldInitialization = UWorld::InitializationValues().AllowAudioPlayback(false).RequiresHitProxies(false)
+                .CreatePhysicsScene(true).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
+            World=UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true,
+                ERHIFeatureLevel::Num, &WorldInitialization); if(!World) { return; }
             if(GEngine) { GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World); }
-            World->InitializeNewWorld(UWorld::InitializationValues().AllowAudioPlayback(false).RequiresHitProxies(false)
-                .CreatePhysicsScene(true).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false));
             PC=World->SpawnActor<ASovHandoffRuntimeTestController>(); Player=World->SpawnActor<ASovHandoffRuntimeTestPawn>();
             auto* PS=World->SpawnActor<ASovPlayerState>(); if(!PC||!Player||!PS) { return; }
             auto* Definition=NewObject<UPlayerDefinition>(PC); PC->KeepAlive.Add(Definition);

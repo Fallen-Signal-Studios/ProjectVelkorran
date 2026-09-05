@@ -7,7 +7,7 @@
 #include "UObject/Interface.h"
 #include "NarrativeMassParticipantBridge.generated.h"
 
-class FMassEntityManager;
+struct FMassEntityManager;
 
 /** Project-owned lifecycle policy; NarrativeArsenal does not depend on a campaign module. */
 UINTERFACE(MinimalAPI, meta = (CannotImplementInterfaceInBlueprint))

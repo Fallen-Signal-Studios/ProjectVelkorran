@@ -19,7 +19,7 @@ class PROJECTVELKORRAN_API USovTargetingComponent : public UActorComponent
 	GENERATED_BODY()
 public:
 	USovTargetingComponent();
-	UFUNCTION(BlueprintPure, Category="Sovereign|Targeting") AActor* GetLockedTarget() const { return LockedTarget.Get(); }
+	UFUNCTION(BlueprintPure, Category="Sovereign|Targeting") AActor* GetLockedTarget() const;
 	UFUNCTION(BlueprintCallable, Category="Sovereign|Targeting") bool ToggleHardLock();
 	UFUNCTION(BlueprintCallable, Category="Sovereign|Targeting") bool CycleTarget(bool bRight);
 	UFUNCTION(BlueprintCallable, Category="Sovereign|Targeting") void ClearHardLock();

@@ -37,7 +37,7 @@ TArray<FString> USovAccessibilityPresentation::PaginateText(const FString& Text,
 	CharactersPerLine = FMath::Clamp(CharactersPerLine, 1, 64); MaximumLines = FMath::Clamp(MaximumLines, 1, 4);
 	// Unicode character boundaries preserve combining sequences/surrogates; UMG shapes the final localized lines.
 	auto Iterator = FBreakIterator::CreateCharacterBoundaryIterator(); Iterator->SetString(Text);
-	FString Page; int32 LineLength = 0, Lines = 1, Start = Iterator->MoveToBeginning();
+	FString Page; int32 LineLength = 0, Lines = 1, Start = Iterator->ResetToBeginning();
 	for (int32 End = Iterator->MoveToNext(); End != INDEX_NONE; Start = End, End = Iterator->MoveToNext())
 	{
 		const FString Character = Text.Mid(Start, End - Start);
@@ -234,7 +234,7 @@ void USovAccessibilityPresentation::NativeTick(const FGeometry& Geometry, float 
 		const FGameplayTag Domain = FNavigatorGameplayTags::Get().NavigatorTypes_Screenspace;
 		for (UMapMarker* Marker : Navigation->Markers)
 		{
-			if (Markers.Num() >= 48) { break; } if (!IsValid(Marker) || !Marker->MarkerDomain.HasTagExact(Domain)) { continue; }
+			if (Markers.Num() >= 48) { break; } if (!IsValid(Marker) || !Marker->HasDomain(Domain)) { continue; }
 			FText Subtitle; const FText Title = Marker->GetMarkerDisplayText(Navigation,Domain,Subtitle);
 			Markers.Add({Marker->GetMarkerTransform().GetLocation(),Title,false,true});
 		}

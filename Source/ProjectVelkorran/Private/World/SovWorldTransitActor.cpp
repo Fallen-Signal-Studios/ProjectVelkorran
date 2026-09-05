@@ -274,9 +274,9 @@ void ASovWorldTransitActor::Serialize(FArchive& Ar)
 void ASovWorldTransitActor::EndPlay(EEndPlayReason::Type Reason)
 { Finish(false, FText()); Super::EndPlay(Reason); }
 void ASovWorldTransitActor::OnRep_State() { UpdateLinks(); OnTransitChanged.Broadcast(State, FText()); }
-void ASovWorldTransitActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out) const
+void ASovWorldTransitActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
-    Super::GetLifetimeReplicatedProps(Out); DOREPLIFETIME(ASovWorldTransitActor, State);
+    Super::GetLifetimeReplicatedProps(OutLifetimeProps); DOREPLIFETIME(ASovWorldTransitActor, State);
     DOREPLIFETIME(ASovWorldTransitActor, bAtDestination); DOREPLIFETIME(ASovWorldTransitActor, bPowered);
     DOREPLIFETIME(ASovWorldTransitActor, LockReason); DOREPLIFETIME(ASovWorldTransitActor, StructuralHealth);
 }

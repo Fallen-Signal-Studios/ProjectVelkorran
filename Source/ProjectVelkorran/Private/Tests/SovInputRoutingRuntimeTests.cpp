@@ -10,10 +10,10 @@
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovInputRoutingWorldTest, "ProjectVelkorran.Campaign.Settings.SemanticToggleChordAndCancellation", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FSovInputRoutingWorldTest::RunTest(const FString& Parameters)
 {
-	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+	const UWorld::InitializationValues IVS = UWorld::InitializationValues().AllowAudioPlayback(false).CreatePhysicsScene(false).CreateNavigation(false).CreateAISystem(false);
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &IVS);
 	if (!World) { return false; }
 	if (GEngine) { GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World); }
-	World->InitializeNewWorld(UWorld::InitializationValues().AllowAudioPlayback(false).CreatePhysicsScene(false).CreateNavigation(false).CreateAISystem(false));
 	auto* Controller = World->SpawnActor<ASovInputRoutingTestController>();
 	if (!Controller) { World->DestroyWorld(false); if (GEngine) { GEngine->DestroyWorldContext(World); } return false; }
 	auto* Probe = NewObject<USovInputRoutingProbe>(Controller);

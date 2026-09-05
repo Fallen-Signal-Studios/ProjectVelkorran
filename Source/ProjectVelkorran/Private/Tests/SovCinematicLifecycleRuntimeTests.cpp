@@ -118,10 +118,10 @@ namespace
 		USovSequenceLifecycleProbe* Probe = nullptr;
 		FSequenceWorld()
 		{
-			World = UWorld::CreateWorld(EWorldType::Game, false);
+			const UWorld::InitializationValues IVS = UWorld::InitializationValues().AllowAudioPlayback(false).CreatePhysicsScene(false).CreateNavigation(false).CreateAISystem(false);
+			World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &IVS);
 			if (!World) { return; }
 			if (GEngine) { GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World); }
-			World->InitializeNewWorld(UWorld::InitializationValues().AllowAudioPlayback(false).CreatePhysicsScene(false).CreateNavigation(false).CreateAISystem(false));
 			Actor = World->SpawnActor<ASovSequenceLifecycleTestActor>();
 			Participant = World->SpawnActor<ASovAxiomRuntimeTestCharacter>();
 			if (!Actor || !Participant) { return; }
@@ -258,7 +258,8 @@ bool FSovCampaignCinematicValidationTest::RunTest(const FString& Parameters)
 	FManagedSequenceWorld F; if (!TestNotNull(TEXT("Managed cinematic component"), F.Component)) { return false; }
 	FString Error;
 	TestTrue(TEXT("One controlled protagonist and finite presentation is valid"), F.Component->ValidateConfiguration(Error));
-	F.Component->Participants.Add(F.Component->Participants[0]);
+	const FSovCinematicParticipant DuplicateParticipant = F.Component->Participants[0];
+	F.Component->Participants.Add(DuplicateParticipant);
 	TestFalse(TEXT("Duplicate participant binding is rejected"), F.Component->ValidateConfiguration(Error));
 	F.Component->Participants.SetNum(1);
 	F.Component->Participants[0].ExitWield = ESovCinematicExitWield::DrawRequiredWeapon;
@@ -299,6 +300,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCampaignCinematicAbortTest, "ProjectVelkorr
 bool FSovCampaignCinematicAbortTest::RunTest(const FString& Parameters)
 {
 	FManagedSequenceWorld F; if (!TestNotNull(TEXT("Managed cinematic component"), F.Component)) { return false; }
+	F.Component->RegisterAllComponentTickFunctions(true);
+	F.Component->BeginPlay();
 	const FGameplayTag Controlled = FNarrativeGameplayTags::Get().State_SequencerControlled;
 	F.PC->SetIgnoreMoveInput(true); F.PC->SetIgnoreLookInput(true); F.ASC->AddLooseGameplayTag(Controlled);
 	FSovCinematicTestAccess::StageOwnedSession(F.Component, F.PC, F.Pawn, F.ASC);
@@ -596,12 +599,14 @@ bool FSovCinematicInventoryReceiptTest::RunTest(const FString& Parameters)
         Grant.Mutation.MutationId = TEXT("ReceiptGrant"); Grant.Mutation.ItemClass = USovCinematicTestStack::StaticClass(); Grant.Mutation.Quantity = 2;
         F.Component->InventoryPostconditions = {Grant};
         FSovCinematicTestAccess::StageOwnedSession(F.Component, F.PC, F.Pawn, F.ASC);
-        TestTrue(TEXT("Resolve receipt inventory manifest"), FSovCinematicTestAccess::ResolveInventory(F.Component, Error));
-        TestTrue(TEXT("Both completion paths use identical native item application"), FSovCinematicTestAccess::ApplyInventory(F.Component, Error));
+        if (!TestTrue(TEXT("Resolve receipt inventory manifest"), FSovCinematicTestAccess::ResolveInventory(F.Component, Error))) { return false; }
+        if (!TestTrue(TEXT("Both completion paths use identical native item application"), FSovCinematicTestAccess::ApplyInventory(F.Component, Error))) { return false; }
         if (Skipped) { TestTrue(TEXT("Earlier non-skipped receipt authorizes replay skip"), F.PC->GetCampaignState()->CanSkipCinematic(TEXT("Replay"))); }
-        TestTrue(TEXT("Native campaign receipt commits exactly once"), FSovCinematicTestAccess::CommitInventoryReceipt(F.Component, Skipped, Error));
+        if (!TestTrue(TEXT("Native campaign receipt commits exactly once"), FSovCinematicTestAccess::CommitInventoryReceipt(F.Component, Skipped, Error))) { return false; }
         TestFalse(TEXT("Duplicate native receipt is rejected"), FSovCinematicTestAccess::CommitInventoryReceipt(F.Component, Skipped, Error));
-        TestEqual(TEXT("Journal records correct completion path"), F.PC->GetCampaignState()->GetJournal().Last().bPresentationSkipped, Skipped);
+        const auto& Journal = F.PC->GetCampaignState()->GetJournal();
+        if (!TestFalse(TEXT("Committed receipt has a journal entry"), Journal.IsEmpty())) { return false; }
+        TestEqual(TEXT("Journal records correct completion path"), Journal.Last().bPresentationSkipped, Skipped);
         const int32 Quantity = Inventory->GetTotalQuantityOfItem(USovCinematicTestStack::StaticClass());
         FSovCinematicTestAccess::RestoreInventory(F.Component);
         TestEqual(TEXT("Committed inventory cannot later roll back"), Inventory->GetTotalQuantityOfItem(USovCinematicTestStack::StaticClass()), Quantity);

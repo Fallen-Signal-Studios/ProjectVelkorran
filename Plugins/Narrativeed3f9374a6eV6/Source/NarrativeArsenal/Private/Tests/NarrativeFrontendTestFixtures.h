@@ -28,5 +28,10 @@ class UNarrativeFrontendTestButton : public UNarrativeCommonButtonBase
 public:
 	void BuildNativeButton();
 	void SetAuthoredAccessibleText(const FText& Text);
-	USlateAccessibleWidgetData* ReadAccessibleData() const { return AccessibleWidgetData; }
+	virtual void ReleaseSlateResources(bool bReleaseChildren) override;
+#if WITH_ACCESSIBILITY
+	TSharedPtr<SWidget> ReadAccessibleWidget() const { return GetAccessibleWidget(); }
+#endif
+private:
+	TSharedPtr<SWidget> NativeTestWidget;
 };

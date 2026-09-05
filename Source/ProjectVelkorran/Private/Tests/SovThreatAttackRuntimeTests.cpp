@@ -41,11 +41,12 @@ struct FThreatAttackWorld
 	uint64 TimerFrame = GFrameCounter;
 	FThreatAttackWorld()
 	{
-		World = UWorld::CreateWorld(EWorldType::Game, false);
+		const UWorld::InitializationValues WorldInitialization = UWorld::InitializationValues().AllowAudioPlayback(false).RequiresHitProxies(false)
+			.CreatePhysicsScene(true).CreateNavigation(false).CreateAISystem(true).ShouldSimulatePhysics(false);
+		World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true,
+			ERHIFeatureLevel::Num, &WorldInitialization);
 		if (!World) { return; }
 		if (GEngine) { GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World); }
-		World->InitializeNewWorld(UWorld::InitializationValues().AllowAudioPlayback(false).RequiresHitProxies(false)
-			.CreatePhysicsScene(true).CreateNavigation(false).CreateAISystem(true).ShouldSimulatePhysics(false));
 		World->GetTimerManager().Tick(0.f);
 		FActorSpawnParameters Spawn; Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 		Source = World->SpawnActor<ASovBotTestCharacter>(ASovBotTestCharacter::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, Spawn);

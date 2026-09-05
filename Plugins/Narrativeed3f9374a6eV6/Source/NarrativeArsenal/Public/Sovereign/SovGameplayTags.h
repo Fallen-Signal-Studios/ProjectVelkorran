@@ -17,7 +17,7 @@ class UGameplayTagsManager;
 struct NARRATIVEARSENAL_API FSovGameplayTags
 {
 public:
-	static const FSovGameplayTags& Get() { return GameplayTags; }
+	static const FSovGameplayTags& Get();
 	static void InitializeNativeTags();
 
 	FGameplayTag Input_Evade;

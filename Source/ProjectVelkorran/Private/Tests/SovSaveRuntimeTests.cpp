@@ -203,11 +203,12 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovNarrativeCaptureTransactionTest, "ProjectVe
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovNarrativeCaptureTransactionTest::RunTest(const FString& Parameters)
 {
-    UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+    const UWorld::InitializationValues WorldInitialization = UWorld::InitializationValues().AllowAudioPlayback(false).RequiresHitProxies(false)
+        .CreatePhysicsScene(false).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
+    UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true,
+        ERHIFeatureLevel::Num, &WorldInitialization);
     if (!World) { AddError(TEXT("World creation failed")); return false; }
     if (GEngine) { GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World); }
-    World->InitializeNewWorld(UWorld::InitializationValues().AllowAudioPlayback(false).RequiresHitProxies(false)
-        .CreatePhysicsScene(false).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false));
     auto* Narrative = World->GetSubsystem<UNarrativeSaveSubsystem>();
     auto* Actor = World->SpawnActor<ASovSaveRuntimeActor>();
     auto* Live = NewObject<USovSaveRuntimeSubclass>(Narrative); Live->CreatorMarker = TEXT("Keep subclass");
@@ -228,11 +229,12 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovNarrativeRestorePhaseTest, "ProjectVelkorra
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovNarrativeRestorePhaseTest::RunTest(const FString& Parameters)
 {
-    UWorld* World = UWorld::CreateWorld(EWorldType::Game, false);
+    const UWorld::InitializationValues WorldInitialization = UWorld::InitializationValues().AllowAudioPlayback(false).RequiresHitProxies(false)
+        .CreatePhysicsScene(false).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
+    UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true,
+        ERHIFeatureLevel::Num, &WorldInitialization);
     if (!World) { AddError(TEXT("World creation failed")); return false; }
     if (GEngine) { GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World); }
-    World->InitializeNewWorld(UWorld::InitializationValues().AllowAudioPlayback(false).RequiresHitProxies(false)
-        .CreatePhysicsScene(false).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false));
     auto* Narrative = World->GetSubsystem<UNarrativeSaveSubsystem>();
     auto* Actor = World->SpawnActor<ASovSaveRuntimeActor>();
     auto* Late = NewObject<USovSavePhaseProbeComponent>(Actor, TEXT("Presentation"));

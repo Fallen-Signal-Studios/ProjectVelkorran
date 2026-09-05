@@ -262,6 +262,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Marker")
 	FNavigationMarkerSettings GetMarkerSettings(UPARAM(meta = (Categories = "Navigator.NavigatorTypes")) const FGameplayTag& NavigatorType) const ;
 
+	/** Whether this marker is currently enabled for the exact navigator domain. */
+	bool HasDomain(const FGameplayTag& Domain) const { return MarkerDomain.HasTagExact(Domain); }
+
 	//Call this function whenever you've changed some settings on the marker! It will inform the UI widgets they need to refresh themselves. 
 	UFUNCTION(BlueprintCallable, Category = "Marker")
 	void RefreshMarker();

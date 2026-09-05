@@ -9,6 +9,22 @@ namespace
 {
 	constexpr EUINavigation MenuDirections[] = { EUINavigation::Left, EUINavigation::Right,
 		EUINavigation::Up, EUINavigation::Down, EUINavigation::Next, EUINavigation::Previous };
+
+	EUINavigationRule ReadNarrativeMenuNavigationRule(const UWidgetNavigation& Navigation, EUINavigation Direction)
+	{
+		// UWidgetNavigation's convenience getter is editor-only. These runtime
+		// fields hold the same authored rules in game and packaged builds.
+		switch (Direction)
+		{
+		case EUINavigation::Up: return Navigation.Up.Rule;
+		case EUINavigation::Down: return Navigation.Down.Rule;
+		case EUINavigation::Left: return Navigation.Left.Rule;
+		case EUINavigation::Right: return Navigation.Right.Rule;
+		case EUINavigation::Next: return Navigation.Next.Rule;
+		case EUINavigation::Previous: return Navigation.Previous.Rule;
+		default: return EUINavigationRule::Escape;
+		}
+	}
 }
 
 UNarrativeMenu::UNarrativeMenu()
@@ -53,7 +69,7 @@ void UNarrativeMenu::ReleaseMenuNavigation()
 		for (uint8 Index = 0; Index < UE_ARRAY_COUNT(MenuDirections); ++Index)
 		{
 			if ((OwnedWrapDirections & (1 << Index)) != 0 &&
-				Root->Navigation->GetNavigationRule(MenuDirections[Index]) == EUINavigationRule::Wrap)
+				ReadNarrativeMenuNavigationRule(*Root->Navigation, MenuDirections[Index]) == EUINavigationRule::Wrap)
 			{
 				Root->SetNavigationRuleBase(MenuDirections[Index], EUINavigationRule::Escape);
 			}
@@ -80,7 +96,7 @@ void UNarrativeMenu::RefreshMenuNavigation()
 	for (uint8 Index = 0; Index < UE_ARRAY_COUNT(MenuDirections); ++Index)
 	{
 		const EUINavigationRule Rule = Root->Navigation ?
-			Root->Navigation->GetNavigationRule(MenuDirections[Index]) : EUINavigationRule::Escape;
+			ReadNarrativeMenuNavigationRule(*Root->Navigation, MenuDirections[Index]) : EUINavigationRule::Escape;
 		if (Rule == EUINavigationRule::Escape)
 		{
 			Root->SetNavigationRuleBase(MenuDirections[Index], EUINavigationRule::Wrap);

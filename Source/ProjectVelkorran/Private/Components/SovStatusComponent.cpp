@@ -274,7 +274,7 @@ void USovStatusComponent::CreateBuiltInDefinitions()
 	const FSovGameplayTags& Tags = FSovGameplayTags::Get();
 	const FNarrativeGameplayTags& NarrativeTags = FNarrativeGameplayTags::Get();
 
-	const auto MakeDefinition = [this](
+	const auto MakeDefinition = [this, &Tags](
 		const FName ObjectName,
 		const FGameplayTag& RequestTag,
 		const FGameplayTag& StateTag,

@@ -4,12 +4,13 @@
 
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
+#include "NarrativeSavableActor.h"
 #include "UnrealFramework/NarrativePlayerCharacter.h"
 #include "SovPlayerCharacterBase.generated.h"
 
 /** Project-owned player base that makes lifecycle components part of readiness. */
 UCLASS(Blueprintable)
-class PROJECTVELKORRAN_API ASovPlayerCharacterBase : public ANarrativePlayerCharacter
+class PROJECTVELKORRAN_API ASovPlayerCharacterBase : public ANarrativePlayerCharacter, public INarrativeSavableActor
 {
 	GENERATED_BODY()
 
@@ -24,6 +25,8 @@ public:
 	virtual FGuid GetActorGUID_Implementation() const override;
 	virtual void SetActorGUID_Implementation(const FGuid& SavedGUID) override;
 	virtual bool ShouldRespawn_Implementation() const override { return false; }
+	/** Campaign PlayerData and protagonist snapshots explicitly own this pawn's record. */
+	virtual bool ShouldSaveWorldRecord() const override { return false; }
 	virtual bool ShouldResetAttributesOnRevive() const override { return false; }
 	UFUNCTION(BlueprintPure, Category="Sovereign|Components") class USovFatalRecoveryComponent* GetRecoveryComponent() const { return RecoveryComponent; }
 	UFUNCTION(BlueprintPure, Category="Sovereign|Components") class USovTargetingComponent* GetTargetingComponent() const { return TargetingComponent; }

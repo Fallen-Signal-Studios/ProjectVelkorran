@@ -19,6 +19,10 @@ class PROJECTVELKORRAN_API USovAccessibilityNativeButton : public UButton
 	GENERATED_BODY()
 public:
 	void SetAccessibleLabel(const FText& Label);
+	virtual void SynchronizeProperties() override;
+private:
+	UPROPERTY(Transient)
+	FText NativeAccessibleLabel;
 };
 
 /** A real focusable native control; labels and narration update after each committed transaction. */

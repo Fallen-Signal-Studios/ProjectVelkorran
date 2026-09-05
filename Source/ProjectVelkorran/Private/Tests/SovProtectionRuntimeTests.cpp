@@ -32,12 +32,13 @@ namespace
 		AAIController* Controller = nullptr;
 		FProtectionWorld()
 		{
-			World = UWorld::CreateWorld(EWorldType::Game, false);
+			const UWorld::InitializationValues WorldInitialization = UWorld::InitializationValues().AllowAudioPlayback(false)
+				.RequiresHitProxies(false).CreatePhysicsScene(true).CreateNavigation(false)
+				.CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
+			World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true,
+				ERHIFeatureLevel::Num, &WorldInitialization);
 			if (!World) return;
 			if (GEngine) GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
-			World->InitializeNewWorld(UWorld::InitializationValues().AllowAudioPlayback(false)
-				.RequiresHitProxies(false).CreatePhysicsScene(true).CreateNavigation(false)
-				.CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false));
 			Threat = Character(0.f, 1);
 			Tarrik = Character(400.f, 0);
 			Ally = Character(800.f, 0);
@@ -182,7 +183,7 @@ bool FSovProtectionGunfireRuntimeTest::RunTest(const FString&)
 	const FSovDamageResult Nested = Observer->SourceResults[0];
 	const FSovDamageResult Shot = Observer->SourceResults[1];
 	TestTrue(TEXT("Nested damage carries a distinct context"), Nested.EffectContext.Get() != Shot.EffectContext.Get());
-	TestEqual(TEXT("Shot context preserves original weapon SourceObject"), Shot.EffectContext.GetSourceObject(),
+	TestEqual(TEXT("Shot context preserves original weapon SourceObject"), static_cast<const UObject*>(Shot.EffectContext.GetSourceObject()),
 		static_cast<const UObject*>(F.Threat->GetWeapon()));
 	TestEqual(TEXT("Shot context preserves SourceAbility CDO identity"), Shot.EffectContext.GetAbility(),
 		static_cast<const UGameplayAbility*>(GetDefault<USovProtectionRuntimeGunfire>()));

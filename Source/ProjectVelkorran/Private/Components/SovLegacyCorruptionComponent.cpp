@@ -287,7 +287,7 @@ float USovLegacyCorruptionComponent::GetExposureCeilingForBand(
 	const ESovLegacyCorruptionBand Band) const
 {
 	const float MaxValue = GetMaxCorruption();
-	const float BeforeNextBand = [MaxValue](const float Threshold)
+	const auto BeforeNextBand = [MaxValue](const float Threshold)
 	{
 		return FMath::Clamp(
 			Threshold - FMath::Max(KINDA_SMALL_NUMBER, MaxValue * 0.0001f),

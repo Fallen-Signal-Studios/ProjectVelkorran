@@ -1,4 +1,5 @@
 // Copyright Narrative Tools. All Rights Reserved.
+#include "GAS/NarrativeBotAttackSelection.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
 
 #include "AbilitySystemBlueprintLibrary.h"

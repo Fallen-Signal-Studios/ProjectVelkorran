@@ -6,6 +6,7 @@
 #include "ArsenalStatics.h"
 #include "MassActorSubsystem.h"
 #include "MassCommonFragments.h"
+#include "MassCommonTypes.h"
 #if WITH_MASSGAMEPLAY_DEBUG
 #include "MassDebuggerSubsystem.h"
 #endif

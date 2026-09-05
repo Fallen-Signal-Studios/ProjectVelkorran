@@ -1,4 +1,5 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
+#include "Items/NarrativeCinematicTransaction.h"
 #include "Items/InventoryComponent.h"
 #include "Items/NarrativeItem.h"
 #include "Items/EquippableItem.h"

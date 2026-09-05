@@ -77,8 +77,8 @@ void USovResonanceComponent::EndPlay(const EEndPlayReason::Type Reason)
 	if (IsValid(PartnerASC)) { PartnerASC->OnDamageResolvedAsTarget.RemoveDynamic(this, &ThisClass::ObserveDamage); }
 	Super::EndPlay(Reason);
 }
-void USovResonanceComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Props) const
-{ Super::GetLifetimeReplicatedProps(Props); DOREPLIFETIME(USovResonanceComponent, Interaction); }
+void USovResonanceComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{ Super::GetLifetimeReplicatedProps(OutLifetimeProps); DOREPLIFETIME(USovResonanceComponent, Interaction); }
 void USovResonanceComponent::OnRep_Interaction() { OnInteractionChanged.Broadcast(Interaction); }
 USovResonanceComponent* USovResonanceComponent::FindActive(UWorld* World)
 {
@@ -292,7 +292,7 @@ void USovResonanceComponent::ApplyReleaseDamage(AActor* Source, const FVector& O
 	{
 		if (Interaction.InteractionId != Id || Interaction.State != ESovResonanceState::Committed || !Alive(Source) || !Target.IsValid()) { return; }
 		USovResonanceTicket* SourceTicket = nullptr;
-		for (auto* Candidate : Tickets) { if (Candidate && Candidate->ExpectedASC.Get() == SourceASC && IsTicketCurrent(Candidate)) { SourceTicket = Candidate; break; } }
+		for (const auto& Candidate : Tickets) { if (Candidate && Candidate->ExpectedASC.Get() == SourceASC && IsTicketCurrent(Candidate)) { SourceTicket = Candidate; break; } }
 		if (!SourceTicket) { return; }
 		FGameplayEffectContextHandle Context = SourceASC->MakeEffectContext(); Context.AddSourceObject(SourceTicket); Context.AddOrigin(Origin);
 		auto Spec = SourceASC->MakeOutgoingSpec(USovGameplayEffect_SeleneDamage::StaticClass(), 1.f, Context);

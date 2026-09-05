@@ -10,6 +10,12 @@ class UTalesComponent;
 class USovDialogueChoiceWidget;
 class USovAccessibleNarrationSubsystem;
 struct FSovDialoguePresentationState;
+// UHT emits a vtable-helper constructor where the private state is incomplete.
+// Keep deletion out of line so generated code does not instantiate delete there.
+struct PROJECTVELKORRAN_API FSovDialoguePresentationStateDeleter
+{
+	void operator()(FSovDialoguePresentationState* State) const;
+};
 
 /** Controller-local presentation of the existing Tales reply revision. Never owns graph progression. */
 UCLASS(ClassGroup=(Sovereign), meta=(BlueprintSpawnableComponent))
@@ -49,7 +55,7 @@ private:
 	UPROPERTY(Transient) TWeakObjectPtr<UDialogue> PresentedDialogue;
 	UPROPERTY(Transient) TArray<TObjectPtr<UDialogueNode_Player>> PresentedReplies;
 	UPROPERTY(Transient) TObjectPtr<UDialogueNode_Player> SilenceReply;
-	TUniquePtr<FSovDialoguePresentationState> State;
+	TUniquePtr<FSovDialoguePresentationState, FSovDialoguePresentationStateDeleter> State;
 	uint64 Generation = 0;
 	int64 SeenRevision = INDEX_NONE;
 	TWeakObjectPtr<UDialogue> SeenDialogue;

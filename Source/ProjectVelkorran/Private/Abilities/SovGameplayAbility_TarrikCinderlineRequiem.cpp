@@ -129,7 +129,7 @@ bool USovGameplayAbility_TarrikCinderlineRequiem::ReleaseCinderlineRequiemFromAi
 	FGameplayEffectContextHandle Context = Source->MakeEffectContext();
 	Context.SetAbility(this); Context.AddInstigator(Avatar, Avatar); Context.AddSourceObject(GetCurrentSourceObject());
 	TSubclassOf<ASovCinderRequiemLine> PayloadClass = LineClass.Get() && !LineClass->HasAnyClassFlags(CLASS_Abstract | CLASS_Deprecated)
-		? LineClass : ASovCinderRequiemLine::StaticClass();
+		? LineClass.Get() : ASovCinderRequiemLine::StaticClass();
 	const FTransform SpawnTransform(Direction.ToOrientationQuat(), Start);
 	auto* Line = World->SpawnActorDeferred<ASovCinderRequiemLine>(PayloadClass, SpawnTransform,
 		Avatar, Cast<APawn>(Avatar), ESpawnActorCollisionHandlingMethod::AlwaysSpawn);

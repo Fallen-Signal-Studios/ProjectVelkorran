@@ -4,6 +4,8 @@
 #include "GameplayTagContainer.h"
 #include "NarrativeThreatMemory.generated.h"
 
+class AActor;
+
 UENUM(BlueprintType)
 enum class ENarrativeThreatSource : uint8
 {

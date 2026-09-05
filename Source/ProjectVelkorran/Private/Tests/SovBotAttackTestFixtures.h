@@ -22,9 +22,13 @@ class ASovBotTestCharacter : public ANarrativeNPCCharacter
 public:
 	ASovBotTestCharacter(const FObjectInitializer& Initializer);
 	void InitializeTestCombat(int32 Team);
+	virtual FGuid GetActorGUID_Implementation() const override { return TestActorGuid; }
 	virtual ETeamAttitude::Type GetTeamAttitudeTowards(const AActor& Other) const override;
 	virtual void GetActorEyesViewPoint(FVector& Location, FRotator& Rotation) const override;
 	int32 TestTeam = 0;
+private:
+	// Intentionally unreflected: each constructor supplies an identity that CDO copying cannot replace.
+	FGuid TestActorGuid;
 };
 
 UCLASS(Transient, NotBlueprintable)

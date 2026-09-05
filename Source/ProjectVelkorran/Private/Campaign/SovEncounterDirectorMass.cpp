@@ -235,7 +235,7 @@ bool ASovEncounterDirector::SetParticipantRepresentation(FName Id, ESovCampaignR
 			{ if (Link->GetCommandSource() == NPC || Link->GetLinkedActors().Contains(NPC)) { Error = TEXT("An incoming command link requires this actor."); return false; } }
 		}
 		if (GetParticipant(Id) != NPC || !IsValid(NPC) || !NPC->IsAlive()) { Error = TEXT("Participant changed during snapshot callbacks."); return false; }
-		for (auto* Actor : AttemptActors)
+		for (AActor* Actor : AttemptActors)
 		{
 			TSet<const AActor*> Visited;
 			for (const AActor* Owner = IsValid(Actor) ? Actor->GetOwner() : nullptr; Owner && !Visited.Contains(Owner); Owner = Owner->GetOwner())
