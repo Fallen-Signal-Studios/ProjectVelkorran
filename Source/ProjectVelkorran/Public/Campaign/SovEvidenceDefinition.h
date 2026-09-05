@@ -15,6 +15,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly) FName CanonicalContentId;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly) FText Summary;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly) FText FullText;
+	/** Optional editorial separation. Empty legacy records remain explicitly unclassified, never asserted as fact. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly) FText ObservedFacts;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly) FText Interpretation;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly) TSoftObjectPtr<class USoundBase> OptionalAudio;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly) FName OriginalCustodian;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly) TArray<FName> SourceCustodians;

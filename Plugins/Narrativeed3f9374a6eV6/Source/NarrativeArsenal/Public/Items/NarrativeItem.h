@@ -308,6 +308,18 @@ public:
 	UPROPERTY(SaveGame)
 	FGuid ItemGUID;
 
+	/** Explicit content approval for finite native campaign postconditions; never a general Blueprint inventory writer. */
+	UPROPERTY(EditDefaultsOnly, Category = "Item | Campaign Cinematic")
+	bool bAllowCampaignCinematicGrant = false;
+	UPROPERTY(EditDefaultsOnly, Category = "Item | Campaign Cinematic")
+	bool bAllowCampaignCinematicRemoval = false;
+	UPROPERTY(EditDefaultsOnly, Category = "Item | Campaign Cinematic")
+	bool bAllowCampaignCinematicEquipment = false;
+
+	uint64 GetCinematicStateRevision() const { return CinematicStateRevision; }
+	uint64 GetQuantityRevision() const { return QuantityRevision; }
+	uint64 GetInventoryMembershipRevision() const { return InventoryMembershipRevision; }
+
 	UPROPERTY(BlueprintAssignable)
 	FOnItemModified OnItemModified;
 
@@ -503,6 +515,10 @@ protected:
 
 
 	friend class UNarrativeInventoryComponent;
+	// Transient ownership tokens, deliberately not checkpoint state. Same-value setter calls invalidate ownership.
+	uint64 CinematicStateRevision = 0;
+	uint64 QuantityRevision = 0;
+	uint64 InventoryMembershipRevision = 0;
 
 	//Called once inventory component reloads all its items in
 	virtual void PostInventoryLoaded();

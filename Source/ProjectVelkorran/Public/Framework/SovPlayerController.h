@@ -29,6 +29,8 @@ public:
 	class USovConvergenceCompanionState* GetConvergenceCompanionState() const { return ConvergenceCompanionState; }
 	UFUNCTION(BlueprintPure, Category="Narrative") class USovNarrativeCueComponent* GetNarrativeCues() const { return NarrativeCues; }
 	UFUNCTION(BlueprintPure, Category="Feedback") class USovHapticFeedbackComponent* GetHapticFeedback() const { return HapticFeedback; }
+	UFUNCTION(BlueprintPure, Category="Accessibility") class USovFrontendComponent* GetFrontend() const { return Frontend; }
+	UFUNCTION(BlueprintCallable, Category="Accessibility") bool OpenAccessibilitySettings();
 	UFUNCTION(BlueprintPure, Category="Campaign") ESovCampaignTransitionState GetCampaignTransitionState() const { return TransitionState; }
 	/** Authored handoff after mandatory beats, into content already loaded in this world. */
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Campaign")
@@ -52,6 +54,7 @@ public:
 	virtual bool ShouldRespawn_Implementation() const override { return false; }
 
 protected:
+	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Campaign") TObjectPtr<USovCampaignStateComponent> CampaignState;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Campaign") TObjectPtr<class USovConvergenceCompanionState> ConvergenceCompanionState;
@@ -61,6 +64,8 @@ private:
 	friend struct FSovTransitionCallbackTestAccess;
 	UPROPERTY(VisibleAnywhere, Category="Narrative") TObjectPtr<class USovNarrativeCueComponent> NarrativeCues;
 	UPROPERTY(VisibleAnywhere, Category="Feedback") TObjectPtr<class USovHapticFeedbackComponent> HapticFeedback;
+	UPROPERTY(VisibleAnywhere, Category="Accessibility") TObjectPtr<class USovFrontendComponent> Frontend;
+	UPROPERTY(VisibleAnywhere, Category="Dialogue") TObjectPtr<class USovDialoguePresentationComponent> DialoguePresentation;
 	bool PrepareTransitionCheckpoint(FName BoundaryId, FString& OutError);
 	bool CanTransitionTo(USovCampaignDefinition* Destination, FString& OutError, bool bRequireDifferentProtagonist = true) const;
 	ASovPlayerCharacterBase* SpawnCampaignPawn(USovCampaignDefinition* Mission, const FTransform& Transform, FGameplayTag Lead = FGameplayTag());

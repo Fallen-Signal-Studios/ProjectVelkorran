@@ -21,6 +21,10 @@
 #include "Misc/App.h"
 #include "Misc/PackageName.h"
 #include "Misc/SecureHash.h"
+#include "Misc/Crc.h"
+#include "HAL/PlatformProperties.h"
+#include "Serialization/MemoryReader.h"
+#include "Serialization/MemoryWriter.h"
 #include "NarrativeGameplayTags.h"
 #include "Progression/SovTechniqueComponent.h"
 #include "Settings/SovGameUserSettings.h"
@@ -43,15 +47,51 @@ namespace
     };
     constexpr double LoadTimeoutSeconds = 120.0;
     SovSavePolicy::Kind PolicyKind(ESovSaveSlotKind Kind) { return static_cast<SovSavePolicy::Kind>(Kind); }
+    constexpr uint32 ProfileHintMagic = 0x534F5641;
+    constexpr int32 ProfileHintBytes = 88;
+    struct FProfileHint { FString Namespace; int64 Generation = 0; };
+    FString ProfileHintSlot(int32 User, int32 Bank)
+    { return FString::Printf(TEXT("SovAccount_v1_%s_%d_%c"), FPlatformProperties::IniPlatformName(), User, Bank ? TCHAR('B') : TCHAR('A')); }
+    bool IsOpaqueNamespace(const FString& Value)
+    {
+        if (Value.Len() != 32) { return false; }
+        for (const TCHAR Character : Value)
+        { if (!((Character >= TCHAR('0') && Character <= TCHAR('9')) || (Character >= TCHAR('a') && Character <= TCHAR('f')))) { return false; } }
+        return true;
+    }
+    bool DecodeProfileHint(const TArray<uint8>& Bytes, int32 ExpectedUser, FProfileHint& Hint)
+    {
+        if (Bytes.Num() != ProfileHintBytes) { return false; }
+        FMemoryReader Reader(Bytes, true); uint32 StoredCRC = 0;
+        Reader.Seek(ProfileHintBytes - sizeof(uint32)); Reader << StoredCRC;
+        if (StoredCRC != FCrc::MemCrc32(Bytes.GetData(), ProfileHintBytes - sizeof(uint32))) { return false; }
+        Reader.Seek(0); uint32 Magic = 0, Version = 0; int32 User = -1; int64 Generation = 0;
+        ANSICHAR Namespace[33] = {}, Platform[33] = {};
+        Reader << Magic << Version << User << Generation; Reader.Serialize(Namespace, 32); Reader.Serialize(Platform, 32);
+        Hint.Namespace = ANSI_TO_TCHAR(Namespace); Hint.Generation = Generation;
+        return !Reader.IsError() && Magic == ProfileHintMagic && Version == 1 && User == ExpectedUser && User >= 0
+            && Generation > 0 && IsOpaqueNamespace(Hint.Namespace)
+            && FString(ANSI_TO_TCHAR(Platform)) == FMD5::HashAnsiString(FPlatformProperties::IniPlatformName());
+    }
+    TArray<uint8> EncodeProfileHint(const FString& Namespace, int32 User, int64 Generation)
+    {
+        TArray<uint8> Bytes; FMemoryWriter Writer(Bytes, true); uint32 Magic = ProfileHintMagic, Version = 1;
+        Writer << Magic << Version << User << Generation;
+        ANSICHAR Hash[32], Platform[32]; const FString PlatformHash = FMD5::HashAnsiString(FPlatformProperties::IniPlatformName());
+        for (int32 Index = 0; Index < 32; ++Index) { Hash[Index] = static_cast<ANSICHAR>(Namespace[Index]); Platform[Index] = static_cast<ANSICHAR>(PlatformHash[Index]); }
+        Writer.Serialize(Hash, 32); Writer.Serialize(Platform, 32);
+        uint32 CRC = FCrc::MemCrc32(Bytes.GetData(), Bytes.Num()); Writer << CRC; return Bytes;
+    }
 }
 
 void USovSaveSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
     Super::Initialize(Collection);
     Storage = MakeUnique<FPlatformSaveStorage>();
-    // Offline profiles remain scoped by the OS/platform save API. Signed-in frontends
-    // replace this explicit local profile before selecting campaign slots.
-    FString Error; SelectPlatformUser(TEXT("Offline.LocalProfile.0"), 0, Error);
+    // Restore only a hash-only, versioned hint from this platform/local-user save compartment.
+    // Offline startup must find the previous campaign even if network identity is temporarily absent.
+    AccountNamespace = FMD5::HashAnsiString(TEXT("Offline.LocalProfile.0")); UserIndex = 0;
+    RestorePlatformProfileHint(UserIndex);
     InitialSaveHandle = UNarrativeSaveSubsystem::OnInitialSaveRequested.AddUObject(this, &USovSaveSubsystem::ResolveInitialSave);
     TickHandle = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateUObject(this, &USovSaveSubsystem::Tick));
 }
@@ -70,16 +110,140 @@ bool USovSaveSubsystem::SelectPlatformUser(const FString& Id, int32 LocalUserInd
     if (Id.TrimStartAndEnd().IsEmpty() || LocalUserIndex < 0)
     { Error = TEXT("A stable platform account and nonnegative local user index are required."); return false; }
     const FString NewNamespace = FMD5::HashAnsiString(*Id);
-    if (!AccountNamespace.IsEmpty() && (AccountNamespace != NewNamespace || UserIndex != LocalUserIndex))
+    if (AccountNamespace != NewNamespace || UserIndex != LocalUserIndex)
     {
         // Never stamp the outgoing user's live campaign records as another user's save.
-        if (const ASovPlayerController* PC = Controller(); PC && PC->GetCampaignState()->GetActiveMission())
-        { Error = TEXT("Return to the front end before changing the campaign's platform account."); return false; }
+        if (!AccountNamespace.IsEmpty() && !CanManagePlatformSaves(Error)) { return false; }
+        if (!PersistPlatformProfileHint(NewNamespace, LocalUserIndex, Error)) { return false; }
         PendingAutosaves.Reset(); PlaySeconds = 0;
         AcknowledgedWorld.Reset(); AcknowledgmentExpiresAt = 0;
     }
     AccountNamespace = NewNamespace; UserIndex = LocalUserIndex;
+    bPlatformStorageOwnerAvailable = true;
     return true;
+}
+bool USovSaveSubsystem::RestorePlatformProfileHint(int32 LocalUserIndex)
+{
+    if (!Storage || LocalUserIndex < 0) { return false; }
+    FProfileHint Best;
+    for (int32 Bank = 0; Bank < 2; ++Bank)
+    {
+        TArray<uint8> Bytes; FProfileHint Hint;
+        if (Storage->Read(ProfileHintSlot(LocalUserIndex, Bank), LocalUserIndex, Bytes)
+            && DecodeProfileHint(Bytes, LocalUserIndex, Hint) && Hint.Generation > Best.Generation) { Best = Hint; }
+    }
+    if (Best.Generation <= 0) { return false; }
+    AccountNamespace = Best.Namespace; UserIndex = LocalUserIndex; return true;
+}
+bool USovSaveSubsystem::PersistPlatformProfileHint(const FString& Namespace, int32 LocalUserIndex, FString& Error)
+{
+    if (!Storage || LocalUserIndex < 0 || !IsOpaqueNamespace(Namespace))
+    { Error = TEXT("Platform profile storage is unavailable."); return false; }
+    FProfileHint Best; int32 BestBank = -1;
+    for (int32 Bank = 0; Bank < 2; ++Bank)
+    {
+        TArray<uint8> Bytes; FProfileHint Hint;
+        if (Storage->Read(ProfileHintSlot(LocalUserIndex, Bank), LocalUserIndex, Bytes)
+            && DecodeProfileHint(Bytes, LocalUserIndex, Hint) && Hint.Generation > Best.Generation) { Best = Hint; BestBank = Bank; }
+    }
+    if (Best.Namespace == Namespace) { return true; }
+    if (Best.Generation == MAX_int64) { Error = TEXT("Platform profile generation limit reached."); return false; }
+    const TArray<uint8> Bytes = EncodeProfileHint(Namespace, LocalUserIndex, Best.Generation + 1);
+    const FString Slot = ProfileHintSlot(LocalUserIndex, BestBank == 0 ? 1 : 0);
+    TArray<uint8> Readback; FProfileHint Verified;
+    if (!Storage->Write(Slot, LocalUserIndex, Bytes) || !Storage->Read(Slot, LocalUserIndex, Readback) || Readback != Bytes
+        || !DecodeProfileHint(Readback, LocalUserIndex, Verified) || Verified.Namespace != Namespace)
+    { Error = TEXT("Could not retain the selected profile for offline restart. Previous profile and campaign remain selected."); return false; }
+    return true;
+}
+void USovSaveSubsystem::ObservePlatformStorageOwner(const FString& Id, int32 LocalUserIndex)
+{
+    // First online identification is not proof that the owner of an explicit offline local campaign
+    // changed. Keep that campaign writable in its native local compartment until a safe profile choice.
+    const FString OfflineId = FString::Printf(TEXT("Offline.LocalProfile.%d"), UserIndex);
+    bPlatformStorageOwnerAvailable = UserIndex == LocalUserIndex
+        && (AccountNamespace == FMD5::HashAnsiString(*Id) || AccountNamespace == FMD5::HashAnsiString(*OfflineId));
+}
+bool USovSaveSubsystem::CanManagePlatformSaves(FString& Error) const
+{
+    if (bBusy || PendingSave || bAwaitingFailureDecision)
+    { Error = TEXT("Finish the current save/load or save-failure decision first."); return false; }
+    const ASovPlayerController* PC = Controller();
+    const UWorld* World = GetWorld();
+    // The mode check closes the interval before the destination controller is ready.
+    if ((PC && ((PC->GetCampaignState() && PC->GetCampaignState()->GetActiveMission())
+            || PC->GetCampaignTransitionState() != ESovCampaignTransitionState::Idle))
+        || (World && Cast<ASovCampaignGameMode>(World->GetAuthGameMode())))
+    { Error = TEXT("Return to the front end before changing account or importing a cloud save."); return false; }
+    Error.Reset(); return true;
+}
+bool USovSaveSubsystem::ExportPlatformSnapshot(ESovSaveSlotKind Kind, int32 Index, TArray<uint8>& Bytes,
+    FSovSaveSlotHeader& Header, bool& bExists, FString& Error)
+{
+    Bytes.Reset(); Header = {}; bExists = false;
+    if (!Storage || !bPlatformStorageOwnerAvailable || AccountNamespace.IsEmpty() || !SovSavePolicy::ValidSlot(PolicyKind(Kind), Index))
+    { Error = TEXT("Save storage, account or slot is unavailable."); return false; }
+    if (bBusy || PendingSave || bAwaitingFailureDecision)
+    { Error = TEXT("Finish the current local save transaction first."); return false; }
+    int32 Bank; bool Damaged;
+    TStrongObjectPtr<USovCampaignSaveGame> Save(ReadBest(Kind, Index, Bank, Damaged, Error));
+    // Do not turn a damaged local slot into an apparently empty cloud-import target.
+    if (Damaged) { Error = TEXT("Recover the damaged local save before comparing cloud copies."); return false; }
+    if (!Save.IsValid()) { Error.Reset(); return true; }
+    if (!Storage->Read(BankName(Kind, Index, Bank), UserIndex, Bytes)
+        || !ValidatePlatformSnapshot(Bytes, Kind, Index, Header, Error))
+    { Bytes.Reset(); return false; }
+    bExists = true; Error.Reset(); return true;
+}
+bool USovSaveSubsystem::ValidatePlatformSnapshot(const TArray<uint8>& Bytes, ESovSaveSlotKind Kind, int32 Index,
+    FSovSaveSlotHeader& Header, FString& Error) const
+{
+    // Size is checked before Unreal deserializes provider-controlled bytes.
+    if (Bytes.IsEmpty() || Bytes.Num() > 64 * 1024 * 1024)
+    { Error = TEXT("Cloud save is empty or exceeds the supported 64 MiB envelope limit."); return false; }
+    TStrongObjectPtr<USovCampaignSaveGame> Save(Cast<USovCampaignSaveGame>(UGameplayStatics::LoadGameFromMemory(Bytes)));
+    if (!ValidateEnvelope(Save.Get(), false, Error)) { return false; }
+    if (Save->Header.Kind != Kind || Save->Header.SlotIndex != Index || Save->Header.Generation <= 0)
+    { Error = TEXT("Cloud save belongs to a different slot or has an invalid generation."); return false; }
+    // Review is not a world load. Import performs the full asset/canon preflight again before mutation.
+    Header = Save->Header; return true;
+}
+ESovSaveResult USovSaveSubsystem::ImportPlatformSnapshot(const TArray<uint8>& Bytes,
+    const TArray<uint8>& ReviewedLocalBytes, ESovSaveSlotKind Kind, int32 Index, FString& Error)
+{
+    if (!CanManagePlatformSaves(Error)) { return ESovSaveResult::UnsafeState; }
+    FSovSaveSlotHeader Header;
+    if (!ValidatePlatformSnapshot(Bytes, Kind, Index, Header, Error)) { return ESovSaveResult::IncompatibleSave; }
+    TStrongObjectPtr<USovCampaignSaveGame> Candidate(Cast<USovCampaignSaveGame>(UGameplayStatics::LoadGameFromMemory(Bytes)));
+    if (!ValidateEnvelope(Candidate.Get(), true, Error) || !DecodeNarrative(Candidate.Get(), Error))
+    { return ESovSaveResult::IncompatibleSave; }
+    // Synchronous required-asset loads can pump events. Recheck admission/account after preflight.
+    if (!CanManagePlatformSaves(Error) || !ValidateEnvelope(Candidate.Get(), false, Error)) { return ESovSaveResult::UnsafeState; }
+    return CommitPlatformSnapshot(Bytes, ReviewedLocalBytes, Kind, Index, Error);
+}
+ESovSaveResult USovSaveSubsystem::CommitPlatformSnapshot(const TArray<uint8>& Bytes,
+    const TArray<uint8>& ReviewedLocalBytes, ESovSaveSlotKind Kind, int32 Index, FString& Error)
+{
+    FSovSaveSlotHeader Header; bool Exists; TArray<uint8> Current;
+    if (!ValidatePlatformSnapshot(Bytes, Kind, Index, Header, Error)) { return ESovSaveResult::IncompatibleSave; }
+    if (!ExportPlatformSnapshot(Kind, Index, Current, Header, Exists, Error)) { return ESovSaveResult::CorruptSave; }
+    if (Current != ReviewedLocalBytes)
+    { Error = TEXT("Local save changed after review. Compare the copies again before importing."); return ESovSaveResult::Busy; }
+    TGuardValue<bool> Mutation(bBusy, true);
+    const FString ArchivePrefix = BankName(Kind, Index, 0) + TEXT("_CloudReview_") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
+    auto Preserve = [&](const FString& Suffix, const TArray<uint8>& Data)
+    {
+        if (Data.IsEmpty()) { return true; }
+        TArray<uint8> Readback;
+        return Storage->Write(ArchivePrefix + Suffix, UserIndex, Data)
+            && Storage->Read(ArchivePrefix + Suffix, UserIndex, Readback) && Readback == Data;
+    };
+    if (!Preserve(TEXT("_Local"), Current) || !Preserve(TEXT("_Remote"), Bytes))
+    { Error = TEXT("Could not durably preserve both reviewed copies. Local save banks were not changed."); return ESovSaveResult::WriteFailed; }
+    TStrongObjectPtr<USovCampaignSaveGame> Save(Cast<USovCampaignSaveGame>(UGameplayStatics::LoadGameFromMemory(Bytes)));
+    // The native writer assigns the next LOCAL generation and preserves the previous good bank.
+    // Cloud revision clocks/generations are never used to select or rename local bank authority.
+    return WriteEnvelope(Save.Get(), Error);
 }
 ASovPlayerController* USovSaveSubsystem::Controller() const
 {
@@ -93,6 +257,8 @@ bool USovSaveSubsystem::CanCapture(FString& Error) const
 { return CanCaptureInternal(Error, false); }
 bool USovSaveSubsystem::CanCaptureInternal(FString& Error, bool bAllowEntrySuspension) const
 {
+    if (!bPlatformStorageOwnerAvailable)
+    { Error = TEXT("The campaign's platform storage owner changed. Continue playing, restore the original account, or return to the front end to choose a profile."); return false; }
     const ASovPlayerController* PC = Controller();
     const ASovPlayerCharacterBase* Pawn = PC ? Cast<ASovPlayerCharacterBase>(PC->GetPawn()) : nullptr;
     const ASovPlayerState* PS = PC ? PC->GetPlayerState<ASovPlayerState>() : nullptr;
@@ -184,7 +350,7 @@ bool USovSaveSubsystem::ValidateEnvelope(USovCampaignSaveGame* Save, bool bValid
 USovCampaignSaveGame* USovSaveSubsystem::ReadBest(ESovSaveSlotKind Kind, int32 Index, int32& OutBank, bool& bDamaged, FString& Error)
 {
     OutBank = -1; bDamaged = false;
-    if (!Storage || !SovSavePolicy::ValidSlot(PolicyKind(Kind), Index) || AccountNamespace.IsEmpty()) { return nullptr; }
+    if (!Storage || !bPlatformStorageOwnerAvailable || !SovSavePolicy::ValidSlot(PolicyKind(Kind), Index) || AccountNamespace.IsEmpty()) { return nullptr; }
     TStrongObjectPtr<USovCampaignSaveGame> Banks[2];
     SovSavePolicy::Bank Valid[2];
     for (int32 Bank = 0; Bank < 2; ++Bank)
@@ -204,6 +370,8 @@ USovCampaignSaveGame* USovSaveSubsystem::ReadBest(ESovSaveSlotKind Kind, int32 I
 }
 ESovSaveResult USovSaveSubsystem::WriteEnvelope(USovCampaignSaveGame* Save, FString& Error)
 {
+    if (!bPlatformStorageOwnerAvailable)
+    { Error = TEXT("Original platform save owner is unavailable. The existing campaign and save banks were not changed."); return ESovSaveResult::MissingAccount; }
     if (!Storage || !Save) { Error = TEXT("Save storage is unavailable."); return ESovSaveResult::WriteFailed; }
     int32 OldBank = -1; bool Damaged = false;
     TStrongObjectPtr<USovCampaignSaveGame> Previous(ReadBest(Save->Header.Kind, Save->Header.SlotIndex, OldBank, Damaged, Error));
@@ -259,7 +427,8 @@ ESovSaveResult USovSaveSubsystem::CaptureAndWrite(ESovSaveSlotKind Kind, int32 I
     if (bBusy || PendingSave) { return ESovSaveResult::Busy; }
     if (bAwaitingFailureDecision) { return ESovSaveResult::AwaitingFailureDecision; }
     if (!SovSavePolicy::ValidSlot(PolicyKind(Kind), Index)) { return ESovSaveResult::InvalidSlot; }
-    if (AccountNamespace.IsEmpty()) { return ESovSaveResult::MissingAccount; }
+    if (AccountNamespace.IsEmpty() || !bPlatformStorageOwnerAvailable)
+    { Error = TEXT("The selected campaign's platform storage owner is unavailable."); return ESovSaveResult::MissingAccount; }
     if (!CanCaptureInternal(Error, bAllowEntrySuspension)) { return ESovSaveResult::UnsafeState; }
     TGuardValue<bool> Mutation(bBusy, true);
     ASovPlayerController* PC = Controller(); APawn* Pawn = PC->GetPawn();
@@ -400,7 +569,8 @@ ESovSaveResult USovSaveSubsystem::LoadSlot(ESovSaveSlotKind Kind, int32 Index, F
     // has been published. A retry must not overwrite that pending completion.
     if (bBusy || PendingSave) { return ESovSaveResult::Busy; }
     if (!SovSavePolicy::ValidSlot(PolicyKind(Kind), Index)) { return ESovSaveResult::InvalidSlot; }
-    if (AccountNamespace.IsEmpty()) { return ESovSaveResult::MissingAccount; }
+    if (AccountNamespace.IsEmpty() || !bPlatformStorageOwnerAvailable)
+    { Error = TEXT("The selected campaign's platform storage owner is unavailable."); return ESovSaveResult::MissingAccount; }
     ASovPlayerController* PC = Controller();
     if (!PC || !PC->HasAuthority() || PC->GetWorld()->GetNetMode() != NM_Standalone)
     { Error = TEXT("Campaign load requires the standalone local controller."); return ESovSaveResult::UnsafeState; }

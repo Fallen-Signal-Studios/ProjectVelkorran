@@ -2,6 +2,8 @@
 #include "Tests/SovCinematicLifecycleRuntimeTestFixtures.h"
 #include "Tests/SovAxiomRuntimeTestFixtures.h"
 #include "Tests/SovHandoffRuntimeTestFixtures.h"
+#include "Tests/SovCinematicInventoryRuntimeTestFixtures.h"
+#include "Components/EquipmentComponent.h"
 #include "Cinematics/SovCampaignCinematicComponent.h"
 #include "Campaign/SovCampaignDefinition.h"
 #include "Campaign/SovCampaignStateComponent.h"
@@ -40,6 +42,18 @@ struct FSovCinematicTestAccess
 	static bool ApplyTransit(USovCampaignCinematicComponent* C, FString& Error) { return C->ApplyTransitPostconditions(Error); }
 	static bool ValidateTransit(USovCampaignCinematicComponent* C, bool Applied, FString& Error) { return C->ValidateTransitPostconditions(Applied, Error); }
 	static void RestoreTransit(USovCampaignCinematicComponent* C) { C->RestoreTransitPostconditions(); }
+	static bool ResolveInventory(USovCampaignCinematicComponent* C, FString& Error) { return C->ResolveInventoryPostconditions(Error); }
+	static bool ApplyInventory(USovCampaignCinematicComponent* C, FString& Error) { return C->ApplyInventoryPostconditions(Error); }
+	static bool ValidateInventory(USovCampaignCinematicComponent* C, FString& Error) { return C->ValidateInventoryPostconditions(true, Error); }
+	static void RestoreInventory(USovCampaignCinematicComponent* C) { C->RestoreParticipants(); }
+	static bool InventoryNeedsRecovery(const USovCampaignCinematicComponent* C) { return C->bInventoryRollbackIncomplete; }
+	static void RetireInventorySession(USovCampaignCinematicComponent* C) { C->ReleaseOwnership(); }
+	static bool CommitInventoryReceipt(USovCampaignCinematicComponent* C, bool Skipped, FString& Error)
+	{
+		C->Phase = ESovCinematicPhase::Committing;
+		C->ExpectedPlaybackGeneration = CastChecked<ANarrativeLevelSequenceActor>(C->GetOwner())->GetPlaybackGeneration();
+		TGuardValue<bool> Finishing(C->bFinishing, true); return C->CommitNativePostconditions(Skipped, Error);
+	}
 	static void ExpireLoading(USovCampaignCinematicComponent* C)
 	{ C->LoadingStartedSeconds = FPlatformTime::Seconds() - C->LoadingTimeoutSeconds - 1.; C->TickComponent(0.f, LEVELTICK_PauseTick, nullptr); }
 	static bool CheckWatchdog(USovCampaignCinematicComponent* C) { return C->CheckPreparationWatchdog(C->RequestEpoch); }
@@ -50,6 +64,9 @@ struct FSovCinematicTestAccess
 		C->OriginalViewTarget = PC->GetViewTarget(); C->OriginalControlRotation = PC->GetControlRotation();
 		FSovCinematicParticipantSnapshot Entry; Entry.Character = Pawn; Entry.ASC = ASC;
 		Entry.Transform = Pawn->GetActorTransform(); Entry.Wield = Pawn->GetWeaponWieldState();
+		Entry.OriginalWieldRevision = Pawn->GetWeaponWieldRevision();
+		C->InventoryChanges.Reset(); C->EquipmentSnapshots.Reset(); C->bInventoryPostconditionsApplied = false;
+		C->bInventoryTransactionCommitted = false; C->bInventoryRollbackIncomplete = false;
 		C->Snapshot = {Entry}; C->Phase = ESovCinematicPhase::Loading; ++C->RequestEpoch;
 		C->ReservedPlaybackGeneration = CastChecked<ANarrativeLevelSequenceActor>(C->GetOwner())->GetPlaybackGeneration();
 		C->SessionId = FGuid::NewGuid(); C->bOwnInput = true;
@@ -116,7 +133,7 @@ namespace
 		ASovHandoffRuntimeTestPawn* Pawn = nullptr;
 		UNarrativeAbilitySystemComponent* ASC = nullptr;
 		USovCampaignCinematicComponent* Component = nullptr;
-		FManagedSequenceWorld()
+		FManagedSequenceWorld(bool bIncludeReplayBeat = false)
 		{
 			if (!Base.World || !Base.Actor) { return; }
 			PC = Base.World->SpawnActor<ASovHandoffRuntimeTestController>();
@@ -133,6 +150,8 @@ namespace
 			Mission->PawnClass = Pawn->GetClass(); Mission->PlayerDefinition = Definition;
 			FSovCampaignBeatDefinition Beat; Beat.BeatId = TEXT("Scene"); Beat.CinematicId = TEXT("FirstView"); Beat.bRequiresCinematicProof = true;
 			Mission->Beats.Add(Beat);
+			if (bIncludeReplayBeat)
+			{ FSovCampaignBeatDefinition Replay = Beat; Replay.BeatId = TEXT("Replay"); Replay.PrerequisiteBeats = {Beat.BeatId}; Mission->Beats.Add(Replay); }
 			if (PC->GetCampaignState()->BeginMission(Mission) != ESovCampaignResult::Applied) { return; }
 			Component = NewObject<USovCampaignCinematicComponent>(Base.Actor); Base.Actor->AddInstanceComponent(Component); Component->RegisterComponent();
 			Component->MissionId = Mission->MissionId; Component->BeatId = Beat.BeatId; Component->Sequence = Base.Sequence;
@@ -453,5 +472,125 @@ bool FSovCinematicTransitRevisionTest::RunTest(const FString& Parameters)
 		}
 	}
 	return true;
+}
+namespace
+{
+    void AddCinematicReplacementManifest(FManagedSequenceWorld& F, UEquippableItem* Previous)
+    {
+        F.Component->Participants[0].ExitWield = ESovCinematicExitWield::Holster;
+        FSovCinematicInventoryPostcondition Remove; Remove.ParticipantBinding = TEXT("Player");
+        Remove.Mutation.MutationId = TEXT("TakeOldEquipment"); Remove.Mutation.Operation = ENarrativeCinematicItemOperation::Remove;
+        Remove.Mutation.ItemClass = Previous->GetClass(); Remove.Mutation.ItemGUID = Previous->ItemGUID;
+        FSovCinematicInventoryPostcondition Grant; Grant.ParticipantBinding = TEXT("Player");
+        Grant.Mutation.MutationId = TEXT("GiveReplacement"); Grant.Mutation.ItemClass = USovCinematicTestEquipmentReplacement::StaticClass();
+        F.Component->InventoryPostconditions = {Remove, Grant};
+        FSovCinematicEquipmentPostcondition Equipment; Equipment.ParticipantBinding = TEXT("Player");
+        Equipment.EquipmentSlot = FNarrativeGameplayTags::Get().Equipment_Slot_Ammo;
+        Equipment.PreviousItemClass = Previous->GetClass(); Equipment.PreviousItemGUID = Previous->ItemGUID;
+        Equipment.ReplacementItemClass = USovCinematicTestEquipmentReplacement::StaticClass(); Equipment.ReplacementGrantId = Grant.Mutation.MutationId;
+        F.Component->EquipmentPostconditions = {Equipment};
+    }
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCinematicEquipmentReplacementTest, "ProjectVelkorran.Campaign.Cinematic.Inventory.FullCapacityEquipmentReplacementAndRollback",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCinematicEquipmentReplacementTest::RunTest(const FString& Parameters)
+{
+    FManagedSequenceWorld F; if (!TestNotNull(TEXT("Managed cinematic"), F.Component)) { return false; }
+    auto* Inventory = F.Pawn->GetInventoryComponent();
+    auto Added = Inventory->TryAddItemFromClass(USovCinematicTestEquipment::StaticClass(), 1, false);
+    if (!TestEqual(TEXT("Original equipment exists"), Added.AmountGiven, 1)) { return false; }
+    auto* Original = CastChecked<UEquippableItem>(Added.Stacks[0]); const FGuid OriginalGUID = Original->ItemGUID;
+    const auto Slot = FNarrativeGameplayTags::Get().Equipment_Slot_Ammo;
+    if (!Original->IsEquipped()) { TestTrue(TEXT("Equip original"), Inventory->SetCinematicEquipment(Original, Slot)); }
+    Original->SetLastUseTime(23.f); Inventory->SetCapacity(Inventory->GetItems().Num());
+    AddCinematicReplacementManifest(F, Original); FString Error;
+    FSovCinematicTestAccess::StageOwnedSession(F.Component, F.PC, F.Pawn, F.ASC);
+    TestTrue(TEXT("Resolve approved exact inventory/equipment"), FSovCinematicTestAccess::ResolveInventory(F.Component, Error));
+    TestTrue(TEXT("Remove-before-grant replacement succeeds at full capacity"), FSovCinematicTestAccess::ApplyInventory(F.Component, Error));
+    auto* Replacement = F.Pawn->GetEquipmentComponent()->GetEquippedItemAtSlot(Slot);
+    TestTrue(TEXT("New granted identity owns equipment slot"), Replacement && Replacement != Original && Replacement->IsA<USovCinematicTestEquipmentReplacement>());
+    TestNull(TEXT("Removed original is not GUID-visible"), Inventory->FindItemByGUID(OriginalGUID));
+    TestTrue(TEXT("All postconditions survive callbacks"), FSovCinematicTestAccess::ValidateInventory(F.Component, Error));
+    FSovCinematicTestAccess::RestoreInventory(F.Component);
+    TestTrue(TEXT("Rollback restores original equipment identity"), F.Pawn->GetEquipmentComponent()->GetEquippedItemAtSlot(Slot) == Original);
+    TestTrue(TEXT("Rollback restores original GUID membership"), Inventory->FindItemByGUID(OriginalGUID) == Original);
+    TestEqual(TEXT("Rollback preserves recharge timestamp"), Original->GetLastUseTime(), 23.f);
+    TestFalse(TEXT("Rollback is complete"), FSovCinematicTestAccess::InventoryNeedsRecovery(F.Component));
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCinematicEquipmentCallbackConflictTest, "ProjectVelkorran.Campaign.Cinematic.Inventory.LaterEquipmentOwnerAndRetryGate",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCinematicEquipmentCallbackConflictTest::RunTest(const FString& Parameters)
+{
+    FManagedSequenceWorld F; if (!TestNotNull(TEXT("Managed cinematic"), F.Component)) { return false; }
+    auto* Inventory = F.Pawn->GetInventoryComponent();
+    auto OriginalAdd = Inventory->TryAddItemFromClass(USovCinematicTestEquipment::StaticClass(), 1, false);
+    auto LaterAdd = Inventory->TryAddItemFromClass(USovCinematicTestEquipmentReplacement::StaticClass(), 1, false);
+    if (!TestEqual(TEXT("Original equipment"), OriginalAdd.AmountGiven, 1) || !TestEqual(TEXT("Later-owner equipment"), LaterAdd.AmountGiven, 1)) { return false; }
+    auto* Original = CastChecked<UEquippableItem>(OriginalAdd.Stacks[0]); auto* Later = CastChecked<UEquippableItem>(LaterAdd.Stacks[0]);
+    const auto Slot = FNarrativeGameplayTags::Get().Equipment_Slot_Ammo;
+    if (!Original->IsEquipped()) { Inventory->SetCinematicEquipment(Original, Slot); }
+    AddCinematicReplacementManifest(F, Original); FString Error;
+    FSovCinematicTestAccess::StageOwnedSession(F.Component, F.PC, F.Pawn, F.ASC);
+    TestTrue(TEXT("Resolve replacement"), FSovCinematicTestAccess::ResolveInventory(F.Component, Error));
+    auto* Probe = NewObject<USovCinematicInventoryProbe>(F.Component); Probe->Inventory = Inventory; Probe->OtherEquipment = Later;
+    F.Pawn->GetEquipmentComponent()->OnItemUnequipped.AddDynamic(Probe, &USovCinematicInventoryProbe::ReplaceDuringUnequip);
+    TestFalse(TEXT("Later native equip callback invalidates owned replacement"), FSovCinematicTestAccess::ApplyInventory(F.Component, Error));
+    FSovCinematicTestAccess::RestoreInventory(F.Component);
+    TestTrue(TEXT("Later equipment owner is preserved"), F.Pawn->GetEquipmentComponent()->GetEquippedItemAtSlot(Slot) == Later);
+    TestTrue(TEXT("Conflict explicitly requires checkpoint recovery"), FSovCinematicTestAccess::InventoryNeedsRecovery(F.Component));
+    TestFalse(TEXT("Conflict cannot silently retry and duplicate grants"), F.Component->RequestPlay(F.PC, Error));
+    TestTrue(TEXT("Retry explains required checkpoint"), Error.Contains(TEXT("checkpoint")));
+    TestFalse(TEXT("Failed scene never commits beat"), F.PC->GetCampaignState()->IsBeatComplete(F.Component->MissionId, F.Component->BeatId));
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCinematicInventoryReceiptTest, "ProjectVelkorran.Campaign.Cinematic.Inventory.FullAndSkipShareSingleNativeReceipt",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCinematicInventoryReceiptTest::RunTest(const FString& Parameters)
+{
+    FManagedSequenceWorld F(true); if (!TestNotNull(TEXT("Managed cinematic"), F.Component)) { return false; }
+    auto* Inventory = F.Pawn->GetInventoryComponent(); FString Error;
+    // Stage the existing playback-proof boundary, then execute production native postconditions and the real campaign receipt.
+    // Playback clock/binding proof itself remains covered by the existing lifecycle suite.
+    for (bool Skipped : {false, true})
+    {
+        if (Skipped) { F.Component->BeatId = TEXT("Replay"); }
+        FSovCinematicInventoryPostcondition Grant; Grant.ParticipantBinding = TEXT("Player");
+        Grant.Mutation.MutationId = TEXT("ReceiptGrant"); Grant.Mutation.ItemClass = USovCinematicTestStack::StaticClass(); Grant.Mutation.Quantity = 2;
+        F.Component->InventoryPostconditions = {Grant};
+        FSovCinematicTestAccess::StageOwnedSession(F.Component, F.PC, F.Pawn, F.ASC);
+        TestTrue(TEXT("Resolve receipt inventory manifest"), FSovCinematicTestAccess::ResolveInventory(F.Component, Error));
+        TestTrue(TEXT("Both completion paths use identical native item application"), FSovCinematicTestAccess::ApplyInventory(F.Component, Error));
+        if (Skipped) { TestTrue(TEXT("Earlier non-skipped receipt authorizes replay skip"), F.PC->GetCampaignState()->CanSkipCinematic(TEXT("Replay"))); }
+        TestTrue(TEXT("Native campaign receipt commits exactly once"), FSovCinematicTestAccess::CommitInventoryReceipt(F.Component, Skipped, Error));
+        TestFalse(TEXT("Duplicate native receipt is rejected"), FSovCinematicTestAccess::CommitInventoryReceipt(F.Component, Skipped, Error));
+        TestEqual(TEXT("Journal records correct completion path"), F.PC->GetCampaignState()->GetJournal().Last().bPresentationSkipped, Skipped);
+        const int32 Quantity = Inventory->GetTotalQuantityOfItem(USovCinematicTestStack::StaticClass());
+        FSovCinematicTestAccess::RestoreInventory(F.Component);
+        TestEqual(TEXT("Committed inventory cannot later roll back"), Inventory->GetTotalQuantityOfItem(USovCinematicTestStack::StaticClass()), Quantity);
+        FSovCinematicTestAccess::RetireInventorySession(F.Component);
+    }
+    TestEqual(TEXT("Exactly two grants across full and skipped receipts"), Inventory->GetTotalQuantityOfItem(USovCinematicTestStack::StaticClass()), 4);
+    TestEqual(TEXT("Exactly two campaign journal receipts"), F.PC->GetCampaignState()->GetJournal().Num(), 2);
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCinematicInventoryUnregisterTest, "ProjectVelkorran.Campaign.Cinematic.Inventory.UnregisterDuringGrantRestoresOwnedDelta",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCinematicInventoryUnregisterTest::RunTest(const FString& Parameters)
+{
+    FManagedSequenceWorld F; if (!TestNotNull(TEXT("Managed cinematic"), F.Component)) { return false; }
+    auto* Inventory = F.Pawn->GetInventoryComponent(); const int32 Before = Inventory->GetItems().Num(); FString Error;
+    FSovCinematicInventoryPostcondition Grant; Grant.ParticipantBinding = TEXT("Player"); Grant.Mutation.MutationId = TEXT("CanceledGrant");
+    Grant.Mutation.ItemClass = USovCinematicTestStack::StaticClass(); F.Component->InventoryPostconditions = {Grant};
+    FSovCinematicTestAccess::StageOwnedSession(F.Component, F.PC, F.Pawn, F.ASC);
+    TestTrue(TEXT("Resolve pending inventory"), FSovCinematicTestAccess::ResolveInventory(F.Component, Error));
+    auto* Probe = NewObject<USovCinematicInventoryProbe>(F.Component); Probe->Managed = F.Component;
+    Inventory->OnItemAdded.AddDynamic(Probe, &USovCinematicInventoryProbe::RetireDuringAdd);
+    TestFalse(TEXT("Unregister invalidates commit request"), FSovCinematicTestAccess::ApplyInventory(F.Component, Error));
+    FSovCinematicTestAccess::RestoreInventory(F.Component);
+    TestEqual(TEXT("Owned grant is removed without touching prior inventory"), Inventory->GetItems().Num(), Before);
+    TestFalse(TEXT("Interrupted scene does not commit beat"), F.PC->GetCampaignState()->IsBeatComplete(F.Component->MissionId, F.Component->BeatId));
+    TestFalse(TEXT("Input ownership released"), F.PC->IsMoveInputIgnored());
+    return true;
 }
 #endif

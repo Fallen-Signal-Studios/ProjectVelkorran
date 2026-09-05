@@ -472,6 +472,23 @@ TArray<FName> USovWeakPointComponent::GetRevealedWeakPointIds() const
 	return RevealedIds;
 }
 
+TArray<FVector> USovWeakPointComponent::GetRevealedWeakPointAnchors() const
+{
+	TArray<FVector> Result;
+	if (!IsWeakPointRevealActive()) { return Result; }
+	for (const FSovWeakPointZone& Zone : WeakPointZones)
+	{
+		if (Zone.ZoneId.IsNone() || IsWeakPointBroken(Zone.ZoneId)) { continue; }
+		const FName AttachPoint = ResolveRevealAttachPoint(Zone);
+		if (const UMeshComponent* Mesh = ResolveRevealAttachmentMesh(Zone, AttachPoint))
+		{
+			const FVector Anchor = Mesh->GetSocketTransform(AttachPoint).TransformPosition(Zone.RevealRelativeTransform.GetLocation());
+			if (!Anchor.ContainsNaN()) { Result.Add(Anchor); }
+		}
+	}
+	return Result;
+}
+
 bool USovWeakPointComponent::HasValidWeakPointConfiguration() const
 {
 	TSet<FName> SeenZoneIds;

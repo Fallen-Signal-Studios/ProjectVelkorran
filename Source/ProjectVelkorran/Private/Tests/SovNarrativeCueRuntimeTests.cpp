@@ -10,6 +10,9 @@
 #include "Narrative/SovNarrativeCueComponent.h"
 #include "Tales/TalesComponent.h"
 #include "Sovereign/SovGameplayTags.h"
+#include "Components/AudioComponent.h"
+#include "Sound/SoundClass.h"
+#include <limits>
 
 #if WITH_AUTOMATION_TESTS
 struct FSovNarrativeCueTestAccess
@@ -19,6 +22,8 @@ struct FSovNarrativeCueTestAccess
 	static int32 Queued(USovNarrativeCueComponent* C) { return C->Pending.Num(); }
 	static void Interrupt(USovNarrativeCueComponent* C) { C->StopBark(true); }
 	static void DuplicateInFlight(USovNarrativeCueComponent* C) { C->Pending.Add(C->InFlightCriticalSave); }
+	static bool ControllerOutput(UAudioComponent* Audio, USoundClass* Class, float Volume)
+	{ return USovNarrativeCueComponent::ConfigureControllerOutput(Audio, Class, Volume); }
 };
 namespace
 {
@@ -125,6 +130,24 @@ bool FSovDialogueCompletionOwnershipTest::RunTest(const FString& Parameters)
 	Tales->ExitDialogue(EExitDialogueReason::EDR_NoLines);
 	TestTrue(TEXT("A finish listener may clear the active pointer safely"),Tales->GetCurrentDialogue()==nullptr);
 	TestTrue(TEXT("The captured ending instance is still deinitialized"),Dialogue->OwningComp==nullptr);
+	return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCueControllerOutputTest, "ProjectVelkorran.Campaign.Narrative.ControllerAudioFallbackContract",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCueControllerOutputTest::RunTest(const FString& Parameters)
+{
+	auto* Audio = NewObject<UAudioComponent>(); auto* Class = NewObject<USoundClass>();
+	Class->Properties.OutputTarget = EAudioOutputTarget::Controller;
+	TestFalse(TEXT("Controller-only output cannot silently lose a critical cue"), FSovNarrativeCueTestAccess::ControllerOutput(Audio, Class, 1.f));
+	TestNull(TEXT("Rejected routing keeps normal sound class"), Audio->SoundClassOverride.Get());
+	Class->Properties.OutputTarget = EAudioOutputTarget::ControllerFallbackToSpeaker;
+	TestTrue(TEXT("Approved native fallback class configured before playback"), FSovNarrativeCueTestAccess::ControllerOutput(Audio, Class, .25f));
+	TestEqual(TEXT("Separate controller channel gain applied"), Audio->VolumeMultiplier, .25f);
+	TestTrue(TEXT("Shared authored sound class remains the same object"), Audio->SoundClassOverride == Class);
+	TestFalse(TEXT("Nonfinite channel volume rejected"), FSovNarrativeCueTestAccess::ControllerOutput(Audio, Class, std::numeric_limits<float>::quiet_NaN()));
+	TestEqual(TEXT("Invalid update retains preceding gain"), Audio->VolumeMultiplier, .25f);
+	TestTrue(TEXT("Optional controller channel can be muted"), FSovNarrativeCueTestAccess::ControllerOutput(Audio, Class, 0.f));
+	TestEqual(TEXT("Mute applied without changing caption producer"), Audio->VolumeMultiplier, 0.f);
 	return true;
 }
 #endif

@@ -10,6 +10,7 @@
 #include "MassCommands.h"
 #include "MassEntityManager.h"
 #include "AI/Mass/Peds/NarrativePedFragments.h"
+#include "AI/Mass/Peds/NarrativeMassParticipantBridge.h"
 #include "Character/NarrativeCharacterVisual.h"
 #include "StructUtils/StructView.h"
 
@@ -18,7 +19,37 @@ EMassActorSpawnRequestAction UMassNarrativePedRepresentationActorManagement::OnP
 	TSharedRef<FMassEntityManager> EntityManager) const
 {
 	const FMassActorSpawnRequest& MassActorSpawnRequest = SpawnRequest.Get<const FMassActorSpawnRequest>();
+	if (!EntityManager->IsEntityValid(MassActorSpawnRequest.MassAgent))
+	{
+		return EMassActorSpawnRequestAction::Remove;
+	}
+	const bool bParticipantRepresentation = EntityManager->GetFragmentDataPtr<FNarrativeMassParticipantFragment>(MassActorSpawnRequest.MassAgent) != nullptr;
 	auto RequestAction = Super::OnPostActorSpawn(SpawnRequestHandle, SpawnRequest, EntityManager);
+
+	// This representation family also supports project-owned, non-NPC proxies.
+	// Dispatch before either checked pedestrian fragment access or NPC initialization.
+	if (bParticipantRepresentation)
+	{
+		AActor* Actor = MassActorSpawnRequest.SpawnedActor;
+		if (IsValid(Actor) && !Actor->IsActorBeingDestroyed())
+		{
+			auto* Receipt = Actor->FindComponentByClass<UNarrativeMassParticipantReceiptComponent>();
+			if (!Receipt)
+			{
+				Receipt = NewObject<UNarrativeMassParticipantReceiptComponent>(Actor);
+				Actor->AddInstanceComponent(Receipt);
+				Receipt->RegisterComponent();
+			}
+			if (!Receipt->Bind(EntityManager, MassActorSpawnRequest.MassAgent)
+				&& IsValid(Actor) && !Actor->IsActorBeingDestroyed() && !Receipt->IsCurrent(EntityManager.Get()))
+			{
+				Actor->SetActorEnableCollision(false);
+				Actor->SetActorHiddenInGame(true);
+				Actor->SetActorTickEnabled(false);
+			}
+		}
+		return RequestAction;
+	}
 	
 	if (MassActorSpawnRequest.SpawnedActor)
 	{
@@ -46,12 +77,21 @@ void UMassNarrativePedRepresentationActorManagement::SetActorEnabled(const EMass
 	const TWeakObjectPtr<AActor> WeakActor = &Actor;
 	const TWeakObjectPtr<UMassAgentComponent> Agent = Actor.FindComponentByClass<UMassAgentComponent>();
 	const FMassEntityHandle ExpectedEntity = Agent.IsValid() ? Agent->GetEntityHandle() : FMassEntityHandle();
-	CommandBuffer.PushCommand<FMassDeferredSetCommand>([WeakActor, Agent, ExpectedEntity, bEnabled](FMassEntityManager&)
+	const TWeakObjectPtr<UNarrativeMassParticipantReceiptComponent> Receipt = Actor.FindComponentByClass<UNarrativeMassParticipantReceiptComponent>();
+	if (Receipt.IsValid() && Receipt->GetEntity().Index != EntityIdx) { return; }
+	const uint64 ExpectedReceiptEpoch = Receipt.IsValid() ? Receipt->GetBindingEpoch() : 0;
+	const bool bPresentationOnly = Receipt.IsValid() && Receipt->GetParticipant().bPresentationOnly;
+	const bool bCollisionAndTickEnabled = bEnabled && !bPresentationOnly;
+	CommandBuffer.PushCommand<FMassDeferredSetCommand>([WeakActor, Agent, ExpectedEntity, Receipt,
+		ExpectedReceiptEpoch, bEnabled, bCollisionAndTickEnabled](FMassEntityManager& EntityManager)
 	{
-		const auto StillAssociated = [WeakActor, Agent, ExpectedEntity]()
+		const auto StillAssociated = [WeakActor, Agent, ExpectedEntity, Receipt, ExpectedReceiptEpoch, &EntityManager]()
 		{
 			AActor* CurrentActor = WeakActor.Get();
-			if (!IsValid(CurrentActor) || CurrentActor->IsActorBeingDestroyed() || Agent.IsStale()) { return false; }
+			if (!IsValid(CurrentActor) || CurrentActor->IsActorBeingDestroyed() || Agent.IsStale() || Receipt.IsStale()) { return false; }
+			auto* CurrentReceipt = CurrentActor->FindComponentByClass<UNarrativeMassParticipantReceiptComponent>();
+			if (CurrentReceipt != Receipt.Get()
+				|| (CurrentReceipt && !CurrentReceipt->MatchesReceipt(EntityManager, ExpectedReceiptEpoch))) { return false; }
 			UMassAgentComponent* CurrentAgent = CurrentActor->FindComponentByClass<UMassAgentComponent>();
 			return CurrentAgent == Agent.Get() && (!CurrentAgent || CurrentAgent->GetEntityHandle() == ExpectedEntity);
 		};
@@ -64,12 +104,13 @@ void UMassNarrativePedRepresentationActorManagement::SetActorEnabled(const EMass
 		{
 			if (!StillAssociated()) { return; }
 			if (!IsValid(ModifiedActor) || ModifiedActor->IsActorBeingDestroyed()) { continue; }
-			if (ModifiedActor->GetActorEnableCollision() != bEnabled) { ModifiedActor->SetActorEnableCollision(bEnabled); }
+			if (ModifiedActor->GetActorEnableCollision() != bCollisionAndTickEnabled) { ModifiedActor->SetActorEnableCollision(bCollisionAndTickEnabled); }
 			if (!StillAssociated()) { return; }
 			if (!IsValid(ModifiedActor) || ModifiedActor->IsActorBeingDestroyed()) { continue; }
 			if (ModifiedActor->IsHidden() == bEnabled) { ModifiedActor->SetActorHiddenInGame(!bEnabled); }
+			if (!StillAssociated()) { return; }
 			if (!IsValid(ModifiedActor) || ModifiedActor->IsActorBeingDestroyed()) { continue; }
-			if (ModifiedActor->IsActorTickEnabled() != bEnabled) { ModifiedActor->SetActorTickEnabled(bEnabled); }
+			if (ModifiedActor->IsActorTickEnabled() != bCollisionAndTickEnabled) { ModifiedActor->SetActorTickEnabled(bCollisionAndTickEnabled); }
 		}
 	});
 }

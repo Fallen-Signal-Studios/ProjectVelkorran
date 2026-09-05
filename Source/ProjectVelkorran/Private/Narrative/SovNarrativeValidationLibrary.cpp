@@ -56,6 +56,24 @@ bool USovNarrativeValidationLibrary::ValidateDialogue(UDialogue* Dialogue, USovC
         }
         if (const auto* NPC = Cast<UDialogueNode_NPC>(Node); NPC && !NPC->IsRoutingNode() && !Speakers.Contains(NPC->GetSpeakerID()))
         { OutErrors.Add(Label + TEXT(": spoken line references an absent speaker role.")); }
+        if (const auto* NPC = Cast<UDialogueNode_NPC>(Node))
+        {
+            if (!FMath::IsFinite(NPC->ReplyPressureSeconds) || NPC->ReplyPressureSeconds < 0.f || NPC->ReplyPressureSeconds > 300.f)
+            { OutErrors.Add(Label + TEXT(": response pressure must be finite and within 0..300 seconds; zero means no timer.")); }
+            if (NPC->ReplyPressureSeconds > 0.f)
+            {
+                const UDialogueNode_Player* Silence = nullptr;
+                int32 SilenceMatches = 0;
+                for (const UDialogueNode_Player* Reply : NPC->PlayerReplies)
+                {
+                    if (IsValid(Reply) && !NPC->SilenceReplyID.IsNone() && Reply->GetID() == NPC->SilenceReplyID)
+                    { Silence = Reply; ++SilenceMatches; }
+                }
+                if (SilenceMatches != 1 || !Silence || Silence->IsAutoSelect() || !Silence->Conditions.IsEmpty()
+                    || Silence->GetOptionText(Dialogue).IsEmpty())
+                { OutErrors.Add(Label + TEXT(": pressure requires exactly one direct, unconditional, non-auto-selected silence reply with readable intent text.")); }
+            }
+        }
         if (!Node->DirectedAtSpeakerID.IsNone() && !Speakers.Contains(Node->DirectedAtSpeakerID))
         { OutErrors.Add(Label + TEXT(": directed listener is not a declared participant.")); }
         bool bHasFallbackLine = false;

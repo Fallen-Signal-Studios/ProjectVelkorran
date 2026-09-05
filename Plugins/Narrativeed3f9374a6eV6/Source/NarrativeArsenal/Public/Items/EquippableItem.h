@@ -40,6 +40,7 @@ protected:
 	friend class ANarrativeCharacter;
 	friend class ANarrativeCharacterVisual;
 	friend class UUseAction_Equip;
+	friend class UNarrativeInventoryComponent;
 
 	UEquippableItem();
 
@@ -145,9 +146,15 @@ protected:
 	class UEquipmentComponent* GetEquipmentComponent() const;
 
 public:
+	FGameplayTag GetEquippedSlot() const { return CurrentSlot; }
+	uint64 GetEquipmentRevision() const { return EquipmentRevision; }
+	bool AllowsEquipmentSlot(FGameplayTag Slot) const { return Slot.IsValid() && EquippableSlots.HasTagExact(Slot); }
 
 	UFUNCTION(BlueprintPure, Category = "Item - Equippable")
 	bool IsEquipped() const; 
+
+private:
+	uint64 EquipmentRevision = 0;
 
 };
 

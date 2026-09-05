@@ -525,6 +525,25 @@ bool UTalesComponent::IsInDialogue()
 	return CurrentDialogue != nullptr;
 }
 
+bool UTalesComponent::TrySelectPresentedDialogueOption(UDialogue* ExpectedDialogue, int64 ExpectedRevision, UDialogueNode_Player* Option)
+{
+	if (bDialogueOwnerEndingPlay || !IsValid(ExpectedDialogue) || CurrentDialogue != ExpectedDialogue
+		|| !ExpectedDialogue->IsCurrentReplyPresentation(ExpectedRevision) || !ExpectedDialogue->CanSelectDialogueOption(Option))
+	{
+		return false;
+	}
+	if (HasAuthority())
+	{
+		APlayerController* PC = GetOwningController();
+		if (!PC || !IsValid(ExpectedDialogue->OwningComp)) { return false; }
+		const TWeakObjectPtr<UDialogue> SelectingDialogue = ExpectedDialogue;
+		ExpectedDialogue->OwningComp->SelectDialogueOption(Option, PC->PlayerState);
+		return !SelectingDialogue.IsValid() || !SelectingDialogue->IsCurrentReplyPresentation(ExpectedRevision);
+	}
+	TrySelectDialogueOption(Option);
+	return true; // Existing Tales RPC accepted for submission; never a local timed-pressure authority.
+}
+
 void UTalesComponent::TrySelectDialogueOption(class UDialogueNode_Player* Option)
 {
 	//Ask the server to select the option 

@@ -111,13 +111,14 @@ bool USovEncounterCoordinationComponent::ValidateComposition(FString& Error) con
 	TSet<const ASovNPCCharacterBase*> Actors;
 	for (const auto& Entry : OwnerDirector->Participants)
 	{
-		if (Entry.ParticipantId.IsNone() || Ids.Contains(Entry.ParticipantId) || !IsValid(Entry.Character) || Actors.Contains(Entry.Character)
-			|| Entry.Character->GetWorld() != GetWorld())
+		const bool bMass = OwnerDirector->IsParticipantMassRepresented(Entry.ParticipantId);
+		if (Entry.ParticipantId.IsNone() || Ids.Contains(Entry.ParticipantId)
+			|| (!bMass && (!IsValid(Entry.Character) || Actors.Contains(Entry.Character) || Entry.Character->GetWorld() != GetWorld())))
 		{ Error = TEXT("Composition requires unique registered participant identities and actors in this world."); return false; }
-		const auto* ASC = Cast<UNarrativeAbilitySystemComponent>(Entry.Character->GetAbilitySystemComponent());
+		const auto* ASC = Entry.Character ? Cast<UNarrativeAbilitySystemComponent>(Entry.Character->GetAbilitySystemComponent()) : nullptr;
 		if (ASC && ASC->GetBotAttackCoordinator() && ASC->GetBotAttackCoordinator() != this)
 		{ Error = TEXT("An NPC cannot belong to two encounter coordinators."); return false; }
-		Ids.Add(Entry.ParticipantId); Actors.Add(Entry.Character);
+		Ids.Add(Entry.ParticipantId); if (Entry.Character) { Actors.Add(Entry.Character); }
 	}
 	TSet<FName> Configured;
 	TSet<int32> Waves;
@@ -140,7 +141,8 @@ bool USovEncounterCoordinationComponent::ValidateComposition(FString& Error) con
 		{
 			const auto Entry = Member(Participant.ParticipantId);
 			if (Entry.Wave != Wave) { continue; }
-			if (Entry.Tier == ESovEncounterDecisionTier::Combatant) { ++Combatants; } else { ++Supporting; }
+			if (!OwnerDirector->IsParticipantMassRepresented(Participant.ParticipantId))
+			{ if (Entry.Tier == ESovEncounterDecisionTier::Combatant) { ++Combatants; } else { ++Supporting; } }
 			if (Participant.bRequiredForVictory) { ++Required; }
 		}
 		if (Combatants > MaximumCombatants || Supporting > MaximumSupporting || (Waves.Num() > 1 && Required == 0))
@@ -263,6 +265,7 @@ void USovEncounterCoordinationComponent::RefreshComposition()
 	const auto Participants = Director->Participants;
 	for (const auto& Participant : Participants)
 	{
+		if (Director->IsParticipantMassRepresented(Participant.ParticipantId)) { continue; }
 		auto* Character = Participant.Character.Get();
 		if (!IsValid(Character) || !Character->IsAlive()) { continue; }
 		auto* ASC = Cast<UNarrativeAbilitySystemComponent>(Character->GetAbilitySystemComponent());
@@ -290,6 +293,54 @@ void USovEncounterCoordinationComponent::RefreshComposition()
 			}
 		}
 	}
+}
+
+bool USovEncounterCoordinationComponent::CanChangeRepresentation(FName Id) const
+{
+	if (!Director.IsValid() || !Director->HasAuthority() || !bValidComposition || bRefreshing || bReserving
+		|| Director->GetEncounterState() != ESovEncounterState::Active || BoundAttempt != Director->GetAttemptId()
+		|| Staged.Contains(Id) || Member(Id).Wave != CurrentWave) { return false; }
+	const auto* Character = Director->GetParticipant(Id);
+	const auto* ASC = Character ? Character->GetNarrativeAbilitySystemComponent() : nullptr;
+	if (!ASC || !Character->IsAlive()) { return false; }
+	for (const auto& Pair : Reservations)
+	{ if (Pair.Value.ASC.Get() == ASC || Pair.Value.Target.Get() == Character) { return false; } }
+	for (const auto& Spec : ASC->GetActivatableAbilities()) { if (Spec.IsActive()) { return false; } }
+	return true;
+}
+
+bool USovEncounterCoordinationComponent::CanPromoteRepresentation(FName Id) const
+{
+	if (!Director.IsValid() || !bValidComposition || Director->GetEncounterState() != ESovEncounterState::Active
+		|| BoundAttempt != Director->GetAttemptId() || Member(Id).Wave != CurrentWave) { return false; }
+	const auto Tier = Member(Id).Tier;
+	int32 Count = 0;
+	for (const auto& Participant : Director->Participants)
+	{
+		if (Participant.ParticipantId != Id && !Director->IsParticipantMassRepresented(Participant.ParticipantId)
+			&& IsValid(Participant.Character) && Participant.Character->IsAlive()
+			&& Member(Participant.ParticipantId).Wave <= CurrentWave && Member(Participant.ParticipantId).Tier == Tier) { ++Count; }
+	}
+	return Count < (Tier == ESovEncounterDecisionTier::Combatant ? MaximumCombatants : MaximumSupporting);
+}
+
+void USovEncounterCoordinationComponent::ReleaseRepresentationActor(FName Id, ASovNPCCharacterBase* Character)
+{
+	if (!IsValid(Character)) { return; }
+	auto* ASC = Character->GetNarrativeAbilitySystemComponent();
+	if (ASC && ASC->GetBotAttackCoordinator() == this) { ASC->SetBotAttackCoordinator(nullptr); }
+	BoundASCs.Remove(ASC); Warnings.Remove(Id); NextAttackAt.Remove(Id);
+	// Stage transitions are rejected before conversion. Never release another future-wave owner's contribution.
+	for (auto It = PriorDecisionIntervals.CreateIterator(); It; ++It)
+	{
+		if (!It.Key().IsValid() || It.Key()->GetOwner() == Character || It.Key()->GetOwner() == Character->GetController()) { It.RemoveCurrent(); }
+	}
+}
+
+void USovEncounterCoordinationComponent::RefreshRepresentationBindings()
+{
+	FString Error; bValidComposition = ValidateComposition(Error);
+	if (bValidComposition) { RefreshComposition(); }
 }
 
 bool USovEncounterCoordinationComponent::SetDecisionTier(FName ParticipantId, ESovEncounterDecisionTier Tier)
@@ -329,6 +380,7 @@ bool USovEncounterCoordinationComponent::IsBoundSource(UNarrativeAbilitySystemCo
 		|| Director->GetEncounterState() != ESovEncounterState::Active || Director->GetAttemptId() != BoundAttempt
 		|| !IsValid(Source) || Source->GetBotAttackCoordinator() != this || !BoundASCs.Contains(Source)) { return false; }
 	OutId = Director->FindParticipantId(Source->GetAvatarActor());
+	if (Director->IsParticipantMassRepresented(OutId)) { return false; }
 	const auto* Character = Director->GetParticipant(OutId);
 	return IsValid(Character) && !Character->IsActorBeingDestroyed() && Character->IsAlive() && !Source->IsDead()
 		&& Source->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()) > 0.f && Character->GetAbilitySystemComponent() == Source
@@ -481,6 +533,12 @@ void USovEncounterCoordinationComponent::TickComponent(float Delta, ELevelTick T
 	int32 NextCombatants = 0, NextSupporting = 0;
 	for (const auto& Participant : Director->Participants)
 	{
+		if (Director->IsParticipantMassRepresented(Participant.ParticipantId))
+		{
+			// Representation loss is never a confirmed defeat. Required C/D ownership holds the wave gate.
+			if (Member(Participant.ParticipantId).Wave == CurrentWave && Participant.bRequiredForVictory) { bRequiredAlive = true; }
+			continue;
+		}
 		if (!IsValid(Participant.Character) || !Participant.Character->IsAlive()) { continue; }
 		const auto Entry = Member(Participant.ParticipantId);
 		if (Entry.Wave == CurrentWave && Participant.bRequiredForVictory) { bRequiredAlive = true; }

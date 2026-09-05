@@ -217,6 +217,8 @@ protected:
 	//Spawn a weapon visual, attach to us 
 	UFUNCTION(BlueprintCallable, Category = "Character Visual")
 	bool AddWeaponVisual(class UWeaponItem* WeaponItem);
+	/** Complete only an already-loaded, currently equipped native item. Does not synchronously load assets. */
+	bool CompletePreloadedWeaponVisual(class UWeaponItem* WeaponItem);
 
 	UFUNCTION(BlueprintCallable, Category = "Character Visual")
 	void AttachWeaponVisual(class UWeaponItem* WeaponItem, const FGameplayTag& EquipSlot, const FGameplayTag& WieldSlot);

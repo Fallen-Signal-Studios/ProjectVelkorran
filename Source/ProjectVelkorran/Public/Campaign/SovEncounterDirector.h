@@ -8,6 +8,9 @@
 #include "Components/SovWeakPointComponent.h"
 #include "UnrealFramework/NarrativeNPCCharacter.h"
 #include "NarrativeSavableActor.h"
+#include "Campaign/SovCampaignMassTypes.h"
+#include "AI/Mass/Peds/NarrativeMassParticipantBridge.h"
+#include "MassEntityConfigAsset.h"
 #include "SovEncounterDirector.generated.h"
 
 class ASovNPCCharacterBase;
@@ -23,6 +26,8 @@ struct PROJECTVELKORRAN_API FSovEncounterParticipant
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) FName ParticipantId;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) TObjectPtr<ASovNPCCharacterBase> Character = nullptr;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bRequiredForVictory = true;
+	/** Explicit campaign eligibility, never inferred from a pedestrian definition. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bAllowMassRepresentation = false;
 };
 
 USTRUCT()
@@ -41,6 +46,7 @@ struct FSovEncounterNPCRecord
 	GENERATED_BODY()
 	UPROPERTY(SaveGame) FName ParticipantId;
 	UPROPERTY(SaveGame) bool bRequiredForVictory = true;
+	UPROPERTY(SaveGame) bool bAllowMassRepresentation = false;
 	UPROPERTY(SaveGame) FNarrativeActorRecord ActorRecord;
 	UPROPERTY(SaveGame) TSoftObjectPtr<UNPCDefinition> Definition;
 	UPROPERTY(SaveGame) FNPCSpawnInfo SpawnInfo;
@@ -55,6 +61,18 @@ struct FSovEncounterNPCRecord
 	UPROPERTY(SaveGame) TArray<FSovEncounterLinkRecord> Links;
 };
 
+USTRUCT()
+struct FSovEncounterMassRecord
+{
+	GENERATED_BODY()
+	UPROPERTY(SaveGame) FSovEncounterNPCRecord NPC;
+	UPROPERTY(SaveGame) FSovCampaignMassState Transfer;
+	UPROPERTY(SaveGame) ESovCampaignRepresentationTier Tier = ESovCampaignRepresentationTier::Mass;
+	UPROPERTY(SaveGame) TArray<FVector> Route;
+	UPROPERTY(SaveGame) int32 NextRoutePoint = 0;
+	UPROPERTY(SaveGame) float RouteSpeed = 0.f;
+};
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FSovEncounterStateChanged, ESovEncounterState, Previous, ESovEncounterState, Current);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FSovEncounterRestoreFailed, const FString&, Reason);
 
@@ -64,7 +82,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FSovEncounterRestoreFailed, const FS
  * and requires RetryEncounter; it never claims arbitrary midfight physics rollback.
  */
 UCLASS(Blueprintable)
-class PROJECTVELKORRAN_API ASovEncounterDirector : public AActor, public INarrativeSavableActor
+class PROJECTVELKORRAN_API ASovEncounterDirector : public AActor, public INarrativeSavableActor, public INarrativeMassParticipantOwner
 {
 	GENERATED_BODY()
 public:
@@ -88,6 +106,15 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Encounter") ASovNPCCharacterBase* GetParticipant(FName ParticipantId) const;
 	UFUNCTION(BlueprintPure, Category = "Encounter") FName FindParticipantId(const AActor* Actor) const;
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Encounter") bool RegisterParticipant(FName ParticipantId, ASovNPCCharacterBase* Character, bool bRequiredForVictory = true);
+	/** Only explicit director-owned boundaries admit conversion; ordinary distance LOD cannot convert combatants. */
+	UPROPERTY(EditAnywhere, Category="Encounter|Mass") TSet<FName> RepresentationBoundaries = { TEXT("Encounter.ControlledBoundary") };
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Encounter|Mass") bool SetParticipantRepresentation(FName ParticipantId, ESovCampaignRepresentationTier Tier, FName Boundary, FString& Error);
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Encounter|Mass") bool SetParticipantMassRoute(FName ParticipantId, const TArray<FVector>& Points, float Speed, FString& Error);
+	UFUNCTION(BlueprintPure, Category="Encounter|Mass") bool IsParticipantMassRepresented(FName ParticipantId) const;
+	UFUNCTION(BlueprintPure, Category="Encounter|Mass") bool IsMassPromotionPending() const { return !MassPromotions.IsEmpty(); }
+	virtual bool AcceptMassRepresentation(FMassEntityManager& Manager, FMassEntityHandle Entity, AActor& Actor, const FNarrativeMassParticipantFragment& Identity) override;
+	virtual bool IsMassRepresentationCurrent(FMassEntityManager& Manager, FMassEntityHandle Entity, const AActor& Actor, const FNarrativeMassParticipantFragment& Identity) const override;
+	virtual void ReleaseMassRepresentation(FMassEntityManager& Manager, FMassEntityHandle Entity, AActor& Actor, const FNarrativeMassParticipantFragment& Identity) override;
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Encounter") bool CaptureEntryCheckpoint(ASovPlayerCharacterBase* Player, FString& Error);
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Encounter") bool BeginEncounter();
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Encounter") bool CompleteEncounter();
@@ -128,6 +155,7 @@ protected:
 	UPROPERTY(SaveGame) TArray<FGuid> AttemptActorGuids;
 
 private:
+	friend struct FSovCampaignMassTestAccess;
 	friend struct FSovEncounterCallbackTestAccess;
 	friend struct FSovCoordinationTestAccess;
 	UPROPERTY(VisibleAnywhere, Category="Encounter") TObjectPtr<class USovEncounterCoordinationComponent> Coordination;
@@ -144,6 +172,7 @@ private:
 	void SuspendActor(AActor* Actor);
 	void ReleaseSuspensions();
 	bool ReleaseSuspensions(TFunctionRef<bool()> CanContinue);
+	bool ReleaseActorSuspension(AActor* Actor, TFunctionRef<bool()> CanContinue);
 	void RemoveTimedEffects(UAbilitySystemComponent* ASC);
 	bool RemoveTimedEffects(UAbilitySystemComponent* ASC, TFunctionRef<bool()> CanContinue);
 	UFUNCTION() void HandleDeath(AActor* KilledActor, UNarrativeAbilitySystemComponent* ASC, bool bIsDead);
@@ -168,4 +197,21 @@ private:
 	float RestoreStartedAt = 0.f;
 	bool bMutationInProgress = false;
 	bool bInvalidEncounterIdentity = false;
+	/** Current C/D state shares this director's checkpoint record/serialization authority. Never saved on a proxy. */
+	UPROPERTY(SaveGame) TArray<FSovEncounterMassRecord> MassParticipants;
+	UPROPERTY(Transient) FMassEntityConfig MassConfig;
+	UPROPERTY(Transient) TMap<FName, TObjectPtr<ASovNPCCharacterBase>> MassPromotions;
+	TMap<FName, FMassEntityHandle> MassEntities;
+	TMap<FName, TWeakObjectPtr<AActor>> MassProxies;
+	TMap<FName, uint64> MassEpochs;
+	TMap<FName, double> MassPromotionStarts;
+	uint64 NextMassEpoch = 0;
+	bool CreateMassEntity(FSovEncounterMassRecord& Record, FString& Error);
+	void DestroyMassEntity(FName Id);
+	void ClearMassRepresentations(bool bDiscardRecords);
+	void CaptureMassTransforms();
+	void RefreshMassProcessingState();
+	void TickMassPromotions();
+	bool CaptureMassTransfer(ASovNPCCharacterBase* NPC, FSovCampaignMassState& Transfer, FString& Error) const;
+	bool RestoreMassTransfer(ASovNPCCharacterBase* NPC, const FSovEncounterMassRecord& Record, FString& Error);
 };

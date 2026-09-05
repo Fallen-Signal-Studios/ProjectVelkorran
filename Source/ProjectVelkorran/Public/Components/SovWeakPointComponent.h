@@ -245,6 +245,8 @@ public:
 	/** Returns the unbroken zone IDs visible during the current reveal. */
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Weak Point|Reveal")
 	TArray<FName> GetRevealedWeakPointIds() const;
+	/** Exact visible-zone bone/socket anchors for the native material-free accessibility overlay. */
+	TArray<FVector> GetRevealedWeakPointAnchors() const;
 
 	/** Rebuilds local decals after an appearance or material change. */
 	UFUNCTION(BlueprintCallable, Category = "Sovereign|Weak Point|Reveal")

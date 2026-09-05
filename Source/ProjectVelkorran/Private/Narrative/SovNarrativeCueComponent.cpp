@@ -17,6 +17,8 @@
 #include "NarrativeGameplayTags.h"
 #include "NarrativeSavableActor.h"
 #include "Sound/SoundBase.h"
+#include "Sound/SoundClass.h"
+#include "Settings/SovGameUserSettings.h"
 #include "Subsystems/NarrativeSaveSubsystem.h"
 #include "Tales/TalesComponent.h"
 
@@ -98,6 +100,7 @@ void USovNarrativeCueComponent::StopBark(bool bInterrupted, bool bPreserveCritic
 	USovNarrativeCue* Finished = CurrentBark; CurrentBark = nullptr; const uint64 ExpectedEpoch=++Epoch;
 	const FSovQueuedCue InterruptedRequest = CurrentRequest;
 	UAudioComponent* Audio = BarkAudio; BarkAudio = nullptr;
+	bBarkUsesControllerOutput = false;
 	if (IsValid(Audio)) { Audio->Stop(); Audio->DestroyComponent(); }
 	if (Epoch!=ExpectedEpoch || bOwnerEndingPlay) { return; }
 	if (Finished)
@@ -112,6 +115,15 @@ void USovNarrativeCueComponent::StopBark(bool bInterrupted, bool bPreserveCritic
 		else if (!bInterrupted) { UnheardRecords.Remove(Finished); }
 		OnCueEnded.Broadcast(Finished, bInterrupted);
 	}
+}
+bool USovNarrativeCueComponent::ConfigureControllerOutput(UAudioComponent* Audio, USoundClass* Class, float Volume)
+{
+	if (!IsValid(Audio) || !IsValid(Class) || !FMath::IsFinite(Volume) || Volume < 0.f || Volume > 1.f
+		|| Class->Properties.OutputTarget != EAudioOutputTarget::ControllerFallbackToSpeaker) { return false; }
+	// Never mutate a shared sound/class asset or guess a proprietary device ID. The engine owns fallback routing.
+	Audio->SoundClassOverride = Class;
+	Audio->SetVolumeMultiplier(Volume);
+	return true;
 }
 bool USovNarrativeCueComponent::StartRequest(FSovQueuedCue Request)
 {
@@ -140,6 +152,8 @@ bool USovNarrativeCueComponent::StartRequest(FSovQueuedCue Request)
 		const int32 Count = FMath::Max(0, RepetitionCounts.FindRef(Cue->CueId));
 		const auto& Variant = Cue->BarkVariants[Count % Cue->BarkVariants.Num()];
 		USoundBase* Sound = Variant.Sound.IsNull() ? nullptr : Variant.Sound.LoadSynchronous();
+		USoundClass* ControllerClass = Cue->ControllerAudioClass.IsNull() ? nullptr : Cue->ControllerAudioClass.LoadSynchronous();
+		if (bOwnerEndingPlay || ExpectedEpoch != Epoch || !IsValid(Speaker) || !MatchesContext(Cue)) { return false; }
 		if (!Variant.Sound.IsNull() && !Sound)
 		{ UE_LOG(LogTemp, Warning, TEXT("Narrative cue %s could not load voice audio; presenting its authored caption."), *Cue->CueId.ToString()); }
 		CurrentBark = Cue;
@@ -147,8 +161,25 @@ bool USovNarrativeCueComponent::StartRequest(FSovQueuedCue Request)
 		if (Sound)
 		{
 			// Looping speech cannot monopolize the queue. Content duration is bounded to the caption contract.
-			BarkAudio = UGameplayStatics::SpawnSoundAtLocation(this, Sound, Speaker->GetActorLocation(), FRotator::ZeroRotator,
-				1.f, 1.f, 0.f, nullptr, nullptr, false);
+			if (IsValid(ControllerClass) && ControllerClass->Properties.OutputTarget == EAudioOutputTarget::ControllerFallbackToSpeaker)
+			{
+				const auto* Settings = USovGameUserSettings::Get();
+				BarkAudio = NewObject<UAudioComponent>(GetOwner());
+				BarkAudio->bAutoActivate = false; BarkAudio->bAutoDestroy = false; BarkAudio->bStopWhenOwnerDestroyed = true;
+				bBarkUsesControllerOutput = ConfigureControllerOutput(BarkAudio, ControllerClass,
+					Settings ? Settings->GetSettingsSnapshot().ControllerAudioVolume : 1.f);
+				BarkAudio->SetSound(Sound); BarkAudio->SetWorldLocation(Speaker->GetActorLocation());
+				BarkAudio->RegisterComponent();
+				if (ExpectedEpoch != Epoch || bOwnerEndingPlay || !IsValid(BarkAudio)) { return false; }
+				BarkAudio->Play();
+			}
+			else
+			{
+				bBarkUsesControllerOutput = false;
+				BarkAudio = UGameplayStatics::SpawnSoundAtLocation(this, Sound, Speaker->GetActorLocation(), FRotator::ZeroRotator,
+					1.f, 1.f, 0.f, nullptr, nullptr, false);
+			}
+			if (ExpectedEpoch != Epoch || bOwnerEndingPlay) { return false; }
 			// Missing audio devices still deliver the authored direction through the caption contract.
 			if (FMath::IsFinite(Sound->GetDuration()) && Sound->GetDuration() > 0.f && Sound->GetDuration() <= 30.f)
 			{ Duration = FMath::Max(Duration, Sound->GetDuration()); }
@@ -167,6 +198,11 @@ void USovNarrativeCueComponent::TickComponent(float Delta, ELevelTick Type, FAct
 	Super::TickComponent(Delta, Type, TickFunction);
 	if (bMutation || !ResolveOwner() || !GetWorld() || GetWorld()->IsPaused() || !FMath::IsFinite(Delta) || Delta <= 0.f) { return; }
 	TGuardValue<bool> Mutation(bMutation, true);
+	if (bBarkUsesControllerOutput && IsValid(BarkAudio))
+	{
+		if (const auto* Settings = USovGameUserSettings::Get())
+		{ BarkAudio->SetVolumeMultiplier(Settings->GetSettingsSnapshot().ControllerAudioVolume); }
+	}
 	const bool Combat = IsCombatRequired();
 	if (CurrentBark && !ResolveSpeaker(CurrentRequest)) { StopBark(true); }
 	if (!ResolveOwner()) { return; }

@@ -5,7 +5,14 @@
 #include "CoreMinimal.h"
 #include "GameFramework/GameUserSettings.h"
 #include "GameplayTagContainer.h"
+#include "AudioDeviceHandle.h"
 #include "NarrativeGameUserSettings.generated.h"
+class UArsenalSettings;
+class USoundClass;
+class USoundMix;
+
+UENUM(BlueprintType)
+enum class ENarrativeAudioDynamicRange : uint8 { Full, Reduced, Night };
 
 UENUM(BlueprintType)
 enum class ENarrativeGameplayDifficulty : uint8
@@ -64,6 +71,8 @@ public:
 
 	virtual void ApplySettings(bool bCheckForCommandLineOverrides) override;
 	virtual void ApplyNonResolutionSettings() override; 
+	virtual void LoadSettings(bool bForceReload = false) override;
+	virtual void BeginDestroy() override;
 
 	virtual void ApplySoundSettings();
 	virtual void ApplyMonitorSelection();
@@ -97,6 +106,15 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = Settings)
 	float GetMusicAudioVolume() const;
+
+	UFUNCTION(BlueprintCallable, Category = Settings) void SetAmbienceAudioVolume(float Value);
+	UFUNCTION(BlueprintPure, Category = Settings) float GetAmbienceAudioVolume() const { return AmbienceAudioVolume; }
+	UFUNCTION(BlueprintCallable, Category = Settings) void SetTinnitusAudioVolume(float Value);
+	UFUNCTION(BlueprintPure, Category = Settings) float GetTinnitusAudioVolume() const { return TinnitusAudioVolume; }
+	UFUNCTION(BlueprintCallable, Category = Settings) void SetAudioDynamicRange(ENarrativeAudioDynamicRange Value);
+	UFUNCTION(BlueprintPure, Category = Settings) ENarrativeAudioDynamicRange GetAudioDynamicRange() const { return AudioDynamicRange; }
+	UFUNCTION(BlueprintPure, Category = Settings) bool IsAudioDynamicRangeAvailable(ENarrativeAudioDynamicRange Value) const;
+	UFUNCTION(BlueprintPure, Category = Settings) ENarrativeAudioDynamicRange GetAppliedAudioDynamicRange() const { return AppliedAudioDynamicRange; }
 
 	//Set whether or not crouching is a toggle or whether crouch key requires held. 
 	UFUNCTION(BlueprintCallable, Category = Settings)
@@ -171,6 +189,14 @@ public:
 	void SetOnlineUsername(const FString Username);
 	
 protected:
+	/** Device seams exercise the real settings/config-to-bus path without changing automation hardware. */
+	virtual bool HasAudioOutput() const;
+	virtual const UArsenalSettings* ReadAudioConfiguration() const;
+	virtual USoundMix* ReadAudioBaseMix() const;
+	virtual void SubmitSoundClassVolume(USoundMix* Mix, USoundClass* Class, float Volume);
+	virtual void SubmitDynamicRangeMix(USoundMix* Mix);
+	void NormalizeAudioSettings();
+	void ReleaseDynamicRangeMix();
 
 	UPROPERTY(config)
 	float OverallAudioVolume;
@@ -186,6 +212,12 @@ protected:
 
 	UPROPERTY(config)
 	float MusicAudioVolume;
+	UPROPERTY(config) float AmbienceAudioVolume = 1.f;
+	UPROPERTY(config) float TinnitusAudioVolume = 1.f;
+	UPROPERTY(config) ENarrativeAudioDynamicRange AudioDynamicRange = ENarrativeAudioDynamicRange::Full;
+	UPROPERTY(Transient) ENarrativeAudioDynamicRange AppliedAudioDynamicRange = ENarrativeAudioDynamicRange::Full;
+	UPROPERTY(Transient) TObjectPtr<USoundMix> ActiveDynamicRangeMix;
+	FAudioDeviceHandle DynamicRangeAudioDevice;
 
 	///**If true, bloom will be allowed in the camera views rendering settings.  */
 	UPROPERTY(config)

@@ -2,6 +2,9 @@
 #include "Framework/SovPlayerController.h"
 #include "Narrative/SovNarrativeCueComponent.h"
 #include "Feedback/SovHapticFeedbackComponent.h"
+#include "UI/SovFrontendComponent.h"
+#include "UI/SovNativeGameplayHUD.h"
+#include "UI/Dialogue/SovDialoguePresentationComponent.h"
 
 #include "AI/NarrativeCharacterSubsystem.h"
 #include "Campaign/SovCampaignDefinition.h"
@@ -39,6 +42,21 @@ ASovPlayerController::ASovPlayerController(const FObjectInitializer& ObjectIniti
 	NarrativeCues = CreateDefaultSubobject<USovNarrativeCueComponent>(TEXT("SovNarrativeCues"));
 	ConvergenceCompanionState = CreateDefaultSubobject<USovConvergenceCompanionState>(TEXT("SovConvergenceCompanionState"));
 	HapticFeedback = CreateDefaultSubobject<USovHapticFeedbackComponent>(TEXT("HapticFeedback"));
+	Frontend = CreateDefaultSubobject<USovFrontendComponent>(TEXT("NativeFrontend"));
+	DialoguePresentation = CreateDefaultSubobject<USovDialoguePresentationComponent>(TEXT("DialoguePresentation"));
+	GameplayHUDClass = USovNativeGameplayHUD::StaticClass();
+}
+
+void ASovPlayerController::BeginPlay()
+{
+	Super::BeginPlay();
+	EnsureGameplayHUDCreated();
+	if (Frontend) { Frontend->RefreshFrontend(); }
+}
+bool ASovPlayerController::OpenAccessibilitySettings()
+{
+	EnsureGameplayHUDCreated();
+	return Frontend && Frontend->OpenAccessibilitySettings();
 }
 
 FGuid ASovPlayerController::GetActorGUID_Implementation() const

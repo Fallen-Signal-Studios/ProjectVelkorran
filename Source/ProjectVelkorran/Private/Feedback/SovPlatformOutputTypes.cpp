@@ -1,5 +1,17 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Feedback/SovPlatformOutputTypes.h"
+#include "Settings/SovDisplayPolicy.h"
+
+bool FSovHDRCalibration::IsValid() const
+{
+	return SovDisplayPolicy::ValidCalibration(BlackFloorNits, PaperWhiteNits, UIWhiteNits);
+}
+bool FSovHDRCalibration::Equals(const FSovHDRCalibration& Other) const
+{
+	return FMath::IsNearlyEqual(BlackFloorNits, Other.BlackFloorNits, 1.e-7f)
+		&& FMath::IsNearlyEqual(PaperWhiteNits, Other.PaperWhiteNits, .01f)
+		&& FMath::IsNearlyEqual(UIWhiteNits, Other.UIWhiteNits, .01f);
+}
 #include "Feedback/SovHapticPolicy.h"
 float FSovHapticSettings::Scale(ESovHapticChannel Channel) const
 {

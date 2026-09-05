@@ -597,6 +597,8 @@ public:
 	though the server validates replies before it sends them to you, so this should never fail */
 	UFUNCTION(BlueprintCallable, Category = "Dialogues")
 	virtual void TrySelectDialogueOption(class UDialogueNode_Player* Option);
+	/** UI/timeout clients must bind both the live instance and its presentation revision. */
+	bool TrySelectPresentedDialogueOption(UDialogue* ExpectedDialogue, int64 ExpectedRevision, UDialogueNode_Player* Option);
 
 	/**[server] Selects a dialogue option. Will update the dialogue and automatically start playing the next bit of dialogue*/
 	virtual void SelectDialogueOption(class UDialogueNode_Player* Option, class APlayerState* Selector = nullptr);

@@ -156,6 +156,7 @@ void UEquipmentComponent::EquipItem(class UEquippableItem* Equippable, const FGa
 {
 	if (Equippable && Slot.IsValid())
 	{	
+		++EquipmentSlotRevisions.FindOrAdd(Slot);
 		//Remove the old item from our equipped items if one is already equipped
 		if (EquippedItems.Contains(Slot))
 		{
@@ -198,6 +199,7 @@ void UEquipmentComponent::EquipItem(class UEquippableItem* Equippable, const FGa
 
 void UEquipmentComponent::UnequipItem(const FGameplayTag& Slot)
 {
+	if (Slot.IsValid()) { ++EquipmentSlotRevisions.FindOrAdd(Slot); }
 	if (UEquippableItem* Equippable = GetEquippedItemAtSlot(Slot))
 	{
 		ANarrativeCharacter* NChar = Cast<ANarrativeCharacter>(GetOwner());

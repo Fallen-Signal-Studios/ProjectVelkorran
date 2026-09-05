@@ -59,6 +59,8 @@ namespace
 			if (EvidenceIds.Contains(Evidence->EvidenceId) && EvidenceIds.FindChecked(Evidence->EvidenceId) != Evidence) { Fail(TEXT("Duplicate evidence ID in the dependency closure.")); }
 			else { EvidenceIds.Add(Evidence->EvidenceId, Evidence); }
 			CheckText(Evidence->Summary, TEXT("Evidence summary")); CheckText(Evidence->FullText, TEXT("Evidence full text"));
+			if (!Evidence->ObservedFacts.IsEmpty()) { CheckText(Evidence->ObservedFacts,TEXT("Evidence observed facts")); }
+			if (!Evidence->Interpretation.IsEmpty()) { CheckText(Evidence->Interpretation,TEXT("Evidence interpretation")); }
 			for (FName Mission : Evidence->RelevantMissions) { if (!Missions.Contains(Mission)) { Fail(TEXT("Evidence relevant mission is absent from the manifest.")); } }
 		}
 		else if (auto* Melee = Cast<USovMeleeAttackDefinition>(Asset)) { if (!Melee->Validate(Error)) { Fail(Error); } }

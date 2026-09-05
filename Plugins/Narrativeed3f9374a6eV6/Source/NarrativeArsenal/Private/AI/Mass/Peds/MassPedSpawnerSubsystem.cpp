@@ -8,6 +8,8 @@
 #include "Engine/World.h"
 #include "AI/NarrativeCharacterSubsystem.h"
 #include "AI/Mass/Peds/NarrativePedFragments.h"
+#include "AI/Mass/Peds/NarrativeMassParticipantBridge.h"
+#include "StructUtils/StructView.h"
 
 ESpawnRequestStatus UMassPedSpawnerSubsystem::SpawnActor(FConstStructView SpawnRequestView,
                                                          TObjectPtr<AActor>& OutSpawnedActor, FActorSpawnParameters& InOutSpawnParameters) const
@@ -16,6 +18,29 @@ ESpawnRequestStatus UMassPedSpawnerSubsystem::SpawnActor(FConstStructView SpawnR
 	check(World);
 
 	const FMassActorSpawnRequest& SpawnRequest = SpawnRequestView.Get<const FMassActorSpawnRequest>();
+	FMassEntityManager* EntityManager = UE::Mass::Utils::GetEntityManager(World);
+	if (!EntityManager || !EntityManager->IsEntityValid(SpawnRequest.MassAgent))
+	{
+		return ESpawnRequestStatus::Failed;
+	}
+	if (const auto* Participant = EntityManager->GetFragmentDataPtr<FNarrativeMassParticipantFragment>(SpawnRequest.MassAgent))
+	{
+		UObject* Owner = Participant->Owner.Get();
+		const AActor* OwnerActor = Cast<AActor>(Owner);
+		if (!Participant->HasValidIdentity() || !Owner || Owner->GetWorld() != World
+			|| (OwnerActor && OwnerActor->IsActorBeingDestroyed())
+			|| !Cast<INarrativeMassParticipantOwner>(Owner))
+		{
+			return ESpawnRequestStatus::Failed;
+		}
+		// Project-owned actors use the configured plain actor template. Never resolve a
+		// GUID-name alias or call SpawnNPC for a participant representation.
+		InOutSpawnParameters.Name = NAME_None;
+		InOutSpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		FMassActorSpawnRequest ParticipantRequest = SpawnRequest;
+		ParticipantRequest.Guid.Invalidate(); // The fragment owns stable identity, never the actor name.
+		return Super::SpawnActor(FConstStructView::Make(ParticipantRequest), OutSpawnedActor, InOutSpawnParameters);
+	}
 
 	if (SpawnRequest.Guid.IsValid())
 	{
@@ -37,7 +62,6 @@ ESpawnRequestStatus UMassPedSpawnerSubsystem::SpawnActor(FConstStructView SpawnR
 	UNarrativeCharacterSubsystem* CharacterSubsystem = World->GetSubsystem<UNarrativeCharacterSubsystem>();
 	check(CharacterSubsystem)
 	
-	FMassEntityManager* EntityManager = UE::Mass::Utils::GetEntityManager(World);
 	auto& PedFragment = EntityManager->GetFragmentDataChecked<FNarrativePedFragment>(SpawnRequest.MassAgent);
 	auto& PedProperties = EntityManager->GetConstSharedFragmentDataChecked<FNarrativePedProperties>(SpawnRequest.MassAgent);
 	

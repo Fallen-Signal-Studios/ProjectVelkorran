@@ -99,6 +99,18 @@ public:
 	UPROPERTY(EditAnywhere, config, BlueprintReadOnly, Category = "Narrative Pro|Sounds", meta = (AllowedClasses = "/Script/Engine.SoundClass"))
 	FSoftObjectPath MusicSoundClass;
 
+	/** Independent ambience bus; author as a sibling of SFX/dialogue/music beneath Master. */
+	UPROPERTY(EditAnywhere, config, BlueprintReadOnly, Category = "Narrative Pro|Sounds", meta = (AllowedClasses = "/Script/Engine.SoundClass"))
+	FSoftObjectPath AmbienceSoundClass;
+	/** Route tinnitus-like comfort-sensitive tones here, never ordinary gameplay-critical cues alone. */
+	UPROPERTY(EditAnywhere, config, BlueprintReadOnly, Category = "Narrative Pro|Sounds", meta = (AllowedClasses = "/Script/Engine.SoundClass"))
+	FSoftObjectPath TinnitusSoundClass;
+	/** Optional authored persistent SoundMix modifiers. Empty/unavailable assets use the ordinary full mix. */
+	UPROPERTY(EditAnywhere, config, BlueprintReadOnly, Category = "Narrative Pro|Sounds", meta = (AllowedClasses = "/Script/Engine.SoundMix"))
+	FSoftObjectPath ReducedDynamicRangeSoundMix;
+	UPROPERTY(EditAnywhere, config, BlueprintReadOnly, Category = "Narrative Pro|Sounds", meta = (AllowedClasses = "/Script/Engine.SoundMix"))
+	FSoftObjectPath NightDynamicRangeSoundMix;
+
 	UPROPERTY(EditDefaultsOnly, config, BlueprintReadOnly, Category = "Narrative Pro|Sounds")
 	TSoftObjectPtr<USoundBase> MasterMetaSound;
 

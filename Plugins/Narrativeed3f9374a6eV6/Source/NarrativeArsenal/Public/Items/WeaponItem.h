@@ -118,6 +118,7 @@ class NARRATIVEARSENAL_API UWeaponItem : public UEquippableItem
 	GENERATED_BODY()
 
 public:
+	TSoftClassPtr<class AWeaponVisual> GetWeaponVisualClass() const { return WeaponVisualClass; }
 
 	friend class UEquipmentComponent;
 	friend class UNarrativeCombatAbility;

@@ -688,6 +688,29 @@ void ASovTransformingWeaponVisual::HandlePhaseTimerExpired()
 	}
 }
 
+bool ASovTransformingWeaponVisual::CompleteCinematicHandoff(FGameplayTag ExpectedWieldSlot)
+{
+	const int32 Serial = TransitionState.TransitionSerial;
+	const uint32 Generation = AttachmentRequestGeneration;
+	const auto Current = [&]()
+	{
+		return HasAuthority() && !IsActorBeingDestroyed() && !IsOwnerDead() && !bPhysicalAttachmentCommitInProgress
+			&& TransitionState.TransitionSerial == Serial && AttachmentRequestGeneration == Generation
+			&& (!bEnableStagedTransitions || LatestRequestedWieldSlot == ExpectedWieldSlot);
+	};
+	if (!Current()) { return false; }
+	// Drawing -> Deploying -> Ready or Retracting -> Stowing -> Holstered.
+	// These are the same finite native handoff functions used by montage notifies/timer watchdogs.
+	for (int32 Step = 0; Step < 3 && IsTransitionPhase(); ++Step)
+	{
+		if (!Current() || TransitionState.TargetWieldSlot != ExpectedWieldSlot) { return false; }
+		HandlePhaseTimerExpired();
+	}
+	return Current() && !IsTransitionPhase() && HasCommittedAttachment(AttachState.EquippedSlot, ExpectedWieldSlot)
+		&& (!bEnableStagedTransitions || TransitionState.Phase == (ExpectedWieldSlot.IsValid()
+			? ESovWeaponTransitionPhase::Ready : ESovWeaponTransitionPhase::Holstered));
+}
+
 void ASovTransformingWeaponVisual::ForceCompleteTransition()
 {
 	if (!HasAuthority())

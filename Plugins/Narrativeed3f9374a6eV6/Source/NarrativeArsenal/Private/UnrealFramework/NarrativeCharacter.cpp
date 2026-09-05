@@ -1070,6 +1070,7 @@ void ANarrativeCharacter::SetRandomSeed(const int32 NewSeed)
 
 void ANarrativeCharacter::SetWieldState(const FWeaponWieldState& NewWieldState)
 {
+	++WeaponWieldRevision;
 	//TODO validate weaponstoequip can actually be equipped together? 
 	FWeaponWieldState OldWieldState = WieldState;
 	WieldState = NewWieldState;
