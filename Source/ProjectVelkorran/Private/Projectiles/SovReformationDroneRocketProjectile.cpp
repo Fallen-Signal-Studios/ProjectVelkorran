@@ -1,6 +1,7 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 
 #include "Projectiles/SovReformationDroneRocketProjectile.h"
+#include "Combat/SovThreatTargeting.h"
 #include "Projectiles/SovProjectileDefensePolicy.h"
 
 #include "AbilitySystemBlueprintLibrary.h"
@@ -102,7 +103,8 @@ namespace
 ASovReformationDroneRocketProjectile::
 	ASovReformationDroneRocketProjectile()
 {
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bStartWithTickEnabled = false;
 	bReplicates = true;
 	SetReplicateMovement(true);
 	SetNetUpdateFrequency(30.0f);
@@ -412,11 +414,12 @@ void ASovReformationDroneRocketProjectile::HandleProjectileHit(
 	ResolveImpact(Hit);
 }
 
-void ASovReformationDroneRocketProjectile::OnRep_FlightState()
+void ASovReformationDroneRocketProjectile::OnRep_FlightState(const FSovReformationDroneRocketFlightState& PreviousState)
 {
 	if (HasActorBegunPlay() && !Resolution.bResolved)
 	{
-		StartProjectileMovement();
+		if (FVector(PreviousState.InitialVelocity) != FVector(FlightState.InitialVelocity)) { StartProjectileMovement(); }
+		else { ConfigureHoming(); } // Tracking retirement must not reset an in-flight proxy to muzzle velocity.
 	}
 }
 
@@ -462,6 +465,13 @@ void ASovReformationDroneRocketProjectile::ConfigureHoming()
 	}
 
 	AActor* HomingTarget = FlightState.HomingTarget.Get();
+	if (HasAuthority() && HomingTarget && !SovThreatTargeting::CanTrack(SourceAvatar.Get(), HomingTarget))
+	{
+		FlightState.HomingTarget = nullptr;
+		FlightState.HomingAccelerationMagnitude = 0.f;
+		HomingTarget = nullptr;
+		ForceNetUpdate();
+	}
 	USceneComponent* TargetComponent =
 		IsValid(HomingTarget) ? HomingTarget->GetRootComponent() : nullptr;
 	const bool bCanHome = IsValid(TargetComponent)
@@ -478,10 +488,28 @@ void ASovReformationDroneRocketProjectile::ConfigureHoming()
 	ProjectileMovement->HomingAccelerationMagnitude = bCanHome
 		? FlightState.HomingAccelerationMagnitude
 		: 0.0f;
+	// Retire lost tracking before this frame's movement computes homing acceleration.
+	ProjectileMovement->AddTickPrerequisiteActor(this);
+	SetActorTickEnabled(HasAuthority() && bCanHome);
+}
+
+void ASovReformationDroneRocketProjectile::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	if (!HasAuthority() || Resolution.bResolved) { return; }
+	if (!SourceAbilitySystem.IsValid() || SourceAbilitySystem->GetAvatarActor() != SourceAvatar.Get()
+		|| !SovThreatTargeting::CanTrack(SourceAvatar.Get(), FlightState.HomingTarget.Get()))
+	{
+		FlightState.HomingTarget = nullptr;
+		FlightState.HomingAccelerationMagnitude = 0.f;
+		ConfigureHoming();
+		ForceNetUpdate();
+	}
 }
 
 void ASovReformationDroneRocketProjectile::DeactivateProjectile()
 {
+	SetActorTickEnabled(false);
 	bCollisionArmed = false;
 	if (IsValid(ProjectileMovement))
 	{

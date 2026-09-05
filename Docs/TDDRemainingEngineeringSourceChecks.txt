@@ -1,0 +1,6 @@
+Changed/new C++ source files: 74
+Reflected headers checked: 26
+Unique ProjectVelkorran native simple-test registrations: 174
+Source consistency errors: 0
+Checks: repository-owned includes, generated-header order, preprocessor balance, no plugin-to-project include dependency, unique automation names.
+These are source checks. UHT/UBT, linking and runtime behavior were not tested.

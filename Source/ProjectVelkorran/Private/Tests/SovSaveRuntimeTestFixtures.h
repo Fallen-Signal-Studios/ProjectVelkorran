@@ -6,7 +6,20 @@
 #include "NarrativeSavableComponent.h"
 #include "Components/ActorComponent.h"
 #include "GameFramework/Actor.h"
+#include "Save/SovCampaignSaveGame.h"
 #include "SovSaveRuntimeTestFixtures.generated.h"
+UCLASS()
+class USovSaveLoadCompletionProbe : public UObject
+{
+    GENERATED_BODY()
+public:
+    UPROPERTY() TObjectPtr<class USovSaveSubsystem> Subsystem;
+    int32 Notifications = 0;
+    ESovSaveResult LastResult = ESovSaveResult::MissingSave;
+    bool bObservedReleasedOwnership = false;
+    FString LastMessage;
+    UFUNCTION() void OnCompleted(ESovSaveResult Result, const FSovSaveSlotHeader& Header, const FString& Message);
+};
 UCLASS()
 class USovSaveRuntimeSubclass : public UNarrativeSave
 {

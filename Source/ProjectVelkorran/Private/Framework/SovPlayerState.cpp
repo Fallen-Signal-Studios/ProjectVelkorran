@@ -150,7 +150,7 @@ bool ASovPlayerState::RestoreProtagonistSnapshot(ASovPlayerCharacterBase* Pawn, 
 	if (!StillOwnsPawn()) { return false; }
 	FNarrativeActorRecord PawnRecord = Snapshot.PawnRecord;
 	// PlayerState ASC is not in PawnRecord; resource restoration is explicit.
-	if (!bRestoreTransform) { PawnRecord.Transform = FTransform::Identity; }
+	if (!bRestoreTransform) { PawnRecord.Transform = FTransform::Identity; PawnRecord.bHasTransform = false; }
 	if (!Save->LoadActorFromRecord(Pawn, PawnRecord))
 	{
 		OutError = TEXT("Narrative rejected the pawn record; the retained origin snapshot remains available."); return false;

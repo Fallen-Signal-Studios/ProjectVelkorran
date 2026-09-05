@@ -12,6 +12,7 @@ UNarrativeActivatableWidget::UNarrativeActivatableWidget()
 
 void UNarrativeActivatableWidget::NativeDestruct()
 {
+	++ActivationGeneration;
 	for (FUIActionBindingHandle Handle : BindingHandles)
 	{
 		if (Handle.IsValid())
@@ -105,22 +106,32 @@ void UNarrativeActivatableWidget::SetBindingShowOnActionBar(FInputActionBindingH
 
 void UNarrativeActivatableWidget::NativeOnActivated()
 {
+	const uint64 ExpectedGeneration = ++ActivationGeneration;
 	Super::NativeOnActivated();
 
-	if (bFocusDesiredTargetOnActivate)
+	if (!IsActivated() || ActivationGeneration != ExpectedGeneration)
 	{
-		if (UWidget* Widget = NativeGetDesiredFocusTarget())
-		{
-			Widget->SetFocus();
-		}
+		return;
 	}
 
 	NativeRegisterActions();
+	if (!IsActivated() || ActivationGeneration != ExpectedGeneration)
+	{
+		return;
+	}
 	RegisterActions();
+	if (IsActivated() && ActivationGeneration == ExpectedGeneration && bFocusDesiredTargetOnActivate)
+	{
+		//Do not call NativeGetDesiredFocusTarget/SetFocus directly: that bypasses
+		//CommonUI's cached restoration target and can steal focus from a newer modal.
+		//Refresh after callbacks so dynamically populated controls are available.
+		RequestRefreshFocus();
+	}
 }
 
 void UNarrativeActivatableWidget::NativeOnDeactivated()
 {
+	++ActivationGeneration;
 	UnregisterAllBindings();
 
 	Super::NativeOnDeactivated();

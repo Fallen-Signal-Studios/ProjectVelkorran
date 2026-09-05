@@ -8,6 +8,7 @@
 #include "CollisionQueryParams.h"
 #include "Components/PrimitiveComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/SphereComponent.h"
 #include "Effects/SovGameplayEffect_CinderJudgement.h"
 #include "Engine/World.h"
 #include "Engine/OverlapResult.h"
@@ -18,6 +19,7 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/Pawn.h"
+#include "GameFramework/ProjectileMovementComponent.h"
 #include "GameplayEffect.h"
 #include "Kismet/GameplayStatics.h"
 #include "NarrativeGameplayTags.h"
@@ -147,16 +149,18 @@ namespace
 		}
 
 		const FVector HorizontalDelta(Delta.X, Delta.Y, 0.0f);
+		const FVector AgainstGravity = GravityZ > 0.f ? FVector::DownVector : FVector::UpVector;
+		const double HeightAgainstGravity = FVector::DotProduct(Delta, AgainstGravity);
 		const float HorizontalDistance = HorizontalDelta.Size();
 		const double SpeedSquared = static_cast<double>(LaunchSpeed) * LaunchSpeed;
 		if (HorizontalDistance <= KINDA_SMALL_NUMBER)
 		{
 			const double MaximumRise = SpeedSquared / (2.0 * GravityMagnitude);
-			if (Delta.Z > MaximumRise)
+			if (HeightAgainstGravity > MaximumRise)
 			{
 				return false;
 			}
-			OutVelocity = FVector::UpVector * FMath::Sign(Delta.Z) * LaunchSpeed;
+			OutVelocity = AgainstGravity * FMath::Sign(HeightAgainstGravity) * LaunchSpeed;
 			return !OutVelocity.IsNearlyZero();
 		}
 
@@ -165,7 +169,7 @@ namespace
 		const double Discriminant = (SpeedSquared * SpeedSquared)
 			- (GravityMagnitude
 				* ((GravityMagnitude * HorizontalDistanceSquared)
-					+ (2.0 * Delta.Z * SpeedSquared)));
+					+ (2.0 * HeightAgainstGravity * SpeedSquared)));
 		if (Discriminant < 0.0)
 		{
 			return false;
@@ -177,7 +181,7 @@ namespace
 		const double Cosine = 1.0 / FMath::Sqrt(1.0 + (Tangent * Tangent));
 		const double Sine = Tangent * Cosine;
 		OutVelocity = (HorizontalDelta.GetSafeNormal() * LaunchSpeed * Cosine)
-			+ (FVector::UpVector * LaunchSpeed * Sine);
+			+ (AgainstGravity * LaunchSpeed * Sine);
 		return !OutVelocity.ContainsNaN() && !OutVelocity.IsNearlyZero();
 	}
 }
@@ -360,15 +364,27 @@ USovGameplayAbility_TarrikVelkorransHunger::ReleaseVelkorransHungerFromAim()
 	{
 		LaunchDirection = AimRotation.Vector().GetSafeNormal();
 	}
-	if (FMath::IsNearlyZero(HungerProjectileGravityScale))
+	FVector InitialVelocity = LaunchDirection * HungerProjectileSpeed;
+	const auto* ProjectileDefaults = ResolveHungerProjectileClass().GetDefaultObject();
+	const auto* Sphere = ProjectileDefaults ? ProjectileDefaults->FindComponentByClass<USphereComponent>() : nullptr;
+	const auto* Movement = ProjectileDefaults ? ProjectileDefaults->FindComponentByClass<UProjectileMovementComponent>() : nullptr;
+	if (Sphere && Movement && !Movement->bIsHomingProjectile)
 	{
-		FVector AssistedDirection;
-		if (SovAimAssist::GetProjectileLead(Avatar, SpawnTransform.GetLocation(), LaunchDirection,
-			HungerProjectileSpeed, HungerAimTraceDistance, AssistedDirection)) { LaunchDirection = AssistedDirection; }
+		SovAimAssist::FProjectileLeadRequest Request;
+		Request.AimDirection = LaunchDirection;
+		Request.InitialVelocity = InitialVelocity;
+		Request.Gravity = FVector(0., 0., World->GetGravityZ() * HungerProjectileGravityScale);
+		Request.Range = HungerAimTraceDistance;
+		Request.MaximumFlightSeconds = HungerProjectileFlightDuration;
+		Request.MaximumFlightSpeed = HungerProjectileSpeed;
+		Request.CollisionRadius = Sphere->GetScaledSphereRadius();
+		Request.CollisionChannel = Sphere->GetCollisionObjectType();
+		Request.CollisionResponses = Sphere->GetCollisionResponseToChannels();
+		SovAimAssist::GetBallisticProjectileLead(Avatar, SpawnTransform.GetLocation(), Request, InitialVelocity);
+		LaunchDirection = InitialVelocity.GetSafeNormal();
 	}
 	SpawnTransform.SetRotation(LaunchDirection.ToOrientationQuat());
 	SpawnTransform.SetScale3D(FVector::OneVector);
-	const FVector InitialVelocity = LaunchDirection * HungerProjectileSpeed;
 	return ReleaseVelkorransHunger(SpawnTransform, InitialVelocity);
 }
 
@@ -675,6 +691,24 @@ USovGameplayAbility_TarrikCinderStickyGrenade::ReleaseCinderStickyGrenadeFromAim
 			AimRotation.Yaw,
 			0.0f);
 		InitialVelocity = FallbackRotation.Vector() * DefaultGrenadeLaunchSpeed;
+	}
+	const auto* GrenadeDefaults = ResolveGrenadeClass().GetDefaultObject();
+	const auto* Sphere = GrenadeDefaults ? GrenadeDefaults->FindComponentByClass<USphereComponent>() : nullptr;
+	const auto* Movement = GrenadeDefaults ? GrenadeDefaults->FindComponentByClass<UProjectileMovementComponent>() : nullptr;
+	if (Sphere && Movement && !Movement->bIsHomingProjectile)
+	{
+		SovAimAssist::FProjectileLeadRequest Request;
+		Request.AimDirection = (AimTarget - SpawnLocation).GetSafeNormal();
+		Request.InitialVelocity = InitialVelocity;
+		Request.Gravity = FVector(0., 0., GravityZ);
+		Request.Range = GrenadeAimTraceDistance;
+		Request.MaximumFlightSeconds = FuseDuration;
+		Request.MaximumFlightSpeed = Movement->MaxSpeed;
+		Request.bPreferHighArc = bUseHighGrenadeThrowArc;
+		Request.CollisionRadius = Sphere->GetScaledSphereRadius();
+		Request.CollisionChannel = Sphere->GetCollisionObjectType();
+		Request.CollisionResponses = Sphere->GetCollisionResponseToChannels();
+		SovAimAssist::GetBallisticProjectileLead(Avatar, SpawnLocation, Request, InitialVelocity);
 	}
 
 	const FTransform SpawnTransform(

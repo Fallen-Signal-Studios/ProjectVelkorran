@@ -5,6 +5,7 @@
 ## Prerequisites
 
 - Windows PowerShell 5.1 or PowerShell 7 on Windows.
+- Python 3 for source-to-report coverage validation. The runner checks Unreal's bundled Windows Python, then `python.exe` on PATH; `-PythonExecutable` accepts an explicit executable path. Build-only validation does not require Python.
 - Unreal Engine 5.7, including `Engine/Build/Build.version`, `Build.bat`, and `UnrealEditor-Cmd.exe`.
 - The Visual Studio C++ toolchain and Windows SDK required by the installed UE 5.7 build. UnrealBuildTool checks their compatibility.
 - This project's source, configuration, and NarrativePro plugin. Install the UE 5.7 version of **ZenDyn**, which is enabled in the project descriptor but absent from the source repository. Other enabled engine plugins must also be available.
@@ -50,7 +51,7 @@ Every invocation that reaches the build phase uses a fresh timestamped folder un
 - Native build/editor failures preserve the process exit code.
 - Automation timeout returns `124` and stops the launched editor process.
 - Missing prerequisites, a missing/malformed report, zero matching tests, failures, skipped tests, or incomplete tests return `2`.
-- Success requires at least one matching test with successful states and a completed report with zero failed, unrun, or in-progress tests. Success with warnings is reported; review the warnings.
+- Success requires every selected native simple-test registration in project/plugin source to appear as successful. `Scripts/Check-UnrealReport.py` rejects missing/duplicate rows, inconsistent totals, hidden error events and failed/unrun/in-progress tests, and writes `coverage.json`. Success with warnings is reported; review the warnings. A same-name stale implementation still requires rebuilding.
 - Build-only success explicitly states that automation was not run.
 
 `-NullRHI` is appropriate for these native gameplay tests. It does not validate rendered materials, animation presentation, input/UI wiring, replication across multiple processes, or Level 1/2 campaign playthroughs. Those remain separate Unreal editor and PIE acceptance checks.

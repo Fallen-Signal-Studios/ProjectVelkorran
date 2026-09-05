@@ -45,6 +45,9 @@ public:
 	/* Save transform of actor */
 	UPROPERTY(SaveGame)
 	FTransform Transform;
+	/** A captured movable transform may legitimately be Identity. Missing legacy fields retain the old sentinel semantics. */
+	UPROPERTY(SaveGame)
+	bool bHasTransform = false;
 
 	/* Whether the actor has been destroyed. This is only relevant for actors placed in the level - dynamic actors simply have their save record removed. */
 	UPROPERTY(SaveGame)

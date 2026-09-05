@@ -145,6 +145,7 @@ protected:
 	void ReceiveGrenadeDetonated(FVector ExplosionLocation, FVector SurfaceNormal);
 
 private:
+	friend struct FSovBallisticAssistTestAccess;
 	UFUNCTION()
 	void HandleProjectileHit(
 		UPrimitiveComponent* HitComponent,

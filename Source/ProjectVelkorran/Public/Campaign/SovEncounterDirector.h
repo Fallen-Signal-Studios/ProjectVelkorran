@@ -158,6 +158,7 @@ private:
 	TSet<TWeakObjectPtr<UAbilitySystemComponent>> OwnedBusySuspensions;
 	TSet<TWeakObjectPtr<UAbilitySystemComponent>> OwnedProtectionSuspensions;
 	TMap<TWeakObjectPtr<UBrainComponent>, TWeakObjectPtr<APawn>> PausedBrainPawns;
+	TMap<TWeakObjectPtr<class ANarrativeNPCController>, TWeakObjectPtr<APawn>> SuspendedThreatControllers;
 	uint64 RestoreGeneration = 0;
 	TWeakObjectPtr<AController> RestoreController;
 	TWeakObjectPtr<class ASovPlayerState> RestorePlayerState;

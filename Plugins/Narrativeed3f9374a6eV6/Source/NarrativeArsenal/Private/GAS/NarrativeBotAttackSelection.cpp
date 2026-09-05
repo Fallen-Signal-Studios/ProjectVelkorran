@@ -127,6 +127,11 @@ bool UNarrativeAbilitySystemComponent::IsBotCombatContextValid(AActor* Target, c
 	const INarrativeTeamAgentInterface* Team = Cast<INarrativeTeamAgentInterface>(Source);
 	if (!NarrativeBotCombat::IsAlive(TargetASC) || !Team
 		|| Team->GetTeamAttitudeTowards(*Target) != ETeamAttitude::Hostile) { return false; }
+	if (const ANarrativeNPCController* Controller = Cast<ANarrativeNPCController>(Source->GetController()))
+	{
+		// The same gate applies before selection, after token callbacks and during owned payload execution.
+		if (!Controller->CanDirectlyTargetThreat(Target)) { return false; }
+	}
 	const FNarrativeGameplayTags& N = FNarrativeGameplayTags::Get();
 	const FSovGameplayTags& S = FSovGameplayTags::Get();
 	FGameplayTagContainer Blocked;

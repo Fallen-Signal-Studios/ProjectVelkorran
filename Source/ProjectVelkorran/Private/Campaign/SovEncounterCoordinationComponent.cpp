@@ -1,5 +1,6 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Campaign/SovEncounterCoordinationComponent.h"
+#include "AI/NarrativeNPCController.h"
 #include "Campaign/SovEncounterCoordinationPolicy.h"
 #include "Campaign/SovEncounterDirector.h"
 #include "Characters/SovNPCCharacterBase.h"
@@ -211,8 +212,16 @@ void USovEncounterCoordinationComponent::StageParticipant(FName Id, ASovNPCChara
 		if ((IsDecisionComponent(Component) || Component->IsA<USkeletalMeshComponent>()) && Component->IsComponentTickEnabled())
 		{ Saved.DisabledTicks.Add(Component); Component->SetComponentTickEnabled(false); }
 	}
-	Saved.bOwnsBusy = true;
+	Saved.ThreatController = Cast<ANarrativeNPCController>(Character->GetController());
 	Staged.Add(Id, Saved); // Commit ownership before tag callbacks.
+	if (Saved.ThreatController.IsValid())
+	{
+		Saved.ThreatController->SetThreatMemorySuspended(this, true);
+		const FStaged* Current = Staged.Find(Id);
+		if (!Current || Current->Character.Get() != Character || !IsValid(Character) || !IsValid(ASC)
+			|| ASC->GetAvatarActor() != Character) { return; }
+	}
+	Staged.FindChecked(Id).bOwnsBusy = true;
 	ASC->AddLooseGameplayTag(FNarrativeGameplayTags::Get().State_Busy, 1, EGameplayTagReplicationState::TagAndCountToAll);
 	FStaged* Live = Staged.Find(Id);
 	if (!Live || Live->Character.Get() != Character || !IsValid(Character) || !IsValid(ASC)) { return; }
@@ -239,6 +248,12 @@ void USovEncounterCoordinationComponent::ReleaseStagedParticipant(FName Id)
 		if (Saved.bOwnsBusy) { Saved.ASC->RemoveLooseGameplayTag(FNarrativeGameplayTags::Get().State_Busy, 1, EGameplayTagReplicationState::TagAndCountToAll); }
 		if (Saved.ASC.IsValid() && Saved.bOwnsInvulnerability) { Saved.ASC->RemoveLooseGameplayTag(FNarrativeGameplayTags::Get().State_Invulnerable, 1, EGameplayTagReplicationState::TagAndCountToAll); }
 	}
+	// A callback may have restaged this same participant. Keep that new lease intact.
+	const FStaged* Replacement = Staged.Find(Id);
+	const bool bLeaseRenewed = Replacement && Replacement->ThreatController == Saved.ThreatController && Replacement->Character == Saved.Character;
+	if (!bLeaseRenewed && Saved.ThreatController.IsValid() && Saved.Character.IsValid()
+		&& Saved.ThreatController->GetPawn() == Saved.Character.Get())
+	{ Saved.ThreatController->SetThreatMemorySuspended(this, false); }
 }
 
 void USovEncounterCoordinationComponent::RefreshComposition()

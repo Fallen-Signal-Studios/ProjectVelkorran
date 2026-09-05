@@ -28,6 +28,7 @@ public:
 	UFUNCTION(BlueprintPure, Category="Campaign") USovCampaignStateComponent* GetCampaignState() const { return CampaignState; }
 	class USovConvergenceCompanionState* GetConvergenceCompanionState() const { return ConvergenceCompanionState; }
 	UFUNCTION(BlueprintPure, Category="Narrative") class USovNarrativeCueComponent* GetNarrativeCues() const { return NarrativeCues; }
+	UFUNCTION(BlueprintPure, Category="Feedback") class USovHapticFeedbackComponent* GetHapticFeedback() const { return HapticFeedback; }
 	UFUNCTION(BlueprintPure, Category="Campaign") ESovCampaignTransitionState GetCampaignTransitionState() const { return TransitionState; }
 	/** Authored handoff after mandatory beats, into content already loaded in this world. */
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Campaign")
@@ -59,6 +60,7 @@ protected:
 private:
 	friend struct FSovTransitionCallbackTestAccess;
 	UPROPERTY(VisibleAnywhere, Category="Narrative") TObjectPtr<class USovNarrativeCueComponent> NarrativeCues;
+	UPROPERTY(VisibleAnywhere, Category="Feedback") TObjectPtr<class USovHapticFeedbackComponent> HapticFeedback;
 	bool PrepareTransitionCheckpoint(FName BoundaryId, FString& OutError);
 	bool CanTransitionTo(USovCampaignDefinition* Destination, FString& OutError, bool bRequireDifferentProtagonist = true) const;
 	ASovPlayerCharacterBase* SpawnCampaignPawn(USovCampaignDefinition* Mission, const FTransform& Transform, FGameplayTag Lead = FGameplayTag());

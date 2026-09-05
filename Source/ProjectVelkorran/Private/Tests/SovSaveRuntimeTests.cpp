@@ -2,6 +2,7 @@
 #include "Tests/SovSaveRuntimeTestFixtures.h"
 #include "Save/SovSaveSubsystem.h"
 #include "Engine/Engine.h"
+#include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/AutomationTest.h"
@@ -12,6 +13,12 @@
 
 TArray<FName> USovSavePhaseProbeComponent::RestoreOrder;
 
+void USovSaveLoadCompletionProbe::OnCompleted(ESovSaveResult Result, const FSovSaveSlotHeader& Header, const FString& Message)
+{
+    ++Notifications; LastResult = Result; LastMessage = Message;
+    bObservedReleasedOwnership = Subsystem && !Subsystem->IsLoadPending();
+}
+
 #if WITH_AUTOMATION_TESTS
 namespace
 {
@@ -21,13 +28,14 @@ namespace
         TMap<FString, TArray<uint8>> Slots;
         bool bFailWrite = false;
         bool bTornWrite = false;
+        bool bAcknowledgeTornWrite = false;
         bool Read(const FString& Slot, int32 User, TArray<uint8>& Bytes) override
         { const auto* Found = Slots.Find(FString::FromInt(User) + Slot); if (!Found) { return false; } Bytes = *Found; return true; }
         bool Write(const FString& Slot, int32 User, const TArray<uint8>& Bytes) override
         {
             if (bFailWrite) { return false; }
             auto& Stored = Slots.FindOrAdd(FString::FromInt(User) + Slot); Stored = Bytes;
-            if (bTornWrite) { Stored.SetNum(Stored.Num() / 2); return false; }
+            if (bTornWrite) { Stored.SetNum(Stored.Num() / 2); return bAcknowledgeTornWrite; }
             return true;
         }
         bool Exists(const FString& Slot, int32 User) override { return Slots.Contains(FString::FromInt(User) + Slot); }
@@ -47,6 +55,16 @@ struct FSovSaveTestAccess
     static bool Validate(USovSaveSubsystem& S, USovCampaignSaveGame* Save, FString& Error) { return S.ValidateEnvelope(Save, false, Error); }
     static FString Name(USovSaveSubsystem& S, ESovSaveSlotKind Kind, int32 Index, int32 Bank) { return S.BankName(Kind, Index, Bank); }
     static void SetAccount(USovSaveSubsystem& S, const FString& Namespace) { S.AccountNamespace = Namespace; }
+    static void StageLoad(USovSaveSubsystem& S, const FGuid& Request, bool bFailed, double Deadline)
+    {
+        S.PendingSave = Envelope(S); S.PendingNarrative = NewObject<UNarrativeSave>(&S);
+        S.PendingLoadRequest = Request; S.bPendingLoadFailed = bFailed; S.PendingLoadDeadline = Deadline;
+        S.PendingLoadError = bFailed ? TEXT("Required destination participant is unavailable.") : FString();
+    }
+    static bool Matches(USovSaveSubsystem& S, const FString& Options) { return S.MatchesPendingLoadRequest(Options); }
+    static void Tick(USovSaveSubsystem& S) { S.Tick(0.1f); }
+    static bool IsFailed(const USovSaveSubsystem& S) { return S.bPendingLoadFailed; }
+    static void Complete(USovSaveSubsystem& S, bool bSucceeded) { S.CompletePendingLoad(bSucceeded, TEXT("Test completion")); }
     static USovCampaignSaveGame* Envelope(USovSaveSubsystem& S)
     {
         auto* Save = NewObject<USovCampaignSaveGame>(&S);
@@ -64,6 +82,40 @@ struct FSovSaveTestAccess
         return Save;
     }
 };
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovSaveLoadRequestTest, "ProjectVelkorran.Campaign.Save.ExactLoadRequestAndTerminalFailure",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovSaveLoadRequestTest::RunTest(const FString& Parameters)
+{
+    TStrongObjectPtr<UGameInstance> Instance(NewObject<UGameInstance>());
+    TStrongObjectPtr<USovSaveSubsystem> S(NewObject<USovSaveSubsystem>(Instance.Get()));
+    FSovSaveTestAccess::Initialize(*S);
+    TStrongObjectPtr<USovSaveLoadCompletionProbe> Probe(NewObject<USovSaveLoadCompletionProbe>());
+    Probe->Subsystem = S.Get(); S->OnLoadCompleted.AddDynamic(Probe.Get(), &USovSaveLoadCompletionProbe::OnCompleted);
+    const FGuid Old = FGuid::NewGuid(), Current = FGuid::NewGuid();
+    const auto Options = [](const FGuid& Request)
+    { return TEXT("?SovCampaignSlotLoad=1?SovCampaignLoadRequest=") + Request.ToString(EGuidFormats::Digits); };
+    FSovSaveTestAccess::StageLoad(*S, Current, true, FPlatformTime::Seconds() + 60.0);
+    TestFalse(TEXT("Missing request token cannot consume a load"), FSovSaveTestAccess::Matches(*S, TEXT("?SovCampaignSlotLoad=1")));
+    TestFalse(TEXT("Old request cannot consume a newer same-map load"), FSovSaveTestAccess::Matches(*S, Options(Old)));
+    TestTrue(TEXT("Only exact request matches"), FSovSaveTestAccess::Matches(*S, Options(Current)));
+    FSovSaveTestAccess::Tick(*S);
+    TestEqual(TEXT("Initialization rejection publishes a terminal result without waiting for timeout"), Probe->Notifications, 1);
+    TestEqual(TEXT("Failure is recovery, never success"), Probe->LastResult, ESovSaveResult::RecoveryAvailable);
+    TestTrue(TEXT("Actual rejection reason preserved"), Probe->LastMessage.Contains(TEXT("participant")));
+    TestTrue(TEXT("Ownership released before notification; failed world remains blocked"), Probe->bObservedReleasedOwnership && FSovSaveTestAccess::IsFailed(*S));
+    TestFalse(TEXT("Late callback cannot resurrect completed request"), FSovSaveTestAccess::Matches(*S, Options(Current)));
+    FSovSaveTestAccess::Tick(*S); FSovSaveTestAccess::Complete(*S, true);
+    TestEqual(TEXT("Repeated tick/late completion cannot send duplicate success"), Probe->Notifications, 1);
+    FSovSaveTestAccess::StageLoad(*S, FGuid::NewGuid(), false, FPlatformTime::Seconds() - 1.0);
+    FSovSaveTestAccess::Tick(*S);
+    TestEqual(TEXT("Timed-out replacement also terminates exactly once"), Probe->Notifications, 2);
+    TestTrue(TEXT("Timeout is actionable"), Probe->LastMessage.Contains(TEXT("timed out")));
+    FSovSaveTestAccess::StageLoad(*S, FGuid::NewGuid(), false, FPlatformTime::Seconds() + 60.0);
+    FSovSaveTestAccess::Complete(*S, true);
+    TestEqual(TEXT("Successful later recovery completes"), Probe->LastResult, ESovSaveResult::Success);
+    TestFalse(TEXT("Successful recovery clears prior failure"), FSovSaveTestAccess::IsFailed(*S));
+    return true;
+}
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovSaveBankFailureTest, "ProjectVelkorran.Campaign.Save.VerifiedBanksAndWriteFailure",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovSaveBankFailureTest::RunTest(const FString& Parameters)
@@ -111,6 +163,40 @@ bool FSovSaveSchemaTest::RunTest(const FString& Parameters)
     FSovSaveTestAccess::SetAccount(*S, TEXT("test-account-hash"));
     Save->NarrativePayload[0] ^= 1;
     TestFalse(TEXT("Payload mutation invalidates checksum"), FSovSaveTestAccess::Validate(*S, Save.Get(), Error));
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovSaveRepeatedFaultRecoveryTest, "ProjectVelkorran.Campaign.Save.RepeatedStorageFaultsAcrossSubsystemRestart",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovSaveRepeatedFaultRecoveryTest::RunTest(const FString& Parameters)
+{
+    TMap<FString, TArray<uint8>> Disk;
+    int64 LastGoodGeneration = 0;
+    for (int32 Cycle = 0; Cycle < 100; ++Cycle)
+    {
+        // Recreate the subsystem over retained physical bytes, not a retained live save UObject.
+        TStrongObjectPtr<USovSaveSubsystem> S(NewObject<USovSaveSubsystem>());
+        auto* Storage = FSovSaveTestAccess::Initialize(*S); Storage->Slots = Disk;
+        TStrongObjectPtr<USovCampaignSaveGame> Save(FSovSaveTestAccess::Envelope(*S));
+        Save->Header.PlaySeconds = Cycle;
+        FString Error; bool Bad = false;
+        if (Cycle > 0)
+        {
+            Storage->bFailWrite = Cycle % 2 == 0;
+            Storage->bTornWrite = !Storage->bFailWrite;
+            Storage->bAcknowledgeTornWrite = true;
+            TestEqual(TEXT("A denied or falsely acknowledged torn write never reports success"),
+                FSovSaveTestAccess::Write(*S, Save.Get(), Error),
+                Storage->bFailWrite ? ESovSaveResult::WriteFailed : ESovSaveResult::ReadbackFailed);
+            auto* Prior = FSovSaveTestAccess::Read(*S, ESovSaveSlotKind::Manual, 0, Bad);
+            if (!TestTrue(TEXT("Last verified generation survives every injected fault"), Prior && Prior->Header.Generation == LastGoodGeneration)) { return false; }
+        }
+        Storage->bFailWrite = false; Storage->bTornWrite = false;
+        if (!TestEqual(TEXT("A later verified retry can recover"), FSovSaveTestAccess::Write(*S, Save.Get(), Error), ESovSaveResult::Success)) { return false; }
+        auto* Recovered = FSovSaveTestAccess::Read(*S, ESovSaveSlotKind::Manual, 0, Bad);
+        if (!TestTrue(TEXT("Verified generation and data survive restart/recovery"), Recovered && !Bad
+            && Recovered->Header.Generation == LastGoodGeneration + 1 && Recovered->Header.PlaySeconds == Cycle)) { return false; }
+        ++LastGoodGeneration; Disk = Storage->Slots;
+    }
     return true;
 }
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovNarrativeCaptureTransactionTest, "ProjectVelkorran.Campaign.Save.NarrativeCaptureRetainsLastGood",
