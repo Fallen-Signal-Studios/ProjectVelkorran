@@ -26,6 +26,7 @@ struct PROJECTVELKORRAN_API FSovSeleneProjectileParameters
 	float Range = 2200.0f;
 	float CenterlineWidth = 120.0f;
 	float Speed = 1800.0f;
+	float GravityScale = 1.0f; // Stillpoint only; multiplied by the actual world's gravity.
 	float ReturnSpeed = 2600.0f;
 	float OutboundDuration = 2.5f;
 	float SteeringDegrees = 180.0f;
@@ -47,6 +48,7 @@ public:
 		const FVector& Origin, const FSovSeleneProjectileParameters& Parameters);
 	bool InitializePayload(const FSovSeleneProjectileParameters& Parameters);
 	bool Recall();
+	virtual FVector GetVelocity() const override { return Velocity; }
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	UPROPERTY(BlueprintAssignable, Category = "Sovereign|Selene")

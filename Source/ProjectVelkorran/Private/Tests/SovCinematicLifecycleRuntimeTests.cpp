@@ -8,6 +8,8 @@
 #include "Character/PlayerDefinition.h"
 #include "Framework/SovPlayerState.h"
 #include "Tracks/MovieSceneEventTrack.h"
+#include "Components/WorldPartitionStreamingSourceComponent.h"
+#include "HAL/PlatformTime.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
@@ -30,6 +32,17 @@ struct FSovCinematicTestAccess
 {
 	static bool ValidateSequence(USovCampaignCinematicComponent* C, ULevelSequence* Sequence, FString& Error)
 	{ return C->ValidatePresentationSequence(Sequence, Error); }
+	static bool AcquirePartition(USovCampaignCinematicComponent* C, FString& Error) { return C->AcquirePartitionSources(Error); }
+	static bool PartitionReady(const USovCampaignCinematicComponent* C) { return C->ArePartitionRegionsReady(); }
+	static void AdoptTestSource(USovCampaignCinematicComponent* C, UWorldPartitionStreamingSourceComponent* Source)
+	{ FSovCinematicPartitionLease Lease; Lease.Anchor = Source->GetOwner(); Lease.Source = Source; C->PartitionLeases.Add(Lease); }
+	static bool ResolveTransit(USovCampaignCinematicComponent* C, FString& Error) { return C->ResolveTransitPostconditions(Error); }
+	static bool ApplyTransit(USovCampaignCinematicComponent* C, FString& Error) { return C->ApplyTransitPostconditions(Error); }
+	static bool ValidateTransit(USovCampaignCinematicComponent* C, bool Applied, FString& Error) { return C->ValidateTransitPostconditions(Applied, Error); }
+	static void RestoreTransit(USovCampaignCinematicComponent* C) { C->RestoreTransitPostconditions(); }
+	static void ExpireLoading(USovCampaignCinematicComponent* C)
+	{ C->LoadingStartedSeconds = FPlatformTime::Seconds() - C->LoadingTimeoutSeconds - 1.; C->TickComponent(0.f, LEVELTICK_PauseTick, nullptr); }
+	static bool CheckWatchdog(USovCampaignCinematicComponent* C) { return C->CheckPreparationWatchdog(C->RequestEpoch); }
 	static void StageOwnedSession(USovCampaignCinematicComponent* C, ASovHandoffRuntimeTestController* PC,
 		ASovHandoffRuntimeTestPawn* Pawn, UAbilitySystemComponent* ASC)
 	{
@@ -40,6 +53,7 @@ struct FSovCinematicTestAccess
 		C->Snapshot = {Entry}; C->Phase = ESovCinematicPhase::Loading; ++C->RequestEpoch;
 		C->ReservedPlaybackGeneration = CastChecked<ANarrativeLevelSequenceActor>(C->GetOwner())->GetPlaybackGeneration();
 		C->SessionId = FGuid::NewGuid(); C->bOwnInput = true;
+		C->LoadingStartedSeconds = FPlatformTime::Seconds();
 		PC->SetIgnoreMoveInput(true); PC->SetIgnoreLookInput(true);
 		C->bOwnSequenceTag = true; ASC->AddLooseGameplayTag(FNarrativeGameplayTags::Get().State_SequencerControlled);
 	}
@@ -59,7 +73,7 @@ struct FSovCinematicTestAccess
 		Actor->GetSequencePlayer()->Play();
 		C->bFinishing = false;
 	}
-	static bool OwnsAnything(const USovCampaignCinematicComponent* C) { return C->bOwnInput || C->bOwnSequenceTag || C->bReceiptAvailable; }
+	static bool OwnsAnything(const USovCampaignCinematicComponent* C) { return C->bOwnInput || C->bOwnSequenceTag || C->bReceiptAvailable || !C->PartitionLeases.IsEmpty(); }
 	static void LeaveWorld(USovCampaignCinematicComponent* C) { C->EndPlay(EEndPlayReason::Destroyed); }
 };
 namespace
@@ -301,6 +315,143 @@ bool FSovCampaignCinematicDirectRestartTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Retired cleanup cannot restore old camera over the restarted scene"), F.PC->GetViewTarget() == F.Base.Actor);
 	TestFalse(TEXT("Retired component releases its own leases"), FSovCinematicTestAccess::OwnsAnything(F.Component));
 	TestFalse(TEXT("Direct restart cannot supply first-view proof"), F.PC->GetCampaignState()->IsBeatComplete(F.Component->MissionId, TEXT("Scene")));
+	return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCinematicPartitionManifestTest, "ProjectVelkorran.Campaign.Cinematic.PartitionManifestAndClassicWorldRejection",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCinematicPartitionManifestTest::RunTest(const FString& Parameters)
+{
+	FManagedSequenceWorld F; if (!TestNotNull(TEXT("Managed cinematic component"), F.Component)) { return false; }
+	FString Error;
+	TestTrue(TEXT("Classic scenes do not require World Partition"), FSovCinematicTestAccess::PartitionReady(F.Component));
+	FSovCinematicPartitionRegion Region; Region.RegionId = TEXT("CameraDestination"); Region.RequiredActors.Add(F.Base.Participant);
+	F.Component->RequiredPartitionRegions.Add(Region);
+	TestTrue(TEXT("Bounded partition declaration validates before runtime world gate"), F.Component->ValidateConfiguration(Error));
+	TestFalse(TEXT("Partition declaration fails explicitly in a conventional world"), FSovCinematicTestAccess::AcquirePartition(F.Component, Error));
+	TestFalse(TEXT("An unacquired partition manifest cannot count as ready"), FSovCinematicTestAccess::PartitionReady(F.Component));
+	F.Component->RequiredPartitionRegions[0].RequiredActors.Reset();
+	TestFalse(TEXT("No activation witness cannot prove a cell was streamed"), F.Component->ValidateConfiguration(Error));
+	F.Component->RequiredPartitionRegions[0] = Region; F.Component->RequiredPartitionRegions.Add(Region);
+	TestFalse(TEXT("Duplicate region identities are rejected"), F.Component->ValidateConfiguration(Error));
+	return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCinematicPartitionCleanupTest, "ProjectVelkorran.Campaign.Cinematic.PartitionOwnedTeardownAndPausedTimeout",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCinematicPartitionCleanupTest::RunTest(const FString& Parameters)
+{
+	FManagedSequenceWorld F; if (!TestNotNull(TEXT("Managed cinematic component"), F.Component)) { return false; }
+	const auto MakeSource = [&F]()
+	{
+		AActor* Anchor = F.Base.World->SpawnActor<AActor>();
+		auto* Source = NewObject<UWorldPartitionStreamingSourceComponent>(Anchor);
+		Anchor->AddInstanceComponent(Source); Source->RegisterComponent(); Source->EnableStreamingSource(); return Source;
+	};
+	auto* Other = MakeSource(); auto* Owned = MakeSource(); TWeakObjectPtr<AActor> OwnedAnchor = Owned->GetOwner();
+	FSovCinematicTestAccess::StageOwnedSession(F.Component, F.PC, F.Pawn, F.ASC);
+	FSovCinematicTestAccess::AdoptTestSource(F.Component, Owned);
+	FSovCinematicTestAccess::ExpireLoading(F.Component);
+	TestEqual(TEXT("Preparation wall-clock timeout runs at zero game delta"), F.Component->GetPhase(), ESovCinematicPhase::Failed);
+	TestFalse(TEXT("Timeout retires owned source registration"), IsValid(Owned) && Owned->IsRegistered());
+	TestTrue(TEXT("Timeout destroys only the owned anchor"), !OwnedAnchor.IsValid() || OwnedAnchor->IsActorBeingDestroyed());
+	TestTrue(TEXT("Unrelated streaming source remains registered and enabled"), IsValid(Other) && Other->IsRegistered() && Other->IsStreamingSourceEnabled());
+	TestFalse(TEXT("Timeout releases component input and tag leases"), FSovCinematicTestAccess::OwnsAnything(F.Component));
+	Owned = MakeSource(); FSovCinematicTestAccess::StageOwnedSession(F.Component, F.PC, F.Pawn, F.ASC);
+	FSovCinematicTestAccess::AdoptTestSource(F.Component, Owned); F.Component->UnregisterComponent();
+	TestFalse(TEXT("Unregister removes a source even before normal EndPlay"), IsValid(Owned) && Owned->IsRegistered());
+	TestTrue(TEXT("Unregister preserves a source owned elsewhere"), Other->IsRegistered() && Other->IsStreamingSourceEnabled());
+	FString Error;
+	TestFalse(TEXT("A retained unregistered component cannot reacquire cinematic ownership"), F.Component->RequestPlay(F.PC, Error));
+	TestFalse(TEXT("Rejected unregistered request leaves no leases"), FSovCinematicTestAccess::OwnsAnything(F.Component));
+	F.Component->RegisterComponent(); F.Component->SetComponentTickEnabled(true);
+	FSovCinematicTestAccess::StageOwnedSession(F.Component, F.PC, F.Pawn, F.ASC);
+	Owned = MakeSource(); FSovCinematicTestAccess::AdoptTestSource(F.Component, Owned);
+	F.Component->SetComponentTickEnabled(false);
+	TestFalse(TEXT("Independent core watchdog retires accidentally disabled component ticking"), FSovCinematicTestAccess::CheckWatchdog(F.Component));
+	TestFalse(TEXT("Tick disable cannot strand source/input/tag leases"), FSovCinematicTestAccess::OwnsAnything(F.Component));
+	return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCinematicTransitContractTest, "ProjectVelkorran.Campaign.Cinematic.NativeTransitPostconditionAndRollback",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCinematicTransitContractTest::RunTest(const FString& Parameters)
+{
+	FManagedSequenceWorld F; if (!TestNotNull(TEXT("Managed cinematic component"), F.Component)) { return false; }
+	auto* Transit = F.Base.World->SpawnActor<ASovWorldTransitActor>();
+	if (!TestNotNull(TEXT("Native transit owner"), Transit)) { return false; }
+	Transit->TransitId = TEXT("ExitDoor"); Transit->SetPower(false); Transit->SetLockReason(FText::FromString(TEXT("Before scene")));
+	FSovCinematicTransitPostcondition Contract; Contract.Transit = Transit; Contract.ExpectedTransitId = Transit->TransitId;
+	Contract.bSetPower = true; Contract.bPowered = true; Contract.bSetLock = true;
+	F.Component->TransitPostconditions.Add(Contract); FString Error;
+	FSovCinematicTestAccess::StageOwnedSession(F.Component, F.PC, F.Pawn, F.ASC);
+	TestTrue(TEXT("Native stable mechanism snapshots successfully"), FSovCinematicTestAccess::ResolveTransit(F.Component, Error));
+	TestTrue(TEXT("The completion/skip shared postcondition applies through native setters"), FSovCinematicTestAccess::ApplyTransit(F.Component, Error));
+	TestTrue(TEXT("Power and lock postconditions are actually present"), Transit->bPowered && Transit->LockReason.IsEmpty());
+	TestTrue(TEXT("Final receipt validation observes the applied world state"), FSovCinematicTestAccess::ValidateTransit(F.Component, true, Error));
+	FSovCinematicTestAccess::RestoreTransit(F.Component);
+	TestTrue(TEXT("Failed commit restores its native power and lock values"), !Transit->bPowered && Transit->LockReason.ToString() == TEXT("Before scene"));
+	TestFalse(TEXT("Applying native world state alone cannot mint a campaign beat"), F.PC->GetCampaignState()->IsBeatComplete(F.Component->MissionId, TEXT("Scene")));
+	Transit->StructuralHealth = 0.f;
+	TestFalse(TEXT("Destroyed mechanism cannot be repaired by cinematic power writes"), FSovCinematicTestAccess::ResolveTransit(F.Component, Error));
+	return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCinematicTransitReentryTest, "ProjectVelkorran.Campaign.Cinematic.TransitCallbackConflictPreservesExternalState",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCinematicTransitReentryTest::RunTest(const FString& Parameters)
+{
+	FManagedSequenceWorld F; if (!TestNotNull(TEXT("Managed cinematic component"), F.Component)) { return false; }
+	auto* Transit = F.Base.World->SpawnActor<ASovWorldTransitActor>();
+	if (!TestNotNull(TEXT("Native transit owner"), Transit)) { return false; }
+	Transit->TransitId = TEXT("ExitDoor"); Transit->SetPower(false);
+	FSovCinematicTransitPostcondition Contract; Contract.Transit = Transit; Contract.ExpectedTransitId = Transit->TransitId;
+	Contract.bSetPower = true; Contract.bPowered = true; Contract.bSetLock = true;
+	F.Component->TransitPostconditions.Add(Contract); FString Error;
+	FSovCinematicTestAccess::StageOwnedSession(F.Component, F.PC, F.Pawn, F.ASC);
+	TestTrue(TEXT("Native transit snapshot"), FSovCinematicTestAccess::ResolveTransit(F.Component, Error));
+	F.Base.Probe->Transit = Transit;
+	Transit->OnTransitChanged.AddDynamic(F.Base.Probe, &USovSequenceLifecycleProbe::ChangeTransitLock);
+	TestFalse(TEXT("A conflicting native callback aborts the postcondition"), FSovCinematicTestAccess::ApplyTransit(F.Component, Error));
+	FSovCinematicTestAccess::RestoreTransit(F.Component);
+	TestFalse(TEXT("Our power change is restored"), Transit->bPowered);
+	TestEqual(TEXT("External lock owner is preserved by rollback"), Transit->LockReason.ToString(), FString(TEXT("External lock owner")));
+	return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCinematicTransitRevisionTest, "ProjectVelkorran.Campaign.Cinematic.TransitRollbackSameValueOwnershipAndDestruction",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCinematicTransitRevisionTest::RunTest(const FString& Parameters)
+{
+	for (const bool bDamageDuringRestore : {false, true})
+	{
+		FManagedSequenceWorld F; if (!TestNotNull(TEXT("Managed cinematic component"), F.Component)) { return false; }
+		auto* Transit = F.Base.World->SpawnActor<ASovWorldTransitActor>();
+		if (!TestNotNull(TEXT("Native transit owner"), Transit)) { return false; }
+		Transit->TransitId = TEXT("ExitDoor"); Transit->SetPower(false); Transit->SetLockReason(FText::FromString(TEXT("Before scene")));
+		FSovCinematicTransitPostcondition Contract; Contract.Transit = Transit; Contract.ExpectedTransitId = Transit->TransitId;
+		Contract.bSetPower = true; Contract.bPowered = true; Contract.bSetLock = true;
+		F.Component->TransitPostconditions.Add(Contract); FString Error;
+		FSovCinematicTestAccess::StageOwnedSession(F.Component, F.PC, F.Pawn, F.ASC);
+		TestTrue(TEXT("Snapshot native transit revision"), FSovCinematicTestAccess::ResolveTransit(F.Component, Error));
+		TestTrue(TEXT("Apply exact native setter revisions"), FSovCinematicTestAccess::ApplyTransit(F.Component, Error));
+		if (bDamageDuringRestore)
+		{
+			F.Base.Probe->Transit = Transit;
+			Transit->OnTransitChanged.AddDynamic(F.Base.Probe, &USovSequenceLifecycleProbe::DamageTransitOnChange);
+		}
+		else
+		{
+			Transit->SetPower(true); Transit->SetLockReason(FText());
+			TestFalse(TEXT("A later same-value native write invalidates the original receipt"), FSovCinematicTestAccess::ValidateTransit(F.Component, true, Error));
+		}
+		FSovCinematicTestAccess::RestoreTransit(F.Component);
+		if (bDamageDuringRestore)
+		{
+			TestEqual(TEXT("Power rollback callback can break the mechanism"), Transit->GetTransitState(), ESovWorldTransitState::Broken);
+			TestTrue(TEXT("No subsequent lock rollback touches the broken mechanism"), Transit->LockReason.IsEmpty());
+		}
+		else
+		{
+			TestTrue(TEXT("Later same-value power owner survives rollback"), Transit->bPowered);
+			TestTrue(TEXT("Later same-value lock owner survives rollback"), Transit->LockReason.IsEmpty());
+		}
+	}
 	return true;
 }
 #endif

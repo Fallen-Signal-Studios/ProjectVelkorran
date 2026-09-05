@@ -14,6 +14,8 @@
 #include <DisplayDebugHelpers.h>
 #include "Kismet/KismetMathLibrary.h"
 #include "AI/NarrativePathFollowingComp.h"
+#include "Perception/AIPerceptionComponent.h"
+#include "Engine/World.h"
 
 ANarrativeNPCController::ANarrativeNPCController(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer.SetDefaultSubobjectClass("PathFollowingComponent", UNarrativePathFollowingComp::StaticClass()))
 {
@@ -25,6 +27,7 @@ ANarrativeNPCController::ANarrativeNPCController(const FObjectInitializer& Objec
 void ANarrativeNPCController::BeginPlay()
 {
 	Super::BeginPlay();
+	RefreshThreatMemory();
 
 	if (UPathFollowingComponent* PFC = GetPathFollowingComponent())
 	{
@@ -34,6 +37,14 @@ void ANarrativeNPCController::BeginPlay()
 
 void ANarrativeNPCController::EndPlay(EEndPlayReason::Type EndPlayReason)
 {
+	ClearThreatMemory();
+	if (ThreatPerception.IsValid())
+	{
+		ThreatPerception->OnTargetPerceptionUpdated.RemoveDynamic(this, &ThisClass::HandleThreatPerception);
+		ThreatPerception->OnComponentActivated.RemoveDynamic(this, &ThisClass::HandleThreatPerceptionActivated);
+		ThreatPerception->OnComponentDeactivated.RemoveDynamic(this, &ThisClass::HandleThreatPerceptionDeactivated);
+	}
+	ThreatPerception.Reset();
 	if (UPathFollowingComponent* PFC = GetPathFollowingComponent())
 	{
 		PFC->OnRequestFinished.RemoveAll(this);
@@ -113,6 +124,17 @@ void ANarrativeNPCController::DisplayDebug(class UCanvas* Canvas, const FDebugDi
 
 	FDisplayDebugManager& DisplayDebugManager = Canvas->DisplayDebugManager;
 	DisplayDebugManager.SetDrawColor(FColor(255, 255, 0));
+	if (DebugDisplay.IsDisplayOn("Threat"))
+	{
+		const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+		for (const FNarrativeThreatMemory& Memory : GetThreatDebugSnapshot())
+		{
+			DisplayDebugManager.DrawString(FString::Printf(TEXT("Threat %s source=%s strength=%.2f confidence=%.2f direct=%d position=%s sharedBy=%s factions=%s expiry=%.2fs"),
+				*GetNameSafe(Memory.Target.Get()), *UEnum::GetValueAsString(Memory.Source), Memory.Strength, Memory.Confidence,
+				Memory.bDirectObservation, *Memory.LastKnownPosition.ToCompactString(), *GetNameSafe(Memory.SharedBy.Get()),
+				*Memory.SharedFactions.ToString(), Memory.ExpiresAt - Now));
+		}
+	}
 
 	if (UNPCActivityComponent* ActivityComp = NPCActivityComponent)
 	{
@@ -155,16 +177,60 @@ void ANarrativeNPCController::DisplayDebug(class UCanvas* Canvas, const FDebugDi
 
 void ANarrativeNPCController::SetPawn(APawn* InPawn)
 {
-	Super::SetPawn(InPawn);
-
-	if (ANarrativeNPCCharacter* NChar = Cast<ANarrativeNPCCharacter>(InPawn))
+	const uint64 Assignment = ++PawnAssignmentGeneration;
+	const bool bChangingPawn = GetPawn() != InPawn;
+	const TWeakObjectPtr<ANarrativeNPCController> Self = this;
+	const TWeakObjectPtr<APawn> RequestedPawn = InPawn;
+	// Vehicle possession preserves Narrative's separate NPC identity. Unpossessing
+	// must clear it, and possessing a different NPC installs that NPC instead.
+	ANarrativeNPCCharacter* IncomingCharacter = Cast<ANarrativeNPCCharacter>(InPawn);
+	if (!IncomingCharacter && InPawn) { IncomingCharacter = OwnedCharacter; }
+	const TWeakObjectPtr<ANarrativeNPCCharacter> RequestedCharacter = IncomingCharacter;
+	if (bChangingPawn)
 	{
-		//cache this incase GetPawn changes 
-		OwnedCharacter = NChar;
-
-		if (UNarrativeAbilitySystemComponent* NASC = Cast<UNarrativeAbilitySystemComponent>(NChar->GetAbilitySystemComponent()))
+		if (IsValid(OwnedCharacter))
+		{
+			if (auto* OldASC = Cast<UNarrativeAbilitySystemComponent>(OwnedCharacter->GetAbilitySystemComponent()))
+			{ OldASC->OnDeathStateChanged.RemoveDynamic(this, &ThisClass::HandleDeath); }
+		}
+		// Native resets cannot invoke Blackboard or Perception callbacks. Do not emit
+		// cleanup while the outgoing Pawn and incoming OwnedCharacter disagree.
+		OwnedCharacter = nullptr;
+		++ThreatMemoryGeneration;
+		ThreatMemory.Reset();
+		ThreatSuspensionOwners.Reset();
+		ThreatUpdateAccumulator = 0.f;
+		bPawnThreatCleanupPending = true;
+	}
+	Super::SetPawn(InPawn);
+	const auto StillOwnsAssignment = [Self, RequestedPawn, Assignment]()
+	{
+		return Self.IsValid() && !Self->IsActorBeingDestroyed() && !RequestedPawn.IsStale()
+			&& Self->PawnAssignmentGeneration == Assignment && Self->GetPawn() == RequestedPawn.Get();
+	};
+	// Super can synchronously broadcast pawn changes. A nested assignment is newer
+	// and owns all subsequent state; the older call must never install its NPC.
+	if (!StillOwnsAssignment()) { return; }
+	OwnedCharacter = RequestedCharacter.Get();
+	if (IsValid(OwnedCharacter))
+	{
+		if (auto* NASC = Cast<UNarrativeAbilitySystemComponent>(OwnedCharacter->GetAbilitySystemComponent()))
 		{
 			NASC->OnDeathStateChanged.AddUniqueDynamic(this, &ThisClass::HandleDeath);
+		}
+	}
+	if (bPawnThreatCleanupPending)
+	{
+		bPawnThreatCleanupPending = false;
+		// Memory callbacks see consistent Pawn/OwnedCharacter and occur after the
+		// final Super call. Reentry can replace us without an older Super overwriting it.
+		ClearThreatMemory();
+		if (!StillOwnsAssignment()) { return; }
+		if (!InPawn)
+		{
+			ClearFocus(EAIFocusPriority::Gameplay);
+			if (!StillOwnsAssignment()) { return; }
+			StopMovement();
 		}
 	}
 }
@@ -483,10 +549,12 @@ void ANarrativeNPCController::TokenStolen()
 }
 
 void ANarrativeNPCController::HandleDeath_Implementation(AActor* KilledActor, UNarrativeAbilitySystemComponent* KilledActorASC, const bool bIsDead)
-{	
+{
+	if (KilledActor != OwnedCharacter) { return; }
 	//Mark the controller and pawn to be removed after 90s. TODO config option in settings 
 	if (bIsDead)
 	{
+		ClearThreatMemory();
 		FString RoleStr = HasAuthority() ? "Server" : "Client";
 
 		UE_LOG(LogTemp, Warning, TEXT("%s HANDLE DEATH, ASKING FOR CLEANUP 90s"), *RoleStr);

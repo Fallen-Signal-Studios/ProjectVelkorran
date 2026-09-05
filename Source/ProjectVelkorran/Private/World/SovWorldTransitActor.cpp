@@ -235,10 +235,10 @@ void ASovWorldTransitActor::Finish(bool bSuccess, const FText& Message)
 }
 void ASovWorldTransitActor::SetPower(bool Value)
 {
-    if (HasAuthority()) { bPowered = Value; UpdateLinks(); OnTransitChanged.Broadcast(State, Value ? FText() : FText::FromString(TEXT("Power required"))); }
+    if (HasAuthority()) { ++PowerRevision; bPowered = Value; UpdateLinks(); OnTransitChanged.Broadcast(State, Value ? FText() : FText::FromString(TEXT("Power required"))); }
 }
 void ASovWorldTransitActor::SetLockReason(const FText& Reason)
-{ if (HasAuthority()) { LockReason = Reason; UpdateLinks(); OnTransitChanged.Broadcast(State, Reason); } }
+{ if (HasAuthority()) { ++LockRevision; LockReason = Reason; UpdateLinks(); OnTransitChanged.Broadcast(State, Reason); } }
 float ASovWorldTransitActor::TakeDamage(float Amount, const FDamageEvent& Event, AController* Instigator, AActor* Causer)
 {
     if (!HasAuthority() || !FMath::IsFinite(Amount) || Amount <= 0.f || StructuralHealth <= 0.f) { return 0.f; }
@@ -261,7 +261,7 @@ void ASovWorldTransitActor::ReconcileEndpoint()
     UpdateLinks();
 }
 void ASovWorldTransitActor::Load_Implementation()
-{ if (HasAuthority()) { Finish(false, FText()); ReconcileEndpoint(); } }
+{ if (HasAuthority()) { ++PowerRevision; ++LockRevision; Finish(false, FText()); ReconcileEndpoint(); } }
 void ASovWorldTransitActor::Serialize(FArchive& Ar)
 {
     Super::Serialize(Ar);

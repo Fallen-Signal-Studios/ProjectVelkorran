@@ -70,12 +70,13 @@ bool USovSaveSubsystem::SelectPlatformUser(const FString& Id, int32 LocalUserInd
     if (Id.TrimStartAndEnd().IsEmpty() || LocalUserIndex < 0)
     { Error = TEXT("A stable platform account and nonnegative local user index are required."); return false; }
     const FString NewNamespace = FMD5::HashAnsiString(*Id);
-    if (!AccountNamespace.IsEmpty() && AccountNamespace != NewNamespace)
+    if (!AccountNamespace.IsEmpty() && (AccountNamespace != NewNamespace || UserIndex != LocalUserIndex))
     {
         // Never stamp the outgoing user's live campaign records as another user's save.
         if (const ASovPlayerController* PC = Controller(); PC && PC->GetCampaignState()->GetActiveMission())
         { Error = TEXT("Return to the front end before changing the campaign's platform account."); return false; }
         PendingAutosaves.Reset(); PlaySeconds = 0;
+        AcknowledgedWorld.Reset(); AcknowledgmentExpiresAt = 0;
     }
     AccountNamespace = NewNamespace; UserIndex = LocalUserIndex;
     return true;
@@ -234,7 +235,8 @@ ESovSaveResult USovSaveSubsystem::WriteEnvelope(USovCampaignSaveGame* Save, FStr
         { Error = TEXT("Existing save bank cannot be read safely; it was not overwritten."); return ESovSaveResult::WriteFailed; }
         TStrongObjectPtr<USovCampaignSaveGame> Existing(Cast<USovCampaignSaveGame>(UGameplayStatics::LoadGameFromMemory(ExistingBytes)));
         FString ExistingError;
-        if (!ValidateEnvelope(Existing.Get(), false, ExistingError))
+        if (!ValidateEnvelope(Existing.Get(), false, ExistingError)
+            || Existing->Header.Kind != Save->Header.Kind || Existing->Header.SlotIndex != Save->Header.SlotIndex)
         {
             const FString RecoveryName = TargetName + TEXT("_Recovery_") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
             TArray<uint8> RecoveryBytes;
@@ -333,8 +335,10 @@ bool USovSaveSubsystem::FindRecoveryAutosave(FSovSaveSlotHeader& Slot)
     {
         if (Header.Kind == ESovSaveSlotKind::Auto && (!Found || Header.Generation > Slot.Generation))
         {
-            int32 Bank; bool Bad; FString Error; auto* Save = ReadBest(Header.Kind, Header.SlotIndex, Bank, Bad, Error);
-            if (ValidateEnvelope(Save, true, Error) && DecodeNarrative(Save, Error)) { Slot = Header; Found = true; }
+            int32 Bank; bool Bad; FString Error;
+            // Required asset preflight can synchronously load packages and collect garbage.
+            TStrongObjectPtr<USovCampaignSaveGame> Save(ReadBest(Header.Kind, Header.SlotIndex, Bank, Bad, Error));
+            if (ValidateEnvelope(Save.Get(), true, Error) && DecodeNarrative(Save.Get(), Error)) { Slot = Header; Found = true; }
         }
     }
     return Found;
@@ -392,7 +396,9 @@ UNarrativeSave* USovSaveSubsystem::DecodeNarrative(USovCampaignSaveGame* Save, F
 }
 ESovSaveResult USovSaveSubsystem::LoadSlot(ESovSaveSlotKind Kind, int32 Index, FString& Error, bool bAcceptRecoveredBank)
 {
-    if (bBusy || (PendingSave && !bPendingLoadFailed)) { return ESovSaveResult::Busy; }
+    // Even a rejected initialization retains its request until the terminal event
+    // has been published. A retry must not overwrite that pending completion.
+    if (bBusy || PendingSave) { return ESovSaveResult::Busy; }
     if (!SovSavePolicy::ValidSlot(PolicyKind(Kind), Index)) { return ESovSaveResult::InvalidSlot; }
     if (AccountNamespace.IsEmpty()) { return ESovSaveResult::MissingAccount; }
     ASovPlayerController* PC = Controller();
@@ -413,28 +419,55 @@ ESovSaveResult USovSaveSubsystem::LoadSlot(ESovSaveSlotKind Kind, int32 Index, F
     PendingNarrative = DecodeNarrative(PendingSave, Error);
     if (!PendingNarrative) { PendingSave = nullptr; return ESovSaveResult::IncompatibleSave; }
     bPendingWorldApplied = false; bPendingLoadFailed = false; PendingDestination.Reset();
+    PendingLoadError.Reset(); PendingLoadRequest = FGuid::NewGuid();
     PendingLoadDeadline = FPlatformTime::Seconds() + LoadTimeoutSeconds;
-    const FString Destination = PendingSave->Header.MapPackage + TEXT("?SovCampaignSlotLoad=1");
+    const FString Destination = PendingSave->Header.MapPackage + TEXT("?SovCampaignSlotLoad=1?SovCampaignLoadRequest=")
+        + PendingLoadRequest.ToString(EGuidFormats::Digits);
     AcknowledgeSaveFailure();
     if (!PC->GetWorld()->ServerTravel(Destination, true))
-    { PendingSave = nullptr; PendingNarrative = nullptr; Error = TEXT("Saved-map travel was rejected; current world retained."); return ESovSaveResult::TravelFailed; }
+    {
+        PendingSave = nullptr; PendingNarrative = nullptr; PendingLoadRequest.Invalidate(); PendingLoadDeadline = 0;
+        Error = TEXT("Saved-map travel was rejected; current world retained."); return ESovSaveResult::TravelFailed;
+    }
     // Acceptance starts asynchronous map/managed-pawn restoration. Success notification occurs only at CharacterReady.
     return ESovSaveResult::LoadStarted;
 }
 void USovSaveSubsystem::ResolveInitialSave(UWorld& World, UNarrativeSave*& Snapshot, bool& bOverride)
 {
-    if (World.GetGameInstance() != GetGameInstance() || !PendingSave) { return; }
+    if (World.GetGameInstance() != GetGameInstance()) { return; }
     const AGameModeBase* GM = World.GetAuthGameMode();
     if (!GM || !UGameplayStatics::HasOption(GM->OptionsString, TEXT("SovCampaignSlotLoad"))) { return; }
-    bOverride = true; Snapshot = nullptr; PendingDestination = &World;
+    // A timed-out or superseded slot travel must never fall through to a new campaign.
+    // Reject stale callbacks without consuming or failing a newer request.
+    bOverride = true; Snapshot = nullptr;
+    if (!MatchesPendingLoadRequest(GM->OptionsString)) { return; }
+    PendingDestination = &World;
     FString Error;
-    if (bPendingWorldApplied || !ValidatePendingWorld(World, Error)) { bPendingLoadFailed = true; return; }
+    if (bPendingWorldApplied || !ValidatePendingWorld(World, Error))
+    {
+        bPendingLoadFailed = true;
+        PendingLoadError = Error.IsEmpty() ? TEXT("The saved world attempted to apply its snapshot more than once.") : Error;
+        return; // The core ticker publishes failure after world initialization unwinds.
+    }
     Snapshot = PendingNarrative;
     bPendingWorldApplied = true;
 }
+bool USovSaveSubsystem::MatchesPendingLoadRequest(const FString& Options) const
+{
+    FGuid Request;
+    return PendingSave && PendingLoadRequest.IsValid()
+        && UGameplayStatics::HasOption(Options, TEXT("SovCampaignSlotLoad"))
+        && FGuid::ParseExact(UGameplayStatics::ParseOption(Options, TEXT("SovCampaignLoadRequest")), EGuidFormats::Digits, Request)
+        && Request == PendingLoadRequest;
+}
 bool USovSaveSubsystem::ValidatePendingWorld(UWorld& World, FString& Error) const
 {
-    if (bPendingLoadFailed) { Error = TEXT("Previous campaign load failed; choose a valid recovery save."); return false; }
+    const AGameModeBase* Mode = World.GetAuthGameMode();
+    if (Mode && UGameplayStatics::HasOption(Mode->OptionsString, TEXT("SovCampaignSlotLoad"))
+        && !MatchesPendingLoadRequest(Mode->OptionsString))
+    { Error = TEXT("This saved-map request has expired or was replaced. Select a valid recovery save."); return false; }
+    if (bPendingLoadFailed && RejectedLoadWorld.Get() == &World)
+    { Error = TEXT("This campaign world failed restoration; choose a valid recovery save."); return false; }
     if (!PendingSave) { return true; }
     const auto* GM = Cast<ASovCampaignGameMode>(World.GetAuthGameMode());
     const auto* Narrative = World.GetSubsystem<UNarrativeSaveSubsystem>();
@@ -446,16 +479,28 @@ bool USovSaveSubsystem::ValidatePendingWorld(UWorld& World, FString& Error) cons
 }
 void USovSaveSubsystem::NotifyCampaignReady(ASovPlayerController* PC, bool bSucceeded)
 {
-    if (!PendingSave || !PC || PC->GetWorld() != PendingDestination.Get()) { return; }
-    const auto Header = PendingSave->Header;
+    if (!PendingSave || !PC || PC->GetWorld() != PendingDestination.Get()
+        || !PC->GetWorld()->GetAuthGameMode()
+        || !MatchesPendingLoadRequest(PC->GetWorld()->GetAuthGameMode()->OptionsString)) { return; }
     FString Error;
     const bool Good = bSucceeded && bPendingWorldApplied && ValidatePendingWorld(*PC->GetWorld(), Error)
         && PC->GetPawn() && Cast<ASovPlayerCharacterBase>(PC->GetPawn())
         && CastChecked<ASovPlayerCharacterBase>(PC->GetPawn())->IsCharacterReady();
-    if (Good) { PlaySeconds = Header.PlaySeconds; PendingAutosaves.Reset(); }
-    else { if (Error.IsEmpty()) { Error = TEXT("Campaign restoration failed; choose a compatible autosave."); } }
+    if (!Good && Error.IsEmpty()) { Error = TEXT("Campaign restoration failed; choose a compatible autosave."); }
+    CompletePendingLoad(Good, Error);
+}
+void USovSaveSubsystem::CompletePendingLoad(bool bSucceeded, const FString& Error)
+{
+    if (!PendingSave) { return; }
+    const auto Header = PendingSave->Header;
+    if (bSucceeded) { PlaySeconds = Header.PlaySeconds; RejectedLoadWorld.Reset(); }
+    else { RejectedLoadWorld = PendingDestination; }
+    PendingAutosaves.Reset();
     PendingSave = nullptr; PendingNarrative = nullptr; PendingDestination.Reset();
-    OnLoadCompleted.Broadcast(Good ? ESovSaveResult::Success : ESovSaveResult::RecoveryAvailable, Header, Error);
+    PendingLoadRequest.Invalidate(); PendingLoadDeadline = 0; PendingLoadError.Reset();
+    bPendingWorldApplied = false; bPendingLoadFailed = !bSucceeded;
+    // All ownership is released before observers may request a different recovery slot.
+    OnLoadCompleted.Broadcast(bSucceeded ? ESovSaveResult::Success : ESovSaveResult::RecoveryAvailable, Header, Error);
 }
 void USovSaveSubsystem::ReportSave(ESovSaveResult Result, const FSovSaveSlotHeader& Header, const FString& Error)
 {
@@ -507,11 +552,20 @@ bool USovSaveSubsystem::Tick(float DeltaSeconds)
     ASovPlayerController* PC = Controller();
     if (PC && PC->GetPawn() && PC->GetCampaignState()->GetActiveMission() && !UGameplayStatics::IsGamePaused(PC))
     { PlaySeconds += DeltaSeconds; }
-    if (PendingSave && !bPendingLoadFailed && FPlatformTime::Seconds() > PendingLoadDeadline)
+    if (PendingSave && bPendingWorldApplied && !bPendingLoadFailed && PendingDestination.IsValid())
     {
-        const auto Header = PendingSave->Header;
-        PendingSave = nullptr; PendingNarrative = nullptr; PendingDestination.Reset(); bPendingLoadFailed = true;
-        OnLoadCompleted.Broadcast(ESovSaveResult::RecoveryAvailable, Header, TEXT("Saved-map initialization timed out. Choose a last known-good autosave."));
+        const auto* Narrative = PendingDestination->GetSubsystem<UNarrativeSaveSubsystem>();
+        if (Narrative && Narrative->DidInitialLoadFail())
+        {
+            bPendingLoadFailed = true;
+            PendingLoadError = TEXT("The saved world's actor or component restoration failed. Select a compatible recovery save.");
+        }
+    }
+    if (PendingSave && (bPendingLoadFailed || FPlatformTime::Seconds() > PendingLoadDeadline))
+    {
+        const FString Error = PendingLoadError.IsEmpty()
+            ? TEXT("Saved-map initialization timed out. Choose a last known-good autosave.") : PendingLoadError;
+        CompletePendingLoad(false, Error);
         return true;
     }
     FString Error;

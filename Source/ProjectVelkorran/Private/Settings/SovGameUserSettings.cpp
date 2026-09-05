@@ -5,6 +5,8 @@
 #include "Engine/Engine.h"
 #include "Serialization/MemoryReader.h"
 #include "Serialization/MemoryWriter.h"
+#include "HAL/PlatformTime.h"
+#include "Misc/App.h"
 
 namespace
 {
@@ -39,7 +41,10 @@ bool USovGameUserSettings::ValidateSnapshot(const FSovUserSettingsSnapshot& Valu
 }
 void USovGameUserSettings::LoadSettings(bool bForceReload)
 {
+	if (bHDRTransaction) { return; }
+	if (HDRPreviewReceipt.IsValid()) { RevertHDRCalibration(HDRPreviewReceipt); }
 	Super::LoadSettings(bForceReload);
+	if (!HapticSettings.IsValid()) { HapticSettings = FSovHapticSettings(); HapticSettings.Master = 0.f; SaveSettings(); }
 	FString Error;
 	if (SettingsSchemaVersion != 1 || !ValidateSnapshot(Settings, bCampaignCompleted, Error))
 	{
@@ -48,6 +53,131 @@ void USovGameUserSettings::LoadSettings(bool bForceReload)
 		bLocalDiagnosticsEnabled = false;
 		SaveSettings();
 	}
+}
+
+void USovGameUserSettings::SaveSettings()
+{
+	TGuardValue<bool> Guard(bHDRTransaction, true);
+	// Narrative audio/input widgets save immediately. Never let an unrelated save commit an HDR preview.
+	if (HDRPreviewReceipt.IsValid())
+	{
+		TGuardValue<bool> RestoreEnabled(bUseHDRDisplayOutput, bHDRBeforePreview);
+		TGuardValue<int32> RestoreNits(HDRDisplayOutputNits, HDRNitsBeforePreview);
+		PersistSettings();
+		return;
+	}
+	PersistSettings();
+}
+void USovGameUserSettings::PersistSettings() { Super::SaveSettings(); }
+void USovGameUserSettings::ApplySettings(bool bCheckForCommandLineOverrides)
+{
+	if (bHDRTransaction) { return; }
+	if (HDRPreviewReceipt.IsValid()) { RevertHDRCalibration(HDRPreviewReceipt); }
+	TGuardValue<bool> Guard(bHDRTransaction, true);
+	const bool bRequestedHDR = bUseHDRDisplayOutput;
+	const int32 RequestedNits = HDRDisplayOutputNits;
+	Super::ApplySettings(bCheckForCommandLineOverrides);
+	// Narrative moves the window after UGameUserSettings applies resolution. Query/reapply on the final monitor.
+	if (CanApplyHDROutput()) { WriteHDROutput(bRequestedHDR && ReadHDROutput().bSupported, RequestedNits); SaveSettings(); }
+}
+bool USovGameUserSettings::ApplyHapticSettings(const FSovHapticSettings& Value, FString& Error)
+{
+	if (bApplying || !Value.IsValid()) { Error = TEXT("Feedback settings are invalid or a settings transaction is active."); return false; }
+	TGuardValue<bool> Guard(bApplying, true);
+	HapticSettings = Value;
+	SaveSettings();
+	OnHapticSettingsChanged.Broadcast(HapticSettings);
+	Error.Reset(); return true;
+}
+bool USovGameUserSettings::CanApplyHDROutput() const { return GEngine && !IsRunningCommandlet() && FApp::CanEverRender(); }
+double USovGameUserSettings::HDRTime() const { return FPlatformTime::Seconds(); }
+FSovHDROutputStatus USovGameUserSettings::ReadHDROutput()
+{
+	FSovHDROutputStatus Result;
+	if (!CanApplyHDROutput()) { return Result; }
+	Result.bSupported = SupportsHDRDisplayOutput();
+	Result.bEnabled = Result.bSupported && IsHDREnabled();
+	Result.PeakNits = Result.bEnabled ? GetCurrentHDRDisplayNits() : 0;
+	return Result;
+}
+void USovGameUserSettings::WriteHDROutput(bool bEnable, int32 PeakNits)
+{
+	if (CanApplyHDROutput()) { EnableHDRDisplayOutput(bEnable, PeakNits); }
+}
+FSovHDROutputStatus USovGameUserSettings::GetHDROutputStatus() { return ReadHDROutput(); }
+bool USovGameUserSettings::PreviewHDRCalibration(bool bEnable, int32 PeakNits, FGuid& Receipt, FString& Error)
+{
+	Receipt.Invalidate();
+	if (bHDRTransaction || HDRPreviewReceipt.IsValid() || !CanApplyHDROutput() || PeakNits < 400 || PeakNits > 2000)
+	{ Error = TEXT("HDR preview is unavailable, already active, or outside the supported 400-2000 nit request range."); return false; }
+	const FSovHDROutputStatus Before = ReadHDROutput();
+	if (bEnable && !Before.bSupported) { Error = TEXT("The current platform/display does not support HDR output."); return false; }
+	TGuardValue<bool> Guard(bHDRTransaction, true);
+	bHDRBeforePreview = bUseHDRDisplayOutput;
+	HDRNitsBeforePreview = HDRDisplayOutputNits;
+	HDRPreviewReceipt = FGuid::NewGuid(); // Protect unrelated saves during the engine call as well.
+	WriteHDROutput(bEnable, PeakNits);
+	HDRPreviewOutput = ReadHDROutput();
+	if (!CanApplyHDROutput() || HDRPreviewOutput.bSupported != Before.bSupported || HDRPreviewOutput.bEnabled != bEnable
+		|| (bEnable && (!HDRPreviewOutput.bSupported || HDRPreviewOutput.PeakNits <= 0)))
+	{
+		WriteHDROutput(Before.bEnabled && ReadHDROutput().bSupported, Before.PeakNits > 0 ? Before.PeakNits : 1000);
+		// Physical rollback can be unavailable after display/device loss. Never leave the rejected preview in config.
+		bUseHDRDisplayOutput = bHDRBeforePreview;
+		HDRDisplayOutputNits = HDRNitsBeforePreview;
+		HDRPreviewReceipt.Invalidate();
+		Error = TEXT("The engine could not apply the requested HDR output; the previous available output was restored."); return false;
+	}
+	HDRPreviewDeadline = HDRTime() + 15.;
+	HDRPreviewTicker = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateUObject(this, &ThisClass::TickHDRPreview), .25f);
+	Receipt = HDRPreviewReceipt;
+	Error.Reset(); return true;
+}
+void USovGameUserSettings::RemoveHDRPreviewTicker()
+{
+	if (HDRPreviewTicker.IsValid()) { FTSTicker::GetCoreTicker().RemoveTicker(HDRPreviewTicker); HDRPreviewTicker.Reset(); }
+}
+bool USovGameUserSettings::ConfirmHDRCalibration(FGuid Receipt, FString& Error)
+{
+	if (bHDRTransaction || !Receipt.IsValid() || Receipt != HDRPreviewReceipt)
+	{ Error = TEXT("HDR preview receipt is stale or unavailable."); return false; }
+	const FSovHDROutputStatus Current = ReadHDROutput();
+	if (!CanApplyHDROutput() || HDRTime() >= HDRPreviewDeadline || Current.bEnabled != HDRPreviewOutput.bEnabled
+		|| Current.PeakNits != HDRPreviewOutput.PeakNits || Current.bSupported != HDRPreviewOutput.bSupported)
+	{ RevertHDRCalibration(Receipt); Error = TEXT("HDR preview expired or display output changed; preview reverted."); return false; }
+	TGuardValue<bool> Guard(bHDRTransaction, true);
+	HDRPreviewReceipt.Invalidate(); RemoveHDRPreviewTicker();
+	SaveSettings();
+	Error.Reset(); return true;
+}
+bool USovGameUserSettings::RevertHDRCalibration(FGuid Receipt)
+{
+	if (bHDRTransaction || !Receipt.IsValid() || Receipt != HDRPreviewReceipt) { return false; }
+	TGuardValue<bool> Guard(bHDRTransaction, true);
+	RemoveHDRPreviewTicker();
+	// Keep save masking active during the engine call. The transaction guard rejects every reentrant receipt action.
+	WriteHDROutput(bHDRBeforePreview && ReadHDROutput().bSupported, HDRNitsBeforePreview);
+	// Confirmed config must recover even when rendering/output is unavailable and WriteHDROutput does nothing.
+	bUseHDRDisplayOutput = bHDRBeforePreview;
+	HDRDisplayOutputNits = HDRNitsBeforePreview;
+	HDRPreviewReceipt.Invalidate();
+	return true;
+}
+bool USovGameUserSettings::TickHDRPreview(float DeltaTime)
+{
+	if (!HDRPreviewReceipt.IsValid()) { return false; }
+	const FSovHDROutputStatus Current = ReadHDROutput();
+	if (HDRTime() >= HDRPreviewDeadline || !CanApplyHDROutput()
+		|| Current.bEnabled != HDRPreviewOutput.bEnabled || Current.PeakNits != HDRPreviewOutput.PeakNits
+		|| Current.bSupported != HDRPreviewOutput.bSupported)
+	{ HDRPreviewTicker.Reset(); RevertHDRCalibration(HDRPreviewReceipt); return false; }
+	return true;
+}
+void USovGameUserSettings::BeginDestroy()
+{
+	if (HDRPreviewReceipt.IsValid()) { RevertHDRCalibration(HDRPreviewReceipt); }
+	RemoveHDRPreviewTicker();
+	Super::BeginDestroy();
 }
 bool USovGameUserSettings::ApplySettingsSnapshot(const FSovUserSettingsSnapshot& NewSettings, FString& Error)
 {

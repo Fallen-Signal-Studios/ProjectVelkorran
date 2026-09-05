@@ -64,6 +64,9 @@ public:
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Transit") bool RequestUse(APawn* Player, FText& Error);
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Transit") void SetPower(bool bAvailable);
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Transit") void SetLockReason(const FText& Reason);
+    /** Setter revisions distinguish later writes even when the value is unchanged. Not serialized gameplay state. */
+    uint64 GetPowerRevision() const { return PowerRevision; }
+    uint64 GetLockRevision() const { return LockRevision; }
     UFUNCTION(BlueprintPure, Category="Transit") ESovWorldTransitState GetTransitState() const { return State; }
     bool CanUse(const APawn* Player, FText& Error) const;
     virtual float TakeDamage(float DamageAmount, const FDamageEvent& DamageEvent, AController* Instigator, AActor* Causer) override;
@@ -101,4 +104,6 @@ private:
     bool bOwnInputLock = false;
     bool bMutating = false;
     bool bEnding = false;
+    uint64 PowerRevision = 0;
+    uint64 LockRevision = 0;
 };

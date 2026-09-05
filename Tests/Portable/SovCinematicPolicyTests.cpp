@@ -7,6 +7,26 @@ int main()
 {
     using namespace SovCinematicPolicy;
     unsigned Checks = 0;
+    assert(ValidPartitionRegion(0, 0, 0, 100, 1)); ++Checks;
+    assert(ValidPartitionRegion(1.e9, -1.e9, 1000, 200000, 16)); ++Checks;
+    assert(!ValidPartitionRegion(0, 0, 0, 99.9, 1)); ++Checks;
+    assert(!ValidPartitionRegion(0, 0, 0, 200001, 1)); ++Checks;
+    assert(!ValidPartitionRegion(0, 0, 0, 100, 0)); ++Checks;
+    assert(!ValidPartitionRegion(0, 0, 0, 100, 17)); ++Checks;
+    assert(WitnessInsideRegion(10000, 100)); ++Checks;
+    assert(!WitnessInsideRegion(10000.01, 100)); ++Checks;
+    assert(!WitnessInsideRegion(-1, 100)); ++Checks;
+    unsigned Observed = AdvanceReadyObservations(0, true);
+    assert(Observed == 1); ++Checks; // One stale registration-frame query cannot authorize playback.
+    Observed = AdvanceReadyObservations(Observed, false);
+    assert(Observed == 0); ++Checks;
+    Observed = AdvanceReadyObservations(AdvanceReadyObservations(Observed, true), true);
+    assert(Observed == 2); ++Checks;
+    assert(AdvanceReadyObservations(std::numeric_limits<unsigned>::max(), true) == 2); ++Checks;
+    assert(!LoadingExpired(14.99, 15)); ++Checks;
+    assert(LoadingExpired(15, 15)); ++Checks;
+    assert(LoadingExpired(0, 0)); ++Checks;
+    assert(LoadingExpired(-1, 15)); ++Checks;
     for (const double Step : {1.0 / 30.0, 1.0 / 60.0, .25, 1.0})
     {
         double Position = 0, Watched = 0;
@@ -27,6 +47,14 @@ int main()
     assert(!ValidProgress(1, 2, -1, 1)); ++Checks;
     for (const double Bad : {std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::infinity()})
     {
+        assert(!ValidPartitionRegion(Bad, 0, 0, 100, 1)); ++Checks;
+        assert(!ValidPartitionRegion(0, Bad, 0, 100, 1)); ++Checks;
+        assert(!ValidPartitionRegion(0, 0, Bad, 100, 1)); ++Checks;
+        assert(!ValidPartitionRegion(0, 0, 0, Bad, 1)); ++Checks;
+        assert(!WitnessInsideRegion(Bad, 100)); ++Checks;
+        assert(!WitnessInsideRegion(0, Bad)); ++Checks;
+        assert(LoadingExpired(Bad, 15)); ++Checks;
+        assert(LoadingExpired(0, Bad)); ++Checks;
         assert(!ValidProgress(Bad, 1, 1, 1)); ++Checks;
         assert(!ValidProgress(0, Bad, 1, 1)); ++Checks;
         assert(!ValidProgress(0, 1, Bad, 1)); ++Checks;

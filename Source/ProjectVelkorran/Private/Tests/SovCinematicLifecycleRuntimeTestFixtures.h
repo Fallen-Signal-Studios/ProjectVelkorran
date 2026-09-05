@@ -3,6 +3,8 @@
 #include "CoreMinimal.h"
 #include "Cinematics/NarrativeLevelSequenceActor.h"
 #include "Cinematics/SovCampaignCinematicComponent.h"
+#include "World/SovWorldTransitActor.h"
+#include "Engine/DamageEvents.h"
 #include "SovCinematicLifecycleRuntimeTestFixtures.generated.h"
 
 UCLASS()
@@ -22,6 +24,18 @@ class USovSequenceLifecycleProbe : public UObject
 	GENERATED_BODY()
 public:
 	UPROPERTY() TObjectPtr<USovCampaignCinematicComponent> Managed;
+	UPROPERTY() TObjectPtr<ASovWorldTransitActor> Transit;
+	bool bMutateTransitOnce = true;
+	UFUNCTION() void ChangeTransitLock(ESovWorldTransitState State, const FText& Message)
+	{
+		if (Transit && bMutateTransitOnce)
+		{ bMutateTransitOnce = false; Transit->SetLockReason(FText::FromString(TEXT("External lock owner"))); }
+	}
+	UFUNCTION() void DamageTransitOnChange(ESovWorldTransitState State, const FText& Message)
+	{
+		if (Transit && bMutateTransitOnce)
+		{ bMutateTransitOnce = false; Transit->TakeDamage(10000.f, FDamageEvent(), nullptr, nullptr); }
+	}
 	UFUNCTION() void AbortManaged() { if (Managed) { Managed->Abort(TEXT("Reentrant pause interruption")); } }
 	int32 FinishedCount = 0;
 	int32 InterruptedCount = 0;

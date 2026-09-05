@@ -7,6 +7,7 @@
 #include "Abilities/GameplayAbility.h"
 #include "Abilities/SovGameplayAbility_DominionHound.h"
 #include "CollisionQueryParams.h"
+#include "Combat/SovThreatTargeting.h"
 #include "Components/SovCommandLinkComponent.h"
 #include "Engine/World.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
@@ -438,7 +439,7 @@ bool ASovDominionHandler::TryActivateExactHornCharge(
 		}
 
 		OutChargeTarget = HoundAbility->GetCurrentAttackTarget();
-		if (!IsValid(OutChargeTarget))
+		if (!IsValid(OutChargeTarget) || !SovThreatTargeting::CanTrack(Candidate, OutChargeTarget))
 		{
 			HoundAbilitySystem->CancelAbilityHandle(Handle);
 			OutChargeTarget = nullptr;

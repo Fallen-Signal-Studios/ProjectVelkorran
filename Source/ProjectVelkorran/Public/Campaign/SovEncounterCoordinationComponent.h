@@ -93,7 +93,7 @@ private:
 	double NextReliefAttackAt = 0.;
 	struct FReservation { TWeakObjectPtr<UNarrativeAbilitySystemComponent> ASC; TWeakObjectPtr<AActor> Avatar; TWeakObjectPtr<AActor> Target; FGameplayAbilitySpecHandle Handle; ESovEncounterRole Role; bool bMelee = false; };
 	struct FWarning { FGuid Id; TWeakObjectPtr<AActor> Source; double CreatedAt = 0.; double AcknowledgedAt = 0.; bool bAcknowledged = false; };
-	struct FStaged { TWeakObjectPtr<UNarrativeAbilitySystemComponent> ASC; TWeakObjectPtr<ASovNPCCharacterBase> Character; TArray<TWeakObjectPtr<UActorComponent>> DisabledTicks; uint8 MovementMode = 0; uint8 CustomMovementMode = 0; bool bHidden = false; bool bCollision = true; bool bOwnsBusy = false; bool bOwnsInvulnerability = false; };
+	struct FStaged { TWeakObjectPtr<UNarrativeAbilitySystemComponent> ASC; TWeakObjectPtr<ASovNPCCharacterBase> Character; TWeakObjectPtr<class ANarrativeNPCController> ThreatController; TArray<TWeakObjectPtr<UActorComponent>> DisabledTicks; uint8 MovementMode = 0; uint8 CustomMovementMode = 0; bool bHidden = false; bool bCollision = true; bool bOwnsBusy = false; bool bOwnsInvulnerability = false; };
 	TMap<FGuid, FReservation> Reservations;
 	TMap<FName, FWarning> Warnings;
 	TMap<FName, FStaged> Staged;

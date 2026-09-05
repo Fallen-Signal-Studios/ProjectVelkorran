@@ -1,6 +1,7 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Projectiles/SovSeleneCombatProjectile.h"
 #include "Combat/SovSelenePayloadMath.h"
+#include "Targeting/SovAimAssistPolicy.h"
 #include "Components/SceneComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/OverlapResult.h"
@@ -48,6 +49,7 @@ bool ASovSeleneCombatProjectile::InitializePayload(const FSovSeleneProjectilePar
 		|| !NonNegative(Parameters.Fuse) || !NonNegative(Parameters.Damage) || !NonNegative(Parameters.Poise)
 		|| !NonNegative(Parameters.DamagePerSecond) || !NonNegative(Parameters.RefreezeLockout)
 		|| !NonNegative(Parameters.CenterlineWidth) || !NonNegative(Parameters.SteeringDegrees)
+		|| !NonNegative(Parameters.GravityScale) || Parameters.GravityScale > 10.f
 		|| !NonNegative(Parameters.ShatterBonusPoise) || Parameters.SteeringDegrees > 720.0f
 		|| Parameters.Radius > 10000.0f || Parameters.Range > 10000.0f || Parameters.MaximumLifetime > 120.0f) { return false; }
 	Tuning = Parameters;
@@ -153,8 +155,15 @@ void ASovSeleneCombatProjectile::Advance(float DeltaSeconds)
 			Velocity = Steered.Vector() * Tuning.Speed;
 		}
 	}
-	else if (Mode == ESovSeleneProjectileMode::Stillpoint) { Velocity.Z -= 980.0f * DeltaSeconds; }
 	FVector End = Start + Velocity * DeltaSeconds;
+	if (Mode == ESovSeleneProjectileMode::Stillpoint)
+	{
+		const FVector Gravity(0., 0., GetWorld()->GetGravityZ() * Tuning.GravityScale);
+		const auto EndPoint = SovAimAssistPolicy::PositionAtTime({Start.X, Start.Y, Start.Z},
+			{Velocity.X, Velocity.Y, Velocity.Z}, {Gravity.X, Gravity.Y, Gravity.Z}, DeltaSeconds);
+		End = FVector(EndPoint.X, EndPoint.Y, EndPoint.Z);
+		Velocity += Gravity * DeltaSeconds;
+	}
 	if (Mode == ESovSeleneProjectileMode::Wake
 		|| (Mode == ESovSeleneProjectileMode::Dispatch && Phase == ESovSeleneProjectilePhase::Outbound))
 	{

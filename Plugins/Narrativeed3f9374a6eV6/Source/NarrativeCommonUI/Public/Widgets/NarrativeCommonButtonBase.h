@@ -27,10 +27,19 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Narrative Common Button")
 	virtual void SetButtonText(FText InText);
 
+	virtual void SynchronizeProperties() override;
+
 protected:
 
 	virtual void NativePreConstruct() override;
 	virtual void NativeOnCurrentTextStyleChanged() override;
+#if WITH_ACCESSIBILITY
+	virtual TSharedPtr<SWidget> GetAccessibleWidget() const override;
+#endif
+
+	/** Native default label stays in sync with the full localized button text. */
+	UFUNCTION()
+	FText GetDefaultAccessibleButtonText() const;
 
 	//Optional button text that can be placed on the button. 
 	UPROPERTY(BlueprintReadOnly, Category = "Button Text", meta = (BindWidgetOptional))

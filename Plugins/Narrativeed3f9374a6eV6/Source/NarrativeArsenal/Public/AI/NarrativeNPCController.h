@@ -9,6 +9,8 @@
 #include <GameplayTagAssetInterface.h>
 #include "UnrealFramework/NarrativeCharacter.h"
 #include "Navigation/PathFollowingComponent.h"
+#include "AI/NarrativeThreatMemory.h"
+#include "Perception/AIPerceptionTypes.h"
 #include "NarrativeNPCController.generated.h"
 
 struct FPathFollowingResult;
@@ -31,6 +33,7 @@ public:
 
 	//Interfaces 
 	virtual void BeginPlay() override; 
+	virtual void Tick(float DeltaSeconds) override;
 	virtual void EndPlay(EEndPlayReason::Type EndPlayReason) override; 
 	class UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 	virtual FGameplayTagContainer GetFactions() const override;
@@ -44,6 +47,37 @@ public:
 	virtual bool ShouldPostponePathUpdates() const override;
 
 	virtual class ANarrativeCharacter* GetNarrativeCharacter() const override;
+
+	/** Uses the controller's existing Perception component; does not install a second sensor. */
+	UFUNCTION(BlueprintCallable, Category = "Narrative|Threat")
+	void RefreshThreatMemory();
+	/** Server-side producer adapter for authored sensor, Echo, command and spoof events. */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Narrative|Threat")
+	bool ReportThreatObservation(AActor* Target, ENarrativeThreatSource Source, FVector Position,
+		float Strength = 1.f, float Confidence = 1.f, float Lifetime = 8.f);
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Narrative|Threat")
+	bool ShareThreatWith(ANarrativeNPCController* Recipient, AActor* Target);
+	UFUNCTION(BlueprintPure, Category = "Narrative|Threat")
+	bool CanDirectlyTargetThreat(AActor* Target) const;
+	UFUNCTION(BlueprintPure, Category = "Narrative|Threat")
+	bool GetBestThreatMemory(AActor* Target, FNarrativeThreatMemory& OutMemory) const;
+	UFUNCTION(BlueprintPure, Category = "Narrative|Threat")
+	TArray<FNarrativeThreatMemory> GetThreatDebugSnapshot() const;
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Narrative|Threat")
+	void ForgetThreat(AActor* Target);
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Narrative|Threat")
+	void ClearThreatMemory();
+	/** Existing encounter/restore owners hold independent, idempotent suspension contributions. */
+	void SetThreatMemorySuspended(UObject* SuspensionOwner, bool bSuspend);
+	bool IsThreatMemorySuspended() const;
+	/** Selected archetypes must opt into these nonvisual sensing capabilities. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative|Threat") bool bRequireThreatMemoryForTargeting = false;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative|Threat") bool bAcceptNetworkThreats = false;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative|Threat") bool bAcceptEchoThreats = false;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative|Threat") bool bShareThreatsWithFaction = true;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative|Threat", meta = (ClampMin = "0", ClampMax = "10000"))
+	float ThreatShareRadius = 2500.f;
+	bool IsThreatMemoryManaged() const;
 
 	#if ENABLE_VISUAL_LOG
 	virtual void GrabDebugSnapshot(FVisualLogEntry* Snapshot) const override;
@@ -126,6 +160,32 @@ protected:
 	TObjectPtr<class UNarrativeAbilitySystemComponent> GrantedToken;
 
 private:
+	UFUNCTION() void HandleThreatPerception(AActor* Actor, FAIStimulus Stimulus);
+	UFUNCTION() void HandleThreatPerceptionActivated(UActorComponent* Component, bool bReset);
+	UFUNCTION() void HandleThreatPerceptionDeactivated(UActorComponent* Component);
+	void InvalidateCachedThreatPerception();
+	void BindThreatPerception();
+	void ClearInvalidThreatTarget();
+	bool IsThreatTargetEligible(AActor* Target) const;
+	bool IsThreatTargetCloaked(AActor* Target) const;
+	bool IsThreatPerceptionReady() const;
+	void ShareFreshThreats();
+	UPROPERTY(Transient) TArray<FNarrativeThreatMemory> ThreatMemory;
+	UPROPERTY(Transient) TWeakObjectPtr<class UAIPerceptionComponent> ThreatPerception;
+	bool bThreatMemoryManaged = false;
+	bool bRefreshingThreatMemory = false;
+	bool bThreatPerceptionWasReady = false;
+	bool bInvalidatingThreatPerception = false;
+	bool bClearingThreatTarget = false;
+	uint64 ThreatMemoryGeneration = 0;
+	uint64 PawnAssignmentGeneration = 0;
+	bool bPawnThreatCleanupPending = false;
+	UPROPERTY(Transient) TArray<TWeakObjectPtr<UObject>> ThreatSuspensionOwners;
+	float ThreatUpdateAccumulator = 0.f;
+	TWeakObjectPtr<AActor> InvestigationTarget;
+	FVector InvestigationPosition = FVector::ZeroVector;
+	bool bOwnsInvestigationLocation = false;
+
 	void SetGrantedAttackToken(
 		UNarrativeAbilitySystemComponent* NewGrantedToken);
 	void AdvanceAttackTokenLeaseSerial();

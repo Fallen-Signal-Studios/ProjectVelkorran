@@ -3,6 +3,20 @@
 #include <cmath>
 namespace SovCinematicPolicy
 {
+    inline bool ValidPartitionRegion(double X, double Y, double Z, double Radius, unsigned Witnesses)
+    {
+        return std::isfinite(X) && std::isfinite(Y) && std::isfinite(Z) && std::isfinite(Radius)
+            && Radius >= 100.0 && Radius <= 200000.0 && Witnesses >= 1 && Witnesses <= 16;
+    }
+    inline bool WitnessInsideRegion(double DistanceSquared, double Radius)
+    {
+        return std::isfinite(DistanceSquared) && std::isfinite(Radius) && DistanceSquared >= 0.0
+            && Radius >= 100.0 && Radius <= 200000.0 && DistanceSquared <= Radius * Radius;
+    }
+    inline unsigned AdvanceReadyObservations(unsigned Previous, bool Ready)
+    { return Ready ? (Previous >= 1 ? 2U : 1U) : 0U; }
+    inline bool LoadingExpired(double Elapsed, double Timeout)
+    { return !std::isfinite(Elapsed) || !std::isfinite(Timeout) || Elapsed < 0.0 || Timeout < 1.0 || Timeout > 60.0 || Elapsed >= Timeout; }
     inline bool ValidProgress(double Previous, double Position, double Elapsed, double Rate)
     {
         return std::isfinite(Previous) && std::isfinite(Position) && std::isfinite(Elapsed) && std::isfinite(Rate)

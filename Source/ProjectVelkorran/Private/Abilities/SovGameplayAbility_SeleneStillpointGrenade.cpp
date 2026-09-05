@@ -6,6 +6,7 @@
 #include "NarrativeGameplayTags.h"
 #include "Projectiles/SovSeleneCombatProjectile.h"
 #include "Sovereign/SovGameplayTags.h"
+#include "Targeting/SovAimAssist.h"
 
 USovGameplayAbility_SeleneStillpointGrenade::USovGameplayAbility_SeleneStillpointGrenade()
 {
@@ -64,6 +65,19 @@ void USovGameplayAbility_SeleneStillpointGrenade::ActivateAbility(const FGamepla
 	Parameters.Damage = DetonationDamage;
 	Parameters.DamagePerSecond = FrozenDamagePerSecond;
 	Parameters.MaximumLifetime = FuseDuration + StasisDuration + 0.25f;
+	SovAimAssist::FProjectileLeadRequest Lead;
+	Lead.AimDirection = Direction;
+	Lead.InitialVelocity = Direction * Parameters.Speed;
+	Lead.Gravity = FVector(0., 0., GetWorld()->GetGravityZ() * Parameters.GravityScale);
+	Lead.Range = Parameters.Range;
+	Lead.MaximumFlightSeconds = Parameters.Fuse;
+	Lead.CollisionRadius = 18.f; // Same sphere as ASovSeleneCombatProjectile::Advance.
+	FVector AssistedVelocity;
+	if (SovAimAssist::GetBallisticProjectileLead(Parameters.Context.SourceAvatar.Get(), Origin, Lead, AssistedVelocity))
+	{
+		Direction = AssistedVelocity.GetSafeNormal();
+		Parameters.Direction = Direction;
+	}
 	auto* Projectile = ASovSeleneCombatProjectile::SpawnNativePayload(GrenadeClass, Origin, Parameters);
 	if (!ContinueNativePayload(Epoch)) { if (IsValid(Projectile)) { Projectile->Destroy(); } return; }
 	if (!Projectile) { FinishEchoAbility(true); return; }

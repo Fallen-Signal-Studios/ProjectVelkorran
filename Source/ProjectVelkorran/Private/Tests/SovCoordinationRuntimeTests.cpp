@@ -1,6 +1,7 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Tests/SovCoordinationRuntimeTestFixtures.h"
 #include "Tests/SovExertionRuntimeTestFixtures.h"
+#include "AI/NarrativeNPCController.h"
 #include "Campaign/SovEncounterCoordinationComponent.h"
 #include "Campaign/SovEncounterDirector.h"
 #include "Engine/Engine.h"
@@ -8,6 +9,7 @@
 #include "GAS/NarrativeAttributeSetBase.h"
 #include "Misc/AutomationTest.h"
 #include "NarrativeGameplayTags.h"
+#include "UObject/StrongObjectPtr.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 struct FSovCoordinationTestAccess
@@ -27,6 +29,12 @@ struct FSovCoordinationTestAccess
 	static void Stop(ASovEncounterDirector* Director)
 	{ Director->State = ESovEncounterState::Failed; Director->GetCoordinationComponent()->HandleEncounterState(ESovEncounterState::Active, ESovEncounterState::Failed); }
 	static void EndRelief(USovEncounterCoordinationComponent* Component) { Component->ReliefUntil = 0.; }
+	static void Suspend(ASovEncounterDirector* Director, AActor* Actor) { Director->SuspendActor(Actor); }
+	static void ReleaseDirector(ASovEncounterDirector* Director) { Director->ReleaseSuspensions(); }
+	static void Stage(USovEncounterCoordinationComponent* Component, FName Id, ASovNPCCharacterBase* Character)
+	{ Component->StageParticipant(Id, Character); }
+	static void ReleaseStage(USovEncounterCoordinationComponent* Component, FName Id) { Component->ReleaseStagedParticipant(Id); }
+	static void ResetStaging(USovEncounterCoordinationComponent* Component) { Component->ResetAttempt(); }
 };
 namespace
 {
@@ -109,6 +117,65 @@ bool FSovCoordinationWaveTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Test attack activates"), ASC(Second)->TryActivateAbility(Handle, false));
 	TestFalse(TEXT("An active attack cannot change decision tier"), Coordination->SetDecisionTier(TEXT("Second"), ESovEncounterDecisionTier::Supporting));
 	Ability->FinishTestAttack();
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCoordinationThreatSuspensionTest, "ProjectVelkorran.Campaign.Encounter.Coordination.ThreatSuspensionOwnersAndPawnReplacement",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FSovCoordinationThreatSuspensionTest::RunTest(const FString& Parameters)
+{
+	static_cast<void>(Parameters);
+	FCoordinationWorld Test;
+	auto* First = Test.Add(TEXT("First"), FVector(200.f, 0.f, 0.f));
+	auto* Future = Test.Add(TEXT("Future"), FVector(300.f, 0.f, 0.f), 1);
+	auto* Controller = Test.World->SpawnActor<ANarrativeNPCController>();
+	if (!TestNotNull(TEXT("Real Narrative controller"), Controller)) { return false; }
+	Controller->Possess(Future); Future->InitializeTestCombat();
+	Controller->bRequireThreatMemoryForTargeting = true;
+	auto* Coordination = Test.Director->GetCoordinationComponent();
+	const auto Observe = [&]()
+	{ return Controller->ReportThreatObservation(Test.Player, ENarrativeThreatSource::Damage, Test.Player->GetActorLocation(), 1.f, 1.f, 8.f); };
+	TestTrue(TEXT("Managed controller accepts an authoritative observation before staging"), Observe());
+	TestTrue(TEXT("Observation permits direct target query"), Controller->CanDirectlyTargetThreat(Test.Player));
+	FSovCoordinationTestAccess::Start(Test.Director, Test.Player);
+	TestTrue(TEXT("Future-wave staging owns a threat suspension and hides the actor"), Controller->IsThreatMemorySuspended() && Future->IsHidden());
+	TestFalse(TEXT("Hidden staged wave cannot acquire new threat observations"), Observe());
+	TestFalse(TEXT("Staged wave cannot use its old target query"), Controller->CanDirectlyTargetThreat(Test.Player));
+	FSovCoordinationTestAccess::Suspend(Test.Director, Future);
+	FSovCoordinationTestAccess::ReleaseDirector(Test.Director);
+	TestTrue(TEXT("Director release preserves the independent future-wave suspension"), Controller->IsThreatMemorySuspended());
+	TestTrue(TEXT("Director release does not reveal the staged participant"), Future->IsHidden());
+	TestFalse(TEXT("Wave owner continues to block observation after director release"), Observe());
+	CastChecked<USovCoordinationTestASC>(ASC(First))->SeedDead(true);
+	FSovCoordinationTestAccess::Step(Coordination);
+	TestEqual(TEXT("Actual wave promotion releases staged participant"), Coordination->GetCurrentWave(), 1);
+	TestFalse(TEXT("Last suspension owner is released on promotion"), Controller->IsThreatMemorySuspended());
+	TestFalse(TEXT("Promotion restores actor presentation"), Future->IsHidden());
+	TestFalse(TEXT("Promotion does not resurrect stale pre-checkpoint observations"), Controller->CanDirectlyTargetThreat(Test.Player));
+	TestTrue(TEXT("Promoted controller accepts a fresh observation"), Observe());
+	TestTrue(TEXT("Fresh observation restores direct target query"), Controller->CanDirectlyTargetThreat(Test.Player));
+
+	FSovCoordinationTestAccess::Stage(Coordination, TEXT("Future"), Future);
+	FSovCoordinationTestAccess::Suspend(Test.Director, Future);
+	FActorSpawnParameters Spawn; Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	auto* Replacement = Test.World->SpawnActor<ASovCoordinationTestNPC>(ASovCoordinationTestNPC::StaticClass(), FVector(450.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
+	if (!TestNotNull(TEXT("Replacement controller pawn"), Replacement)) { return false; }
+	Controller->Possess(Replacement); Replacement->InitializeTestCombat();
+	TestFalse(TEXT("Possession replacement clears old pawn suspension ownership"), Controller->IsThreatMemorySuspended());
+	TStrongObjectPtr<UObject> ExternalOwner(NewObject<UObject>());
+	Controller->SetThreatMemorySuspended(ExternalOwner.Get(), true);
+	FSovCoordinationTestAccess::ReleaseDirector(Test.Director);
+	FSovCoordinationTestAccess::ReleaseStage(Coordination, TEXT("Future"));
+	TestTrue(TEXT("Old pawn cleanup cannot remove a replacement pawn's unrelated lease"), Controller->IsThreatMemorySuspended());
+	Controller->SetThreatMemorySuspended(ExternalOwner.Get(), false);
+	TestFalse(TEXT("Replacement lease owner can release its own suspension"), Controller->IsThreatMemorySuspended());
+	FSovCoordinationTestAccess::Stage(Coordination, TEXT("Replacement"), Replacement);
+	FSovCoordinationTestAccess::Suspend(Test.Director, Replacement);
+	FSovCoordinationTestAccess::ResetStaging(Coordination); // The same cleanup path used by component EndPlay.
+	TestTrue(TEXT("Coordination teardown preserves director suspension"), Controller->IsThreatMemorySuspended());
+	FSovCoordinationTestAccess::ReleaseDirector(Test.Director);
+	TestFalse(TEXT("Both teardown paths leave no threat-suspension lease"), Controller->IsThreatMemorySuspended());
+	TestTrue(TEXT("Replacement target query can resume after fresh sensing"), Observe() && Controller->CanDirectlyTargetThreat(Test.Player));
 	return true;
 }
 

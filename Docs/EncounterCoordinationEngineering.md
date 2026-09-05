@@ -20,6 +20,8 @@ TDD §§8.4–8.7 required encounter composition, decision budgets, attacker slo
 
 All timers and composition reservations are attempt-local. Future-wave staging owns only the state counts it added; existing checkpoint/failure suspensions and other immunity sources remain intact. Failed encounters keep future actors staged until retry replaces/restores the registered roster. No midfight composition snapshot is represented as an arbitrary rollback save.
 
+Future-wave staging and director checkpoint restoration also hold separate owner contributions on the existing Narrative NPC controller's threat memory. Hidden staged actors cannot accept new threat observations or target from old ones; releasing only the director contribution leaves the wave contribution active. Promotion releases the final contribution and requires fresh sensing. Cleanup verifies the original controller/pawn pair so an old checkpoint or wave cannot release a replacement pawn's suspension owner.
+
 ## Integration and limits
 
 - An empty composition preserves an existing single-wave encounter, subject to the same population budgets. Once any composition rows are authored, every participant needs exactly one row. Waves start at zero, remain contiguous, and multiwave encounters need a required defeat gate in every wave.
@@ -37,5 +39,7 @@ Authored UE automation, not executed in this workspace:
 
 1. `ProjectVelkorran.Campaign.Encounter.Coordination.WavesAndIdentity`: duplicate identity rejection, owned staging, wave promotion, exact actor/GUID/location/health preservation, preservation of another Busy contribution, runtime tier changes and active-attack rejection.
 2. `ProjectVelkorran.Campaign.Encounter.Coordination.AttackLeasesWarningsAndRelief`: real Narrative selector and GAS activation, coordination-only execution, shared melee exclusion/release, acknowledgement and lead time, one-use warning receipt, no free resource grant, relief cooldown and attempt invalidation.
+
+`ProjectVelkorran.Campaign.Encounter.Coordination.ThreatSuspensionOwnersAndPawnReplacement` exercises actual director and wave-owner methods on a Narrative NPC controller: hidden-wave observation rejection, director release preserving staging, wave promotion requiring fresh observations, possession replacement, and cleanup preserving another owner. This regression awaits UE5.7 execution.
 
 Engine acceptance must exercise authored two-wave encounters for both protagonists, optional survivor capacity, retry during a staged wave, an offscreen ranged unit with/without acknowledged presentation, real perception/StateTree throttling and the simultaneous 16A/24B budget under a console profiler. Unreal Engine, UHT and assets are unavailable here; portable results do not replace those gates.

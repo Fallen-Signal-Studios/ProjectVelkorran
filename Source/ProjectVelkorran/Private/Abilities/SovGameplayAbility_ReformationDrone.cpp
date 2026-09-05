@@ -13,6 +13,7 @@
 #include "CollisionQueryParams.h"
 #include "Combat/SovNativeDamageReceipt.h"
 #include "Combat/SovProtectionInterceptReceipt.h"
+#include "Combat/SovThreatTargeting.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Effects/SovGameplayEffect_ReformationDroneWeapons.h"
 #include "Engine/OverlapResult.h"
@@ -141,7 +142,8 @@ bool USovGameplayAbility_ReformationDroneWeaponBase::CanActivateAbility(
 		return false;
 	}
 	if (!IsValid(ActorInfo->AbilitySystemComponent.Get())
-		|| !IsValid(Cast<ANarrativeCharacter>(ActorInfo->AvatarActor.Get())))
+		|| !IsValid(Cast<ANarrativeCharacter>(ActorInfo->AvatarActor.Get()))
+		|| !SovThreatTargeting::CanUseActorFocus(ActorInfo->AvatarActor.Get()))
 	{
 		if (OptionalRelevantTags)
 		{
@@ -862,6 +864,7 @@ float USovGameplayAbility_ReformationDroneGunfire::
 void USovGameplayAbility_ReformationDroneGunfire::FireNextBurstShot()
 {
 	if (!CanContinueWeaponPayload()
+		|| !SovThreatTargeting::CanUseActorFocus(GetAvatarActorFromActorInfo())
 		|| !bBurstStarted
 		|| ShotsFired >= BurstShotCount)
 	{
@@ -1113,6 +1116,10 @@ USovGameplayAbility_ReformationDroneRocketLauncher::LaunchRocketFromAim()
 	}
 
 	const int32 MuzzleIndex = NextMuzzleIndex;
+	if (!SovThreatTargeting::CanUseActorFocus(GetAvatarActorFromActorInfo()))
+	{
+		CancelDroneWeaponAbility(); return nullptr;
+	}
 	const FTransform MuzzleTransform = ResolveMuzzleTransform(MuzzleIndex);
 	const FVector AimPoint = ResolveAuthorityAimPoint(RocketAimTraceDistance);
 	FVector LaunchDirection = (AimPoint - MuzzleTransform.GetLocation()).GetSafeNormal();
@@ -1213,7 +1220,8 @@ USovGameplayAbility_ReformationDroneRocketLauncher::LaunchRocket(
 	{
 		UAbilitySystemComponent* HomingTargetASC =
 			ResolveAbilitySystemFromActor(HomingTarget);
-		if (IsHostileTarget(HomingTargetASC) && IsTargetAlive(HomingTargetASC))
+		if (IsHostileTarget(HomingTargetASC) && IsTargetAlive(HomingTargetASC)
+			&& SovThreatTargeting::CanTrack(Avatar, HomingTargetASC->GetAvatarActor()))
 		{
 			ValidatedHomingTarget = HomingTargetASC->GetAvatarActor();
 		}
@@ -1274,6 +1282,7 @@ AActor* USovGameplayAbility_ReformationDroneRocketLauncher::
 
 	UAbilitySystemComponent* TargetASC = ResolveAbilitySystemFromActor(FocusActor);
 	return IsHostileTarget(TargetASC) && IsTargetAlive(TargetASC)
+		&& SovThreatTargeting::CanTrack(GetAvatarActorFromActorInfo(), TargetASC->GetAvatarActor())
 		? TargetASC->GetAvatarActor()
 		: nullptr;
 }
@@ -1469,7 +1478,7 @@ void USovGameplayAbility_ReformationDroneSelfDestruct::
 	{
 		return;
 	}
-	if (!CanContinueWeaponPayload())
+	if (!CanContinueWeaponPayload() || !SovThreatTargeting::CanTrack(SourceDrone, TargetActor))
 	{
 		CancelDroneWeaponAbility();
 		return;
@@ -1556,7 +1565,8 @@ void USovGameplayAbility_ReformationDroneSelfDestruct::UpdatePursuit()
 		|| !IsValid(TargetActor)
 		|| !IsValid(World)
 		|| !IsHostileTarget(TargetASC)
-		|| !IsTargetAlive(TargetASC))
+		|| !IsTargetAlive(TargetASC)
+		|| !SovThreatTargeting::CanTrack(SourceDrone, TargetActor))
 	{
 		CancelDroneWeaponAbility();
 		return;
@@ -1647,6 +1657,7 @@ AActor* USovGameplayAbility_ReformationDroneSelfDestruct::
 				<= FMath::Square(FMath::Max(TargetAcquisitionRange, 0.0f))
 			&& IsHostileTarget(CandidateASC)
 			&& IsTargetAlive(CandidateASC)
+			&& SovThreatTargeting::CanTrack(SourceDrone, TargetAvatar)
 			? TargetAvatar
 			: nullptr;
 	};
@@ -1686,7 +1697,8 @@ bool USovGameplayAbility_ReformationDroneSelfDestruct::RequestPursuitMove(
 	AActor* TargetActor)
 {
 	AAIController* AIController = Cast<AAIController>(GetOwningController());
-	if (!IsValid(AIController) || !IsValid(TargetActor))
+	if (!IsValid(AIController) || !IsValid(TargetActor)
+		|| !SovThreatTargeting::CanTrack(GetAvatarActorFromActorInfo(), TargetActor))
 	{
 		return false;
 	}
@@ -1704,7 +1716,7 @@ bool USovGameplayAbility_ReformationDroneSelfDestruct::RequestPursuitMove(
 	const FPathFollowingRequestResult MoveResult =
 		AIController->MoveTo(MoveRequest, nullptr);
 	OwnedPursuitMoveRequestId = MoveResult.MoveId;
-	if (!IsActive())
+	if (!IsActive() || !SovThreatTargeting::CanTrack(GetAvatarActorFromActorInfo(), TargetActor))
 	{
 		// Replacing a previous AI request may synchronously notify StateTree/BT.
 		// If that ended the ability, do not leave the newly issued move running.

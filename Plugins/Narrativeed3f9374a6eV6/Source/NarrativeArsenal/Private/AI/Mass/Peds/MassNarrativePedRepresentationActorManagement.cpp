@@ -5,6 +5,7 @@
 
 #include "ArsenalStatics.h"
 #include "MassActorSpawnerSubsystem.h"
+#include "MassAgentComponent.h"
 #include "MassCommandBuffer.h"
 #include "MassCommands.h"
 #include "MassEntityManager.h"
@@ -40,21 +41,35 @@ void UMassNarrativePedRepresentationActorManagement::SetActorEnabled(const EMass
 {
 	const bool bEnabled = EnabledType != EMassActorEnabledType::Disabled;
 	
-	if (Actor.GetActorEnableCollision() != bEnabled)
+	// Always enqueue: the actor's present state does not include earlier queued commands.
+	// A disable followed by enable before a flush must leave the actor enabled.
+	const TWeakObjectPtr<AActor> WeakActor = &Actor;
+	const TWeakObjectPtr<UMassAgentComponent> Agent = Actor.FindComponentByClass<UMassAgentComponent>();
+	const FMassEntityHandle ExpectedEntity = Agent.IsValid() ? Agent->GetEntityHandle() : FMassEntityHandle();
+	CommandBuffer.PushCommand<FMassDeferredSetCommand>([WeakActor, Agent, ExpectedEntity, bEnabled](FMassEntityManager&)
 	{
-		// Deferring this as there is a callback internally that could end up doing things outside of the game thread and will fire checks(Chaos mostly)
-		CommandBuffer.PushCommand<FMassDeferredSetCommand>([&Actor, bEnabled](FMassEntityManager&)
+		const auto StillAssociated = [WeakActor, Agent, ExpectedEntity]()
 		{
-			TArray<AActor*> ActorsToChange;
-			Actor.GetAllChildActors(ActorsToChange);
-			ActorsToChange.Emplace(&Actor);
-			
-			for (AActor* ModifiedActor : ActorsToChange)
-			{
-				ModifiedActor->SetActorEnableCollision(bEnabled);
-				ModifiedActor->SetActorHiddenInGame(!bEnabled);
-				ModifiedActor->SetActorTickEnabled(bEnabled);
-			}
-		});
-	}
+			AActor* CurrentActor = WeakActor.Get();
+			if (!IsValid(CurrentActor) || CurrentActor->IsActorBeingDestroyed() || Agent.IsStale()) { return false; }
+			UMassAgentComponent* CurrentAgent = CurrentActor->FindComponentByClass<UMassAgentComponent>();
+			return CurrentAgent == Agent.Get() && (!CurrentAgent || CurrentAgent->GetEntityHandle() == ExpectedEntity);
+		};
+		if (!StillAssociated()) { return; }
+		AActor* LiveActor = WeakActor.Get();
+		TArray<AActor*> ActorsToChange;
+		LiveActor->GetAllChildActors(ActorsToChange);
+		ActorsToChange.Emplace(LiveActor);
+		for (AActor* ModifiedActor : ActorsToChange)
+		{
+			if (!StillAssociated()) { return; }
+			if (!IsValid(ModifiedActor) || ModifiedActor->IsActorBeingDestroyed()) { continue; }
+			if (ModifiedActor->GetActorEnableCollision() != bEnabled) { ModifiedActor->SetActorEnableCollision(bEnabled); }
+			if (!StillAssociated()) { return; }
+			if (!IsValid(ModifiedActor) || ModifiedActor->IsActorBeingDestroyed()) { continue; }
+			if (ModifiedActor->IsHidden() == bEnabled) { ModifiedActor->SetActorHiddenInGame(!bEnabled); }
+			if (!IsValid(ModifiedActor) || ModifiedActor->IsActorBeingDestroyed()) { continue; }
+			if (ModifiedActor->IsActorTickEnabled() != bEnabled) { ModifiedActor->SetActorTickEnabled(bEnabled); }
+		}
+	});
 }

@@ -2,6 +2,8 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "UnrealFramework/NarrativeGameUserSettings.h"
+#include "Containers/Ticker.h"
+#include "Feedback/SovPlatformOutputTypes.h"
 #include "SovGameUserSettings.generated.h"
 
 class USovCampaignStateComponent;
@@ -46,6 +48,17 @@ class PROJECTVELKORRAN_API USovGameUserSettings : public UNarrativeGameUserSetti
 public:
 	static USovGameUserSettings* Get();
 	virtual void LoadSettings(bool bForceReload = false) override;
+	virtual void SaveSettings() override;
+	virtual void ApplySettings(bool bCheckForCommandLineOverrides) override;
+	virtual void BeginDestroy() override;
+	UFUNCTION(BlueprintPure, Category="Sovereign|Settings|Feedback") FSovHapticSettings GetHapticSettings() const { return HapticSettings; }
+	UFUNCTION(BlueprintCallable, Category="Sovereign|Settings|Feedback") bool ApplyHapticSettings(const FSovHapticSettings& Value, FString& Error);
+	UPROPERTY(BlueprintAssignable, Category="Sovereign|Settings|Feedback") FSovHapticSettingsChanged OnHapticSettingsChanged;
+	UFUNCTION(BlueprintCallable, Category="Sovereign|Settings|HDR") FSovHDROutputStatus GetHDROutputStatus();
+	/** Applies engine output immediately; unconfirmed preview automatically reverts after 15 real seconds. */
+	UFUNCTION(BlueprintCallable, Category="Sovereign|Settings|HDR") bool PreviewHDRCalibration(bool bEnable, int32 PeakNits, FGuid& Receipt, FString& Error);
+	UFUNCTION(BlueprintCallable, Category="Sovereign|Settings|HDR") bool ConfirmHDRCalibration(FGuid Receipt, FString& Error);
+	UFUNCTION(BlueprintCallable, Category="Sovereign|Settings|HDR") bool RevertHDRCalibration(FGuid Receipt);
 	virtual void SetGameplayDifficulty(const ENarrativeGameplayDifficulty NewDifficulty) override;
 	UFUNCTION(BlueprintPure, Category="Sovereign|Settings") FSovUserSettingsSnapshot GetSettingsSnapshot() const { return Settings; }
 	/** Validates the complete transaction before mutation, then persists immediately and emits one typed event. */
@@ -85,7 +98,25 @@ public:
 	/** Explicit opt-in import only: current local accessibility/comfort/consent settings are retained. */
 	bool RestorePortableSettings(const TArray<uint8>& Data, FString& Error);
 	static bool ValidateSnapshot(const FSovUserSettingsSnapshot& Value, bool bSovereignUnlocked, FString& Error);
+protected:
+	/** Real engine adapter seams permit deterministic automation without driving the test machine's display. */
+	virtual FSovHDROutputStatus ReadHDROutput();
+	virtual void WriteHDROutput(bool bEnable, int32 PeakNits);
+	virtual bool CanApplyHDROutput() const;
+	virtual double HDRTime() const;
+	virtual void PersistSettings();
 private:
+	friend struct FSovPlatformOutputTestAccess;
+	bool TickHDRPreview(float DeltaTime);
+	void RemoveHDRPreviewTicker();
+	UPROPERTY(config) FSovHapticSettings HapticSettings;
+	FGuid HDRPreviewReceipt;
+	FSovHDROutputStatus HDRPreviewOutput;
+	FTSTicker::FDelegateHandle HDRPreviewTicker;
+	double HDRPreviewDeadline = 0.;
+	bool bHDRBeforePreview = false;
+	int32 HDRNitsBeforePreview = 1000;
+	bool bHDRTransaction = false;
 	UPROPERTY(config) int32 SettingsSchemaVersion = 1;
 	UPROPERTY(config) FSovUserSettingsSnapshot Settings;
 	UPROPERTY(config) bool bCampaignCompleted = false;

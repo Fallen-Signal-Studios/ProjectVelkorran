@@ -502,6 +502,16 @@ void ASovEncounterDirector::HandleDeath(AActor* KilledActor, UNarrativeAbilitySy
 void ASovEncounterDirector::SuspendActor(AActor* Actor)
 {
 	if (!IsValid(Actor)) { return; }
+	if (APawn* Pawn = Cast<APawn>(Actor))
+	{
+		if (auto* ThreatController = Cast<ANarrativeNPCController>(Pawn->GetController()))
+		{
+			SuspendedThreatControllers.Add(ThreatController, Pawn);
+			ThreatController->SetThreatMemorySuspended(this, true);
+			if (!IsValid(Actor) || !IsValid(ThreatController) || ThreatController->GetPawn() != Pawn
+				|| SuspendedThreatControllers.FindRef(ThreatController).Get() != Pawn) { return; }
+		}
+	}
 	if (UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Actor))
 	{
 		if (!SuspendedASCs.Contains(ASC) || !OwnedBusySuspensions.Contains(ASC) || !OwnedProtectionSuspensions.Contains(ASC))
@@ -541,6 +551,7 @@ bool ASovEncounterDirector::ReleaseSuspensions(TFunctionRef<bool()> CanContinue)
 {
 	const TArray<TObjectPtr<UAbilitySystemComponent>> ASCs = SuspendedASCs;
 	const TArray<TObjectPtr<UBrainComponent>> Brains = PausedBrains;
+	const auto ThreatControllers = SuspendedThreatControllers;
 	for (UAbilitySystemComponent* ASC : ASCs)
 	{
 		if (!CanContinue()) { return false; }
@@ -554,6 +565,15 @@ bool ASovEncounterDirector::ReleaseSuspensions(TFunctionRef<bool()> CanContinue)
 			if (!CanContinue()) { return false; }
 		}
 		SuspendedASCs.Remove(ASC); SuspendedAvatars.Remove(ASC); OwnedBusySuspensions.Remove(ASC); OwnedProtectionSuspensions.Remove(ASC);
+	}
+	for (const auto& Pair : ThreatControllers)
+	{
+		if (!CanContinue()) { return false; }
+		if (SuspendedThreatControllers.FindRef(Pair.Key) != Pair.Value) { continue; }
+		SuspendedThreatControllers.Remove(Pair.Key);
+		if (Pair.Key.IsValid() && Pair.Value.IsValid() && Pair.Key->GetPawn() == Pair.Value.Get())
+		{ Pair.Key->SetThreatMemorySuspended(this, false); }
+		if (!CanContinue()) { return false; }
 	}
 	for (UBrainComponent* Brain : Brains)
 	{
@@ -908,7 +928,7 @@ void ASovEncounterDirector::FinishRestore()
 		if (!bPlayerRestored) { AbortRestore(Error); return; }
 		if (SavedController.IsValid())
 		{
-			FNarrativeActorRecord ControllerRecord = SavedController; ControllerRecord.Transform = FTransform::Identity;
+			FNarrativeActorRecord ControllerRecord = SavedController; ControllerRecord.Transform = FTransform::Identity; ControllerRecord.bHasTransform = false;
 			const bool bControllerRestored = Save->LoadActorFromRecord(Controller, ControllerRecord);
 			if (!OwnsRestore()) { StopStaleRestore(); return; }
 			if (!bControllerRestored) { AbortRestore(TEXT("Narrative rejected the checkpoint controller record.")); return; }

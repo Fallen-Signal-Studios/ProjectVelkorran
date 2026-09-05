@@ -13,6 +13,7 @@ param(
     [string] $EngineRoot,
     [string] $ProjectPath = (Join-Path $PSScriptRoot '..\ProjectVelkorran.uproject'),
     [string] $OutputDirectory,
+    [string] $PythonExecutable,
     [ValidatePattern('^ProjectVelkorran(?:\.[A-Za-z0-9_]+)*$')]
     [string] $TestFilter = 'ProjectVelkorran',
     [ValidateRange(30, 86400)]
@@ -171,6 +172,17 @@ try {
     Assert-ContentAvailable -Directory (Join-Path $script:ProjectDirectory 'Content') -Label 'Project'
     Assert-ContentAvailable -Directory (Join-Path (Split-Path -Parent $narrativeDescriptor) 'Content') -Label 'NarrativePro'
     if ($SkipBuild) { Write-Warning 'Build skipped. You are responsible for ensuring editor binaries contain the current source and tests.' }
+    if ([string]::IsNullOrWhiteSpace($PythonExecutable)) {
+        $PythonExecutable = Join-Path $engineDirectory 'Binaries\ThirdParty\Python3\Win64\python.exe'
+        if (-not (Test-Path -LiteralPath $PythonExecutable -PathType Leaf)) {
+            $pythonCommand = Get-Command python.exe -ErrorAction SilentlyContinue
+            if ($null -eq $pythonCommand) { throw 'Python 3 is required for source-to-report coverage validation. Supply -PythonExecutable or install Python 3.' }
+            $PythonExecutable = $pythonCommand.Source
+        }
+    }
+    if (-not (Test-Path -LiteralPath $PythonExecutable -PathType Leaf)) { throw "Python executable not found: $PythonExecutable" }
+    $reportChecker = Join-Path $PSScriptRoot 'Check-UnrealReport.py'
+    if (-not (Test-Path -LiteralPath $reportChecker -PathType Leaf)) { throw "Report coverage checker not found: $reportChecker" }
 
     $reportDirectory = Join-Path $script:RunDirectory 'AutomationReport'
     $editorLog = Join-Path $script:RunDirectory 'UnrealEditor.log'
@@ -205,6 +217,15 @@ try {
             throw "Automation test did not pass: $($test.fullTestPath) (state=$($test.state))."
         }
     }
+    # Source inventory includes the project-prefixed regressions implemented inside
+    # Narrative's modules. An old binary that runs only one passing test cannot pass.
+    $coveragePath = Join-Path $script:RunDirectory 'coverage.json'
+    $coverageExit = Invoke-LoggedProcess -Executable $PythonExecutable -LogName 'ReportCoverage' `
+        -TimeoutSeconds 120 -Arguments @(
+            $reportChecker, '--report', $reportPath, '--source-root', $script:ProjectDirectory,
+            '--filter', $TestFilter, '--output', $coveragePath
+        )
+    if ($coverageExit -ne 0) { throw "Automation source coverage validation failed (exit $coverageExit). Inspect ReportCoverage.stdout.log and coverage.json." }
     $summary.automation = "passed $($selectedTests.Count) matching tests; warnings=$($report.succeededWithWarnings)"
     $summary | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $script:RunDirectory 'summary.json') -Encoding UTF8
     Write-Host "Validation passed: $($selectedTests.Count) matching automation tests. Report: $reportPath"

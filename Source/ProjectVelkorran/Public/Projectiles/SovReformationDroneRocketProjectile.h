@@ -100,6 +100,7 @@ class PROJECTVELKORRAN_API ASovReformationDroneRocketProjectile : public ANarrat
 	GENERATED_BODY()
 
 public:
+	virtual void Tick(float DeltaSeconds) override;
 	ASovReformationDroneRocketProjectile();
 
 	virtual void GetLifetimeReplicatedProps(
@@ -300,7 +301,7 @@ private:
 		const FHitResult& Hit);
 
 	UFUNCTION()
-	void OnRep_FlightState();
+	void OnRep_FlightState(const FSovReformationDroneRocketFlightState& PreviousState);
 
 	UFUNCTION()
 	void OnRep_Resolution();
@@ -309,6 +310,7 @@ private:
 	void ResumeReflectedFlight();
 	UFUNCTION() void ReceiveDirectDefense(const FSovDamageResult& Result);
 	friend struct FSovProjectileDefenseTestAccess;
+	friend struct FSovThreatAttackTestAccess;
 	void StartProjectileMovement();
 	void ConfigureHoming();
 	void DeactivateProjectile();

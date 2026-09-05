@@ -92,6 +92,8 @@ protected:
 	virtual void ServerStopInteractBehavior(const bool bWasStolen, UNarrativeInteractionComponent* OptionalStealer = nullptr, FGameplayEventData OptionalPayload = FGameplayEventData());
 
 public:
+	/** Native presentation subscribers observe the same admitted interaction event as Blueprint. */
+	FOnUseInteractable& GetOnBeginUseInteractable() { return OnBeginUseInteractable; }
 
 	//Return true if we're occuping an interactable currently, such as a seat. 
 	UFUNCTION(BlueprintPure, Category = "Narrative|NarrativeCharacter|Interaction")

@@ -93,6 +93,8 @@ bool UNarrativeSaveSubsystem::CaptureSaveObject(UNarrativeSave*& OutSnapshot)
 					//Don't save the controller or player state transforms, we don't really need to do this and at worst it may cause bugs 
 					PlayerData.PlayerStateData.Transform = FTransform::Identity;
 					PlayerData.ControllerData.Transform = FTransform::Identity;
+					PlayerData.PlayerStateData.bHasTransform = false;
+					PlayerData.ControllerData.bHasTransform = false;
 
 					Candidate->PlayerData = PlayerData;
 
@@ -124,6 +126,8 @@ bool UNarrativeSaveSubsystem::CaptureSaveObject(UNarrativeSave*& OutSnapshot)
 							{ Candidate->RecordMap.Remove(ActorGUID); continue; }
 							if (CapturedGuids.Contains(ActorGUID)) { return false; }
 							CapturedGuids.Add(ActorGUID);
+							// Stable actors may exist only as GUID lookup targets. Only Savable opts into world records.
+							if (!Actor->Implements<UNarrativeSavableActor>()) { continue; }
 							//Create a record of the actor and any components its needs saved 
 							FNarrativeActorRecord SaveActor;
 							if (!CreateActorRecord(Actor, SaveActor)) { return false; }
@@ -332,6 +336,8 @@ bool UNarrativeSaveSubsystem::CreatePlayerOnlySaveInSlot(APlayerController* PC, 
 	if (!PlayerSave) { return false; }
 	Records.PlayerStateData.Transform = FTransform::Identity;
 	Records.ControllerData.Transform = FTransform::Identity;
+	Records.PlayerStateData.bHasTransform = false;
+	Records.ControllerData.bHasTransform = false;
 	PlayerSave->PlayerData = MoveTemp(Records);
 	return UGameplayStatics::SaveGameToSlot(PlayerSave, SlotName, 0);
 }
@@ -677,10 +683,13 @@ bool UNarrativeSaveSubsystem::CreateActorRecord(AActor* Actor, FNarrativeActorRe
 {
 	if (!IsValid(Actor)) { return false; }
 	FNarrativeActorRecord Candidate;
-	if (Actor->Implements<UNarrativeSavableActor>())
+	if (Actor->Implements<UNarrativeStableActor>())
 	{
 		Candidate.ActorGUID = INarrativeStableActor::Execute_GetActorGUID(Actor);
-		if (!Candidate.ActorGUID.IsValid()) { return false; }
+		if (!IsValid(Actor) || !Candidate.ActorGUID.IsValid()) { return false; }
+	}
+	if (Actor->Implements<UNarrativeSavableActor>())
+	{
 		Candidate.bNeedsDynamicSpawn = INarrativeSavableActor::Execute_ShouldRespawn(Actor);
 		if (!IsValid(Actor)) { return false; }
 		Candidate.bOptional = INarrativeSavableActor::Execute_IsOptionalSaveRecord(Actor);
@@ -694,7 +703,7 @@ bool UNarrativeSaveSubsystem::CreateActorRecord(AActor* Actor, FNarrativeActorRe
 	Candidate.bNetStartup = Actor->IsNetStartupActor();
 	Candidate.Transform = FTransform::Identity;
 	if (Actor->GetRootComponent() && Actor->GetRootComponent()->Mobility == EComponentMobility::Movable)
-	{ Candidate.Transform = Actor->GetActorTransform(); }
+	{ Candidate.Transform = Actor->GetActorTransform(); Candidate.bHasTransform = true; }
 	FMemoryWriter MemWriter(Candidate.ByteData);
 	FObjectAndNameAsStringProxyArchive Ar(MemWriter, true);
 	Ar.ArIsSaveGame = true;
@@ -752,7 +761,7 @@ bool UNarrativeSaveSubsystem::LoadActorFromRecord(AActor* Actor, const FNarrativ
 {
 	if (!ValidateRecordForActor(Actor, ActorRecord)) { return false; }
 	if (ActorRecord.bNetStartup && ActorRecord.bDestroyed) { return Actor->Destroy(); }
-	if (!ActorRecord.Transform.Equals(FTransform::Identity)
+	if ((ActorRecord.bHasTransform || !ActorRecord.Transform.Equals(FTransform::Identity))
 		&& Actor->GetRootComponent() && Actor->GetRootComponent()->Mobility == EComponentMobility::Movable)
 	{ Actor->SetActorTransform(ActorRecord.Transform, false, nullptr, ETeleportType::TeleportPhysics); }
 	if (!IsValid(Actor)) { return false; }

@@ -1,6 +1,7 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Framework/SovPlayerController.h"
 #include "Narrative/SovNarrativeCueComponent.h"
+#include "Feedback/SovHapticFeedbackComponent.h"
 
 #include "AI/NarrativeCharacterSubsystem.h"
 #include "Campaign/SovCampaignDefinition.h"
@@ -37,6 +38,7 @@ ASovPlayerController::ASovPlayerController(const FObjectInitializer& ObjectIniti
 	CampaignState = CreateDefaultSubobject<USovCampaignStateComponent>(TEXT("SovCampaignState"));
 	NarrativeCues = CreateDefaultSubobject<USovNarrativeCueComponent>(TEXT("SovNarrativeCues"));
 	ConvergenceCompanionState = CreateDefaultSubobject<USovConvergenceCompanionState>(TEXT("SovConvergenceCompanionState"));
+	HapticFeedback = CreateDefaultSubobject<USovHapticFeedbackComponent>(TEXT("HapticFeedback"));
 }
 
 FGuid ASovPlayerController::GetActorGUID_Implementation() const
@@ -140,6 +142,7 @@ void ASovPlayerController::SetTransitionState(ESovCampaignTransitionState State,
 
 bool ASovPlayerController::ClearOutgoingCombatState()
 {
+	if (HapticFeedback) { HapticFeedback->CancelAllFeedback(); }
 	APawn* ExpectedPawn = GetPawn();
 	UNarrativeAbilitySystemComponent* ASC = Cast<UNarrativeAbilitySystemComponent>(GetAbilitySystemComponent());
 	if (!IsValid(ExpectedPawn) || !ASC || ASC->GetAvatarActor() != ExpectedPawn) { return false; }
@@ -293,6 +296,7 @@ bool ASovPlayerController::StageCampaignLoad(USovCampaignDefinition* Mission, co
 		FNarrativeActorRecord ActorOnly = Records->PlayerStateData;
 		ActorOnly.SavedComponents.Reset(); // Never load source ASC or source skills onto a different protagonist.
 		ActorOnly.Transform = FTransform::Identity;
+		ActorOnly.bHasTransform = false;
 		if (!Save->LoadActorFromRecord(PS, ActorOnly))
 		{ OutError = TEXT("Campaign PlayerState record could not be deserialized."); return false; }
 	}
@@ -455,6 +459,8 @@ void ASovPlayerController::PollCampaignInitialization(uint64 ExpectedEpoch)
 	if (!StillCompleting(CompletingState)) { return; }
 	RefreshGameplayReadiness();
 	if (!StillCompleting(CompletingState)) { return; }
+	if (HapticFeedback) { HapticFeedback->RefreshSources(); }
+	if (!StillCompleting(CompletingState)) { return; }
 	SetTransitionState(ESovCampaignTransitionState::Idle);
 	if (!StillCompleting(ESovCampaignTransitionState::Idle)) { return; }
 	if (USovSaveSubsystem* Slots = GetGameInstance() ? GetGameInstance()->GetSubsystem<USovSaveSubsystem>() : nullptr)
@@ -599,6 +605,7 @@ bool ASovPlayerController::TravelToMission(USovCampaignDefinition* Destination, 
 
 void ASovPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	if (HapticFeedback) { HapticFeedback->CancelAllFeedback(); }
 	++TransitionEpoch;
 	GetWorldTimerManager().ClearTimer(InitializationTimer);
 	Super::EndPlay(EndPlayReason);

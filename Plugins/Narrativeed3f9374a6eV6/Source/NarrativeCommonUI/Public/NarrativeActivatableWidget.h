@@ -59,8 +59,8 @@ protected:
 	UFUNCTION(BlueprintCallable, Category = "Narrative Activatable Widget")
 	void SetBindingShowOnActionBar(FInputActionBindingHandle BindingHandle, const bool bShowOnActionBar);
 
-	virtual void NativeOnActivated();
-	virtual void NativeOnDeactivated();
+	virtual void NativeOnActivated() override;
+	virtual void NativeOnDeactivated() override;
 
 	UFUNCTION(BlueprintImplementableEvent)
 	void RegisterActions();
@@ -77,7 +77,8 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative Activatable Widget")
 	bool bDeactivateOnBack;
 
-	//If true we'll automatically focus GetDesiredFocusTarget() when widget activates
+	//Ask CommonUI to restore its cached focus, or the authored desired target, on activation.
+	//CommonUI remains responsible for deciding which active layer may receive focus.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative Activatable Widget")
 	bool bFocusDesiredTargetOnActivate;
 
@@ -102,5 +103,8 @@ protected:
 private:
 
 	TArray<struct FUIActionBindingHandle> BindingHandles;
+
+	//Activation callbacks may deactivate/reactivate the same instance synchronously.
+	uint64 ActivationGeneration = 0;
 
 };

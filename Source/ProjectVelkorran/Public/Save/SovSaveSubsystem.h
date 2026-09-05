@@ -65,12 +65,15 @@ public:
     UPROPERTY(BlueprintAssignable, Category="Campaign|Save") FSovSaveCompleted OnLoadCompleted;
 private:
     friend struct FSovSaveTestAccess;
+    friend struct FSovSaveWorldLoadTestAccess;
     struct FQueuedBoundary { ESovSaveBoundary Kind; FName Id; };
     bool CanCaptureInternal(FString& Error, bool bAllowEntrySuspension) const;
     ESovSaveResult CaptureAndWrite(ESovSaveSlotKind Kind, int32 SlotIndex, FName BoundaryId, FString& Error, bool bAllowEntrySuspension = false, ESovSaveBoundary Boundary = ESovSaveBoundary::ExplicitCheckpoint);
     ESovSaveResult WriteEnvelope(USovCampaignSaveGame* Save, FString& Error);
     USovCampaignSaveGame* ReadBest(ESovSaveSlotKind Kind, int32 Index, int32& OutBank, bool& bDamaged, FString& Error);
     bool ValidateEnvelope(USovCampaignSaveGame* Save, bool bValidateAssets, FString& Error) const;
+    bool MatchesPendingLoadRequest(const FString& Options) const;
+    void CompletePendingLoad(bool bSucceeded, const FString& Error);
     UNarrativeSave* DecodeNarrative(USovCampaignSaveGame* Save, FString& Error) const;
     FString BankName(ESovSaveSlotKind Kind, int32 Index, int32 Bank) const;
     void ResolveInitialSave(UWorld& World, UNarrativeSave*& Snapshot, bool& bOverride);
@@ -82,12 +85,15 @@ private:
     UPROPERTY(Transient) TObjectPtr<USovCampaignSaveGame> FailedWrite;
     UPROPERTY(Transient) TObjectPtr<UNarrativeSave> PendingNarrative;
     TWeakObjectPtr<UWorld> PendingDestination;
+    TWeakObjectPtr<UWorld> RejectedLoadWorld;
     TWeakObjectPtr<ASovPlayerController> PausedController;
     TArray<FQueuedBoundary> PendingAutosaves;
     FString AccountNamespace;
     int32 UserIndex = 0;
     double PlaySeconds = 0;
     double PendingLoadDeadline = 0;
+    FGuid PendingLoadRequest;
+    FString PendingLoadError;
     bool bBusy = false;
     bool bAwaitingFailureDecision = false;
     bool bOwnPause = false;

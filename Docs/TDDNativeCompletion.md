@@ -1,5 +1,7 @@
 # TDD native completion audit and delivery
 
+Subsequent delivery: [Remaining engineering audit, 5 September 2026](TDDRemainingEngineering-2026-09-05.md) supersedes this report's remaining-work list. The baseline below remains historical.
+
 Audit date: 4 September 2026. Comparison baseline: `fe31c66e69226d73d92a3dea38ed6a6fef3aa1dd` (`codex/campaign-engineering`). This report describes the next source pass, not the state of the older December prototype or a verified packaged game.
 
 ## Authority and evidence
