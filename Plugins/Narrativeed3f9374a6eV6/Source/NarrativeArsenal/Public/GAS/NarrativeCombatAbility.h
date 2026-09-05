@@ -8,6 +8,10 @@
 #include "NarrativeActorProvider.h"
 #include "NarrativeCombatAbility.generated.h"
 
+/** Automatic preserves existing range metadata; lunges and hybrid attacks can declare their real pressure class. */
+UENUM(BlueprintType)
+enum class ESovBotAttackPressure : uint8 { Automatic, Melee, Ranged, Support };
+
 //Stored on both weapons and our player for unarmed combat. Replaces the need for expensive targeting actors, GAs just generate target data themselves
 USTRUCT(BlueprintType)
 struct FCombatTraceData
@@ -127,10 +131,50 @@ protected:
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
 
+private:
+	FGuid CurrentCombatAttackId;
+	FGameplayAbilitySpecHandle CombatAttackSpecHandle;
+	bool bChargedReleaseCommitted = false;
+	bool bDefensiveCancelCommitted = false;
+	bool bExertionCommitPending = false;
+	bool bCombatEndPending = false;
+	bool TryPayAttackExertion(float Cost);
+
 public:
+	/** Receipt factories capture this identity; the mutable ability itself is deliberately not a receipt. */
+	bool GetSovAttackIdentity(const AActor* ExpectedSource, FGuid& OutAttackId) const;
+
+	/** Call only after release geometry and authored charge-tier admission succeed. One release per activation. */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Combat|Exertion")
+	bool TryCommitChargedRelease(int32 ReleasedChargeTier);
+
+	/** Caller first validates its authored defensive cancel node/window. Does not cancel the ability itself. */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Combat|Exertion")
+	bool TryCommitDefensiveCancel(float StaminaCost);
+
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Combat|Exertion")
+	bool IsChargedReleaseCommitted() const { return bChargedReleaseCommitted; }
+
+	/** Admission shared by target-data and native direct-damage payloads. */
+	bool CanDispatchNativeAttack() const;
+	/** Exact GAS activation-owned contribution, for read-only defensive-cancel admission. */
+	bool OwnsCombatActivationTag(FGameplayTag Tag) const { return IsActive() && ActivationOwnedTags.HasTagExact(Tag); }
+
+	/** Opt in for charged melee nodes; ordinary attacks and existing Echo payloads remain unchanged. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Combat|Exertion")
+	bool bRequiresChargedRelease = false;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Combat|Exertion", meta = (ClampMin = "0"))
+	int32 MinimumStaminaChargeTier = 2;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Combat|Exertion", meta = (ClampMin = "0"))
+	float ChargedReleaseStaminaCost = 20.f;
+
 	virtual bool CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayTagContainer* SourceTags = nullptr, const FGameplayTagContainer* TargetTags = nullptr, OUT FGameplayTagContainer* OptionalRelevantTags = nullptr) const;
 
-protected: 
+protected:
+	/** Renew the receipt after a validated finite combo-node transition, without a second GAS activation. */
+	bool BeginNextSovCombatAttack();
 
 	UFUNCTION(BlueprintPure, Category = "Combat")
 	virtual bool HasAmmo() const;
@@ -198,6 +242,41 @@ public:
 	float GetBotAttackRange() const;
 	virtual float GetBotAttackRange_Implementation() const;
 
+	/** Whole-repertoire NPC selection. Disable for reactions, passives or player-only actions. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Narrative Combat Ability - Bots")
+	bool bBotSelectionEnabled = true;
+
+	/** Higher priority wins; equal-priority ready abilities rotate least recently used first. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Narrative Combat Ability - Bots")
+	float BotSelectionPriority = 0.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Narrative Combat Ability - Bots")
+	bool bBotRequiresLineOfSight = true;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Narrative Combat Ability - Bots")
+	bool bBotRequiresAttackToken = true;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative Combat Ability - Bots")
+	ESovBotAttackPressure BotAttackPressure = ESovBotAttackPressure::Automatic;
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintPure, Category = "Narrative Combat Ability - Bots")
+	float GetBotAttackMinimumRange() const;
+	virtual float GetBotAttackMinimumRange_Implementation() const;
+
+	/** Actual activation range, distinct from the preferred positioning range. */
+	UFUNCTION(BlueprintNativeEvent, BlueprintPure, Category = "Narrative Combat Ability - Bots")
+	float GetBotAttackMaximumRange() const;
+	virtual float GetBotAttackMaximumRange_Implementation() const;
+
+	UFUNCTION(BlueprintNativeEvent, BlueprintPure, Category = "Narrative Combat Ability - Bots")
+	bool RequiresBotAttackToken() const;
+	virtual bool RequiresBotAttackToken_Implementation() const;
+
+	/** True only when the payload already acquires/releases Narrative's token lease itself. */
+	UFUNCTION(BlueprintNativeEvent, BlueprintPure, Category = "Narrative Combat Ability - Bots")
+	bool ManagesBotAttackToken() const;
+	virtual bool ManagesBotAttackToken_Implementation() const;
+
 	//Get the weapon hand this combat ability acts on - can be overriden to specify a hand. Not neccesarily used by all combat abilities, some may not need. 
 	UFUNCTION(BlueprintNativeEvent, BlueprintPure, Category = "Narrative Combat Ability")
 	bool IsMainhand() const;
@@ -221,4 +300,3 @@ private:
 
 	FDelegateHandle OnTargetDataReadyCallbackDelegateHandle;
 };
-

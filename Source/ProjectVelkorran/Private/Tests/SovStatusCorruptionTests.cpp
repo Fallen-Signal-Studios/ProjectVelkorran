@@ -1,6 +1,6 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 
-#include "Components/SovCorruptionComponent.h"
+#include "Components/SovLegacyCorruptionComponent.h"
 #include "Components/SovStatusComponent.h"
 #include "GAS/SovCombatTypes.h"
 #include "Misc/AutomationTest.h"
@@ -13,7 +13,7 @@ static_assert(std::is_same_v<
 	std::underlying_type_t<ESovStatusApplicationResult>,
 	uint8>);
 static_assert(std::is_same_v<
-	std::underlying_type_t<ESovCorruptionBand>,
+	std::underlying_type_t<ESovLegacyCorruptionBand>,
 	uint8>);
 
 #if WITH_AUTOMATION_TESTS
@@ -97,8 +97,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSovCorruptionPrototypeContractTest::RunTest(const FString& Parameters)
 {
-	const USovCorruptionComponent* Corruption =
-		GetDefault<USovCorruptionComponent>();
+	const USovLegacyCorruptionComponent* Corruption =
+		GetDefault<USovLegacyCorruptionComponent>();
 	TestNotNull(TEXT("Corruption component CDO exists"), Corruption);
 	if (!Corruption)
 	{
@@ -108,23 +108,23 @@ bool FSovCorruptionPrototypeContractTest::RunTest(const FString& Parameters)
 	TestTrue(
 		TEXT("Zero exposure is the internal None state"),
 		Corruption->DetermineBandForExposure(0.0f)
-			== ESovCorruptionBand::None);
+			== ESovLegacyCorruptionBand::None);
 	TestTrue(
 		TEXT("Positive sub-threshold exposure is Trace"),
 		Corruption->DetermineBandForExposure(1.0f)
-			== ESovCorruptionBand::Trace);
+			== ESovLegacyCorruptionBand::Trace);
 	TestTrue(
 		TEXT("Prototype Intrusion begins at 25 percent"),
 		Corruption->DetermineBandForExposure(25.0f)
-			== ESovCorruptionBand::Intrusion);
+			== ESovLegacyCorruptionBand::Intrusion);
 	TestTrue(
 		TEXT("Prototype Contest begins at 55 percent"),
 		Corruption->DetermineBandForExposure(55.0f)
-			== ESovCorruptionBand::Contest);
+			== ESovLegacyCorruptionBand::Contest);
 	TestTrue(
 		TEXT("Overwrite Risk is impossible without mission and source authorization"),
 		Corruption->DetermineBandForExposure(100.0f)
-			== ESovCorruptionBand::Contest);
+			== ESovLegacyCorruptionBand::Contest);
 	TestFalse(
 		TEXT("Overwrite Risk mission permission defaults off"),
 		Corruption->DoesMissionAllowOverwriteRisk());
@@ -158,7 +158,7 @@ bool FSovCorruptionPrototypeContractTest::RunTest(const FString& Parameters)
 		TEXT("A source with no continuous or instant exposure fails closed"),
 		SourceSpec.HasValidNumbers());
 	SourceSpec.ExposurePerSecond = 5.0f;
-	SourceSpec.BandCap = static_cast<ESovCorruptionBand>(255);
+	SourceSpec.BandCap = static_cast<ESovLegacyCorruptionBand>(255);
 	TestFalse(
 		TEXT("An invalid corruption band cap fails closed"),
 		SourceSpec.HasValidNumbers());

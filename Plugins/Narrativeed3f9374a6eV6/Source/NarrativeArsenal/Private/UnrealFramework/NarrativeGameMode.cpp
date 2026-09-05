@@ -157,6 +157,14 @@ void ANarrativeGameMode::ProcessServerTravel(const FString& URL, bool bAbsolute)
 	UE_LOG(LogGameMode, Log, TEXT("ProcessServerTravel: %s"), *URL);
 	UWorld* World = GetWorld();
 	check(World);
+	// ServerTravel may already have queued this URL before notifying the game
+	// mode. Returning without Super alone must not leave a failed save travelling
+	// on the world's next travel tick.
+	const auto CancelPendingTravel = [World]()
+	{
+		World->NextURL.Reset();
+		World->NextSwitchCountdown = 0.f;
+	};
 	FWorldContext& WorldContext = GEngine->GetWorldContextFromWorldChecked(World);
 	
 	// Compute the next URL, and pull the map out of it. This handles short->long package name conversion
@@ -174,9 +182,20 @@ void ANarrativeGameMode::ProcessServerTravel(const FString& URL, bool bAbsolute)
 
 				if (PC)
 				{
-					SaveSub->CreatePlayerOnlySave(PC);
+					if (!SaveSub->CreatePlayerOnlySave(PC))
+					{
+						UE_LOG(LogGameMode, Error, TEXT("Travel aborted: player save failed for %s."), *GetNameSafe(PC));
+						CancelPendingTravel();
+						return;
+					}
 				}
 			}
+		}
+		else
+		{
+			UE_LOG(LogGameMode, Error, TEXT("Travel aborted: NarrativeSaveSubsystem is unavailable."));
+			CancelPendingTravel();
+			return;
 		}
 	}
 

@@ -16,8 +16,31 @@ class PROJECTVELKORRAN_API ASovPlayerCharacterBase : public ANarrativePlayerChar
 public:
 	ASovPlayerCharacterBase(const FObjectInitializer& ObjectInitializer);
 
+	/** Campaign controller owns save/default inventory application before readiness. Set before possession. */
+	bool PrepareCampaignInitialization(class UPlayerDefinition* Definition);
+	bool IsCampaignDataReadyToApply() const;
+	bool CompleteCampaignDataInitialization(bool bGrantDefaultInventory);
+	void FailCampaignInitialization();
+	virtual FGuid GetActorGUID_Implementation() const override;
+	virtual void SetActorGUID_Implementation(const FGuid& SavedGUID) override;
+	virtual bool ShouldRespawn_Implementation() const override { return false; }
+	virtual bool ShouldResetAttributesOnRevive() const override { return false; }
+	UFUNCTION(BlueprintPure, Category="Sovereign|Components") class USovFatalRecoveryComponent* GetRecoveryComponent() const { return RecoveryComponent; }
+	UFUNCTION(BlueprintPure, Category="Sovereign|Components") class USovTargetingComponent* GetTargetingComponent() const { return TargetingComponent; }
+
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Components")
 	class USovEchoComponent* GetEchoComponent() const { return EchoComponent; }
+
+	UFUNCTION(BlueprintPure, Category="Sovereign|Components")
+	class USovExertionComponent* GetExertionComponent() const { return ExertionComponent; }
+	UFUNCTION(BlueprintPure, Category="Sovereign|Components")
+	class USovFieldRecoveryComponent* GetFieldRecoveryComponent() const { return FieldRecoveryComponent; }
+	UFUNCTION(BlueprintPure, Category="Sovereign|Components")
+	class USovResonanceComponent* GetResonanceComponent() const { return ResonanceComponent; }
+
+	/** Dormant until an explicitly mission-permitted source makes real authority contact. */
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Components")
+	class USovCorruptionComponent* GetCorruptionComponent() const { return CorruptionComponent; }
 
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Components")
 	class USovTarrikEchoGenerationComponent* GetTarrikEchoGenerationComponent() const
@@ -38,12 +61,6 @@ public:
 	class USovStatusComponent* GetStatusComponent() const { return StatusComponent; }
 
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Components")
-	class USovCorruptionComponent* GetCorruptionComponent() const
-	{
-		return CorruptionComponent;
-	}
-
-	UFUNCTION(BlueprintPure, Category = "Sovereign|Components")
 	class USovGuardComponent* GetGuardComponent() const { return GuardComponent; }
 
 	/** Exact project identity owned by the concrete protagonist class. */
@@ -59,12 +76,20 @@ public:
 	void SovPreCMCTick();
 
 protected:
+	virtual void OnCharacterVisualInitialized() override;
+	virtual class UNarrativeSaveWithCreatorData* GetCharacterCreatorData() const override;
 	virtual void HandleAbilitySystemReady(UNarrativeAbilitySystemComponent* ReadyAbilitySystem) override;
 	virtual bool AreAdditionalCharacterSystemsReady() const override;
 	virtual void OnDefinitionSet_Implementation(UCharacterDefinition* NewDefinition) override;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sovereign|Components")
 	TObjectPtr<class USovEchoComponent> EchoComponent;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Sovereign|Components") TObjectPtr<class USovExertionComponent> ExertionComponent;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Sovereign|Components") TObjectPtr<class USovFieldRecoveryComponent> FieldRecoveryComponent;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Sovereign|Components") TObjectPtr<class USovResonanceComponent> ResonanceComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sovereign|Components")
+	TObjectPtr<class USovCorruptionComponent> CorruptionComponent;
 
 	/**
 	 * Optional compatibility slot owned only by ASovTarrikCharacter.
@@ -87,11 +112,14 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sovereign|Components")
 	TObjectPtr<class USovStatusComponent> StatusComponent;
 
-	/** Player-only Eclipse exposure, source, remedy, and band-transition owner. */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sovereign|Components")
-	TObjectPtr<class USovCorruptionComponent> CorruptionComponent;
-
 	/** Optional compatibility slot owned only by ASovTarrikCharacter. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sovereign|Components")
 	TObjectPtr<class USovGuardComponent> GuardComponent;
+
+private:
+	UPROPERTY(VisibleAnywhere, Category="Sovereign|Components") TObjectPtr<class USovFatalRecoveryComponent> RecoveryComponent;
+	UPROPERTY(VisibleAnywhere, Category="Sovereign|Components") TObjectPtr<class USovTargetingComponent> TargetingComponent;
+	UPROPERTY(SaveGame) FGuid CampaignSaveGuid;
+	bool bCampaignManagedInitialization = false;
+	bool bCampaignInitializationFailed = false;
 };

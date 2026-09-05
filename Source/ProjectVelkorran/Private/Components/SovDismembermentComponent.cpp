@@ -1,6 +1,7 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 
 #include "Components/SovDismembermentComponent.h"
+#include "Components/SovWeakPointComponent.h"
 
 #include "Animation/SovDismembermentCopyPoseAnimInstance.h"
 #include "Character/NarrativeCharacterVisual.h"
@@ -224,6 +225,14 @@ void USovDismembermentComponent::PrepareForSave_Implementation()
 
 void USovDismembermentComponent::Load_Implementation()
 {
+	if ((ObservedSeveredRegionMask & ~SeveredRegionMask) != 0)
+	{
+		UE_LOG(LogSovDismemberment, Warning,
+			TEXT("Cannot restore intact limbs on existing %s; checkpoint restore must respawn this participant."), *GetNameSafe(GetOwner()));
+		SeveredRegionMask |= ObservedSeveredRegionMask;
+	}
+	ObservedSeveredRegionMask |= SeveredRegionMask;
+	ApplyAuthoredSeverConsequences();
 	OnDismembermentStateChanged.Broadcast(SeveredRegionMask);
 	ScheduleVisualRefresh();
 	if (IsValid(AbilitySystemComponent.Get())
@@ -237,6 +246,37 @@ void USovDismembermentComponent::Load_Implementation()
 		Owner->FlushNetDormancy();
 		Owner->ForceNetUpdate();
 	}
+}
+
+bool USovDismembermentComponent::CanRestoreSeveredRegionMask(const int32 SavedMask) const
+{
+	const int32 ValidBits = ((1 << static_cast<uint8>(ESovDismembermentRegion::MAX)) - 1) & ~1;
+	return GetOwner() && GetOwner()->HasAuthority() && SavedMask >= 0
+		&& (SavedMask & ~ValidBits) == 0
+		&& ((SeveredRegionMask | ObservedSeveredRegionMask | AppliedPhysicsRegionMask) & ~SavedMask) == 0;
+}
+
+bool USovDismembermentComponent::RestoreSeveredRegionMask(const int32 SavedMask)
+{
+	if (!CanRestoreSeveredRegionMask(SavedMask)) { return false; }
+	SeveredRegionMask = SavedMask;
+	Load_Implementation();
+	return true;
+}
+
+void USovDismembermentComponent::ApplyAuthoredSeverConsequences()
+{
+	if (!GetOwner() || !GetOwner()->HasAuthority()) { return; }
+	USovWeakPointComponent* WeakPoints = GetOwner()->FindComponentByClass<USovWeakPointComponent>();
+	if (!WeakPoints) { return; }
+	TArray<FName> ConsequenceIds;
+	for (const FSovDismembermentRegionDefinition& Definition : GetActiveRegionDefinitions())
+	{
+		if (!IsRegionSevered(Definition.Region)) { continue; }
+		for (const FName Id : Definition.ConsequenceWeakPointIds) { ConsequenceIds.AddUnique(Id); }
+	}
+	// Weak-point callbacks can rebuild the profile/visual; never hold its array references across dispatch.
+	for (const FName Id : ConsequenceIds) { WeakPoints->BreakWeakPointWithoutReward(Id); }
 }
 
 bool USovDismembermentComponent::IsInitialized() const
@@ -846,6 +886,8 @@ void USovDismembermentComponent::HandleDeferredVisualRefresh()
 void USovDismembermentComponent::RefreshDismembermentVisuals()
 {
 	RebuildRuntimeRegionDefinitions();
+	ObservedSeveredRegionMask |= SeveredRegionMask;
+	ApplyAuthoredSeverConsequences();
 
 	if (USkeletalMeshComponent* PrimaryMesh = ResolvePrimaryMesh())
 	{
@@ -1081,14 +1123,17 @@ bool USovDismembermentComponent::CommitSever(
 		SafeImpactNormal = FVector::UpVector;
 	}
 
+	const ESovDismembermentRegion SeveredRegion = Definition.Region;
 	GetOwner()->FlushNetDormancy();
-	SeveredRegionMask |= GetRegionBit(Definition.Region);
+	SeveredRegionMask |= GetRegionBit(SeveredRegion);
+	ObservedSeveredRegionMask |= SeveredRegionMask;
+	ApplyAuthoredSeverConsequences();
 	OnDismembermentStateChanged.Broadcast(SeveredRegionMask);
 	GetOwner()->ForceNetUpdate();
 
 	const int32 CosmeticSeed = ++CosmeticEventCounter ^ GetOwner()->GetUniqueID();
 	MulticastPlaySever(
-		Definition.Region,
+		SeveredRegion,
 		SafeHitBone,
 		SafeImpactLocation,
 		SafeImpactNormal,

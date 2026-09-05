@@ -3,6 +3,10 @@
 
 #include "SkillTrees/SkillTreeComponent.h"
 #include "SkillTrees/TreePerk.h"
+#include "SkillTrees/SovOwnedPerkGrants.h"
+#include "AbilitySystemBlueprintLibrary.h"
+#include "AbilitySystemComponent.h"
+#include "GameFramework/PlayerState.h"
 
 #define LOCTEXT_NAMESPACE "SkillTreeComponent"
 
@@ -42,6 +46,7 @@ void USkillTreeComponent::BeginPlay()
 
 bool USkillTreeComponent::BuyPerk(TSubclassOf<UTreePerk> Perk, UTreeSkill* OwnerSkill)
 {
+	if (!GetOwner() || !GetOwner()->HasAuthority() || bRestoringPerks) { return false; }
 
 	check(OwnerSkill);
 
@@ -60,7 +65,7 @@ bool USkillTreeComponent::BuyPerk(TSubclassOf<UTreePerk> Perk, UTreeSkill* Owner
 
 			if (PerkInstance)
 			{
-				PerkInstance->SetPerkLevel(PerkInstance->PerkLevel + 1);
+				ApplyPurchasedPerkLevel(PerkInstance, PerkInstance->PerkLevel + 1);
 
 				//We now have 1 less point to spend, and buying a perk should level up the skill. 
 				--SkillTreePoints;
@@ -183,6 +188,13 @@ FSavedPerk USkillTreeComponent::PerkToSaveData(const UTreePerk* Perk) const
 
 void USkillTreeComponent::Load_Implementation()
 {
+	if (!GetOwner() || !GetOwner()->HasAuthority() || bRestoringPerks) { return; }
+	TGuardValue<bool> RestoreGuard(bRestoringPerks, true);
+	ClearPurchasedPerksForRestore();
+	for (UTreeSkill* Skill : SkillTreeSkills)
+	{
+		if (Skill) { Skill->SkillLevel = GetDefault<UTreeSkill>(Skill->GetClass())->SkillLevel; }
+	}
 	if (SkillTreeSaveData.HasSaveData())
 	{
 		//Set the skills back to their saved state
@@ -197,17 +209,75 @@ void USkillTreeComponent::Load_Implementation()
 			}
 		}
 
+		TSet<UClass*> RestoredClasses;
 		for (auto& SavedPerk : SkillTreeSaveData.SavedPerks)
 		{
-			if (SavedPerk.PerkClass)
+			if (SavedPerk.PerkClass && !RestoredClasses.Contains(SavedPerk.PerkClass.Get()) && SavedPerk.PerkLevel >= 0)
 			{
+				RestoredClasses.Add(SavedPerk.PerkClass.Get());
 				if (UTreePerk* PerkInstance = NewObject<UTreePerk>(this, SavedPerk.PerkClass))
 				{
 					PurchasedPerks.Add(PerkInstance);
-					PerkInstance->SetPerkLevel(SavedPerk.PerkLevel);
+					ApplyPurchasedPerkLevel(PerkInstance, FMath::Clamp(SavedPerk.PerkLevel, 0, FMath::Max(0, PerkInstance->MaxLevels - 1)));
 				}
 			}
 		}
+	}
+}
+
+void USkillTreeComponent::ApplyPurchasedPerkLevel(UTreePerk* Perk, int32 Level)
+{
+	if (!IsValid(Perk)) { return; }
+	UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner());
+	TSet<FGameplayAbilitySpecHandle> BeforeAbilities;
+	TSet<FActiveGameplayEffectHandle> BeforeEffects;
+	if (ASC)
+	{
+		for (const FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities()) { BeforeAbilities.Add(Spec.Handle); }
+		for (const FActiveGameplayEffectHandle Handle : ASC->GetActiveEffects(FGameplayEffectQuery())) { BeforeEffects.Add(Handle); }
+	}
+	Perk->SetPerkLevel(Level);
+	if (!IsValid(Perk) || !PurchasedPerks.Contains(Perk)) { return; }
+	if (const ISovOwnedPerkGrants* Reporter = Cast<ISovOwnedPerkGrants>(Perk))
+	{
+		FOwnedPerkGrants ExactGrants;
+		Reporter->GetOwnedPerkGrants(ExactGrants.Abilities, ExactGrants.Effects);
+		OwnedPerkGrants.Add(Perk, MoveTemp(ExactGrants));
+		return;
+	}
+	if (ASC)
+	{
+		FOwnedPerkGrants& Grants = OwnedPerkGrants.FindOrAdd(Perk);
+		for (const FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
+		{
+			if (!BeforeAbilities.Contains(Spec.Handle)) { Grants.Abilities.AddUnique(Spec.Handle); }
+		}
+		for (const FActiveGameplayEffectHandle Handle : ASC->GetActiveEffects(FGameplayEffectQuery()))
+		{
+			if (!BeforeEffects.Contains(Handle)) { Grants.Effects.AddUnique(Handle); }
+		}
+	}
+}
+
+void USkillTreeComponent::ClearPurchasedPerksForRestore()
+{
+	if (!GetOwner() || !GetOwner()->HasAuthority()) { return; }
+	UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner());
+	const TArray<TObjectPtr<UTreePerk>> PreviousPerks = MoveTemp(PurchasedPerks);
+	PurchasedPerks.Reset();
+	const auto PreviousGrants = MoveTemp(OwnedPerkGrants);
+	OwnedPerkGrants.Reset();
+	if (ASC)
+	{
+		for (const auto& Pair : PreviousGrants)
+		{
+			for (const FGameplayAbilitySpecHandle Handle : Pair.Value.Abilities) { ASC->ClearAbility(Handle); }
+			for (const FActiveGameplayEffectHandle Handle : Pair.Value.Effects) { ASC->RemoveActiveGameplayEffect(Handle); }
+		}
+	}
+	for (UTreePerk* Perk : PreviousPerks)
+	{
+		if (Perk) { Perk->PerkLevel = -1; }
 	}
 }
 
@@ -227,4 +297,4 @@ void USkillTreeComponent::PrepareForSave_Implementation()
 	}
 }
 
-#undef LOCTEXT_NAMESPACE 
+#undef LOCTEXT_NAMESPACE

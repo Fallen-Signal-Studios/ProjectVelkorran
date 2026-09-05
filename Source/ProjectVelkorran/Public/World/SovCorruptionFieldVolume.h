@@ -3,18 +3,18 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Components/SovCorruptionComponent.h"
+#include "Components/SovLegacyCorruptionComponent.h"
 #include "Engine/TriggerBox.h"
 #include "TimerManager.h"
 #include "SovCorruptionFieldVolume.generated.h"
 
-class USovCorruptionComponent;
+class USovLegacyCorruptionComponent;
 
 /**
  * Authored Eclipse field. Overlap owns registration lifetime; the corruption
  * component owns elapsed-time accumulation, falloff, occlusion, and band caps.
  */
-UCLASS(Blueprintable, meta = (DisplayName = "Sovereign Corruption Field Volume"))
+UCLASS(Blueprintable, meta = (DisplayName = "Sovereign Legacy Corruption Field Volume"))
 class PROJECTVELKORRAN_API ASovCorruptionFieldVolume : public ATriggerBox
 {
 	GENERATED_BODY()
@@ -45,8 +45,8 @@ protected:
 private:
 	struct FRegisteredTarget
 	{
-		TWeakObjectPtr<USovCorruptionComponent> Component;
-		FSovCorruptionSourceHandle SourceHandle;
+		TWeakObjectPtr<USovLegacyCorruptionComponent> Component;
+		FSovLegacyCorruptionSourceHandle SourceHandle;
 	};
 
 	void ReconcileOverlaps();

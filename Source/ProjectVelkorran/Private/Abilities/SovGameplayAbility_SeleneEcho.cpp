@@ -3,7 +3,9 @@
 #include "Abilities/SovGameplayAbility_SeleneEcho.h"
 
 #include "AbilitySystemComponent.h"
-#include "Components/SovSeleneEchoGenerationComponent.h"
+#include "AbilitySystemBlueprintLibrary.h"
+#include "Items/WeaponItem.h"
+#include "UnrealFramework/NarrativeCharacter.h"
 #include "GameplayEffect.h"
 #include "NarrativeGameplayTags.h"
 #include "Sovereign/SovGameplayTags.h"
@@ -12,207 +14,103 @@
 USovGameplayAbility_SeleneEchoBase::USovGameplayAbility_SeleneEchoBase()
 {
 	RequiredCharacterTag = FSovGameplayTags::Get().Character_Player_Selene;
+	ActivationRequiredTags.AddTag(RequiredCharacterTag);
+	ActivationBlockedTags.AddTag(FSovGameplayTags::Get().Character_Player_Tarrik);
+	ActivationBlockedTags.AddTag(FNarrativeGameplayTags::Get().State_Weapon_Equipping);
 }
 
-USovGameplayAbility_SeleneStillpointGrenade::USovGameplayAbility_SeleneStillpointGrenade()
+bool USovGameplayAbility_SeleneEchoBase::CanActivateAbility(const FGameplayAbilitySpecHandle Handle,
+	const FGameplayAbilityActorInfo* ActorInfo, const FGameplayTagContainer* SourceTags,
+	const FGameplayTagContainer* TargetTags, FGameplayTagContainer* OptionalRelevantTags) const
 {
-	const FSovGameplayTags& Tags = FSovGameplayTags::Get();
-	MinimumEchoRequired = 35.0f;
-	EchoCost = 35.0f;
-	EchoSpendTag = Tags.Ability_Echo_Selene_StillpointGrenade;
-	FGameplayTagContainer AssetTags = GetAssetTags();
-	AssetTags.AddTag(EchoSpendTag);
-	SetAssetTags(AssetTags);
-	AbilityAnimSetTag = Tags.AnimSet_Ability_Selene_StillpointGrenade;
-	InputTag = FNarrativeGameplayTags::Get().Narrative_Input_Ability1;
-	WeaponFamily = ESovSeleneEchoWeaponFamily::Universal;
-	WeaponGatePolicy = ESovEchoWeaponGatePolicy::AnyAllowedWielded;
-	AbilityDisplayName = NSLOCTEXT("SovSeleneEcho", "StillpointGrenadeName", "Stillpoint Grenade");
-	AbilityDescription = NSLOCTEXT(
-		"SovSeleneEcho",
-		"StillpointGrenadeDescription",
-		"Open a cryothermal Stasis field that locks down standard enemies and damages them while Frozen; resistant targets are Chilled instead.");
-}
-
-bool USovGameplayAbility_SeleneStillpointGrenade::HasRequiredPayloadConfiguration() const
-{
-	return GrenadeClass.Get()
-		&& ChillEffectClass.Get()
-		&& FreezeEffectClass.Get()
-		&& FrozenDamageOverTimeEffectClass.Get()
-		&& ResistantTargetDamageOverTimeEffectClass.Get()
-		&& StasisRadius > KINDA_SMALL_NUMBER
-		&& StasisDuration > KINDA_SMALL_NUMBER;
-}
-
-USovGameplayAbility_SeleneDispatch::USovGameplayAbility_SeleneDispatch()
-{
-	const FSovGameplayTags& Tags = FSovGameplayTags::Get();
-	MinimumEchoRequired = 90.0f;
-	EchoCost = 90.0f;
-	EchoSpendTag = Tags.Ability_Echo_Selene_Dispatch;
-	FGameplayTagContainer AssetTags = GetAssetTags();
-	AssetTags.AddTag(EchoSpendTag);
-	SetAssetTags(AssetTags);
-	AbilityAnimSetTag = Tags.AnimSet_Ability_Selene_Dispatch;
-	InputTag = FNarrativeGameplayTags::Get().Narrative_Input_Ability3;
-	WeaponFamily = ESovSeleneEchoWeaponFamily::Verity;
-	// Dispatch is Selene's signature and summons Verity even while a firearm is active.
-	bRequiresAllowedWeapon = false;
-	MaximumActiveDuration = 7.0f;
-	AbilityDisplayName = NSLOCTEXT("SovSeleneEcho", "DispatchName", "Dispatch");
-	AbilityDescription = NSLOCTEXT(
-		"SovSeleneEcho",
-		"DispatchDescription",
-		"Cast Verity through a steerable arc, then recall it on command or at the outbound limit; enemies can be struck once on each leg of the path.");
-}
-
-bool USovGameplayAbility_SeleneDispatch::HasRequiredPayloadConfiguration() const
-{
-	return ReturningVerityClass.Get()
-		&& OutboundDamageEffectClass.Get()
-		&& ReturnDamageEffectClass.Get()
-		&& MaximumOutboundDuration > KINDA_SMALL_NUMBER
-		&& MaximumOutboundDistance > KINDA_SMALL_NUMBER
-		&& OutboundSpeed > KINDA_SMALL_NUMBER
-		&& ReturnSpeed > KINDA_SMALL_NUMBER;
-}
-
-USovGameplayAbility_SeleneStaccatoZero::USovGameplayAbility_SeleneStaccatoZero()
-{
-	const FSovGameplayTags& Tags = FSovGameplayTags::Get();
-	MinimumEchoRequired = 30.0f;
-	EchoCost = 30.0f;
-	EchoSpendTag = Tags.Ability_Echo_Selene_StaccatoZero;
-	FGameplayTagContainer AssetTags = GetAssetTags();
-	AssetTags.AddTag(EchoSpendTag);
-	SetAssetTags(AssetTags);
-	AbilityAnimSetTag = Tags.AnimSet_Ability_Selene_StaccatoZero;
-	InputTag = FNarrativeGameplayTags::Get().Narrative_Input_Ability2;
-	WeaponFamily = ESovSeleneEchoWeaponFamily::Staccato;
-	AbilityDisplayName = NSLOCTEXT("SovSeleneEcho", "StaccatoZeroName", "Staccato Zero");
-	AbilityDescription = NSLOCTEXT(
-		"SovSeleneEcho",
-		"StaccatoZeroDescription",
-		"Fire one overdriven precision shot with extreme direct damage and a deterministic Freeze against a valid target.");
-}
-
-bool USovGameplayAbility_SeleneStaccatoZero::HasRequiredPayloadConfiguration() const
-{
-	return EmpoweredShotDamageEffectClass.Get()
-		&& FreezeEffectClass.Get()
-		&& ResistantTargetChillEffectClass.Get()
-		&& MaximumRange > KINDA_SMALL_NUMBER
-		&& DamageMultiplier > KINDA_SMALL_NUMBER;
-}
-
-USovGameplayAbility_SeleneAxiomNullPulse::USovGameplayAbility_SeleneAxiomNullPulse()
-{
-	const FSovGameplayTags& Tags = FSovGameplayTags::Get();
-	MinimumEchoRequired = 30.0f;
-	EchoCost = 30.0f;
-	EchoSpendTag = Tags.Ability_Echo_Selene_AxiomNullPulse;
-	FGameplayTagContainer AssetTags = GetAssetTags();
-	AssetTags.AddTag(EchoSpendTag);
-	SetAssetTags(AssetTags);
-	AbilityAnimSetTag = Tags.AnimSet_Ability_Selene_AxiomNullPulse;
-	InputTag = FNarrativeGameplayTags::Get().Narrative_Input_Ability2;
-	WeaponFamily = ESovSeleneEchoWeaponFamily::Axiom;
-	AbilityDisplayName = NSLOCTEXT("SovSeleneEcho", "AxiomNullPulseName", "Axiom Null Pulse");
-	AbilityDescription = NSLOCTEXT(
-		"SovSeleneEcho",
-		"AxiomNullPulseDescription",
-		"Charge Axiom and release a directed EMP pulse that collapses Shields, suppresses recharge, and disables eligible combat systems.");
-}
-
-ESovCommandLinkSeverResolution
-USovGameplayAbility_SeleneAxiomNullPulse::TrySeverAxiomCommandLink(
-	AActor* CommandNode,
-	FSovCommandLinkSeverResult& OutResult)
-{
-	OutResult = FSovCommandLinkSeverResult();
-	if (!CurrentActorInfo
-		|| !CurrentActorInfo->IsNetAuthority()
-		|| !IsActive())
+	const auto* Character = ActorInfo ? Cast<ANarrativeCharacter>(ActorInfo->AvatarActor.Get()) : nullptr;
+	const auto* ASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
+	if (!IsValid(Character) || !IsValid(ASC) || ASC->GetAvatarActor() != Character
+		|| UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(const_cast<ANarrativeCharacter*>(Character)) != ASC) { return false; }
+	if (bRequiresAllowedWeapon)
 	{
-		return ESovCommandLinkSeverResolution::Invalid;
-	}
-
-	AActor* Avatar = CurrentActorInfo->AvatarActor.Get();
-	UAbilitySystemComponent* SourceAbilitySystem =
-		CurrentActorInfo->AbilitySystemComponent.Get();
-	if (!IsValid(Avatar)
-		|| !IsValid(SourceAbilitySystem)
-		|| !IsValid(CommandNode)
-		|| CommandNode == Avatar
-		|| CommandNode->GetWorld() != Avatar->GetWorld()
-		|| MaximumPulseRange <= KINDA_SMALL_NUMBER
-		|| FVector::DistSquared(
-				Avatar->GetActorLocation(),
-				CommandNode->GetActorLocation())
-			> FMath::Square(MaximumPulseRange))
-	{
-		return ESovCommandLinkSeverResolution::Invalid;
-	}
-
-	USovCommandLinkComponent* CommandLink =
-		CommandNode->FindComponentByClass<USovCommandLinkComponent>();
-	if (!IsValid(CommandLink))
-	{
-		return ESovCommandLinkSeverResolution::Invalid;
-	}
-
-	const ESovCommandLinkSeverResolution Resolution =
-		CommandLink->TrySeverCommandLink(Avatar, OutResult);
-	if (Resolution == ESovCommandLinkSeverResolution::NewlySevered)
-	{
-		if (USovSeleneEchoGenerationComponent* EchoGeneration =
-			Avatar->FindComponentByClass<USovSeleneEchoGenerationComponent>())
+		const auto AllowedAndWielded = [this](const UWeaponItem* Weapon)
 		{
-			EchoGeneration->ConsumeCommandLinkSever(OutResult);
+			return IsValid(Weapon) && Weapon->IsWielded() && AllowedWeaponClasses.ContainsByPredicate(
+				[Weapon](const TSubclassOf<UWeaponItem>& Class) { return Class && Weapon->IsA(Class); });
+		};
+		if (WeaponGatePolicy == ESovEchoWeaponGatePolicy::AnyAllowedWielded)
+		{
+			if (!AllowedAndWielded(Character->GetWeapon(true)) && !AllowedAndWielded(Character->GetWeapon(false))) { return false; }
+		}
+		else
+		{
+			const auto* Weapon = Cast<UWeaponItem>(GetSourceObject(Handle, ActorInfo));
+			if (!AllowedAndWielded(Weapon) || (Character->GetWeapon(true) != Weapon && Character->GetWeapon(false) != Weapon)) { return false; }
 		}
 	}
-
-	return Resolution;
+	return Super::CanActivateAbility(Handle, ActorInfo, SourceTags, TargetTags, OptionalRelevantTags);
 }
 
-bool USovGameplayAbility_SeleneAxiomNullPulse::HasRequiredPayloadConfiguration() const
+void USovGameplayAbility_SeleneEchoBase::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
+	const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo,
+	const FGameplayEventData* TriggerEventData)
 {
-	return ShieldDisruptionDamageEffectClass.Get()
-		&& ShieldRechargeBlockEffectClass.Get()
-		&& FullChargeDuration > KINDA_SMALL_NUMBER
-		&& MinimumPulseRange > KINDA_SMALL_NUMBER
-		&& MaximumPulseRange >= MinimumPulseRange
-		&& MaximumPulseHalfAngleDegrees >= MinimumPulseHalfAngleDegrees
-		&& MaximumShieldSuppressionDuration >= MinimumShieldSuppressionDuration;
+	++NativePayloadEpoch; // Fence BEFORE cost/Blueprint/ASC delegates may end or reactivate this instance.
+	NativeSourceWeapon = ActorInfo ? Cast<UWeaponItem>(GetSourceObject(Handle, ActorInfo)) : nullptr;
+	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 }
-
-USovGameplayAbility_SeleneVeritysWake::USovGameplayAbility_SeleneVeritysWake()
+void USovGameplayAbility_SeleneEchoBase::EndAbility(const FGameplayAbilitySpecHandle Handle,
+	const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo,
+	bool bReplicateEndAbility, bool bWasCancelled)
 {
-	const FSovGameplayTags& Tags = FSovGameplayTags::Get();
-	MinimumEchoRequired = 30.0f;
-	EchoCost = 30.0f;
-	EchoSpendTag = Tags.Ability_Echo_Selene_VeritysWake;
-	FGameplayTagContainer AssetTags = GetAssetTags();
-	AssetTags.AddTag(EchoSpendTag);
-	SetAssetTags(AssetTags);
-	AbilityAnimSetTag = Tags.AnimSet_Ability_Selene_VeritysWake;
-	InputTag = FNarrativeGameplayTags::Get().Narrative_Input_Ability2;
-	WeaponFamily = ESovSeleneEchoWeaponFamily::Verity;
-	AbilityDisplayName = NSLOCTEXT("SovSeleneEcho", "VeritysWakeName", "Verity's Wake");
-	AbilityDescription = NSLOCTEXT(
-		"SovSeleneEcho",
-		"VeritysWakeDescription",
-		"Drive a fast frost wave down a combat lane, dealing Echo damage and Chill; centerline or already-Chilled targets Freeze and suffer Frost damage over time.");
+	++NativePayloadEpoch;
+	NativeSourceWeapon.Reset();
+	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
-
-bool USovGameplayAbility_SeleneVeritysWake::HasRequiredPayloadConfiguration() const
+FSovSelenePayloadContext USovGameplayAbility_SeleneEchoBase::MakeNativePayloadContext() const
 {
-	return WaveClass.Get()
-		&& WaveDamageEffectClass.Get()
-		&& ChillEffectClass.Get()
-		&& FreezeEffectClass.Get()
-		&& FrostDamageOverTimeEffectClass.Get()
-		&& WaveRange > KINDA_SMALL_NUMBER
-		&& WaveWidth > KINDA_SMALL_NUMBER;
+	FSovSelenePayloadContext Context;
+	Context.SourceASC = CurrentActorInfo ? CurrentActorInfo->AbilitySystemComponent.Get() : nullptr;
+	Context.SourceAvatar = GetAvatarActorFromActorInfo();
+	Context.SourceObject = NativeSourceWeapon.Get();
+	Context.AbilityTag = EchoSpendTag;
+	Context.Level = GetAbilityLevel();
+	return Context;
+}
+bool USovGameplayAbility_SeleneEchoBase::CanExecuteNativePayload(uint32 Epoch) const
+{
+	if (Epoch != NativePayloadEpoch || !IsActive() || !CurrentActorInfo || !GetWorld()
+		|| !HasRequiredPayloadConfiguration() || !SovSelenePayload::ValidSource(MakeNativePayloadContext())
+		|| !MeetsWeaponRequirement(CurrentSpecHandle, CurrentActorInfo)) { return false; }
+	const UAbilitySystemComponent* ASC = CurrentActorInfo->AbilitySystemComponent.Get();
+	const auto* Character = Cast<ANarrativeCharacter>(GetAvatarActorFromActorInfo());
+	if (!Character || UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(const_cast<ANarrativeCharacter*>(Character)) != ASC) { return false; }
+	if (bRequiresAllowedWeapon && WeaponGatePolicy == ESovEchoWeaponGatePolicy::GrantingSourceMustBeWielded)
+	{
+		if (!NativeSourceWeapon.IsValid() || !NativeSourceWeapon->IsWielded()
+			|| GetSourceObject(CurrentSpecHandle, CurrentActorInfo) != NativeSourceWeapon.Get()
+			|| (Character->GetWeapon(true) != NativeSourceWeapon.Get() && Character->GetWeapon(false) != NativeSourceWeapon.Get())) { return false; }
+	}
+	else if (bRequiresAllowedWeapon)
+	{
+		const auto AllowedAndWielded = [this](const UWeaponItem* Weapon)
+		{
+			return IsValid(Weapon) && Weapon->IsWielded() && AllowedWeaponClasses.ContainsByPredicate(
+				[Weapon](const TSubclassOf<UWeaponItem>& Class) { return Class && Weapon->IsA(Class); });
+		};
+		if (!AllowedAndWielded(Character->GetWeapon(true)) && !AllowedAndWielded(Character->GetWeapon(false))) { return false; }
+	}
+	const auto& Narrative = FNarrativeGameplayTags::Get();
+	const auto& Tags = FSovGameplayTags::Get();
+	FGameplayTagContainer Blocking;
+	Blocking.AddTag(Narrative.State_Weapon_Equipping);
+	Blocking.AddTag(Narrative.State_Interacting);
+	Blocking.AddTag(Narrative.State_SequencerControlled);
+	Blocking.AddTag(Narrative.State_Movement_Ragdoll);
+	Blocking.AddTag(Tags.State_Poise_Broken);
+	Blocking.AddTag(Tags.State_Guard_Broken);
+	Blocking.AddTag(Tags.State_Status_Frozen);
+	return !ASC->HasAnyMatchingGameplayTags(Blocking) && ASC->GetGameplayTagCount(Narrative.State_Busy) <= 1;
+}
+bool USovGameplayAbility_SeleneEchoBase::ContinueNativePayload(uint32 Epoch)
+{
+	if (CanExecuteNativePayload(Epoch)) { return true; }
+	if (NativePayloadEpoch == Epoch && IsActive()) { FinishEchoAbility(true); }
+	return false;
 }

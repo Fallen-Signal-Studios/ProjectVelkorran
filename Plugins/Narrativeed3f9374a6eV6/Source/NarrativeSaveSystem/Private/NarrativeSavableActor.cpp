@@ -22,3 +22,6 @@ void INarrativeSavableActor::SetActorGUID_Implementation(const FGuid& SavedGUID)
 {
 	//checkf(false, TEXT("Actor was marked INarrativeSavableActor but doesn't implement SetActorGUID() interface function "));
 }
+
+bool INarrativeSavableActor::IsOptionalSaveRecord_Implementation() const
+{ return false; }

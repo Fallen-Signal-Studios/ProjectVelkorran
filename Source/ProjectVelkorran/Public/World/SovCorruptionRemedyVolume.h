@@ -9,7 +9,7 @@
 #include "SovCorruptionRemedyVolume.generated.h"
 
 /** One-shot-per-entry authored remedy/cleanse volume. */
-UCLASS(Blueprintable, meta = (DisplayName = "Sovereign Corruption Remedy Volume"))
+UCLASS(Blueprintable, meta = (DisplayName = "Sovereign Legacy Corruption Remedy Volume"))
 class PROJECTVELKORRAN_API ASovCorruptionRemedyVolume : public ATriggerBox
 {
 	GENERATED_BODY()

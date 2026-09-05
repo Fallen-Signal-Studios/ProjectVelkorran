@@ -1,6 +1,8 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 
 #include "Projectiles/SovReformationDroneRocketProjectile.h"
+#include "Combat/SovThreatTargeting.h"
+#include "Projectiles/SovProjectileDefensePolicy.h"
 
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
@@ -101,7 +103,8 @@ namespace
 ASovReformationDroneRocketProjectile::
 	ASovReformationDroneRocketProjectile()
 {
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bStartWithTickEnabled = false;
 	bReplicates = true;
 	SetReplicateMovement(true);
 	SetNetUpdateFrequency(30.0f);
@@ -236,6 +239,12 @@ void ASovReformationDroneRocketProjectile::BeginPlay()
 			|| !AbilityIdentityTag.IsValid()
 			|| DamageChannels.IsEmpty()
 			|| AttackClassifications.IsEmpty()
+			|| FVector(FlightState.InitialVelocity).ContainsNaN()
+			|| !FMath::IsFinite(FlightState.GravityScale)
+			|| !FMath::IsFinite(FlightState.HomingAccelerationMagnitude)
+			|| !FMath::IsFinite(CollisionRadius) || !FMath::IsFinite(FlightDuration)
+			|| !FMath::IsFinite(ExplosionRadius) || !FMath::IsFinite(ExplosionDamage)
+			|| !FMath::IsFinite(ExplosionPoiseDamage) || !FMath::IsFinite(MinimumDamageFraction)
 			|| FVector(FlightState.InitialVelocity).IsNearlyZero()
 			|| CollisionRadius < 1.0f
 			|| FlightDuration < 0.1f
@@ -405,11 +414,12 @@ void ASovReformationDroneRocketProjectile::HandleProjectileHit(
 	ResolveImpact(Hit);
 }
 
-void ASovReformationDroneRocketProjectile::OnRep_FlightState()
+void ASovReformationDroneRocketProjectile::OnRep_FlightState(const FSovReformationDroneRocketFlightState& PreviousState)
 {
 	if (HasActorBegunPlay() && !Resolution.bResolved)
 	{
-		StartProjectileMovement();
+		if (FVector(PreviousState.InitialVelocity) != FVector(FlightState.InitialVelocity)) { StartProjectileMovement(); }
+		else { ConfigureHoming(); } // Tracking retirement must not reset an in-flight proxy to muzzle velocity.
 	}
 }
 
@@ -455,6 +465,13 @@ void ASovReformationDroneRocketProjectile::ConfigureHoming()
 	}
 
 	AActor* HomingTarget = FlightState.HomingTarget.Get();
+	if (HasAuthority() && HomingTarget && !SovThreatTargeting::CanTrack(SourceAvatar.Get(), HomingTarget))
+	{
+		FlightState.HomingTarget = nullptr;
+		FlightState.HomingAccelerationMagnitude = 0.f;
+		HomingTarget = nullptr;
+		ForceNetUpdate();
+	}
 	USceneComponent* TargetComponent =
 		IsValid(HomingTarget) ? HomingTarget->GetRootComponent() : nullptr;
 	const bool bCanHome = IsValid(TargetComponent)
@@ -471,10 +488,28 @@ void ASovReformationDroneRocketProjectile::ConfigureHoming()
 	ProjectileMovement->HomingAccelerationMagnitude = bCanHome
 		? FlightState.HomingAccelerationMagnitude
 		: 0.0f;
+	// Retire lost tracking before this frame's movement computes homing acceleration.
+	ProjectileMovement->AddTickPrerequisiteActor(this);
+	SetActorTickEnabled(HasAuthority() && bCanHome);
+}
+
+void ASovReformationDroneRocketProjectile::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	if (!HasAuthority() || Resolution.bResolved) { return; }
+	if (!SourceAbilitySystem.IsValid() || SourceAbilitySystem->GetAvatarActor() != SourceAvatar.Get()
+		|| !SovThreatTargeting::CanTrack(SourceAvatar.Get(), FlightState.HomingTarget.Get()))
+	{
+		FlightState.HomingTarget = nullptr;
+		FlightState.HomingAccelerationMagnitude = 0.f;
+		ConfigureHoming();
+		ForceNetUpdate();
+	}
 }
 
 void ASovReformationDroneRocketProjectile::DeactivateProjectile()
 {
+	SetActorTickEnabled(false);
 	bCollisionArmed = false;
 	if (IsValid(ProjectileMovement))
 	{
@@ -496,10 +531,13 @@ void ASovReformationDroneRocketProjectile::DeactivateProjectile()
 
 void ASovReformationDroneRocketProjectile::ExpireProjectile()
 {
-	if (!HasAuthority() || Resolution.bResolved || bResolving)
+	if (!HasAuthority() || Resolution.bResolved)
 	{
 		return;
 	}
+	// Reflection defers the movement restart one tick. Do not lose the one-shot launch expiry
+	// if that deadline arrives while the collision callback is still resolving.
+	if (bResolving) { bFlightExpiredWhileResolving=true; return; }
 	ResolveExpired();
 }
 
@@ -511,6 +549,7 @@ void ASovReformationDroneRocketProjectile::ResolveImpact(
 		return;
 	}
 	bResolving = true;
+	if (ResolveDirectDefense(Hit)) { return; }
 
 	FVector ImpactLocation = FVector(Hit.ImpactPoint);
 	if (ImpactLocation.ContainsNaN())
@@ -539,7 +578,8 @@ void ASovReformationDroneRocketProjectile::ResolveImpact(
 		nullptr,
 		ETeleportType::TeleportPhysics);
 	DeactivateProjectile();
-	Resolution.bDamagedAnyTarget = ApplyExplosion(ImpactLocation, &Hit);
+	Resolution.bDamagedAnyTarget = ApplyExplosion(ImpactLocation, &Hit)
+		|| DirectResult.AppliedHealthDamage > 0.f || DirectResult.AppliedShieldDamage > 0.f;
 	ApplyExplosionPhysicsImpulse(ImpactLocation);
 	Resolution.bResolved = true;
 
@@ -552,7 +592,78 @@ void ASovReformationDroneRocketProjectile::ResolveImpact(
 	SetLifeSpan(FMath::Max(ResolutionCleanupDelay, 0.1f));
 }
 
-void ASovReformationDroneRocketProjectile::ResolveExpired()
+void ASovReformationDroneRocketProjectile::ReceiveDirectDefense(const FSovDamageResult& Result)
+{
+	if (!HasAuthority() || !PendingDirectContext || Result.EffectContext.Get()!=PendingDirectContext
+		|| !DirectDamageTarget.IsValid() || Result.TargetActor!=DirectDamageTarget->GetAvatarActor()
+		|| Result.SourceActor!=SourceAvatar.Get() || bReceivedDirectResult) { return; }
+	bReceivedDirectResult=true; DirectResult=Result;
+}
+
+bool ASovReformationDroneRocketProjectile::ResolveDirectDefense(const FHitResult& Hit)
+{
+	DirectDamageTarget.Reset(); DirectResult=FSovDamageResult(); bReceivedDirectResult=false;
+	UAbilitySystemComponent* SourceASC=SourceAbilitySystem.Get();
+	auto* Target=Cast<UNarrativeAbilitySystemComponent>(ResolveAbilitySystemFromActor(Hit.GetActor()));
+	AActor* Defender=Target?Target->GetAvatarActor():nullptr;
+	const auto* Team=Cast<INarrativeTeamAgentInterface>(SourceAvatar.Get());
+	if (!Target || !IsValid(SourceASC) || SourceASC->GetAvatarActor()!=SourceAvatar.Get()
+		|| !IsValid(Defender) || !IsTargetAlive(Target) || !Team
+		|| Team->GetTeamAttitudeTowards(*Defender)!=ETeamAttitude::Hostile) { return false; }
+	FGameplayEffectContextHandle Context=SourceASC->MakeEffectContext();
+	Context.AddInstigator(SourceAvatar.Get(),this); Context.AddHitResult(Hit,true);
+	Context.AddSourceObject(DamageSourceObject.IsValid()?DamageSourceObject.Get():SourceAvatar.Get());
+	FGameplayEffectSpecHandle Spec=SourceASC->MakeOutgoingSpec(ExplosionDamageEffectClass,EffectLevel,Context);
+	if (!Spec.IsValid()) { return false; }
+	Spec.Data->AddDynamicAssetTag(AbilityIdentityTag);
+	for (const auto& Tag:DamageChannels) { Spec.Data->AddDynamicAssetTag(Tag); }
+	for (const auto& Tag:AttackClassifications) { Spec.Data->AddDynamicAssetTag(Tag); }
+	Spec.Data->SetSetByCallerMagnitude(FNarrativeGameplayTags::Get().SetByCaller_Damage,ExplosionDamage);
+	Spec.Data->SetSetByCallerMagnitude(FSovGameplayTags::Get().SetByCaller_Damage_PoiseDamage,ExplosionPoiseDamage);
+	DirectDamageTarget=Target; PendingDirectContext=Context.Get();
+	Target->OnDamageResolvedAsTarget.AddUniqueDynamic(this,&ThisClass::ReceiveDirectDefense);
+	SourceASC->ApplyGameplayEffectSpecToTarget(*Spec.Data.Get(),Target);
+	if (IsValid(Target)) { Target->OnDamageResolvedAsTarget.RemoveDynamic(this,&ThisClass::ReceiveDirectDefense); }
+	PendingDirectContext=nullptr;
+	if (IsActorBeingDestroyed() || Resolution.bResolved) { return true; }
+	const auto Outcome=SovProjectileDefense::Resolve(bReceivedDirectResult,DirectResult.bPerfectDefense,
+		DirectResult.bDeflected,DirectResult.bGuarded,ReflectionCount,FMath::Min<uint8>(MaximumReflections,4));
+	if (Outcome==SovProjectileDefense::EOutcome::Explode) { return false; }
+	if (Outcome==SovProjectileDefense::EOutcome::Absorb || !IsValid(Target) || !IsTargetAlive(Target)
+		|| Target->GetAvatarActor()!=Defender)
+	{
+		bResolving=false; ResolveExpired(true); return true;
+	}
+	// Redirect the real collision body and move its damage ownership to the successful defender.
+	// A later impact uses normal team and immunity routing; this is never a cosmetic tracer reversal.
+	AActor* PreviousSource=SourceAvatar.Get();
+	const float Speed=FMath::Max(ProjectileMovement->Velocity.Size(),FVector(FlightState.InitialVelocity).Size());
+	FVector Direction=IsValid(PreviousSource)?(PreviousSource->GetActorLocation()-GetActorLocation()).GetSafeNormal():-FVector(FlightState.InitialVelocity).GetSafeNormal();
+	if (Direction.IsNearlyZero()) { Direction=Defender->GetActorForwardVector(); }
+	++ReflectionCount; SourceAbilitySystem=Target; SourceAvatar=Defender; DamageSourceObject=Defender;
+	SetOwner(Defender); SetInstigator(Cast<APawn>(Defender));
+	CollisionSphere->ClearMoveIgnoreActors(); CollisionSphere->IgnoreActorWhenMoving(Defender,true);
+	TArray<AActor*> Attached; Defender->GetAttachedActors(Attached,true,true);
+	for (AActor* Actor:Attached) { CollisionSphere->IgnoreActorWhenMoving(Actor,true); }
+	if (const auto* Character=Cast<ANarrativeCharacter>(Defender))
+	{ if (auto* Visual=Character->GetCharacterVisual()) { CollisionSphere->IgnoreActorWhenMoving(Visual,true); } }
+	FlightState.InitialVelocity=Direction*FMath::Max(Speed,1.f); FlightState.HomingTarget=nullptr; FlightState.HomingAccelerationMagnitude=0.f;
+	// The movement component may clear its UpdatedComponent after this hit callback. Restart on the next tick.
+	CollisionSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision); bCollisionArmed=false;
+	GetWorld()->GetTimerManager().SetTimerForNextTick(this,&ThisClass::ResumeReflectedFlight);
+	DirectDamageTarget.Reset(); ForceNetUpdate(); return true;
+}
+void ASovReformationDroneRocketProjectile::ResumeReflectedFlight()
+{
+	if (!HasAuthority() || Resolution.bResolved || IsActorBeingDestroyed()) { return; }
+	if (bFlightExpiredWhileResolving || !SourceAbilitySystem.IsValid() || SourceAbilitySystem->GetAvatarActor()!=SourceAvatar.Get())
+	{ bResolving=false; ResolveExpired(); return; }
+	ProjectileMovement->SetUpdatedComponent(CollisionSphere);
+	CollisionSphere->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics); bCollisionArmed=true; bResolving=false;
+	StartProjectileMovement();
+}
+
+void ASovReformationDroneRocketProjectile::ResolveExpired(const bool bAbsorbed)
 {
 	if (!HasAuthority() || Resolution.bResolved || bResolving)
 	{
@@ -569,6 +680,7 @@ void ASovReformationDroneRocketProjectile::ResolveExpired()
 
 	Resolution = FSovReformationDroneRocketResolution();
 	Resolution.bExpired = true;
+	Resolution.bAbsorbed = bAbsorbed;
 	Resolution.Location = GetActorLocation();
 	Resolution.Normal = DissipationNormal;
 	Resolution.bResolved = true;
@@ -593,6 +705,7 @@ bool ASovReformationDroneRocketProjectile::ApplyExplosion(
 	if (!IsValid(World)
 		|| !IsValid(SourceASC)
 		|| !IsValid(SourceActor)
+		|| SourceASC->GetAvatarActor()!=SourceActor
 		|| !ExplosionDamageEffectClass.Get()
 		|| ExplosionRadius <= KINDA_SMALL_NUMBER
 		|| ExplosionDamage <= KINDA_SMALL_NUMBER)
@@ -649,11 +762,13 @@ bool ASovReformationDroneRocketProjectile::ApplyExplosion(
 	bool bDamagedAnyTarget = false;
 	for (UAbilitySystemComponent* TargetASC : UniqueTargets)
 	{
+		if (IsActorBeingDestroyed() || !IsValid(SourceASC) || !IsValid(SourceActor) || SourceASC->GetAvatarActor()!=SourceActor) { break; }
 		AActor* TargetActor = IsValid(TargetASC)
 			? TargetASC->GetAvatarActor()
 			: nullptr;
 		const bool bIsDirectTarget = TargetASC == DirectTargetASC;
 		if (!IsValid(TargetASC)
+			|| TargetASC == DirectDamageTarget.Get()
 			|| !IsValid(TargetActor)
 			|| TargetASC == SourceASC
 			|| !TargetASC->GetSet<UNarrativeAttributeSetBase>()
@@ -735,6 +850,7 @@ bool ASovReformationDroneRocketProjectile::ApplyExplosion(
 		const float OldStamina = TargetASC->GetNumericAttribute(
 			UNarrativeAttributeSetBase::GetStaminaAttribute());
 		SourceASC->ApplyGameplayEffectSpecToTarget(*DamageSpec, TargetASC);
+		if (!IsValid(TargetASC) || TargetASC->GetAvatarActor()!=TargetActor) { continue; }
 
 		bDamagedAnyTarget = bDamagedAnyTarget
 			|| TargetASC->GetNumericAttribute(

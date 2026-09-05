@@ -11,6 +11,9 @@
 #include "Character/NarrativeCharacterVisual.h"
 #include "Characters/SovDroneNPCBase.h"
 #include "CollisionQueryParams.h"
+#include "Combat/SovNativeDamageReceipt.h"
+#include "Combat/SovProtectionInterceptReceipt.h"
+#include "Combat/SovThreatTargeting.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Effects/SovGameplayEffect_ReformationDroneWeapons.h"
 #include "Engine/OverlapResult.h"
@@ -32,6 +35,7 @@
 #include "UnrealFramework/NarrativeCharacter.h"
 #include "UnrealFramework/NarrativeTeamAgentInterface.h"
 #include "Weapons/NarrativeProjectile.h"
+#include "UObject/StrongObjectPtr.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogSovReformationDroneAbility, Log, All);
 
@@ -138,7 +142,8 @@ bool USovGameplayAbility_ReformationDroneWeaponBase::CanActivateAbility(
 		return false;
 	}
 	if (!IsValid(ActorInfo->AbilitySystemComponent.Get())
-		|| !IsValid(Cast<ANarrativeCharacter>(ActorInfo->AvatarActor.Get())))
+		|| !IsValid(Cast<ANarrativeCharacter>(ActorInfo->AvatarActor.Get()))
+		|| !SovThreatTargeting::CanUseActorFocus(ActorInfo->AvatarActor.Get()))
 	{
 		if (OptionalRelevantTags)
 		{
@@ -522,7 +527,8 @@ FVector USovGameplayAbility_ReformationDroneWeaponBase::ResolveAuthorityAimPoint
 bool USovGameplayAbility_ReformationDroneWeaponBase::ApplyPointDamage(
 	const FHitResult& Hit,
 	const float Damage,
-	const float PoiseDamage) const
+	const float PoiseDamage,
+	USovProtectionInterceptReceipt* ProtectionReceipt) const
 {
 	if (!CurrentActorInfo || !CurrentActorInfo->IsNetAuthority())
 	{
@@ -545,6 +551,7 @@ bool USovGameplayAbility_ReformationDroneWeaponBase::ApplyPointDamage(
 	}
 
 	FGameplayEffectContextHandle Context = SourceASC->MakeEffectContext();
+	Context.SetAbility(this);
 	Context.AddInstigator(SourceActor, SourceActor);
 	UObject* SourceObject = GetCurrentSourceObject();
 	if (!IsValid(SourceObject) || SourceObject->IsA<UGameplayAbility>())
@@ -584,28 +591,28 @@ bool USovGameplayAbility_ReformationDroneWeaponBase::ApplyPointDamage(
 			PoiseDamage);
 	}
 
-	const float OldShield = TargetASC->GetNumericAttribute(
-		UNarrativeAttributeSetBase::GetShieldAttribute());
-	const float OldHealth = TargetASC->GetNumericAttribute(
-		UNarrativeAttributeSetBase::GetHealthAttribute());
-	const float OldPoise = TargetASC->GetNumericAttribute(
-		UNarrativeAttributeSetBase::GetPoiseAttribute());
-	const float OldStamina = TargetASC->GetNumericAttribute(
-		UNarrativeAttributeSetBase::GetStaminaAttribute());
+	UNarrativeAbilitySystemComponent* NarrativeSource = Cast<UNarrativeAbilitySystemComponent>(SourceASC);
+	TStrongObjectPtr<USovNativeDamageReceipt> Receipt(NewObject<USovNativeDamageReceipt>());
+	Receipt->ExpectedTarget = TargetASC->GetAvatarActor(); Receipt->ExpectedContext = DamageSpec->GetContext().Get();
+	if (NarrativeSource)
+	{
+		NarrativeSource->OnDamageResolvedAsSource.AddDynamic(Receipt.Get(), &USovNativeDamageReceipt::ReceiveResult);
+		if (ProtectionReceipt && ProtectionReceipt->ArmForDamage(DamageSpec->GetContext(), SourceASC, TargetASC))
+		{
+			NarrativeSource->OnDamageResolvedAsSource.AddDynamic(ProtectionReceipt, &USovProtectionInterceptReceipt::ReceiveResult);
+		}
+	}
 	SourceASC->ApplyGameplayEffectSpecToTarget(*DamageSpec, TargetASC);
-
-	return TargetASC->GetNumericAttribute(
-			UNarrativeAttributeSetBase::GetShieldAttribute())
-			< OldShield - KINDA_SMALL_NUMBER
-		|| TargetASC->GetNumericAttribute(
-			UNarrativeAttributeSetBase::GetHealthAttribute())
-			< OldHealth - KINDA_SMALL_NUMBER
-		|| TargetASC->GetNumericAttribute(
-			UNarrativeAttributeSetBase::GetPoiseAttribute())
-			< OldPoise - KINDA_SMALL_NUMBER
-		|| TargetASC->GetNumericAttribute(
-			UNarrativeAttributeSetBase::GetStaminaAttribute())
-			< OldStamina - KINDA_SMALL_NUMBER;
+	if (NarrativeSource)
+	{
+		NarrativeSource->OnDamageResolvedAsSource.RemoveDynamic(Receipt.Get(), &USovNativeDamageReceipt::ReceiveResult);
+		if (ProtectionReceipt)
+		{
+			NarrativeSource->OnDamageResolvedAsSource.RemoveDynamic(ProtectionReceipt, &USovProtectionInterceptReceipt::ReceiveResult);
+			ProtectionReceipt->Disarm();
+		}
+	}
+	return Receipt->bAppliedDamage;
 }
 
 bool USovGameplayAbility_ReformationDroneWeaponBase::IsHostileTarget(
@@ -791,6 +798,7 @@ void USovGameplayAbility_ReformationDroneGunfire::FireGunBurstFromAim()
 	}
 
 	bBurstStarted = true;
+	++BurstEpoch;
 	ShotsFired = 0;
 	FireNextBurstShot();
 }
@@ -802,6 +810,7 @@ void USovGameplayAbility_ReformationDroneGunfire::EndAbility(
 	const bool bReplicateEndAbility,
 	const bool bWasCancelled)
 {
+	++BurstEpoch;
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(BurstTimerHandle);
@@ -855,6 +864,7 @@ float USovGameplayAbility_ReformationDroneGunfire::
 void USovGameplayAbility_ReformationDroneGunfire::FireNextBurstShot()
 {
 	if (!CanContinueWeaponPayload()
+		|| !SovThreatTargeting::CanUseActorFocus(GetAvatarActorFromActorInfo())
 		|| !bBurstStarted
 		|| ShotsFired >= BurstShotCount)
 	{
@@ -869,7 +879,11 @@ void USovGameplayAbility_ReformationDroneGunfire::FireNextBurstShot()
 		return;
 	}
 
+	const uint32 ExpectedBurstEpoch = BurstEpoch;
 	const int32 ShotIndex = ShotsFired;
+	ANarrativeCharacter* SourceCharacter = Cast<ANarrativeCharacter>(GetAvatarActorFromActorInfo());
+	AAIController* SourceController = SourceCharacter ? Cast<AAIController>(SourceCharacter->GetController()) : nullptr;
+	AActor* IntendedFocus = SourceController ? SourceController->GetFocusActor() : nullptr;
 	const FTransform MuzzleTransform = ResolveMuzzleTransform(ShotIndex);
 	const FVector TraceStart = MuzzleTransform.GetLocation();
 	const FVector AimPoint = ResolveAuthorityAimPoint(MaximumRange);
@@ -898,8 +912,15 @@ void USovGameplayAbility_ReformationDroneGunfire::FireNextBurstShot()
 	const FVector TraceEnd = BlockingHit
 		? FVector(BlockingHit->ImpactPoint)
 		: UnblockedEnd;
+	TStrongObjectPtr<USovProtectionInterceptReceipt> ProtectionReceipt(BlockingHit
+		? USovProtectionInterceptReceipt::TryCreateForDroneShot(SourceCharacter, IntendedFocus, *BlockingHit,
+			TraceStart, UnblockedEnd, FMath::Max(TraceRadius, 0.f)) : nullptr);
 	const bool bDamagedTarget = BlockingHit
-		&& ApplyPointDamage(*BlockingHit, DamagePerShot, PoiseDamagePerShot);
+		&& ApplyPointDamage(*BlockingHit, DamagePerShot, PoiseDamagePerShot, ProtectionReceipt.Get());
+	// Typed damage/reward callbacks may end this ability, start a new activation,
+	// or switch the avatar. The old shot must not schedule that activation's burst.
+	if (BurstEpoch != ExpectedBurstEpoch || !CanContinueWeaponPayload()
+		|| GetAvatarActorFromActorInfo() != SourceCharacter) { return; }
 	SpawnGunshotPresentation(
 		TraceStart,
 		TraceEnd,
@@ -1095,6 +1116,10 @@ USovGameplayAbility_ReformationDroneRocketLauncher::LaunchRocketFromAim()
 	}
 
 	const int32 MuzzleIndex = NextMuzzleIndex;
+	if (!SovThreatTargeting::CanUseActorFocus(GetAvatarActorFromActorInfo()))
+	{
+		CancelDroneWeaponAbility(); return nullptr;
+	}
 	const FTransform MuzzleTransform = ResolveMuzzleTransform(MuzzleIndex);
 	const FVector AimPoint = ResolveAuthorityAimPoint(RocketAimTraceDistance);
 	FVector LaunchDirection = (AimPoint - MuzzleTransform.GetLocation()).GetSafeNormal();
@@ -1195,7 +1220,8 @@ USovGameplayAbility_ReformationDroneRocketLauncher::LaunchRocket(
 	{
 		UAbilitySystemComponent* HomingTargetASC =
 			ResolveAbilitySystemFromActor(HomingTarget);
-		if (IsHostileTarget(HomingTargetASC) && IsTargetAlive(HomingTargetASC))
+		if (IsHostileTarget(HomingTargetASC) && IsTargetAlive(HomingTargetASC)
+			&& SovThreatTargeting::CanTrack(Avatar, HomingTargetASC->GetAvatarActor()))
 		{
 			ValidatedHomingTarget = HomingTargetASC->GetAvatarActor();
 		}
@@ -1256,6 +1282,7 @@ AActor* USovGameplayAbility_ReformationDroneRocketLauncher::
 
 	UAbilitySystemComponent* TargetASC = ResolveAbilitySystemFromActor(FocusActor);
 	return IsHostileTarget(TargetASC) && IsTargetAlive(TargetASC)
+		&& SovThreatTargeting::CanTrack(GetAvatarActorFromActorInfo(), TargetASC->GetAvatarActor())
 		? TargetASC->GetAvatarActor()
 		: nullptr;
 }
@@ -1451,7 +1478,7 @@ void USovGameplayAbility_ReformationDroneSelfDestruct::
 	{
 		return;
 	}
-	if (!CanContinueWeaponPayload())
+	if (!CanContinueWeaponPayload() || !SovThreatTargeting::CanTrack(SourceDrone, TargetActor))
 	{
 		CancelDroneWeaponAbility();
 		return;
@@ -1538,7 +1565,8 @@ void USovGameplayAbility_ReformationDroneSelfDestruct::UpdatePursuit()
 		|| !IsValid(TargetActor)
 		|| !IsValid(World)
 		|| !IsHostileTarget(TargetASC)
-		|| !IsTargetAlive(TargetASC))
+		|| !IsTargetAlive(TargetASC)
+		|| !SovThreatTargeting::CanTrack(SourceDrone, TargetActor))
 	{
 		CancelDroneWeaponAbility();
 		return;
@@ -1629,6 +1657,7 @@ AActor* USovGameplayAbility_ReformationDroneSelfDestruct::
 				<= FMath::Square(FMath::Max(TargetAcquisitionRange, 0.0f))
 			&& IsHostileTarget(CandidateASC)
 			&& IsTargetAlive(CandidateASC)
+			&& SovThreatTargeting::CanTrack(SourceDrone, TargetAvatar)
 			? TargetAvatar
 			: nullptr;
 	};
@@ -1668,7 +1697,8 @@ bool USovGameplayAbility_ReformationDroneSelfDestruct::RequestPursuitMove(
 	AActor* TargetActor)
 {
 	AAIController* AIController = Cast<AAIController>(GetOwningController());
-	if (!IsValid(AIController) || !IsValid(TargetActor))
+	if (!IsValid(AIController) || !IsValid(TargetActor)
+		|| !SovThreatTargeting::CanTrack(GetAvatarActorFromActorInfo(), TargetActor))
 	{
 		return false;
 	}
@@ -1686,7 +1716,7 @@ bool USovGameplayAbility_ReformationDroneSelfDestruct::RequestPursuitMove(
 	const FPathFollowingRequestResult MoveResult =
 		AIController->MoveTo(MoveRequest, nullptr);
 	OwnedPursuitMoveRequestId = MoveResult.MoveId;
-	if (!IsActive())
+	if (!IsActive() || !SovThreatTargeting::CanTrack(GetAvatarActorFromActorInfo(), TargetActor))
 	{
 		// Replacing a previous AI request may synchronously notify StateTree/BT.
 		// If that ended the ability, do not leave the newly issued move running.

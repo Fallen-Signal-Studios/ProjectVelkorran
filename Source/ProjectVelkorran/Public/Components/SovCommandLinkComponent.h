@@ -67,6 +67,17 @@ struct PROJECTVELKORRAN_API FSovCommandLinkSeverResult
 	TArray<TObjectPtr<AActor>> AffectedActors;
 };
 
+/** Durable link state. Actor references are resolved by the encounter's stable participant IDs. */
+USTRUCT(BlueprintType)
+struct PROJECTVELKORRAN_API FSovCommandLinkSnapshot
+{
+	GENERATED_BODY()
+	UPROPERTY(SaveGame, BlueprintReadOnly) FName LinkId;
+	UPROPERTY(SaveGame, BlueprintReadOnly) ESovCommandLinkState State = ESovCommandLinkState::Inactive;
+	UPROPERTY(SaveGame, BlueprintReadOnly) FGuid LinkInstanceId;
+	UPROPERTY(SaveGame, BlueprintReadOnly) FGuid LastSeverTransactionId;
+};
+
 /** Atomic replication payload so client callbacks never observe half a sever. */
 USTRUCT()
 struct FSovCommandLinkReplicationState
@@ -202,6 +213,12 @@ public:
 	/** Restores the authored starting state and creates a fresh instance identity. */
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Command Link")
 	void ResetCommandLink();
+
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Command Link|Checkpoint")
+	FSovCommandLinkSnapshot CaptureCommandLinkState() const;
+	/** No synthetic Sever event, reveal, or reward is emitted by restoration. */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Command Link|Checkpoint")
+	bool RestoreCommandLinkState(const FSovCommandLinkSnapshot& Snapshot, AActor* CommandSource, const TArray<AActor*>& Participants);
 
 	/** The only gameplay mutation that may produce a successful sever result. */
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Command Link")

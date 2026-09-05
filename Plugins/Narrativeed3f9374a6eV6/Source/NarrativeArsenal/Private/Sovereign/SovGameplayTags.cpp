@@ -49,6 +49,36 @@ void FSovGameplayTags::InitializeNativeTags()
 
 void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 {
+	AddTag(Input_Evade, "Narrative.Input.Evade", "Semantic evade input, independent of physical device bindings.");
+	AddTag(Input_FieldRecovery, "Narrative.Input.FieldRecovery", "Semantic field recovery input.");
+	AddTag(Ability_FieldRecovery, "Sov.Ability.FieldRecovery", "Interruptible field recovery charge use.");
+	AddTag(State_FieldRecovery, "Sov.State.FieldRecovery", "Native field recovery in progress.");
+	AddTag(Input_ThreatFocus, "Narrative.Input.ThreatFocus", "Toggle native threat focus.");
+	AddTag(Input_CycleTargetLeft, "Narrative.Input.CycleTargetLeft", "Cycle to the visible threat on the left.");
+	AddTag(Input_CycleTargetRight, "Narrative.Input.CycleTargetRight", "Cycle to the visible threat on the right.");
+	AddTag(Input_AbilityModifier, "Narrative.Input.AbilityModifier", "Semantic alternate-ability modifier.");
+	AddTag(Ability_Evade, "Sov.Ability.Evade", "Native campaign runtime contract.");
+	AddTag(State_Evading, "Sov.State.Evading", "Native campaign runtime contract.");
+	AddTag(State_Exertion_Exhausted, "Sov.State.Exertion.Exhausted", "Native campaign runtime contract.");
+	AddTag(Ability_Finisher, "Sov.Ability.Finisher", "Native campaign runtime contract.");
+	AddTag(Input_Finisher, "Sov.Input.Finisher", "Native campaign runtime contract.");
+	AddTag(State_Finisher_Active, "Sov.State.Finisher.Active", "Native campaign runtime contract.");
+	AddTag(State_Finisher_Target, "Sov.State.Finisher.Target", "Native campaign runtime contract.");
+	AddTag(State_InterruptProtected, "Sov.State.InterruptProtected", "Native campaign runtime contract.");
+	AddTag(Event_Finisher_PhaseResolved, "Sov.Event.Finisher.PhaseResolved", "Native campaign runtime contract.");
+	AddTag(Event_Finisher_Strike, "Sov.Event.Finisher.Strike", "Native campaign runtime contract.");
+	AddTag(State_Resonance_Available, "Sov.State.Resonance.Available", "Native campaign runtime contract.");
+	AddTag(State_Resonance_Committed, "Sov.State.Resonance.Committed", "Native campaign runtime contract.");
+	AddTag(Event_Resonance_Setup_PerfectGuard, "Sov.Event.Resonance.Setup.PerfectGuard", "Native campaign runtime contract.");
+	AddTag(Event_Resonance_Setup_CommandExposed, "Sov.Event.Resonance.Setup.CommandExposed", "Native campaign runtime contract.");
+	AddTag(Event_Resonance_Setup_TerminalProtection, "Sov.Event.Resonance.Setup.TerminalProtection", "Native campaign runtime contract.");
+	AddTag(Event_Resonance_Setup_RoutedFire, "Sov.Event.Resonance.Setup.RoutedFire", "Native campaign runtime contract.");
+	AddTag(State_Resonance_CounterWindow, "Sov.State.Resonance.CounterWindow", "Native campaign runtime contract.");
+	AddTag(State_Resonance_ProtectedTarget, "Sov.State.Resonance.ProtectedTarget", "Native campaign runtime contract.");
+	AddTag(State_Invulnerable_Respawn, "Sov.State.Invulnerable.Respawn", "Native campaign runtime contract.");
+	AddTag(State_Recovery_Rescue, "Sov.State.Recovery.Rescue", "Native campaign runtime contract.");
+	AddTag(State_Traversal, "Sov.State.Traversal", "Native campaign runtime contract.");
+	AddTag(State_Choice_Unresolved, "Sov.State.Choice.Unresolved", "Native campaign runtime contract.");
 	AddTag(Character_Player, "Sov.Character.Player", "Parent identity tag for playable Sovereign characters.");
 	AddTag(Character_Player_Tarrik, "Sov.Character.Player.Tarrik", "Tarrik Walcur player character.");
 	AddTag(Character_Player_Selene, "Sov.Character.Player.Selene", "Selene Veyne player character.");
@@ -114,10 +144,17 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 	AddTag(State_Status_Exposed, "Sov.State.Status.Exposed", "The target is temporarily vulnerable to an authored exposure payoff.");
 	AddTag(State_Status_Corrupted, "Sov.State.Status.Corrupted", "The target has nonzero persistent Eclipse corruption exposure.");
 	AddTag(State_Corruption, "Sov.State.Corruption", "Parent tag for the target's exact corruption-pressure band.");
-	AddTag(State_Corruption_Trace, "Sov.State.Corruption.Trace", "Corruption exposure is in the Trace band.");
-	AddTag(State_Corruption_Intrusion, "Sov.State.Corruption.Intrusion", "Corruption exposure is in the Intrusion band.");
-	AddTag(State_Corruption_Contest, "Sov.State.Corruption.Contest", "Corruption exposure is in the Contest band.");
-	AddTag(State_Corruption_OverwriteRisk, "Sov.State.Corruption.OverwriteRisk", "Corruption exposure has reached the non-terminal Overwrite Risk band.");
+	AddTag(State_Weapon_VerityAbsent, "Sov.State.Weapon.VerityAbsent", "Verity is committed to its authoritative Dispatch flight and cannot be drawn as a duplicate.");
+	AddTag(Campaign_Value_Withheld, "Sov.Campaign.Value.Withheld", "Authored immutable campaign fact or discrete value.");
+	AddTag(Campaign_Fact_MarketShot, "Sov.Campaign.Fact.MarketShot", "Authored immutable campaign fact or discrete value.");
+	AddTag(Campaign_Value_WoundedAlive, "Sov.Campaign.Value.WoundedAlive", "Authored immutable campaign fact or discrete value.");
+	AddTag(Campaign_Fact_Caelus, "Sov.Campaign.Fact.Caelus", "Authored immutable campaign fact or discrete value.");
+	AddTag(Campaign_Value_Tarrik, "Sov.Campaign.Value.Tarrik", "Authored immutable campaign fact or discrete value.");
+	AddTag(Campaign_Fact_Heir, "Sov.Campaign.Fact.Heir", "Authored immutable campaign fact or discrete value.");
+	AddTag(State_Corruption_OverwriteRisk, "Sov.State.Corruption.OverwriteRisk", "Mission-permitted corruption exposure band; presentation never changes player input.");
+	AddTag(State_Corruption_Contest, "Sov.State.Corruption.Contest", "Mission-permitted corruption exposure band; presentation never changes player input.");
+	AddTag(State_Corruption_Intrusion, "Sov.State.Corruption.Intrusion", "Mission-permitted corruption exposure band; presentation never changes player input.");
+	AddTag(State_Corruption_Trace, "Sov.State.Corruption.Trace", "Mission-permitted corruption exposure band; presentation never changes player input.");
 
 	AddTag(Damage_BypassShield, "Sov.Damage.BypassShield", "All resolved health damage bypasses Shield.");
 	AddTag(Damage_BypassShield_Partial, "Sov.Damage.BypassShield.Partial", "Uses the authored partial Shield bypass ratio.");
@@ -154,6 +191,7 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 	AddTag(Damage_Immunity_Corruption, "Sov.Damage.Immunity.Corruption", "Target ignores Corruption damage.");
 	AddTag(Damage_Immunity_Environmental, "Sov.Damage.Immunity.Environmental", "Target ignores Environmental damage.");
 	AddTag(Status_Apply, "Sov.Status.Apply", "Parent tag for requested status applications carried by damage specs.");
+	AddTag(Status_Application_NativeOwned, "Sov.Status.Application.NativeOwned", "The native payload consumes status acceptance and owns its effects; generic status listeners must not duplicate them.");
 	AddTag(Status_Apply_Burn, "Sov.Status.Apply.Burn", "A resolved hit requests the project-owned Burn status.");
 	AddTag(Status_Apply_Chill, "Sov.Status.Apply.Chill", "A resolved hit requests the project-owned Chill status.");
 	AddTag(Status_Apply_Freeze, "Sov.Status.Apply.Freeze", "A resolved hit requests the project-owned hard-Freeze status.");
@@ -218,6 +256,7 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 	AddTag(Echo_Source_PerfectGuard, "Sov.Echo.Source.PerfectGuard", "Echo source for Tarrik perfect guard.");
 	AddTag(Echo_Source_PerfectDeflection, "Sov.Echo.Source.PerfectDeflection", "Echo source for Selene's correctly timed Deflection.");
 	AddTag(Echo_Source_WeakPointBreak, "Sov.Echo.Source.WeakPointBreak", "Echo source for breaking an authored weak point.");
+	AddTag(Echo_Source_WeakPointHit, "Sov.Echo.Source.WeakPointHit", "Echo source for an accepted hit on an unbroken authored weak point.");
 	AddTag(Echo_Source_CommandLinkSever, "Sov.Echo.Source.CommandLinkSever", "Echo source for Selene severing one active hostile command link.");
 	AddTag(Echo_Source_GuardPressure, "Sov.Echo.Source.GuardPressure", "Combat activity caused by intentional guard pressure.");
 	AddTag(Echo_Source_GuardCounter, "Sov.Echo.Source.GuardCounter", "Echo source for a landed Tarrik guard counter.");
@@ -225,6 +264,16 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 	AddTag(Echo_Source_CinderlinePrecisionKill, "Sov.Echo.Source.CinderlinePrecisionKill", "Echo source for a Cinderline precision kill.");
 	AddTag(Echo_Source_CombatSustainPickup, "Sov.Echo.Source.CombatSustainPickup", "Echo source for collecting a transient combat-sustain mote.");
 	AddTag(Echo_Source_ExposureKill, "Sov.Echo.Source.ExposureKill", "Echo source for defeating an enemy while its Exposed status is active.");
+	AddTag(State_CommandTarget_Window, "Sov.State.CommandTarget.Window", "Target-owned authored command-target reward window.");
+	AddTag(State_Target_Exposed, "Sov.State.Target.Exposed", "Target-owned authored exposure for precision reward eligibility.");
+	AddTag(State_Target_Marked, "Sov.State.Target.Marked", "Target-owned authored mark for precision reward eligibility.");
+	AddTag(Echo_Source_UndetectedBypass, "Sov.Echo.Source.UndetectedBypass", "Echo awarded for crossing a registered encounter without being perceived.");
+	AddTag(Echo_Source_PrecisionChain, "Sov.Echo.Source.PrecisionChain", "Echo awarded for a verified precision kill chain.");
+	AddTag(Echo_Source_MarkedKill, "Sov.Echo.Source.MarkedKill", "Echo awarded for killing a marked or exposed hostile.");
+	AddTag(Echo_Source_CommandTargetKill, "Sov.Echo.Source.CommandTargetKill", "Echo awarded for killing a target within its authored command window.");
+	AddTag(Echo_Source_PoiseBreak, "Sov.Echo.Source.PoiseBreak", "Echo awarded for an accepted hostile Poise break.");
+	AddTag(Echo_Source_HeavyMultiHit, "Sov.Echo.Source.HeavyMultiHit", "Echo awarded once for one verified heavy attack hitting three distinct hostiles.");
+	AddTag(Echo_Source_ProtectionIntercept, "Sov.Echo.Source.ProtectionIntercept", "Echo awarded from an authoritative ally-protection damage receipt.");
 }
 
 void FSovGameplayTags::AddTag(FGameplayTag& OutTag, const ANSICHAR* TagName, const ANSICHAR* TagComment)

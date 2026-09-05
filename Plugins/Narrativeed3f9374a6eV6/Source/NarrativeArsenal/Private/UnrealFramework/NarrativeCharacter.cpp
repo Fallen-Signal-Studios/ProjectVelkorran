@@ -1070,6 +1070,7 @@ void ANarrativeCharacter::SetRandomSeed(const int32 NewSeed)
 
 void ANarrativeCharacter::SetWieldState(const FWeaponWieldState& NewWieldState)
 {
+	++WeaponWieldRevision;
 	//TODO validate weaponstoequip can actually be equipped together? 
 	FWeaponWieldState OldWieldState = WieldState;
 	WieldState = NewWieldState;
@@ -1834,7 +1835,7 @@ void ANarrativeCharacter::HandleDeath_Implementation(AActor* KilledActor, UNarra
 	UE_LOG(LogNarrativeNet, Warning, TEXT("%s: Message, death state is now: %s"), *GetCharacterName().ToString(), *DeadStr);
 
 	//If being revived, reset our players attributes
-	if (!bIsDead)
+	if (!bIsDead && ShouldResetAttributesOnRevive())
 	{
 		InitializeAttributes();
 		AddStartupEffects();

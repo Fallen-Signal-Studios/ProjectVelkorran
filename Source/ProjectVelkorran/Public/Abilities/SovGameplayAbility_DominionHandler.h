@@ -27,6 +27,9 @@ class PROJECTVELKORRAN_API USovGameplayAbility_DominionHandlerCommandHound
 	GENERATED_BODY()
 
 public:
+	// The dispatched Hound owns the attack token; the order itself does not reserve one.
+	virtual bool RequiresBotAttackToken_Implementation() const override { return false; }
+
 	USovGameplayAbility_DominionHandlerCommandHound();
 
 	virtual bool CanActivateAbility(

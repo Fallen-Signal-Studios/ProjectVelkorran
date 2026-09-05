@@ -43,6 +43,8 @@ public:
 	virtual void Deactivate() override;
 
 	virtual void PerformInteractionCheck(float DeltaTime);
+	/** Actual pawn range and unoccluded view, rechecked at interaction completion. */
+	bool IsInteractableInReach(UNarrativeInteractableComponent* Interactable) const;
 	
 	UFUNCTION(BlueprintCallable, Category = "Interaction")
 	void ClearViewedInteractable();
@@ -63,6 +65,7 @@ public:
 	virtual void EndInteract();
 
 protected:
+	void CompletePendingInteraction();
 
 	//The current interactable component we're viewing, if there is one
 	UPROPERTY(BlueprintReadOnly, Category = "Interaction")

@@ -5,12 +5,13 @@ This pass creates project-owned campaign framework seams without discarding Narr
 ## Native ownership
 
 - `ASovCampaignGameMode` derives from `ANarrativeGameMode` and defaults to the project PlayerController, PlayerState, and Tarrik pawn classes while retaining `ANarrativeGameState` behavior.
-- `ASovPlayerController` is the future owner of campaign possession, authored protagonist handoffs, input profiles, and HUD coordination.
-- `ASovPlayerState` preserves Narrative's replicated Ability System Component, owns the persistent corruption AttributeSet, and provides the future campaign-state seam.
-- `ASovPlayerCharacterBase` owns Echo, Shield, player Health recharge, Poise, centralized combat status, and the player-only corruption lifecycle.
-- `ASovNPCCharacterBase` owns centralized combat status but not player corruption. Mechanical drones explicitly accept Device Disabled.
+- `ASovPlayerController` owns managed campaign initialization, authored protagonist handoff, guarded map travel and the campaign state component. Input/HUD assets remain authored; see [CampaignHandoff.md](CampaignHandoff.md).
+- `ASovPlayerState` preserves Narrative's replicated Ability System Component, stores independent protagonist snapshots, and replaces the existing skill-tree subobject with the campaign Technique policy.
+- `ASovPlayerCharacterBase` owns Echo, Exertion, Field Recovery, Resonance, fatal recovery, targeting, Shield, Health recharge, Poise, generic combat status, and mission-scoped corruption. Each component is constructed once.
+- `ASovNPCCharacterBase` owns generic combat status and encounter save/restore identity; drones explicitly accept Device Disabled. NPCs do not construct player corruption.
 - `ASovTarrikCharacter` additionally owns Guard and Cinderline Echo generation.
-- `ASovSeleneCharacter` additionally owns the one-hit Deflection component and Selene's typed precision Echo generator. The implemented generator rewards perfect Deflection, the first break of an authored weak point, Axiom's first valid Sever of an active hostile command link, and a hostile defeat during Selene's Exposed window.
+- `ASovSeleneCharacter` additionally owns the one-hit Deflection component and Selene's typed precision Echo generator. The generator rewards perfect Deflection, accepted hits on unbroken authored weak points, precision chains, verified undetected bypass, Axiom's first valid command-link Sever, and marked/exposed kills. Selene-authored Exposed status preserves its source provenance; a target carrying both that status and an authored mark earns one kill payoff.
+- `USovGameplayAbility_SeleneAxiomNullPulse` owns native charge, directed Shield collapse, timed recharge/device suppression, and validated command-link Sever. Its Blueprint supplies presentation and the exact Axiom weapon grant/allowlist. The other four approved Selene Echo abilities now also have native payloads. Remove superseded Blueprint gameplay execution when adopting them, and preserve their presentation bindings.
 - `ASovDominionHandler` is the first concrete Commander profile: it owns one command link and a server-authoritative ability that orders an exact linked Hound Horn Charge. Horn Charge requires both the active relationship and a transient native Handler order.
 
 Each concrete protagonist supplies a canonical native identity tag. When its Player Definition is applied, the character retains all definition-owned tags, removes the opposite protagonist identity, and adds its own. This uses `SetDefinitionOwnedTags`, rather than an unrelated loose tag, because Narrative's ASC lives on PlayerState and may survive pawn replacement.
@@ -28,9 +29,9 @@ The repository snapshot does not include the project's binary Content assets. Co
 7. Remove any Blueprint-added Deflection or Selene Echo generator that duplicates the new inherited native components. Replace old Blueprint parry/reward logic with presentation bindings only after validating the native result.
 8. Create a Gameplay Ability Blueprint derived from `USovGameplayAbility_SeleneDeflection` and grant it once through Selene's default Ability Configuration. See `Docs/SeleneCoreLoop.md` for input, target, and tuning setup.
 9. Add one `USovWeakPointComponent` to each eligible enemy Blueprint and author stable zones only where the encounter truly exposes a breakable weak point. An empty component is a valid no-op.
-10. Use `ASovDominionHandler` for the Dominion Handler Blueprint and keep its inherited `USovCommandLinkComponent`; add the component explicitly only to other authored command nodes. Keep **Include Owner As Participant** enabled for the Handler so its ASC receives the active-link state, assign linked actors, and configure their red weak-point reveal presentation. Wire `Try Sever Axiom Command Link` into Axiom's authority-owned pulse flow. See `Docs/SeleneCommandLinkAndWeakPointReveal.md`.
+10. Use `ASovDominionHandler` for the Dominion Handler Blueprint and keep its inherited `USovCommandLinkComponent`; add the component explicitly only to other authored command nodes. Keep **Include Owner As Participant** enabled for the Handler so its ASC receives the active-link state, assign linked actors, and configure their red weak-point reveal presentation. Use the native Axiom pulse by granting `USovGameplayAbility_SeleneAxiomNullPulse` from Axiom's weapon item with its exact allowlist. Remove old Blueprint pulse/status/Sever gameplay; native charge/release owns it and direct helper calls are invalid. See [AxiomNullPulse.md](AxiomNullPulse.md) and [SeleneCommandLinkAndWeakPointReveal.md](SeleneCommandLinkAndWeakPointReveal.md).
 11. Create and grant the Handler command ability, reserve Hound Ability1 for native Handler dispatch, and complete the encounter/AI setup in `Docs/DominionHandlerProfile.md`.
-12. Review inherited `USovStatusComponent` and `USovCorruptionComponent` templates, author any status-definition overrides, and place one uniquely identified corruption field plus its communicated remedy. Follow `Docs/StatusAndCorruptionPrototype.md`.
+12. Review the inherited `USovStatusComponent` and mission-scoped `USovCorruptionComponent`. Author campaign exposure with validated `USovCorruptionProfile` assets and native producers/remedies from [CorruptionEngineering.md](CorruptionEngineering.md). Generic status definitions remain documented in [StatusAndCorruptionPrototype.md](StatusAndCorruptionPrototype.md). The optional `USovLegacyCorruptionComponent` and old field/remedy volumes are for standalone prototype maps; remove the legacy component before managed campaign initialization.
 13. Keep `Sov.Character.Player.Tarrik` on Tarrik's Player Definition and `Sov.Character.Player.Selene` on Selene's. The tag picker permits the `Sov.Character` category.
 14. Compile and save the player, ability, command-node, material, weak-point target, status-definition, and corruption-volume assets, then run `CompileAllBlueprints` before testing gameplay.
 
@@ -51,7 +52,9 @@ Do not switch `GameInstanceClass` yet. Narrative's native GameInstance is empty,
 
 ## Current handoff boundary
 
-This pass establishes class ownership and Selene's first real character-method loop, but does not implement Tarrik/Selene handoff on one PlayerState. Destroying the old pawn is not sufficient: Narrative keeps the ASC on PlayerState, and the prior protagonist's granted ability specs, loose tags, and persistent effects can survive the avatar change. Until an explicit ability/effect migration and component-detach policy is implemented, test each protagonist in a separate play session or with a newly created PlayerState. Do not ship an authored protagonist switch through ordinary re-possession.
+The native managed path now handles per-protagonist snapshots, source ability/effect teardown, faction and Technique isolation, destination readiness, origin recovery, and explicit-slot non-seamless travel. Enable it by assigning `InitialMission` on each campaign map's project GameMode. See [CampaignHandoff.md](CampaignHandoff.md) and [EncounterRecovery.md](EncounterRecovery.md).
+
+Ordinary re-possession still bypasses these campaign guarantees. The managed campaign transition is standalone only; network combat component tests do not certify multiplayer campaign travel. No map/playthrough or UE build result has been obtained in the source-only audit workspace.
 
 ## Verification
 
@@ -60,11 +63,15 @@ Run:
 1. `ProjectVelkorranEditor Win64 Development`
 2. `Automation RunTests ProjectVelkorran.Campaign.Foundation`
 3. `Automation RunTests ProjectVelkorran.Campaign.Selene`
-4. `Automation RunTests ProjectVelkorran.Campaign.Status`
-5. `Automation RunTests ProjectVelkorran.Campaign.Corruption`
-6. `CompileAllBlueprints`
-7. Standalone PIE with Tarrik
-8. Standalone PIE with Selene
-9. Two-player listen-server PIE and, when available, dedicated-server PIE using the matrices in `Docs/SeleneCoreLoop.md` and `Docs/StatusAndCorruptionPrototype.md`
+4. `Automation RunTests ProjectVelkorran.Campaign.AxiomNullPulse`
+5. `Automation RunTests ProjectVelkorran.Campaign.Status`
+6. `Automation RunTests ProjectVelkorran.Campaign.Corruption`
+7. `Automation RunTests ProjectVelkorran.Campaign.Echo`
+8. `CompileAllBlueprints`
+9. Standalone PIE with Tarrik
+10. Standalone PIE with Selene
+11. Two-player listen-server PIE and, when available, dedicated-server PIE using the matrix in `Docs/SeleneCoreLoop.md`
 
-Verify that Tarrik reaches readiness with one Guard and one Cinderline generator and no Selene systems. Verify that Selene reaches readiness with one Deflection component and one Selene Echo generator, no Tarrik systems, and all shared resource components exactly once. Both must own exactly one status/corruption component, while NPC bases own status only. A valid perfect Deflection must award `+10` Echo once and expose its logical hostile attacker; a Selene-authored exposure kill must award `+6` once; the first valid break of an authored hostile weak point must award `+8` once; and Axiom's first valid Sever of an active hostile link instance must award `+12` once. Ordinary body hits, repeated hits on the same broken zone, Shield break or Device Disabled without a live link, friendly targets, Tarrik, and replayed damage/Sever transactions must not grant those rewards.
+Verify that Tarrik reaches readiness with one Guard and one Cinderline generator and no Selene systems. Verify that Selene reaches readiness with one Deflection component and one Selene Echo generator, no Tarrik systems, and all shared resource components exactly once. A valid perfect Deflection must award `+10` Echo once; an accepted hit on an unbroken authored hostile weak point must award `+8` once per native hit transaction; and Axiom's first valid Sever of an active hostile link instance must award `+12` once. Ordinary body hits, repeated hits on the same broken zone, Shield break or Device Disabled without a live link, friendly targets, Tarrik, and replayed Sever transactions must not grant those rewards.
+
+A Selene-authored exposure kill grants `+6` once, including when the target also has an authored mark/exposure window. Native Selene control and native Tarrik payload-owned Burn use `Sov.Status.Application.NativeOwned` so the generic status listener cannot duplicate their effects. See [MergeResolution-2026-09-05.md](MergeResolution-2026-09-05.md) for the integration decisions and validation limits.

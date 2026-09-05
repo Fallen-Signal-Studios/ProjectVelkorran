@@ -312,22 +312,20 @@ bool UNarrativeInteractableComponent::HasSlotAvailable(const bool bAllowTargeted
 
 FBox UNarrativeInteractableComponent::GetInteractableBounds() const
 {
-	FBox BoundingBox(ForceInitToZero);
-
 	const AActor* Owner = GetOwner();
-	if (Owner != nullptr)
+	if (!Owner) { return FBox(ForceInit); }
+	if (InteractionSlots.IsEmpty())
 	{
-		FBox SlotBounds;
-		for (auto& Slot : InteractionSlots)
-		{
-			SlotBounds += Slot.SlotTransform.GetLocation() + FVector(40, 40, 90);
-			SlotBounds += Slot.SlotTransform.GetLocation() - FVector(40, 40, 90);
-		}
-
-		BoundingBox = SlotBounds.TransformBy(Owner->GetTransform());
+		const FBox Bounds = Owner->GetComponentsBoundingBox(true);
+		return Bounds.IsValid ? Bounds : FBox(Owner->GetActorLocation(), Owner->GetActorLocation());
 	}
-
-	return BoundingBox;
+	FBox Bounds(ForceInit);
+	for (const auto& Slot : InteractionSlots)
+	{
+		Bounds += Slot.SlotTransform.GetLocation() + FVector(40, 40, 90);
+		Bounds += Slot.SlotTransform.GetLocation() - FVector(40, 40, 90);
+	}
+	return Bounds.TransformBy(Owner->GetTransform());
 }
 
 void UNarrativeInteractableComponent::BeginFocus(class APawn* Interactor, class UNarrativeInteractionComponent* InteractionComp)

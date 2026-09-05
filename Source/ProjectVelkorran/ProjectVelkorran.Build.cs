@@ -16,6 +16,7 @@ public class ProjectVelkorran : ModuleRules
 				"Engine",
 				"AIModule",
 				"InputCore",
+				"ApplicationCore",
 				"EnhancedInput",
 				"GameplayAbilities",
 				"GameplayTags",
@@ -23,10 +24,25 @@ public class ProjectVelkorran : ModuleRules
 				"Niagara",
 				"PhysicsCore",
 				"NarrativeArsenal",
-				"NarrativeSaveSystem"
+				"NarrativeSaveSystem",
+				"NarrativeCommonUI",
+				"UMG",
+				"CommonUI",
+				"MassEntity",
+				"MassCommon",
+				"MassActors",
+				"MassSpawner",
+				"MassRepresentation",
+				"MassCrowd"
 			}
 		);
 
-		PrivateDependencyModuleNames.Add("AnimGraphRuntime");
+		PrivateDependencyModuleNames.AddRange(new string[] { "AnimGraphRuntime", "NavigationSystem", "AssetRegistry", "LevelSequence", "MovieScene", "MovieSceneTracks", "Slate", "SlateCore", "OnlineSubsystem", "OnlineSubsystemUtils" });
+		if (Target.Platform == UnrealTargetPlatform.Win64)
+		{
+			PrivateDependencyModuleNames.Add("TextToSpeech");
+			PrivateDefinitions.Add("SOV_WITH_TEXT_TO_SPEECH=1");
+		}
+		else { PrivateDefinitions.Add("SOV_WITH_TEXT_TO_SPEECH=0"); }
 	}
 }

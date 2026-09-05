@@ -1,0 +1,9 @@
+Changed/new C++ files checked: 254
+Reflected headers checked: 94
+Include/order findings: []
+Plugin imports of project-only headers: []
+Native automation registrations: 144
+Duplicate automation paths: {}
+Tests outside runner default prefix: []
+git diff --check exit: 0
+Unreal/UHT/API compilation: NOT RUN (toolchain absent).

@@ -5,7 +5,11 @@
 #include "CoreMinimal.h"
 #include "Subsystems/WorldSubsystem.h"
 #include "NarrativeSave.h"
+#include "Templates/Function.h"
 #include "NarrativeSaveSubsystem.generated.h"
+
+/** Project save wrappers can supply already validated records before actors begin play. */
+DECLARE_MULTICAST_DELEGATE_ThreeParams(FNarrativeInitialSaveRequested, UWorld&, UNarrativeSave*&, bool&);
 
 //Called when the save system updates 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnSavePhaseChanged);
@@ -33,6 +37,12 @@ public:
 
 	//Create/update the save game object, and store the worlds state in it. This won't actually save it to disk. 
 	virtual bool UpdateSaveObject(const bool bSkipRecordCreation=false);
+	/** Transactional capture preserves the configured save subclass and the previous live save on failure. */
+	bool CaptureSaveObject(UNarrativeSave*& OutSnapshot);
+	/** Apply an already validated snapshot through the existing actor restore path. */
+	bool LoadFromSnapshot(UNarrativeSave* Snapshot);
+	static FNarrativeInitialSaveRequested OnInitialSaveRequested;
+	bool DidInitialLoadFail() const { return bInitialLoadFailed; }
 	
 	/**
 	* Will write to the records to a save file, and actually commit the save file to disk also. 
@@ -58,6 +68,12 @@ public:
 	persistence, where we can change levels and keep each players items and weapons in its own file. We can also support having players leave and re-join the game later,
 	whilst keeping all their stuff saved. */
 	virtual bool CreatePlayerOnlySave(APlayerController* PC);
+	/** Explicit platform user/slot. Optional native owner predicate fences capture and serialization callbacks before IO. */
+	bool CreatePlayerOnlySaveInSlot(APlayerController* PC, const FString& SlotName, int32 LocalUserIndex = 0,
+		TFunction<bool()> IsOwnerCurrent = {});
+	/** Read records without applying them to the currently possessed pawn or replacing world state. */
+	bool ReadPlayerOnlySave(const FString& SlotName, FNarrativeSavePlayer& OutPlayerData, int32 LocalUserIndex = 0,
+		TFunction<bool()> IsOwnerCurrent = {}) const;
 	virtual bool LoadPlayerOnlySave(APlayerController* PC);
 	virtual bool DeletePlayerOnlySave(APlayerController* PC);
 
@@ -135,10 +151,13 @@ public:
 	/** Allows you to quickly lookup an actor reference using its save GUID. Useful for actor references - save the GUID to disk and look it up later.  */
 	UFUNCTION(BlueprintPure, Category = "Lookups")
 	AActor* LookupActorByGUID(const FGuid& SearchGUID);
+	/** Refresh derived lookup state after a deferred actor receives its saved identity. */
+	void RefreshStableActorIdentity(AActor* Actor) const;
 
 	//Helper functions for creating a record from an actor, or initializing an actor from an actor record. 
 	bool CreateActorRecord(class AActor* Actor, FNarrativeActorRecord& ActorRecord) const;
-	void LoadActorFromRecord(class AActor* Actor, const FNarrativeActorRecord& ActorRecord) const;
+	/** Returns false on invalid records, archive errors or invalidation during callbacks. */
+	bool LoadActorFromRecord(class AActor* Actor, const FNarrativeActorRecord& ActorRecord) const;
 
 	/** Called by GameMode->InitGame */
 	void InitializeSaveSystem(UWorld& InWorld);
@@ -192,14 +211,19 @@ protected:
 	UFUNCTION()
 	virtual void OnPostWorldCreation(UWorld* World);
 
-	bool bSavingDisabled; 
+	bool bSavingDisabled;
+	bool bInitialLoadFailed = false;
 
 	FTimerHandle TimerHandle_DeferredLoadPlayerData;
 
 private:
+	friend struct FSovSaveTestAccess;
+    bool ValidateRecordForActor(const AActor* Actor, const FNarrativeActorRecord& Record) const;
 
 	TSubclassOf<class UNarrativeSave> GetSaveGameClass() const;
 
-	TMap<FGuid, TWeakObjectPtr<class AActor>> QuickLookupMap;
+	mutable TMap<FGuid, TWeakObjectPtr<class AActor>> QuickLookupMap;
+	TSet<FGuid> FailedUnloadedRecords;
+	bool bIsCapturingSnapshot = false;
 
 };

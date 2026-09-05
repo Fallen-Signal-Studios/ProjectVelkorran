@@ -1,17 +1,17 @@
 # Status and Eclipse Corruption Prototype
 
-This slice closes the TDD's next Phase 1 systems dependency after Selene's network encounter. It adds one authoritative status owner for players and NPCs, the first playable Eclipse-corruption loop, and Selene's missing Deflection-to-Exposed payoff. It deliberately provides checkpoint capture/restore contracts without inventing the campaign checkpoint manager before consequence ownership is defined.
+The generic status system and Deflection-to-Exposed payoff remain active on project characters. The corruption implementation in this document is retained as an **opt-in standalone prototype** under `USovLegacyCorruptionComponent`. Campaign characters use the newer mission-scoped `USovCorruptionComponent` described in [CorruptionEngineering.md](CorruptionEngineering.md). See [MergeResolution-2026-09-05.md](MergeResolution-2026-09-05.md) before migrating existing Blueprint corruption calls or fields.
 
 ## Runtime ownership
 
 | State | Runtime owner | Replication / persistence rule |
 |---|---|---|
 | Burn, Chill, Freeze, Device Disabled, Exposed | `USovStatusComponent` on every project player and NPC base | GAS effects/tags carry gameplay; a compact status view replicates UI/VFX identity, stacks, and expiry while authority retains exact handles and provenance |
-| Eclipse exposure | `USovCorruptionAttributeSet` on `ASovPlayerState` | The persistent player ASC is the numeric source of truth |
-| Corruption sources, bands, remedy, presentation | `USovCorruptionComponent` on `ASovPlayerCharacterBase` | Server owns transitions; compact band and presentation state replicate |
+| Eclipse exposure | `USovCorruptionAttributeSet` retained on `ASovPlayerState` | Compatibility storage for the optional legacy component; campaign exposure uses mission-scoped records |
+| Corruption sources, bands, remedy, presentation | `USovLegacyCorruptionComponent` explicitly added to a standalone prototype pawn | Server owns transitions; compact band and presentation state replicate |
 | Checkpoint representation | Versioned semantic structs | No actor pointers, timers, GUID handles, or active GE handles are serialized |
 
-`ASovNPCCharacterBase` owns status but not player corruption. `ASovDroneNPCBase` explicitly opts into Device Disabled; ordinary characters do not. Both protagonists inherit exactly one status and one corruption component.
+`ASovNPCCharacterBase` owns status but not player corruption. `ASovDroneNPCBase` explicitly opts into Device Disabled; ordinary characters do not. Both protagonists inherit exactly one generic status component and one mission-scoped corruption component. Neither constructs the legacy component by default.
 
 ## Status request path
 
@@ -20,11 +20,11 @@ For a status coupled to damage, put the exact `Sov.Status.Apply.*` tag on the sa
 - `Sov.SetByCaller.Status.Magnitude`
 - `Sov.SetByCaller.Status.Duration`
 
-The damage transaction emits a typed `FSovStatusApplicationRequest` only when it actually reduces Health, Shield, or Poise and the target survives. The target's `USovStatusComponent` then performs authority, avatar, replay, immunity, eligibility, stacking, and definition validation. The aggregate `Sov.Event.Status.ApplicationRequested` gameplay event remains available for compatibility and presentation, but it is not the source of gameplay truth.
+The damage transaction emits a typed `FSovStatusApplicationRequest` after accepted, nonfatal Health/Shield/Poise damage or an accepted control-only transaction. Native payloads tagged `Sov.Status.Application.NativeOwned` retain the typed damage receipt but do not emit generic status requests; their payload owns the effect and duration. The target's `USovStatusComponent` then performs authority, avatar, replay, immunity, eligibility, stacking, and definition validation. The aggregate `Sov.Event.Status.ApplicationRequested` gameplay event remains available for compatibility and presentation, but it is not the source of gameplay truth.
 
 For an authored non-damage ability, hazard, or interaction, run on authority and call `Apply Status By Tag` on the target's `USovStatusComponent`. That helper creates the immutable request identity and exact target. Use the full `Apply Status` request only when the caller needs to preserve explicit source-ability tags or a transaction identity.
 
-Do not apply a second duration GE in Blueprint. That would bypass centralized immunity, exact-handle cleanup, reapplication policy, and checkpoint semantics.
+For generic status requests, do not apply a second duration GE in Blueprint. That would bypass centralized immunity, exact-handle cleanup, reapplication policy, and checkpoint semantics.
 
 ## Built-in launch definitions
 

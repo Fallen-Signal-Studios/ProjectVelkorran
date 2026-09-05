@@ -1,0 +1,48 @@
+{
+  "audited_source_tree": "049edf431aa27a57f6d1ef1c00add8b10fe90de0",
+  "scope": "source audit; runtime unchanged",
+  "portable_suites": {
+    "executed": 39,
+    "exit_code": 0,
+    "log": "PortableTests.txt"
+  },
+  "host_tests": {
+    "executed": 27,
+    "exit_code": 0,
+    "log": "HostTests.txt"
+  },
+  "console_descriptor_preflight": {
+    "exit_code": 1,
+    "status": "blocked",
+    "log": "ConsolePreflight.json"
+  },
+  "unity_collision_probe": {
+    "compiler_exit_code": 1,
+    "status": "expected redefinition reproduced",
+    "log": "BuildPermutationEvidence.txt"
+  },
+  "unity_overload_probe": {
+    "compiler_exit_codes": [
+      0,
+      0
+    ],
+    "isolated_result": 1,
+    "combined_result": 0,
+    "context": "minimal stub types; actual helper bodies; not Unreal execution"
+  },
+  "cloud_revision_probe": {
+    "scope": "host filename ordering only",
+    "counterexample_reproduced": true
+  },
+  "native_registrations": 224,
+  "native_executed": 0,
+  "ue_uht_ubt_executed": false,
+  "gameplay_source_modified": false,
+  "local_report_links_checked": true,
+  "root_counter_review": [
+    "ED-01 explicit shield-break nested damage trace confirmed",
+    "PC-02 scope timing and stale setup outcome qualified",
+    "SP-01 busy/identity observer and configured-class exposure narrowed"
+  ],
+  "added_audit_files": 19
+}

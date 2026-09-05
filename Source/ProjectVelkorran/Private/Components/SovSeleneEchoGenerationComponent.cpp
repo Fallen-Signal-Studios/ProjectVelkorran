@@ -3,6 +3,8 @@
 #include "Components/SovSeleneEchoGenerationComponent.h"
 
 #include "AbilitySystemBlueprintLibrary.h"
+#include "Campaign/SovEchoBypassGate.h"
+#include "Engine/World.h"
 #include "Components/SovCommandLinkComponent.h"
 #include "Components/SovDeflectionComponent.h"
 #include "Components/SovEchoComponent.h"
@@ -119,6 +121,8 @@ bool USovSeleneEchoGenerationComponent::InitializeWithAbilitySystem(
 	AbilitySystemComponent->OnDamageResolvedAsSource.AddUniqueDynamic(
 		this,
 		&ThisClass::HandleDamageResolvedAsSource);
+	AbilitySystemComponent->OnDamageResolvedAsTarget.AddUniqueDynamic(this, &ThisClass::HandleDamageResolvedAsTarget);
+	EchoComponent->OnEncounterScopeChanged.AddUniqueDynamic(this, &ThisClass::HandleEncounterScopeChanged);
 	return true;
 }
 
@@ -148,6 +152,9 @@ void USovSeleneEchoGenerationComponent::TryInitializeFromOwner()
 
 void USovSeleneEchoGenerationComponent::UninitializeFromAbilitySystem()
 {
+	ResetPrecisionChain();
+	if (IsValid(EchoComponent.Get()))
+		EchoComponent->OnEncounterScopeChanged.RemoveDynamic(this, &ThisClass::HandleEncounterScopeChanged);
 	if (IsValid(DeflectionComponent.Get()))
 	{
 		DeflectionComponent->OnPerfectDeflection.RemoveDynamic(
@@ -156,6 +163,7 @@ void USovSeleneEchoGenerationComponent::UninitializeFromAbilitySystem()
 	}
 	if (IsValid(AbilitySystemComponent.Get()))
 	{
+		AbilitySystemComponent->OnDamageResolvedAsTarget.RemoveDynamic(this, &ThisClass::HandleDamageResolvedAsTarget);
 		AbilitySystemComponent->OnDamageResolvedAsSource.RemoveDynamic(
 			this,
 			&ThisClass::HandleDamageResolvedAsSource);
@@ -172,9 +180,9 @@ bool USovSeleneEchoGenerationComponent::CanGenerateSeleneEcho(
 	if (!IsInitialized()
 		|| !GetOwner()
 		|| !GetOwner()->HasAuthority()
-		|| EchoComponent->GetMaxEcho() <= KINDA_SMALL_NUMBER
-		|| EchoComponent->GetEcho() + KINDA_SMALL_NUMBER
-			>= EchoComponent->GetMaxEcho())
+		|| GetOwner()->IsActorBeingDestroyed()
+		|| AbilitySystemComponent->GetAvatarActor() != GetOwner()
+		|| EchoComponent->GetMaxEcho() <= KINDA_SMALL_NUMBER)
 	{
 		return false;
 	}
@@ -336,14 +344,18 @@ void USovSeleneEchoGenerationComponent::AwardEcho(
 		return;
 	}
 
-	const float AppliedEcho = EchoComponent->AddEcho(
-		RequestedEcho,
-		SourceTag);
+	USovEchoComponent* OriginalEcho = EchoComponent.Get();
+	UNarrativeAbilitySystemComponent* OriginalASC = AbilitySystemComponent.Get();
+	const uint32 Epoch = ResourceScopeEpoch;
+	const float BeforeEcho = OriginalEcho->GetEcho();
+	const float AppliedEcho = OriginalEcho->AddEcho(RequestedEcho, SourceTag);
+	if (ResourceScopeEpoch != Epoch || EchoComponent.Get() != OriginalEcho
+		|| AbilitySystemComponent.Get() != OriginalASC || !IsValid(OriginalEcho) || !IsValid(GetOwner())) return;
 	if (AppliedEcho > KINDA_SMALL_NUMBER)
 	{
 		ClientNotifySeleneEchoAwarded(
 			AppliedEcho,
-			EchoComponent->GetEcho(),
+			BeforeEcho + AppliedEcho,
 			AwardType,
 			WeakPointId,
 			OtherActor);
@@ -400,75 +412,89 @@ void USovSeleneEchoGenerationComponent::HandlePerfectDeflection(
 void USovSeleneEchoGenerationComponent::HandleDamageResolvedAsSource(
 	const FSovDamageResult& DamageResult)
 {
-	AActor* Owner = GetOwner();
-	AActor* TargetActor = DamageResult.TargetActor.Get();
-	if (!IsValid(Owner)
-		|| !Owner->HasAuthority()
-		|| ResolveLogicalDamageSource(DamageResult) != Owner
-		|| !IsValid(TargetActor)
-		|| TargetActor == Owner
-		|| TargetActor->GetWorld() != GetWorld())
+	AActor* Target = DamageResult.TargetActor.Get();
+	if (!GetOwner() || !GetOwner()->HasAuthority() || ResolveLogicalDamageSource(DamageResult) != GetOwner()
+		|| !IsValid(Target) || Target == GetOwner() || Target->GetWorld() != GetWorld()
+		|| !DamageResult.TransactionId.IsValid()
+		|| ConsumedDamageTransactions.Contains(DamageResult.TransactionId)) return;
+	ConsumedDamageTransactions.Add(DamageResult.TransactionId);
+
+	FName BrokenWeakPointId = NAME_None;
+	USovWeakPointComponent* WeakPoints = Target->FindComponentByClass<USovWeakPointComponent>();
+	// Consume target-owned proof even when resource/identity policy rejects its reward.
+	const bool bPrecision = WeakPoints && WeakPoints->ConsumeWeakPointHit(DamageResult, BrokenWeakPointId);
+	FName IgnoredBreak;
+	if (WeakPoints) WeakPoints->ConsumeWeakPointBreak(DamageResult, IgnoredBreak);
+	if (!IsHostileTarget(Target) || IsEchoAbilityDamage(DamageResult) || !CanGenerateSeleneEcho())
 	{
+		ResetPrecisionChain();
 		return;
 	}
-
-	USovWeakPointComponent* WeakPointComponent =
-		TargetActor->FindComponentByClass<USovWeakPointComponent>();
-	if (IsValid(WeakPointComponent))
+	const uint32 ExpectedScope = ResourceScopeEpoch;
+	const FSovGameplayTags& Tags = FSovGameplayTags::Get();
+	const USovStatusComponent* TargetStatus = Target->FindComponentByClass<USovStatusComponent>();
+	const bool bSeleneExposure = IsValid(TargetStatus)
+		&& TargetStatus->HasActiveStatus(Tags.Status_Apply_Exposed)
+		&& TargetStatus->WasStatusAppliedBy(Tags.Status_Apply_Exposed, GetOwner());
+	if (DamageResult.bFatal && DamageResult.AppliedHealthDamage > 0.0f)
 	{
-		// Consume the target-owned transaction before any resource, identity, or
-		// source policy can discard it. This branch is deliberately independent
-		// from the exposure-kill reward below.
-		FName BrokenWeakPointId = NAME_None;
-		if (WeakPointComponent->ConsumeWeakPointBreak(
-				DamageResult,
-				BrokenWeakPointId)
-			&& IsHostileTarget(TargetActor)
-			&& !IsEchoAbilityDamage(DamageResult))
+		// A status exposure and an authored target mark are the same kill payoff,
+		// not two independent awards. Preserve the prototype's source provenance.
+		if (bSeleneExposure)
 		{
-			AwardEcho(
-				GetWeakPointBreakEchoReward(),
-				FSovGameplayTags::Get().Echo_Source_WeakPointBreak,
-				ESovSeleneEchoAwardType::WeakPointBreak,
-				BrokenWeakPointId,
-				TargetActor);
+			AwardEcho(GetExposureKillEchoReward(), Tags.Echo_Source_ExposureKill,
+				ESovSeleneEchoAwardType::ExposureKill, NAME_None, Target);
+		}
+		else if (DamageResult.TargetTagsBeforeDamage.HasTag(Tags.State_Target_Marked)
+			|| DamageResult.TargetTagsBeforeDamage.HasTag(Tags.State_Target_Exposed))
+		{
+			AwardEcho(MarkedKillEchoReward, Tags.Echo_Source_MarkedKill,
+				ESovSeleneEchoAwardType::MarkedOrExposedKill, NAME_None, Target);
 		}
 	}
-
-	if (!DamageResult.bFatal || !DamageResult.TransactionId.IsValid())
+	if (ResourceScopeEpoch != ExpectedScope) return;
+	if (!bPrecision)
 	{
+		if (DamageResult.AppliedHealthDamage + DamageResult.AppliedShieldDamage > 0.0f)
+			ResetPrecisionChain();
 		return;
 	}
-	if (!ConsumeDamageRewardTransaction(
-			DamageResult.TransactionId,
-			ConsumedExposureKillTransactions,
-			ExposureKillTransactionOrder))
-	{
-		return;
-	}
-	// Consume before mutable status, team, identity, and Echo-cap checks. A fatal
-	// transaction may never become payable later if its callback is replayed.
+	// Reserve chain state before notification callbacks can cause another hit.
+	const float Now = GetWorld()->GetTimeSeconds();
+	const bool bBonus = PrecisionChain.Advance(TWeakObjectPtr<AActor>(Target), Now,
+		FMath::Max(PrecisionChainWindow, 0.05f), MaximumPrecisionChainBonusLinks);
+	AwardEcho(GetWeakPointHitEchoReward(), Tags.Echo_Source_WeakPointHit,
+		ESovSeleneEchoAwardType::WeakPointHit, BrokenWeakPointId, Target);
+	if (bBonus && ResourceScopeEpoch == ExpectedScope)
+		AwardEcho(PrecisionChainEchoReward, Tags.Echo_Source_PrecisionChain,
+			ESovSeleneEchoAwardType::PrecisionChain, BrokenWeakPointId, Target);
+}
 
-	USovStatusComponent* TargetStatus =
-		TargetActor->FindComponentByClass<USovStatusComponent>();
-	const FGameplayTag ExposedStatus =
-		FSovGameplayTags::Get().Status_Apply_Exposed;
-	if (!CanGenerateSeleneEcho()
-		|| IsEchoAbilityDamage(DamageResult)
-		|| !IsHostileTarget(TargetActor)
-		|| !IsValid(TargetStatus)
-		|| !TargetStatus->HasActiveStatus(ExposedStatus)
-		|| !TargetStatus->WasStatusAppliedBy(ExposedStatus, Owner))
-	{
-		return;
-	}
+void USovSeleneEchoGenerationComponent::ResetPrecisionChain()
+{
+	PrecisionChain.Reset();
+	++ResourceScopeEpoch;
+}
 
-	AwardEcho(
-		GetExposureKillEchoReward(),
-		FSovGameplayTags::Get().Echo_Source_ExposureKill,
-		ESovSeleneEchoAwardType::ExposureKill,
-		NAME_None,
-		TargetActor);
+void USovSeleneEchoGenerationComponent::HandleEncounterScopeChanged(bool bStarted)
+{
+	ResetPrecisionChain();
+}
+
+void USovSeleneEchoGenerationComponent::HandleDamageResolvedAsTarget(const FSovDamageResult& Result)
+{
+	if (Result.TargetActor.Get() == GetOwner()
+		&& Result.AppliedHealthDamage + Result.AppliedShieldDamage > 0.0f) ResetPrecisionChain();
+}
+
+void USovSeleneEchoGenerationComponent::ConsumeUndetectedBypass(ASovEchoBypassGate* Gate, const FGuid& ReceiptId)
+{
+	FGuid Attempt;
+	if (!IsValid(Gate) || !Gate->ConsumeReceipt(GetOwner(), ReceiptId, Attempt)
+		|| ConsumedBypassAttempts.Contains(Attempt)) return;
+	ConsumedBypassAttempts.Add(Attempt);
+	AwardEcho(15.0f, FSovGameplayTags::Get().Echo_Source_UndetectedBypass,
+		ESovSeleneEchoAwardType::UndetectedBypass, NAME_None, Gate);
 }
 
 void USovSeleneEchoGenerationComponent::ClientNotifySeleneEchoAwarded_Implementation(

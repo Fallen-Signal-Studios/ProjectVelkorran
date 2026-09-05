@@ -4,7 +4,15 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameUserSettings.h"
+#include "GameplayTagContainer.h"
+#include "AudioDeviceHandle.h"
 #include "NarrativeGameUserSettings.generated.h"
+class UArsenalSettings;
+class USoundClass;
+class USoundMix;
+
+UENUM(BlueprintType)
+enum class ENarrativeAudioDynamicRange : uint8 { Full, Reduced, Night };
 
 UENUM(BlueprintType)
 enum class ENarrativeGameplayDifficulty : uint8
@@ -36,8 +44,35 @@ public:
 
 	UNarrativeGameUserSettings();
 
+	/** Project extension seam; neutral defaults preserve other Narrative consumers. */
+	static const UNarrativeGameUserSettings* GetSovSettings();
+	virtual float GetIncomingDamageScale() const { return 1.f; }
+	virtual float GetEnemyRecoveryScale() const { return 1.f; }
+	virtual float GetDefenseWindowScale() const { return 1.f; }
+	virtual float GetExertionCostScale() const { return 1.f; }
+	virtual float GetInputBufferAssistanceSeconds() const { return 0.f; }
+	virtual float GetMeleeAimAssistStrength() const { return 0.f; }
+	virtual float GetRangedAimAssistStrength() const { return 0.f; }
+	virtual bool IsCompanionRescueAllowed() const { return true; }
+	virtual float GetInteractionHoldScale() const { return 1.f; }
+	virtual bool UseTapInteractions() const { return false; }
+	virtual bool ShouldAimToggle() const { return false; }
+	virtual bool ShouldGuardToggle() const { return false; }
+	virtual bool ShouldSprintToggle() const { return false; }
+	virtual bool UseAutomaticSprint() const { return false; }
+	virtual bool UseAimSnap() const { return false; }
+	virtual bool UseProjectileLead() const { return false; }
+	virtual bool ShouldAbilityModifierToggle() const { return false; }
+	virtual float GetAutoCameraStrength() const { return 0.f; }
+	virtual bool IsCameraShakeDisabled() const { return false; }
+	virtual bool IsReducedLensEffectsEnabled() const { return false; }
+	virtual bool IsReducedCorruptionEffectsEnabled() const { return false; }
+
+
 	virtual void ApplySettings(bool bCheckForCommandLineOverrides) override;
 	virtual void ApplyNonResolutionSettings() override; 
+	virtual void LoadSettings(bool bForceReload = false) override;
+	virtual void BeginDestroy() override;
 
 	virtual void ApplySoundSettings();
 	virtual void ApplyMonitorSelection();
@@ -72,6 +107,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category = Settings)
 	float GetMusicAudioVolume() const;
 
+	UFUNCTION(BlueprintCallable, Category = Settings) void SetAmbienceAudioVolume(float Value);
+	UFUNCTION(BlueprintPure, Category = Settings) float GetAmbienceAudioVolume() const { return AmbienceAudioVolume; }
+	UFUNCTION(BlueprintCallable, Category = Settings) void SetTinnitusAudioVolume(float Value);
+	UFUNCTION(BlueprintPure, Category = Settings) float GetTinnitusAudioVolume() const { return TinnitusAudioVolume; }
+	UFUNCTION(BlueprintCallable, Category = Settings) void SetAudioDynamicRange(ENarrativeAudioDynamicRange Value);
+	UFUNCTION(BlueprintPure, Category = Settings) ENarrativeAudioDynamicRange GetAudioDynamicRange() const { return AudioDynamicRange; }
+	UFUNCTION(BlueprintPure, Category = Settings) bool IsAudioDynamicRangeAvailable(ENarrativeAudioDynamicRange Value) const;
+	UFUNCTION(BlueprintPure, Category = Settings) ENarrativeAudioDynamicRange GetAppliedAudioDynamicRange() const { return AppliedAudioDynamicRange; }
+
 	//Set whether or not crouching is a toggle or whether crouch key requires held. 
 	UFUNCTION(BlueprintCallable, Category = Settings)
 	void SetShouldCrouchToggle(const bool bNewCrouchToggles);
@@ -102,7 +146,7 @@ public:
 
 	//Set the current gameplay difficulty
 	UFUNCTION(BlueprintCallable, Category = Settings)
-	void SetGameplayDifficulty(const ENarrativeGameplayDifficulty NewDifficulty);
+	virtual void SetGameplayDifficulty(const ENarrativeGameplayDifficulty NewDifficulty);
 
 	UFUNCTION(BlueprintCallable, Category = Settings)
 	ENarrativeGameplayDifficulty GetGameplayDifficulty();
@@ -145,6 +189,14 @@ public:
 	void SetOnlineUsername(const FString Username);
 	
 protected:
+	/** Device seams exercise the real settings/config-to-bus path without changing automation hardware. */
+	virtual bool HasAudioOutput() const;
+	virtual const UArsenalSettings* ReadAudioConfiguration() const;
+	virtual USoundMix* ReadAudioBaseMix() const;
+	virtual void SubmitSoundClassVolume(USoundMix* Mix, USoundClass* Class, float Volume);
+	virtual void SubmitDynamicRangeMix(USoundMix* Mix);
+	void NormalizeAudioSettings();
+	void ReleaseDynamicRangeMix();
 
 	UPROPERTY(config)
 	float OverallAudioVolume;
@@ -160,6 +212,12 @@ protected:
 
 	UPROPERTY(config)
 	float MusicAudioVolume;
+	UPROPERTY(config) float AmbienceAudioVolume = 1.f;
+	UPROPERTY(config) float TinnitusAudioVolume = 1.f;
+	UPROPERTY(config) ENarrativeAudioDynamicRange AudioDynamicRange = ENarrativeAudioDynamicRange::Full;
+	UPROPERTY(Transient) ENarrativeAudioDynamicRange AppliedAudioDynamicRange = ENarrativeAudioDynamicRange::Full;
+	UPROPERTY(Transient) TObjectPtr<USoundMix> ActiveDynamicRangeMix;
+	FAudioDeviceHandle DynamicRangeAudioDevice;
 
 	///**If true, bloom will be allowed in the camera views rendering settings.  */
 	UPROPERTY(config)

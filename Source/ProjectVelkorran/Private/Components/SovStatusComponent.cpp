@@ -5,7 +5,7 @@
 #include "Abilities/GameplayAbilityTypes.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
-#include "Components/SovCorruptionComponent.h"
+#include "Components/SovLegacyCorruptionComponent.h"
 #include "Engine/World.h"
 #include "Effects/SovGameplayEffect_CinderGrenade.h"
 #include "Effects/SovGameplayEffect_Status.h"
@@ -551,8 +551,8 @@ ESovStatusApplicationResult USovStatusComponent::ApplyStatus(
 			return ESovStatusApplicationResult::RejectedImmune;
 		}
 
-		USovCorruptionComponent* CorruptionComponent =
-			OwnerActor->FindComponentByClass<USovCorruptionComponent>();
+		USovLegacyCorruptionComponent* CorruptionComponent =
+			OwnerActor->FindComponentByClass<USovLegacyCorruptionComponent>();
 		if (!IsValid(CorruptionComponent))
 		{
 			BroadcastApplicationResult(
@@ -565,7 +565,7 @@ ESovStatusApplicationResult USovStatusComponent::ApplyStatus(
 		const float AppliedExposure = CorruptionComponent->ApplyInstantExposure(
 			Request.Magnitude,
 			Request.SourceActor.Get(),
-			ESovCorruptionBand::Intrusion);
+			ESovLegacyCorruptionBand::Intrusion);
 		const ESovStatusApplicationResult CorruptionResult =
 			AppliedExposure > 0.0f
 				? ESovStatusApplicationResult::Applied

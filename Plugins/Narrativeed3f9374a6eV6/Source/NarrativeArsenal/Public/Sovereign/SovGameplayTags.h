@@ -20,6 +20,36 @@ public:
 	static const FSovGameplayTags& Get() { return GameplayTags; }
 	static void InitializeNativeTags();
 
+	FGameplayTag Input_Evade;
+	FGameplayTag Input_FieldRecovery;
+	FGameplayTag Ability_FieldRecovery;
+	FGameplayTag State_FieldRecovery;
+	FGameplayTag Input_ThreatFocus;
+	FGameplayTag Input_CycleTargetLeft;
+	FGameplayTag Input_CycleTargetRight;
+	FGameplayTag Input_AbilityModifier;
+	FGameplayTag Ability_Evade;
+	FGameplayTag State_Evading;
+	FGameplayTag State_Exertion_Exhausted;
+	FGameplayTag Ability_Finisher;
+	FGameplayTag Input_Finisher;
+	FGameplayTag State_Finisher_Active;
+	FGameplayTag State_Finisher_Target;
+	FGameplayTag State_InterruptProtected;
+	FGameplayTag Event_Finisher_PhaseResolved;
+	FGameplayTag Event_Finisher_Strike;
+	FGameplayTag State_Resonance_Available;
+	FGameplayTag State_Resonance_Committed;
+	FGameplayTag Event_Resonance_Setup_PerfectGuard;
+	FGameplayTag Event_Resonance_Setup_CommandExposed;
+	FGameplayTag Event_Resonance_Setup_TerminalProtection;
+	FGameplayTag Event_Resonance_Setup_RoutedFire;
+	FGameplayTag State_Resonance_CounterWindow;
+	FGameplayTag State_Resonance_ProtectedTarget;
+	FGameplayTag State_Invulnerable_Respawn;
+	FGameplayTag State_Recovery_Rescue;
+	FGameplayTag State_Traversal;
+	FGameplayTag State_Choice_Unresolved;
 	FGameplayTag Character_Player;
 	FGameplayTag Character_Player_Tarrik;
 	FGameplayTag Character_Player_Selene;
@@ -85,10 +115,17 @@ public:
 	FGameplayTag State_Status_Exposed;
 	FGameplayTag State_Status_Corrupted;
 	FGameplayTag State_Corruption;
-	FGameplayTag State_Corruption_Trace;
-	FGameplayTag State_Corruption_Intrusion;
-	FGameplayTag State_Corruption_Contest;
+	FGameplayTag State_Weapon_VerityAbsent;
+	FGameplayTag Campaign_Value_Withheld;
+	FGameplayTag Campaign_Fact_MarketShot;
+	FGameplayTag Campaign_Value_WoundedAlive;
+	FGameplayTag Campaign_Fact_Caelus;
+	FGameplayTag Campaign_Value_Tarrik;
+	FGameplayTag Campaign_Fact_Heir;
 	FGameplayTag State_Corruption_OverwriteRisk;
+	FGameplayTag State_Corruption_Contest;
+	FGameplayTag State_Corruption_Intrusion;
+	FGameplayTag State_Corruption_Trace;
 
 	FGameplayTag Damage_BypassShield;
 	FGameplayTag Damage_BypassShield_Partial;
@@ -125,6 +162,8 @@ public:
 	FGameplayTag Damage_Immunity_Corruption;
 	FGameplayTag Damage_Immunity_Environmental;
 	FGameplayTag Status_Apply;
+	/** Native payload owns status effects after consuming the accepted damage receipt. */
+	FGameplayTag Status_Application_NativeOwned;
 	FGameplayTag Status_Apply_Burn;
 	FGameplayTag Status_Apply_Chill;
 	FGameplayTag Status_Apply_Freeze;
@@ -189,6 +228,7 @@ public:
 	FGameplayTag Echo_Source_PerfectGuard;
 	FGameplayTag Echo_Source_PerfectDeflection;
 	FGameplayTag Echo_Source_WeakPointBreak;
+	FGameplayTag Echo_Source_WeakPointHit;
 	FGameplayTag Echo_Source_CommandLinkSever;
 	FGameplayTag Echo_Source_GuardPressure;
 	FGameplayTag Echo_Source_GuardCounter;
@@ -196,6 +236,16 @@ public:
 	FGameplayTag Echo_Source_CinderlinePrecisionKill;
 	FGameplayTag Echo_Source_CombatSustainPickup;
 	FGameplayTag Echo_Source_ExposureKill;
+	FGameplayTag State_CommandTarget_Window;
+	FGameplayTag State_Target_Exposed;
+	FGameplayTag State_Target_Marked;
+	FGameplayTag Echo_Source_UndetectedBypass;
+	FGameplayTag Echo_Source_PrecisionChain;
+	FGameplayTag Echo_Source_MarkedKill;
+	FGameplayTag Echo_Source_CommandTargetKill;
+	FGameplayTag Echo_Source_PoiseBreak;
+	FGameplayTag Echo_Source_HeavyMultiHit;
+	FGameplayTag Echo_Source_ProtectionIntercept;
 
 private:
 	void AddAllTags(UGameplayTagsManager& Manager);

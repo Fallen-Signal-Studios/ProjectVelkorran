@@ -89,6 +89,18 @@ struct NARRATIVEARSENAL_API FSovDamageResult
 	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Damage")
 	FGuid TransactionId;
 
+	/** Authority-produced identity shared by one attack's victims. Invalid when no trusted receipt exists. */
+	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Damage")
+	FGuid AttackId;
+
+	/** Periodic effect delivery (including its initial execution), captured from the authoritative spec. */
+	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Damage")
+	bool bPeriodicDamage = false;
+
+	/** Target state captured before Stamina, damage, break, death, or presentation callbacks. */
+	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Damage")
+	FGameplayTagContainer TargetTagsBeforeDamage;
+
 	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Damage")
 	TObjectPtr<AActor> SourceActor = nullptr;
 
@@ -98,11 +110,27 @@ struct NARRATIVEARSENAL_API FSovDamageResult
 	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Damage")
 	FGameplayTagContainer DamageChannels;
 
+	/** Declared portions rejected by channel immunity or zero weight. */
+	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Damage")
+	FGameplayTagContainer RejectedDamageChannels;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Damage")
+	float AcceptedChannelFraction = 1.f;
+
 	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Damage")
 	FGameplayTagContainer AttackClassifications;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Damage")
 	FGameplayTagContainer RequestedStatusTags;
+
+	/** True only when this transaction passed action-state defense for a status request. */
+	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Damage")
+	bool bStatusApplicationRequested = false;
+
+	/** Poise payload before Guard/Deflection and recovery-floor routing. */
+	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Damage")
+	float RequestedPoiseDamage = 0.f;
+
 
 	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Damage")
 	FName HitZone = NAME_None;
@@ -169,6 +197,10 @@ struct NARRATIVEARSENAL_API FSovDamageResult
 
 	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Damage")
 	bool bFatal = false;
+
+	/** Authored non-rescuable fatal transaction, captured before damage callbacks. */
+	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Damage")
+	bool bCanonicalFatal = false;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Damage")
 	bool bShouldRestartShieldRecharge = false;

@@ -688,6 +688,29 @@ void ASovTransformingWeaponVisual::HandlePhaseTimerExpired()
 	}
 }
 
+bool ASovTransformingWeaponVisual::CompleteCinematicHandoff(FGameplayTag ExpectedWieldSlot)
+{
+	const int32 Serial = TransitionState.TransitionSerial;
+	const uint32 Generation = AttachmentRequestGeneration;
+	const auto Current = [&]()
+	{
+		return HasAuthority() && !IsActorBeingDestroyed() && !IsOwnerDead() && !bPhysicalAttachmentCommitInProgress
+			&& TransitionState.TransitionSerial == Serial && AttachmentRequestGeneration == Generation
+			&& (!bEnableStagedTransitions || LatestRequestedWieldSlot == ExpectedWieldSlot);
+	};
+	if (!Current()) { return false; }
+	// Drawing -> Deploying -> Ready or Retracting -> Stowing -> Holstered.
+	// These are the same finite native handoff functions used by montage notifies/timer watchdogs.
+	for (int32 Step = 0; Step < 3 && IsTransitionPhase(); ++Step)
+	{
+		if (!Current() || TransitionState.TargetWieldSlot != ExpectedWieldSlot) { return false; }
+		HandlePhaseTimerExpired();
+	}
+	return Current() && !IsTransitionPhase() && HasCommittedAttachment(AttachState.EquippedSlot, ExpectedWieldSlot)
+		&& (!bEnableStagedTransitions || TransitionState.Phase == (ExpectedWieldSlot.IsValid()
+			? ESovWeaponTransitionPhase::Ready : ESovWeaponTransitionPhase::Holstered));
+}
+
 void ASovTransformingWeaponVisual::ForceCompleteTransition()
 {
 	if (!HasAuthority())
@@ -958,75 +981,64 @@ void ASovTransformingWeaponVisual::ApplyCharacterMontage(
 		return;
 	}
 
-	auto PlayOnMesh = [PhaseAge, PlayRate](
-		USkeletalMeshComponent* Mesh,
-		UAnimMontage* Montage,
-		TObjectPtr<UAnimMontage>& ActiveMontage)
+	const int32 ExpectedSerial = TransitionState.TransitionSerial;
+	const ESovWeaponTransitionPhase ExpectedPhase = TransitionState.Phase;
+	const uint32 ExpectedRequest = AttachmentRequestGeneration;
+	TWeakObjectPtr<ANarrativeCharacterVisual> ExpectedVisual = VisualOwner;
+	TWeakObjectPtr<ANarrativeCharacter> ExpectedCharacter = CharacterOwner;
+	auto StillCurrent = [this, ExpectedSerial, ExpectedPhase, ExpectedRequest, ExpectedVisual, ExpectedCharacter]()
 	{
-		if (!IsValid(Mesh) || !Montage)
+		return !IsActorBeingDestroyed() && ExpectedVisual.IsValid() && VisualOwner == ExpectedVisual.Get()
+			&& ExpectedCharacter.IsValid() && CharacterOwner == ExpectedCharacter.Get()
+			&& TransitionState.TransitionSerial == ExpectedSerial && TransitionState.Phase == ExpectedPhase
+			&& AttachmentRequestGeneration == ExpectedRequest;
+	};
+	auto PlayOnMesh = [PhaseAge, PlayRate, StillCurrent](
+		USkeletalMeshComponent* Mesh, UAnimMontage* Montage,
+		TObjectPtr<UAnimMontage>& ActiveMontage, TWeakObjectPtr<UAnimInstance>& ActiveInstance)
+	{
+		if (!StillCurrent()) return;
+		UAnimInstance* Instance = IsValid(Mesh) ? Mesh->GetAnimInstance() : nullptr;
+		UAnimInstance* PreviousInstance = ActiveInstance.Get();
+		UAnimMontage* PreviousMontage = ActiveMontage.Get();
+		ActiveMontage = nullptr;
+		ActiveInstance.Reset();
+		if (PreviousInstance && PreviousMontage && (PreviousInstance != Instance || PreviousMontage != Montage))
+			PreviousInstance->Montage_Stop(0.10f, PreviousMontage);
+		if (!StillCurrent() || !IsValid(Instance) || !IsValid(Montage) || !FMath::IsFinite(PlayRate)) return;
+		const float SafeRate = FMath::Max(PlayRate, KINDA_SMALL_NUMBER);
+		// Stage ownership before Montage_Play can synchronously invoke OnMontageStarted.
+		ActiveMontage = Montage;
+		ActiveInstance = Instance;
+		const float Duration = Instance->Montage_Play(Montage, SafeRate, EMontagePlayReturnType::MontageLength,
+			FMath::Clamp(PhaseAge * SafeRate, 0.f, Montage->GetPlayLength()), false);
+		if (Duration <= 0.0f && ActiveMontage.Get() == Montage && ActiveInstance.Get() == Instance)
 		{
-			return;
-		}
-		if (UAnimInstance* AnimInstance = Mesh->GetAnimInstance())
-		{
-			if (ActiveMontage.Get() && ActiveMontage.Get() != Montage)
-			{
-				AnimInstance->Montage_Stop(0.10f, ActiveMontage.Get());
-			}
-			AnimInstance->Montage_Play(
-				Montage,
-				FMath::Max(PlayRate, KINDA_SMALL_NUMBER),
-				EMontagePlayReturnType::MontageLength,
-				FMath::Min(
-					PhaseAge * FMath::Max(PlayRate, KINDA_SMALL_NUMBER),
-					Montage->GetPlayLength()),
-				false);
-			ActiveMontage = Montage;
+			ActiveMontage = nullptr;
+			ActiveInstance.Reset();
 		}
 	};
 
 	USkeletalMeshComponent* MainMesh = VisualOwner->GetMainMesh();
 	USkeletalMeshComponent* LocalMesh = VisualOwner->GetLocalMesh();
-	PlayOnMesh(MainMesh, MainMontage, ActiveMainCharacterMontage);
-	if (LocalMesh != MainMesh)
-	{
-		PlayOnMesh(LocalMesh, LocalMontage, ActiveLocalCharacterMontage);
-	}
+	PlayOnMesh(MainMesh, MainMontage, ActiveMainCharacterMontage, ActiveMainCharacterAnimInstance);
+	PlayOnMesh(LocalMesh != MainMesh ? LocalMesh : nullptr, LocalMontage,
+		ActiveLocalCharacterMontage, ActiveLocalCharacterAnimInstance);
 }
 
-void ASovTransformingWeaponVisual::StopCharacterTransitionMontages(
-	const float BlendOutTime)
+void ASovTransformingWeaponVisual::StopCharacterTransitionMontages(const float BlendOutTime)
 {
-	if (!IsValid(VisualOwner))
+	// Stop the exact instance that played our montage even if the owner/mesh was replaced.
+	auto Stop = [BlendOutTime](TObjectPtr<UAnimMontage>& Montage, TWeakObjectPtr<UAnimInstance>& Instance)
 	{
-		ActiveMainCharacterMontage = nullptr;
-		ActiveLocalCharacterMontage = nullptr;
-		return;
-	}
-
-	auto StopOnMesh = [BlendOutTime](
-		USkeletalMeshComponent* Mesh,
-		TObjectPtr<UAnimMontage>& ActiveMontage)
-	{
-		if (IsValid(Mesh) && ActiveMontage.Get())
-		{
-			if (UAnimInstance* AnimInstance = Mesh->GetAnimInstance())
-			{
-				AnimInstance->Montage_Stop(
-					BlendOutTime,
-					ActiveMontage.Get());
-			}
-		}
-		ActiveMontage = nullptr;
+		UAnimMontage* OldMontage = Montage.Get();
+		UAnimInstance* OldInstance = Instance.Get();
+		Montage = nullptr;
+		Instance.Reset();
+		if (OldInstance && OldMontage) OldInstance->Montage_Stop(FMath::Max(BlendOutTime, 0.f), OldMontage);
 	};
-
-	USkeletalMeshComponent* MainMesh = VisualOwner->GetMainMesh();
-	USkeletalMeshComponent* LocalMesh = VisualOwner->GetLocalMesh();
-	StopOnMesh(MainMesh, ActiveMainCharacterMontage);
-	if (LocalMesh != MainMesh)
-	{
-		StopOnMesh(LocalMesh, ActiveLocalCharacterMontage);
-	}
+	Stop(ActiveMainCharacterMontage, ActiveMainCharacterAnimInstance);
+	Stop(ActiveLocalCharacterMontage, ActiveLocalCharacterAnimInstance);
 }
 
 bool ASovTransformingWeaponVisual::PlayDeflectionWeaponMontageLocal()
@@ -1356,80 +1368,54 @@ void ASovTransformingWeaponVisual::ApplyMaterialProgress(
 	}
 }
 
-void ASovTransformingWeaponVisual::SetTransitionGateActive(
-	const bool bActive)
+void ASovTransformingWeaponVisual::SetTransitionGateActive(const bool bActive)
 {
-	UAbilitySystemComponent* AbilitySystem =
-		TransitionGateAbilitySystem.IsValid()
-			? TransitionGateAbilitySystem.Get()
-			: (IsValid(CharacterOwner)
-				? CharacterOwner->GetAbilitySystemComponent()
-				: nullptr);
-	if (!AbilitySystem)
-	{
-		return;
-	}
-
-	const FNarrativeGameplayTags& NarrativeTags =
-		FNarrativeGameplayTags::Get();
+	bRequestedTransitionGate = bActive;
+	if (bUpdatingTransitionGate) return;
+	TGuardValue<bool> Guard(bUpdatingTransitionGate, true);
+	const FNarrativeGameplayTags& Tags = FNarrativeGameplayTags::Get();
 	FGameplayTagContainer GateTags;
-	GateTags.AddTag(NarrativeTags.State_Weapon_Equipping);
-	GateTags.AddTag(NarrativeTags.State_Weapon_BlockFiring);
-
-	if (HasAuthority())
+	GateTags.AddTag(Tags.State_Weapon_Equipping);
+	GateTags.AddTag(Tags.State_Weapon_BlockFiring);
+	// Tag delegates may replace the pawn or cancel the transition synchronously.
+	for (int32 Pass = 0; Pass < 4; ++Pass)
 	{
-		if (bActive && !TransitionGateEffectHandle.IsValid())
+		UAbilitySystemComponent* Desired = IsValid(CharacterOwner) ? CharacterOwner->GetAbilitySystemComponent() : nullptr;
+		UAbilitySystemComponent* Previous = TransitionGateAbilitySystem.Get();
+		if (!bRequestedTransitionGate || Previous != Desired || !Previous)
 		{
-			if (UNarrativeAbilitySystemComponent* NarrativeAbilitySystem =
-				Cast<UNarrativeAbilitySystemComponent>(AbilitySystem))
-			{
-				TransitionGateEffectHandle =
-					NarrativeAbilitySystem->AddDynamicTagsGameplayEffect(
-						GateTags);
-			}
-			if (!TransitionGateEffectHandle.IsValid()
-				&& !bOwnsLocalLooseTransitionGate)
-			{
-				AbilitySystem->AddLooseGameplayTags(GateTags);
-				bOwnsLocalLooseTransitionGate = true;
-			}
-			if (TransitionGateEffectHandle.IsValid()
-				|| bOwnsLocalLooseTransitionGate)
-			{
-				TransitionGateAbilitySystem = AbilitySystem;
-			}
-		}
-		else if (!bActive)
-		{
-			if (TransitionGateEffectHandle.IsValid())
-			{
-				AbilitySystem->RemoveActiveGameplayEffect(
-					TransitionGateEffectHandle);
-				TransitionGateEffectHandle = FActiveGameplayEffectHandle();
-			}
-			if (bOwnsLocalLooseTransitionGate)
-			{
-				AbilitySystem->RemoveLooseGameplayTags(GateTags);
-				bOwnsLocalLooseTransitionGate = false;
-			}
+			const FActiveGameplayEffectHandle OldHandle = TransitionGateEffectHandle;
+			const bool bOldLoose = bOwnsLocalLooseTransitionGate;
+			TransitionGateEffectHandle = FActiveGameplayEffectHandle();
+			bOwnsLocalLooseTransitionGate = false;
 			TransitionGateAbilitySystem.Reset();
+			if (Previous)
+			{
+				if (OldHandle.IsValid()) Previous->RemoveActiveGameplayEffect(OldHandle);
+				if (bOldLoose) Previous->RemoveLooseGameplayTags(GateTags);
+			}
 		}
-		return;
+		Desired = IsValid(CharacterOwner) ? CharacterOwner->GetAbilitySystemComponent() : nullptr;
+		if (!bRequestedTransitionGate || !Desired) return;
+		if (HasAuthority() && TransitionGateEffectHandle.IsValid()
+			&& !Desired->GetActiveGameplayEffect(TransitionGateEffectHandle))
+			TransitionGateEffectHandle = FActiveGameplayEffectHandle();
+		if (!TransitionGateEffectHandle.IsValid() && !bOwnsLocalLooseTransitionGate)
+		{
+			TransitionGateAbilitySystem = Desired;
+			if (HasAuthority())
+				if (UNarrativeAbilitySystemComponent* ASC = Cast<UNarrativeAbilitySystemComponent>(Desired))
+					TransitionGateEffectHandle = ASC->AddDynamicTagsGameplayEffect(GateTags);
+			if (!TransitionGateEffectHandle.IsValid())
+			{
+				bOwnsLocalLooseTransitionGate = true;
+				Desired->AddLooseGameplayTags(GateTags);
+			}
+		}
+		if (bRequestedTransitionGate && IsValid(CharacterOwner)
+			&& CharacterOwner->GetAbilitySystemComponent() == Desired) return;
 	}
-
-	// Replicated phase convergence closes the owning client's prediction lane.
-	if (bActive && !bOwnsLocalLooseTransitionGate)
-	{
-		AbilitySystem->AddLooseGameplayTags(GateTags);
-		bOwnsLocalLooseTransitionGate = true;
-		TransitionGateAbilitySystem = AbilitySystem;
-	}
-	else if (!bActive && bOwnsLocalLooseTransitionGate)
-	{
-		AbilitySystem->RemoveLooseGameplayTags(GateTags);
-		bOwnsLocalLooseTransitionGate = false;
-		TransitionGateAbilitySystem.Reset();
-	}
+	// A pathological callback cycle converges on the next normal visual tick.
 }
 
 float ASovTransformingWeaponVisual::GetSynchronizedServerTime() const
@@ -1457,7 +1443,9 @@ float ASovTransformingWeaponVisual::GetAnimationDuration(
 	const float PlayRate,
 	const float FallbackDuration) const
 {
-	if (Animation && Animation->GetPlayLength() > KINDA_SMALL_NUMBER)
+	if (!FMath::IsFinite(PlayRate) || !FMath::IsFinite(FallbackDuration)) return 0.0f;
+	if (Animation && FMath::IsFinite(Animation->GetPlayLength())
+		&& Animation->GetPlayLength() > KINDA_SMALL_NUMBER)
 	{
 		return Animation->GetPlayLength()
 			/ FMath::Max(PlayRate, KINDA_SMALL_NUMBER);

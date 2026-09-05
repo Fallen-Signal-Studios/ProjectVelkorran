@@ -126,6 +126,20 @@ bool USovPoiseComponent::InitializeWithAbilitySystem(UAbilitySystemComponent* In
 	return true;
 }
 
+void USovPoiseComponent::ResetForCheckpoint()
+{
+	if (!CanWritePoise()) { return; }
+	ClearLifecycleTimers();
+	RemoveOwnedStateTags();
+	PoiseState = ESovPoiseState::Stable;
+	bHasRecordedPoiseDamage = false;
+	bRegenerationDelayElapsed = true;
+	LastPoiseDamageWorldTime = GetWorldTimeSeconds();
+	LastRegenerationUpdateWorldTime = LastPoiseDamageWorldTime;
+	RefreshPoiseState(false);
+	if (GetPoise() > KINDA_SMALL_NUMBER && GetPoise() + KINDA_SMALL_NUMBER < GetMaxPoise()) { RecordPoiseDamage(); }
+}
+
 bool USovPoiseComponent::IsInitialized() const
 {
 	return IsValid(AbilitySystemComponent);
@@ -338,7 +352,7 @@ void USovPoiseComponent::HandlePoiseAttributeChanged(const FOnAttributeChangeDat
 	const float OldPoise = FMath::Max(ChangeData.OldValue, 0.0f);
 	const float NewPoise = FMath::Clamp(ChangeData.NewValue, 0.0f, GetMaxPoise());
 
-	if (CanWritePoise() && NewPoise + KINDA_SMALL_NUMBER < OldPoise)
+	if (CanWritePoise() && !bRestoringCheckpoint && NewPoise + KINDA_SMALL_NUMBER < OldPoise)
 	{
 		RecordPoiseDamage();
 	}
@@ -347,11 +361,11 @@ void USovPoiseComponent::HandlePoiseAttributeChanged(const FOnAttributeChangeDat
 		&& GetMaxPoise() > KINDA_SMALL_NUMBER
 		&& PoiseState != ESovPoiseState::Recovering)
 	{
-		EnterBrokenState(true);
+		EnterBrokenState(!bRestoringCheckpoint);
 	}
 	else
 	{
-		RefreshPoiseState(true);
+		RefreshPoiseState(!bRestoringCheckpoint);
 	}
 
 	OnPoiseChanged.Broadcast(OldPoise, NewPoise, GetMaxPoise());

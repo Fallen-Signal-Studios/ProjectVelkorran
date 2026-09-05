@@ -34,17 +34,17 @@ The shared `USovGameplayAbility_EchoBase` now owns predicted activation, server-
 
 Do not add an Echo Cost Gameplay Effect and do not implement the generic Blueprint `Event ActivateAbility`. Use:
 
-- `Echo Ability Started` for predicted/authority montage and task setup;
+- `Echo Ability Started` for predicted/authority presentation setup;
 - `Echo Ability Local Presentation` for owner-only camera, audio, rumble, and cosmetic hit-stop;
-- `Echo Ability Authority Committed` as the only point that may spawn gameplay actors or apply gameplay effects;
+- `Echo Ability Authority Committed` for presentation only: every Selene payload now executes natively;
 - `Echo Ability Ended` for presentation cleanup;
-- `Finish Echo Ability` when the authored flow is complete or interrupted.
+- `Receive Native Selene Payload Released` for the confirmed Stillpoint/Wake/Zero/Dispatch release; the actor parameter is the projectile or Zero's confirmed target. Native code owns normal completion. Do not finish abilities from start/commit hooks; explicit interruption may call `Finish Echo Ability(true)`.
 
-Every Selene parent fails activation when its required payload classes are unassigned, preventing a paid no-op. Treat every non-optional slot in the sections below as required before testing. The current native parents still validate their legacy Chill/Freeze effect-class slots as compatibility scaffolds; keep those slots assigned until each ability payload is migrated to submit centralized status requests. Do not use those compatibility effects as a second status-application path. Optional accents such as Stillpoint detonation damage, Dispatch's Frozen shatter, Axiom's device disable, and their presentation assets may remain empty.
+All five abilities now have native gameplay payloads and safe effect defaults. Stillpoint, Wake, and Dispatch use `ASovSeleneCombatProjectile`, whose Blueprint children may supply presentation; no custom projectile asset is required to execute gameplay. Serialized legacy Gameplay Effect overrides remain for migration but are not executed. See [SeleneNativePayloads.md](SeleneNativePayloads.md) for lifecycle, tuning, tests, and migration; Axiom retains its detailed [AxiomNullPulse.md](AxiomNullPulse.md) contract.
 
 ## Identity and granting
 
-Selene's player Blueprint must derive from `ASovSeleneCharacter`. That concrete class merges `Sov.Character.Player.Selene` into the definition-owned ASC tag contribution and removes a conflicting Tarrik identity. Keep the same Selene tag on her Player Definition so the asset remains self-describing. Tarrik should likewise derive from `ASovTarrikCharacter`. Legacy Blueprints still deriving directly from `ASovPlayerCharacterBase` retain the temporary untagged migration fallback.
+Selene's player Blueprint must derive from `ASovSeleneCharacter`. That concrete class merges `Sov.Character.Player.Selene` into the definition-owned ASC tag contribution and removes a conflicting Tarrik identity. Keep the same Selene tag on her Player Definition so the asset remains self-describing. Tarrik should likewise derive from `ASovTarrikCharacter`. All Selene native payloads fail closed without the explicit Selene identity. Weapon variants additionally require their actual granting weapon to remain wielded. Migrate legacy untagged player Blueprints before testing.
 
 Grant Stillpoint Grenade and Dispatch once through Selene's default `UAbilityConfiguration`:
 
@@ -84,17 +84,15 @@ The centralized `USovStatusComponent` consumes these native contracts:
 - `Sov.Status.Immunity.Freeze`
 - `Sov.Status.Immunity.DeviceDisable`
 
-For status coupled to damage, add the exact `Sov.Status.Apply.*` tag and `Sov.SetByCaller.Status.Magnitude` / `Sov.SetByCaller.Status.Duration` to the same authoritative damage spec. The unified damage transaction submits a typed request only after positive, nonfatal Health, Shield, or Poise damage. For a non-damaging payload, call `Apply Status By Tag` on the target's status component from authority. Do not directly apply a second duration GE in the ability Blueprint.
+Native Selene payloads apply their own bounded, independently owned status effects. Zero and Wake first send their requested control tags through Narrative's single damage transaction and use its typed `bStatusApplicationRequested` result; perfect defense cannot still Freeze a target. Stillpoint is an explicitly guard-independent area-control field and validates hostile/alive/invulnerability/control immunity directly.
 
-Native definitions provide functional Burn, Chill, Freeze, Device Disabled, and Exposed behavior. Optional `USovStatusDefinition` assets can replace them by exact request tag. Relevant rules are:
+- `USovGameplayEffect_SeleneControl` supplies finite, nonperiodic grants. Frozen grants `Sov.State.Status.Frozen`, Narrative movement lock, and Busy; Chill grants `Sov.State.Status.Chilled` and Narrative slow-walking. Known active enemy attacks are canceled when Frozen is accepted.
+- A separate duration grant owns Freeze immunity for Freeze duration plus `RefreezeLockout`. Removing Frozen does not remove that protection. Overlapping effects never overwrite another cast's tag count or shorten its duration.
+- Bosses and Freeze-immune actors fall back to Chill. An exact root `Sov.Status.Immunity` tag rejects control; individual Burn/Freeze immunity children do not become blanket immunity.
+- `USovGameplayEffect_SeleneFrozenDOT` checks Frozen before every Narrative damage execution. Thawed targets cannot receive its ticks. `USovGameplayEffect_SeleneFrostDOT` supplies resistant/Wake damage without requiring Frozen. Both tick every second, without an initial application tick.
+- Native damage keeps Echo/Thermal channels, the Echo ability source tag, hit context, zero DOT Poise, and the existing shield/health/poise resolver. No native Selene payload directly writes Health or Shield.
 
-- Chill lasts 4 seconds, adds up to three stacks, refreshes on a valid added stack, and grants the prototype movement-slow constraint.
-- Freeze lasts 1.25 seconds, grants Busy, Movement Lock, and Weapon Block Firing, stops current controller movement, and applies 1.5 seconds of Freeze immunity after removal.
-- `GE_Damage_FrostDOT`: periodic damage through `UNarrativeDamageExecCalc`, never a direct Health or Damage-meta modifier.
-- Device Disabled lasts 4 seconds and succeeds only on a status component explicitly marked device-eligible. `ASovDroneNPCBase` opts in by default.
-- `GE_Status_ShieldRechargeBlocked`: duration effect granting `Sov.State.Shield.RechargeBlocked`.
-
-CC-resistant elites and bosses should reject hard Freeze through immunity tags and receive the authored Chill/exposure fallback. Branch presentation from the returned status result or `On Status Changed`; do not play a Frozen pose when the authoritative target rejected the request. See `Docs/StatusAndCorruptionPrototype.md` for definitions, cleanses, checkpoint semantics, and PIE coverage.
+The native damage spec carries `Sov.Status.Application.NativeOwned`: the shared resolver validates control acceptance but suppresses the generic `USovStatusComponent` request. This prevents premature Freeze/Chill and duplicate effects while retaining generic statuses for other attacks. Do not add a second gameplay listener for these native attacks. Axiom's Disruption, suppression and device-disable effects retain their separate policy.
 
 ## Payload contracts
 
@@ -103,8 +101,8 @@ CC-resistant elites and bosses should reject hard Freeze through immunity tags a
 - Spawn one replicated grenade on authority. Prediction may spawn a separate non-gameplay throw/trail cosmetic.
 - Authority owns the fuse, overlap, faction filter, target deduplication, and refreeze lockout.
 - Standard enemies in the detonation field receive Freeze plus Frost DOT. Freeze-immune targets receive Chill plus the authored reduced DOT.
-- Author the Frozen DOT so it requires `Sov.State.Status.Frozen` and ends or inhibits when Freeze ends. Use the separate resistant-target DOT slot for the reduced fallback; do not reuse the Frozen-only effect.
-- Treat `StasisDuration` as the target duration for Freeze and its DOT, then copy that value into the projectile/effect payload instead of maintaining unrelated timers.
+- The native Frozen DOT requires `Sov.State.Status.Frozen` on every tick; the resistant fallback uses a separate native DOT shell at half the standard magnitude.
+- `StasisDuration` is the field lifetime and the maximum Freeze/DOT duration. Late entrants receive its remaining lifetime. Each field reserves an actor once before applying effects, so repeated overlaps cannot re-freeze it.
 - The field is the reliable area lockdown tool; it should not also become Selene's highest burst-damage option.
 - The ability may end once the initialized authority grenade exists. Copy all ASC/effect/tuning data into the grenade and never retain the Gameplay Ability instance.
 
@@ -125,40 +123,35 @@ CC-resistant elites and bosses should reject hard Freeze through immunity tags a
 
 ### Axiom Null Pulse
 
-- Clamp charge alpha on authority and interpolate the authored minimum/maximum pulse range, half-angle, and suppression duration. Charge never accepts an unvalidated client damage value.
-- On authority, send a shield-only Disruption packet through the normal SetByCaller damage Gameplay Effect:
-  - `Sov.Damage.Channel.Disruption`
-  - `Sov.Damage.Policy.AlreadyResolved` when submitting an exact Shield-collapse magnitude
-  - `Sov.Damage.BypassGuard` if the EMP is not meant to be intercepted by a physical guard plane
-  - Shield coefficient `1`
-  - Health coefficient `0`
-  - Poise damage `0` unless separately authored
-- Then apply the duration recharge-block effect. `Sov.State.Shield.RechargeBlocked` only pauses recharge; the Disruption packet is what removes existing Shield while preserving Shield-break events, material state, and Niagara.
-- Apply Device Disabled only to eligible targets that do not carry `Sov.Status.Immunity.DeviceDisable`.
-- Exact full-Shield collapse for 30 Echo is intentionally aggressive. Bosses or shield-critical elites should carry an authored EMP immunity/cap policy if they must retain phase mechanics.
-- The command-link payload is separate. Add `USovCommandLinkComponent` to the actual hostile command node, give it a stable `LinkId`, and assign/register its encounter participants. Do not award Sever from the Shield or Device Disabled result.
-- Inside the existing `Echo Ability Authority Committed` pulse target loop, call `Try Sever Axiom Command Link` once for each unique command-node actor selected by the authoritative pulse. Do not call it from local presentation, an animation notify, a Gameplay Cue, or client-authored target data.
-- The helper revalidates active ability state, authority, world, maximum Axiom range, and component presence. The component then validates hostility against the link's actual participants. Only `NewlySevered` changes link state. The helper automatically submits that transaction to Selene's Echo generator; Blueprint must not add the `+12` itself.
-- `Inactive`, `NotHostile`, `Immune`, `AlreadySevered`, and `Invalid` are deliberate no-award outcomes. A repeated call returns the existing Sever identity and cannot restart the reveal or repay Echo.
-- A successful Sever removes the component's `Sov.State.CommandLink.Active` and optional active-link Gameplay Effect contributions, adds `Sov.State.CommandLink.Severed`, interrupts watched specialist actions, and begins the configured weak-point reveal on affected actors.
+Axiom has a complete native gameplay payload. See [AxiomNullPulse.md](AxiomNullPulse.md) for the setup, migration, tuning, and validation details.
 
-This implementation is a Shield collapse plus timed suppression. If the design later needs an intact but temporarily bypassed Shield, add a separate routing contract rather than pretending RechargeBlocked disables it.
+- Grant `GA_Selene_AxiomNullPulse` only from the actual Axiom `UWeaponItem`, and set `AllowedWeaponClasses` to that item class. Native activation and release require Selene's identity, the original granting weapon still wielded, and no weapon transition.
+- Native code spends Echo once, starts its authoritative charge clock, releases on input release or the `0.65`-second full-charge timer, and ends after native recovery. It interpolates range, cone half-angle, and suppression duration from that clock. No client supplies target or charge magnitude.
+- The release deduplicates candidates and applies charge-derived range/cone and visibility checks. The target and source are revalidated as the transaction progresses.
+- Exact Shield collapse uses the existing Narrative damage execution with Disruption, guard/deflection bypass, Shield coefficient `1`, Health coefficient `0`, and zero Poise. Native duration effects pause Shield recharge and expire normally; this preserves Shield-break feedback without Health overflow.
+- Device Disabled defaults to eligible `ASovDroneNPCBase` targets and explicitly opted-in additional classes. Immunity and boss policy still apply. Organic Handlers and Hounds are not globally disabled; their command-dependent action stops through genuine link Sever while independent Bite/Pounce remain available.
+- Native safe Gameplay Effect shells are supplied. Legacy Blueprint effect overrides are retained as serialized references but safely replaced by native shells during application. Reset those fields to the native defaults when migrating; leaving an old slot empty does not disable the native payload.
+- Author `USovCommandLinkComponent` on the actual hostile command node, with its stable `LinkId` and encounter participants. Native release authorizes each eligible node and calls `TrySeverAxiomCommandLink` internally. Direct Blueprint calls to that helper now return `Invalid`; do not build a second target loop or call Sever from `Echo Ability Authority Committed`.
+- Only a new valid link transaction awards the existing `+12` Echo and reveals weak points. Shield collapse, Device Disabled, link deactivation, and repeated attempts cannot substitute for Sever or repay a consumed transaction.
+- Use `Echo Ability Started`, local presentation, `Receive Axiom Pulse Released`, and `Echo Ability Ended` for animation/audio/VFX/UI only. The release-result event runs on authority after gameplay; route observer cosmetics through the existing replicated presentation mechanisms when needed. Remove old Blueprint charge timers, input-release tasks, damage/status applications, direct Sever/Echo writes, and normal-end calls.
 
-Full command-node and red decal authoring instructions are in `Docs/SeleneCommandLinkAndWeakPointReveal.md`.
+Exact Shield collapse for 30 Echo is an aggressive prototype. Author immunity on phase-critical targets when needed; any future capped-collapse behavior needs its own explicit native policy. RechargeBlocked pauses regeneration and does not make an intact Shield bypassable.
+
+Command-node and red decal authoring instructions are in [SeleneCommandLinkAndWeakPointReveal.md](SeleneCommandLinkAndWeakPointReveal.md).
 
 ### Dispatch
 
-**Required content:** `ReturningVerityClass` must be a project-owned replicated actor derived from `ANarrativeProjectile` that implements the state machine, steering validation, hit ledgers, recall, forced return, and cleanup below. The native Gameplay Ability supplies the paid lifecycle contract but does not fabricate that actor behavior.
+`ReturningVerityClass` defaults to `ASovSeleneCombatProjectile`, which implements this state machine natively. An optional Blueprint child may provide the Verity mesh and phase presentation. Set `VerityWeaponClasses` to the actual Verity item classes to hide their existing equipped/holstered visuals during flight; inventory and equipment remain intact.
 
 - Spawn one authority-owned replicated Verity actor with explicit `Outbound`, `Recalling`, and `Returned/Expired` states.
 - The server accepts control rotation/aim intent, never client projectile positions. Clamp steering rate, speed, range, and lifetime.
 - In the active ability, use GAS `Wait Input Press` for the second press. That request recalls the existing Verity actor and never spends Echo again.
 - Auto-recall at the outbound timer/range limit. Death, interruption, owner loss, or timeout must also force return/cleanup.
 - Maintain separate server hit ledgers so each actor can be damaged at most once outbound and once inbound.
-- A return pass through a Frozen or Chilled target may consume/shatter that state for bonus Poise pressure, but must not duplicate the base leg hit.
+- A return pass through a Frozen or Chilled target adds `ShatterBonusPoise` to that leg's single damage transaction. It preserves independently owned status effects and never duplicates base damage.
 - Keep the ability active until Verity returns or the failsafe resolves. The native Dispatch parent raises the general maximum duration to seven seconds.
 
-Narrative's stock projectile task is not suitable for Dispatch's authoritative state machine and can create unreconciled predicted/authority copies for replicated projectiles. Use a project-owned returning-weapon actor.
+Native Dispatch owns the GAS recall task, its queued-input latch, an equipment/owner watchdog, and the finite `Sov.State.Weapon.VerityAbsent` effect. Return, death, cancellation, obstruction on return, or timeout cleans the actor and restores only its captured Verity visuals. Narrative's stock projectile task is not used.
 
 ## Minimum PIE matrix
 
@@ -172,10 +165,12 @@ Narrative's stock projectile task is not suitable for Dispatch's authoritative s
 - Axiom target with full, partial, zero, and no MaxShield; no Health overflow at any charge
 - Axiom recharge remains blocked for the authored duration, then resumes normally
 - Axiom first active hostile link Sever returns `NewlySevered`, grants exactly `+12`, and exposes only unbroken authored weak points
-- Axiom repeated, inactive, immune, non-hostile, missing-link, and out-of-range Sever attempts grant no Echo or reveal
+- Axiom repeated, inactive, immune, non-hostile, missing-link, outside-charge-cone/range, and occluded targets grant no Sever Echo or reveal
+- Direct Blueprint Sever calls fail; input release plus full-charge timer releases at most one pulse
+- Death, cinematic interruption, or weapon replacement during charge prevents a late payload
 - Axiom spends `30` before the eligible Sever reward: verify `100 -> 82` and `30 -> 12`, with no replay after later meter changes
 - Dispatch early recall, timed recall, range recall, owner death, interruption, obstruction, and owner disconnect
 - Dispatch one hit per actor per leg, including repeated overlaps at low speed
 - first-person owner and third-person simulated-proxy montage/cue presentation
 
-These native classes are intentionally abstract scaffolds. Blueprint children, projectiles, effects, AnimSets, Gameplay Cues, Niagara, audio, reveal decal materials, command-node membership, and final balance must still be authored in the Unreal project. Physical projectile reflection/retargeting remains a separate deferred system; this Sever integration does not change projectile ownership or trajectory.
+All five Selene payloads now execute in native code. Blueprint grants, exact weapon allowlists, Verity visual item classes, AnimSets, Gameplay Cues, meshes, Niagara, audio, reveal materials, command-node membership, and final balance still require Unreal content setup. The native payloads have source review and portable math coverage; their Unreal automation tests require an installed UE 5.7 editor and have not been run in this workspace. Physical projectile reflection/retargeting remains a separate system.

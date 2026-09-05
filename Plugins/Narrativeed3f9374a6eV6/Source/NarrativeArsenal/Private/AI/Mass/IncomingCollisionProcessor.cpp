@@ -6,7 +6,9 @@
 #include "ArsenalStatics.h"
 #include "MassActorSubsystem.h"
 #include "MassCommonFragments.h"
+#if WITH_MASSGAMEPLAY_DEBUG
 #include "MassDebuggerSubsystem.h"
+#endif
 #include "MassEntityView.h"
 #include "MassExecutionContext.h"
 #include "MassMovementFragments.h"
@@ -135,7 +137,7 @@ void UIncomingCollisionProcessor::Execute(FMassEntityManager& EntityManager, FMa
 				IncomingCollisionEntities.Add({Context.GetEntity(EntityIndex), IncomingCollisionFragment.IncomingEntity});
 			}
 
-#if ENABLE_VISUAL_LOG
+#if ENABLE_VISUAL_LOG && WITH_MASSGAMEPLAY_DEBUG
 			FTransformFragment* ObstacleTransform = IncomingCollisionFragment.IncomingEntity.IsValid() ? EntityManager.GetFragmentDataPtr<FTransformFragment>(IncomingCollisionFragment.IncomingEntity) : nullptr;
 			if (MassDebuggerSubsystem.GetSelectedEntity() == Context.GetEntity(EntityIndex) && ObstacleTransform)
 			{

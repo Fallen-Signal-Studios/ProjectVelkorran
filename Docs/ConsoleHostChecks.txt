@@ -1,0 +1,32 @@
+test_deny_list_wins (TestConsoleBuild.ConsoleBuildTests.test_deny_list_wins) ... ok
+test_editor_dependency_is_not_a_console_game_dependency (TestConsoleBuild.ConsoleBuildTests.test_editor_dependency_is_not_a_console_game_dependency) ... ok
+test_explicit_empty_platforms_fail_closed (TestConsoleBuild.ConsoleBuildTests.test_explicit_empty_platforms_fail_closed) ... ok
+test_missing_runtime_dependency_blocks (TestConsoleBuild.ConsoleBuildTests.test_missing_runtime_dependency_blocks) ... ok
+test_portable_descriptor_does_not_claim_compilation (TestConsoleBuild.ConsoleBuildTests.test_portable_descriptor_does_not_claim_compilation) ... ok
+test_production_mass_debug_reference_has_a_declaration_in_all_configurations (TestConsoleBuild.ConsoleBuildTests.test_production_mass_debug_reference_has_a_declaration_in_all_configurations) ... ok
+test_project_descriptor_supported_platforms_checked (TestConsoleBuild.ConsoleBuildTests.test_project_descriptor_supported_platforms_checked) ... ok
+test_required_runtime_module_excluded (TestConsoleBuild.ConsoleBuildTests.test_required_runtime_module_excluded) ... ok
+test_template_descriptor_does_not_resolve_missing_plugin (TestConsoleBuild.ConsoleBuildTests.test_template_descriptor_does_not_resolve_missing_plugin) ... ok
+test_unspecified_platform_does_not_guess_vendor_support (TestConsoleBuild.ConsoleBuildTests.test_unspecified_platform_does_not_guess_vendor_support) ... ok
+test_bad_total (TestUnrealReport.ReportGateTests.test_bad_total) ... ok
+test_complete_success (TestUnrealReport.ReportGateTests.test_complete_success) ... ok
+test_counter_tampering (TestUnrealReport.ReportGateTests.test_counter_tampering) ... ok
+test_duplicate_rows (TestUnrealReport.ReportGateTests.test_duplicate_rows) ... ok
+test_empty_report (TestUnrealReport.ReportGateTests.test_empty_report) ... ok
+test_filter_namespace_boundary (TestUnrealReport.ReportGateTests.test_filter_namespace_boundary) ... ok
+test_focused_run (TestUnrealReport.ReportGateTests.test_focused_run) ... ok
+test_hidden_error_event (TestUnrealReport.ReportGateTests.test_hidden_error_event) ... ok
+test_incomplete_or_failure (TestUnrealReport.ReportGateTests.test_incomplete_or_failure) ... ok
+test_missing_counter (TestUnrealReport.ReportGateTests.test_missing_counter) ... ok
+test_missing_error_count (TestUnrealReport.ReportGateTests.test_missing_error_count) ... ok
+test_missing_source_test_rejects_stale_binary_report (TestUnrealReport.ReportGateTests.test_missing_source_test_rejects_stale_binary_report) ... ok
+test_no_inventory_rejected (TestUnrealReport.ReportGateTests.test_no_inventory_rejected) ... ok
+test_non_success_state (TestUnrealReport.ReportGateTests.test_non_success_state) ... ok
+test_nonzero_error_count (TestUnrealReport.ReportGateTests.test_nonzero_error_count) ... ok
+test_source_inventory_includes_plugin_and_ignores_comments (TestUnrealReport.ReportGateTests.test_source_inventory_includes_plugin_and_ignores_comments) ... ok
+test_warning_success (TestUnrealReport.ReportGateTests.test_warning_success) ... ok
+
+----------------------------------------------------------------------
+Ran 27 tests in 0.032s
+
+OK

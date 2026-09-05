@@ -15,6 +15,16 @@ class PROJECTVELKORRAN_API ASovNPCCharacterBase : public ANarrativeNPCCharacter
 public:
 	ASovNPCCharacterBase(const FObjectInitializer& ObjectInitializer);
 	virtual void BeginPlay() override;
+	virtual FGuid GetActorGUID_Implementation() const override;
+	virtual void SetActorGUID_Implementation(const FGuid& SavedGUID) override;
+	virtual bool ShouldRespawn_Implementation() const override;
+
+	/** Called on a deferred replacement before setting its NPC definition. */
+	void PrepareForEncounterRestore(const FNPCSpawnInfo& SavedSpawnInfo, const FGuid& SavedGUID);
+	const FNPCSpawnInfo& GetEncounterSpawnInfo() const { return SpawnInfo; }
+	bool IsEncounterSnapshotReady() const { return bEncounterSnapshotReady; }
+	void SetEncounterOwned() { bEncounterOwned = true; }
+	void EnsureEncounterController();
 
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Components")
 	class USovDismembermentComponent* GetDismembermentComponent() const
@@ -32,6 +42,14 @@ public:
 	class USovStatusComponent* GetStatusComponent() const { return StatusComponent; }
 
 protected:
+	virtual void OnCharacterVisualInitialized() override;
+	UPROPERTY(SaveGame)
+	FGuid NativeSaveGuid;
+	UPROPERTY(SaveGame)
+	bool bEncounterOwned = false;
+	bool bEncounterRestoreInitialization = false;
+	bool bEncounterSnapshotReady = false;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sovereign|Components")
 	TObjectPtr<class USovDismembermentComponent> DismembermentComponent;
 

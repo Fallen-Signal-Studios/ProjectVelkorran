@@ -2,7 +2,7 @@
 
 #include "World/SovCorruptionRemedyVolume.h"
 
-#include "Components/SovCorruptionComponent.h"
+#include "Components/SovLegacyCorruptionComponent.h"
 #include "Engine/World.h"
 #include "Sovereign/SovGameplayTags.h"
 
@@ -98,8 +98,8 @@ void ASovCorruptionRemedyVolume::TryApplyToActor(AActor* OtherActor)
 		return;
 	}
 
-	USovCorruptionComponent* CorruptionComponent =
-		OtherActor->FindComponentByClass<USovCorruptionComponent>();
+	USovLegacyCorruptionComponent* CorruptionComponent =
+		OtherActor->FindComponentByClass<USovLegacyCorruptionComponent>();
 	if (!IsValid(CorruptionComponent) || !CorruptionComponent->IsInitialized())
 	{
 		return;

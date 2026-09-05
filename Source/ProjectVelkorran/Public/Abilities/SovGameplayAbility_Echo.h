@@ -58,6 +58,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Echo Ability")
 	float GetEchoCost() const { return FMath::Max(EchoCost, 0.0f); }
 
+	/** Read-only shared weapon rule for resource feedback; activation still validates every other gate. */
+	bool CanUseEchoWeaponContext(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo) const
+	{
+		return ActorInfo && MeetsWeaponRequirement(Handle, ActorInfo);
+	}
+
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Echo Ability")
 	float GetCurrentEcho() const;
 

@@ -180,6 +180,13 @@ public:
 	virtual UWorld* GetWorld() const override;
 	virtual bool Initialize(class UTalesComponent* InitializingComp, const FDialoguePlayParams PlayParams);
 	virtual void Deinitialize();
+	/** Pause an authored walk-and-talk in place. Resuming never replays graph events or a selected choice. */
+	bool SetPlaybackSuspended(bool bSuspend);
+	UFUNCTION(BlueprintPure, Category="Dialogue") bool IsPlaybackSuspended() const { return bPlaybackSuspended; }
+	bool CanSuspendPlayback() const;
+	/** Native campaign critical cues defer forced interruption in the same graph instance. */
+	void SetPreserveOnInterruption(bool bPreserve) { bPreserveOnInterruption = bPreserve; }
+	bool PreservesInterruptedPlayback() const { return bPreserveOnInterruption; }
 
 	virtual void DuplicateAndInitializeFromDialogue(UDialogue* DialogueTemplate);
 
@@ -197,6 +204,10 @@ public:
 	FSpeakerInfo GetSpeaker(const FName& SpeakerID);
 
 	UDialogueNode* GetCurrentNode() { return CurrentNode; }
+	/** Revision of the actual replies-available presentation, not the graph/node asset identity. */
+	int64 GetReplyPresentationRevision() const { return ReplyPresentationRevision; }
+	bool AreRepliesPresented() const { return bRepliesPresented && !bDeinitialized; }
+	bool IsCurrentReplyPresentation(int64 Revision) const { return AreRepliesPresented() && Revision == ReplyPresentationRevision; }
 
 	//All the NPC speakers in this dialogue - for the player fill out the PlayerSpeakerInfo below! 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Speakers", meta = (TitleProperty="SpeakerID"))
@@ -656,6 +667,13 @@ protected:
 
 	//Deintialize has been called and the dialogue should not play anymore
 	bool bDeinitialized;
+	bool bPlaybackSuspended = false;
+	int64 ReplyPresentationRevision = 0;
+	bool bRepliesPresented = false;
+	bool bLineCompletionInProgress = false;
+	bool bCurrentLineFinished = false;
+	bool bPlaybackStartPending = false;
+	bool bPreserveOnInterruption = false;
 
 	//The dialogue may be initialized, but has it began playing yet?
 	bool bBeganPlaying;

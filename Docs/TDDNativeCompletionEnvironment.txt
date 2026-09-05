@@ -1,0 +1,16 @@
+Native completion environment preflight
+Repository: /workspace/scratch/4e000d64b13d/ProjectVelkorran
+Branch: codex/tdd-native-completion
+Base HEAD: fe31c66e69226d73d92a3dea38ed6a6fef3aa1dd
+EngineAssociation: 5.7
+UnrealEditor: unavailable
+UnrealEditor-Cmd: unavailable
+UnrealBuildTool: unavailable
+dotnet: unavailable
+pwsh: unavailable
+g++: /usr/bin/g++
+python3: /opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3
+.uasset count: 0
+.umap count: 0
+Common engine roots: [('/opt/UnrealEngine', False), ('/opt/unreal-engine', False), ('/opt/UE_5.7', False), ('/UnrealEngine', False), ('/workspace/UnrealEngine', False)]
+UE compilation/automation: BLOCKED, not executed. Required toolchain/content absent.

@@ -1,8 +1,8 @@
 # Selene command-link Sever and weak-point reveal
 
-This slice implements the TDD's first concrete **Sever** contract: Axiom Null Pulse can break one live, authored command link; the server interrupts that network's coordinated behavior, Selene receives `+12` Echo once for the validated hostile transition, and each participating enemy temporarily reveals its remaining weak points in red. `ASovDominionHandler` is the first native enemy profile that actively consumes this contract by ordering a linked Hound's Horn Charge. The Sever path does not treat Shield break, Device Disabled, damage, an animation event, or merely activating Axiom as proof that a link was severed.
+This slice implements the TDD's first concrete **Sever** contract: Axiom Null Pulse can break live, authored command links selected by its native pulse; the server interrupts that network's coordinated behavior, Selene receives `+12` Echo once for the validated hostile transition, and each participating enemy temporarily reveals its remaining weak points in red. `ASovDominionHandler` is the first native enemy profile that actively consumes this contract by ordering a linked Hound's Horn Charge. The Sever path does not treat Shield break, Device Disabled, damage, an animation event, or merely activating Axiom as proof that a link was severed.
 
-The current Axiom implementation is the project-specific expression of the TDD's `GA_Selene_Disrupt` role. Its Shield collapse, recharge suppression, and optional Device Disabled payload remain independent of the command-link transaction.
+The current Axiom implementation is the project-specific expression of the TDD's `GA_Selene_Disrupt` role. Its native Shield collapse, recharge suppression, and eligible-device shutdown remain independent of the command-link transaction. [AxiomNullPulse.md](AxiomNullPulse.md) documents the native charge/release and Blueprint migration.
 
 ## Runtime contract
 
@@ -22,16 +22,16 @@ An active link has a generated `LinkInstanceId`. A successful `Active -> Severed
 
 | Result | Typical cause | Echo / reveal |
 |---|---|---|
-| `Invalid` | Wrong execution context, missing identity, invalid actor/world, Axiom inactive, or command node outside Axiom's maximum range | None |
+| `Invalid` | Direct helper call outside native release authorization, missing identity/source weapon, invalid actor/world, inactive Axiom, or node outside the released cone/range/visibility | None |
 | `Inactive` | The component exists but this link instance is not active | None |
 | `NotHostile` | Selene is not hostile to any included/registered participant in the active link | None |
 | `Immune` | **Severable** is disabled, or the owner/source carries `Sov.Status.Immunity.DeviceDisable` while that policy is respected | None |
 | `AlreadySevered` | A second request targets the same severed instance | None; original transaction is returned for observation only |
 | `NewlySevered` | The server validated the first request against an active, severable instance | Eligible Selene receives `+12`; affected actors begin their authored weak-point reveal |
 
-Hostility and identity are checked on authority. The Echo generator consumes the transaction ID before testing resource availability, so a duplicate cannot become payable after Selene's meter changes. This is the only Selene award allowed while Axiom owns `Sov.State.EchoAbility.Active`; other Echo-ability damage still cannot generate precision Echo.
+These are native transaction outcomes. Blueprint should observe link/result presentation events, not call the Axiom helper to obtain them. Hostility and identity are checked on authority. The Echo generator consumes the transaction ID before testing resource availability, so a duplicate cannot become payable after Selene's meter changes. This is the only Selene award allowed while Axiom owns `Sov.State.EchoAbility.Active`; other Echo-ability damage still cannot generate precision Echo.
 
-At native defaults, Axiom spends `30` and a successful hostile Sever immediately returns `12`, for a net change of `-18`. At exactly `30` Echo the expected result is `12`, and at a full meter the expected result is `82`.
+At native defaults, Axiom spends `30` and one successful hostile link Sever immediately returns `12`, for a net change of `-18`. Each distinct eligible link instance owns its own reward identity; the examples below use a single link. At exactly `30` Echo the expected result is `12`, and at a full meter the expected result is `82`.
 
 ## One-time Unreal Editor setup
 
@@ -41,7 +41,7 @@ Close the editor and perform a full `ProjectVelkorranEditor Win64 Development` b
 
 1. For a Dominion Handler, use `ASovDominionHandler` as the Blueprint parent and keep its one inherited `Sov Command Link Component`; do not add a duplicate. A different commander, relay, or device can own exactly one explicitly added `USovCommandLinkComponent`. Do not add one to every linked Hound.
 2. Ensure the owning actor replicates. The component is replicated by default, but a non-replicated owner cannot deliver its state to clients.
-3. Give the command node and linked enemies the correct Narrative team identity. The command-link component fails closed unless Selene is hostile to at least one actual included/registered participant. This permits a neutral relay to coordinate hostile enemies without treating an empty relay as a rewardable link.
+3. Give the command node and linked enemies the correct Narrative team identity. The command-link component fails closed unless Selene is hostile to at least one actual included/registered participant. A relay without an ASC can be selected by the native pulse and validate hostility through its participants. An ASC-bearing command node must itself be hostile to Selene under the pulse filter; do not assume neutral ASC-bearing actors bypass that filter. An empty relay cannot create a rewardable link.
 4. Set **Link Id** to a stable, encounter-unique name such as `KennelA_HandlerLink`. Never derive reward identity from a display name or actor label.
 5. Leave **Starts Active** enabled when the network should operate at Begin Play. If activation depends on encounter scripting, disable it and call `Activate Command Link` on the server when the encounter enters the linked phase.
 6. Leave **Severable** enabled for an ordinary Axiom target. Disable it for a deliberately immune phase.
@@ -56,16 +56,16 @@ If the command source is a different actor from the component owner, call `Activ
 
 ### 2. Connect Axiom Null Pulse
 
-Keep the existing authority-owned pulse validation, Shield disruption, recharge-block, and optional Device Disabled work. In `GA_Selene_AxiomNullPulse`:
+Use the native `USovGameplayAbility_SeleneAxiomNullPulse` parent. Follow [AxiomNullPulse.md](AxiomNullPulse.md) when migrating an existing Blueprint:
 
-1. Use `Echo Ability Authority Committed`; do not run this logic from local presentation, montage notifies, Gameplay Cues, or generic `Event ActivateAbility`.
-2. From the existing server-validated pulse target loop, identify the actual command-node actor that owns `USovCommandLinkComponent`.
-3. Call `Try Sever Axiom Command Link`, passing that command node. The helper revalidates authority, active ability state, world, maximum range, and component presence; the component validates hostility against the affected participant snapshot.
-4. Switch on the returned `ESovCommandLinkSeverResolution` only when presentation or encounter branching needs the distinction. `NewlySevered` is the sole success. The native helper automatically routes that transaction to `USovSeleneEchoGenerationComponent`; Blueprint must not add Echo.
-5. Continue applying the normal Shield/recharge/device payload according to its own validated target rules. Those results neither cause nor substitute for Sever.
-6. Finish the Echo ability through the existing `Finish Echo Ability` path after all authority targets are processed.
+1. Grant the ability from Axiom's actual `UWeaponItem` and set its exact `AllowedWeaponClasses`. The player must have Selene's explicit identity; the granting Axiom must remain wielded through release.
+2. Remove Blueprint gameplay from `Echo Ability Authority Committed`: charge timers, pulse traces/overlaps, Shield/status applications, direct Sever and Echo calls, and normal ability-ending logic. Native code now performs that work once.
+3. Keep Blueprint montage, camera, sound, VFX and UI presentation. `Receive Axiom Pulse Released` reports the authoritative release geometry and result counts after gameplay; `OnCommandLinkSevered` still supplies the individual link transaction for presentation/encounter reactions. Neither hook may apply the pulse again.
+4. Keep the native Gameplay Effect defaults. Native code uses safe damage and bounded-duration suppression/device-disable shells even if legacy serialized overrides remain. Device Disabled defaults to eligible drones, so losing a Handler link does not stop unrelated organic Hound attacks.
+5. Input release or the native full-charge timer releases the pulse using the authority clock. Range, cone and line of sight select actual command-node owners; author collision/query participation and link membership so the command node is discoverable. The node must be in the pulse itself; merely hitting a linked Hound does not discover and sever its Handler.
+6. Let native recovery finish the ability. Do not call `Finish Echo Ability` at charge start or immediately on authority commit.
 
-Call the helper once per unique command node. Duplicate calls are safe because the component is idempotent, but deduplicating the pulse list avoids redundant presentation branches. Passing a linked hound instead of the actor that owns the component returns `Invalid`; resolve the command node in encounter data rather than searching every actor in Blueprint.
+`Try Sever Axiom Command Link` is an internal step authorized for the current node by native release. Direct calls from Blueprint, notifies, Gameplay Cues, or presentation delegates return `Invalid`. Its component remains idempotent: a later legitimate pulse reaching an already-severed instance cannot restart reveal or repay Echo. Shield/recharge/device results remain separate from the successful link transaction.
 
 ### 3. Author weak-point reveal zones
 
@@ -134,7 +134,8 @@ Test in Standalone first, then repeat network-sensitive cases with a remote Sele
 |---|---|
 | Active link begins | Included owner and registered live participants have `Sov.State.CommandLink.Active` and one optional effect contribution |
 | First hostile Axiom Sever | Returns `NewlySevered`; active tag/effect are removed; Severed tag appears; specialist attack cancels; Selene gains exactly `+12` |
-| Repeat on same instance | Returns `AlreadySevered`; no second Echo, reveal restart, event, or effect removal |
+| Later legitimate pulse on same instance | Native link transaction returns `AlreadySevered`; no second Echo, reveal restart, event, or effect removal |
+| Direct helper / blocked geometry | External helper call returns `Invalid`; a node outside the released cone/range or behind blocking geometry never Severs |
 | Inactive / immune / invalid target | Appropriate non-success enum; no Echo and no weak-point reveal |
 | Ordinary Axiom target without a link | Shield/recharge/device payload may resolve; no Sever or `+12` |
 | Link node without Shield | A valid authored link may still Sever; Shield amount is not the Sever predicate |
@@ -156,7 +157,8 @@ Also run:
 2. `Automation RunTests ProjectVelkorran.Campaign.Selene`
 3. `Automation RunTests ProjectVelkorran.Campaign.DominionHandler`
 4. `Automation RunTests ProjectVelkorran.Campaign.DominionHound`
-5. `CompileAllBlueprints`
+5. `Automation RunTests ProjectVelkorran.Campaign.AxiomNullPulse`
+6. `CompileAllBlueprints`
 
 ## Explicitly deferred
 

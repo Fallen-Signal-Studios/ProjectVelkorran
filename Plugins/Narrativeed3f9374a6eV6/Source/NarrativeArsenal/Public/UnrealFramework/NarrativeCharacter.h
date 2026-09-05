@@ -541,6 +541,8 @@ protected:
 	UFUNCTION(BlueprintNativeEvent, Category = "Narrative|NarrativeCharacter")
 	void HandleDeath(AActor* KilledActor, UNarrativeAbilitySystemComponent* KilledActorASC, const bool bIsDead);
 	virtual void HandleDeath_Implementation(AActor* KilledActor, UNarrativeAbilitySystemComponent* KilledActorASC, const bool bIsDead);
+	/** Project recovery can restore resources explicitly without resetting a persistent ASC's attributes or startup grants. */
+	virtual bool ShouldResetAttributesOnRevive() const { return true; }
 
 	//Called when our spawned data bundle is loaded 
 	UFUNCTION()
@@ -642,6 +644,7 @@ public:
 	//Set our wielded weapons 
 	UFUNCTION(BlueprintCallable, Category = "Narrative|Getters/Setters")
 	void SetWieldState(const FWeaponWieldState& NewWieldState);
+	uint64 GetWeaponWieldRevision() const { return WeaponWieldRevision; }
 
 	//WieldState can rep back to client, but several things need to be valid before we 
 	virtual bool CanApplyWieldState() const;
@@ -652,6 +655,10 @@ public:
 	//Returns our characters current wield state. 
 	UFUNCTION(BlueprintPure, Category = "Narrative|Getters/Setters")
 	FORCEINLINE FWeaponWieldState GetWeaponWieldState() const {return WieldState;};
+
+private:
+	uint64 WeaponWieldRevision = 0;
+public:
 
 	//Returns our characters narrative anim instance, which should always be on Char mesh. 
 	UFUNCTION(BlueprintPure, Category = "Narrative|Getters/Setters")
@@ -776,4 +783,3 @@ public:
 
 
 };
-

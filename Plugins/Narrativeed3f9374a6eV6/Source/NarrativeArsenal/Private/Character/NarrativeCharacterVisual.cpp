@@ -940,6 +940,23 @@ bool ANarrativeCharacterVisual::AddWeaponVisual(class UWeaponItem* WeaponItem)
 	return false; 
 }
 
+bool ANarrativeCharacterVisual::CompletePreloadedWeaponVisual(UWeaponItem* WeaponItem)
+{
+	if (!HasAuthority() || !IsValid(WeaponItem) || !IsValid(OwnerCharacter) || OwnerCharacter->IsActorBeingDestroyed()
+		|| WeaponItem->OwningInventory != OwnerCharacter->GetInventoryComponent() || !OwnerCharacter->GetEquipmentComponent()
+		|| !WeaponItem->GetEquippedSlot().IsValid()
+		|| OwnerCharacter->GetEquipmentComponent()->GetEquippedItemAtSlot(WeaponItem->GetEquippedSlot()) != WeaponItem
+		|| !WeaponItem->GetWeaponVisualClass().IsValid()) { return false; }
+	const FGameplayTag Slot = WeaponItem->GetEquippedSlot();
+	if (auto* Existing = GetWeaponVisual(Slot))
+	{ return IsValid(Existing) && !Existing->IsActorBeingDestroyed() && Existing->WeaponOwner == WeaponItem; }
+	if (auto* Handle = WeaponLoadHandles.Find(Slot))
+	{ if (Handle->IsValid()) { (*Handle)->CancelHandle(); } WeaponLoadHandles.Remove(Slot); }
+	OnWeaponVisualClassReady(WeaponItem);
+	auto* Visual = GetWeaponVisual(Slot);
+	return IsValid(Visual) && !Visual->IsActorBeingDestroyed() && Visual->WeaponOwner == WeaponItem;
+}
+
 void ANarrativeCharacterVisual::AttachWeaponVisual(class UWeaponItem* WeaponItem, const FGameplayTag& EquipSlot, const FGameplayTag& WieldSlot)
 {
 	if (!WeaponItem)
@@ -1140,17 +1157,14 @@ void ANarrativeCharacterVisual::RemoveWeaponVisual(const FGameplayTag& WeaponSlo
 	//Destroy the weapon visual - client will update SpawnedWeaponVisuals when their weapon destroys locally
 	if (HasAuthority())
 	{
-		if (SpawnedWeaponVisuals.Contains(WeaponSlot))
-		{
-			if (AWeaponVisual* WeaponVisual = SpawnedWeaponVisuals[WeaponSlot])
-			{
-				WeaponVisual->Destroy();
-			}
-		}
+		if (auto* Handle = WeaponLoadHandles.Find(WeaponSlot))
+		{ if (Handle->IsValid()) { (*Handle)->CancelHandle(); } WeaponLoadHandles.Remove(WeaponSlot); }
+		AWeaponVisual* RetiringVisual = SpawnedWeaponVisuals.FindRef(WeaponSlot);
+		SpawnedWeaponVisuals.Remove(WeaponSlot);
+		if (IsValid(RetiringVisual)) { RetiringVisual->Destroy(); }
 
 		UE_LOG(LogNarrativeNet, Warning, TEXT("%s removing weapon visual at slot %s"), *GetNameSafe(OwnerCharacter), *WeaponSlot.ToString());
 
-		SpawnedWeaponVisuals.Remove(WeaponSlot);
 	}
 
 }
@@ -1696,6 +1710,12 @@ void ANarrativeCharacterVisual::OnGroomAppearanceReady(FGameplayTag Slot, FChara
 
 void ANarrativeCharacterVisual::OnWeaponVisualClassReady(class UWeaponItem* WeaponItem)
 {
+	// A canceled or delayed callback must not resurrect an unequipped/removed/replaced identity.
+	if (!IsValid(WeaponItem) || !IsValid(OwnerCharacter) || OwnerCharacter->IsActorBeingDestroyed()
+		|| !OwnerCharacter->GetEquipmentComponent() || !WeaponItem->CurrentSlot.IsValid()
+		|| WeaponItem->OwningInventory != OwnerCharacter->GetInventoryComponent()
+		|| OwnerCharacter->GetEquipmentComponent()->GetEquippedItemAtSlot(WeaponItem->CurrentSlot) != WeaponItem
+		|| !WeaponItem->WeaponVisualClass.IsValid()) { return; }
 	if (WeaponItem)
 	{
 		FGameplayTag Slot = WeaponItem->CurrentSlot;
@@ -1713,7 +1733,7 @@ void ANarrativeCharacterVisual::OnWeaponVisualClassReady(class UWeaponItem* Weap
 			WeaponLoadHandles.Remove(Slot);
 		}
 		
-		check(WeaponItem->WeaponVisualClass.IsValid());
+		if (auto* Existing = GetWeaponVisual(Slot); IsValid(Existing) && !Existing->IsActorBeingDestroyed()) { return; }
 		
 		if (WeaponItem->WeaponVisualClass && OwnerCharacter && OwnerCharacter->HasAuthority())
 		{
@@ -1732,6 +1752,16 @@ void ANarrativeCharacterVisual::OnWeaponVisualClassReady(class UWeaponItem* Weap
 				SpawnedWeaponVisuals.Add(Slot, SpawnedWeaponVisual);
 
 				SpawnedWeaponVisual->FinishSpawning(FTransform::Identity, /*bIsDefaultTransform=*/ true);
+				if (!IsValid(SpawnedWeaponVisual) || SpawnedWeaponVisual->IsActorBeingDestroyed() || !IsValid(OwnerCharacter)
+					|| OwnerCharacter->IsActorBeingDestroyed() || !OwnerCharacter->GetEquipmentComponent()
+					|| !IsValid(WeaponItem) || WeaponItem->CurrentSlot != Slot
+					|| OwnerCharacter->GetEquipmentComponent()->GetEquippedItemAtSlot(Slot) != WeaponItem
+					|| SpawnedWeaponVisuals.FindRef(Slot) != SpawnedWeaponVisual)
+				{
+					if (SpawnedWeaponVisuals.FindRef(Slot) == SpawnedWeaponVisual) { SpawnedWeaponVisuals.Remove(Slot); }
+					if (IsValid(SpawnedWeaponVisual)) { SpawnedWeaponVisual->Destroy(); }
+					return;
+				}
 
 				//SpawnedWeaponVisual->UpdateWeaponAttachment();
 				SpawnedWeaponVisual->OnRep_AttachState();

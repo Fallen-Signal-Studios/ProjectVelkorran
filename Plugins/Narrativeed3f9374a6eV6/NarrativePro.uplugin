@@ -136,10 +136,6 @@
 			"Enabled": true
 		},
 		{
-			"Name": "HairStrands",
-			"Enabled": true
-		},
-		{
 			"Name": "Chooser",
 			"Enabled": true
 		},

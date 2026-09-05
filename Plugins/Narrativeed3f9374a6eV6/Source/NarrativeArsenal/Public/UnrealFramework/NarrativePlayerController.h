@@ -45,11 +45,38 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnCinematicEvent, ANarrativeLevelS
 /**
  * Base class for Player Controllers in Narrative Pro. Typically possesses an ANarrativePlayerCharacter. 
  */
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FSovSemanticInputChanged, FGameplayTag, InputTag, bool, bPressed);
+
 UCLASS()
 class NARRATIVEARSENAL_API ANarrativePlayerController : public APlayerController, 
 	public INarrativeSavableActor, public IAbilitySystemInterface, public IGameplayTagAssetInterface, public INarrativeTeamAgentInterface, public INarrativeCharacterOwner
 {
 	GENERATED_BODY()
+public:
+	UPROPERTY(BlueprintAssignable, Category="Narrative|Input") FSovSemanticInputChanged OnSemanticInputChanged;
+	/** Last deliberate camera input, used to yield assisted framing back to the player. */
+	double GetLastManualLookTime() const { return SovLastManualLookTime; }
+	/** Existing Move action submits its magnitude; automatic sprint never fabricates movement. */
+	void UpdateAutomaticSprintInput(float MovementMagnitude);
+private:
+	friend class FSovInputRoutingWorldTest;
+	TSet<FGameplayTag> SovLatchedInputTags;
+	TMap<FGameplayTag, FGameplayTag> SovInputRoutes;
+	TMap<FGameplayTag, uint64> SovInputRevisions;
+	uint64 SovInputRevisionSerial = 0;
+	uint64 SovRoutingEpoch = 0;
+	double SovLastManualLookTime = -1.0;
+	float SovLookAccelerationElapsed = 0.f;
+	double SovLastLookInputTime = -1.0;
+	void AbilityInputCanceled(FGameplayTag InputTag);
+	void ReleaseSemanticInput(FGameplayTag EffectiveTag);
+	void PressSemanticInput(FGameplayTag EffectiveTag, bool bAllowToggle);
+	void SetAutomaticSprintHeld(bool bWanted);
+	bool bSovAutomaticSprintHeld = false;
+	virtual bool WantsToggleForInput(FGameplayTag InputTag) const;
+	/** Project-level platform interruption gate; releases must still be delivered. */
+	virtual bool IsGameplayAbilityInputSuppressed() const { return false; }
+
 	
 public:
 

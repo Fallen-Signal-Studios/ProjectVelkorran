@@ -1,6 +1,7 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 
 #include "Abilities/SovGameplayAbility_DominionHound.h"
+#include "Combat/SovThreatTargeting.h"
 
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
@@ -294,7 +295,8 @@ void USovGameplayAbility_DominionHoundAttackBase::ActivateAbility(
 		return;
 	}
 	BindCancellationTags(SourceAbilitySystem);
-	if (!CanContinueAttackPayload())
+	if (!CanContinueAttackPayload()
+		|| !SovThreatTargeting::CanTrack(GetAvatarActorFromActorInfo(), AttackTarget.Get()))
 	{
 		CancelHoundAttack();
 		return;
@@ -502,7 +504,8 @@ bool USovGameplayAbility_DominionHoundAttackBase::TryBeginAttackPayload()
 	{
 		return true;
 	}
-	if (!CanContinueAttackPayload())
+	if (!CanContinueAttackPayload()
+		|| !SovThreatTargeting::CanTrack(GetAvatarActorFromActorInfo(), AttackTarget.Get()))
 	{
 		return false;
 	}
@@ -740,6 +743,11 @@ FVector USovGameplayAbility_DominionHoundAttackBase::ResolveAttackDirection(
 {
 	if (const AActor* TargetActor = AttackTarget.Get())
 	{
+		if (!SovThreatTargeting::CanTrack(GetAvatarActorFromActorInfo(), AttackTarget.Get()))
+		{
+			const AActor* Source = GetAvatarActorFromActorInfo();
+			return IsValid(Source) ? Source->GetActorForwardVector() : FVector::ForwardVector;
+		}
 		const FVector ToTarget = TargetActor->GetActorLocation() - FromLocation;
 		if (!ToTarget.IsNearlyZero())
 		{
@@ -875,6 +883,7 @@ AActor* USovGameplayAbility_DominionHoundAttackBase::FindBestAttackTarget(
 			: nullptr;
 		const APawn* TargetPawn = Cast<APawn>(TargetAvatar);
 		if (!IsValid(TargetAvatar)
+			|| !SovThreatTargeting::CanTrack(SourceActor, TargetAvatar)
 			|| (bOnlyAcquirePlayerControlledTargets
 				&& (!IsValid(TargetPawn) || !TargetPawn->IsPlayerControlled()))
 			|| !IsValidAttackTarget(
@@ -1635,7 +1644,8 @@ void USovGameplayAbility_DominionHoundPounce::BeginAttackPayload()
 	ACharacter* Character = Cast<ACharacter>(GetAvatarActorFromActorInfo());
 	AActor* Target = GetAttackTarget();
 	UWorld* World = GetWorld();
-	if (!IsValid(Character) || !IsValid(Target) || !IsValid(World))
+	if (!IsValid(Character) || !IsValid(Target) || !IsValid(World)
+		|| !SovThreatTargeting::CanTrack(Character, Target))
 	{
 		CancelHoundAttack();
 		return;

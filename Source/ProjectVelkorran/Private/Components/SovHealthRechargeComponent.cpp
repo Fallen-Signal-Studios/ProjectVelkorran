@@ -109,6 +109,17 @@ bool USovHealthRechargeComponent::InitializeWithAbilitySystem(
 	return true;
 }
 
+void USovHealthRechargeComponent::ResetForCheckpoint()
+{
+	if (!IsInitialized() || !GetOwner() || !GetOwner()->HasAuthority()) { return; }
+	ClearLifecycleTimers();
+	bHasRecordedAppliedHit = false;
+	bRechargeDelayElapsed = true;
+	LastAppliedHitWorldTime = GetWorldTimeSeconds();
+	LastRechargeUpdateWorldTime = LastAppliedHitWorldTime;
+	if (GetHealth() > KINDA_SMALL_NUMBER && GetHealth() + KINDA_SMALL_NUMBER < GetMaxHealth()) { RecordAppliedHit(); }
+}
+
 bool USovHealthRechargeComponent::IsInitialized() const
 {
 	return IsValid(AbilitySystemComponent);

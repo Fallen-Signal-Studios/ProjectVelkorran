@@ -9,6 +9,8 @@
 #include <Engine/DataAsset.h>
 
 #include "Net/Serialization/FastArraySerializer.h"
+#include "Items/NarrativeCinematicTransaction.h"
+#include "GameplayTagContainer.h"
 #include "InventoryComponent.generated.h"
 
 class UNarrativeItem;
@@ -391,6 +393,14 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Inventory")
 	UNarrativeItem* FindItemByGUID(const FGuid& ItemGUID) const;
 
+	/** Native bounded cinematic postconditions. Callers must retain journals and retire them after receipt commit. */
+	bool PrepareCinematicItemChange(const FNarrativeCinematicItemMutation& Mutation, FNarrativeCinematicItemChange& Change, FString& OutError);
+	bool ApplyCinematicItemChange(FNarrativeCinematicItemChange& Change, FString& OutError);
+	bool ValidateCinematicItemChange(const FNarrativeCinematicItemChange& Change, bool bApplied, FString& OutError) const;
+	bool RollbackCinematicItemChange(FNarrativeCinematicItemChange& Change);
+	bool SetCinematicEquipment(class UEquippableItem* Item, FGameplayTag Slot);
+	uint64 GetCinematicLoadRevision() const { return CinematicLoadRevision; }
+
 	/**Return the first item with the same class as ItemClass, including child classes. */
 	UFUNCTION(BlueprintPure, Category = "Inventory")
 	UNarrativeItem* FindItemOfClass(TSubclassOf<class UNarrativeItem> ItemClass, const bool bCheckVisibility = false) const;
@@ -641,6 +651,10 @@ protected:
 	virtual int32 GetSellPrice_Implementation(TSubclassOf<class UNarrativeItem> Item, int32 Quantity = 1) const;
 
 private:
+	uint64 CinematicLoadRevision = 0;
+	bool OwnsCinematicItem(const UNarrativeItem* Item) const;
+	bool InsertCinematicItem(UNarrativeItem* Item, bool bRestoreExisting = false);
+	bool RemoveOwnedItemInternal(UNarrativeItem* Item);
 	
 	/**Don't call Items.Add() directly, use this function instead, as it handles replication and ownership*/
 	UNarrativeItem* AddItem(TSubclassOf<class UNarrativeItem> ItemClass, const int32 Quantity);

@@ -3,8 +3,14 @@
 #include "Characters/SovPlayerCharacterBase.h"
 
 #include "Character/CharacterDefinition.h"
-#include "Components/SovCorruptionComponent.h"
+#include "Character/PlayerDefinition.h"
 #include "Components/SovEchoComponent.h"
+#include "Exertion/SovExertionComponent.h"
+#include "FieldRecovery/SovFieldRecoveryComponent.h"
+#include "Resonance/SovResonanceComponent.h"
+#include "Recovery/SovFatalRecoveryComponent.h"
+#include "Targeting/SovTargetingComponent.h"
+#include "Components/SovCorruptionComponent.h"
 #include "Components/SovHealthRechargeComponent.h"
 #include "Components/SovPoiseComponent.h"
 #include "Components/SovShieldComponent.h"
@@ -16,13 +22,82 @@ ASovPlayerCharacterBase::ASovPlayerCharacterBase(const FObjectInitializer& Objec
 	: Super(ObjectInitializer)
 {
 	EchoComponent = CreateDefaultSubobject<USovEchoComponent>(TEXT("SovEchoComponent"));
+	ExertionComponent = CreateDefaultSubobject<USovExertionComponent>(TEXT("SovExertionComponent"));
+	FieldRecoveryComponent = CreateDefaultSubobject<USovFieldRecoveryComponent>(TEXT("SovFieldRecoveryComponent"));
+	ResonanceComponent = CreateDefaultSubobject<USovResonanceComponent>(TEXT("SovResonanceComponent"));
+	RecoveryComponent = CreateDefaultSubobject<USovFatalRecoveryComponent>(TEXT("SovRecoveryComponent"));
+	TargetingComponent = CreateDefaultSubobject<USovTargetingComponent>(TEXT("SovTargetingComponent"));
+	CorruptionComponent = CreateDefaultSubobject<USovCorruptionComponent>(TEXT("SovCorruptionComponent"));
 	ShieldComponent = CreateDefaultSubobject<USovShieldComponent>(TEXT("SovShieldComponent"));
 	HealthRechargeComponent = CreateDefaultSubobject<USovHealthRechargeComponent>(
 		TEXT("SovHealthRechargeComponent"));
 	PoiseComponent = CreateDefaultSubobject<USovPoiseComponent>(TEXT("SovPoiseComponent"));
 	StatusComponent = CreateDefaultSubobject<USovStatusComponent>(TEXT("SovStatusComponent"));
-	CorruptionComponent = CreateDefaultSubobject<USovCorruptionComponent>(
-		TEXT("SovCorruptionComponent"));
+}
+
+bool ASovPlayerCharacterBase::PrepareCampaignInitialization(UPlayerDefinition* Definition)
+{
+	if (!HasAuthority() || GetController() || bCharacterReady || !IsValid(Definition)) { return false; }
+	bCampaignManagedInitialization = true;
+	SetPlayerDefinition(Definition);
+	return true;
+}
+
+bool ASovPlayerCharacterBase::IsCampaignDataReadyToApply() const
+{
+	return bCampaignManagedInitialization && HasAuthority() && !bInitialPlayerDataApplied
+		&& bAuthoritativeGameplayInitialized && bProjectSystemsInitialized
+		&& bAbilitySystemReadyPublished && bVisualReadyForGameplay
+		&& IsValid(InitializedAbilitySystem) && InitializedAbilitySystem->GetAvatarActor() == this
+		&& InitializedPlayerDefinition == PlayerDefinition && AreAdditionalCharacterSystemsReady();
+}
+
+bool ASovPlayerCharacterBase::CompleteCampaignDataInitialization(bool bGrantDefaultInventory)
+{
+	if (!IsCampaignDataReadyToApply()) { return false; }
+	if (bGrantDefaultInventory) { InitNewCharacter(GetCharacterDefinition()); }
+	else { bInitializedNewCharacter = true; }
+	NotifyInitialPlayerDataApplied();
+	return IsCharacterReady();
+}
+
+void ASovPlayerCharacterBase::FailCampaignInitialization()
+{
+	bCampaignInitializationFailed = true;
+	InvalidateCharacterReadiness();
+}
+
+void ASovPlayerCharacterBase::OnCharacterVisualInitialized()
+{
+	if (!bCampaignManagedInitialization) { Super::OnCharacterVisualInitialized(); return; }
+	if (!bVisualReadyForGameplay)
+	{
+		// Skip NarrativePlayerCharacter's generic LoadPlayerData: its PawnData can
+		// belong to the other protagonist. Preserve Narrative's visual notification.
+		ANarrativeCharacter::OnCharacterVisualInitialized();
+		bVisualReadyForGameplay = true;
+	}
+	TryFinalizeCharacterReadiness();
+}
+
+UNarrativeSaveWithCreatorData* ASovPlayerCharacterBase::GetCharacterCreatorData() const
+{
+	return bCampaignManagedInitialization ? nullptr : Super::GetCharacterCreatorData();
+}
+
+FGuid ASovPlayerCharacterBase::GetActorGUID_Implementation() const
+{
+	// Runtime identity must not be generated on the CDO and copied to every pawn.
+	if (!CampaignSaveGuid.IsValid() && !IsTemplate())
+	{
+		const_cast<ASovPlayerCharacterBase*>(this)->CampaignSaveGuid = FGuid::NewGuid();
+	}
+	return CampaignSaveGuid;
+}
+
+void ASovPlayerCharacterBase::SetActorGUID_Implementation(const FGuid& SavedGUID)
+{
+	if (SavedGUID.IsValid()) { CampaignSaveGuid = SavedGUID; }
 }
 
 void ASovPlayerCharacterBase::HandleAbilitySystemReady(
@@ -34,6 +109,9 @@ void ASovPlayerCharacterBase::HandleAbilitySystemReady(
 	{
 		EchoComponent->InitializeWithAbilitySystem(ReadyAbilitySystem);
 	}
+	if (ExertionComponent) { ExertionComponent->InitializeWithAbilitySystem(ReadyAbilitySystem); }
+	if (FieldRecoveryComponent) { FieldRecoveryComponent->InitializeWithAbilitySystem(ReadyAbilitySystem); }
+	if (RecoveryComponent) { RecoveryComponent->InitializeWithAbilitySystem(ReadyAbilitySystem); }
 	if (ShieldComponent)
 	{
 		ShieldComponent->InitializeWithAbilitySystem(ReadyAbilitySystem);
@@ -50,10 +128,6 @@ void ASovPlayerCharacterBase::HandleAbilitySystemReady(
 	{
 		StatusComponent->InitializeWithAbilitySystem(ReadyAbilitySystem);
 	}
-	if (CorruptionComponent)
-	{
-		CorruptionComponent->InitializeWithAbilitySystem(ReadyAbilitySystem);
-	}
 }
 
 FGameplayTag ASovPlayerCharacterBase::GetProtagonistIdentityTag() const
@@ -63,13 +137,14 @@ FGameplayTag ASovPlayerCharacterBase::GetProtagonistIdentityTag() const
 
 bool ASovPlayerCharacterBase::AreAdditionalCharacterSystemsReady() const
 {
-	return Super::AreAdditionalCharacterSystemsReady()
+	return !bCampaignInitializationFailed && Super::AreAdditionalCharacterSystemsReady()
 		&& IsValid(EchoComponent) && EchoComponent->IsInitialized()
+		&& IsValid(ExertionComponent) && ExertionComponent->IsInitialized()
+		&& IsValid(FieldRecoveryComponent) && FieldRecoveryComponent->IsInitialized()
 		&& IsValid(ShieldComponent) && ShieldComponent->IsInitialized()
 		&& IsValid(HealthRechargeComponent) && HealthRechargeComponent->IsInitialized()
 		&& IsValid(PoiseComponent) && PoiseComponent->IsInitialized()
-		&& IsValid(StatusComponent) && StatusComponent->IsInitialized()
-		&& IsValid(CorruptionComponent) && CorruptionComponent->IsInitialized();
+		&& IsValid(StatusComponent) && StatusComponent->IsInitialized();
 }
 
 void ASovPlayerCharacterBase::OnDefinitionSet_Implementation(

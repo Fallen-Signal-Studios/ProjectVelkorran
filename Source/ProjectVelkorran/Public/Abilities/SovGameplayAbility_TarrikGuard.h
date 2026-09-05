@@ -21,6 +21,13 @@ public:
 	USovGameplayAbility_TarrikGuard();
 
 protected:
+	virtual bool CanActivateAbility(
+		const FGameplayAbilitySpecHandle Handle,
+		const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayTagContainer* SourceTags = nullptr,
+		const FGameplayTagContainer* TargetTags = nullptr,
+		FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
+
 	virtual void OnAvatarSet(
 		const FGameplayAbilityActorInfo* ActorInfo,
 		const FGameplayAbilitySpec& Spec) override;
@@ -44,6 +51,9 @@ protected:
 
 	UFUNCTION()
 	void HandleInputReleased(float TimeHeld);
+
+	UFUNCTION()
+	void HandleGuardEnded();
 
 	UFUNCTION()
 	void HandleGuardImpact(const FSovDamageResult& Result);
@@ -93,8 +103,9 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UAbilitySystemComponent> BoundAbilitySystem;
 
-	FDelegateHandle DeadTagChangedHandle;
-	FDelegateHandle PoiseBrokenTagChangedHandle;
-	FDelegateHandle SequencerTagChangedHandle;
+	TMap<FGameplayTag, FDelegateHandle> CancellationTagHandles;
+	FDelegateHandle BusyTagChangedHandle;
+	uint32 ActivationEpoch = 0;
+	bool bEndingGuardAbility = false;
 	bool bGuardStarted = false;
 };

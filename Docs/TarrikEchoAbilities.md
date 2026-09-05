@@ -44,7 +44,7 @@ Do not implement the generic `Event ActivateAbility` in these children. The nati
 
 ## Granting
 
-Tarrik's player Blueprint must derive from `ASovTarrikCharacter`. That concrete class merges `Sov.Character.Player.Tarrik` into the definition-owned ASC tag contribution and removes a conflicting Selene identity. Keep the same Tarrik tag on the Player Definition so the asset remains self-describing. Legacy Blueprints still deriving directly from `ASovPlayerCharacterBase` retain the temporary untagged migration fallback.
+Tarrik's player Blueprint must derive from `ASovTarrikCharacter`. That concrete class merges `Sov.Character.Player.Tarrik` into the definition-owned ASC tag contribution and removes a conflicting Selene identity. Keep the same Tarrik tag on the Player Definition so the asset remains self-describing. Native Tarrik abilities now require the Tarrik identity at activation and release. Legacy Blueprints deriving directly from `ASovPlayerCharacterBase` must supply the correct definition tag or migrate to `ASovTarrikCharacter`; untagged content is rejected before Echo is spent.
 
 Grant the Sticky Grenade once through Tarrik's default `UAbilityConfiguration`. Do not add it to both weapon assets or dual-wield/source-object variants can create duplicate specs. It is character-granted and works with either Tarrik weapon, so it deliberately ignores `AllowedWeaponClasses`.
 
@@ -127,7 +127,7 @@ In `Echo Ability Started`:
 
 Use `Echo Ability Local Presentation` only for owning-player camera, rumble, audio accents, and cosmetic hit-stop. Do not apply damage, spawn replicated actors, or change global time dilation there.
 
-`Cinder Judgement` is the exception to the notify requirement for gameplay. Its authority instance automatically releases after `Payload Release Delay` and finishes after `Post Release Recovery`, so an empty Event Graph works on a dedicated server after the Blueprint class has Cinderline in `AllowedWeaponClasses`. A server-side authored release event may call `Release Cinder Judgement From Aim` earlier; the native timer and manual call share the same exactly-once gate. Keep the timer enabled unless the replacement release path is proven to execute on authority.
+All five Tarrik abilities now own native authority release and recovery timing. An empty gameplay Event Graph works after weapon allowlists and the Tarrik identity are configured. A server montage event can call the corresponding release function earlier; that event and the native fallback share one release gate. Tune `Payload Release Delay` and `Post Release Recovery` to the montage. See `TarrikNativeCompletion.md` for defaults, migration and validation.
 
 ## Payload contracts
 
@@ -142,12 +142,12 @@ Use `Echo Ability Local Presentation` only for owning-player camera, rumble, aud
 - The explosion damage spec publishes `Sov.Status.Apply.Burn` with `Sov.SetByCaller.Status.Magnitude` and `.Duration`. The status component applies the tracked Burn only after that transaction actually reduces Shield, Health, or Poise and the target survives. Native Burn ticks once per second without an immediate tick and routes through `UNarrativeDamageExecCalc` with Thermal, Bypass Guard, and Bypass Deflection. Equal strength refreshes, stronger replaces, and weaker is rejected. Global/Burn immunity and perfect defense therefore cannot receive a detached Burn.
 - In the GA child, resolve and play the tagged Narrative anim set from `Echo Ability Started`. At the authoritative throw-frame notify, call `Release Cinder Sticky Grenade From Aim`. The native ability resolves `GrenadeThrowSocketName` (falling back to `GrenadeFallbackSpawnOffset`), traces the server controller's aim, solves a fixed-speed ballistic arc, and applies the same `GrenadeGravityScale` to the projectile. `Release Cinder Sticky Grenade(SpawnTransform, InitialVelocity)` remains available only for unusual server-validated custom throws.
 - The release function is not a client-to-server RPC. The montage/release notify must run on the server ability instance as well as the predicting owner. Native authority and once-per-activation guards ensure that only the server creates one gameplay grenade.
-- For a first smoke test, call `Release Cinder Sticky Grenade From Aim` directly from `Echo Ability Authority Committed`. Once that works, move it to the server's release-frame path. If your dedicated-server mesh does not evaluate animation notifies, start a server timer from `Echo Ability Authority Committed` using the montage's authored release offset; never depend on an owner-only AnimBP notify for gameplay.
-- End the ability from montage completed/blend-out and cancel it on interruption. Successful release does not end the ability automatically, and the replicated grenade safely outlives the ability instance.
+- Native fallback releases the grenade at 0.35 seconds, then recovers for 0.4 seconds. A server release-frame notify may release earlier. Do not create a second Blueprint gameplay timer or spawn path.
+- End the ability from montage completed/blend-out and cancel it on interruption. Successful release schedules native recovery, and the replicated grenade safely outlives the ability instance.
 - Native behavior starts the fuse at launch, sticks once to a hit component/bone, damages unique hostile ASCs in radius, optionally requires line of sight, replicates stuck/detonated presentation state, and cleans itself up after detonation.
 - Do not use Narrative's stock `Spawn Projectile` task for this Local Predicted ability: its replicated-projectile policy can spawn an unreconciled client copy as well as the authoritative copy. Spawn on authority and use prediction only for the throw presentation.
 
-The grenade, Velkorran's Hunger, and Cinder Judgement now own complete native gameplay payloads. Cinder Slam and Cinderline Requiem remain Blueprint-authored payload contracts until their native vertical slices are implemented; incomplete children fail activation before Echo is spent.
+All five Tarrik abilities now own native gameplay payloads. Blueprint children supply weapon allowlists, presentation and optional tuning. Remove legacy Blueprint damage, ward and projectile spawning before using the native release functions.
 
 ### Velkorran's Hunger
 
@@ -160,14 +160,15 @@ The grenade, Velkorran's Hunger, and Cinder Judgement now own complete native ga
 - Native defaults launch a straight `4200 cm/s` blade wave for `1.25 s` with a `35 cm` collision radius. The projectile overlaps Pawn collision so allies do not absorb the shot, resolves on the first valid hostile or blocking world surface, and dissipates harmlessly at its flight limit. All values remain editable on the GA child.
 - A valid hostile impact applies `65` direct damage and `30` Poise pressure through `UNarrativeDamageExecCalc` with Edge + Thermal and Standard guard classification. The same damage spec requests Burn magnitude/duration; centralized status validation accepts it only after positive nonfatal Shield, Health, or Poise damage. Perfectly defended, fatal, or immune hits do not receive a detached Burn.
 - The projectile copies the source ASC, source object, effect classes, ability tag, effect level, movement, and damage values before `FinishSpawning`. It never retains the Gameplay Ability instance, so unwielding Velkorran after launch cannot invalidate the paid projectile.
-- End the ability from montage completed/blend-out and cancel it on interruption. Successful release does not end the ability automatically, and the replicated projectile safely outlives the ability instance.
+- End the ability from montage completed/blend-out and cancel it on interruption. Successful release schedules native recovery, and the replicated projectile safely outlives the ability instance.
 - Do not use Narrative's stock `Spawn Projectile` task for this Local Predicted ability. The predicting owner may create a separate non-gameplay trail or release flash, but only authority may spawn the gameplay projectile.
 
 ### Cinder Slam
 
-- Perform radial damage on authority, with high Poise damage through the normal damage execution.
-- Knockback is a consequence of a valid Poise break, not an unconditional launch; this preserves boss and crowd-control immunity rules.
-- Apply `ProtectiveWardEffectClass` to Tarrik for the brief orb. Prefer a short Damage Resistance/barrier policy plus Gameplay Cue over temporarily changing `Shield` or `MaxShield`.
+- Native authority release at 0.55 seconds applies a 450 cm radial heavy Kinetic/Thermal blast, 90 base damage and 80 Poise pressure, with linear falloff to 50%. It deduplicates ASCs and requires line of sight.
+- Knockback is allowed only for the typed damage receipt's new Poise break on a surviving non-boss target without super armor.
+- The native Cinder Ward adds 50 Damage Resistance for 2.5 seconds and refreshes without stacking from the same source. It never changes current or maximum Shield.
+- `Release Cinder Slam` and `Receive Cinder Slam Released` expose the notify and authority cosmetic hooks; native recovery lasts 0.65 seconds.
 
 ### Cinder Judgement
 
@@ -186,9 +187,10 @@ The grenade, Velkorran's Hunger, and Cinder Judgement now own complete native ga
 
 ### Cinderline Requiem
 
-- Perform an authority-validated penetrating line trace and deduplicate hit actors.
-- Apply the penetrating hit once per target, then detonate a short sequence along the confirmed line or leave a brief burning lane.
-- It is intentionally different from Judgement: Judgement is one explosive impact; Requiem controls an entire firing lane and applies extreme Poise pressure.
+- Native eye/muzzle aiming uses Narrative's configured weapon trace channel, penetrates resolved character ASCs and stops at the first world blocker. Each hostile receives at most one 100-damage/80-Poise direct hit. Friendly characters are penetrated without damage.
+- `ASovCinderRequiemLine` owns the paid chain after release: 220 cm blasts spaced by 350 cm at 0.035-second intervals, bounded to 64 points, with one 60-damage/100-Poise line packet per hostile across the entire sequence. Endpoints remain on the confirmed clear line and every radial hit requires line of sight.
+- Confirmed line damage applies the existing source-owned Cinder Burn, 5 damage per second for 4 seconds, with existing immunity policy. The paid lane survives ordinary ability recovery and weapon changes; encounter cleanup owns it through its source-pawn owner/instigator.
+- `Release Cinderline Requiem From Aim` supports an earlier server notify. Native release is 0.45 seconds and recovery 0.65 seconds. Optional `Line Class` Blueprint children receive replicated `Receive Line Detonation` cosmetic events.
 
 ## Damage and status requirements
 
@@ -196,6 +198,6 @@ All damage must enter the configured SetByCaller damage Gameplay Effect with `UN
 
 Use authored asset tags for damage channel and guard class. Explosions and projectiles must set an Effect Causer at the actual impact source so Guard evaluates direction from the blast/projectile rather than Tarrik's pawn.
 
-`USovStatusComponent` is now the only runtime owner of Burn, Chill, Freeze, Device Disabled, and Exposed. Damage-coupled statuses travel on the unified damage spec; non-damage abilities call `Apply Status By Tag` on authority. Do not directly apply a second duration GE. See `Docs/StatusAndCorruptionPrototype.md` for reapplication, immunity, cleanse, presentation, and checkpoint contracts.
+`USovStatusComponent` owns generic Burn, Chill, Freeze, Device Disabled, and Exposed requests, including Cinder Sticky Grenade and Velkorran's Hunger Burn. Other native Tarrik payloads that consume a damage receipt and apply their own Burn mark the spec `Sov.Status.Application.NativeOwned`; that receipt does not also invoke the generic listener. Damage-coupled generic statuses travel on the unified damage spec; non-damage generic abilities call `Apply Status By Tag` on authority. Do not add a second duration effect to either path. See `Docs/StatusAndCorruptionPrototype.md` for reapplication, immunity, cleanse, presentation, and checkpoint contracts.
 
 For Cinder Judgement and Requiem, do not trust an unvalidated client hit result. Re-trace or clamp origin, aim, and range on authority before applying a 50/90-Echo payload.

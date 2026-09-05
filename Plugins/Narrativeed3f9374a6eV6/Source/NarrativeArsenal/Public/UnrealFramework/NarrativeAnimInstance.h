@@ -166,6 +166,8 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Narrative Anim Instance")
 	virtual void BlendOutOfSequencer();
+	/** Reuses the existing authored snapshot blend path after a native representation handoff. */
+	bool BlendFromRepresentationPose(const FPoseSnapshot& Pose);
 
 protected:
 

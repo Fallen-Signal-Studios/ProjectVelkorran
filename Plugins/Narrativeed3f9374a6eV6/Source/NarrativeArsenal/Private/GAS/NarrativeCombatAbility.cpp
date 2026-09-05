@@ -2,6 +2,8 @@
 
 
 #include "GAS/NarrativeCombatAbility.h"
+#include "GAS/SovExertionProvider.h"
+#include "Sovereign/SovGameplayTags.h"
 #include <AbilitySystemComponent.h>
 #include "Items/InventoryFunctionLibrary.h"
 #include "Items/WeaponItem.h"
@@ -54,11 +56,93 @@ void UNarrativeCombatAbility::CommitExecute(const FGameplayAbilitySpecHandle Han
 
 bool UNarrativeCombatAbility::CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayTagContainer* SourceTags /*= nullptr*/, const FGameplayTagContainer* TargetTags /*= nullptr*/, OUT FGameplayTagContainer* OptionalRelevantTags /*= nullptr*/) const
 {
-	return Super::CanActivateAbility(Handle, ActorInfo, SourceTags, TargetTags, OptionalRelevantTags);
+	return ActorInfo && ActorInfo->AbilitySystemComponent.IsValid()
+		&& !ActorInfo->AbilitySystemComponent->HasMatchingGameplayTag(FSovGameplayTags::Get().State_Evading)
+		&& Super::CanActivateAbility(Handle, ActorInfo, SourceTags, TargetTags, OptionalRelevantTags);
+}
+
+bool UNarrativeCombatAbility::GetSovAttackIdentity(const AActor* ExpectedSource, FGuid& OutAttackId) const
+{
+	OutAttackId.Invalidate();
+	if (!IsValid(ExpectedSource) || !ExpectedSource->HasAuthority() || !IsActive()
+		|| HasAnyFlags(RF_ClassDefaultObject) || GetInstancingPolicy() == EGameplayAbilityInstancingPolicy::NonInstanced
+		|| !CurrentCombatAttackId.IsValid() || CombatAttackSpecHandle != CurrentSpecHandle
+		|| !CurrentActorInfo || CurrentActorInfo->AvatarActor.Get() != ExpectedSource
+		|| !CurrentActorInfo->IsNetAuthority())
+	{
+		return false;
+	}
+	OutAttackId = CurrentCombatAttackId;
+	return true;
+}
+
+bool UNarrativeCombatAbility::CanDispatchNativeAttack() const
+{
+	return !bCombatEndPending && IsActive() && CurrentActorInfo && CurrentActorInfo->AbilitySystemComponent.IsValid()
+		&& CurrentActorInfo->AbilitySystemComponent->GetAvatarActor() == CurrentActorInfo->AvatarActor.Get()
+		&& !bDefensiveCancelCommitted && (!bRequiresChargedRelease || bChargedReleaseCommitted);
+}
+
+bool UNarrativeCombatAbility::BeginNextSovCombatAttack()
+{
+	FGuid Previous;
+	if (bCombatEndPending || bExertionCommitPending || !GetSovAttackIdentity(GetAvatarActorFromActorInfo(), Previous)) { return false; }
+	CurrentCombatAttackId = FGuid::NewGuid();
+	bChargedReleaseCommitted = false;
+	bDefensiveCancelCommitted = false;
+	return true;
+}
+
+bool UNarrativeCombatAbility::TryPayAttackExertion(float Cost)
+{
+	AActor* Avatar = GetAvatarActorFromActorInfo();
+	FGuid AttackId;
+	if (!FMath::IsFinite(Cost) || Cost < 0.f || bExertionCommitPending || !GetSovAttackIdentity(Avatar, AttackId)) { return false; }
+	TGuardValue<bool> Pending(bExertionCommitPending, true);
+	TInlineComponentArray<UActorComponent*> Components(Avatar);
+	for (UActorComponent* Component : Components)
+	{
+		if (ISovExertionProvider* Provider = Cast<ISovExertionProvider>(Component))
+		{
+			if (!Provider->CanSpendExertion(Cost) || !Provider->TrySpendExertion(Cost)) { return false; }
+			FGuid CurrentId;
+			return GetSovAttackIdentity(Avatar, CurrentId) && CurrentId == AttackId;
+		}
+	}
+	return false;
+}
+
+bool UNarrativeCombatAbility::TryCommitChargedRelease(int32 ReleasedChargeTier)
+{
+	if (!bRequiresChargedRelease || bChargedReleaseCommitted || bDefensiveCancelCommitted
+		|| ReleasedChargeTier < 0 || MinimumStaminaChargeTier < 0
+		|| !FMath::IsFinite(ChargedReleaseStaminaCost) || ChargedReleaseStaminaCost < 0.f) { return false; }
+	const float Cost = ReleasedChargeTier >= MinimumStaminaChargeTier ? ChargedReleaseStaminaCost : 0.f;
+	if (!TryPayAttackExertion(Cost)) { return false; }
+	bChargedReleaseCommitted = true;
+	return true;
+}
+
+bool UNarrativeCombatAbility::TryCommitDefensiveCancel(float StaminaCost)
+{
+	if (bDefensiveCancelCommitted || !TryPayAttackExertion(StaminaCost)) { return false; }
+	bDefensiveCancelCommitted = true;
+	return true;
 }
 
 void UNarrativeCombatAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
+	CurrentCombatAttackId.Invalidate();
+	bChargedReleaseCommitted = false;
+	bDefensiveCancelCommitted = false;
+	bExertionCommitPending = false;
+	bCombatEndPending = false;
+	CombatAttackSpecHandle = Handle;
+	if (ActorInfo && ActorInfo->IsNetAuthority() && !HasAnyFlags(RF_ClassDefaultObject)
+		&& GetInstancingPolicy() != EGameplayAbilityInstancingPolicy::NonInstanced)
+	{
+		CurrentCombatAttackId = FGuid::NewGuid();
+	}
 	// Bind target data callback
 	UAbilitySystemComponent* MyAbilityComponent = CurrentActorInfo->AbilitySystemComponent.Get();
 	check(MyAbilityComponent);
@@ -73,12 +157,18 @@ void UNarrativeCombatAbility::EndAbility(const FGameplayAbilitySpecHandle Handle
 {
 	if (IsEndAbilityValid(Handle, ActorInfo))
 	{
+		bCombatEndPending = true;
 		if (ScopeLockCount > 0)
 		{
+			CurrentCombatAttackId.Invalidate();
 			WaitingToExecute.Add(FPostLockDelegate::CreateUObject(this, &ThisClass::EndAbility, Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled));
 			return;
 		}
 
+		CurrentCombatAttackId.Invalidate();
+		bChargedReleaseCommitted = false;
+		bDefensiveCancelCommitted = false;
+		CombatAttackSpecHandle = FGameplayAbilitySpecHandle();
 		if (CurrentActorInfo)
 		{
 			if (UAbilitySystemComponent* MyAbilityComponent = CurrentActorInfo->AbilitySystemComponent.Get())
@@ -159,6 +249,7 @@ FGameplayAbilityTargetDataHandle UNarrativeCombatAbility::GetTargetDataUsingTrac
 
 void UNarrativeCombatAbility::FinalizeTargetData(const FGameplayAbilityTargetDataHandle& TargetData, FGameplayTag ApplicationTag)
 {
+	if (!CanDispatchNativeAttack()) { return; }
 	UAbilitySystemComponent* ASC = CurrentActorInfo->AbilitySystemComponent.Get();
 
 	if (const FGameplayAbilitySpec* AbilitySpec = ASC->FindAbilitySpecFromHandle(CurrentSpecHandle))
@@ -166,7 +257,7 @@ void UNarrativeCombatAbility::FinalizeTargetData(const FGameplayAbilityTargetDat
 		FScopedPredictionWindow	ScopedPrediction(ASC);
 
 		//We use this method from lyra to avoid using targeting actors and just call the target datas ourselves 
-		FGameplayAbilityTargetDataHandle LocalTargetDataHandle(MoveTemp(const_cast<FGameplayAbilityTargetDataHandle&>(TargetData)));
+		FGameplayAbilityTargetDataHandle LocalTargetDataHandle(TargetData);
 
 		//We call this function manually instead of using the target data node, which is inefficient and spawns a target data generating actor. We're basically just overriding that to just do a nice lightweight trace instead! 
 		if (CurrentActorInfo->IsLocallyControlled() && !CurrentActorInfo->IsNetAuthority())
@@ -177,10 +268,12 @@ void UNarrativeCombatAbility::FinalizeTargetData(const FGameplayAbilityTargetDat
 		//Client calls this once, that also makes sense. 
 		// then server calls this again from the bound target data coming through from client.  
 
+		const FGameplayAbilitySpecHandle DispatchedHandle = CurrentSpecHandle;
+		const FPredictionKey DispatchedKey = CurrentActivationInfo.GetActivationPredictionKey();
 		HandleTargetData(LocalTargetDataHandle, ApplicationTag);
 
-		//Another core GAS function, just cleans out the target data. 
-		ASC->ConsumeClientReplicatedTargetData(CurrentSpecHandle, CurrentActivationInfo.GetActivationPredictionKey());
+		// Target callbacks may end this activation and begin another one.
+		ASC->ConsumeClientReplicatedTargetData(DispatchedHandle, DispatchedKey);
 	}
 }
 
@@ -526,3 +619,8 @@ FTransform UTargetingTransformProvider_WeaponTowardsFocus::ProvideTargetingTrans
 
 
 #undef LOCTEXT_NAMESPACE 
+
+float UNarrativeCombatAbility::GetBotAttackMinimumRange_Implementation() const { return 0.f; }
+float UNarrativeCombatAbility::GetBotAttackMaximumRange_Implementation() const { return GetBotAttackRange(); }
+bool UNarrativeCombatAbility::RequiresBotAttackToken_Implementation() const { return bBotRequiresAttackToken; }
+bool UNarrativeCombatAbility::ManagesBotAttackToken_Implementation() const { return false; }

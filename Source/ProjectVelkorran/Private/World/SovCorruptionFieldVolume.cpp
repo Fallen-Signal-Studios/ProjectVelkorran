@@ -2,7 +2,7 @@
 
 #include "World/SovCorruptionFieldVolume.h"
 
-#include "Components/SovCorruptionComponent.h"
+#include "Components/SovLegacyCorruptionComponent.h"
 #include "Engine/World.h"
 #include "Sovereign/SovGameplayTags.h"
 
@@ -184,14 +184,14 @@ void ASovCorruptionFieldVolume::TryRegisterActor(AActor* OtherActor)
 		RegisteredTargets.Remove(OtherActor);
 	}
 
-	USovCorruptionComponent* CorruptionComponent =
-		OtherActor->FindComponentByClass<USovCorruptionComponent>();
+	USovLegacyCorruptionComponent* CorruptionComponent =
+		OtherActor->FindComponentByClass<USovLegacyCorruptionComponent>();
 	if (!IsValid(CorruptionComponent) || !CorruptionComponent->IsInitialized())
 	{
 		return;
 	}
 
-	const FSovCorruptionSourceHandle SourceHandle =
+	const FSovLegacyCorruptionSourceHandle SourceHandle =
 		CorruptionComponent->RegisterCorruptionSource(this, SourceSpec);
 	if (!SourceHandle.IsValid())
 	{

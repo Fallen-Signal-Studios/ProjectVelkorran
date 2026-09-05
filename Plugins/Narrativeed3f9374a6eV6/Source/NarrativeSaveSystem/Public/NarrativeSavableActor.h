@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "UObject/Interface.h"
 #include "NarrativeStableActor.h"
+#include "NarrativeSavePhases.h"
 #include "NarrativeSavableActor.generated.h"
 
 /**
@@ -25,6 +26,14 @@ class NARRATIVESAVESYSTEM_API INarrativeSavableActor : public INarrativeStableAc
 	GENERATED_BODY()
 
 public:
+    /** Native dependency ordering; neutral existing actors retain the interactable phase. */
+    virtual ENarrativeRestorePhase GetSaveRestorePhase() const { return ENarrativeRestorePhase::Interactables; }
+	/** Native owners may serialize this actor explicitly inside an existing owner record instead of world enumeration. */
+	virtual bool ShouldSaveWorldRecord() const { return true; }
+	/** Required by default. Use only for cosmetic/DLC state whose absence cannot change canon or progression. */
+	UFUNCTION(BlueprintNativeEvent)
+	bool IsOptionalSaveRecord() const;
+	virtual bool IsOptionalSaveRecord_Implementation() const;
 	
 	//Tell the actor it is about to be saved, and needs to populate all its save data 
 	UFUNCTION(BlueprintNativeEvent)

@@ -10,6 +10,7 @@
 
 class FLifetimeProperty;
 class UAnimMontage;
+class UAnimInstance;
 class UAnimSequenceBase;
 class UAbilitySystemComponent;
 class UMaterialInstanceDynamic;
@@ -148,6 +149,9 @@ public:
 	void StopDeflectionWeaponMontage();
 
 protected:
+	friend class USovCampaignCinematicComponent;
+	/** Finite cinematic exit: finish the existing native phases, fenced against a newer semantic request. */
+	bool CompleteCinematicHandoff(FGameplayTag ExpectedWieldSlot);
 	virtual void OnWielded() override;
 	virtual void OnHolstered() override;
 	virtual void HandleAttachedToOwner_Implementation() override;
@@ -274,6 +278,7 @@ protected:
 	void ReceiveHolsterAttachmentCommitted();
 
 private:
+	friend struct FSovEchoResourceTestAccess;
 	UFUNCTION()
 	void OnRep_TransitionState();
 
@@ -324,6 +329,10 @@ private:
 	FTimerHandle CollisionRefreshTimerHandle;
 	FActiveGameplayEffectHandle TransitionGateEffectHandle;
 	TWeakObjectPtr<UAbilitySystemComponent> TransitionGateAbilitySystem;
+	TWeakObjectPtr<UAnimInstance> ActiveMainCharacterAnimInstance;
+	TWeakObjectPtr<UAnimInstance> ActiveLocalCharacterAnimInstance;
+	bool bUpdatingTransitionGate = false;
+	bool bRequestedTransitionGate = false;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UAnimMontage> ActiveMainCharacterMontage = nullptr;

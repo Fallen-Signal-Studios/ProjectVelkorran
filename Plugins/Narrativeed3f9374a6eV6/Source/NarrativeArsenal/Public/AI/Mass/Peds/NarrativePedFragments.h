@@ -28,3 +28,46 @@ struct FNarrativePedFragment : public FMassFragment
 
 	int32 NarrativePedSeed;
 };
+
+/**
+ * Identity of a project-owned representation. These entities deliberately do not
+ * contain FNarrativePedFragment/FNarrativePedProperties: they must never choose a
+ * random NPC definition or create a second gameplay character.
+ */
+USTRUCT()
+struct NARRATIVEARSENAL_API FNarrativeMassParticipantFragment : public FMassFragment
+{
+	GENERATED_BODY()
+
+	UPROPERTY(Transient)
+	TWeakObjectPtr<UObject> Owner;
+
+	UPROPERTY(Transient)
+	FGuid ActorIdentity;
+
+	UPROPERTY(Transient)
+	FName ParticipantId;
+
+	UPROPERTY(Transient)
+	FName EncounterId;
+
+	UPROPERTY(Transient)
+	uint64 Generation = 0;
+
+	// Presentation-only proxies cannot acquire collision or actor ticking from LOD changes.
+	UPROPERTY(Transient)
+	bool bPresentationOnly = true;
+
+	bool HasValidIdentity() const
+	{
+		return Owner.IsValid() && ActorIdentity.IsValid() && !ParticipantId.IsNone()
+			&& !EncounterId.IsNone() && Generation != 0;
+	}
+
+	bool HasSameIdentity(const FNarrativeMassParticipantFragment& Other) const
+	{
+		return Owner == Other.Owner && ActorIdentity == Other.ActorIdentity
+			&& ParticipantId == Other.ParticipantId && EncounterId == Other.EncounterId
+			&& Generation == Other.Generation && bPresentationOnly == Other.bPresentationOnly;
+	}
+};

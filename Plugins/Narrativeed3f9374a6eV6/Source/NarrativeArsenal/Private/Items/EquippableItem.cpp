@@ -110,9 +110,10 @@ bool UEquippableItem::EquipItem(FGameplayTag DesiredSlot)
 		if (!DesiredSlot.IsValid() || EquippableSlots.HasTag(DesiredSlot))
 		{
 			FGameplayTag OldSlot = CurrentSlot;
+			++EquipmentRevision;
 			CurrentSlot = DesiredSlot;
-			OnRep_CurrentSlot(OldSlot);
 			MarkDirtyForReplication();
+			OnRep_CurrentSlot(OldSlot);
 
 			return true; 
 		}
@@ -178,6 +179,7 @@ void UEquippableItem::RemovedFromInventory(class UNarrativeInventoryComponent* I
 	if (IsEquipped())
 	{
 		FGameplayTag OldSlot = CurrentSlot;
+		++EquipmentRevision;
 		CurrentSlot = FGameplayTag();
 		OnRep_CurrentSlot(OldSlot);
 	}

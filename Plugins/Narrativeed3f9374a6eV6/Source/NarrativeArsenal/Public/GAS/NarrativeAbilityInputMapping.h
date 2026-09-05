@@ -24,6 +24,9 @@ struct FAbilityInputMappingData
 	//The input tag the action maps
 	UPROPERTY(EditAnywhere, Category = "GameplayInputAbilityInfo", meta=(Categories="Narrative.Input"))
 	FGameplayTag InputTag = FNarrativeGameplayTags::Get().Narrative_Input_None;
+	/** Optional semantic chord. Modifier can be held or toggled by accessibility settings. */
+	UPROPERTY(EditAnywhere, Category="GameplayInputAbilityInfo") FGameplayTag RequiredModifierTag;
+	UPROPERTY(EditAnywhere, Category="GameplayInputAbilityInfo") FGameplayTag ModifiedInputTag;
 };
 
 /**

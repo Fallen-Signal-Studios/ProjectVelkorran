@@ -14,4 +14,15 @@ class PROJECTVELKORRAN_API ASovCampaignGameMode : public ANarrativeGameMode
 
 public:
 	ASovCampaignGameMode();
+	/** Each campaign map assigns exactly one mission asset; class and definition are resolved together. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Campaign")
+	TObjectPtr<class USovCampaignDefinition> InitialMission;
+
+protected:
+	virtual FString InitNewPlayer(APlayerController* NewPlayerController, const FUniqueNetIdRepl& UniqueId,
+		const FString& Options, const FString& Portal = TEXT("")) override;
+	virtual APawn* SpawnDefaultPawnAtTransform_Implementation(AController* NewPlayer, const FTransform& SpawnTransform) override;
+	virtual UClass* GetDefaultPawnClassForController_Implementation(AController* InController) override;
+	virtual UPlayerDefinition* GetPlayerDefinitionForController_Implementation(AController* InController) override;
+	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
 };

@@ -1,0 +1,10 @@
+Engineering environment preflight, 5 September 2026
+g++ (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0
+Unreal binary assets present: {'.uasset': 0, '.umap': 0}
+UnrealEditor: not on PATH
+UnrealEditor-Cmd: not on PATH
+UnrealBuildTool: not on PATH
+dotnet: not on PATH
+pwsh: not on PATH
+powershell: not on PATH
+UE5.7 build/runtime, PowerShell runner and packaged/device validation were not run.

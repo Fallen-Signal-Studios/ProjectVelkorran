@@ -2,6 +2,14 @@
 
 
 #include "UnrealFramework/NarrativePlayerController.h"
+#include "CollisionQueryParams.h"
+#include "Items/RangedWeaponItem.h"
+#include "Sovereign/SovLookInputPolicy.h"
+#include "Sovereign/SovMovementAssistPolicy.h"
+#include "GameFramework/CharacterMovementComponent.h"
+#include "Sovereign/SovGameplayTags.h"
+#include "Engine/World.h"
+
 #include "UnrealFramework/NarrativePlayerState.h"
 #include "UnrealFramework/NarrativeCharacter.h"
 #include "UnrealFramework/NarrativeCheatManager.h"
@@ -173,7 +181,7 @@ void ANarrativePlayerController::SetupInputComponent()
 				{
 					EnhancedInput->BindAction(IA.InputAction, ETriggerEvent::Started, this, &ANarrativePlayerController::AbilityInputPressed, IA.InputTag);
 					EnhancedInput->BindAction(IA.InputAction, ETriggerEvent::Completed, this, &ANarrativePlayerController::AbilityInputReleased, IA.InputTag);
-					EnhancedInput->BindAction(IA.InputAction, ETriggerEvent::Canceled, this, &ANarrativePlayerController::AbilityInputReleased, IA.InputTag);
+					EnhancedInput->BindAction(IA.InputAction, ETriggerEvent::Canceled, this, &ANarrativePlayerController::AbilityInputCanceled, IA.InputTag);
 				}
 			}
 		}
@@ -272,9 +280,14 @@ void ANarrativePlayerController::Look(const FInputActionValue& Value)
 {
 	//TODO - needs moved to playercontroller so sensitivity is globally applied. 
 	FVector2D LookAxisInput = Value.Get<FVector2D>();
+	if (LookAxisInput.ContainsNaN()) { return; }
 	const UInputSettings* DefaultInputSettings = GetDefault<UInputSettings>();
 
 	float AimSensitivity = 1.f;
+	float DeadZone = 0.f, AccelerationSeconds = 0.f;
+	const bool bAiming = HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_Weapon_IsAiming);
+	const UCommonInputSubsystem* CommonInput = GetLocalPlayer() ? GetLocalPlayer()->GetSubsystem<UCommonInputSubsystem>() : nullptr;
+	const bool bGamepad = CommonInput && CommonInput->GetCurrentInputType() == ECommonInputType::Gamepad;
 
 	if (const ULocalPlayer* LocalPlayer = GetLocalPlayer())
 	{
@@ -292,17 +305,66 @@ void ANarrativePlayerController::Look(const FInputActionValue& Value)
 					LookAxisInput.X = -LookAxisInput.X;
 				}
 
-				AimSensitivity = IS->GetAimSensitivity();
+				AimSensitivity = bAiming ? IS->GetAimSensitivity() : IS->GetCameraSensitivity();
+				DeadZone = IS->GetGamepadDeadZone();
+				AccelerationSeconds = IS->GetGamepadAccelerationSeconds();
 			}
 		}
 	}
+
+	if (bGamepad)
+	{
+		const double Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+		const float Delta = GetWorld() ? FMath::Clamp(GetWorld()->GetDeltaSeconds(), 0.f, .1f) : 0.f;
+		const float Magnitude = FMath::Min(LookAxisInput.Size(), 1.f);
+		if (Now - SovLastLookInputTime > FMath::Max(.05f, Delta * 2.f) || Magnitude <= DeadZone)
+		{ SovLookAccelerationElapsed = 0.f; }
+		SovLastLookInputTime = Now;
+		if (Magnitude <= DeadZone) { LookAxisInput = FVector2D::ZeroVector; }
+		else
+		{
+			LookAxisInput = LookAxisInput.GetSafeNormal() * ((Magnitude - DeadZone) / (1.f - DeadZone));
+			const float Acceleration = SovLookInputPolicy::AverageAcceleration(SovLookAccelerationElapsed, Delta, AccelerationSeconds);
+			SovLookAccelerationElapsed = FMath::Min(SovLookAccelerationElapsed + Delta, AccelerationSeconds);
+			// Preserve baseline speed at 60 fps; stick rates no longer double between 60 and 120 fps.
+			LookAxisInput *= Delta * 60.f * Acceleration;
+		}
+	}
+	else { SovLookAccelerationElapsed = 0.f; SovLastLookInputTime = -1.0; }
+
+	if (!LookAxisInput.IsNearlyZero() && GetWorld()) { SovLastManualLookTime = GetWorld()->GetTimeSeconds(); }
 
 	//UE Look input scaling feature appears to be broken. Add it back in here.
 	float const FOVScale = (DefaultInputSettings->bEnableFOVScaling && PlayerCameraManager) ? (DefaultInputSettings->FOVScale * PlayerCameraManager->GetFOVAngle()) : 1.0f;
 
 
-	AddYawInput(LookAxisInput.X * FOVScale * AimSensitivity);
-	AddPitchInput(LookAxisInput.Y * FOVScale * AimSensitivity);
+	// Friction slows deliberate input over a living hostile. No snapping, world-space displacement or cover bypass.
+	float AimFriction = 1.f;
+	if (const UNarrativeGameUserSettings* Settings = UNarrativeGameUserSettings::GetSovSettings();
+		Settings && Settings->GetRangedAimAssistStrength() > 0.f && PlayerCameraManager && GetPawn()
+		&& HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_Weapon_IsAiming))
+	{
+		FVector Origin; FRotator Direction; GetPlayerViewPoint(Origin, Direction);
+		FCollisionQueryParams Query(SCENE_QUERY_STAT(SovAimFriction), false, GetPawn());
+		TArray<AActor*> Attached; GetPawn()->GetAttachedActors(Attached, true, true); Query.AddIgnoredActors(Attached);
+		FHitResult Hit;
+		if (GetWorld()->LineTraceSingleByChannel(Hit, Origin, Origin + Direction.Vector() * 10000.f, ECC_Visibility, Query))
+		{
+			AActor* HitActor = Hit.GetActor();
+			ANarrativeCharacter* Target = Cast<ANarrativeCharacter>(HitActor);
+			// Narrative's independently spawned character visual can own the hit primitive.
+			if (!Target && HitActor) { Target = Cast<ANarrativeCharacter>(HitActor->GetOwner()); }
+			if (IsValid(Target) && UArsenalStatics::GetAttitude(GetPawn(), Target) == ETeamAttitude::Hostile)
+			{
+				if (UNarrativeAbilitySystemComponent* ASC = Target->GetNarrativeAbilitySystemComponent(); ASC && !ASC->IsDead())
+				{
+					AimFriction = 1.f - .65f * FMath::Clamp(Settings->GetRangedAimAssistStrength(), 0.f, 1.f);
+				}
+			}
+		}
+	}
+	AddYawInput(LookAxisInput.X * FOVScale * AimSensitivity * AimFriction);
+	AddPitchInput(LookAxisInput.Y * FOVScale * AimSensitivity * AimFriction);
 }
 
 void ANarrativePlayerController::ClientShowHUDNotification_Implementation(const FText& Message, const float Duration)
@@ -848,41 +910,151 @@ void ANarrativePlayerController::OnTetheredNPCDestroyed(AActor* DestroyedActor)
 	}
 }
 
+
+bool ANarrativePlayerController::WantsToggleForInput(FGameplayTag InputTag) const
+{
+	const UNarrativeGameUserSettings* Settings = UNarrativeGameUserSettings::GetSovSettings();
+	if (!Settings) { return false; }
+	if (InputTag == FSovGameplayTags::Get().Input_AbilityModifier) { return Settings->ShouldAbilityModifierToggle(); }
+	if (InputTag == FNarrativeGameplayTags::Get().Narrative_Input_Sprint) { return Settings->ShouldSprintToggle(); }
+	if (InputTag == FNarrativeGameplayTags::Get().Narrative_Input_AltAttack)
+	{
+		const ANarrativeCharacter* Character = GetNarrativeCharacter();
+		return Character && Cast<URangedWeaponItem>(Character->GetWeapon()) ? Settings->ShouldAimToggle() : Settings->ShouldGuardToggle();
+	}
+	return false;
+}
+void ANarrativePlayerController::ReleaseSemanticInput(FGameplayTag EffectiveTag)
+{
+	if (!PressedAbilityInputTags.Contains(EffectiveTag) && !SovLatchedInputTags.Contains(EffectiveTag)) { return; }
+	TWeakObjectPtr<UNarrativeAbilitySystemComponent> OriginalASC = Cast<UNarrativeAbilitySystemComponent>(GetAbilitySystemComponent());
+	TWeakObjectPtr<AActor> OriginalAvatar = OriginalASC.IsValid() ? OriginalASC->GetAvatarActor() : nullptr;
+	const uint64 Epoch = SovRoutingEpoch;
+	const uint64 Revision = ++SovInputRevisionSerial; SovInputRevisions.Add(EffectiveTag, Revision);
+	PressedAbilityInputTags.Remove(EffectiveTag);
+	SovLatchedInputTags.Remove(EffectiveTag);
+	OnSemanticInputChanged.Broadcast(EffectiveTag, false);
+	if (SovRoutingEpoch == Epoch && SovInputRevisions.FindRef(EffectiveTag) == Revision
+		&& OriginalASC.IsValid() && OriginalAvatar.IsValid() && OriginalASC->GetAvatarActor() == OriginalAvatar.Get())
+	{ OriginalASC->AbilityInputTagReleased(EffectiveTag); }
+}
 void ANarrativePlayerController::AbilityInputPressed(FGameplayTag InputTag)
 {
-	if (InputTag.IsValid())
+	if (!InputTag.IsValid() || IsGameplayAbilityInputSuppressed()) { return; }
+	FGameplayTag EffectiveTag = InputTag;
+	if (AbilityInputMappings)
 	{
-		PressedAbilityInputTags.Add(InputTag);
+		for (const FAbilityInputMappingData& Mapping : AbilityInputMappings->InputAbilities)
+		{
+			if (Mapping.InputTag == InputTag && Mapping.RequiredModifierTag.IsValid() && Mapping.ModifiedInputTag.IsValid()
+				&& PressedAbilityInputTags.Contains(Mapping.RequiredModifierTag))
+			{ EffectiveTag = Mapping.ModifiedInputTag; break; }
+		}
 	}
-
-	if (UNarrativeAbilitySystemComponent* ASC = Cast<UNarrativeAbilitySystemComponent>(GetAbilitySystemComponent()))
-	{
-		ASC->AbilityInputTagPressed(InputTag);
-	}
+	SovInputRoutes.Add(InputTag, EffectiveTag);
+	PressSemanticInput(EffectiveTag, true);
 }
-
+void ANarrativePlayerController::PressSemanticInput(FGameplayTag EffectiveTag, bool bAllowToggle)
+{
+	if (IsGameplayAbilityInputSuppressed()) { return; }
+	if (SovLatchedInputTags.Contains(EffectiveTag))
+	{
+		bool bStillActive = EffectiveTag == FSovGameplayTags::Get().Input_AbilityModifier;
+		if (const UNarrativeAbilitySystemComponent* ASC = Cast<UNarrativeAbilitySystemComponent>(GetAbilitySystemComponent()))
+		{
+			for (const FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
+			{ bStillActive |= Spec.IsActive() && Spec.GetDynamicSpecSourceTags().HasTagExact(EffectiveTag); }
+		}
+		const uint64 ReleaseEpoch = SovRoutingEpoch;
+		const uint64 ReleaseRevision = SovInputRevisionSerial + 1;
+		ReleaseSemanticInput(EffectiveTag);
+		if (SovRoutingEpoch != ReleaseEpoch || SovInputRevisions.FindRef(EffectiveTag) != ReleaseRevision || bStillActive) { return; }
+	}
+	// Different physical/semantic routes may share an effective action. Only the first route presses it.
+	if (PressedAbilityInputTags.Contains(EffectiveTag)) { return; }
+	if (bAllowToggle && WantsToggleForInput(EffectiveTag)) { SovLatchedInputTags.Add(EffectiveTag); }
+	TWeakObjectPtr<UNarrativeAbilitySystemComponent> OriginalASC = Cast<UNarrativeAbilitySystemComponent>(GetAbilitySystemComponent());
+	TWeakObjectPtr<AActor> OriginalAvatar = OriginalASC.IsValid() ? OriginalASC->GetAvatarActor() : nullptr;
+	const uint64 Epoch = SovRoutingEpoch;
+	const uint64 Revision = ++SovInputRevisionSerial; SovInputRevisions.Add(EffectiveTag, Revision);
+	PressedAbilityInputTags.Add(EffectiveTag);
+	OnSemanticInputChanged.Broadcast(EffectiveTag, true);
+	if (SovRoutingEpoch == Epoch && SovInputRevisions.FindRef(EffectiveTag) == Revision && OriginalASC.IsValid() && OriginalAvatar.IsValid() && OriginalASC->GetAvatarActor() == OriginalAvatar.Get()
+		&& PressedAbilityInputTags.Contains(EffectiveTag))
+	{ OriginalASC->AbilityInputTagPressed(EffectiveTag); }
+}
 void ANarrativePlayerController::AbilityInputReleased(FGameplayTag InputTag)
 {
-	PressedAbilityInputTags.Remove(InputTag);
-
-	if (UNarrativeAbilitySystemComponent* ASC = Cast<UNarrativeAbilitySystemComponent>(GetAbilitySystemComponent()))
+	const FGameplayTag EffectiveTag = SovInputRoutes.Contains(InputTag) ? SovInputRoutes.FindChecked(InputTag) : InputTag;
+	SovInputRoutes.Remove(InputTag);
+	bool bOtherRouteHeld = bSovAutomaticSprintHeld && EffectiveTag == FNarrativeGameplayTags::Get().Narrative_Input_Sprint;
+	for (const auto& Route : SovInputRoutes) { bOtherRouteHeld |= Route.Value == EffectiveTag; }
+	if (!bOtherRouteHeld && !SovLatchedInputTags.Contains(EffectiveTag)) { ReleaseSemanticInput(EffectiveTag); }
+}
+void ANarrativePlayerController::AbilityInputCanceled(FGameplayTag InputTag)
+{
+	const FGameplayTag EffectiveTag = SovInputRoutes.Contains(InputTag) ? SovInputRoutes.FindChecked(InputTag) : InputTag;
+	SovInputRoutes.Remove(InputTag);
+	if (SovLatchedInputTags.Contains(EffectiveTag))
 	{
-		ASC->AbilityInputTagReleased(InputTag);
+		for (auto It = SovInputRoutes.CreateIterator(); It; ++It) { if (It.Value() == EffectiveTag) { It.RemoveCurrent(); } }
+		ReleaseSemanticInput(EffectiveTag);
+	}
+	else
+	{
+		bool bOtherRouteHeld = bSovAutomaticSprintHeld && EffectiveTag == FNarrativeGameplayTags::Get().Narrative_Input_Sprint;
+		for (const auto& Route : SovInputRoutes) { bOtherRouteHeld |= Route.Value == EffectiveTag; }
+		if (!bOtherRouteHeld) { ReleaseSemanticInput(EffectiveTag); }
+	}
+}
+void ANarrativePlayerController::ReleaseHeldAbilityInputs()
+{
+	UNarrativeAbilitySystemComponent* ASC = Cast<UNarrativeAbilitySystemComponent>(GetAbilitySystemComponent());
+	const TArray<FGameplayTag> HeldTags = PressedAbilityInputTags.Array();
+	const TWeakObjectPtr<AActor> OriginalAvatar = IsValid(ASC) ? ASC->GetAvatarActor() : nullptr;
+	if (IsValid(ASC)) { ASC->ClearCombatInputBuffer(); }
+	const uint64 Epoch = ++SovRoutingEpoch;
+	PressedAbilityInputTags.Empty(); SovLatchedInputTags.Empty(); SovInputRoutes.Empty(); SovInputRevisions.Empty(); bSovAutomaticSprintHeld = false;
+	TMap<FGameplayTag, uint64> ExpectedRevisions;
+	for (const FGameplayTag& InputTag : HeldTags)
+	{ const uint64 Revision = ++SovInputRevisionSerial; SovInputRevisions.Add(InputTag, Revision); ExpectedRevisions.Add(InputTag, Revision); }
+	for (const FGameplayTag& InputTag : HeldTags)
+	{
+		if (SovRoutingEpoch != Epoch || SovInputRevisions.FindRef(InputTag) != ExpectedRevisions.FindRef(InputTag)) { continue; }
+		OnSemanticInputChanged.Broadcast(InputTag, false);
+		if (SovRoutingEpoch == Epoch && SovInputRevisions.FindRef(InputTag) == ExpectedRevisions.FindRef(InputTag)
+			&& IsValid(ASC) && OriginalAvatar.IsValid() && ASC->GetAvatarActor() == OriginalAvatar.Get()) { ASC->AbilityInputTagReleased(InputTag); }
 	}
 }
 
-void ANarrativePlayerController::ReleaseHeldAbilityInputs()
+void ANarrativePlayerController::UpdateAutomaticSprintInput(float MovementMagnitude)
 {
-	UNarrativeAbilitySystemComponent* ASC =
-		Cast<UNarrativeAbilitySystemComponent>(GetAbilitySystemComponent());
-	const TArray<FGameplayTag> HeldTags = PressedAbilityInputTags.Array();
-	PressedAbilityInputTags.Empty();
-
-	if (ASC)
+	const auto* Settings = UNarrativeGameUserSettings::GetSovSettings();
+	const ANarrativePlayerCharacter* Character = Cast<ANarrativePlayerCharacter>(GetPawn());
+	const UCharacterMovementComponent* Movement = Character ? Character->GetCharacterMovement() : nullptr;
+	const UNarrativeAbilitySystemComponent* ASC = Cast<UNarrativeAbilitySystemComponent>(GetAbilitySystemComponent());
+	const auto& Tags = FNarrativeGameplayTags::Get();
+	const bool bReady = Character && Character->IsCharacterReady() && ASC && ASC->GetAvatarActor() == Character && !ASC->IsDead();
+	const bool bBlocked = !bReady || !IsLocalController() || IsMoveInputIgnored() || IsLookInputIgnored()
+		|| !GetWorld() || GetWorld()->IsPaused() || bCinematicMode || (ASC && (ASC->HasMatchingGameplayTag(Tags.State_Busy)
+		|| ASC->HasMatchingGameplayTag(Tags.State_Weapon_IsAiming) || ASC->HasMatchingGameplayTag(Tags.State_SequencerControlled)));
+	SetAutomaticSprintHeld(SovMovementAssistPolicy::WantsAutomaticSprint(Settings && Settings->UseAutomaticSprint(),
+		MovementMagnitude, Movement && Movement->IsMovingOnGround(), !bBlocked));
+}
+void ANarrativePlayerController::SetAutomaticSprintHeld(bool bWanted)
+{
+	if (bSovAutomaticSprintHeld == bWanted) { return; }
+	bSovAutomaticSprintHeld = bWanted;
+	const FGameplayTag Sprint = FNarrativeGameplayTags::Get().Narrative_Input_Sprint;
+	if (bWanted)
 	{
-		for (const FGameplayTag& InputTag : HeldTags)
-		{
-			ASC->AbilityInputTagReleased(InputTag);
-		}
+		// Share the semantic hold with manual input, without turning an automatic request into a toggle latch.
+		if (!PressedAbilityInputTags.Contains(Sprint)) { PressSemanticInput(Sprint, false); }
+	}
+	else
+	{
+		bool bManualHold = SovLatchedInputTags.Contains(Sprint);
+		for (const auto& Route : SovInputRoutes) { bManualHold |= Route.Value == Sprint; }
+		if (!bManualHold) { ReleaseSemanticInput(Sprint); }
 	}
 }

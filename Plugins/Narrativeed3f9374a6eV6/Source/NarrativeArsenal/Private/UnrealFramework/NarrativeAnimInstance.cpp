@@ -2,6 +2,7 @@
 
 
 #include "UnrealFramework/NarrativeAnimInstance.h"
+#include "Engine/SkeletalMesh.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemGlobals.h"
 #include "IMediaControls.h"
@@ -331,4 +332,18 @@ void UNarrativeAnimInstance::BlendOutOfSequencer()
 		bWantsBlendOutOfSequencer = true;
 	}
 
+}
+
+bool UNarrativeAnimInstance::BlendFromRepresentationPose(const FPoseSnapshot& Pose)
+{
+	USkeletalMeshComponent* Mesh = GetSkelMeshComponent();
+	if (!Mesh || !Mesh->GetSkeletalMeshAsset() || !Pose.bIsValid || Pose.LocalTransforms.IsEmpty()
+		|| Pose.LocalTransforms.Num() != Pose.BoneNames.Num() || Pose.SkeletalMeshName != Mesh->GetSkeletalMeshAsset()->GetFName()) { return false; }
+	for (int32 Index = 0; Index < Pose.BoneNames.Num(); ++Index)
+	{
+		if (Mesh->GetBoneIndex(Pose.BoneNames[Index]) == INDEX_NONE || Pose.LocalTransforms[Index].ContainsNaN()) { return false; }
+	}
+	SequencerPoseSnapshot = Pose;
+	bWantsBlendOutOfSequencer = true;
+	return true;
 }

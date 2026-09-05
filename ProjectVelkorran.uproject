@@ -12,6 +12,19 @@
 	],
 	"Plugins": [
 		{
+			"Name": "OnlineSubsystem",
+			"Enabled": true
+		},
+		{
+			"Name": "OnlineSubsystemUtils",
+			"Enabled": true
+		},
+		{
+			"Name": "TextToSpeech",
+			"Enabled": true,
+			"PlatformAllowList": [ "Win64" ]
+		},
+		{
 			"Name": "NarrativePro",
 			"Enabled": true,
 			"MarketplaceURL": "com.epicgames.launcher://ue/Fab/product/86f8c09a-957c-451a-a4d1-fb1b4a6bbc46"
@@ -34,6 +47,7 @@
 		{
 			"Name": "MetaHuman",
 			"Enabled": true,
+			"TargetAllowList": [ "Editor" ],
 			"SupportedTargetPlatforms": [
 				"Win64",
 				"Linux"
@@ -42,6 +56,7 @@
 		{
 			"Name": "MetaHumanCoreTech",
 			"Enabled": true,
+			"TargetAllowList": [ "Editor" ],
 			"SupportedTargetPlatforms": [
 				"Win64",
 				"Linux"
@@ -49,10 +64,16 @@
 		},
 		{
 			"Name": "MetaHumanCharacter",
-			"Enabled": true
+			"Enabled": true,
+			"TargetAllowList": [ "Editor" ]
 		},
 		{
 			"Name": "MetaHumanLiveLink",
+			"Enabled": true,
+			"TargetAllowList": [ "Editor" ]
+		},
+		{
+			"Name": "RigLogic",
 			"Enabled": true
 		},
 		{
@@ -62,6 +83,7 @@
 		{
 			"Name": "MetaHumanCalibrationProcessing",
 			"Enabled": true,
+			"TargetAllowList": [ "Editor" ],
 			"SupportedTargetPlatforms": [
 				"Win64",
 				"Linux"

@@ -235,6 +235,8 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Weapon Visual")
 	TArray<USkeletalMeshComponent*> GetWeaponMeshes() const;
+	/** Check actual mesh/socket/offset after callbacks, not just cached attachment bookkeeping. */
+	bool HasCommittedAttachment(FGameplayTag EquipmentSlot, FGameplayTag WieldSlot) const;
 
 protected: 
 

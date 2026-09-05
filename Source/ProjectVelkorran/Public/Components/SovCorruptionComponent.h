@@ -1,570 +1,146 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
-
 #pragma once
-
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "Corruption/SovCorruptionProfile.h"
 #include "GameplayEffectTypes.h"
-#include "GameplayTagContainer.h"
-#include "TimerManager.h"
+#include "NarrativeSavableComponent.h"
 #include "SovCorruptionComponent.generated.h"
 
-class FLifetimeProperty;
+class ASovCorruptionSourceVolume;
+class USovCorruptionSourceComponent;
+class USovCorruptionInteractableComponent;
 class UAbilitySystemComponent;
-class UGameplayEffect;
-class UNarrativeAbilitySystemComponent;
-struct FOnAttributeChangeData;
+class USovCampaignStateComponent;
+class USovCampaignDefinition;
 
-/** Exact TDD exposure bands. None is the internal zero-exposure state. */
-UENUM(BlueprintType)
-enum class ESovCorruptionBand : uint8
-{
-	None UMETA(DisplayName = "None"),
-	Trace UMETA(DisplayName = "Trace"),
-	Intrusion UMETA(DisplayName = "Intrusion"),
-	Contest UMETA(DisplayName = "Contest"),
-	OverwriteRisk UMETA(DisplayName = "Overwrite Risk")
-};
-
-UENUM(BlueprintType)
-enum class ESovCorruptionFalloffPolicy : uint8
-{
-	None UMETA(DisplayName = "No Falloff"),
-	Linear UMETA(DisplayName = "Linear")
-};
-
-/** Opaque authority handle for one independently authored exposure source. */
 USTRUCT(BlueprintType)
 struct PROJECTVELKORRAN_API FSovCorruptionSourceHandle
 {
 	GENERATED_BODY()
-
-	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Corruption")
-	FGuid Id;
-
+	UPROPERTY(BlueprintReadOnly) FGuid Id;
 	bool IsValid() const { return Id.IsValid(); }
-	void Invalidate() { Id.Invalidate(); }
 };
-
-/**
- * Complete authored contract for one corruption source.
- *
- * Gameplay remains identical when reduced-effects presentation is enabled;
- * PresentationProfile and AccessibilitySubstitute select only how the same
- * band/source information is communicated.
- */
-USTRUCT(BlueprintType)
-struct PROJECTVELKORRAN_API FSovCorruptionSourceSpec
-{
-	GENERATED_BODY()
-
-	/** Stable authored identity used by checkpoint/encounter reconstruction. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Identity")
-	FName SourceId = NAME_None;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Exposure", meta = (ClampMin = "0.0"))
-	float ExposurePerSecond = 5.0f;
-
-	/** Applied once when RegisterCorruptionSource accepts the source. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Exposure", meta = (ClampMin = "0.0"))
-	float InstantExposure = 0.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spatial")
-	ESovCorruptionFalloffPolicy FalloffPolicy = ESovCorruptionFalloffPolicy::None;
-
-	/** Full strength at or inside this radius. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spatial", meta = (ClampMin = "0.0", Units = "cm"))
-	float InnerRadius = 0.0f;
-
-	/** Zero strength at or beyond this radius when Linear falloff is selected. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spatial", meta = (ClampMin = "0.0", Units = "cm"))
-	float OuterRadius = 1000.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spatial")
-	bool bRequireLineOfSight = false;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spatial")
-	TEnumAsByte<ECollisionChannel> OcclusionTraceChannel = ECC_Visibility;
-
-	/** Empty accepts any target; otherwise the target ASC's owned tags must match. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Targeting")
-	FGameplayTagQuery AllowedTargetQuery;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Exposure")
-	bool bEnforceBandCap = true;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Exposure")
-	ESovCorruptionBand BandCap = ESovCorruptionBand::Contest;
-
-	/** Required for every source so the player is never shown exposure without a remedy. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Remedy")
-	FGameplayTag RemedyTag;
-
-	/** Required player-facing cleanse or escape instruction. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Remedy")
-	FText RemedyInstruction;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Presentation")
-	FName PresentationProfile = NAME_None;
-
-	/** Non-distorting substitute cue for reduced-effects/accessibility mode. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Presentation")
-	FText AccessibilitySubstitute;
-
-	/**
-	 * Save this live source's stable ID so re-registration after load suppresses
-	 * its one-time InstantExposure. Aggregate exposure follows component policy.
-	 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Checkpoint")
-	bool bSaveAtCheckpoint = true;
-
-	/** Extends that source-ID reconstruction behavior to canon checkpoints. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Checkpoint")
-	bool bPersistsAcrossCanonCheckpoints = false;
-
-	/** Still requires the owning component's explicit mission permission. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Overwrite Risk")
-	bool bAuthorizesOverwriteRisk = false;
-
-	bool HasValidNumbers() const;
-};
-
-/** Local presentation view derived from replicated gameplay-equivalent state. */
-USTRUCT(BlueprintType)
-struct PROJECTVELKORRAN_API FSovCorruptionPresentationSnapshot
-{
-	GENERATED_BODY()
-
-	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Corruption")
-	float Corruption = 0.0f;
-
-	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Corruption")
-	float MaxCorruption = 100.0f;
-
-	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Corruption")
-	float NormalizedCorruption = 0.0f;
-
-	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Corruption")
-	ESovCorruptionBand Band = ESovCorruptionBand::None;
-
-	/** Unit vector from target toward the most relevant active source. */
-	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Corruption")
-	FVector SourceDirection = FVector::ZeroVector;
-
-	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Corruption")
-	bool bHasDirectionalSource = false;
-
-	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Corruption")
-	FGameplayTag RemedyTag;
-
-	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Corruption")
-	FText RemedyInstruction;
-
-	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Corruption")
-	FName PresentationProfile = NAME_None;
-
-	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Corruption")
-	FText AccessibilitySubstitute;
-
-	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Corruption")
-	bool bReducedEffectsPresentation = false;
-
-	/** Always true: accessibility changes cues, never thresholds or outcomes. */
-	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Corruption")
-	bool bGameplayEquivalentInReducedEffects = true;
-
-	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Corruption")
-	int32 PresentationRevision = 0;
-};
-
-/** Compact, versioned state; live actor pointers and GAS handles are excluded. */
-USTRUCT(BlueprintType)
-struct PROJECTVELKORRAN_API FSovCorruptionCheckpointData
-{
-	GENERATED_BODY()
-
-	static constexpr int32 CurrentVersion = 3;
-
-	UPROPERTY(BlueprintReadWrite, SaveGame, Category = "Sovereign|Corruption")
-	int32 Version = CurrentVersion;
-
-	UPROPERTY(BlueprintReadWrite, SaveGame, Category = "Sovereign|Corruption")
-	float Corruption = 0.0f;
-
-	UPROPERTY(BlueprintReadWrite, SaveGame, Category = "Sovereign|Corruption")
-	float MaxCorruption = 100.0f;
-
-	UPROPERTY(BlueprintReadWrite, SaveGame, Category = "Sovereign|Corruption")
-	bool bOverwriteRiskAuthorizedForCurrentExposure = false;
-
-	UPROPERTY(BlueprintReadWrite, SaveGame, Category = "Sovereign|Corruption")
-	FGameplayTag RemedyTag;
-
-	UPROPERTY(BlueprintReadWrite, SaveGame, Category = "Sovereign|Corruption")
-	FText RemedyInstruction;
-
-	UPROPERTY(BlueprintReadWrite, SaveGame, Category = "Sovereign|Corruption")
-	FName PresentationProfile = NAME_None;
-
-	UPROPERTY(BlueprintReadWrite, SaveGame, Category = "Sovereign|Corruption")
-	FText AccessibilitySubstitute;
-
-	/** Encounter code may use these stable IDs to rebuild opted-in live sources. */
-	UPROPERTY(BlueprintReadWrite, SaveGame, Category = "Sovereign|Corruption")
-	TArray<FName> ActiveSourceIds;
-
-	/** Subset whose authored policy permits reconstruction at canon checkpoints. */
-	UPROPERTY(BlueprintReadWrite, SaveGame, Category = "Sovereign|Corruption")
-	TArray<FName> CanonPersistentSourceIds;
-
-	/**
-		 * All one-shot sources already represented in Corruption, including sources
-		 * that do not opt into encounter reconstruction. These load guards remain
-		 * until consumed or explicitly finalized; they are not actor references or
-		 * runtime source handles.
-	 */
-	UPROPERTY(BlueprintReadWrite, SaveGame, Category = "Sovereign|Corruption")
-	TArray<FName> InstantExposureReplayGuardSourceIds;
-};
-
 USTRUCT()
-struct FSovCorruptionReplicatedPresentationState
+struct FSovCorruptionExposureRecord
 {
 	GENERATED_BODY()
-
-	UPROPERTY()
-	FVector SourceDirection = FVector::ZeroVector;
-
-	UPROPERTY()
-	bool bHasDirectionalSource = false;
-
-	UPROPERTY()
-	FGameplayTag RemedyTag;
-
-	UPROPERTY()
-	FText RemedyInstruction;
-
-	UPROPERTY()
-	FName PresentationProfile = NAME_None;
-
-	UPROPERTY()
-	FText AccessibilitySubstitute;
-
-	UPROPERTY()
-	int32 Revision = 0;
+	UPROPERTY(SaveGame) TObjectPtr<USovCorruptionProfile> Profile;
+	UPROPERTY(SaveGame) FName MissionId;
+	UPROPERTY(SaveGame) float Exposure = 0.0f;
+	UPROPERTY(SaveGame) bool bContactAtCheckpoint = false;
+	UPROPERTY(SaveGame) float OverwriteElapsed = 0.0f;
+	UPROPERTY(SaveGame) bool bOverwriteTriggered = false;
 };
-
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(
-	FSovCorruptionChangedSignature,
-	float, OldCorruption,
-	float, NewCorruption,
-	float, MaxCorruption);
-
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
-	FSovCorruptionBandChangedSignature,
-	ESovCorruptionBand, OldBand,
-	ESovCorruptionBand, NewBand);
-
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
-	FSovCorruptionPresentationChangedSignature,
-	const FSovCorruptionPresentationSnapshot&, Snapshot);
-
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(
-	FSovCorruptionRemediedSignature,
-	FGameplayTag, RemedyTag,
-	float, OldCorruption,
-	float, NewCorruption,
-	AActor*, RemedyInstigator);
-
-DECLARE_DYNAMIC_MULTICAST_DELEGATE(
-	FSovCorruptionOverwriteRiskSignature);
-
-/**
- * Server-owned Eclipse corruption lifecycle and presentation contract.
- *
- * Independent authored sources accumulate on a fixed timer using elapsed world
- * time. Corruption is stored on the persistent ASC, while this avatar component
- * rejects stale PlayerState actor-info and owns only its exact band-effect
- * handle. Overwrite Risk never kills, hijacks input, or removes control: entry
- * merely emits an explicit mission hook.
- */
-UCLASS(ClassGroup = (Sovereign), BlueprintType, meta = (BlueprintSpawnableComponent))
-class PROJECTVELKORRAN_API USovCorruptionComponent : public UActorComponent
+USTRUCT(BlueprintType)
+struct PROJECTVELKORRAN_API FSovCorruptionReplicatedState
 {
 	GENERATED_BODY()
+	UPROPERTY(BlueprintReadOnly) float Exposure = 0.0f;
+	UPROPERTY(BlueprintReadOnly) ESovCorruptionBand Band = ESovCorruptionBand::Clear;
+	UPROPERTY(BlueprintReadOnly) TArray<TObjectPtr<USovCorruptionProfile>> Profiles;
+	UPROPERTY(BlueprintReadOnly) bool bOverwriteClockActive = false;
+	UPROPERTY(BlueprintReadOnly) float OverwriteSecondsRemaining = 0.0f;
+};
+/** Mechanical information is identical in reduced-effects mode; presentation never drives input. */
+USTRUCT(BlueprintType)
+struct PROJECTVELKORRAN_API FSovCorruptionPresentationRequest
+{
+	GENERATED_BODY()
+	UPROPERTY(BlueprintReadOnly) ESovCorruptionBand Band = ESovCorruptionBand::Clear;
+	UPROPERTY(BlueprintReadOnly) float Exposure = 0.0f;
+	UPROPERTY(BlueprintReadOnly) bool bReducedEffects = false;
+	UPROPERTY(BlueprintReadOnly) float SuggestedIntensity = 0.0f;
+	UPROPERTY(BlueprintReadOnly) bool bOverwriteClockActive = false;
+	UPROPERTY(BlueprintReadOnly) float OverwriteSecondsRemaining = 0.0f;
+	UPROPERTY(BlueprintReadOnly) TArray<FName> ProfileIds;
+	UPROPERTY(BlueprintReadOnly) TArray<FText> RemedyTexts;
+	UPROPERTY(BlueprintReadOnly) TArray<FText> InformationTexts;
+};
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FSovCorruptionPresentation, const FSovCorruptionPresentationRequest&, Request);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FSovCorruptionBandChanged, ESovCorruptionBand, Previous, ESovCorruptionBand, Current);
 
+/** Mission-permitted gameplay exposure; Narrative remains the disk and story-state authority. */
+UCLASS(ClassGroup=(Sovereign), meta=(BlueprintSpawnableComponent))
+class PROJECTVELKORRAN_API USovCorruptionComponent : public UActorComponent, public INarrativeSavableComponent
+{
+	GENERATED_BODY()
 public:
 	USovCorruptionComponent();
-
-	UFUNCTION(BlueprintCallable, Category = "Sovereign|Corruption")
-	bool InitializeWithAbilitySystem(UAbilitySystemComponent* InAbilitySystemComponent);
-
-	UFUNCTION(BlueprintPure, Category = "Sovereign|Corruption")
-	bool IsInitialized() const;
-
-	UFUNCTION(BlueprintPure, Category = "Sovereign|Corruption")
-	float GetCorruption() const;
-
-	UFUNCTION(BlueprintPure, Category = "Sovereign|Corruption")
-	float GetMaxCorruption() const;
-
-	UFUNCTION(BlueprintPure, Category = "Sovereign|Corruption")
-	float GetNormalizedCorruption() const;
-
-	UFUNCTION(BlueprintPure, Category = "Sovereign|Corruption")
-	ESovCorruptionBand GetCorruptionBand() const { return CurrentBand; }
-
-	UFUNCTION(BlueprintPure, Category = "Sovereign|Corruption")
-	ESovCorruptionBand DetermineBandForExposure(float Exposure) const;
-
-	UFUNCTION(BlueprintPure, Category = "Sovereign|Corruption")
-	float GetExposureCeilingForBand(ESovCorruptionBand Band) const;
-
-	UFUNCTION(BlueprintPure, Category = "Sovereign|Corruption|Presentation")
-	FSovCorruptionPresentationSnapshot GetPresentationSnapshot() const;
-
-	/** Registers one source; same-frame InstantExposure payloads resolve together once. */
-	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Corruption|Sources")
-	FSovCorruptionSourceHandle RegisterCorruptionSource(
-		AActor* SourceActor,
-		const FSovCorruptionSourceSpec& SourceSpec);
-
-	/** Preserves elapsed contribution under the old spec; instant exposure is not replayed. */
-	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Corruption|Sources")
-	bool UpdateCorruptionSource(
-		FSovCorruptionSourceHandle SourceHandle,
-		const FSovCorruptionSourceSpec& SourceSpec);
-
-	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Corruption|Sources")
-	bool UnregisterCorruptionSource(FSovCorruptionSourceHandle SourceHandle);
-
-	/** Authority-side validity check used by overlap owners after death/rebind cleanup. */
-	UFUNCTION(BlueprintPure, Category = "Sovereign|Corruption|Sources")
-	bool HasRegisteredCorruptionSource(
-		FSovCorruptionSourceHandle SourceHandle) const;
-
-	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Corruption|Sources")
-	void ClearCorruptionSources();
-
-	/** Direct non-field path used by damage/status requests and scripted hazards. */
-	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Corruption")
-	float ApplyInstantExposure(
-		float ExposureAmount,
-		AActor* SourceActor,
-		ESovCorruptionBand BandCap);
-
-	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Corruption|Remedy")
-	float ReduceCorruption(float ExposureReduction, AActor* RemedyInstigator);
-
-	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Corruption|Remedy")
-	bool ClearCorruption(AActor* RemedyInstigator);
-
-	/** Applies a typed remedy; a currently required tag must match exactly. */
-	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Corruption|Remedy")
-	bool ApplyRemedy(
-		FGameplayTag RemedyTag,
-		float ExposureReduction,
-		bool bClearAll,
-		AActor* RemedyInstigator);
-
-	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Corruption|Overwrite Risk")
-	void SetMissionAllowsOverwriteRisk(bool bAllowed);
-
-	UFUNCTION(BlueprintPure, Category = "Sovereign|Corruption|Overwrite Risk")
-	bool DoesMissionAllowOverwriteRisk() const { return bMissionAllowsOverwriteRisk; }
-
-	/** Local accessibility choice; it never changes exposure or bands. */
-	UFUNCTION(BlueprintCallable, Category = "Sovereign|Corruption|Presentation")
-	void SetReducedEffectsPresentationEnabled(bool bEnabled);
-
-	/** Settles elapsed sources before taking the authoritative snapshot. */
-	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Corruption|Checkpoint")
-	FSovCorruptionCheckpointData CaptureCorruptionCheckpoint(bool bCanonCheckpoint);
-
-	/** Queues data until the persistent ASC and this avatar are both ready. */
-	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Corruption|Checkpoint")
-	bool RestoreCorruptionCheckpoint(const FSovCorruptionCheckpointData& CheckpointData);
-
-	UFUNCTION(BlueprintPure, Category = "Sovereign|Corruption|Checkpoint")
-	TArray<FName> GetRestoredSourceIds() const { return RestoredSourceIds; }
-
-	/** Completes reconstruction and clears the restored-ID view plus load guards. */
-	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Corruption|Checkpoint")
-	void FinalizeCorruptionSourceRestore();
-
-	UPROPERTY(BlueprintAssignable, Category = "Sovereign|Corruption")
-	FSovCorruptionChangedSignature OnCorruptionChanged;
-
-	UPROPERTY(BlueprintAssignable, Category = "Sovereign|Corruption")
-	FSovCorruptionBandChangedSignature OnCorruptionBandChanged;
-
-	UPROPERTY(BlueprintAssignable, Category = "Sovereign|Corruption|Presentation")
-	FSovCorruptionPresentationChangedSignature OnCorruptionPresentationChanged;
-
-	UPROPERTY(BlueprintAssignable, Category = "Sovereign|Corruption|Remedy")
-	FSovCorruptionRemediedSignature OnCorruptionRemedied;
-
-	/** Mission/boss logic may bind this hook; core corruption applies no punishment. */
-	UPROPERTY(BlueprintAssignable, Category = "Sovereign|Corruption|Overwrite Risk")
-	FSovCorruptionOverwriteRiskSignature OnOverwriteRiskEntered;
-
+	FSovCorruptionSourceHandle AcquireSource(ASovCorruptionSourceVolume* Source);
+	void ReleaseSource(FSovCorruptionSourceHandle Handle, ASovCorruptionSourceVolume* Source);
+	/** Native reset primitive retained for trusted checkpoint/tests. Gameplay remedies use verified source/interaction paths. */
+	bool CleanseExposure(float Amount, FName SourceId = NAME_None);
+	UFUNCTION(BlueprintCallable, Category="Corruption|Accessibility") void SetReducedEffects(bool bEnabled);
+	/** Apply only to an accepted incoming harmful status; immunity and beneficial durations must not use this adapter. */
+	UFUNCTION(BlueprintPure, Category="Corruption|Combat") static float ResolveIncomingStatusDuration(AActor* Target, float AuthoredDuration);
+	UFUNCTION(BlueprintPure, Category="Corruption") FSovCorruptionReplicatedState GetCorruptionState() const { return State; }
+	UFUNCTION(BlueprintPure, Category="Corruption|Accessibility") FSovCorruptionPresentationRequest GetPresentationRequest() const;
+	UFUNCTION(BlueprintPure, Category="Corruption") bool HasExposureSource() const { return !Sources.IsEmpty(); }
+	bool ValidateSourcePermission(ASovCorruptionSourceVolume* Source, ESovCorruptionBand& OutCap, FName& OutMission) const;
+	/** Restore barrier: call after the destination campaign record is authoritative, before character readiness. */
+	bool FinishCampaignRestore(const USovCampaignDefinition* Destination, FString& OutError);
+	virtual void PrepareForSave_Implementation() override;
+	virtual void Load_Implementation() override;
+	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	UPROPERTY(BlueprintAssignable, Category="Corruption") FSovCorruptionBandChanged OnBandChanged;
+	UPROPERTY(BlueprintAssignable, Category="Corruption|Presentation") FSovCorruptionPresentation OnPresentationRequested;
 protected:
-	virtual void BeginPlay() override;
-	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
-	virtual void GetLifetimeReplicatedProps(
-		TArray<FLifetimeProperty>& OutLifetimeProps) const override;
-
-	/** Prototype fractions of MaxCorruption; intentionally data-editable. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Corruption|Thresholds", meta = (ClampMin = "0.0", ClampMax = "1.0"))
-	float IntrusionThresholdFraction = 0.25f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Corruption|Thresholds", meta = (ClampMin = "0.0", ClampMax = "1.0"))
-	float ContestThresholdFraction = 0.55f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Corruption|Thresholds", meta = (ClampMin = "0.0", ClampMax = "1.0"))
-	float OverwriteRiskThresholdFraction = 0.85f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Corruption|Sources", meta = (ClampMin = "0.02", Units = "s"))
-	float SourceEvaluationInterval = 0.10f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Corruption|Effects")
-	TSubclassOf<UGameplayEffect> BandStateEffectClass;
-
-	/** Disabled by default: a mission must explicitly opt into Overwrite Risk. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Replicated, Category = "Sovereign|Corruption|Overwrite Risk")
-	bool bMissionAllowsOverwriteRisk = false;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Corruption|Death")
-	bool bResetCorruptionOnDeath = true;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Corruption|Death", meta = (ClampMin = "0.0"))
-	float DeathResetCorruption = 0.0f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Corruption|Remedy")
-	bool bRequireMatchingRemedyWhenSpecified = true;
-
-	/** Aggregate player exposure is saved at ordinary checkpoints. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Corruption|Checkpoint")
-	bool bSaveExposureAtCheckpoints = true;
-
-	/** Aggregate exposure normally resets across canon/mission boundaries. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Corruption|Checkpoint")
-	bool bPersistExposureAcrossCanonCheckpoints = false;
-
-	/** Delay before warning that checkpoint source reconstruction was not finalized. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Corruption|Checkpoint", meta = (ClampMin = "0.1", Units = "s"))
-	float InstantReplayGuardWarningDelay = 2.0f;
-
+	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
+	UPROPERTY(EditDefaultsOnly, Category="Corruption|Bands") float TraceThreshold = 1.0f;
+	UPROPERTY(EditDefaultsOnly, Category="Corruption|Bands") float IntrusionThreshold = 25.0f;
+	UPROPERTY(EditDefaultsOnly, Category="Corruption|Bands") float ContestThreshold = 50.0f;
+	UPROPERTY(EditDefaultsOnly, Category="Corruption|Bands") float OverwriteThreshold = 80.0f;
+	UPROPERTY(EditDefaultsOnly, Category="Corruption|Bands") float BandHysteresis = 5.0f;
 private:
-	struct FSovActiveSource
+	friend struct FSovCorruptionTestAccess;
+	friend class USovCorruptionSourceComponent;
+	friend class USovCorruptionInteractableComponent;
+	bool ValidateProfilePermission(const USovCorruptionProfile* Profile, ESovCorruptionBand& OutCap, FName& OutMission) const;
+	bool HasCompatibleProfile(const USovCorruptionProfile* Profile) const;
+	FSovCorruptionSourceHandle AcquireProducer(USovCorruptionSourceComponent* Producer);
+	void ReleaseProducer(FSovCorruptionSourceHandle Handle, USovCorruptionSourceComponent* Producer);
+	bool ApplyVerifiedPulse(USovCorruptionProfile* Profile, AActor* Source, float Falloff);
+	bool ApplyVerifiedRemedy(USovCorruptionProfile* Profile, ESovCorruptionEscape Remedy);
+	void AdvanceOverwrite(float DeltaSeconds);
+	bool IsCombatPressureImmune() const;
+	struct FSourceEntry
 	{
-		TWeakObjectPtr<AActor> SourceActor;
-		FSovCorruptionSourceSpec Spec;
+		TWeakObjectPtr<ASovCorruptionSourceVolume> Source;
+		TWeakObjectPtr<USovCorruptionSourceComponent> Producer;
+		TWeakObjectPtr<USovCorruptionProfile> Profile;
+		FName MissionId;
 	};
-
-	void TryInitializeFromOwner();
-
-	UFUNCTION()
-	void HandleOwnerASCInitialized();
-
-	UFUNCTION()
-	void HandleDeathStateChanged(
-		AActor* ChangedActor,
-		UNarrativeAbilitySystemComponent* ChangedASC,
-		bool bIsDead);
-
-	void UninitializeFromAbilitySystem();
-	bool HasCurrentAvatarBinding() const;
-	bool CanWriteCorruption(bool bAllowDead = false) const;
-
-	void HandleCorruptionAttributeChanged(const FOnAttributeChangeData& ChangeData);
-	void HandleMaxCorruptionAttributeChanged(const FOnAttributeChangeData& ChangeData);
-	void SetCorruptionInternal(float NewCorruption, bool bAllowDead = false);
-	void SetMaxCorruptionInternal(float NewMaxCorruption, bool bAllowDead = false);
-
-	void RefreshSourceTimer();
-	void StopSourceTimer();
-	void EvaluateSourceTimer();
-	void EvaluateAccumulatedSources(bool bAllowDead = false);
-	void SchedulePendingInstantExposureEvaluation();
-	void EvaluatePendingInstantExposures();
-	void ClearPendingInstantExposures();
-	float CalculateSourceStrength(
-		const FSovActiveSource& ActiveSource,
-		FVector* OutDirection = nullptr) const;
-	bool SourceAllowsTarget(const FSovActiveSource& ActiveSource) const;
-	bool SourceHasLineOfSight(const FSovActiveSource& ActiveSource) const;
-	float ApplyExposureInternal(
-		float ExposureAmount,
-		ESovCorruptionBand BandCap,
-		bool bEnforceBandCap,
-		bool bSourceAuthorizesOverwriteRisk,
-		const FSovCorruptionSourceSpec* PresentationSpec,
-		AActor* SourceActor);
-
-	void RefreshBand(bool bBroadcastChanges);
-	void SetBand(ESovCorruptionBand NewBand, bool bBroadcastChanges);
-	void RemoveBandEffect();
-	void ApplyBandEffect();
-	FGameplayTag GetTagForBand(ESovCorruptionBand Band) const;
-	float GetThresholdForBand(ESovCorruptionBand Band) const;
-
-	void RefreshPresentationState();
-	void RememberPresentationContract(
-		const FSovCorruptionSourceSpec& SourceSpec);
-	void ClearRememberedPresentationContract();
-	void BroadcastPresentationSnapshot();
-	void WakeForReplication() const;
-	void SendCorruptionEvent(FGameplayTag EventTag, float Magnitude, AActor* Instigator) const;
-	void ResetForDeath();
-	bool ApplyCheckpointNow(const FSovCorruptionCheckpointData& CheckpointData);
-	void ScheduleInstantReplayGuardWarning();
-	void HandleInstantReplayGuardWarning();
-	void ClearInstantReplayGuards();
-
-	UFUNCTION()
-	void OnRep_CurrentBand(ESovCorruptionBand OldBand);
-
-	UFUNCTION()
-	void OnRep_PresentationState(
-		const FSovCorruptionReplicatedPresentationState& OldState);
-
-	UPROPERTY(Transient)
-	TObjectPtr<UAbilitySystemComponent> AbilitySystemComponent;
-
-	FDelegateHandle CorruptionChangedDelegateHandle;
-	FDelegateHandle MaxCorruptionChangedDelegateHandle;
-	FTimerHandle SourceEvaluationTimerHandle;
-	FTimerHandle PendingInstantExposureTimerHandle;
-	FTimerHandle InstantReplayGuardTimerHandle;
-	float LastSourceEvaluationWorldTime = 0.0f;
-
-	TMap<FGuid, FSovActiveSource> ActiveSources;
-	TSet<FGuid> PendingInstantSourceHandles;
-	FActiveGameplayEffectHandle ActiveBandEffectHandle;
-	FGameplayTag ActiveBandEffectTag;
-
-	UPROPERTY(ReplicatedUsing = OnRep_CurrentBand, Transient)
-	ESovCorruptionBand CurrentBand = ESovCorruptionBand::None;
-
-	UPROPERTY(ReplicatedUsing = OnRep_PresentationState, Transient)
-	FSovCorruptionReplicatedPresentationState PresentationState;
-
-	UPROPERTY(Replicated, Transient)
-	bool bOverwriteRiskAuthorizedForCurrentExposure = false;
-
-	FGameplayTag RememberedRemedyTag;
-	FText RememberedRemedyInstruction;
-	FName RememberedPresentationProfile = NAME_None;
-	FText RememberedAccessibilitySubstitute;
-	FVector RememberedSourceDirection = FVector::ZeroVector;
-	bool bHasRememberedSourceDirection = false;
-	bool bReducedEffectsPresentation = false;
-	bool bSuppressNotifications = false;
-	bool bHasPendingCheckpointRestore = false;
-	FSovCorruptionCheckpointData PendingCheckpointRestore;
-	TArray<FName> RestoredSourceIds;
-	TArray<FName> RestoredCanonPersistentSourceIds;
-	TArray<FName> InstantExposureReplayGuardSourceIds;
-	bool bWarnedMissingAttributeSet = false;
+	UFUNCTION() void OnRep_State(FSovCorruptionReplicatedState Previous);
+	bool ValidOwner() const;
+	bool ValidBandTuning() const;
+	USovCampaignStateComponent* Campaign() const;
+	float ExposureCap(ESovCorruptionBand Cap) const;
+	float TotalExposure() const;
+	void Accumulate(USovCorruptionProfile* Profile, FName MissionId, float Amount, ESovCorruptionBand Cap);
+	void RefreshState(bool bCommitConsequences = false);
+	void RemoveOwnedBandEffect();
+	void CommitAuthoredConsequences();
+	void RefreshSavedSnapshot();
+	void PruneRestoredContacts();
+	UPROPERTY(ReplicatedUsing=OnRep_State) FSovCorruptionReplicatedState State;
+	UPROPERTY(Transient) TArray<FSovCorruptionExposureRecord> Records;
+	UPROPERTY(SaveGame) int32 SavedSchemaVersion = 1;
+	UPROPERTY(SaveGame) TArray<FSovCorruptionExposureRecord> SavedRecords;
+	UPROPERTY(SaveGame) ESovCorruptionBand SavedBand = ESovCorruptionBand::Clear;
+	TMap<FGuid, FSourceEntry> Sources;
+	TSet<FName> RestoredContactProfiles;
+	TWeakObjectPtr<UAbilitySystemComponent> EffectASC;
+	FActiveGameplayEffectHandle BandEffect;
+	ESovCorruptionBand AppliedEffectBand = ESovCorruptionBand::Clear;
+	float AppliedResistance = 0.0f;
+	float AppliedRegenScale = 1.0f;
+	bool bReducedEffects = false;
+	bool bMutating = false;
+	bool bEnding = false;
+	bool bWaitingForMissionRestore = false;
+	bool bRestoredDataValid = true;
+	bool bForceBandEffectRefresh = false;
+	ESovCorruptionBand RestoreBandSeed = ESovCorruptionBand::Clear;
 };
