@@ -6,6 +6,7 @@
 #include "SovAccessibilityPresentation.generated.h"
 
 class UBorder;
+class UCanvasPanel;
 class UCanvasPanelSlot;
 class UTextBlock;
 class UPlayerInteractionComponent;
@@ -52,13 +53,16 @@ protected:
 	virtual int32 NativePaint(const FPaintArgs& Args, const FGeometry& Geometry, const FSlateRect& CullingRect, FSlateWindowElementList& Elements, int32 Layer, const FWidgetStyle& Style, bool bParentEnabled) const override;
 private:
 	friend struct FSovFrontendTestAccess;
+	friend struct FSovAccessibilityFrontendTestAccess;
 	void BeginEntry(const FSovSceneSubtitleEntry& Entry);
 	void RefreshText();
+	float GetSafeTextWidth() const;
 	FText DirectionText(const FVector& Location) const;
 	UFUNCTION() void SettingsChanged(const FSovUserSettingsSnapshot& Value);
 	UFUNCTION() void FoundInteractable(UNarrativeInteractableComponent* Value);
 	UFUNCTION() void LostInteractable(UNarrativeInteractableComponent* Value);
 	UPROPERTY(Transient) TObjectPtr<UBorder> SubtitleBackground;
+	UPROPERTY(Transient) TObjectPtr<UCanvasPanel> SafeTextCanvas;
 	UPROPERTY(Transient) TObjectPtr<UTextBlock> SubtitleText;
 	UPROPERTY(Transient) TObjectPtr<UBorder> CaptionBackground;
 	UPROPERTY(Transient) TObjectPtr<UTextBlock> CaptionText;

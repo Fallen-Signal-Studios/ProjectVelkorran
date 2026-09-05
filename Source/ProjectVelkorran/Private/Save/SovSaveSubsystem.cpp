@@ -1,6 +1,7 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Save/SovSaveSubsystem.h"
 #include "Save/SovSavePolicy.h"
+#include "Platform/SovPlatformServicesAdapter.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
 #include "AIController.h"
@@ -90,8 +91,17 @@ void USovSaveSubsystem::Initialize(FSubsystemCollectionBase& Collection)
     Storage = MakeUnique<FPlatformSaveStorage>();
     // Restore only a hash-only, versioned hint from this platform/local-user save compartment.
     // Offline startup must find the previous campaign even if network identity is temporarily absent.
-    AccountNamespace = FMD5::HashAnsiString(TEXT("Offline.LocalProfile.0")); UserIndex = 0;
-    RestorePlatformProfileHint(UserIndex);
+    if (PLATFORM_DESKTOP)
+    {
+        AccountNamespace = FMD5::HashAnsiString(TEXT("Offline.LocalProfile.0")); UserIndex = 0;
+        RestorePlatformProfileHint(UserIndex);
+    }
+    else
+    {
+        // A local-player array position is not a console storage identity. Never touch a user-0
+        // compartment before the actual owning local platform account has been resolved.
+        AccountNamespace.Reset(); UserIndex = INDEX_NONE; bPlatformStorageOwnerAvailable = false;
+    }
     InitialSaveHandle = UNarrativeSaveSubsystem::OnInitialSaveRequested.AddUObject(this, &USovSaveSubsystem::ResolveInitialSave);
     TickHandle = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateUObject(this, &USovSaveSubsystem::Tick));
 }
@@ -105,10 +115,13 @@ void USovSaveSubsystem::Deinitialize()
 }
 bool USovSaveSubsystem::SelectPlatformUser(const FString& Id, int32 LocalUserIndex, FString& Error)
 {
-    if (bBusy || PendingSave || bAwaitingFailureDecision)
+    if (bPlatformSuspended || bBusy || PendingSave || bAwaitingFailureDecision)
     { Error = TEXT("Finish or cancel the save/load transaction before changing platform user."); return false; }
     if (Id.TrimStartAndEnd().IsEmpty() || LocalUserIndex < 0)
     { Error = TEXT("A stable platform account and nonnegative local user index are required."); return false; }
+    if (bRequiresNativePlatformAuthorization && (!bHasNativePlatformAuthorization
+        || Id != AuthorizedPlatformId || LocalUserIndex != AuthorizedPlatformLocalUser))
+    { Error = TEXT("This platform account has not been authorized by the native account provider."); return false; }
     const FString NewNamespace = FMD5::HashAnsiString(*Id);
     if (AccountNamespace != NewNamespace || UserIndex != LocalUserIndex)
     {
@@ -156,17 +169,39 @@ bool USovSaveSubsystem::PersistPlatformProfileHint(const FString& Namespace, int
     { Error = TEXT("Could not retain the selected profile for offline restart. Previous profile and campaign remain selected."); return false; }
     return true;
 }
-void USovSaveSubsystem::ObservePlatformStorageOwner(const FString& Id, int32 LocalUserIndex)
+void USovSaveSubsystem::ObserveNativePlatformAccount(const FSovObservedPlatformAccount& Account)
 {
-    // First online identification is not proof that the owner of an explicit offline local campaign
-    // changed. Keep that campaign writable in its native local compartment until a safe profile choice.
+    bRequiresNativePlatformAuthorization = !PLATFORM_DESKTOP || Account.bRequiresKnownStorageOwner;
+    bHasNativePlatformAuthorization = Account.bIdentityKnown && !Account.StableId.IsEmpty() && Account.LocalUser >= 0
+        && (!bRequiresNativePlatformAuthorization || Account.bStorageAccessAuthorized);
+    AuthorizedPlatformId = bHasNativePlatformAuthorization ? Account.StableId : FString();
+    AuthorizedPlatformLocalUser = bHasNativePlatformAuthorization ? Account.LocalUser : INDEX_NONE;
+    if (!bHasNativePlatformAuthorization)
+    {
+        // Unknown desktop identity may be an outage. Unknown console ownership never grants access.
+        if (bRequiresNativePlatformAuthorization) { bPlatformStorageOwnerAvailable = false; }
+        return;
+    }
     const FString OfflineId = FString::Printf(TEXT("Offline.LocalProfile.%d"), UserIndex);
-    bPlatformStorageOwnerAvailable = UserIndex == LocalUserIndex
-        && (AccountNamespace == FMD5::HashAnsiString(*Id) || AccountNamespace == FMD5::HashAnsiString(*OfflineId));
+    bPlatformStorageOwnerAvailable = UserIndex >= 0 && UserIndex == Account.LocalUser
+        && (AccountNamespace == FMD5::HashAnsiString(*Account.StableId)
+            || (!bRequiresNativePlatformAuthorization && AccountNamespace == FMD5::HashAnsiString(*OfflineId)));
+}
+void USovSaveSubsystem::SetPlatformSuspended(bool bSuspended)
+{
+    if (bPlatformSuspended == bSuspended) { return; }
+    const double Now = FPlatformTime::Seconds();
+    bPlatformSuspended = bSuspended;
+    if (bSuspended) { PlatformSuspendedAt = Now; return; }
+    const double Elapsed = FMath::Max(0.0, Now - PlatformSuspendedAt);
+    if (PendingLoadDeadline > 0) { PendingLoadDeadline += Elapsed; }
+    if (AcknowledgmentExpiresAt > 0) { AcknowledgmentExpiresAt += Elapsed; }
+    bDiscardPlatformResumeDelta = true;
+    PlatformSuspendedAt = 0;
 }
 bool USovSaveSubsystem::CanManagePlatformSaves(FString& Error) const
 {
-    if (bBusy || PendingSave || bAwaitingFailureDecision)
+    if (bPlatformSuspended || bBusy || PendingSave || bAwaitingFailureDecision)
     { Error = TEXT("Finish the current save/load or save-failure decision first."); return false; }
     const ASovPlayerController* PC = Controller();
     const UWorld* World = GetWorld();
@@ -181,7 +216,7 @@ bool USovSaveSubsystem::ExportPlatformSnapshot(ESovSaveSlotKind Kind, int32 Inde
     FSovSaveSlotHeader& Header, bool& bExists, FString& Error)
 {
     Bytes.Reset(); Header = {}; bExists = false;
-    if (!Storage || !bPlatformStorageOwnerAvailable || AccountNamespace.IsEmpty() || !SovSavePolicy::ValidSlot(PolicyKind(Kind), Index))
+    if (bPlatformSuspended || !Storage || !bPlatformStorageOwnerAvailable || AccountNamespace.IsEmpty() || !SovSavePolicy::ValidSlot(PolicyKind(Kind), Index))
     { Error = TEXT("Save storage, account or slot is unavailable."); return false; }
     if (bBusy || PendingSave || bAwaitingFailureDecision)
     { Error = TEXT("Finish the current local save transaction first."); return false; }
@@ -257,8 +292,9 @@ bool USovSaveSubsystem::CanCapture(FString& Error) const
 { return CanCaptureInternal(Error, false); }
 bool USovSaveSubsystem::CanCaptureInternal(FString& Error, bool bAllowEntrySuspension) const
 {
+    if (bPlatformSuspended) { Error = TEXT("Save capture is held while the application is suspended."); return false; }
     if (!bPlatformStorageOwnerAvailable)
-    { Error = TEXT("The campaign's platform storage owner changed. Continue playing, restore the original account, or return to the front end to choose a profile."); return false; }
+    { Error = TEXT("The campaign's platform storage owner is unavailable. Restore the original account or return to the front end to choose a profile."); return false; }
     const ASovPlayerController* PC = Controller();
     const ASovPlayerCharacterBase* Pawn = PC ? Cast<ASovPlayerCharacterBase>(PC->GetPawn()) : nullptr;
     const ASovPlayerState* PS = PC ? PC->GetPlayerState<ASovPlayerState>() : nullptr;
@@ -350,7 +386,7 @@ bool USovSaveSubsystem::ValidateEnvelope(USovCampaignSaveGame* Save, bool bValid
 USovCampaignSaveGame* USovSaveSubsystem::ReadBest(ESovSaveSlotKind Kind, int32 Index, int32& OutBank, bool& bDamaged, FString& Error)
 {
     OutBank = -1; bDamaged = false;
-    if (!Storage || !bPlatformStorageOwnerAvailable || !SovSavePolicy::ValidSlot(PolicyKind(Kind), Index) || AccountNamespace.IsEmpty()) { return nullptr; }
+    if (bPlatformSuspended || !Storage || !bPlatformStorageOwnerAvailable || !SovSavePolicy::ValidSlot(PolicyKind(Kind), Index) || AccountNamespace.IsEmpty()) { return nullptr; }
     TStrongObjectPtr<USovCampaignSaveGame> Banks[2];
     SovSavePolicy::Bank Valid[2];
     for (int32 Bank = 0; Bank < 2; ++Bank)
@@ -370,6 +406,7 @@ USovCampaignSaveGame* USovSaveSubsystem::ReadBest(ESovSaveSlotKind Kind, int32 I
 }
 ESovSaveResult USovSaveSubsystem::WriteEnvelope(USovCampaignSaveGame* Save, FString& Error)
 {
+    if (bPlatformSuspended) { Error = TEXT("Save writes are held while the application is suspended."); return ESovSaveResult::Busy; }
     if (!bPlatformStorageOwnerAvailable)
     { Error = TEXT("Original platform save owner is unavailable. The existing campaign and save banks were not changed."); return ESovSaveResult::MissingAccount; }
     if (!Storage || !Save) { Error = TEXT("Save storage is unavailable."); return ESovSaveResult::WriteFailed; }
@@ -565,6 +602,7 @@ UNarrativeSave* USovSaveSubsystem::DecodeNarrative(USovCampaignSaveGame* Save, F
 }
 ESovSaveResult USovSaveSubsystem::LoadSlot(ESovSaveSlotKind Kind, int32 Index, FString& Error, bool bAcceptRecoveredBank)
 {
+    if (bPlatformSuspended) { Error = TEXT("Save loading is held while the application is suspended."); return ESovSaveResult::Busy; }
     // Even a rejected initialization retains its request until the terminal event
     // has been published. A retry must not overwrite that pending completion.
     if (bBusy || PendingSave) { return ESovSaveResult::Busy; }
@@ -677,8 +715,8 @@ void USovSaveSubsystem::ReportSave(ESovSaveResult Result, const FSovSaveSlotHead
     if (Result == ESovSaveResult::WriteFailed || Result == ESovSaveResult::ReadbackFailed)
     {
         bAwaitingFailureDecision = true; PausedController = Controller();
-        if (PausedController.IsValid() && !UGameplayStatics::IsGamePaused(PausedController.Get()))
-        { bOwnPause = PausedController->SetPause(true); }
+        if (PausedController.IsValid())
+        { bOwnPause = PausedController->AcquireSystemPause(TEXT("SaveFailure")); }
     }
     OnSaveCompleted.Broadcast(Result, Header, Error);
 }
@@ -696,7 +734,7 @@ ESovSaveResult USovSaveSubsystem::RetryFailedWrite(FString& Error)
 bool USovSaveSubsystem::ConsumeAcknowledgedBoundary(ESovSaveBoundary Boundary, FName Id)
 {
     const ASovPlayerController* PC = Controller();
-    if (!PC || PendingSave || !AcknowledgedWorld.IsValid() || PC->GetWorld() != AcknowledgedWorld.Get()
+    if (bPlatformSuspended || !PC || PendingSave || !AcknowledgedWorld.IsValid() || PC->GetWorld() != AcknowledgedWorld.Get()
         || FPlatformTime::Seconds() > AcknowledgmentExpiresAt || AcknowledgedBoundary.BoundaryKind != Boundary
         || Id.IsNone() || AcknowledgedBoundary.BoundaryId != Id || !PC->GetCampaignState()->GetActiveMission()
         || PC->GetCampaignState()->GetActiveMission()->MissionId != AcknowledgedBoundary.MissionId
@@ -710,15 +748,17 @@ void USovSaveSubsystem::AcknowledgeSaveFailure()
     {
         AcknowledgedBoundary = FailedWrite->Header;
         AcknowledgedWorld = Controller() ? Controller()->GetWorld() : nullptr;
-        AcknowledgmentExpiresAt = FPlatformTime::Seconds() + 60.0;
+        AcknowledgmentExpiresAt = (bPlatformSuspended ? PlatformSuspendedAt : FPlatformTime::Seconds()) + 60.0;
     }
-    if (bOwnPause && PausedController.IsValid()) { PausedController->SetPause(false); }
+    if (bOwnPause && PausedController.IsValid()) { PausedController->ReleaseSystemPause(TEXT("SaveFailure")); }
     bOwnPause = false; bAwaitingFailureDecision = false; PausedController.Reset();
     FailedWrite = nullptr; PendingAutosaves.Reset();
 }
 bool USovSaveSubsystem::Tick(float DeltaSeconds)
 {
-    if (!FMath::IsFinite(DeltaSeconds) || DeltaSeconds <= 0.f || bBusy) { return true; }
+    if (bPlatformSuspended || !FMath::IsFinite(DeltaSeconds) || DeltaSeconds <= 0.f || bBusy) { return true; }
+    // Core ticker may report the entire suspended interval on its first foreground frame.
+    if (bDiscardPlatformResumeDelta) { bDiscardPlatformResumeDelta = false; return true; }
     ASovPlayerController* PC = Controller();
     if (PC && PC->GetPawn() && PC->GetCampaignState()->GetActiveMission() && !UGameplayStatics::IsGamePaused(PC))
     { PlaySeconds += DeltaSeconds; }

@@ -7,6 +7,7 @@
 #include "SovSaveSubsystem.generated.h"
 class UNarrativeSave;
 class ASovPlayerController;
+struct FSovObservedPlatformAccount;
 
 /** Testable platform storage seam; production delegates to Unreal's platform save API. */
 class PROJECTVELKORRAN_API ISovSaveStorage
@@ -34,8 +35,11 @@ public:
     bool CanManagePlatformSaves(FString& Error) const;
     const FString& GetAccountNamespace() const { return AccountNamespace; }
     int32 GetLocalSaveUserIndex() const { return UserIndex; }
-    /** Provider owner changes fence disk access without relabeling or cancelling the active campaign/load. */
-    void ObservePlatformStorageOwner(const FString& StablePlatformUserId, int32 LocalUserIndex);
+    UFUNCTION(BlueprintPure, Category="Campaign|Save")
+    bool IsPlatformStorageOwnerAvailable() const { return bPlatformStorageOwnerAvailable && !AccountNamespace.IsEmpty() && UserIndex >= 0; }
+    bool IsPlatformStorageSuspended() const { return bPlatformSuspended; }
+    /** Suspend does not initiate I/O. It holds native save/load watchdog time until foreground ownership is revalidated. */
+    void SetPlatformSuspended(bool bSuspended);
     /** Cloud transports never become save authorities: export only the verified native bank. */
     bool ExportPlatformSnapshot(ESovSaveSlotKind Kind, int32 SlotIndex, TArray<uint8>& Bytes,
         FSovSaveSlotHeader& Header, bool& bExists, FString& Error);
@@ -78,9 +82,12 @@ public:
     UPROPERTY(BlueprintAssignable, Category="Campaign|Save") FSovSaveCompleted OnSaveCompleted;
     UPROPERTY(BlueprintAssignable, Category="Campaign|Save") FSovSaveCompleted OnLoadCompleted;
 private:
+    friend class USovPlatformServicesSubsystem;
     friend struct FSovSaveTestAccess;
     friend struct FSovSaveWorldLoadTestAccess;
     friend struct FSovPlatformServicesTestAccess;
+    /** Only the native provider observer can establish authorization; never exposed to Blueprint callers. */
+    void ObserveNativePlatformAccount(const FSovObservedPlatformAccount& Account);
     struct FQueuedBoundary { ESovSaveBoundary Kind; FName Id; };
     bool CanCaptureInternal(FString& Error, bool bAllowEntrySuspension) const;
     ESovSaveResult CaptureAndWrite(ESovSaveSlotKind Kind, int32 SlotIndex, FName BoundaryId, FString& Error, bool bAllowEntrySuspension = false, ESovSaveBoundary Boundary = ESovSaveBoundary::ExplicitCheckpoint);
@@ -108,6 +115,10 @@ private:
     TWeakObjectPtr<ASovPlayerController> PausedController;
     TArray<FQueuedBoundary> PendingAutosaves;
     FString AccountNamespace;
+    FString AuthorizedPlatformId;
+    int32 AuthorizedPlatformLocalUser = INDEX_NONE;
+    bool bHasNativePlatformAuthorization = false;
+    bool bRequiresNativePlatformAuthorization = !PLATFORM_DESKTOP;
     int32 UserIndex = 0;
     double PlaySeconds = 0;
     double PendingLoadDeadline = 0;
@@ -115,6 +126,9 @@ private:
     FString PendingLoadError;
     bool bBusy = false;
     bool bPlatformStorageOwnerAvailable = true;
+    bool bPlatformSuspended = false;
+    bool bDiscardPlatformResumeDelta = false;
+    double PlatformSuspendedAt = 0;
     bool bAwaitingFailureDecision = false;
     bool bOwnPause = false;
     bool bPendingWorldApplied = false;

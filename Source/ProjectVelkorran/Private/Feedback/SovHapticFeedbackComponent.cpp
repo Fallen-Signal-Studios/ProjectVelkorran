@@ -1,6 +1,7 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Feedback/SovHapticFeedbackComponent.h"
 #include "Framework/SovPlayerController.h"
+#include "Framework/SovApplicationLifecycleComponent.h"
 #include "Settings/SovGameUserSettings.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
 #include "Interaction/PlayerInteractionComponent.h"
@@ -35,7 +36,10 @@ bool USovHapticFeedbackComponent::CanOutput(ESovHapticChannel Channel) const
 	if (bEnding || !IsActive() || !PC || !PC->IsLocalController() || !PC->bForceFeedbackEnabled
 		|| !GetWorld() || GetWorld()->IsPaused() || PC->IsActorBeingDestroyed()) { return false; }
 	if (const auto* Campaign = Cast<ASovPlayerController>(PC))
-	{ if (Campaign->GetCampaignTransitionState() != ESovCampaignTransitionState::Idle) { return false; } }
+	{
+		if (Campaign->GetCampaignTransitionState() != ESovCampaignTransitionState::Idle
+			|| (Campaign->GetApplicationLifecycle() && Campaign->GetApplicationLifecycle()->IsGameplayInterrupted())) { return false; }
+	}
 	if (Channel == ESovHapticChannel::UI) { return true; }
 	if (!HasCurrentPawn() || BoundASC->IsDead()) { return false; }
 	if (Channel == ESovHapticChannel::Cinematic) { return true; }

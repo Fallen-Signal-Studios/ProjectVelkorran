@@ -14,6 +14,8 @@
 #include "Sound/SoundMix.h"
 #include "UnrealFramework/NarrativeAudioSettingsPolicy.h"
 #include "UObject/StrongObjectPtr.h"
+#include "HAL/PlatformProperties.h"
+#include "Widgets/SWindow.h"
 
 UNarrativeGameUserSettings::UNarrativeGameUserSettings()
 {
@@ -175,6 +177,12 @@ void UNarrativeGameUserSettings::SetAudioDynamicRange(ENarrativeAudioDynamicRang
 
 void UNarrativeGameUserSettings::ApplyMonitorSelection()
 {
+	// Consoles do not have desktop monitor selection. A saved PC preference must not move a
+	// platform-owned viewport, and startup/headless teardown can have no Slate or native window.
+	if (!FPlatformProperties::SupportsWindowedMode() || FPlatformProperties::HasFixedResolution()
+		|| !GEngine || !GEngine->GameViewport || !FSlateApplication::IsInitialized()) { return; }
+	const TSharedPtr<SWindow> Window = GEngine->GameViewport->GetWindow();
+	if (!Window.IsValid()) { return; }
 	//Apply resolution settings will have been called, move window to selected monitor! 
 	// Move window to the corresponding monitor
 	const FString DesiredMonitorName = GetSelectedMonitor();
@@ -201,7 +209,7 @@ void UNarrativeGameUserSettings::ApplyMonitorSelection()
 			//const float HeightPosition = (MonitorIndex)*Display.PrimaryDisplayHeight - Display.MonitorInfo[MonitorIndex].NativeHeight;
 
 			const FVector2D WindowPosition = FVector2D(Display.MonitorInfo[MonitorIndex].WorkArea.Left, Display.MonitorInfo[MonitorIndex].WorkArea.Top);
-			GEngine->GameViewport->GetWindow()->MoveWindowTo(WindowPosition);
+			Window->MoveWindowTo(WindowPosition);
 		}
 	}
 }

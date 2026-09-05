@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Characters/SovPlayerCharacterBase.h"
 #include "Framework/SovPlayerController.h"
+#include "CharacterCreator/NarrativeSaveWithCreatorData.h"
 #include "SovHandoffRuntimeTestFixtures.generated.h"
 class ASovPlayerState;
 class UPlayerDefinition;
@@ -27,5 +28,17 @@ class ASovHandoffRuntimeTestController : public ASovPlayerController
 public:
 	ASovHandoffRuntimeTestController(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {}
 	void SetTestPlayerState(ASovPlayerState* State);
+	virtual void PrepareForSave_Implementation() override;
+	TFunction<void()> OnPrepareTravelSave;
 	UPROPERTY() TArray<TObjectPtr<UObject>> KeepAlive;
+};
+
+/** Native serialization callback seam; all platform IO still uses the production save path. */
+UCLASS(Transient, NotBlueprintable)
+class USovTravelOwnerFenceTestSave : public UNarrativeSaveWithCreatorData
+{
+	GENERATED_BODY()
+public:
+	static TFunction<void(bool)> OnTravelSerialization;
+	virtual void Serialize(FArchive& Ar) override;
 };

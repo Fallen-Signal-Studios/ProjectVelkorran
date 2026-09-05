@@ -32,7 +32,7 @@ float USovGameUserSettings::DisplayUIBaseNits() const
 bool USovGameUserSettings::CanApplyDisplayCalibration() const
 {
     const IConsoleVariable* Composite = FindDisplayCalibrationVariable(TEXT("r.HDR.UI.CompositeMode"));
-    return CanApplyHDROutput() && Composite && Composite->GetInt() == 1
+    return !IsDisplayOutputSystemManaged() && CanApplyHDROutput() && Composite && Composite->GetInt() == 1
         && FMath::IsFinite(DisplayUIBaseNits()) && DisplayUIBaseNits() > 0.f
         && MutableVariable(FindDisplayCalibrationVariable(BlackVariable)) && MutableVariable(FindDisplayCalibrationVariable(GrayVariable))
         && MutableVariable(FindDisplayCalibrationVariable(UIVariable));
@@ -88,7 +88,7 @@ bool USovGameUserSettings::WriteDisplayCalibration(const FSovHDRCalibration& Val
 }
 void USovGameUserSettings::ApplyConfirmedDisplayCalibration()
 {
-    if (bHasDisplayCalibration && DisplayCalibration.IsValid() && ReadHDROutput().bEnabled)
+    if (!IsDisplayOutputSystemManaged() && bHasDisplayCalibration && DisplayCalibration.IsValid() && ReadHDROutput().bEnabled)
     { WriteDisplayCalibration(DisplayCalibration); }
 }
 void USovGameUserSettings::RestorePreviewDisplayCalibration()

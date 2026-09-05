@@ -1,12 +1,14 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Settings/SovGameUserSettings.h"
 #include "Settings/SovSettingsPolicy.h"
+#include "Settings/SovDisplayPolicy.h"
 #include "UI/SovAccessibilityPolicy.h"
 #include "Campaign/SovCampaignStateComponent.h"
 #include "Engine/Engine.h"
 #include "Serialization/MemoryReader.h"
 #include "Serialization/MemoryWriter.h"
 #include "HAL/PlatformTime.h"
+#include "HAL/PlatformProperties.h"
 #include "Misc/App.h"
 
 FString SovCurrentDisplayIdentity();
@@ -102,7 +104,8 @@ void USovGameUserSettings::ApplySettings(bool bCheckForCommandLineOverrides)
 	const int32 RequestedNits = HDRDisplayOutputNits;
 	Super::ApplySettings(bCheckForCommandLineOverrides);
 	// Narrative moves the window after UGameUserSettings applies resolution. Query/reapply on the final monitor.
-	if (CanApplyHDROutput()) { WriteHDROutput(bRequestedHDR && ReadHDROutput().bSupported, RequestedNits); ApplyConfirmedDisplayCalibration(); SaveSettings(); }
+	if (!IsDisplayOutputSystemManaged() && CanApplyHDROutput())
+	{ WriteHDROutput(bRequestedHDR && ReadHDROutput().bSupported, RequestedNits); ApplyConfirmedDisplayCalibration(); SaveSettings(); }
 }
 bool USovGameUserSettings::ApplyHapticSettings(const FSovHapticSettings& Value, FString& Error)
 {
@@ -113,23 +116,40 @@ bool USovGameUserSettings::ApplyHapticSettings(const FSovHapticSettings& Value, 
 	OnHapticSettingsChanged.Broadcast(HapticSettings);
 	Error.Reset(); return true;
 }
-bool USovGameUserSettings::CanApplyHDROutput() const { return GEngine && !IsRunningCommandlet() && FApp::CanEverRender(); }
+bool USovGameUserSettings::IsDisplayOutputSystemManaged() const
+{
+	return SovDisplayPolicy::UsesSystemManagedOutput(FPlatformProperties::SupportsWindowedMode(), FPlatformProperties::HasFixedResolution());
+}
+bool USovGameUserSettings::CanApplyHDROutput() const
+{ return !IsDisplayOutputSystemManaged() && GEngine && !IsRunningCommandlet() && FApp::CanEverRender(); }
 double USovGameUserSettings::HDRTime() const { return FPlatformTime::Seconds(); }
 FSovHDROutputStatus USovGameUserSettings::ReadHDROutput()
 {
 	FSovHDROutputStatus Result;
-	if (!CanApplyHDROutput()) { return Result; }
+	// Observation must remain possible when this game is not allowed to change platform output.
+	if (!GEngine || IsRunningCommandlet() || !FApp::CanEverRender()) { return Result; }
 	Result.bSupported = SupportsHDRDisplayOutput();
 	Result.bEnabled = Result.bSupported && IsHDREnabled();
 	Result.PeakNits = Result.bEnabled ? GetCurrentHDRDisplayNits() : 0;
-	Result.DisplayIdentity = SovCurrentDisplayIdentity();
+	if (!IsDisplayOutputSystemManaged()) { Result.DisplayIdentity = SovCurrentDisplayIdentity(); }
 	return Result;
 }
 void USovGameUserSettings::WriteHDROutput(bool bEnable, int32 PeakNits)
 {
-	if (CanApplyHDROutput()) { EnableHDRDisplayOutput(bEnable, PeakNits); }
+	if (!IsDisplayOutputSystemManaged() && CanApplyHDROutput()) { EnableHDRDisplayOutput(bEnable, PeakNits); }
 }
-FSovHDROutputStatus USovGameUserSettings::GetHDROutputStatus() { return ReadHDROutput(); }
+FSovHDROutputStatus USovGameUserSettings::GetHDROutputStatus()
+{
+	FSovHDROutputStatus Result = ReadHDROutput();
+	Result.bSystemManaged = IsDisplayOutputSystemManaged();
+	Result.bCanPreviewInGame = SovDisplayPolicy::CanPreviewOutput(Result.bSystemManaged, CanApplyHDROutput(), !Result.DisplayIdentity.IsEmpty());
+	Result.bCanCalibrateInGame = Result.bCanPreviewInGame && Result.bSupported && CanApplyDisplayCalibration();
+	return Result;
+}
+bool USovGameUserSettings::RevertUnconfirmedHDRPreview()
+{
+	return HDRPreviewReceipt.IsValid() && RevertHDRCalibration(HDRPreviewReceipt);
+}
 bool USovGameUserSettings::PreviewHDRCalibration(bool bEnable, int32 PeakNits, FGuid& Receipt, FString& Error)
 {
 	return BeginHDRPreview(bEnable, PeakNits, nullptr, Receipt, Error);
@@ -141,6 +161,8 @@ bool USovGameUserSettings::PreviewHDRDisplay(bool bEnable, int32 PeakNits, const
 bool USovGameUserSettings::BeginHDRPreview(bool bEnable, int32 PeakNits, const FSovHDRCalibration* Calibration, FGuid& Receipt, FString& Error)
 {
 	Receipt.Invalidate();
+	if (IsDisplayOutputSystemManaged())
+	{ Error = TEXT("Display output and HDR calibration are managed by the console or platform display settings."); return false; }
 	if (bHDRTransaction || HDRPreviewReceipt.IsValid() || !CanApplyHDROutput() || PeakNits < 400 || PeakNits > 2000)
 	{ Error = TEXT("HDR preview is unavailable, already active, or outside the supported 400-2000 nit request range."); return false; }
 	const FSovHDROutputStatus Before = ReadHDROutput();
@@ -204,7 +226,7 @@ bool USovGameUserSettings::ConfirmHDRCalibration(FGuid Receipt, FString& Error)
 	{ Error = TEXT("HDR preview receipt is stale or unavailable."); return false; }
 	const FSovHDROutputStatus Current = ReadHDROutput();
 	FSovHDRCalibration CurrentCalibration;
-	if (!CanApplyHDROutput() || HDRTime() >= HDRPreviewDeadline || bDisplayMetricsInvalidated
+	if (IsDisplayOutputSystemManaged() || !CanApplyHDROutput() || HDRTime() >= HDRPreviewDeadline || bDisplayMetricsInvalidated
 		|| Current.DisplayIdentity.IsEmpty() || Current.DisplayIdentity != HDRPreviewDisplayIdentity
 		|| (bPreviewOwnsCalibration && (!CanApplyDisplayCalibration() || !FMath::IsNearlyEqual(DisplayUIBaseNits(), PreviewUIBaseNits, .01f)
 			|| !ReadDisplayCalibration(CurrentCalibration) || !CurrentCalibration.Equals(PreviewDisplayCalibration)))
@@ -239,7 +261,7 @@ bool USovGameUserSettings::TickHDRPreview(float DeltaTime)
 	if (!HDRPreviewReceipt.IsValid()) { return false; }
 	const FSovHDROutputStatus Current = ReadHDROutput();
 	FSovHDRCalibration CurrentCalibration;
-	if (HDRTime() >= HDRPreviewDeadline || !CanApplyHDROutput() || bDisplayMetricsInvalidated
+	if (HDRTime() >= HDRPreviewDeadline || IsDisplayOutputSystemManaged() || !CanApplyHDROutput() || bDisplayMetricsInvalidated
 		|| Current.DisplayIdentity.IsEmpty() || Current.DisplayIdentity != HDRPreviewDisplayIdentity
 		|| (bPreviewOwnsCalibration && (!CanApplyDisplayCalibration() || !FMath::IsNearlyEqual(DisplayUIBaseNits(), PreviewUIBaseNits, .01f)
 			|| !ReadDisplayCalibration(CurrentCalibration) || !CurrentCalibration.Equals(PreviewDisplayCalibration)))

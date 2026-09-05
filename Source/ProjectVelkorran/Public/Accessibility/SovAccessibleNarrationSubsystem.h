@@ -25,6 +25,8 @@ public:
 	bool Announce(UObject* Owner, const FText& Text, FGuid& OutRequest,
 		FSovNarrationCompletion Completion = FSovNarrationCompletion());
 	void Cancel(UObject* Owner);
+	/** Cancels with unsuccessful completion and prevents speech over platform system UI. */
+	void SetApplicationSuspended(bool bSuspended);
 	UFUNCTION(BlueprintPure, Category="Sovereign|Accessibility") bool IsSupported() const;
 	UFUNCTION(BlueprintPure, Category="Sovereign|Accessibility") FText GetUnavailableReason() const;
 	virtual void Deinitialize() override;
@@ -39,6 +41,7 @@ private:
 	FSovNarrationCompletion ActiveCompletion;
 	uint64 Generation = 0;
 	bool bShuttingDown = false;
+	bool bApplicationSuspended = false;
 #if WITH_DEV_AUTOMATION_TESTS
 	TFunction<TSharedPtr<ISovAccessibleSpeech>()> TestBackendFactory;
 #endif

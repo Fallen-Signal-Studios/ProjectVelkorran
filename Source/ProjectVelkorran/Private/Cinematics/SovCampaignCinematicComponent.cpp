@@ -6,6 +6,7 @@
 #include "Characters/SovPlayerCharacterBase.h"
 #include "Characters/SovNPCCharacterBase.h"
 #include "Framework/SovPlayerController.h"
+#include "Framework/SovApplicationLifecycleComponent.h"
 #include "Save/SovSaveSubsystem.h"
 #include "Recovery/SovRecoveryExclusionVolume.h"
 #include "World/SovWorldTransitActor.h"
@@ -441,6 +442,8 @@ bool USovCampaignCinematicComponent::ValidatePresentationSequence(ULevelSequence
 bool USovCampaignCinematicComponent::RequestPlay(ASovPlayerController* Player, FString& OutError)
 {
     if (!IsRegistered() || !IsComponentTickEnabled()) { OutError = TEXT("Cinematic component must be registered with ticking enabled."); return false; }
+    if (IsValid(Player) && Player->GetApplicationLifecycle() && Player->GetApplicationLifecycle()->IsGameplayInterrupted())
+    { OutError = TEXT("Resume the game before starting a cinematic."); return false; }
     if (bInventoryRollbackIncomplete)
     {
         for (const auto& Change : InventoryChanges)
@@ -491,7 +494,7 @@ bool USovCampaignCinematicComponent::RequestPlay(ASovPlayerController* Player, F
     if (!AcquirePartitionSources(OutError)) { return false; }
     for (auto& Streaming : StreamingLevels) { Streaming->SetShouldBeLoaded(true); Streaming->SetShouldBeVisible(true); }
     if (RequestEpoch != Epoch || !OwnsPlaybackGeneration() || !IsContextCurrent()) { ReleasePartitionSources(); return false; }
-    ExpectedPlaybackGeneration = 0; SessionId = FGuid::NewGuid(); LoadingStartedSeconds = FPlatformTime::Seconds(); PlayedSeconds = 0.0; bFullViewEligible = true;
+    ExpectedPlaybackGeneration = 0; SessionId = FGuid::NewGuid(); LoadingStartedSeconds = PreparationTimeSeconds(); AccessibilityWaitStartedSeconds = 0.0; PlayedSeconds = 0.0; bFullViewEligible = true;
     OriginalViewTarget = Player->GetViewTarget(); OriginalControlRotation = Player->GetControlRotation();
     bOwnInput = true; Player->SetIgnoreMoveInput(true); Player->SetIgnoreLookInput(true);
     bOwnSequenceTag = true;
@@ -525,9 +528,17 @@ bool USovCampaignCinematicComponent::RequestPlay(ASovPlayerController* Player, F
     OutError.Reset(); return true;
 }
 
+double USovCampaignCinematicComponent::PreparationTimeSeconds() const
+{
+    return USovApplicationLifecycleComponent::ActiveTimeSeconds(Controller.Get());
+}
+
 bool USovCampaignCinematicComponent::WaitForInitialAccessibilitySetup()
 {
-    const double Now = FPlatformTime::Seconds();
+    // This clock excludes app interruption, including time spent waiting for the
+    // player's resume confirmation. First-boot exclusion therefore cannot count
+    // the same suspend interval twice when the two holds overlap.
+    const double Now = PreparationTimeSeconds();
     if (USovFrontendComponent::IsInitialAccessibilitySetupPending(Controller.Get()))
     {
         if (AccessibilityWaitStartedSeconds == 0.0) { AccessibilityWaitStartedSeconds = Now; }
@@ -536,7 +547,8 @@ bool USovCampaignCinematicComponent::WaitForInitialAccessibilitySetup()
     }
     if (AccessibilityWaitStartedSeconds != 0.0)
     { LoadingStartedSeconds += FMath::Max(0.0, Now - AccessibilityWaitStartedSeconds); AccessibilityWaitStartedSeconds = 0.0; }
-    return false;
+    const auto* Lifecycle = Controller.IsValid() ? Controller->GetApplicationLifecycle() : nullptr;
+    return Lifecycle && Lifecycle->IsGameplayInterrupted();
 }
 
 bool USovCampaignCinematicComponent::CheckPreparationWatchdog(uint64 Epoch)
@@ -546,7 +558,7 @@ bool USovCampaignCinematicComponent::CheckPreparationWatchdog(uint64 Epoch)
     if (!IsRegistered() || !IsComponentTickEnabled() || !IsContextCurrent() || !OwnsPlaybackGeneration())
     { Abort(TEXT("Cinematic preparation lost its registered component or protagonist.")); return false; }
     if (Phase == ESovCinematicPhase::Loading && WaitForInitialAccessibilitySetup()) { return true; }
-    if (Phase == ESovCinematicPhase::Loading && SovCinematicPolicy::LoadingExpired(FPlatformTime::Seconds() - LoadingStartedSeconds, LoadingTimeoutSeconds))
+    if (Phase == ESovCinematicPhase::Loading && SovCinematicPolicy::LoadingExpired(PreparationTimeSeconds() - LoadingStartedSeconds, LoadingTimeoutSeconds))
     { Abort(TEXT("Cinematic preparation timed out or its component stopped ticking.")); return false; }
     return true;
 }
@@ -654,6 +666,8 @@ bool USovCampaignCinematicComponent::ObservePlaybackProgress(bool bTerminal)
 
 bool USovCampaignCinematicComponent::RequestSkip(FString& OutError)
 {
+    if (Controller.IsValid() && Controller->GetApplicationLifecycle() && Controller->GetApplicationLifecycle()->IsGameplayInterrupted())
+    { OutError = TEXT("Resume the game before skipping a cinematic."); return false; }
     auto* State = Controller.IsValid() ? Controller->FindComponentByClass<USovCampaignStateComponent>() : nullptr;
     if (!State || !State->CanSkipCinematic(BeatId) || !IsContextCurrent() || (Phase != ESovCinematicPhase::Playing && Phase != ESovCinematicPhase::Paused))
     { OutError = TEXT("Skip requires a prior complete viewing of this non-interactive scene."); return false; }
@@ -861,7 +875,7 @@ void USovCampaignCinematicComponent::TickComponent(float Delta, ELevelTick TickT
         if (!IsContextCurrent() || !OwnsPlaybackGeneration())
         { Abort(TEXT("Cinematic preparation lost its protagonist or playback owner.")); return; }
         if (WaitForInitialAccessibilitySetup()) { return; }
-        if (SovCinematicPolicy::LoadingExpired(FPlatformTime::Seconds() - LoadingStartedSeconds, LoadingTimeoutSeconds))
+        if (SovCinematicPolicy::LoadingExpired(PreparationTimeSeconds() - LoadingStartedSeconds, LoadingTimeoutSeconds))
         { Abort(TEXT("Cinematic preparation timed out or lost its protagonist; required assets, cells and activation actors must be available.")); return; }
         bool bLevelsReady = true; for (const auto& Level : StreamingLevels) { bLevelsReady &= Level && Level->IsLevelLoaded() && Level->IsLevelVisible(); }
         ConsecutivePartitionReadyTicks = static_cast<uint8>(SovCinematicPolicy::AdvanceReadyObservations(ConsecutivePartitionReadyTicks, ArePartitionRegionsReady()));

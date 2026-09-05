@@ -4,6 +4,16 @@
 int main()
 {
     using namespace SovPlatformServicesPolicy;
+    for (int Bits = 0; Bits < 8; ++Bits)
+        for (int User = -1; User <= 4; ++User)
+            assert(CanUseGenericCloud(Bits & 1, Bits & 2, Bits & 4, User) == (Bits == 7 && User >= 0));
+    for (int Bits = 0; Bits < 16; ++Bits)
+        for (int User = -1; User <= 4; ++User)
+        {
+            const bool Known = Bits & 1, ActiveProfile = Bits & 2, MappedOwner = Bits & 4, RequiresOwner = Bits & 8;
+            assert(CanAuthorizeStorage(RequiresOwner, Known, ActiveProfile, MappedOwner, User)
+                == (!RequiresOwner || (Known && ActiveProfile && MappedOwner && User >= 0)));
+        }
     for (int Bits = 0; Bits < 64; ++Bits)
     {
         const bool OptIn = Bits & 1, SignedIn = Bits & 2, Available = Bits & 4;

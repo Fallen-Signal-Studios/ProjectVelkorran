@@ -10,6 +10,7 @@ class UTextBlock;
 class USovAccessibilityNativeButton;
 class USovEvidenceDefinition;
 class USovAccessibilityPresentation;
+class UScrollBox;
 
 /** Acquired evidence/current-scene review, using the existing campaign journal, never a second evidence store. */
 UCLASS()
@@ -27,6 +28,8 @@ protected:
 	virtual void NativeOnActivated() override;
 	virtual void NativeOnDeactivated() override;
 	virtual UWidget* NativeGetDesiredFocusTarget() const override;
+	virtual FReply NativeOnAnalogValueChanged(const FGeometry& Geometry, const FAnalogInputEvent& Event) override;
+	virtual FReply NativeOnKeyDown(const FGeometry& Geometry, const FKeyEvent& Event) override;
 private:
 	friend struct FSovAccessibilityFrontendTestAccess;
 	void RebuildRecords();
@@ -42,6 +45,8 @@ private:
 	UFUNCTION() void MissionChanged(FName Mission,bool bSucceeded);
 	UPROPERTY(Transient) TObjectPtr<UTextBlock> Body;
 	UPROPERTY(Transient) TObjectPtr<UTextBlock> Heading;
+	UPROPERTY(Transient) TObjectPtr<UTextBlock> ScrollHint;
+	UPROPERTY(Transient) TObjectPtr<UScrollBox> RecordScroll;
 	UPROPERTY(Transient) TObjectPtr<USovAccessibilityNativeButton> PreviousButton;
 	UPROPERTY(Transient) TObjectPtr<USovAccessibilityNativeButton> NextButton;
 	UPROPERTY(Transient) TObjectPtr<USovAccessibilityNativeButton> ReadButton;

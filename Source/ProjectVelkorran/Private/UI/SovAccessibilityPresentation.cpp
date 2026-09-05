@@ -6,6 +6,7 @@
 #include "Components/Border.h"
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
+#include "Components/SafeZone.h"
 #include "Components/TextBlock.h"
 #include "Components/SovWeakPointComponent.h"
 #include "Engine/World.h"
@@ -19,6 +20,10 @@
 #include "Navigation/NarrativeNavigationComponent.h"
 #include "Navigation/NavigatorGameplayTags.h"
 #include "Rendering/DrawElementTypes.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Fonts/FontMeasure.h"
+#include "Rendering/SlateRenderer.h"
+#include "Layout/Clipping.h"
 #include "Styling/CoreStyle.h"
 #include "UnrealFramework/NarrativeCharacter.h"
 
@@ -66,17 +71,24 @@ TSharedRef<SWidget> USovAccessibilityPresentation::RebuildWidget()
 	if (!WidgetTree) { WidgetTree = NewObject<UWidgetTree>(this,TEXT("WidgetTree")); }
 	if (!SubtitleText)
 	{
-		UCanvasPanel* Canvas = WidgetTree->ConstructWidget<UCanvasPanel>(); WidgetTree->RootWidget = Canvas;
+		USafeZone* Safe = WidgetTree->ConstructWidget<USafeZone>();
+		SafeTextCanvas = WidgetTree->ConstructWidget<UCanvasPanel>(); Safe->AddChild(SafeTextCanvas); WidgetTree->RootWidget = Safe;
 		SubtitleBackground = WidgetTree->ConstructWidget<UBorder>(); SubtitleBackground->SetPadding(FMargin(18,10));
 		SubtitleText = WidgetTree->ConstructWidget<UTextBlock>(); SubtitleText->SetJustification(ETextJustify::Center); SubtitleText->SetAutoWrapText(true);
-		SubtitleBackground->AddChild(SubtitleText); SubtitleSlot = Canvas->AddChildToCanvas(SubtitleBackground);
+		SubtitleBackground->AddChild(SubtitleText); SubtitleSlot = SafeTextCanvas->AddChildToCanvas(SubtitleBackground);
 		SubtitleSlot->SetAnchors(FAnchors(.5f,.88f)); SubtitleSlot->SetAlignment(FVector2D(.5f,1)); SubtitleSlot->SetAutoSize(true);
 		CaptionBackground = WidgetTree->ConstructWidget<UBorder>(); CaptionBackground->SetPadding(FMargin(14,8));
 		CaptionText = WidgetTree->ConstructWidget<UTextBlock>(); CaptionText->SetJustification(ETextJustify::Center); CaptionText->SetAutoWrapText(true);
-		CaptionBackground->AddChild(CaptionText); UCanvasPanelSlot* Slot = Canvas->AddChildToCanvas(CaptionBackground);
+		CaptionBackground->AddChild(CaptionText); UCanvasPanelSlot* Slot = SafeTextCanvas->AddChildToCanvas(CaptionBackground);
 		Slot->SetAnchors(FAnchors(.5f,.13f)); Slot->SetAlignment(FVector2D(.5f,0)); Slot->SetAutoSize(true);
 	}
 	RefreshText(); return Super::RebuildWidget();
+}
+float USovAccessibilityPresentation::GetSafeTextWidth() const
+{
+	// Text uses the console safe area. NativePaint retains the full player viewport for world projections.
+	const float Width = SafeTextCanvas ? float(SafeTextCanvas->GetCachedGeometry().GetLocalSize().X) : 0.f;
+	return Width > 0.f ? Width : float(GetCachedGeometry().GetLocalSize().X);
 }
 void USovAccessibilityPresentation::NativeConstruct()
 {
@@ -117,7 +129,7 @@ void USovAccessibilityPresentation::BeginEntry(const FSovSceneSubtitleEntry& Ent
 {
 	ActiveSpeech = Entry;
 	int32 Characters = Settings.SubtitleCharactersPerLine;
-	const float Width = GetCachedGeometry().GetLocalSize().X;
+	const float Width = GetSafeTextWidth();
 	if (Width > 0) { Characters = FMath::Min(Characters,FMath::Max(1,FMath::FloorToInt(Width * .84f / (27.f * Settings.SubtitleScale)))); }
 	SpeechPages = PaginateText(Entry.Text.ToString(), Characters, Settings.SubtitleMaximumLines); PageIndex = 0;
 	PageRemaining = FMath::Max(2.f, Entry.Duration / FMath::Max(1,SpeechPages.Num())); RefreshText();
@@ -126,7 +138,7 @@ void USovAccessibilityPresentation::PresentCaption(const FText& Text, float Dura
 {
 	if (Text.IsEmpty() || !FMath::IsFinite(Duration) || Location.ContainsNaN()) { return; }
 	ActiveCaption.Text = Text; ActiveCaption.Location = Location; ActiveCaption.bCaption = true;
-	const float Width=GetCachedGeometry().GetLocalSize().X;
+	const float Width=GetSafeTextWidth();
 	const int32 Characters=Width>0 ? FMath::Min(Settings.SubtitleCharactersPerLine,FMath::Max(1,FMath::FloorToInt(Width*.8f/(27.f*Settings.SubtitleScale)))) : Settings.SubtitleCharactersPerLine;
 	CaptionPages=PaginateText(Text.ToString(),Characters,Settings.SubtitleMaximumLines); CaptionPageIndex=0;
 	CaptionPageDuration=FMath::Max(3.f,FMath::Clamp(Duration,3.f,30.f)/FMath::Max(1,CaptionPages.Num()));
@@ -154,7 +166,7 @@ void USovAccessibilityPresentation::RefreshText()
 {
 	if (!SubtitleText || !CaptionText) { return; }
 	const int32 Size = FMath::RoundToInt(26 * Settings.SubtitleScale);
-	SubtitleText->SetWrapTextAt(FMath::Max(1.f,GetCachedGeometry().GetLocalSize().X * .84f));
+	SubtitleText->SetWrapTextAt(FMath::Max(1.f,GetSafeTextWidth() * .84f));
 	SubtitleText->SetFont(FCoreStyle::GetDefaultFontStyle("Regular",Size)); CaptionText->SetFont(FCoreStyle::GetDefaultFontStyle("Bold",Size));
 	SubtitleText->SetColorAndOpacity(FSlateColor(FLinearColor::White)); CaptionText->SetColorAndOpacity(FSlateColor(FLinearColor::White));
 	const FLinearColor Background(0,0,0,Settings.bHighContrastHUD ? 1.f : Settings.SubtitleBackgroundOpacity);
@@ -170,14 +182,25 @@ void USovAccessibilityPresentation::RefreshText()
 		SubtitleText->SetText(FText::Format(LOCTEXT("SpeechLayout","{0} {1}\n{2}"),Speaker,DirectionText(ActiveSpeech.Location),FText::FromString(SpeechPages[PageIndex])));
 		SubtitleSlot->SetAnchors(FAnchors(.5f,ActiveSpeech.bCinematic ? .9f : .8f));
 	}
-	CaptionText->SetWrapTextAt(FMath::Max(160.f,GetCachedGeometry().GetLocalSize().X * .8f));
+	CaptionText->SetWrapTextAt(FMath::Max(1.f,GetSafeTextWidth() * .8f));
 	CaptionText->SetText(FText::Format(LOCTEXT("CaptionLayout","[sound] {0}\n{1}"),DirectionText(ActiveCaption.Location),CaptionPages.IsValidIndex(CaptionPageIndex) ? FText::FromString(CaptionPages[CaptionPageIndex]) : FText::GetEmpty()));
 }
 void USovAccessibilityPresentation::NativeTick(const FGeometry& Geometry, float DeltaSeconds)
 {
 	Super::NativeTick(Geometry,DeltaSeconds);
-	if(!FMath::IsNearlyEqual(LastLayoutWidth,float(Geometry.GetLocalSize().X),1.f))
-	{ LastLayoutWidth=Geometry.GetLocalSize().X; if(!ActiveSpeech.Text.IsEmpty()) { BeginEntry(ActiveSpeech); } }
+	if(!FMath::IsNearlyEqual(LastLayoutWidth,GetSafeTextWidth(),1.f))
+	{
+		LastLayoutWidth=GetSafeTextWidth();
+		if(!ActiveSpeech.Text.IsEmpty()) { BeginEntry(ActiveSpeech); }
+		// Relayout a live caption without producing a duplicate scene-history record.
+		if(CaptionRemaining > 0.f)
+		{
+			const int32 Characters=FMath::Min(Settings.SubtitleCharactersPerLine,FMath::Max(1,FMath::FloorToInt(LastLayoutWidth*.8f/(27.f*Settings.SubtitleScale))));
+			CaptionPages=PaginateText(ActiveCaption.Text.ToString(),Characters,Settings.SubtitleMaximumLines); CaptionPageIndex=0;
+			CaptionRemaining=FMath::Max(3.f,CaptionRemaining);
+		}
+		RefreshText();
+	}
 	if (!GetWorld() || GetWorld()->IsPaused()) { return; }
 	if (SpeechPages.IsValidIndex(PageIndex))
 	{
@@ -232,8 +255,19 @@ int32 USovAccessibilityPresentation::NativePaint(const FPaintArgs& Args, const F
 	};
 	auto DrawLabel = [&](const FVector2D& Point,const FText& Text,const FLinearColor& Tint)
 	{
-		FSlateDrawElement::MakeText(Elements,++Layer,Geometry.ToPaintGeometry(FVector2D(1,1),FSlateLayoutTransform(Point+FVector2D(2,2))),Text,Font,ESlateDrawEffect::None,FLinearColor::Black);
-		FSlateDrawElement::MakeText(Elements,++Layer,Geometry.ToPaintGeometry(FVector2D(1,1),FSlateLayoutTransform(Point)),Text,Font,ESlateDrawEffect::None,Tint);
+		if (!SafeTextCanvas || !FSlateApplication::IsInitialized()) { return; }
+		const FGeometry& SafeGeometry=SafeTextCanvas->GetCachedGeometry();
+		if (SafeGeometry.GetLocalSize().X <= 0 || SafeGeometry.GetLocalSize().Y <= 0) { return; }
+		const FVector2D SafeMin=Geometry.AbsoluteToLocal(SafeGeometry.LocalToAbsolute(FVector2D::ZeroVector));
+		const FVector2D SafeMax=Geometry.AbsoluteToLocal(SafeGeometry.LocalToAbsolute(SafeGeometry.GetLocalSize()));
+		const FVector2D TextSize=FSlateApplication::Get().GetRenderer()->GetFontMeasureService()->Measure(Text,Font);
+		const FVector2D LabelPoint(FMath::Clamp(Point.X,SafeMin.X,FMath::Max(SafeMin.X,SafeMax.X-TextSize.X-2)),
+			FMath::Clamp(Point.Y,SafeMin.Y,FMath::Max(SafeMin.Y,SafeMax.Y-TextSize.Y-2)));
+		// Move only the label into the safe area; the weak point/interactable outline stays on its target.
+		Elements.PushClip(FSlateClippingZone(SafeGeometry));
+		FSlateDrawElement::MakeText(Elements,++Layer,Geometry.ToPaintGeometry(FVector2D(1,1),FSlateLayoutTransform(LabelPoint+FVector2D(2,2))),Text,Font,ESlateDrawEffect::None,FLinearColor::Black);
+		FSlateDrawElement::MakeText(Elements,++Layer,Geometry.ToPaintGeometry(FVector2D(1,1),FSlateLayoutTransform(LabelPoint)),Text,Font,ESlateDrawEffect::None,Tint);
+		Elements.PopClip();
 	};
 	if (Settings.bInteractableOutlines && FocusedInteractable.IsValid() && Interaction && Interaction->IsInteractableInReach(FocusedInteractable.Get()))
 	{

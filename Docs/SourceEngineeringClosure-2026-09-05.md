@@ -51,3 +51,7 @@ There is no claim that arbitrary Sequencer Blueprint side effects, custom physic
 3. **Packaged opening/convergence recovery and target devices:** automate the real campaign fixtures, fault-inject save/travel/cloud boundaries, and retain timing/performance/accessibility/device evidence.
 
 This is the handoff for a source-level adversarial audit, not a shippability or zero-defect certificate.
+
+## Subsequent console pass
+
+The merged closure was followed by a source compatibility pass for Xbox Series X|S and the PS5 family. See [ConsoleCompatibilityPass-2026-09-05.md](ConsoleCompatibilityPass-2026-09-05.md) for the source fixes, newly identified console build blockers, regression evidence and licensed-engine/device handoff. The counts above describe this earlier closure snapshot.

@@ -198,6 +198,7 @@ private:
     bool HasCommitReceipt(const USovCampaignStateComponent* State, FName RequestedBeat, bool bSkipped) const;
     bool IsContextCurrent() const;
     bool CheckPreparationWatchdog(uint64 Epoch);
+    double PreparationTimeSeconds() const;
     bool WaitForInitialAccessibilitySetup();
     bool ResolveParticipants(FString& OutError);
     bool AcquirePartitionSources(FString& OutError);

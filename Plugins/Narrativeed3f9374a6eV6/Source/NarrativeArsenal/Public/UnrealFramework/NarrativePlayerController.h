@@ -74,6 +74,8 @@ private:
 	void SetAutomaticSprintHeld(bool bWanted);
 	bool bSovAutomaticSprintHeld = false;
 	virtual bool WantsToggleForInput(FGameplayTag InputTag) const;
+	/** Project-level platform interruption gate; releases must still be delivered. */
+	virtual bool IsGameplayAbilityInputSuppressed() const { return false; }
 
 	
 public:

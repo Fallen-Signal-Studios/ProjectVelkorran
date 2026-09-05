@@ -39,6 +39,12 @@ struct PROJECTVELKORRAN_API FSovHDROutputStatus
 	/** Engine platform/RHI support query, not a saved user preference. */
 	UPROPERTY(BlueprintReadOnly) bool bSupported = false;
 	UPROPERTY(BlueprintReadOnly) bool bEnabled = false;
+	/** Fixed/fullscreen platform output stays under the platform renderer's control. */
+	UPROPERTY(BlueprintReadOnly) bool bSystemManaged = false;
+	/** A game-owned output preview also requires a usable, identifiable desktop viewport. */
+	UPROPERTY(BlueprintReadOnly) bool bCanPreviewInGame = false;
+	/** Full calibration additionally requires the writable HDR scene/UI renderer controls. */
+	UPROPERTY(BlueprintReadOnly) bool bCanCalibrateInGame = false;
 	/** Engine-selected output level, which may differ from the requested level. Zero means SDR. */
 	UPROPERTY(BlueprintReadOnly) int32 PeakNits = 0;
 	/** Current viewport's unambiguous physical monitor identity/topology. Empty means it cannot be established. */

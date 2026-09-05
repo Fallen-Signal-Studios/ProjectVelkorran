@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Subsystems/WorldSubsystem.h"
 #include "NarrativeSave.h"
+#include "Templates/Function.h"
 #include "NarrativeSaveSubsystem.generated.h"
 
 /** Project save wrappers can supply already validated records before actors begin play. */
@@ -67,10 +68,12 @@ public:
 	persistence, where we can change levels and keep each players items and weapons in its own file. We can also support having players leave and re-join the game later,
 	whilst keeping all their stuff saved. */
 	virtual bool CreatePlayerOnlySave(APlayerController* PC);
-	/** Explicit slot for authored campaign travel; independent of a character display name. */
-	bool CreatePlayerOnlySaveInSlot(APlayerController* PC, const FString& SlotName);
+	/** Explicit platform user/slot. Optional native owner predicate fences capture and serialization callbacks before IO. */
+	bool CreatePlayerOnlySaveInSlot(APlayerController* PC, const FString& SlotName, int32 LocalUserIndex = 0,
+		TFunction<bool()> IsOwnerCurrent = {});
 	/** Read records without applying them to the currently possessed pawn or replacing world state. */
-	bool ReadPlayerOnlySave(const FString& SlotName, FNarrativeSavePlayer& OutPlayerData) const;
+	bool ReadPlayerOnlySave(const FString& SlotName, FNarrativeSavePlayer& OutPlayerData, int32 LocalUserIndex = 0,
+		TFunction<bool()> IsOwnerCurrent = {}) const;
 	virtual bool LoadPlayerOnlySave(APlayerController* PC);
 	virtual bool DeletePlayerOnlySave(APlayerController* PC);
 

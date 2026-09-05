@@ -6,10 +6,19 @@
 #include "Tests/SovSettingsTestFixtures.h"
 #include "Tests/SovPlatformOutputTestFixtures.h"
 #include "Misc/AutomationTest.h"
+#include "Blueprint/WidgetTree.h"
+#include "Blueprint/WidgetNavigation.h"
+#include "Components/SafeZone.h"
+#include "Components/ScrollBox.h"
 #include <limits>
 
 struct FSovAccessibilityFrontendTestAccess
 {
+	static bool Back(USovAccessibilitySettingsMenu* Menu) { return Menu->NativeOnHandleBackAction(); }
+	static UWidget* Navigate(USovAccessibilitySettingRow* Row, EUINavigation Direction) { return Row->NavigateValue(Direction); }
+	static UScrollBox* RecordScroll(USovAccessibleRecordMenu* Menu) { return Menu->RecordScroll; }
+	static bool HasSafeTextRoot(USovAccessibilityPresentation* Presentation)
+	{ return Presentation->WidgetTree && Cast<USafeZone>(Presentation->WidgetTree->RootWidget) && Presentation->SafeTextCanvas; }
 	static void SetRecords(USovAccessibleRecordMenu* Menu,const FText& Value) { Menu->Records={Value}; }
 	static FText FirstRecord(USovAccessibleRecordMenu* Menu) { return Menu->Records.IsEmpty() ? FText::GetEmpty() : Menu->Records[0]; }
 	static USovAccessibilitySettingRow* Row(USovAccessibilitySettingsMenu* Menu,USovGameUserSettings* Settings,FName Key,float Min,float Max,float Step)
@@ -19,6 +28,51 @@ struct FSovAccessibilityFrontendTestAccess
 	}
 };
 #if WITH_DEV_AUTOMATION_TESTS
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovConsoleMenuBackTest,"ProjectVelkorran.UI.Console.BackAndFirstBoot",EAutomationTestFlags::ApplicationContextMask|EAutomationTestFlags::EngineFilter)
+bool FSovConsoleMenuBackTest::RunTest(const FString& Parameters)
+{
+	auto* Menu=NewObject<USovAccessibilitySettingsMenu>(); Menu->SetFirstBoot(true); Menu->ActivateWidget();
+	TestTrue(TEXT("First boot consumes platform Back"),FSovAccessibilityFrontendTestAccess::Back(Menu));
+	TestTrue(TEXT("Back cannot bypass explicit setup completion"),Menu->IsActivated());
+	Menu->SetFirstBoot(false);
+	TestTrue(TEXT("Normal settings handle platform Back"),FSovAccessibilityFrontendTestAccess::Back(Menu));
+	TestFalse(TEXT("Normal Back retires settings and their owned preview"),Menu->IsActivated());
+	return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovConsoleNativeLayoutTest,"ProjectVelkorran.UI.Console.NavigationAndSafeArea",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FSovConsoleNativeLayoutTest::RunTest(const FString& Parameters)
+{
+	auto* Presentation=NewObject<USovAccessibilityPresentation>(); Presentation->Initialize(); Presentation->TakeWidget();
+	TestTrue(TEXT("Actual subtitle/caption tree uses engine SafeZone"),FSovAccessibilityFrontendTestAccess::HasSafeTextRoot(Presentation));
+	auto* Review=NewObject<USovAccessibleRecordMenu>(); Review->Initialize(); Review->TakeWidget();
+	TestNotNull(TEXT("Evidence text has an independently scrollable viewport"),FSovAccessibilityFrontendTestAccess::RecordScroll(Review));
+	auto* Settings=NewObject<USovSettingsTestSettings>(); auto* Menu=NewObject<USovAccessibilitySettingsMenu>(); Menu->ActivateWidget();
+	auto* Row=FSovAccessibilityFrontendTestAccess::Row(Menu,Settings,"UIScale",1,2,.25f); Row->Initialize(); Row->TakeWidget();
+	TestEqual(TEXT("Directional rule is installed on the actual focused button"),Row->GetFocusTarget()->Navigation->GetNavigationRule(EUINavigation::Right),EUINavigationRule::Custom);
+	TestNull(TEXT("Mapped right direction cannot steal focus from a callback's modal"),FSovAccessibilityFrontendTestAccess::Navigate(Row,EUINavigation::Right));
+	TestEqual(TEXT("Mapped direction commits the settings transaction"),Settings->GetSettingsSnapshot().UIScale,1.25f);
+	auto* Continue=FSovAccessibilityFrontendTestAccess::Row(Menu,Settings,"Continue",0,1,1);
+	FSovAccessibilityFrontendTestAccess::Navigate(Continue,EUINavigation::Left);
+	TestTrue(TEXT("Sideways navigation cannot activate Continue"),Menu->IsActivated());
+	Menu->DeactivateWidget(); FSovAccessibilityFrontendTestAccess::Navigate(Row,EUINavigation::Right);
+	TestEqual(TEXT("Retired menu ignores stale navigation"),Settings->GetSettingsSnapshot().UIScale,1.25f);
+	return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovConsoleHDRRowsTest,"ProjectVelkorran.UI.Console.SystemManagedHDR",EAutomationTestFlags::ApplicationContextMask|EAutomationTestFlags::EngineFilter)
+bool FSovConsoleHDRRowsTest::RunTest(const FString& Parameters)
+{
+	auto* Settings=NewObject<USovPlatformOutputTestSettings>(); Settings->bSystemManaged=true;
+	auto* Menu=NewObject<USovAccessibilitySettingsMenu>();
+	for (FName Key : {FName("HDR.Enabled"),FName("HDR.Peak"),FName("HDR.Black"),FName("HDR.Paper"),FName("HDR.UI"),FName("HDR.Preview"),FName("HDR.Confirm"),FName("HDR.Revert")})
+	{
+		auto* Row=FSovAccessibilityFrontendTestAccess::Row(Menu,Settings,Key,0,1,1);
+		TestFalse(TEXT("Console display setting cannot be edited through desktop controls"),Menu->IsRowEnabled(Row));
+		TestTrue(TEXT("Unavailable controls explain system ownership"),Menu->ValueText(Row).ToString().Contains(TEXT("console display settings")));
+		Menu->Adjust(Row,1);
+	}
+	TestEqual(TEXT("Disabled controls cannot write console HDR output"),Settings->Writes,0);
+	return true;
+}
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovRecordViewReentry,"ProjectVelkorran.UI.Accessibility.RecordViewReentry",EAutomationTestFlags::ApplicationContextMask|EAutomationTestFlags::EngineFilter)
 bool FSovRecordViewReentry::RunTest(const FString& Parameters)
 {
