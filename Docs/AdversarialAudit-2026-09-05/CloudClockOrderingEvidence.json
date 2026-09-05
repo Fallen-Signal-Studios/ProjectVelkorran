@@ -1,0 +1,30 @@
+{
+  "kind": "Host ordering reproduction of the source filename comparison; not OSS, Unreal, SDK, or storage execution",
+  "source": "Source/ProjectVelkorran/Private/Platform/SovOnlinePlatformServicesAdapter.cpp",
+  "source_sha256": "95083b39734f40939918768f07be066824aef541fdbd9ed3119e830a2b0c5a68",
+  "selection_expression": "if (Latest.IsEmpty() || File.FileName > Latest) { Latest = File.FileName; LatestSize = File.FileSize; }",
+  "creation_clock": "FDateTime::UtcNow().GetTicks()",
+  "slot": {
+    "kind": 0,
+    "index": 0,
+    "prefix": "SovCloud1_0_0_"
+  },
+  "actual_publication_order": [
+    {
+      "ordinal": 1,
+      "client_clock": "2027-01-01T00:00:00",
+      "clock_state": "incorrectly ahead",
+      "filename": "SovCloud1_0_0_0639343584000000000_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.sav"
+    },
+    {
+      "ordinal": 2,
+      "client_clock": "2026-09-06T00:00:00",
+      "clock_state": "corrected or second client",
+      "filename": "SovCloud1_0_0_0639242496000000000_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.sav"
+    }
+  ],
+  "latest_filename_selected_by_source": "SovCloud1_0_0_0639343584000000000_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.sav",
+  "last_published_filename": "SovCloud1_0_0_0639242496000000000_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.sav",
+  "result": "The acknowledged second upload is not selected by a later ReadLatest. No account transfer, overwrite, or network failure is needed.",
+  "validation": "Both names meet the source revision shape. String max reproduces the source comparison. Native provider validation remains required."
+}

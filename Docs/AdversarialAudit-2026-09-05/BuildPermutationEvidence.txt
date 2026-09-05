@@ -1,0 +1,22 @@
+$ c++ -std=c++17 -fsyntax-only /workspace/scratch/4e000d64b13d/ProjectVelkorran/Docs/AdversarialAudit-2026-09-05/UnityCollisionRepro.cpp
+exit 1
+Source/ProjectVelkorran/Private/Tests/SovSelenePayloadRuntimeTests.cpp:86:14: error: redefinition of ‘float {anonymous}::Shield(ASovAxiomRuntimeTestCharacter*)’
+   86 |         float Shield(ASovAxiomRuntimeTestCharacter* Target)
+      |              ^~~~~~
+Source/ProjectVelkorran/Private/Tests/SovTarrikPayloadRuntimeTests.cpp:88:7: note: ‘float {anonymous}::Shield(ASovAxiomRuntimeTestCharacter*)’ previously defined here
+   88 | float Shield(ASovAxiomRuntimeTestCharacter* Actor)
+      |       ^~~~~~
+
+$ c++ -std=c++17 -DINCLUDE_PROTECTION=0 /workspace/scratch/4e000d64b13d/ProjectVelkorran/Docs/AdversarialAudit-2026-09-05/UnityOverloadRepro.cpp -o /workspace/scratch/4e000d64b13d/audit_alive_0
+exit 0
+
+$ /workspace/scratch/4e000d64b13d/audit_alive_0
+exit 0
+mutable source lacking AttributeSet: 1; const target: 1
+
+$ c++ -std=c++17 -DINCLUDE_PROTECTION=1 /workspace/scratch/4e000d64b13d/ProjectVelkorran/Docs/AdversarialAudit-2026-09-05/UnityOverloadRepro.cpp -o /workspace/scratch/4e000d64b13d/audit_alive_1
+exit 0
+
+$ /workspace/scratch/4e000d64b13d/audit_alive_1
+exit 0
+mutable source lacking AttributeSet: 0; const target: 1
