@@ -30,6 +30,8 @@ public:
     UFUNCTION(BlueprintPure, Category="Finisher")
     bool HasResolvedPhase(FGameplayTag Phase) const { return ResolvedPhases.HasTagExact(Phase); }
     virtual void Load_Implementation() override;
+    /** Reject capture/load across the synchronous damage/outcome commit boundary. */
+    virtual bool ValidateSaveRecord(const TArray<uint8>& RecordBytes) const override { return !PendingOutcome.IsValid(); }
 protected:
     virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 private:
@@ -38,9 +40,14 @@ private:
     bool OwnsLease(const USovGameplayAbility_Finisher* Ability, const FGuid& Lease) const;
     bool IsReservedTargetValid(const USovGameplayAbility_Finisher* Ability, const FGuid& Lease, AActor* Attacker) const;
     void Release(const USovGameplayAbility_Finisher* Ability, const FGuid& Lease);
-    bool CommitPhase(const USovGameplayAbility_Finisher* Ability, const FGuid& Lease);
+    bool BeginPhaseOutcome(const USovGameplayAbility_Finisher* Ability, const FGuid& Lease, FGuid& OutOutcome);
+    bool CommitPhaseOutcome(const FGuid& Outcome, FGameplayTag Phase, bool bAcceptedDamage, bool bSameTargetGeneration);
+    void FinishPhaseOutcome(const FGuid& Outcome);
     UPROPERTY(SaveGame) FGameplayTagContainer ResolvedPhases;
     TWeakObjectPtr<USovGameplayAbility_Finisher> ReservedBy;
     FGuid Reservation;
     FGameplayTag ReservedPhase;
+    /** Independent of the ability lease: cancellation cannot erase already accepted damage. */
+    FGuid PendingOutcome;
+    FGameplayTag PendingPhase;
 };

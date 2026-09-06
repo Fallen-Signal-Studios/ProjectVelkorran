@@ -19,6 +19,7 @@
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraSystem.h"
 #include "TimerManager.h"
+#include "UObject/StrongObjectPtr.h"
 #include "Sovereign/SovGameplayTags.h"
 #include "UnrealFramework/NarrativeCharacter.h"
 
@@ -50,6 +51,7 @@ void USovShieldComponent::BeginPlay()
 
 void USovShieldComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	bEndingPlay = true;
 	if (ANarrativeCharacter* NarrativeOwner = Cast<ANarrativeCharacter>(GetOwner()))
 	{
 		NarrativeOwner->OnASCInitialized.RemoveDynamic(this, &ThisClass::HandleOwnerASCInitialized);
@@ -69,12 +71,13 @@ void USovShieldComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 bool USovShieldComponent::InitializeWithAbilitySystem(UAbilitySystemComponent* InAbilitySystemComponent)
 {
-	if (!IsValid(InAbilitySystemComponent))
+	if (bEndingPlay || !IsValid(GetOwner()) || GetOwner()->IsActorBeingDestroyed()
+		|| !IsValid(InAbilitySystemComponent) || InAbilitySystemComponent->GetAvatarActor() != GetOwner())
 	{
 		return false;
 	}
 
-	if (AbilitySystemComponent == InAbilitySystemComponent
+	if (AbilitySystemComponent == InAbilitySystemComponent && IsInitialized()
 		&& ShieldChangedDelegateHandle.IsValid()
 		&& MaxShieldChangedDelegateHandle.IsValid())
 	{
@@ -95,8 +98,19 @@ bool USovShieldComponent::InitializeWithAbilitySystem(UAbilitySystemComponent* I
 		return false;
 	}
 
+	const uint64 RetiredGeneration = BindingGeneration;
 	UninitializeFromAbilitySystem();
+	// Releasing owned tags can synchronously bind another ASC. That binding wins.
+	if (BindingGeneration != RetiredGeneration + 1 || bEndingPlay
+		|| !IsValid(InAbilitySystemComponent) || InAbilitySystemComponent->GetAvatarActor() != GetOwner()) { return false; }
 	AbilitySystemComponent = InAbilitySystemComponent;
+	if (const auto* NarrativeASC = Cast<UNarrativeAbilitySystemComponent>(AbilitySystemComponent))
+	{
+		BoundActorInfoEpoch = NarrativeASC->GetCombatActorInfoEpoch();
+		BoundReadyEpoch = NarrativeASC->GetCharacterReadyEpoch();
+	}
+	const uint64 ExpectedBinding = BindingGeneration;
+	const uint64 ExpectedOperation = LifecycleGeneration;
 	bWarnedMissingAttributeSet = false;
 
 	ShieldBrokenTag = FSovGameplayTags::Get().State_Shield_Broken;
@@ -104,11 +118,17 @@ bool USovShieldComponent::InitializeWithAbilitySystem(UAbilitySystemComponent* I
 
 	ShieldChangedDelegateHandle = AbilitySystemComponent
 		->GetGameplayAttributeValueChangeDelegate(UNarrativeAttributeSetBase::GetShieldAttribute())
-		.AddUObject(this, &ThisClass::HandleShieldAttributeChanged);
+		.AddWeakLambda(this, [this, ExpectedBinding](const FOnAttributeChangeData& Data)
+		{
+			if (IsCurrentBinding(ExpectedBinding)) { HandleShieldAttributeChanged(Data); }
+		});
 
 	MaxShieldChangedDelegateHandle = AbilitySystemComponent
 		->GetGameplayAttributeValueChangeDelegate(UNarrativeAttributeSetBase::GetMaxShieldAttribute())
-		.AddUObject(this, &ThisClass::HandleMaxShieldAttributeChanged);
+		.AddWeakLambda(this, [this, ExpectedBinding](const FOnAttributeChangeData& Data)
+		{
+			if (IsCurrentBinding(ExpectedBinding)) { HandleMaxShieldAttributeChanged(Data); }
+		});
 
 	if (RechargeBlockedTag.IsValid())
 	{
@@ -116,12 +136,24 @@ bool USovShieldComponent::InitializeWithAbilitySystem(UAbilitySystemComponent* I
 			->RegisterGameplayTagEvent(
 				RechargeBlockedTag,
 				EGameplayTagEventType::NewOrRemoved)
-			.AddUObject(this, &ThisClass::HandleRechargeBlockedTagChanged);
+			.AddWeakLambda(this, [this, ExpectedBinding](FGameplayTag Tag, int32 Count)
+			{
+				if (IsCurrentBinding(ExpectedBinding)) { HandleRechargeBlockedTagChanged(Tag, Count); }
+			});
 	}
+
+	HealthChangedDelegateHandle = AbilitySystemComponent
+		->GetGameplayAttributeValueChangeDelegate(UNarrativeAttributeSetBase::GetHealthAttribute())
+		.AddWeakLambda(this, [this, ExpectedBinding](const FOnAttributeChangeData& Data)
+		{
+			if (IsCurrentBinding(ExpectedBinding)) { HandleHealthAttributeChanged(Data); }
+		});
 
 	if (UNarrativeAbilitySystemComponent* NarrativeASC = Cast<UNarrativeAbilitySystemComponent>(AbilitySystemComponent))
 	{
 		NarrativeASC->OnDamageResolvedAsTarget.AddUniqueDynamic(this, &ThisClass::HandleDamageResolved);
+		NarrativeASC->OnDeathStateChanged.AddUniqueDynamic(this, &ThisClass::HandleOwnerDeathChanged);
+		NarrativeASC->OnCharacterReadyEpochChanged.AddUniqueDynamic(this, &ThisClass::HandleOwnerReadyEpochChanged);
 	}
 
 	bHasRecordedShieldDamage = false;
@@ -129,30 +161,56 @@ bool USovShieldComponent::InitializeWithAbilitySystem(UAbilitySystemComponent* I
 	LastShieldDamageWorldTime = GetWorldTimeSeconds();
 	LastRechargeUpdateWorldTime = LastShieldDamageWorldTime;
 	RefreshShieldBrokenState(GetShield(), false);
+	if (!IsCurrentOperation(ExpectedOperation)) { return false; }
 	RefreshShieldVisuals();
-
+	if (!IsCurrentOperation(ExpectedOperation)) { return false; }
 	TryStartRecharge();
-	return true;
+	return IsCurrentBinding(ExpectedBinding);
+}
+
+void USovShieldComponent::SetCheckpointRestoreInProgress(const bool bInProgress)
+{
+	SetCheckpointRestoreInProgress(bInProgress, BindingGeneration);
+}
+
+void USovShieldComponent::SetCheckpointRestoreInProgress(const bool bInProgress, const uint64 ExpectedBindingGeneration)
+{
+	// A retired restore scope must never release the replacement binding's hold.
+	if (!IsCurrentBinding(ExpectedBindingGeneration) || bRestoringCheckpoint == bInProgress) { return; }
+	++LifecycleGeneration;
+	ClearLifecycleTimers();
+	bRestoringCheckpoint = bInProgress;
+	if (bInProgress) { bCheckpointResetPending = false; }
+	else if (bCheckpointResetPending)
+	{
+		bCheckpointResetPending = false;
+		ResetForCheckpoint();
+	}
 }
 
 void USovShieldComponent::ResetForCheckpoint()
 {
 	if (!CanWriteShield()) { return; }
+	const uint64 ExpectedOperation = ++LifecycleGeneration;
 	ClearLifecycleTimers();
 	RemoveShieldBrokenTag();
+	if (!IsCurrentOperation(ExpectedOperation)) { return; }
 	bShieldBroken = false;
 	bHasRecordedShieldDamage = false;
 	bRechargeDelayElapsed = true;
 	LastShieldDamageWorldTime = GetWorldTimeSeconds();
 	LastRechargeUpdateWorldTime = LastShieldDamageWorldTime;
 	RefreshShieldBrokenState(GetShield(), false);
+	if (!IsCurrentOperation(ExpectedOperation)) { return; }
 	RefreshShieldVisuals();
+	if (!IsCurrentOperation(ExpectedOperation)) { return; }
+	if (bRestoringCheckpoint) { bCheckpointResetPending = true; return; }
 	if (GetShield() + KINDA_SMALL_NUMBER < GetMaxShield()) { RecordShieldDamage(); }
 }
 
 bool USovShieldComponent::IsInitialized() const
 {
-	return IsValid(AbilitySystemComponent);
+	return IsCurrentBinding(BindingGeneration);
 }
 
 float USovShieldComponent::GetShield() const
@@ -347,10 +405,7 @@ void USovShieldComponent::TryInitializeFromOwner()
 
 	if (UAbilitySystemComponent* OwnerASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner()))
 	{
-		if (OwnerASC != AbilitySystemComponent)
-		{
-			InitializeWithAbilitySystem(OwnerASC);
-		}
+		InitializeWithAbilitySystem(OwnerASC);
 	}
 }
 
@@ -379,69 +434,54 @@ void USovShieldComponent::HandleBaseAppearanceApplied()
 
 void USovShieldComponent::UninitializeFromAbilitySystem()
 {
-	StopRecharge();
+	++BindingGeneration;
+	++LifecycleGeneration;
+	ClearLifecycleTimers();
+	// Detach every local field before removing tags. GAS tag callbacks may rebind us.
+	TStrongObjectPtr<UAbilitySystemComponent> PreviousASC(AbilitySystemComponent.Get());
+	const FDelegateHandle PreviousShieldDelegate = ShieldChangedDelegateHandle;
+	ShieldChangedDelegateHandle.Reset();
+	const FDelegateHandle PreviousMaxShieldDelegate = MaxShieldChangedDelegateHandle;
+	MaxShieldChangedDelegateHandle.Reset();
+	const FDelegateHandle PreviousHealthDelegate = HealthChangedDelegateHandle;
+	HealthChangedDelegateHandle.Reset();
+	const FGameplayTag PreviousRechargeBlockedTag = RechargeBlockedTag;
+	RechargeBlockedTag = FGameplayTag();
+	const FDelegateHandle PreviousRechargeBlockedDelegate = RechargeBlockedTagChangedDelegateHandle;
+	RechargeBlockedTagChangedDelegateHandle.Reset();
+	const FGameplayTag PreviousShieldBrokenTag = ShieldBrokenTag;
+	ShieldBrokenTag = FGameplayTag();
+	const bool bPreviouslyAppliedShieldBroken = bAppliedShieldBrokenTag;
+	bAppliedShieldBrokenTag = false;
+	AbilitySystemComponent = nullptr;
+	BoundActorInfoEpoch = 0;
+	BoundReadyEpoch = 0;
+	bRestoringCheckpoint = false;
+	bCheckpointResetPending = false;
+	bHasRecordedShieldDamage = false;
+	bShieldBroken = false;
+	bRechargeDelayElapsed = false;
+	LastRechargeUpdateWorldTime = 0.f;
+	if (!PreviousASC.IsValid()) { return; }
 
-	if (UWorld* World = GetWorld())
+	PreviousASC->GetGameplayAttributeValueChangeDelegate(UNarrativeAttributeSetBase::GetShieldAttribute()).Remove(PreviousShieldDelegate);
+	PreviousASC->GetGameplayAttributeValueChangeDelegate(UNarrativeAttributeSetBase::GetMaxShieldAttribute()).Remove(PreviousMaxShieldDelegate);
+	PreviousASC->GetGameplayAttributeValueChangeDelegate(UNarrativeAttributeSetBase::GetHealthAttribute()).Remove(PreviousHealthDelegate);
+	if (PreviousRechargeBlockedTag.IsValid())
 	{
-		World->GetTimerManager().ClearTimer(RechargeDelayTimerHandle);
+		PreviousASC->RegisterGameplayTagEvent(PreviousRechargeBlockedTag, EGameplayTagEventType::NewOrRemoved).Remove(PreviousRechargeBlockedDelegate);
 	}
-
-	if (!IsValid(AbilitySystemComponent))
+	if (auto* NarrativeASC = Cast<UNarrativeAbilitySystemComponent>(PreviousASC.Get()))
 	{
-		AbilitySystemComponent = nullptr;
-		ShieldChangedDelegateHandle.Reset();
-		MaxShieldChangedDelegateHandle.Reset();
-		RechargeBlockedTagChangedDelegateHandle.Reset();
-		ShieldBrokenTag = FGameplayTag();
-		RechargeBlockedTag = FGameplayTag();
-		bShieldBroken = false;
-		bAppliedShieldBrokenTag = false;
-		bHasRecordedShieldDamage = false;
-		bRechargeDelayElapsed = false;
-		UpdateShieldVisualScalar();
-		return;
-	}
-
-	if (ShieldChangedDelegateHandle.IsValid())
-	{
-		AbilitySystemComponent
-			->GetGameplayAttributeValueChangeDelegate(UNarrativeAttributeSetBase::GetShieldAttribute())
-			.Remove(ShieldChangedDelegateHandle);
-	}
-
-	if (MaxShieldChangedDelegateHandle.IsValid())
-	{
-		AbilitySystemComponent
-			->GetGameplayAttributeValueChangeDelegate(UNarrativeAttributeSetBase::GetMaxShieldAttribute())
-			.Remove(MaxShieldChangedDelegateHandle);
-	}
-
-	if (RechargeBlockedTag.IsValid() && RechargeBlockedTagChangedDelegateHandle.IsValid())
-	{
-		AbilitySystemComponent
-			->RegisterGameplayTagEvent(
-				RechargeBlockedTag,
-				EGameplayTagEventType::NewOrRemoved)
-			.Remove(RechargeBlockedTagChangedDelegateHandle);
-	}
-
-	if (UNarrativeAbilitySystemComponent* NarrativeASC = Cast<UNarrativeAbilitySystemComponent>(AbilitySystemComponent))
-	{
+		NarrativeASC->OnDeathStateChanged.RemoveDynamic(this, &ThisClass::HandleOwnerDeathChanged);
+		NarrativeASC->OnCharacterReadyEpochChanged.RemoveDynamic(this, &ThisClass::HandleOwnerReadyEpochChanged);
 		NarrativeASC->OnDamageResolvedAsTarget.RemoveDynamic(this, &ThisClass::HandleDamageResolved);
 	}
 
-	RemoveShieldBrokenTag();
-
-	AbilitySystemComponent = nullptr;
-	ShieldChangedDelegateHandle.Reset();
-	MaxShieldChangedDelegateHandle.Reset();
-	RechargeBlockedTagChangedDelegateHandle.Reset();
-	ShieldBrokenTag = FGameplayTag();
-	RechargeBlockedTag = FGameplayTag();
-	bShieldBroken = false;
-	bHasRecordedShieldDamage = false;
-	bRechargeDelayElapsed = false;
-	UpdateShieldVisualScalar();
+	if (bPreviouslyAppliedShieldBroken && PreviousShieldBrokenTag.IsValid())
+	{
+		PreviousASC->RemoveLooseGameplayTag(PreviousShieldBrokenTag, 1, EGameplayTagReplicationState::TagAndCountToAll);
+	}
 }
 
 void USovShieldComponent::ClearLifecycleTimers()
@@ -458,6 +498,8 @@ void USovShieldComponent::ClearLifecycleTimers()
 
 void USovShieldComponent::HandleShieldAttributeChanged(const FOnAttributeChangeData& ChangeData)
 {
+	if (!HasLiveOwner() || !FMath::IsNearlyEqual(ChangeData.NewValue, GetShield())) { return; }
+	const uint64 ExpectedOperation = LifecycleGeneration;
 	const float OldShield = FMath::Max(ChangeData.OldValue, 0.0f);
 	const float NewShield = FMath::Clamp(ChangeData.NewValue, 0.0f, GetMaxShield());
 
@@ -467,10 +509,12 @@ void USovShieldComponent::HandleShieldAttributeChanged(const FOnAttributeChangeD
 	}
 
 	UpdateShieldVisualScalar();
+	if (!IsCurrentOperation(ExpectedOperation)) { return; }
 	RefreshShieldBrokenState(NewShield, !bRestoringCheckpoint);
+	if (!IsCurrentOperation(ExpectedOperation)) { return; }
 	OnShieldChanged.Broadcast(OldShield, NewShield, GetMaxShield());
 
-	if (!CanWriteShield())
+	if (!IsCurrentOperation(ExpectedOperation) || !CanWriteShield() || bRestoringCheckpoint)
 	{
 		return;
 	}
@@ -487,12 +531,17 @@ void USovShieldComponent::HandleShieldAttributeChanged(const FOnAttributeChangeD
 
 void USovShieldComponent::HandleMaxShieldAttributeChanged(const FOnAttributeChangeData& ChangeData)
 {
+	if (!HasLiveOwner() || !FMath::IsNearlyEqual(ChangeData.NewValue, GetMaxShield())) { return; }
+	const uint64 ExpectedOperation = LifecycleGeneration;
 	const float CurrentShield = GetShield();
 	const float CurrentMaxShield = FMath::Max(ChangeData.NewValue, 0.0f);
 
 	RefreshShieldBrokenState(CurrentShield, false);
+	if (!IsCurrentOperation(ExpectedOperation)) { return; }
 	UpdateShieldVisualScalar();
+	if (!IsCurrentOperation(ExpectedOperation)) { return; }
 	OnShieldChanged.Broadcast(CurrentShield, CurrentShield, CurrentMaxShield);
+	if (!IsCurrentOperation(ExpectedOperation) || bRestoringCheckpoint) { return; }
 
 	if (!CanWriteShield() || CurrentShield + KINDA_SMALL_NUMBER >= CurrentMaxShield)
 	{
@@ -508,13 +557,14 @@ void USovShieldComponent::HandleRechargeBlockedTagChanged(
 	const int32 NewCount)
 {
 	static_cast<void>(CallbackTag);
+	static_cast<void>(NewCount);
 
 	if (!CanWriteShield())
 	{
 		return;
 	}
 
-	if (NewCount > 0)
+	if (IsRechargeBlocked())
 	{
 		StopRecharge();
 	}
@@ -530,8 +580,12 @@ void USovShieldComponent::HandleDamageResolved(const FSovDamageResult& Result)
 	// This path covers hits against an already-depleted Shield and explicit
 	// recharge-reset packets, which otherwise have no attribute transition.
 	if (CanWriteShield()
+		&& !bRestoringCheckpoint
+		&& Result.TargetActor == GetOwner()
+		&& Result.IsCurrentTargetLife(AbilitySystemComponent.Get())
 		&& Result.bShouldRestartShieldRecharge
-		&& Result.AppliedShieldDamage <= KINDA_SMALL_NUMBER)
+		&& Result.AppliedShieldDamage <= KINDA_SMALL_NUMBER
+		&& Result.ConsumeNativeReceipt(this))
 	{
 		RecordShieldDamage();
 	}
@@ -539,7 +593,7 @@ void USovShieldComponent::HandleDamageResolved(const FSovDamageResult& Result)
 
 void USovShieldComponent::RecordShieldDamage()
 {
-	if (!CanWriteShield())
+	if (!CanWriteShield() || bRestoringCheckpoint)
 	{
 		return;
 	}
@@ -571,8 +625,10 @@ void USovShieldComponent::ScheduleRechargeDelay(const float DelaySeconds)
 
 		TimerManager.SetTimer(
 			RechargeDelayTimerHandle,
-			this,
-			&ThisClass::HandleRechargeDelayElapsed,
+			FTimerDelegate::CreateWeakLambda(this, [this, ExpectedOperation = LifecycleGeneration]()
+			{
+				if (ValidateLifecycleCallback(ExpectedOperation)) { HandleRechargeDelayElapsed(); }
+			}),
 			DelaySeconds,
 			false,
 			DelaySeconds);
@@ -581,6 +637,7 @@ void USovShieldComponent::ScheduleRechargeDelay(const float DelaySeconds)
 
 void USovShieldComponent::HandleRechargeDelayElapsed()
 {
+	if (!CanWriteShield() || bRestoringCheckpoint) { return; }
 	bRechargeDelayElapsed = true;
 	TryStartRecharge();
 }
@@ -588,6 +645,7 @@ void USovShieldComponent::HandleRechargeDelayElapsed()
 void USovShieldComponent::TryStartRecharge()
 {
 	if (!CanWriteShield()
+		|| bRestoringCheckpoint
 		|| IsRechargeBlocked()
 		|| RechargePercentPerSecond <= 0.0f
 		|| RechargeTimerInterval <= 0.0f)
@@ -632,8 +690,10 @@ void USovShieldComponent::TryStartRecharge()
 		LastRechargeUpdateWorldTime = GetWorldTimeSeconds();
 		TimerManager.SetTimer(
 			RechargeTimerHandle,
-			this,
-			&ThisClass::HandleRechargeTimerElapsed,
+			FTimerDelegate::CreateWeakLambda(this, [this, ExpectedOperation = LifecycleGeneration]()
+			{
+				if (ValidateLifecycleCallback(ExpectedOperation)) { HandleRechargeTimerElapsed(); }
+			}),
 			EffectiveInterval,
 			true,
 			EffectiveInterval);
@@ -642,7 +702,7 @@ void USovShieldComponent::TryStartRecharge()
 
 void USovShieldComponent::HandleRechargeTimerElapsed()
 {
-	if (!CanWriteShield() || IsRechargeBlocked())
+	if (!CanWriteShield() || bRestoringCheckpoint || IsRechargeBlocked())
 	{
 		StopRecharge();
 		return;
@@ -672,10 +732,12 @@ void USovShieldComponent::HandleRechargeTimerElapsed()
 		* FMath::Max(RechargePercentPerSecond, 0.0f)
 		* RechargeSeconds;
 	const float NewShield = FMath::Min(CurrentShield + RechargeAmount, CurrentMaxShield);
+	const uint64 ExpectedOperation = LifecycleGeneration;
 
 	AbilitySystemComponent->SetNumericAttributeBase(
 		UNarrativeAttributeSetBase::GetShieldAttribute(),
 		NewShield);
+	if (!IsCurrentOperation(ExpectedOperation)) { return; }
 
 	if (NewShield + KINDA_SMALL_NUMBER >= CurrentMaxShield)
 	{
@@ -696,6 +758,8 @@ void USovShieldComponent::RefreshShieldBrokenState(
 	const float CurrentShield,
 	const bool bBroadcastBreak)
 {
+	if (!HasLiveOwner()) { return; }
+	const uint64 ExpectedOperation = LifecycleGeneration;
 	const bool bNewShieldBroken = GetMaxShield() > KINDA_SMALL_NUMBER
 		&& CurrentShield <= KINDA_SMALL_NUMBER;
 
@@ -708,9 +772,11 @@ void USovShieldComponent::RefreshShieldBrokenState(
 	if (bShieldBroken)
 	{
 		ApplyShieldBrokenTag();
+		if (!IsCurrentOperation(ExpectedOperation) || !bShieldBroken) { return; }
 		if (bBroadcastBreak)
 		{
 			SpawnShieldBreakSystem();
+			if (!IsCurrentOperation(ExpectedOperation) || !bShieldBroken) { return; }
 			OnShieldBroken.Broadcast();
 		}
 	}
@@ -1111,11 +1177,12 @@ void USovShieldComponent::ApplyShieldBrokenTag()
 		return;
 	}
 
+	// Claim the contribution before GAS broadcasts its synchronous tag callbacks.
+	bAppliedShieldBrokenTag = true;
 	AbilitySystemComponent->AddLooseGameplayTag(
 		ShieldBrokenTag,
 		1,
 		EGameplayTagReplicationState::TagAndCountToAll);
-	bAppliedShieldBrokenTag = true;
 }
 
 void USovShieldComponent::RemoveShieldBrokenTag()
@@ -1127,16 +1194,85 @@ void USovShieldComponent::RemoveShieldBrokenTag()
 		return;
 	}
 
+	bAppliedShieldBrokenTag = false;
 	AbilitySystemComponent->RemoveLooseGameplayTag(
 		ShieldBrokenTag,
 		1,
 		EGameplayTagReplicationState::TagAndCountToAll);
-	bAppliedShieldBrokenTag = false;
+}
+
+bool USovShieldComponent::IsCurrentBinding(const uint64 ExpectedGeneration) const
+{
+	if (ExpectedGeneration != BindingGeneration || bEndingPlay || !IsValid(this)
+		|| !IsValid(GetOwner()) || GetOwner()->IsActorBeingDestroyed()
+		|| !IsValid(AbilitySystemComponent) || AbilitySystemComponent->GetAvatarActor() != GetOwner()) { return false; }
+	const auto* NarrativeASC = Cast<UNarrativeAbilitySystemComponent>(AbilitySystemComponent);
+	return !NarrativeASC || (NarrativeASC->GetCombatActorInfoEpoch() == BoundActorInfoEpoch
+		&& NarrativeASC->GetCharacterReadyEpoch() == BoundReadyEpoch);
+}
+
+bool USovShieldComponent::HasLiveOwner() const
+{
+	if (!IsInitialized()) { return false; }
+	const float Health = AbilitySystemComponent->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute());
+	const auto* NarrativeASC = Cast<UNarrativeAbilitySystemComponent>(AbilitySystemComponent);
+	return FMath::IsFinite(Health) && Health > 0.f && (!NarrativeASC || !NarrativeASC->IsDead());
+}
+
+bool USovShieldComponent::IsCurrentOperation(const uint64 ExpectedGeneration) const
+{
+	return LifecycleGeneration == ExpectedGeneration && IsInitialized() && HasLiveOwner();
+}
+
+bool USovShieldComponent::ValidateLifecycleCallback(const uint64 ExpectedGeneration)
+{
+	if (IsCurrentOperation(ExpectedGeneration) && !bRestoringCheckpoint) { return true; }
+	// Clear only the retired timer generation, never timers installed by a reentrant reset.
+	if (LifecycleGeneration == ExpectedGeneration)
+	{
+		++LifecycleGeneration;
+		ClearLifecycleTimers();
+	}
+	return false;
+}
+
+void USovShieldComponent::HandleHealthAttributeChanged(const FOnAttributeChangeData& ChangeData)
+{
+	if (!IsInitialized()) { return; }
+	const float CurrentHealth = AbilitySystemComponent->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute());
+	if (FMath::IsFinite(CurrentHealth) && CurrentHealth > 0.f) { return; }
+	static_cast<void>(ChangeData);
+	++LifecycleGeneration;
+	ClearLifecycleTimers();
+	bCheckpointResetPending = false;
+	RemoveShieldBrokenTag();
+}
+
+void USovShieldComponent::HandleOwnerDeathChanged(AActor* KilledActor, UNarrativeAbilitySystemComponent* KilledASC, const bool bIsDead)
+{
+	if (!bIsDead || KilledActor != GetOwner() || KilledASC != AbilitySystemComponent
+		|| !IsInitialized() || !KilledASC->IsDead()) { return; }
+	++LifecycleGeneration;
+	ClearLifecycleTimers();
+	bCheckpointResetPending = false;
+	RemoveShieldBrokenTag();
+}
+
+void USovShieldComponent::HandleOwnerReadyEpochChanged(const int32 ReadyEpoch)
+{
+	// Player readiness is published after the legacy OnASCInitialized callback.
+	// Rebind even when the pointer is unchanged so the initial ready epoch remains usable.
+	const auto* NarrativeASC = Cast<UNarrativeAbilitySystemComponent>(AbilitySystemComponent);
+	if (!bEndingPlay && IsValid(NarrativeASC) && NarrativeASC->GetAvatarActor() == GetOwner()
+		&& NarrativeASC->GetCharacterReadyEpoch() == ReadyEpoch)
+	{
+		InitializeWithAbilitySystem(AbilitySystemComponent);
+	}
 }
 
 bool USovShieldComponent::CanWriteShield() const
 {
-	return IsInitialized() && IsValid(GetOwner()) && GetOwner()->HasAuthority();
+	return HasLiveOwner() && GetOwner()->HasAuthority();
 }
 
 float USovShieldComponent::GetWorldTimeSeconds() const

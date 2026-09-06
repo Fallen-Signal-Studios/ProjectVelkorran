@@ -113,6 +113,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Sovereign|Echo")
 	float RestoreEchoFromCheckpoint(float AuthoredValue);
 
+	/** Restart decay timing after the snapshot owner has already restored the GAS base. */
+	void ResetCheckpointActivity();
+
 	/** Starts encounter decay timing without changing the current Echo value. */
 	UFUNCTION(BlueprintCallable, Category = "Sovereign|Echo")
 	void BeginEncounter();

@@ -256,6 +256,7 @@ void USovFatalRecoveryComponent::ResolveFatal(uint64 ExpectedEpoch)
 			if (!USovEncounterSnapshotLibrary::CaptureResources(ASC, Resources)) { break; }
 			Resources.Health = static_cast<float>(SovRecoveryPolicy::RescueHealth(Resources.MaxHealth));
 			Resources.Shield = 0.f; Resources.Stamina = Resources.MaxStamina * .5f; Resources.Poise = Resources.MaxPoise;
+			if (!USovEncounterSnapshotLibrary::RebaseAuthoredResourceCurrents(ASC, Resources)) { break; }
 			UsedRescueAttempt = Encounter->GetAttemptId();
 			const FName CompanionId = Companion->CompanionId;
 			const FName EncounterId = Encounter->EncounterId;

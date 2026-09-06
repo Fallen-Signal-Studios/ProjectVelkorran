@@ -19,11 +19,23 @@ struct PROJECTVELKORRAN_API FSovProtagonistAbilitySnapshot
 	UPROPERTY(SaveGame, BlueprintReadOnly) int32 Level = 1;
 };
 
-/** Values are captured for inspection. Restore clamps currents to the current definition's maxima. */
+/** Resolved values support UI/legacy saves; schema 2 separately stores underlying GAS bases. */
 USTRUCT(BlueprintType)
 struct PROJECTVELKORRAN_API FSovCombatResourceSnapshot
 {
 	GENERATED_BODY()
+	/** Default 1 admits records written before explicit bases existed. Capture writes version 2. */
+	UPROPERTY(SaveGame, BlueprintReadOnly) int32 SchemaVersion = 1;
+	UPROPERTY(SaveGame, BlueprintReadOnly) float BaseHealth = 0.f;
+	UPROPERTY(SaveGame, BlueprintReadOnly) float BaseShield = 0.f;
+	UPROPERTY(SaveGame, BlueprintReadOnly) float BaseStamina = 0.f;
+	UPROPERTY(SaveGame, BlueprintReadOnly) float BasePoise = 0.f;
+	UPROPERTY(SaveGame, BlueprintReadOnly) float BaseEcho = 0.f;
+	UPROPERTY(SaveGame, BlueprintReadOnly) float BaseMaxHealth = 0.f;
+	UPROPERTY(SaveGame, BlueprintReadOnly) float BaseMaxShield = 0.f;
+	UPROPERTY(SaveGame, BlueprintReadOnly) float BaseMaxStamina = 0.f;
+	UPROPERTY(SaveGame, BlueprintReadOnly) float BaseMaxPoise = 0.f;
+	UPROPERTY(SaveGame, BlueprintReadOnly) float BaseMaxEcho = 0.f;
 	UPROPERTY(SaveGame, BlueprintReadOnly) float Health = 0.f;
 	UPROPERTY(SaveGame, BlueprintReadOnly) float Shield = 0.f;
 	UPROPERTY(SaveGame, BlueprintReadOnly) float Stamina = 0.f;

@@ -15,6 +15,8 @@ class PROJECTVELKORRAN_API USovEncounterSnapshotLibrary : public UBlueprintFunct
 	GENERATED_BODY()
 public:
 	static bool CaptureResources(UAbilitySystemComponent* ASC, FSovCombatResourceSnapshot& OutSnapshot);
+	/** After authoring new resolved currents (for example rescue), explicitly update their underlying bases. */
+	static bool RebaseAuthoredResourceCurrents(UAbilitySystemComponent* ASC, FSovCombatResourceSnapshot& InOutSnapshot);
 	static bool RestoreResources(UAbilitySystemComponent* ASC, const FSovCombatResourceSnapshot& Snapshot);
 	static bool CaptureComponent(UActorComponent* Component, FNarrativeSaveComponent& OutRecord);
 	static bool RestoreComponent(UActorComponent* Component, const FNarrativeSaveComponent& Record);

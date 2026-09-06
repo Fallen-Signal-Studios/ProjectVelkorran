@@ -63,9 +63,10 @@ bool FSovDamageResult::HasNativeReceipt() const
 		&& NativeConsumptionReceipt->Transaction == TransactionId;
 }
 
-bool FSovDamageResult::IsCurrentTargetLife() const
+bool FSovDamageResult::IsCurrentTargetLife(const UAbilitySystemComponent* ExpectedTargetASC) const
 {
-	return SovDamageReceipt::IsCurrentTarget(NativeConsumptionReceipt, TransactionId, TargetActor.Get());
+	return SovDamageReceipt::IsCurrentTarget(NativeConsumptionReceipt, TransactionId, TargetActor.Get())
+		&& (!ExpectedTargetASC || NativeConsumptionReceipt->TargetASC.Get() == ExpectedTargetASC);
 }
 
 bool FSovStatusApplicationRequest::IsCurrentDamageOrigin() const

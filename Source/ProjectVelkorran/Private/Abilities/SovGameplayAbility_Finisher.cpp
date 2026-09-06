@@ -21,6 +21,7 @@
 #include "NarrativeGameplayTags.h"
 #include "Sovereign/SovGameplayTags.h"
 #include "UObject/StrongObjectPtr.h"
+#include "Misc/ScopeExit.h"
 USovGameplayEffect_FinisherProtection::USovGameplayEffect_FinisherProtection()
 { DurationPolicy=EGameplayEffectDurationType::HasDuration; DurationMagnitude=FGameplayEffectModifierMagnitude(FScalableFloat(2.f)); StackingType=EGameplayEffectStackingType::None; }
 USovGameplayEffect_FinisherDamage::USovGameplayEffect_FinisherDamage()
@@ -208,21 +209,53 @@ void USovGameplayAbility_Finisher::Strike()
     Spec.SetSetByCallerMagnitude(FNarrativeGameplayTags::Get().SetByCaller_Damage,Damage);
     Spec.SetSetByCallerMagnitude(T.SetByCaller_Damage_PoiseDamage,0.f);
     if (UNarrativeDamageExecCalc::ShouldRejectTransaction(ActionASC.Get(),TargetASC.Get(),Spec)) { FinishAction(); return; }
-    const FGameplayTag ResolvedPhase=TargetComponent->RequiredPhaseTag;
-    // A committed phase belongs to the target's durable state. Capture its
-    // outcome before damage callbacks can end this action and clear our source.
+    TStrongObjectPtr<AActor> KeepTarget(Target);
+    TStrongObjectPtr<USovFinisherTargetComponent> OutcomeOwner(TargetComponent.Get());
+    TStrongObjectPtr<UNarrativeAbilitySystemComponent> DamageTarget(Cast<UNarrativeAbilitySystemComponent>(TargetASC.Get()));
+    TStrongObjectPtr<UAbilitySystemComponent> DamageSource(ActionASC.Get());
+    if (!DamageTarget.IsValid() || Damage <= 0.f) { FinishReservedAction(CapturedLease); return; }
+    TStrongObjectPtr<const UNarrativeAttributeSetBase> TargetAttributes(DamageTarget->GetSet<UNarrativeAttributeSetBase>());
+    if (!TargetAttributes.IsValid()) { FinishReservedAction(CapturedLease); return; }
+    const uint64 TargetActorInfoEpoch=DamageTarget->GetCombatActorInfoEpoch();
+    const int32 TargetReadyEpoch=DamageTarget->GetCharacterReadyEpoch();
+    const uint64 TargetLifeEpoch=TargetAttributes->GetCombatLifeEpoch();
+    const FGameplayTag ResolvedPhase=OutcomeOwner->RequiredPhaseTag;
     FGameplayEventData PhasePayload;
     PhasePayload.EventTag=T.Event_Finisher_PhaseResolved;
     PhasePayload.Instigator=ActionAvatar.Get(); PhasePayload.Target=Target;
     if (ResolvedPhase.IsValid()) { PhasePayload.TargetTags.AddTag(ResolvedPhase); }
     PhasePayload.ContextHandle=Context;
-    const bool bPhaseOutcome=!bNormal && bAligned && TargetComponent->CommitPhase(this,Lease);
-    if (Damage>0.f) { ActionASC->ApplyGameplayEffectSpecToTarget(Spec,TargetASC.Get()); }
-    if (bPhaseOutcome && IsValid(Target) && !Target->IsActorBeingDestroyed())
+    const bool bWantsPhaseOutcome=!bNormal && bAligned;
+    FGuid PendingOutcome;
+    if (bWantsPhaseOutcome && !OutcomeOwner->BeginPhaseOutcome(this,CapturedLease,PendingOutcome))
+    { FinishReservedAction(CapturedLease); return; }
+    ON_SCOPE_EXIT
     {
-        UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(Target,PhasePayload.EventTag,PhasePayload);
-    }
-    if (OwnsAction(CapturedLease)) { OnFinisherResolved(Target,bPhaseOutcome); }
+        if (IsValid(OutcomeOwner.Get())) { OutcomeOwner->FinishPhaseOutcome(PendingOutcome); }
+    };
+    TStrongObjectPtr<USovNativeDamageReceipt> Receipt(NewObject<USovNativeDamageReceipt>());
+    Receipt->ExpectedTarget=Target; Receipt->ExpectedContext=Context.Get(); Receipt->bRequireNativeProof=true;
+    // Target publication survives source ability cancellation, while native proof
+    // rejects rejected/zero packets and retired target lives. The receipt is local
+    // to this exact synchronous execution, never an ability-owned mutable member.
+    DamageTarget->OnDamageResolvedAsTarget.AddDynamic(Receipt.Get(), &USovNativeDamageReceipt::ReceiveResult);
+    DamageSource->ApplyGameplayEffectSpecToTarget(Spec,DamageTarget.Get());
+    if (IsValid(DamageTarget.Get()))
+    { DamageTarget->OnDamageResolvedAsTarget.RemoveDynamic(Receipt.Get(), &USovNativeDamageReceipt::ReceiveResult); }
+    const bool bSameTarget=IsValid(Target) && !Target->IsActorBeingDestroyed()
+        && IsValid(OutcomeOwner.Get()) && Target->FindComponentByClass<USovFinisherTargetComponent>()==OutcomeOwner.Get()
+        && IsValid(DamageTarget.Get()) && DamageTarget->GetAvatarActor()==Target
+        && UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Target)==DamageTarget.Get()
+        && DamageTarget->GetCombatActorInfoEpoch()==TargetActorInfoEpoch
+        && DamageTarget->GetCharacterReadyEpoch()==TargetReadyEpoch
+        && DamageTarget->GetSet<UNarrativeAttributeSetBase>()==TargetAttributes.Get()
+        && TargetAttributes->GetCombatLifeEpoch()==TargetLifeEpoch;
+    const bool bPhaseOutcome=bWantsPhaseOutcome && IsValid(OutcomeOwner.Get())
+        && OutcomeOwner->CommitPhaseOutcome(PendingOutcome,ResolvedPhase,Receipt->bAppliedDamage,bSameTarget);
+    if (bPhaseOutcome)
+    { UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(Target,PhasePayload.EventTag,PhasePayload); }
+    if (Receipt->bAppliedDamage && bSameTarget && OwnsAction(CapturedLease)) { OnFinisherResolved(Target,bPhaseOutcome); }
+
 }
 void USovGameplayAbility_Finisher::FinishAction()
 { if (IsActive()) { EndAbility(CurrentSpecHandle,CurrentActorInfo,CurrentActivationInfo,true,!bStruck); } }

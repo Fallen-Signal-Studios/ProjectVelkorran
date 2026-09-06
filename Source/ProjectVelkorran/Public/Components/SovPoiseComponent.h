@@ -9,6 +9,7 @@
 #include "SovPoiseComponent.generated.h"
 
 class UAbilitySystemComponent;
+class UNarrativeAbilitySystemComponent;
 struct FOnAttributeChangeData;
 
 UENUM(BlueprintType)
@@ -61,7 +62,9 @@ public:
 
 	/** Clear prior-attempt owned state/timers and derive state from restored Poise. */
 	void ResetForCheckpoint();
-	void SetCheckpointRestoreInProgress(bool bInProgress) { bRestoringCheckpoint = bInProgress; }
+	void SetCheckpointRestoreInProgress(bool bInProgress);
+	void SetCheckpointRestoreInProgress(bool bInProgress, uint64 ExpectedBindingGeneration);
+	uint64 GetBindingGeneration() const { return BindingGeneration; }
 
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Poise")
 	bool IsInitialized() const;
@@ -151,6 +154,21 @@ protected:
 
 private:
 	bool bRestoringCheckpoint = false;
+	bool bCheckpointResetPending = false;
+	bool bEndingPlay = false;
+	uint64 BindingGeneration = 0;
+	uint64 LifecycleGeneration = 0;
+	uint64 BoundActorInfoEpoch = 0;
+	int32 BoundReadyEpoch = 0;
+	bool IsCurrentBinding(uint64 ExpectedGeneration) const;
+	bool HasLiveOwner() const;
+	bool IsCurrentOperation(uint64 ExpectedGeneration) const;
+	bool ValidateLifecycleCallback(uint64 ExpectedGeneration);
+	void HandleHealthAttributeChanged(const FOnAttributeChangeData& ChangeData);
+	UFUNCTION()
+	void HandleOwnerDeathChanged(AActor* KilledActor, UNarrativeAbilitySystemComponent* KilledASC, bool bIsDead);
+	UFUNCTION()
+	void HandleOwnerReadyEpochChanged(int32 ReadyEpoch);
 	void TryInitializeFromOwner();
 
 	UFUNCTION()
@@ -194,6 +212,7 @@ private:
 
 	FDelegateHandle PoiseChangedDelegateHandle;
 	FDelegateHandle MaxPoiseChangedDelegateHandle;
+	FDelegateHandle HealthChangedDelegateHandle;
 	FDelegateHandle RegenerationBlockedTagChangedDelegateHandle;
 	FDelegateHandle BrokenTagChangedDelegateHandle;
 	FDelegateHandle RecoveringTagChangedDelegateHandle;

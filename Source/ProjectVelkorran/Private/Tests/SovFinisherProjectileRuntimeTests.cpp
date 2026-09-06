@@ -3,6 +3,8 @@
 #include "Tests/SovCombatRoutingTestFixtures.h"
 #include "Abilities/SovGameplayAbility_Finisher.h"
 #include "Combat/SovFinisherTargetComponent.h"
+#include "Campaign/SovEncounterSnapshotLibrary.h"
+#include "UObject/Script.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
@@ -19,7 +21,12 @@ struct FSovFinisherRuntimeTestAccess
     // Isolate phase delivery from authored alignment geometry. Keep the real
     // GAS activation and target reservation for the durable commit boundary.
     static void AlignedStrike(USovGameplayAbility_Finisher* Ability)
-    { Ability->bAligned=true; Ability->Strike(); }
+    {
+#if WITH_EDITOR
+        FEditorScriptExecutionGuard AllowNativeReceipt;
+#endif
+        Ability->bAligned=true; Ability->Strike();
+    }
 };
 struct FSovProjectileDefenseTestAccess
 {
@@ -141,6 +148,87 @@ bool FSovFinisherCommittedOutcomeTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("A duplicate strike cannot replay the outcome"),OutcomeCount,1);
     TestFalse(TEXT("Committed phase cannot be reserved for repeated damage"),Component->IsAvailableFor(Player));
     EnemyASC->GenericGameplayEventCallbacks.FindOrAdd(T.Event_Finisher_PhaseResolved).Remove(EventHandle);
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovFinisherRejectedDamageOutcomeTest,
+    "ProjectVelkorran.Campaign.Finisher.RejectedDamageCannotCommitPhase",EAutomationTestFlags::EditorContext|EAutomationTestFlags::ProductFilter)
+bool FSovFinisherRejectedDamageOutcomeTest::RunTest(const FString& Parameters)
+{
+    FFinisherWorld F; auto* Player=F.Character(0.f,0); auto* Enemy=F.Character(150.f,1);
+    if (!Player || !Enemy) { return false; }
+    auto* Component=F.Eligible(Enemy); auto* ASC=Player->GetNarrativeAbilitySystemComponent();
+    auto* EnemyASC=Enemy->GetNarrativeAbilitySystemComponent(); const auto& T=FSovGameplayTags::Get();
+    Component->TargetKind=ESovFinisherTargetKind::Elite; Component->RequiredPhaseTag=T.State_Target_Exposed;
+    EnemyASC->AddLooseGameplayTag(T.State_Target_Exposed);
+    const auto Handle=ASC->GiveAbility(FGameplayAbilitySpec(USovGameplayAbility_Finisher::StaticClass(),1));
+    if (!TestTrue(TEXT("Finisher activates"),ASC->TryActivateAbility(Handle,false))) { return false; }
+    auto* Ability=Cast<USovGameplayAbility_Finisher>(ASC->FindAbilitySpecFromHandle(Handle)->GetPrimaryInstance());
+    bool bVetoed=false, bPendingSaveRejected=false, bReplacementRejected=false;
+    const int32 QueryIndex=EnemyASC->GameplayEffectApplicationQueries.Add(FGameplayEffectApplicationQuery::CreateLambda(
+        [&](const FActiveGameplayEffectsContainer&,const FGameplayEffectSpec& Spec)
+        {
+            if (!Spec.Def || !Spec.Def->IsA<USovGameplayEffect_FinisherDamage>()) { return true; }
+            bVetoed=true;
+            FNarrativeSaveComponent Record;
+            bPendingSaveRejected=!USovEncounterSnapshotLibrary::CaptureComponent(Component,Record);
+            ASC->CancelAbilityHandle(Handle);
+            ASC->TryActivateAbility(Handle,false);
+            bReplacementRejected=!ASC->FindAbilitySpecFromHandle(Handle)->IsActive() && !Component->IsAvailableFor(Player);
+            return false;
+        }));
+    FSovFinisherRuntimeTestAccess::AlignedStrike(Ability);
+    EnemyASC->GameplayEffectApplicationQueries.RemoveAt(QueryIndex);
+    TestTrue(TEXT("GAS veto occurs after native preflight"),bVetoed);
+    TestTrue(TEXT("No partial damage/outcome save admitted"),bPendingSaveRejected);
+    TestTrue(TEXT("Cancellation cannot reserve target during pending damage"),bReplacementRejected);
+    TestFalse(TEXT("Rejected damage cannot consume phase"),Component->HasResolvedPhase(T.State_Target_Exposed));
+    TestEqual(TEXT("Rejected damage leaves Health intact"),EnemyASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()),20.f);
+    TestTrue(TEXT("Rejected transaction releases pending ownership"),Component->IsAvailableFor(Player));
+    FNarrativeSaveComponent Record;
+    TestTrue(TEXT("Save capture is available again after outcome settles"),USovEncounterSnapshotLibrary::CaptureComponent(Component,Record));
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovFinisherZeroDamageOutcomeTest,
+    "ProjectVelkorran.Campaign.Finisher.ZeroDamageCannotCommitPhase",EAutomationTestFlags::EditorContext|EAutomationTestFlags::ProductFilter)
+bool FSovFinisherZeroDamageOutcomeTest::RunTest(const FString& Parameters)
+{
+    FFinisherWorld F; auto* Player=F.Character(0.f,0); auto* Enemy=F.Character(150.f,1);
+    if (!Player || !Enemy) { return false; }
+    auto* Component=F.Eligible(Enemy); auto* ASC=Player->GetNarrativeAbilitySystemComponent();
+    auto* EnemyASC=Enemy->GetNarrativeAbilitySystemComponent(); const auto& T=FSovGameplayTags::Get();
+    Component->TargetKind=ESovFinisherTargetKind::Elite; Component->RequiredPhaseTag=T.State_Target_Exposed;
+    EnemyASC->AddLooseGameplayTag(T.State_Target_Exposed);
+    EnemyASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetHealthAttribute(),1.f);
+    const auto Handle=ASC->GiveAbility(FGameplayAbilitySpec(USovGameplayAbility_Finisher::StaticClass(),1));
+    if (!TestTrue(TEXT("Earned one-Health phase activates"),ASC->TryActivateAbility(Handle,false))) { return false; }
+    auto* Ability=Cast<USovGameplayAbility_Finisher>(ASC->FindAbilitySpecFromHandle(Handle)->GetPrimaryInstance());
+    FSovFinisherRuntimeTestAccess::AlignedStrike(Ability);
+    TestFalse(TEXT("Nonlethal zero payload does not award a phase"),Component->HasResolvedPhase(T.State_Target_Exposed));
+    TestTrue(TEXT("Zero strike releases target ownership"),Component->IsAvailableFor(Player));
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovFinisherReboundTargetOutcomeTest,
+    "ProjectVelkorran.Campaign.Finisher.TargetGenerationOwnsOutcome",EAutomationTestFlags::EditorContext|EAutomationTestFlags::ProductFilter)
+bool FSovFinisherReboundTargetOutcomeTest::RunTest(const FString& Parameters)
+{
+    FFinisherWorld F; auto* Player=F.Character(0.f,0); auto* Enemy=F.Character(150.f,1);
+    if (!Player || !Enemy) { return false; }
+    auto* Component=F.Eligible(Enemy); auto* ASC=Player->GetNarrativeAbilitySystemComponent();
+    auto* EnemyASC=Enemy->GetNarrativeAbilitySystemComponent(); const auto& T=FSovGameplayTags::Get();
+    Component->TargetKind=ESovFinisherTargetKind::Elite; Component->RequiredPhaseTag=T.State_Target_Exposed;
+    EnemyASC->AddLooseGameplayTag(T.State_Target_Exposed);
+    const auto Handle=ASC->GiveAbility(FGameplayAbilitySpec(USovGameplayAbility_Finisher::StaticClass(),1));
+    if (!ASC->TryActivateAbility(Handle,false)) { return false; }
+    auto* Ability=Cast<USovGameplayAbility_Finisher>(ASC->FindAbilitySpecFromHandle(Handle)->GetPrimaryInstance());
+    const auto HealthHandle=EnemyASC->GetGameplayAttributeValueChangeDelegate(UNarrativeAttributeSetBase::GetHealthAttribute())
+        .AddLambda([&](const FOnAttributeChangeData&)
+        {
+            EnemyASC->ClearActorInfo(); EnemyASC->InitAbilityActorInfo(Enemy,Enemy);
+        });
+    FSovFinisherRuntimeTestAccess::AlignedStrike(Ability);
+    EnemyASC->GetGameplayAttributeValueChangeDelegate(UNarrativeAttributeSetBase::GetHealthAttribute()).Remove(HealthHandle);
+    TestFalse(TEXT("Same-pointer rebind cannot receive the old phase"),Component->HasResolvedPhase(T.State_Target_Exposed));
+    ASC->CancelAbilityHandle(Handle);
     return true;
 }
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovRocketReflectionRuntimeTest,
