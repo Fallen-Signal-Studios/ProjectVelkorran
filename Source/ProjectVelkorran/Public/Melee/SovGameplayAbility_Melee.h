@@ -75,7 +75,7 @@ private:
     int32 NodeIndex=INDEX_NONE;
     float ChargeStarted=0.f;
     float ChargeScalar=1.f;
-    bool bCharging=false;
+    bool bMeleeCharging=false;
     bool bHitConfirmed=false;
     bool bStartedUnarmed=false;
 };

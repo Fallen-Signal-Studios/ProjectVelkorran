@@ -2,6 +2,7 @@
 #include "Tests/SovStatusCheckpointTestFixtures.h"
 
 #include "Effects/SovGameplayEffect_Status.h"
+#include "Components/SceneComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
@@ -424,7 +425,7 @@ bool FSovStatusCheckpointMalformedPreflightTest::RunTest(const FString& Paramete
 	struct FBadCase { const TCHAR* Name; TFunction<void(FSovStatusCheckpointState&)> Mutate; };
 	const FBadCase Cases[] = {
 		{TEXT("Unsupported schema"), [](auto& S) { ++S.SchemaVersion; }},
-		{TEXT("Duplicate request family"), [](auto& S) { S.Statuses.Add(S.Statuses[0]); }},
+		{TEXT("Duplicate request family"), [](auto& S) { const auto Duplicate = S.Statuses[0]; S.Statuses.Add(Duplicate); }},
 		{TEXT("Oversized semantic array"), [](auto& S) { const auto Record = S.Statuses[0]; S.Statuses.Init(Record, 65); }},
 		{TEXT("Nonfinite magnitude"), [](auto& S) { S.Statuses[0].Magnitude = std::numeric_limits<float>::infinity(); }},
 		{TEXT("Finite magnitude overflows with stacks"), [](auto& S) { S.Statuses[0].Magnitude = std::numeric_limits<float>::max(); S.Statuses[0].StackCount = 3; }},
@@ -470,7 +471,7 @@ bool FSovStatusCheckpointMalformedPreflightTest::RunTest(const FString& Paramete
 		{
 			// Present component bytes without a semantic state field are malformed,
 			// unlike an entirely absent legacy component record.
-			TStrongObjectPtr<UActorComponent> WrongPayload(NewObject<UActorComponent>());
+			TStrongObjectPtr<USceneComponent> WrongPayload(NewObject<USceneComponent>());
 			Saved->ByteData.Reset();
 			FMemoryWriter Writer(Saved->ByteData);
 			FObjectAndNameAsStringProxyArchive Archive(Writer, true);

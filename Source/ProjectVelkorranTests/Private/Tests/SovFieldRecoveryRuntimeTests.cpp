@@ -1,5 +1,8 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Tests/SovFieldRecoveryRuntimeTestFixtures.h"
+#include "Tests/SovHandoffRuntimeTestFixtures.h"
+#include "Character/PlayerDefinition.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "FieldRecovery/SovFieldRecoveryComponent.h"
 #include "FieldRecovery/SovGameplayAbility_FieldRecovery.h"
 #include "FieldRecovery/SovFieldRecoveryStation.h"
@@ -55,6 +58,41 @@ namespace
 	};
 }
 
+namespace
+{
+	// Physical supply authorization needs the same possessed, ready, grounded
+	// campaign protagonist as Technique safe points. Ability-only fixtures above
+	// deliberately do not stage this wider gameplay boundary.
+	struct FReadyFieldRecoveryWorld
+	{
+		UWorld* World = nullptr;
+		ASovPlayerState* State = nullptr;
+		ASovHandoffRuntimeTestPawn* Player = nullptr;
+		USovFieldRecoveryComponent* Recovery = nullptr;
+		FReadyFieldRecoveryWorld()
+		{
+			const UWorld::InitializationValues Values = UWorld::InitializationValues().AllowAudioPlayback(false)
+				.CreatePhysicsScene(true).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false);
+			World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Values);
+			if (!World) { return; }
+			if (GEngine) { GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World); }
+			State = World->SpawnActor<ASovPlayerState>();
+			Player = World->SpawnActor<ASovHandoffRuntimeTestPawn>();
+			auto* Controller = World->SpawnActor<ASovHandoffRuntimeTestController>();
+			if (!State || !Player || !Controller) { return; }
+			auto* Definition = NewObject<UPlayerDefinition>(Controller); Controller->KeepAlive.Add(Definition);
+			Player->PrepareCampaignInitialization(Definition);
+			Controller->SetTestPlayerState(State); Controller->Possess(Player);
+			if (!Player->StageTestReadiness(State, true) || !Player->CompleteCampaignDataInitialization(false)) { return; }
+			Player->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+			Recovery = Player->GetFieldRecoveryComponent();
+		}
+		~FReadyFieldRecoveryWorld()
+		{
+			if (World) { World->DestroyWorld(false); if (GEngine) { GEngine->DestroyWorldContext(World); } }
+		}
+	};
+}
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovFieldRecoveryUseTest, "ProjectVelkorran.Campaign.FieldRecovery.CompletedHealCancellationAndExhaustion",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FSovFieldRecoveryUseTest::RunTest(const FString& Parameters)
@@ -90,7 +128,10 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovFieldRecoverySaveAndRefillTest, "ProjectVel
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FSovFieldRecoverySaveAndRefillTest::RunTest(const FString& Parameters)
 {
-	static_cast<void>(Parameters); FFieldRecoveryWorld Test;
+	static_cast<void>(Parameters); FReadyFieldRecoveryWorld Test;
+	if (!TestNotNull(TEXT("Ready campaign pawn owns field recovery"), Test.Recovery)) { return false; }
+	TestTrue(TEXT("Physical refill fixture is ready and grounded"), Test.Player->IsCharacterReady()
+		&& Test.Player->GetCharacterMovement()->IsMovingOnGround());
 	FSovFieldRecoveryTestAccess::SetCharges(Test.Recovery, 1);
 	FNarrativeSaveComponent Record;
 	TestTrue(TEXT("Charges use Narrative's existing component record"), USovEncounterSnapshotLibrary::CaptureComponent(Test.Recovery, Record));

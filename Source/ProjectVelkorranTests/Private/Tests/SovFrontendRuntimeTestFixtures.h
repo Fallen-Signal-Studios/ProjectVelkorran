@@ -12,7 +12,7 @@ class ASovFrontendRuntimeController : public ASovPlayerController
 	GENERATED_BODY()
 public:
 	ASovFrontendRuntimeController(const FObjectInitializer& Initializer) : Super(Initializer) {}
-	void StagePawn(APawn* Pawn) { SetPawn(Pawn); }
+	void StagePawn(APawn* StagedPawn) { SetPawn(StagedPawn); }
 	void StageHUD(UNarrativeGameplayHUD* HUD) { GameplayHUD = HUD; }
 };
 

@@ -1,4 +1,5 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
+#include "Tests/SovRuntimeObjectTestFixtures.h"
 #include "AI/NarrativeNPCController.h"
 #include "ArsenalSettings.h"
 #include "ArsenalStatics.h"
@@ -10,6 +11,7 @@
 #include "Engine/World.h"
 #include "GAS/NarrativeAttributeSetBase.h"
 #include "Misc/AutomationTest.h"
+#include "UObject/Script.h"
 #include "NarrativeGameplayTags.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISenseConfig_Sight.h"
@@ -21,6 +23,7 @@ namespace
 {
 	struct FThreatWorld
 	{
+		FEditorScriptExecutionGuard ScriptGuard;
 		UWorld* World = nullptr;
 		FThreatWorld()
 		{
@@ -58,8 +61,14 @@ namespace
 		}
 		void Advance(const float Seconds)
 		{
-			TGuardValue<uint64> Frame(GFrameCounter, GFrameCounter + 1);
-			World->Tick(LEVELTICK_TimeOnly, Seconds);
+			// World ticks clamp large deltas; expiry requires actual elapsed world time.
+			const double Until = World->GetTimeSeconds() + Seconds;
+			uint64 FrameNumber = GFrameCounter;
+			while (World->GetTimeSeconds() + UE_DOUBLE_SMALL_NUMBER < Until)
+			{
+				TGuardValue<uint64> Frame(GFrameCounter, ++FrameNumber);
+				World->Tick(LEVELTICK_TimeOnly, FMath::Min(0.05, Until - World->GetTimeSeconds()));
+			}
 		}
 	};
 	UBlackboardComponent* BlackboardFor(ANarrativeNPCController* Controller)
@@ -199,6 +208,98 @@ bool FSovThreatPerceptionRuntimeTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovThreatEventDrivenPerceptionTest,
+	"ProjectVelkorran.Campaign.Threat.AuthoredEventDrivenSensorLifecycle",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovThreatEventDrivenPerceptionTest::RunTest(const FString& Parameters)
+{
+	FThreatWorld F;
+	if (!TestNotNull(TEXT("World"), F.World)) { return false; }
+	auto* Source = F.Character(FVector::ZeroVector, 0);
+	auto* Target = F.Character(FVector(500, 0, 0), 1);
+	if (!Source || !Target) { AddError(TEXT("Character fixtures failed")); return false; }
+	auto* Controller = F.Controller(Source);
+	if (!TestNotNull(TEXT("Controller"), Controller)) { return false; }
+	auto* Blackboard = BlackboardFor(Controller);
+	if (!TestNotNull(TEXT("Blackboard"), Blackboard)) { return false; }
+	const UArsenalSettings* Settings = GetDefault<UArsenalSettings>();
+	auto* ASC = Source->GetNarrativeAbilitySystemComponent();
+	ASC->GiveAbility(FGameplayAbilitySpec(USovBotTestAttackAlpha::StaticClass(), 1));
+	const auto NewSensor = [Controller]()
+	{
+		auto* Sensor = NewObject<UAIPerceptionComponent>(Controller);
+		Controller->AddInstanceComponent(Sensor);
+		auto* Sight = NewObject<UAISenseConfig_Sight>(Sensor);
+		Sight->DetectionByAffiliation.bDetectEnemies = true;
+		Sight->DetectionByAffiliation.bDetectFriendlies = true;
+		Sight->DetectionByAffiliation.bDetectNeutrals = true;
+		Sensor->ConfigureSense(*Sight);
+		Controller->SetPerceptionComponent(*Sensor);
+		Sensor->RegisterComponent();
+		return Sensor;
+	};
+	const auto Observe = [Source, Target](UAIPerceptionComponent* Sensor)
+	{
+		FAIStimulus Seen(*GetDefault<UAISense_Sight>(), 1.f, Target->GetActorLocation(), Source->GetActorLocation());
+		Sensor->RegisterStimulus(Target, Seen);
+		Sensor->ProcessStimuli();
+	};
+	auto* Perception = NewSensor();
+	TestTrue(TEXT("Authored default sensor is registered with sight enabled"),
+		Perception->IsRegistered() && Perception->IsSenseEnabled(UAISense_Sight::StaticClass()));
+	TestFalse(TEXT("Stock sensor does not auto-activate"), Perception->bAutoActivate);
+	TestFalse(TEXT("Stock sensing does not require a component tick"), Perception->PrimaryComponentTick.bCanEverTick);
+	TestFalse(TEXT("No fixture activation masks the authored inactive default"), Perception->IsActive());
+	Controller->RefreshThreatMemory();
+	FNarrativeBotAttackCandidate Candidate;
+	TestFalse(TEXT("Enabled sight still requires an actual observation before attack selection"),
+		ASC->SelectBotAttack(Target, FGameplayTag(), Candidate));
+	Observe(Perception);
+	TestTrue(TEXT("An inactive event-driven sensor admits a real sight event"), Controller->CanDirectlyTargetThreat(Target));
+	TestTrue(TEXT("Authored-default sight admits native attack selection"), ASC->SelectBotAttack(Target, FGameplayTag(), Candidate));
+	Blackboard->SetValueAsObject(Settings->BBKey_AttackTarget, Target);
+	Controller->SetFocus(Target);
+	Controller->RefreshThreatMemory();
+	TestTrue(TEXT("Refresh preserves the observed behavior-tree target"), Blackboard->GetValueAsObject(Settings->BBKey_AttackTarget) == Target);
+	TestTrue(TEXT("Refresh preserves observed actor focus"), Controller->GetFocusActor() == Target);
+
+	Perception->Activate(true);
+	TestFalse(TEXT("Activation does not revive the previous successful stimulus"), Controller->CanDirectlyTargetThreat(Target));
+	Observe(Perception);
+	TestTrue(TEXT("Fresh sight after activation restores targeting"), Controller->CanDirectlyTargetThreat(Target));
+	Blackboard->SetValueAsObject(Settings->BBKey_AttackTarget, Target);
+	Controller->SetFocus(Target);
+	Perception->Deactivate();
+	TestFalse(TEXT("An explicit deactivation vetoes targeting immediately"), Controller->CanDirectlyTargetThreat(Target));
+	TestNull(TEXT("Explicit deactivation clears the behavior-tree target"), Blackboard->GetValueAsObject(Settings->BBKey_AttackTarget));
+	TestNull(TEXT("Explicit deactivation clears actor focus"), Controller->GetFocusActor());
+	Observe(Perception);
+	Controller->RefreshThreatMemory();
+	TestFalse(TEXT("Event-driven stimuli cannot bypass an observed deactivation"), Controller->CanDirectlyTargetThreat(Target));
+	Perception->Activate(true);
+	Controller->RefreshThreatMemory();
+	TestFalse(TEXT("Reactivation discards even stimuli delivered during suspension"), Controller->CanDirectlyTargetThreat(Target));
+	Observe(Perception);
+	TestTrue(TEXT("Fresh post-resume sight restores direct authorization"), Controller->CanDirectlyTargetThreat(Target));
+
+	auto* Replacement = NewSensor();
+	TestFalse(TEXT("Replacement identity cannot use old sight before rebinding"), Controller->CanDirectlyTargetThreat(Target));
+	Controller->RefreshThreatMemory();
+	TestFalse(TEXT("A bound replacement without its own stimulus cannot inherit old sight"), Controller->CanDirectlyTargetThreat(Target));
+	Perception->Deactivate();
+	Observe(Replacement);
+	TestTrue(TEXT("Retired sensor deactivation cannot suspend the newly bound default listener"), Controller->CanDirectlyTargetThreat(Target));
+	Replacement->SetSenseEnabled(UAISense_Sight::StaticClass(), false);
+	TestFalse(TEXT("Disabling sight immediately suspends initial event-driven sensing"), Controller->CanDirectlyTargetThreat(Target));
+	Controller->RefreshThreatMemory();
+	Replacement->SetSenseEnabled(UAISense_Sight::StaticClass(), true);
+	Controller->RefreshThreatMemory();
+	TestFalse(TEXT("Re-enabling sight requires fresh perception"), Controller->CanDirectlyTargetThreat(Target));
+	Observe(Replacement);
+	TestTrue(TEXT("Fresh sight restores the enabled replacement"), Controller->CanDirectlyTargetThreat(Target));
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovThreatSharingRuntimeTest,
 	"ProjectVelkorran.Campaign.Threat.FactionSharingAndLifecycle",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
@@ -269,8 +370,8 @@ bool FSovThreatOwnershipRuntimeTest::RunTest(const FString& Parameters)
 	auto* Controller = F.Controller(Source);
 	if (!TestNotNull(TEXT("Controller"), Controller)) { return false; }
 	Controller->bRequireThreatMemoryForTargeting = true;
-	UObject* FirstOwner = NewObject<UObject>(Controller);
-	UObject* SecondOwner = NewObject<UObject>(Controller);
+	UObject* FirstOwner = NewObject<USovRuntimeTestIdentity>(Controller);
+	UObject* SecondOwner = NewObject<USovRuntimeTestIdentity>(Controller);
 	Controller->ReportThreatObservation(Target, ENarrativeThreatSource::Sight, Target->GetActorLocation());
 	Controller->SetThreatMemorySuspended(FirstOwner, true);
 	Controller->SetThreatMemorySuspended(SecondOwner, true);

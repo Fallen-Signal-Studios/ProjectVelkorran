@@ -19,7 +19,7 @@ int main()
 		assert(!ValidPressure(0,Bad,2)); assert(!ValidPressure(0,5,Bad)); assert(!ValidColor(Bad,1,1,1));
 		assert(Pulse(Bad,true)==1.f);
 	}
-	for (int Mode=0;Mode<3;++Mode) { assert(ValidPressure(Mode,2,1)); assert(ValidPressure(Mode,30,5)); }
+	for (uint8_t Mode=0;Mode<3;++Mode) { assert(ValidPressure(Mode,2,1)); assert(ValidPressure(Mode,30,5)); }
 	assert(!ValidPressure(3,5,2)); assert(!ValidPressure(0,1,2)); assert(!ValidPressure(0,31,2)); assert(!ValidPressure(0,5,6));
 	assert(ValidColor(0,1,.5f,1)); assert(!ValidColor(0,1,.5f,.5f)); assert(!ValidColor(-.1f,1,.5f,1)); assert(!ValidColor(1,1.1f,.5f,1));
 	for (int Tick=0;Tick<10000;++Tick) { float Alpha=Pulse(Tick*.01f,true); assert(Alpha>=.6999f && Alpha<=1.0001f); assert(Pulse(Tick*.01f,false)==1.f); }

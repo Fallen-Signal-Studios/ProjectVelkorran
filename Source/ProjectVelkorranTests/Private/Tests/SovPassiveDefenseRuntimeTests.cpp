@@ -43,6 +43,8 @@ struct FWorld
 		{
 			TGuardValue<uint64> Frame(GFrameCounter, ++FrameNumber);
 			World->Tick(LEVELTICK_TimeOnly, 0.05f);
+			// TimeOnly advances world time but deliberately skips the timer manager.
+			World->GetTimerManager().Tick(0.05f);
 		}
 	}
 };
@@ -77,9 +79,14 @@ bool FSovPassiveDefenseLivingTimersTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Living poise regenerates"), Actor->Attributes->GetPoise() > 50.f);
 	Actor->ActiveASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetPoiseAttribute(), 0.f);
 	TestEqual(TEXT("Break event once"), Actor->PoiseBreaks, 1);
-	F.Advance(10);
+	F.Advance(6);
 	TestEqual(TEXT("Fallback refills poise"), Actor->Attributes->GetPoise(), 100.f);
 	TestEqual(TEXT("Recovery event once"), Actor->PoiseRecoveries, 1);
+	TestTrue(TEXT("Recovery has its bounded authored immunity timer"),
+		Actor->Poise->GetSecondsUntilRecoveryComplete() > 0.f
+		&& Actor->Poise->GetSecondsUntilRecoveryComplete() <= 0.2f + KINDA_SMALL_NUMBER);
+	// Each timer created during a timer callback is activated after that frame's dispatch.
+	F.Advance(6);
 	TestFalse(TEXT("Recovery window finishes"), Actor->Poise->IsPoiseRecovering());
 	return true;
 }

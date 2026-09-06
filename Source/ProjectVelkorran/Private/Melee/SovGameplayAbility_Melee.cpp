@@ -193,8 +193,8 @@ bool USovGameplayAbility_Melee::BeginNode(int32 Index)
     FGuid ExpectedAttack;
     if (!GetSovAttackIdentity(ActionAvatar.Get(),ExpectedAttack)) { FinishMelee(); return false; }
     const auto& Node=AttackDefinition->Nodes[NodeIndex]; bRequiresChargedRelease=Node.bCharged;
-    bCharging=Node.bCharged;
-    if (bCharging)
+    bMeleeCharging=Node.bCharged;
+    if (bMeleeCharging)
     {
         ChargeStarted=GetWorld()->GetTimeSeconds();
         const uint64 Epoch=MeleeActivationEpoch;
@@ -208,18 +208,18 @@ bool USovGameplayAbility_Melee::BeginNode(int32 Index)
     else { StartAttackWindow(); }
     FGuid CurrentAttack;
     if (!ContextValid()||!GetSovAttackIdentity(ActionAvatar.Get(),CurrentAttack)||CurrentAttack!=ExpectedAttack) { return false; }
-    OnMeleeNodeStarted(NodeIndex,bCharging);
+    OnMeleeNodeStarted(NodeIndex,bMeleeCharging);
     return ContextValid()&&GetSovAttackIdentity(ActionAvatar.Get(),CurrentAttack)&&CurrentAttack==ExpectedAttack;
 }
 void USovGameplayAbility_Melee::InputReleased(const FGameplayAbilitySpecHandle Handle,const FGameplayAbilityActorInfo* Info,const FGameplayAbilityActivationInfo Activation)
 {
     const uint64 Epoch=MeleeActivationEpoch;
     Super::InputReleased(Handle,Info,Activation);
-    if (MeleeActivationEpoch==Epoch&&ContextValid()&&bCharging) { ReleaseCharge(); }
+    if (MeleeActivationEpoch==Epoch&&ContextValid()&&bMeleeCharging) { ReleaseCharge(); }
 }
 void USovGameplayAbility_Melee::ReleaseCharge()
 {
-    if (!bCharging) { return; } bCharging=false; GetWorld()->GetTimerManager().ClearTimer(ChargeTimer);
+    if (!bMeleeCharging) { return; } bMeleeCharging=false; GetWorld()->GetTimerManager().ClearTimer(ChargeTimer);
     if (!NodeGeometryValid()) { FinishMelee(); return; }
     const auto& Node=AttackDefinition->Nodes[NodeIndex];
     const bool bFull=GetWorld()->GetTimeSeconds()-ChargeStarted>=Node.FullChargeSeconds;
@@ -349,7 +349,7 @@ void USovGameplayAbility_Melee::OnStep(float Elapsed)
     {
         // A buffered press retains its release edge. Entering a charge node cannot manufacture
         // a held input after the player already let go during the preceding recovery.
-        if (BeginNode(Node.NextNode) && bCharging && !bHeld) { ReleaseCharge(); }
+        if (BeginNode(Node.NextNode) && bMeleeCharging && !bHeld) { ReleaseCharge(); }
         return;
     }
     if (Input==Node.DefensiveInput&&Node.DefensiveAbility)
@@ -381,7 +381,7 @@ void USovGameplayAbility_Melee::EndAbility(const FGameplayAbilitySpecHandle Hand
     if (GetWorld()) { GetWorld()->GetTimerManager().ClearTimer(ChargeTimer); }
     auto* ASC=Cast<UNarrativeAbilitySystemComponent>(ActionASC.Get());
     if (ASC) { ASC->ClearCombatInputWindow(this,InputWindow); }
-    InputWindow.Invalidate(); bCharging=false;
+    InputWindow.Invalidate(); bMeleeCharging=false;
     if (SweepTask) { SweepTask->EndTask(); SweepTask=nullptr; }
     ActionAvatar.Reset(); ActionASC.Reset(); ActionAttributes.Reset(); ActionMesh.Reset(); ActionWeapon.Reset(); AttackReceipt=nullptr; NodeIndex=INDEX_NONE;
     if (IsValid(ASC)&&ASC->GetAnimatingAbility()==this) { ASC->CurrentMontageStop(.1f); }

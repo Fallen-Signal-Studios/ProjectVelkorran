@@ -275,6 +275,8 @@ void UNarrativeAbilitySystemComponent::SetCharacterReadyEpoch(const int32 NewRea
 		{
 			ASCOwnerActor->ForceNetUpdate();
 		}
+		// RepNotifies run on receivers; authority also owns local lifecycle listeners.
+		OnCharacterReadyEpochChanged.Broadcast(NewReadyEpoch);
 	}
 }
 

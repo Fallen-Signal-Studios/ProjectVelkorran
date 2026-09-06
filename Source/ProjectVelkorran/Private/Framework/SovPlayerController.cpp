@@ -31,6 +31,7 @@
 #include "Progression/SovTechniqueComponent.h"
 #include "Subsystems/NarrativeSaveSubsystem.h"
 #include "Engine/World.h"
+#include "GameFramework/GameModeBase.h"
 #include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/PackageName.h"
@@ -65,28 +66,40 @@ bool ASovPlayerController::OpenAccessibilitySettings()
 bool ASovPlayerController::CanReleaseSystemPause() const { return SystemPauseOwners.IsEmpty() && !bExternalPauseRequested; }
 bool ASovPlayerController::IsGameplayAbilityInputSuppressed() const
 { return ApplicationLifecycle && ApplicationLifecycle->IsGameplayInterrupted(); }
+bool ASovPlayerController::RequestNativePause(FCanUnpause CanUnpauseDelegate)
+{
+    if (!GetWorld()) { return false; }
+    // PlayerController::SetPause only changes the pause state. GameMode also
+    // accepts another owner while already paused and retains its unpause rule.
+    if (GetNetMode() != NM_Client && IsPaused())
+    {
+        AGameModeBase* Mode = GetWorld()->GetAuthGameMode();
+        return Mode && Mode->SetPause(this, CanUnpauseDelegate);
+    }
+    return Super::SetPause(true, CanUnpauseDelegate);
+}
 bool ASovPlayerController::SetPause(bool bPause, FCanUnpause CanUnpauseDelegate)
 {
 	// A menu/Blueprint pause remains owned after a platform interruption ends.
 	const bool bPreviousExternalPause = bExternalPauseRequested;
 	bExternalPauseRequested = bPause;
 	if (!bPause && !SystemPauseOwners.IsEmpty()) { return false; }
-	const bool bSucceeded = Super::SetPause(bPause, CanUnpauseDelegate);
+	const bool bSucceeded = bPause ? RequestNativePause(CanUnpauseDelegate) : Super::SetPause(false, CanUnpauseDelegate);
 	if (bPause && !bSucceeded) { bExternalPauseRequested = bPreviousExternalPause; }
 	return bSucceeded;
 }
-bool ASovPlayerController::AcquireSystemPause(FName Owner)
+bool ASovPlayerController::AcquireSystemPause(FName PauseOwner)
 {
-	if (Owner.IsNone() || !HasAuthority() || GetNetMode() != NM_Standalone || !GetWorld()) { return false; }
-	if (SystemPauseOwners.Contains(Owner)) { return true; }
+	if (PauseOwner.IsNone() || !HasAuthority() || GetNetMode() != NM_Standalone || !GetWorld()) { return false; }
+	if (SystemPauseOwners.Contains(PauseOwner)) { return true; }
 	if (SystemPauseOwners.IsEmpty() && GetWorld()->IsPaused()) { bExternalPauseRequested = true; }
-	SystemPauseOwners.Add(Owner);
-	if (Super::SetPause(true, FCanUnpause::CreateUObject(this, &ThisClass::CanReleaseSystemPause))) { return true; }
-	SystemPauseOwners.Remove(Owner); return false;
+	SystemPauseOwners.Add(PauseOwner);
+	if (RequestNativePause(FCanUnpause::CreateUObject(this, &ThisClass::CanReleaseSystemPause))) { return true; }
+	SystemPauseOwners.Remove(PauseOwner); return false;
 }
-void ASovPlayerController::ReleaseSystemPause(FName Owner)
+void ASovPlayerController::ReleaseSystemPause(FName PauseOwner)
 {
-	if (SystemPauseOwners.Remove(Owner) && CanReleaseSystemPause()) { Super::SetPause(false); }
+	if (SystemPauseOwners.Remove(PauseOwner) && CanReleaseSystemPause()) { Super::SetPause(false); }
 }
 
 FGuid ASovPlayerController::GetActorGUID_Implementation() const
@@ -160,15 +173,15 @@ ASovPlayerCharacterBase* ASovPlayerController::SpawnCampaignPawn(USovCampaignDef
 	UClass* Class = Mission->ResolvePawnClass(Lead).LoadSynchronous();
 	UPlayerDefinition* Definition = Mission->ResolvePlayerDefinition(Lead).LoadSynchronous();
 	if (!Class || !Definition) { return nullptr; }
-	ASovPlayerCharacterBase* Pawn = GetWorld()->SpawnActorDeferred<ASovPlayerCharacterBase>(
+	ASovPlayerCharacterBase* CampaignPawn = GetWorld()->SpawnActorDeferred<ASovPlayerCharacterBase>(
 		Class, Transform, this, nullptr, ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButDontSpawnIfColliding);
-	if (!Pawn) { return nullptr; }
-	if (!Pawn->PrepareCampaignInitialization(Definition)) { Pawn->Destroy(); return nullptr; }
-	Pawn->FinishSpawning(Transform);
-	if (!IsValid(Pawn)) { return nullptr; }
+	if (!CampaignPawn) { return nullptr; }
+	if (!CampaignPawn->PrepareCampaignInitialization(Definition)) { CampaignPawn->Destroy(); return nullptr; }
+	CampaignPawn->FinishSpawning(Transform);
+	if (!IsValid(CampaignPawn)) { return nullptr; }
 	if (UNarrativeCharacterSubsystem* Characters = GetWorld()->GetSubsystem<UNarrativeCharacterSubsystem>())
-	{ Characters->RegisterCharacter(Pawn); }
-	return Pawn;
+	{ Characters->RegisterCharacter(CampaignPawn); }
+	return CampaignPawn;
 }
 
 void ASovPlayerController::SetTransitionInputLock(bool bLock)
@@ -364,10 +377,10 @@ bool ASovPlayerController::StageCampaignLoad(USovCampaignDefinition* Mission, co
 	return true;
 }
 
-void ASovPlayerController::InitializeCampaignPawn(ASovPlayerCharacterBase* Pawn)
+void ASovPlayerController::InitializeCampaignPawn(ASovPlayerCharacterBase* CampaignPawn)
 {
-	if (!HasAuthority() || !IsValid(Pawn) || !PendingMission) { return; }
-	PendingPawn = Pawn;
+	if (!HasAuthority() || !IsValid(CampaignPawn) || !PendingMission) { return; }
+	PendingPawn = CampaignPawn;
 	if (TransitionState == ESovCampaignTransitionState::Idle)
 	{ ++TransitionEpoch; TransitionState = ESovCampaignTransitionState::Initializing; }
 	SetTransitionInputLock(true);
@@ -730,8 +743,8 @@ bool ASovPlayerController::RequestAuthoredHandoff(ASovCampaignHandoffAnchor* Anc
 	USovCampaignDefinition* Mission = CampaignState->GetActiveMission();
 	const auto* Beat = Mission->FindBeat(Anchor->HandoffBeat);
 	UNarrativeAbilitySystemComponent* ASC = Cast<UNarrativeAbilitySystemComponent>(GetAbilitySystemComponent());
-	ASovPlayerCharacterBase* Player = Cast<ASovPlayerCharacterBase>(GetPawn());
-	if (!ASC || !Player || ASC->GetAvatarActor() != Player
+	ASovPlayerCharacterBase* PlayerCharacter = Cast<ASovPlayerCharacterBase>(GetPawn());
+	if (!ASC || !PlayerCharacter || ASC->GetAvatarActor() != PlayerCharacter
 		|| ASC->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_Busy)
 		|| ASC->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_SequencerControlled))
 	{ OutError = TEXT("Finish the active action before the authored handoff."); return false; }

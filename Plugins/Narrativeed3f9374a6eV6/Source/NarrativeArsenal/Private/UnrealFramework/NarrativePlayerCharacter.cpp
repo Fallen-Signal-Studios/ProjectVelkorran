@@ -314,38 +314,69 @@ bool ANarrativePlayerCharacter::AreAdditionalCharacterSystemsReady() const
 
 void ANarrativePlayerCharacter::TryFinalizeCharacterReadiness()
 {
-	if (bCharacterReady
-		|| !IsValid(InitializedAbilitySystem)
-		|| InitializedAbilitySystem->GetAvatarActor() != this
-		|| InitializedPlayerDefinition != PlayerDefinition
-		|| !bProjectSystemsInitialized
-		|| !bAbilitySystemReadyPublished
-		|| !bInitialPlayerDataApplied
-		|| !bVisualReadyForGameplay
-		|| (HasAuthority() && !bAuthoritativeGameplayInitialized)
-		|| !AreAdditionalCharacterSystemsReady())
+	if (bFinalizingCharacterReadiness || bCharacterReady) { return; }
+	TGuardValue<bool> FinalizingGuard(bFinalizingCharacterReadiness, true);
+	const TWeakObjectPtr<UNarrativeAbilitySystemComponent> ReadyASC = InitializedAbilitySystem;
+	const TWeakObjectPtr<AActor> ReadyASCOwner = ReadyASC.IsValid() ? ReadyASC->GetOwnerActor() : nullptr;
+	const TWeakObjectPtr<UPlayerDefinition> ReadyDefinition = PlayerDefinition;
+	const TWeakObjectPtr<AController> ReadyController = GetController();
+	const TWeakObjectPtr<ANarrativePlayerState> ReadyPlayerState = GetNarrativePlayerState();
+	const int32 InitializationGeneration = CharacterInitializationGeneration;
+	const auto IsCurrent = [&]()
 	{
-		return;
-	}
+		return IsValid(this) && !IsActorBeingDestroyed() && ReadyASC.IsValid() && ReadyDefinition.IsValid()
+			&& InitializedAbilitySystem == ReadyASC.Get() && ReadyASC->GetAvatarActor() == this
+			&& ReadyASC->GetOwnerActor() == ReadyASCOwner.Get()
+			&& PlayerDefinition == ReadyDefinition.Get() && InitializedPlayerDefinition == ReadyDefinition.Get()
+			&& CharacterInitializationGeneration == InitializationGeneration
+			&& GetController() == ReadyController.Get() && GetNarrativePlayerState() == ReadyPlayerState.Get()
+			&& bProjectSystemsInitialized && bAbilitySystemReadyPublished && bInitialPlayerDataApplied
+			&& bVisualReadyForGameplay && (!HasAuthority() || bAuthoritativeGameplayInitialized)
+			&& AreAdditionalCharacterSystemsReady();
+	};
+	if (!IsCurrent()) { return; }
 
 	if (HasAuthority() && !bAuthoritativeCharacterReady)
 	{
-		AuthoritativeReadyEpoch =
-			InitializedAbilitySystem->GetCharacterReadyEpoch() + 1;
-		InitializedAbilitySystem->SetCharacterReadyEpoch(AuthoritativeReadyEpoch);
+		if (ReadyASC->GetCharacterReadyEpoch() == MAX_int32) { return; }
+		const int32 NewReadyEpoch = ReadyASC->GetCharacterReadyEpoch() + 1;
+		AuthoritativeReadyEpoch = NewReadyEpoch;
+		// Local epoch listeners rebind project systems and may retire this initialization.
+		ReadyASC->SetCharacterReadyEpoch(NewReadyEpoch);
+		if (!IsCurrent() || AuthoritativeReadyEpoch != NewReadyEpoch
+			|| ReadyASC->GetCharacterReadyEpoch() != NewReadyEpoch) { return; }
 		bAuthoritativeCharacterReady = true;
 		ForceNetUpdate();
 	}
-	if (!bAuthoritativeCharacterReady
-		|| AuthoritativeReadyEpoch <= 0
-		|| InitializedAbilitySystem->GetCharacterReadyEpoch() < AuthoritativeReadyEpoch)
-	{
-		return;
-	}
+	if (!bAuthoritativeCharacterReady || AuthoritativeReadyEpoch <= 0
+		|| ReadyASC->GetCharacterReadyEpoch() < AuthoritativeReadyEpoch) { return; }
 
+	const int32 PublishedReadyEpoch = AuthoritativeReadyEpoch;
+	const int32 PublishedASCEpoch = ReadyASC->GetCharacterReadyEpoch();
+	const auto CanContinuePublication = [&]()
+	{
+		if (bCharacterReady && IsCurrent() && bAuthoritativeCharacterReady
+			&& AuthoritativeReadyEpoch == PublishedReadyEpoch
+			&& ReadyASC->GetCharacterReadyEpoch() == PublishedASCEpoch) { return true; }
+		if (!IsValid(this) || IsActorBeingDestroyed()) { return false; }
+		// Clear only the gate this publication owns, never a replacement initialization's gate.
+		if (HasAuthority() && InitializedAbilitySystem == ReadyASC.Get()
+			&& CharacterInitializationGeneration == InitializationGeneration
+			&& PlayerDefinition == ReadyDefinition.Get() && InitializedPlayerDefinition == ReadyDefinition.Get()
+			&& AuthoritativeReadyEpoch == PublishedReadyEpoch)
+		{
+			bAuthoritativeCharacterReady = false;
+			AuthoritativeReadyEpoch = 0;
+			ForceNetUpdate();
+		}
+		InvalidateCharacterReadiness();
+		return false;
+	};
 	bCharacterReady = true;
 	OnCharacterReady.Broadcast(this);
+	if (!CanContinuePublication()) { return; }
 	OnCharacterReadinessChanged.Broadcast(this, true);
+	if (!CanContinuePublication()) { return; }
 
 	// Gameplay events are local to a machine. Publish when each machine crosses
 	// its own readiness gate; only authority mutates persistent gameplay state.
@@ -354,6 +385,7 @@ void ANarrativePlayerCharacter::TryFinalizeCharacterReadiness()
 	Payload.Instigator = this;
 	Payload.Target = this;
 	UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(this, Payload.EventTag, Payload);
+	CanContinuePublication();
 }
 
 void ANarrativePlayerCharacter::OnRep_AuthoritativeCharacterReady()
@@ -369,6 +401,8 @@ void ANarrativePlayerCharacter::HandleAbilitySystemReadyEpochChanged(
 	const int32 ReadyEpoch)
 {
 	static_cast<void>(ReadyEpoch);
+	// Our authority publication is already validating this initialization after all listeners.
+	if (bFinalizingCharacterReadiness) { return; }
 	TryInitializePlayerCharacter();
 	TryFinalizeCharacterReadiness();
 }

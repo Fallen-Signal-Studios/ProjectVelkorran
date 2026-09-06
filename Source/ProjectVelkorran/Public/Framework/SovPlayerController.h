@@ -32,8 +32,8 @@ public:
 	UFUNCTION(BlueprintPure, Category="Accessibility") class USovFrontendComponent* GetFrontend() const { return Frontend; }
 	UFUNCTION(BlueprintPure, Category="Platform") class USovApplicationLifecycleComponent* GetApplicationLifecycle() const { return ApplicationLifecycle; }
 	/** Named pause ownership composes first-boot, save failure and platform interruptions. */
-	bool AcquireSystemPause(FName Owner);
-	void ReleaseSystemPause(FName Owner);
+	bool AcquireSystemPause(FName PauseOwner);
+	void ReleaseSystemPause(FName PauseOwner);
 	virtual bool SetPause(bool bPause, FCanUnpause CanUnpauseDelegate = FCanUnpause()) override;
 	UFUNCTION(BlueprintCallable, Category="Accessibility") bool OpenAccessibilitySettings();
 	UFUNCTION(BlueprintPure, Category="Campaign") ESovCampaignTransitionState GetCampaignTransitionState() const { return TransitionState; }
@@ -51,7 +51,7 @@ public:
 
 	/** GameMode-only staging: actor bytes first; quest/component records after the matching pawn exists. */
 	bool StageCampaignLoad(USovCampaignDefinition* Mission, const FNarrativeSavePlayer* Records, bool bFromTravel, FString& OutError);
-	void InitializeCampaignPawn(ASovPlayerCharacterBase* Pawn);
+	void InitializeCampaignPawn(ASovPlayerCharacterBase* CampaignPawn);
 	static bool ValidateMissionPawn(USovCampaignDefinition* Mission, FString& OutError, FGameplayTag Lead = FGameplayTag());
 	uint64 GetCampaignTransitionEpoch() const { return TransitionEpoch; }
 	static const TCHAR* TravelSaveSlot() { return TEXT("SovCampaignTravel"); }
@@ -77,6 +77,7 @@ private:
 	UPROPERTY(VisibleAnywhere, Category="Dialogue") TObjectPtr<class USovDialoguePresentationComponent> DialoguePresentation;
 	UPROPERTY(VisibleAnywhere, Category="Platform") TObjectPtr<class USovApplicationLifecycleComponent> ApplicationLifecycle;
 	bool CanReleaseSystemPause() const;
+	bool RequestNativePause(FCanUnpause CanUnpauseDelegate);
 	TSet<FName> SystemPauseOwners;
 	bool bExternalPauseRequested = false;
 	bool PrepareTransitionCheckpoint(FName BoundaryId, FString& OutError, bool bRequireDurable = false);

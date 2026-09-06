@@ -6,6 +6,7 @@
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "Misc/AutomationTest.h"
+#include "UObject/Script.h"
 #include "Serialization/MemoryReader.h"
 #include "Serialization/MemoryWriter.h"
 #include "Serialization/ObjectAndNameAsStringProxyArchive.h"
@@ -34,6 +35,7 @@ namespace
 {
 	struct FObjectiveWorld
 	{
+		FEditorScriptExecutionGuard ScriptGuard;
 		UWorld* World = nullptr;
 		ASovCampaignRuntimeTestController* PC = nullptr;
 		ASovCampaignRuntimeTestPawn* Pawn = nullptr;

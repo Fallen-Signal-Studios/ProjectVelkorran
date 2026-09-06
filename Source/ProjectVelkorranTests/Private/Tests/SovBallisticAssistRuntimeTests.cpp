@@ -1,4 +1,5 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
+#include "Tests/SovRuntimeActorTestFixtures.h"
 #include "Targeting/SovAimAssist.h"
 #include "Targeting/SovAimAssistPolicy.h"
 #include "Tests/SovAxiomRuntimeTestFixtures.h"
@@ -57,10 +58,10 @@ struct FBallisticWorld
 			FVector::ZeroVector, FRotator::ZeroRotator, Spawn);
 		Enemy = World->SpawnActor<ASovAxiomRuntimeTestCharacter>(ASovAxiomRuntimeTestCharacter::StaticClass(),
 			FVector(500.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
-		Controller = World->SpawnActor<ANarrativePlayerController>();
+		Controller = World->SpawnActor<ASovRuntimeTestPlayerController>();
 		if (!Player || !Enemy || !Controller) { return; }
 		Player->InitializeTestCombat(0); Enemy->InitializeTestCombat(1);
-		Controller->Possess(Player); Controller->SetViewTarget(Player);
+		Controller->SetAsLocalPlayerController(); Controller->Possess(Player); Controller->SetViewTarget(Player);
 		Player->GetNarrativeAbilitySystemComponent()->SetCharacterReadyEpoch(1);
 		Enemy->GetCapsuleComponent()->SetCollisionResponseToAllChannels(ECR_Block);
 		Enemy->GetCharacterMovement()->Velocity = FVector(0., 160., 0.);

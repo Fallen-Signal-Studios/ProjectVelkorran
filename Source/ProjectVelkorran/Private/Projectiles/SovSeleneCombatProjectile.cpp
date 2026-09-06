@@ -239,9 +239,9 @@ void ASovSeleneCombatProjectile::HitTarget(AActor* Target, const FHitResult& Hit
 	if (!SovSelenePayload::EligibleTarget(Tuning.Context, Target) || Ledger.Contains(Target)
 		|| !SovSelenePayload::Visible(Tuning.Context, SegmentStart, Target, HitPoint)) { return; }
 	Ledger.Add(Target);
-	const auto& Tags = FSovGameplayTags::Get();
-	const bool bWasChilled = SovSelenePayload::HasStatus(Target, Tags.State_Status_Chilled);
-	const bool bWasFrozen = SovSelenePayload::HasStatus(Target, Tags.State_Status_Frozen);
+	const auto& GameplayTags = FSovGameplayTags::Get();
+	const bool bWasChilled = SovSelenePayload::HasStatus(Target, GameplayTags.State_Status_Chilled);
+	const bool bWasFrozen = SovSelenePayload::HasStatus(Target, GameplayTags.State_Status_Frozen);
 	const bool bWake = Mode == ESovSeleneProjectileMode::Wake;
 	// Shatter augments this one transaction, never reapplies its base health damage.
 	const float Poise = Tuning.Poise + (!bWake && bReturn && (bWasChilled || bWasFrozen) ? Tuning.ShatterBonusPoise : 0.0f);

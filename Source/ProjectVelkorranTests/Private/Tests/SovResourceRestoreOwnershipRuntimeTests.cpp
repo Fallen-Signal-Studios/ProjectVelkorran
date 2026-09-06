@@ -5,6 +5,8 @@
 #include "Engine/World.h"
 #include "GAS/NarrativeAttributeSetBase.h"
 #include "Misc/AutomationTest.h"
+#include "Misc/AssertionMacros.h"
+#include "Misc/ScopeExit.h"
 #include "UObject/Script.h"
 
 #if WITH_DEV_AUTOMATION_TESTS && WITH_EDITOR
@@ -39,6 +41,8 @@ struct FWorld
 		{
 			TGuardValue<uint64> Frame(GFrameCounter, ++FrameNumber);
 			World->Tick(LEVELTICK_TimeOnly, 0.05f);
+			// UE 5.7 TimeOnly world ticks intentionally skip the timer manager.
+			World->GetTimerManager().Tick(0.05f);
 		}
 	}
 };
@@ -187,7 +191,27 @@ bool FSovResourceRestoreRegisteredAttributesTest::RunTest(const FString& Paramet
 	{
 		if (!bRemoved) { bRemoved = true; Actor->OwnedASC->RemoveSpawnedAttribute(Actor->Attributes.Get()); }
 	});
-	TestFalse(TEXT("Registered attributes cannot be replaced mid-restore"), USovEncounterSnapshotLibrary::RestoreResources(Actor->OwnedASC, Snapshot));
+	// GAS reads the base once more after the value-change callback. Removing its
+	// registered set deliberately triggers this engine diagnostic before our
+	// transaction can reject the retired storage; later writes must still stop.
+	int32 MissingSetEnsures = 0;
+	{
+		// Verify this exact, deliberately induced engine ensure without treating its
+		// multi-line stack as unrelated test errors. Other ensures retain their handler.
+		auto PreviousHandler = GetEnsureHandler();
+		ON_SCOPE_EXIT { SetEnsureHandler(MoveTemp(PreviousHandler)); };
+		SetEnsureHandler([&](const FEnsureHandlerArgs& Args)
+		{
+			if (FCStringAnsi::Strcmp(Args.Expression, "AttributeSet") == 0
+				&& FCString::Strcmp(Args.Message, TEXT("FActiveGameplayEffectsContainer::SetAttributeBaseValue: Unable to get attribute set for attribute Shield")) == 0)
+			{
+				++MissingSetEnsures; return true;
+			}
+			return PreviousHandler ? PreviousHandler(Args) : false;
+		});
+		TestFalse(TEXT("Registered attributes cannot be replaced mid-restore"), USovEncounterSnapshotLibrary::RestoreResources(Actor->OwnedASC, Snapshot));
+	}
+	TestEqual(TEXT("GAS reports exactly the intentionally retired Shield storage"), MissingSetEnsures, 1);
 	Changed.Remove(Handle);
 	TestTrue(TEXT("Attribute registration removed in real callback"), bRemoved);
 	TestEqual(TEXT("Detached later resource not written"), Actor->Attributes->GetPoise(), 100.f);

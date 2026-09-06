@@ -1,4 +1,5 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
+#include "Tests/SovRuntimeObjectTestFixtures.h"
 #include "Tests/SovCombatRoutingTestFixtures.h"
 #include "Tests/SovAxiomRuntimeTestFixtures.h"
 #include "Components/SovDismembermentComponent.h"
@@ -674,7 +675,7 @@ bool FSovDamageReceiptLifeCopyTest::RunTest(const FString& Parameters)
     const FSovDamageResult Original = Target->LastDamageResult;
     FSovDamageResult ReflectedCopy;
     FSovDamageResult::StaticStruct()->CopyScriptStruct(&ReflectedCopy, &Original);
-    auto* Consumer = NewObject<UObject>(Target);
+    auto* Consumer = NewObject<USovRuntimeTestIdentity>(Target);
     TestTrue(TEXT("Fresh resolver result belongs to the current target life"), Original.IsCurrentTargetLife());
     TestTrue(TEXT("Native result can be claimed once on a dedicated channel"), Original.ConsumeNativeReceipt(Consumer, 5));
     TestTrue(TEXT("Reflected copies preserve native receipt identity"), ReflectedCopy.HasNativeReceipt());
@@ -688,7 +689,7 @@ bool FSovDamageReceiptLifeCopyTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("A new committed hit belongs to the restored life"), Fresh.IsCurrentTargetLife());
     ASC->InitAbilityActorInfo(Target, Replacement);
     TestFalse(TEXT("Avatar replacement retires the fresh receipt too"), Fresh.IsCurrentTargetLife());
-    TestFalse(TEXT("Replaced-avatar receipt cannot be claimed by a new consumer"), Fresh.ConsumeNativeReceipt(NewObject<UObject>(Target)));
+    TestFalse(TEXT("Replaced-avatar receipt cannot be claimed by a new consumer"), Fresh.ConsumeNativeReceipt(NewObject<USovRuntimeTestIdentity>(Target)));
     return true;
 }
 

@@ -337,6 +337,13 @@ bool UWeaponItem::CanDualWieldWith_Implementation(class UWeaponItem* Other)
 			return false; 
 		}
 
+		// Honor either participant's restriction so the caller's hand/order cannot bypass it.
+		if ((bRequireSameClassForDualWield || Other->bRequireSameClassForDualWield)
+			&& GetClass() != Other->GetClass())
+		{
+			return false;
+		}
+
 		//If ourselves or other isn't equipped we cant dual wield it.
 		if (!CurrentSlot.IsValid() || !Other->CurrentSlot.IsValid())
 		{

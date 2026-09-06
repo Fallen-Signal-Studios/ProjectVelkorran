@@ -268,6 +268,10 @@ bool FSovDroneBurstRestartTest::RunTest(const FString& Parameters)
 	Ability->FireGunBurstFromAim();
 	F.Tick(.11f); F.Tick(.11f); F.Tick(.21f);
 	TestEqual(TEXT("Replacement retains all three shots and old presentation only one"), Ability->Hooks.Spawns, 4);
+	TestTrue(TEXT("The final shot starts its own recovery interval"), Ability->IsActive());
+	// The recovery timer is created by the last shot's timer callback, so its
+	// 0.2-second interval starts after that dispatch completes.
+	F.Tick(.21f);
 	TestFalse(TEXT("Replacement owns and completes its recovery"), Ability->IsActive());
 	return true;
 }

@@ -5,6 +5,9 @@
 #include "Character/PlayerDefinition.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "Engine/GameInstance.h"
+#include "Engine/LocalPlayer.h"
+#include "UObject/StrongObjectPtr.h"
 #include "Framework/SovPlayerState.h"
 #include "Misc/AutomationTest.h"
 #include "Narrative/SovNarrativeCueComponent.h"
@@ -33,6 +36,8 @@ namespace
 	struct FCueWorld
 	{
 		UWorld* World; ASovHandoffRuntimeTestController* PC; ASovHandoffRuntimeTestPawn* Pawn;
+		TStrongObjectPtr<UGameInstance> Instance;
+		TStrongObjectPtr<ULocalPlayer> LocalPlayer;
 		FCueWorld()
 		{
 			const UWorld::InitializationValues IVS = UWorld::InitializationValues().AllowAudioPlayback(false).CreatePhysicsScene(true)
@@ -40,6 +45,11 @@ namespace
 			World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &IVS);
 			if (GEngine) { GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World); }
 			PC = World->SpawnActor<ASovHandoffRuntimeTestController>(); Pawn = World->SpawnActor<ASovHandoffRuntimeTestPawn>();
+			// UUserWidget resolves its owner through an actual local-player context.
+			Instance.Reset(NewObject<UGameInstance>()); LocalPlayer.Reset(NewObject<ULocalPlayer>(GEngine));
+			World->SetGameInstance(Instance.Get());
+			PC->Player = LocalPlayer.Get(); LocalPlayer->PlayerController = PC;
+			PC->SetAsLocalPlayerController(); World->AddController(PC);
 			auto* PS = World->SpawnActor<ASovPlayerState>(); auto* Definition = NewObject<UPlayerDefinition>(PC); PC->KeepAlive.Add(Definition);
 			Pawn->PrepareCampaignInitialization(Definition); PC->SetTestPlayerState(PS); PC->Possess(Pawn);
 			Pawn->StageTestReadiness(PS, true); Pawn->CompleteCampaignDataInitialization(false);
@@ -74,7 +84,9 @@ bool FSovCuePriorityTest::RunTest(const FString& Parameters)
 	FSovNarrativeCueTestAccess::Interrupt(Cues);
 	TestEqual(TEXT("Interrupted critical cue remains queued"), FSovNarrativeCueTestAccess::Queued(Cues), 1);
 	TestTrue(TEXT("Only the explicitly diegetic summary is retained"), Cues->GetUnheardRecords().Contains(Critical));
-	auto* Review = NewObject<USovAccessibleRecordMenu>(F.PC); Review->SetOwningPlayer(F.PC); Review->SetSceneHistoryMode(true);
+	auto* Review = NewObject<USovAccessibleRecordMenu>(F.PC); Review->SetOwningPlayer(F.PC);
+	TestEqual(TEXT("Review resolves the fixture's real local player"), Review->GetOwningPlayer(), static_cast<APlayerController*>(F.PC));
+	Review->SetSceneHistoryMode(true);
 	TestTrue(TEXT("Native records review consumes the existing saved unheard archive"), FSovNarrativeCueTestAccess::ReviewContains(Review, TEXT("An authored record summary.")));
 	TestTrue(TEXT("Unheard information keeps its explicit presentation label"), FSovNarrativeCueTestAccess::ReviewContains(Review, TEXT("Unheard important record")));
 	TestTrue(TEXT("Review does not falsely complete the original audio cue"), Cues->GetUnheardRecords().Contains(Critical));

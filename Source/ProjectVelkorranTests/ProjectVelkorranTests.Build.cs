@@ -17,7 +17,7 @@ public class ProjectVelkorranTests : ModuleRules
         PrivateDependencyModuleNames.AddRange(new string[] {
             "Core", "CoreUObject", "Engine", "ProjectVelkorran", "NarrativeArsenal", "NarrativeSaveSystem",
             "NarrativeCommonUI", "GameplayAbilities", "GameplayTags", "GameplayTasks", "AIModule",
-            "UMG", "CommonUI", "Slate", "SlateCore", "InputCore", "ApplicationCore", "EnhancedInput",
+            "UMG", "CommonUI", "CommonInput", "Slate", "SlateCore", "InputCore", "ApplicationCore", "EnhancedInput",
             "PhysicsCore", "Niagara", "NavigationSystem", "AssetRegistry", "DeveloperSettings",
             "LevelSequence", "MovieScene", "MovieSceneTracks", "AnimGraphRuntime",
             "MassEntity", "MassCommon", "MassActors", "MassSpawner", "MassRepresentation", "MassCrowd",

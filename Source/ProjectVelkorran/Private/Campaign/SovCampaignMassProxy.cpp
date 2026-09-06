@@ -8,6 +8,8 @@
 #include "Components/StaticMeshComponent.h"
 #include "Components/SceneComponent.h"
 #include "MassCommonFragments.h"
+#include "MassLODFragments.h"
+#include "MassCrowdFragments.h"
 #include "MassEntityTemplateRegistry.h"
 #include "MassExecutionContext.h"
 #include "MassRepresentationTypes.h"
@@ -79,6 +81,9 @@ USovCampaignMassVisualizationTrait::USovCampaignMassVisualizationTrait()
 void USovCampaignMassVisualizationTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, const UWorld& World) const
 {
 	BuildContext.AddFragment<FTransformFragment>();
+	BuildContext.AddFragment<FMassViewerInfoFragment>();
+	BuildContext.AddFragment<FMassActorFragment>();
+	BuildContext.AddTag<FMassCrowdTag>();
 	BuildContext.AddFragment<FNarrativeMassParticipantFragment>();
 	BuildContext.AddFragment<FSovCampaignMassRouteFragment>();
 	Super::BuildTemplate(BuildContext, World);

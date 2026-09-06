@@ -36,6 +36,8 @@ class ASovInputRoutingTestController : public ANarrativePlayerController
 {
 	GENERATED_BODY()
 public:
+	FGuid TestActorGuid = FGuid::NewGuid();
+	virtual FGuid GetActorGUID_Implementation() const override { return TestActorGuid; }
 	UPROPERTY() TObjectPtr<UNarrativeAbilitySystemComponent> TestASC;
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override { return TestASC ? TestASC.Get() : Super::GetAbilitySystemComponent(); }
 	TSet<FGameplayTag> TestToggleTags;

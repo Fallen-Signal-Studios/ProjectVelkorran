@@ -69,7 +69,7 @@ public:
     uint64 GetLockRevision() const { return LockRevision; }
     UFUNCTION(BlueprintPure, Category="Transit") ESovWorldTransitState GetTransitState() const { return State; }
     bool CanUse(const APawn* Player, FText& Error) const;
-    virtual float TakeDamage(float DamageAmount, const FDamageEvent& DamageEvent, AController* Instigator, AActor* Causer) override;
+    virtual float TakeDamage(float DamageAmount, const FDamageEvent& DamageEvent, AController* EventInstigator, AActor* Causer) override;
     virtual FGuid GetActorGUID_Implementation() const override;
     virtual void SetActorGUID_Implementation(const FGuid& Guid) override { SaveGuid = Guid; }
     virtual bool ShouldRespawn_Implementation() const override { return false; }

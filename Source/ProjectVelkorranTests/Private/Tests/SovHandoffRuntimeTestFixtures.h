@@ -18,7 +18,12 @@ public:
 	virtual FGameplayTag GetProtagonistIdentityTag() const override;
 	virtual void PossessedBy(AController* NewController) override { APawn::PossessedBy(NewController); }
 	bool StageTestReadiness(ASovPlayerState* State, bool bVisualReady);
-	void SetTestVisualReady(bool bReady) { bVisualReadyForGameplay = bReady; }
+	void SetTestVisualReady(bool bReady)
+	{
+		bVisualReadyForGameplay = bReady;
+		if (bReady) { TryFinalizeCharacterReadiness(); }
+		else { InvalidateCharacterReadiness(); }
+	}
 };
 
 UCLASS(Transient, NotBlueprintable)

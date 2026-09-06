@@ -1,4 +1,5 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
+#include "Tests/SovRuntimeActorTestFixtures.h"
 #include "Tests/SovResourceTransactionRepairFixtures.h"
 #include "Components/SovEchoComponent.h"
 #include "Engine/Engine.h"
@@ -40,7 +41,7 @@ struct FResourceRepairWorld
 		if (!World) { return nullptr; }
 		FActorSpawnParameters Spawn; Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 		auto* Result = World->SpawnActor<ASovResourceRepairPlayer>(ASovResourceRepairPlayer::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, Spawn);
-		auto* Controller = World->SpawnActor<ANarrativePlayerController>();
+		auto* Controller = World->SpawnActor<ASovRuntimeTestPlayerController>();
 		if (!Result || !Controller) { return nullptr; }
 		Controller->Possess(Result); Result->InitializeExertion();
 		Result->GetNarrativeAbilitySystemComponent()->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetMaxEchoAttribute(), 100.f);

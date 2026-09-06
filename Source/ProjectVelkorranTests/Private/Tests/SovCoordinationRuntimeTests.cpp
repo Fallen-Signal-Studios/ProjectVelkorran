@@ -1,4 +1,5 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
+#include "Tests/SovRuntimeObjectTestFixtures.h"
 #include "Tests/SovCoordinationRuntimeTestFixtures.h"
 #include "Tests/SovExertionRuntimeTestFixtures.h"
 #include "AI/NarrativeNPCController.h"
@@ -162,7 +163,7 @@ bool FSovCoordinationThreatSuspensionTest::RunTest(const FString& Parameters)
 	if (!TestNotNull(TEXT("Replacement controller pawn"), Replacement)) { return false; }
 	Controller->Possess(Replacement); Replacement->InitializeTestCombat();
 	TestFalse(TEXT("Possession replacement clears old pawn suspension ownership"), Controller->IsThreatMemorySuspended());
-	TStrongObjectPtr<UObject> ExternalOwner(NewObject<UObject>());
+	TStrongObjectPtr<UObject> ExternalOwner(NewObject<USovRuntimeTestIdentity>());
 	Controller->SetThreatMemorySuspended(ExternalOwner.Get(), true);
 	FSovCoordinationTestAccess::ReleaseDirector(Test.Director);
 	FSovCoordinationTestAccess::ReleaseStage(Coordination, TEXT("Future"));

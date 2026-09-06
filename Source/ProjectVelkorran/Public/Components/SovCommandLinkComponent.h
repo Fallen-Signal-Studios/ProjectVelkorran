@@ -206,6 +206,14 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Command Link")
 	bool UnregisterLinkedActor(AActor* Actor);
 
+	/**
+	 * Configures the stable encounter identity before a live link instance exists.
+	 * Runtime coordinators may use this after all spawned participants are ready;
+	 * active, severed, and death-deactivated instances reject reconfiguration.
+	 */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Command Link")
+	bool ConfigureLinkId(FName InLinkId);
+
 	/** Starts a fresh link instance. Null uses the component owner as its source. */
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Command Link")
 	bool ActivateCommandLink(AActor* InCommandSource);

@@ -1,5 +1,6 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Tests/SovMeleeRuntimeTestFixtures.h"
+#include "Tests/SovAxiomRuntimeTestFixtures.h"
 #include "Melee/SovMeleeAttackDefinition.h"
 #include "NarrativeGameplayTags.h"
 #include "Sovereign/SovGameplayTags.h"
@@ -21,3 +22,9 @@ USovMeleeRuntimeTestAbility::USovMeleeRuntimeTestAbility()
 }
 USkeletalMeshComponent* USovMeleeRuntimeTestAbility::ResolveMeleeTraceMesh_Implementation() const
 { AActor* Source=GetAvatarActorFromActorInfo(); return Source?Source->FindComponentByClass<USovMeleeRuntimeTestMesh>():nullptr; }
+
+ETeamAttitude::Type ASovMeleeRuntimeTestPlayer::GetTeamAttitudeTowards(const AActor& Other) const
+{
+    const auto* TestCharacter = Cast<ASovAxiomRuntimeTestCharacter>(&Other);
+    return &Other == this || (TestCharacter && TestCharacter->TestTeam == 0) ? ETeamAttitude::Friendly : ETeamAttitude::Hostile;
+}

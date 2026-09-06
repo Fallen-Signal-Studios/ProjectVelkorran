@@ -9,6 +9,7 @@
 #include "Subsystems/NarrativeSaveSubsystem.h"
 #include "Components/StaticMeshComponent.h"
 #include "UObject/StrongObjectPtr.h"
+#include "UObject/Script.h"
 #include "AI/Mass/Peds/NarrativeMassParticipantBridge.h"
 #include "AI/Mass/Peds/NarrativePedFragments.h"
 #include "Engine/Engine.h"
@@ -16,6 +17,7 @@
 #include "EngineUtils.h"
 #include "HAL/PlatformProperties.h"
 #include "MassAgentComponent.h"
+#include "MassActorSubsystem.h"
 #include "MassCommandBuffer.h"
 #include "MassCommonFragments.h"
 #include "MassEntityManager.h"
@@ -86,6 +88,9 @@ namespace
 {
 	struct FCampaignMassRuntimeWorld
 	{
+#if WITH_EDITOR
+		FEditorScriptExecutionGuard AllowProductionReceivers;
+#endif
 		UWorld* World = nullptr;
 		FCampaignMassRuntimeWorld()
 		{
@@ -412,6 +417,7 @@ bool FSovCampaignMassRoundTripTest::RunTest(const FString& Parameters)
 	auto* Receipt = NewObject<UNarrativeMassParticipantReceiptComponent>(Proxy); Proxy->AddInstanceComponent(Receipt); Receipt->RegisterComponent();
 	TestTrue(TEXT("Exact captured static equipment visual binds to actual entity receipt"), Receipt->Bind(Entities->GetMutableEntityManager().AsShared(), Entity));
 	TestTrue(TEXT("Captured visual creates real proxy mesh"), Proxy->FindComponentByClass<UStaticMeshComponent>() != nullptr);
+	TestFalse(TEXT("External receipt has no Mass-owned spawn reference"), Entities->GetMutableEntityManager().GetFragmentDataChecked<FMassActorFragment>(Entity).IsOwnedByMass());
 	const FVector Moved(440.f, 85.f, 0.f);
 	Entities->GetMutableEntityManager().GetFragmentDataChecked<FTransformFragment>(Entity).GetMutableTransform().SetLocation(Moved);
 	if (!TestTrue(TEXT("Promotion starts a new campaign class instance"), Director->SetParticipantRepresentation(Participant.ParticipantId,
@@ -423,6 +429,7 @@ bool FSovCampaignMassRoundTripTest::RunTest(const FString& Parameters)
 	if (!TestEqual(TEXT("Verified promotion keeps encounter active"), Director->GetEncounterState(), ESovEncounterState::Active)) { return false; }
 	TestFalse(TEXT("Promotion completes asynchronously through readiness gate"), Director->IsMassPromotionPending());
 	TestFalse(TEXT("Successful promotion relinquishes Mass record"), Director->IsParticipantMassRepresented(Participant.ParticipantId));
+	TestTrue(TEXT("Promotion destroys its external proxy without releasing an unowned template reference"), !IsValid(Proxy) || Proxy->IsActorBeingDestroyed());
 	TestEqual(TEXT("Stable participant actor GUID restored"), Replacement->GetActorGUID_Implementation(), Stable);
 	TestTrue(TEXT("Entity current position, not original spawn, wins promotion"), Replacement->GetActorLocation().Equals(Moved));
 	TestEqual(TEXT("Health preserved"), Replacement->GetNarrativeAbilitySystemComponent()->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()), 47.f);

@@ -6,6 +6,7 @@
 #include "AbilitySystemComponent.h"
 #include "Abilities/GameplayAbility.h"
 #include "CollisionQueryParams.h"
+#include "Combat/SovNativeDamageReceipt.h"
 #include "Components/PrimitiveComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/SphereComponent.h"
@@ -833,6 +834,30 @@ USovGameplayAbility_TarrikCinderStickyGrenade::ReleaseCinderStickyGrenade(
 	return Grenade;
 }
 
+/** A radial candidate belongs to the avatar and life sampled before direct-hit callbacks. */
+struct FJudgementTargetSnapshot
+{
+	TWeakObjectPtr<UAbilitySystemComponent> ASC;
+	TWeakObjectPtr<AActor> Avatar;
+	TWeakObjectPtr<UNarrativeAttributeSetBase> Attributes;
+	uint64 LifeEpoch, ActorInfoEpoch;
+
+	explicit FJudgementTargetSnapshot(UAbilitySystemComponent* Target)
+		: ASC(Target), Avatar(Target->GetAvatarActor()), Attributes(const_cast<UNarrativeAttributeSetBase*>(Target->GetSet<UNarrativeAttributeSetBase>())),
+		LifeEpoch(Attributes.IsValid() ? Attributes->GetCombatLifeEpoch() : 0),
+		ActorInfoEpoch(Cast<UNarrativeAbilitySystemComponent>(Target)
+			? CastChecked<UNarrativeAbilitySystemComponent>(Target)->GetCombatActorInfoEpoch() : 0) {}
+
+	bool IsCurrent() const
+	{
+		if (!ASC.IsValid() || !Avatar.IsValid() || Avatar->IsActorBeingDestroyed()
+			|| ASC->GetAvatarActor() != Avatar.Get() || ASC->GetSet<UNarrativeAttributeSetBase>() != Attributes.Get()
+			|| !Attributes.IsValid() || Attributes->GetCombatLifeEpoch() != LifeEpoch) { return false; }
+		const auto* NarrativeASC = Cast<UNarrativeAbilitySystemComponent>(ASC.Get());
+		return !NarrativeASC || NarrativeASC->GetCombatActorInfoEpoch() == ActorInfoEpoch;
+	}
+};
+
 /** One immutable paid payload, retained across callback-capable engine boundaries. */
 struct USovGameplayAbility_TarrikCinderJudgement::FJudgementShotContext
 {
@@ -848,6 +873,8 @@ struct USovGameplayAbility_TarrikCinderJudgement::FJudgementShotContext
 	float Level, DirectDamage, DirectPoise, DirectShield, ExplosionDamage, ExplosionPoise, ExplosionShield;
 	float Radius, MinimumFraction, ImpulseStrength, UpwardBias, Recovery;
 	bool bRequiresLineOfSight, bApplyImpulse;
+	TWeakObjectPtr<UAbilitySystemComponent> DirectTargetASC;
+	TArray<FJudgementTargetSnapshot> ExplosionTargets;
 
 	explicit FJudgementShotContext(const USovGameplayAbility_TarrikCinderJudgement& Ability)
 		: Activation(Ability.GetTarrikActivationSerial()),
@@ -1273,7 +1300,7 @@ bool USovGameplayAbility_TarrikCinderJudgement::
 	}
 	const bool bBlastTriggered = BlockingHit || bExplodeAtMaximumRange;
 
-	const FJudgementShotContext Shot(*this);
+	FJudgementShotContext Shot(*this);
 	ASovCinderJudgementPresentation* Presentation =
 		SpawnDeferredJudgementPresentation(Shot, TraceStart, TraceEnd);
 	TStrongObjectPtr<ASovCinderJudgementPresentation> KeepPresentation(Presentation);
@@ -1290,12 +1317,16 @@ bool USovGameplayAbility_TarrikCinderJudgement::
 	AActor* ExplosionDamageCauser = IsValid(Presentation)
 		? static_cast<AActor*>(Presentation)
 		: Avatar;
+	if (bBlastTriggered)
+	{
+		CaptureJudgementExplosionTargets(Shot, TraceEnd, BlockingHit ? BlockingHit->GetActor() : nullptr, ExplosionDamageCauser);
+	}
+	if (DiscardRetiredPacket()) { return false; }
 
 	bool bDirectDamageResolved = false;
-	if (BlockingHit)
+	if (BlockingHit && !Shot.ExplosionTargets.IsEmpty() && Shot.ExplosionTargets[0].IsCurrent())
 	{
-		UAbilitySystemComponent* TargetASC =
-			ResolveTarrikTargetAbilitySystem(BlockingHit->GetActor());
+		UAbilitySystemComponent* TargetASC = Shot.DirectTargetASC.Get();
 		FGameplayEffectContextHandle DirectContext = Shot.Context.Duplicate();
 		DirectContext.AddHitResult(*BlockingHit, true);
 		DirectContext.AddOrigin(TraceEnd);
@@ -1411,24 +1442,28 @@ bool USovGameplayAbility_TarrikCinderJudgement::ApplyJudgementDamage(
 	Receipt->ExpectedTarget = TargetAbilitySystem->GetAvatarActor();
 	Receipt->ExpectedContext = DamageSpec->GetContext().Get();
 	auto* NarrativeSource = Cast<UNarrativeAbilitySystemComponent>(SourceASC);
+	auto* NarrativeTarget = Cast<UNarrativeAbilitySystemComponent>(TargetAbilitySystem);
+	// A target callback can retire the source after damage commits and suppress its
+	// later notification. Observe the same native proof at the target boundary too.
+	if (NarrativeTarget) { NarrativeTarget->OnDamageResolvedAsTarget.AddDynamic(Receipt.Get(), &USovNativeDamageReceipt::ReceiveResult); }
 	if (NarrativeSource) { NarrativeSource->OnDamageResolvedAsSource.AddDynamic(Receipt.Get(), &USovNativeDamageReceipt::ReceiveResult); }
 	SourceASC->ApplyGameplayEffectSpecToTarget(*DamageSpec, TargetAbilitySystem);
+	if (IsValid(NarrativeTarget)) { NarrativeTarget->OnDamageResolvedAsTarget.RemoveDynamic(Receipt.Get(), &USovNativeDamageReceipt::ReceiveResult); }
 	if (IsValid(NarrativeSource)) { NarrativeSource->OnDamageResolvedAsSource.RemoveDynamic(Receipt.Get(), &USovNativeDamageReceipt::ReceiveResult); }
 	return Receipt->bAppliedDamage;
 }
 
-int32 USovGameplayAbility_TarrikCinderJudgement::ApplyJudgementExplosion(
-	const FJudgementShotContext& Shot,
+void USovGameplayAbility_TarrikCinderJudgement::CaptureJudgementExplosionTargets(
+	FJudgementShotContext& Shot,
 	const FVector& Origin,
-	const FVector& SurfaceNormal,
 	AActor* DirectHitActor,
 	AActor* ExplosionDamageCauser) const
 {
 	UWorld* World = Shot.World.Get();
 	AActor* SourceActor = Shot.Avatar.Get();
-	if (!IsJudgementShotCurrent(Shot) || Shot.Radius <= KINDA_SMALL_NUMBER)
+	if (!IsJudgementShotCurrent(Shot))
 	{
-		return 0;
+		return;
 	}
 
 	FCollisionObjectQueryParams ObjectQuery;
@@ -1453,34 +1488,44 @@ int32 USovGameplayAbility_TarrikCinderJudgement::ApplyJudgementExplosion(
 
 	UAbilitySystemComponent* DirectTargetASC =
 		ResolveTarrikTargetAbilitySystem(DirectHitActor);
-	TArray<TWeakObjectPtr<UAbilitySystemComponent>> CandidateTargets;
+	Shot.DirectTargetASC = DirectTargetASC;
 	if (IsValid(DirectTargetASC))
 	{
 		// The primary target must not lose the blast because its capsule or
 		// modular presentation component falls just outside the overlap query.
-		CandidateTargets.Add(DirectTargetASC);
+		Shot.ExplosionTargets.Emplace(DirectTargetASC);
 	}
 	for (const FOverlapResult& Overlap : Overlaps)
 	{
 		if (UAbilitySystemComponent* OverlapASC =
 			ResolveTarrikTargetAbilitySystem(Overlap.GetActor()))
 		{
-			CandidateTargets.Add(OverlapASC);
+			Shot.ExplosionTargets.Emplace(OverlapASC);
 		}
 	}
+}
+
+int32 USovGameplayAbility_TarrikCinderJudgement::ApplyJudgementExplosion(
+	const FJudgementShotContext& Shot,
+	const FVector& Origin,
+	const FVector& SurfaceNormal,
+	AActor* DirectHitActor,
+	AActor* ExplosionDamageCauser) const
+{
+	AActor* SourceActor = Shot.Avatar.Get();
+	if (!IsJudgementShotCurrent(Shot) || Shot.Radius <= KINDA_SMALL_NUMBER) { return 0; }
+	UAbilitySystemComponent* DirectTargetASC = Shot.DirectTargetASC.Get();
 
 	TSet<UAbilitySystemComponent*> UniqueTargets;
 	int32 ResolvedTargetCount = 0;
-	for (const TWeakObjectPtr<UAbilitySystemComponent>& Candidate : CandidateTargets)
+	for (const FJudgementTargetSnapshot& Candidate : Shot.ExplosionTargets)
 	{
 		if (!IsJudgementShotCurrent(Shot)) { break; }
-		UAbilitySystemComponent* TargetASC = Candidate.Get();
-		AActor* TargetActor = IsValid(TargetASC)
-			? TargetASC->GetAvatarActor()
-			: nullptr;
+		UAbilitySystemComponent* TargetASC = Candidate.ASC.Get();
+		AActor* TargetActor = Candidate.Avatar.Get();
 		TStrongObjectPtr<UAbilitySystemComponent> KeepCandidate(TargetASC);
 		TStrongObjectPtr<AActor> KeepCandidateAvatar(TargetActor);
-		if (!IsValid(TargetASC)
+		if (!Candidate.IsCurrent()
 			|| !IsValid(TargetActor)
 			|| UniqueTargets.Contains(TargetASC)
 			|| !IsTarrikTargetAlive(TargetASC)
@@ -1495,7 +1540,7 @@ int32 USovGameplayAbility_TarrikCinderJudgement::ApplyJudgementExplosion(
 			continue;
 		}
 		if (!IsJudgementShotCurrent(Shot)) { break; }
-		if (!KeepCandidate.IsValid() || !KeepCandidateAvatar.IsValid()
+		if (!Candidate.IsCurrent() || !KeepCandidate.IsValid() || !KeepCandidateAvatar.IsValid()
 			|| TargetActor->IsActorBeingDestroyed() || TargetASC->GetAvatarActor() != TargetActor) { continue; }
 		UniqueTargets.Add(TargetASC);
 

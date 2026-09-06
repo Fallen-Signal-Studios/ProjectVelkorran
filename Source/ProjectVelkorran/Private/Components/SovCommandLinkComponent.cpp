@@ -48,7 +48,7 @@ void USovCommandLinkComponent::BeginPlay()
 		}
 	}
 
-	if (!HasValidCommandLinkConfiguration())
+	if (bStartsActive && !HasValidCommandLinkConfiguration())
 	{
 		UE_LOG(
 			LogSovCommandLink,
@@ -177,6 +177,29 @@ bool USovCommandLinkComponent::UnregisterLinkedActor(AActor* Actor)
 		UnbindParticipant(Actor);
 	}
 	PruneInvalidLinkedActors();
+	WakeOwnerForReplication();
+	return true;
+}
+
+bool USovCommandLinkComponent::ConfigureLinkId(const FName InLinkId)
+{
+	if (!GetOwner() || !GetOwner()->HasAuthority()
+		|| bCommandLinkMutationInProgress
+		|| ReplicationState.State != ESovCommandLinkState::Inactive
+		|| ReplicationState.LinkInstanceId.IsValid()
+		|| InLinkId == NAME_None)
+	{
+		return false;
+	}
+
+	if (LinkId == InLinkId && ReplicationState.LinkId == InLinkId)
+	{
+		return true;
+	}
+
+	LinkId = InLinkId;
+	ReplicationState.LinkId = InLinkId;
+	++ReplicationState.Revision;
 	WakeOwnerForReplication();
 	return true;
 }

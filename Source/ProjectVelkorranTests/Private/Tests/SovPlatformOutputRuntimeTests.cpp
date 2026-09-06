@@ -5,6 +5,7 @@
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "Misc/AutomationTest.h"
+#include "UObject/Script.h"
 #include <limits>
 
 struct FSovPlatformOutputTestAccess
@@ -225,6 +226,9 @@ bool FSovHapticSettingsRuntime::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovHapticEventRuntime, "ProjectVelkorran.Campaign.PlatformOutput.CommittedEventProducers", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FSovHapticEventRuntime::RunTest(const FString& Parameters)
 {
+#if WITH_EDITOR
+	FEditorScriptExecutionGuard AllowProductionReceivers;
+#endif
 	const UWorld::InitializationValues WorldInitialization = UWorld::InitializationValues().AllowAudioPlayback(false).CreatePhysicsScene(false).CreateNavigation(false).CreateAISystem(false);
 	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true,
 		ERHIFeatureLevel::Num, &WorldInitialization);
@@ -233,6 +237,9 @@ bool FSovHapticEventRuntime::RunTest(const FString& Parameters)
 	auto* PC = World->SpawnActor<ASovInputRoutingTestController>();
 	auto* Pawn = World->SpawnActor<APawn>();
 	if (!PC || !Pawn) { World->DestroyWorld(false); if (GEngine) { GEngine->DestroyWorldContext(World); } return false; }
+	// The standalone fixture has no GameMode to designate its local controller.
+	PC->SetAsLocalPlayerController();
+	TestTrue(TEXT("Event producer fixture is a local player controller"), PC->IsLocalController());
 	PC->TestASC = NewObject<UNarrativeAbilitySystemComponent>(PC); PC->TestASC->RegisterComponent();
 	PC->Possess(Pawn); PC->TestASC->InitAbilityActorInfo(PC, Pawn); PC->TestASC->SetCharacterReadyEpoch(1);
 	auto* Feedback = NewObject<USovHapticOutputTestComponent>(PC); Feedback->RegisterComponent(); Feedback->RefreshSources();

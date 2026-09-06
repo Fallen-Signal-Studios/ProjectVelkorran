@@ -24,6 +24,7 @@ namespace SovTarrikPayloadTests
 struct FTarrikTestWorld
 {
 	UWorld* World = nullptr;
+	uint64 TimerFrame = GFrameCounter;
 	FTarrikTestWorld()
 	{
 		const UWorld::InitializationValues WorldInitialization = UWorld::InitializationValues().AllowAudioPlayback(false)
@@ -36,6 +37,11 @@ struct FTarrikTestWorld
 			if (GEngine) { GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World); }
 			World->GetTimerManager().Tick(0.f); // activate newly registered timers in this frame
 		}
+	}
+	void AdvanceTimers(float Seconds)
+	{
+		TGuardValue<uint64> Frame(GFrameCounter, ++TimerFrame);
+		World->GetTimerManager().Tick(Seconds);
 	}
 	~FTarrikTestWorld()
 	{
@@ -152,7 +158,7 @@ bool FSovTarrikRequiemRuntimeTest::RunTest(const FString& Parameters)
 	Ability->FinishEchoAbility();
 	Source->RemoveTestWeapon();
 	// Advance the actual world's native timer manager after the ability has ended.
-	Fixture.World->GetTimerManager().Tick(0.5f);
+	Fixture.AdvanceTimers(0.5f);
 	TestEqual(TEXT("First enemy gets exactly one line packet"), First->ResolvedHitCount, 2);
 	TestEqual(TEXT("Second enemy gets exactly one line packet"), Second->ResolvedHitCount, 2);
 	TestEqual(TEXT("Off-axis hostile receives line only"), Side->ResolvedHitCount, 1);
@@ -171,7 +177,7 @@ bool FSovTarrikProjectileLifecycleRuntimeTest::RunTest(const FString& Parameters
 		auto* Source = Fixture.Character(FVector::ZeroVector, 0);
 		auto* Hunger = SovTarrikPayloadTests::Activate<USovTarrikHungerTestAbility>(*this, Source);
 		if (!Hunger) { return false; }
-		Fixture.World->GetTimerManager().Tick(0.4f);
+		Fixture.AdvanceTimers(0.4f);
 		TestEqual(TEXT("Empty Blueprint gameplay releases one Hunger projectile"), Fixture.Count<ASovVelkorransHungerProjectile>(), 1);
 		TestNull(TEXT("Late notify cannot spawn another projectile"), Hunger->ReleaseVelkorransHungerFromAim());
 		Hunger->FinishEchoAbility();
@@ -183,7 +189,7 @@ bool FSovTarrikProjectileLifecycleRuntimeTest::RunTest(const FString& Parameters
 		auto* Hunger = SovTarrikPayloadTests::Activate<USovTarrikHungerTestAbility>(*this, Source);
 		if (!Hunger) { return false; }
 		Source->RemoveTestWeapon();
-		Fixture.World->GetTimerManager().Tick(0.4f);
+		Fixture.AdvanceTimers(0.4f);
 		TestEqual(TEXT("Weapon removal rejects queued release"), Fixture.Count<ASovVelkorransHungerProjectile>(), 0);
 		TestFalse(TEXT("Invalid source cancels recovery lane"), Hunger->IsActive());
 	}
@@ -192,7 +198,7 @@ bool FSovTarrikProjectileLifecycleRuntimeTest::RunTest(const FString& Parameters
 		auto* Source = Fixture.Character(FVector::ZeroVector, 0);
 		auto* Grenade = SovTarrikPayloadTests::Activate<USovTarrikGrenadeTestAbility>(*this, Source);
 		if (!Grenade) { return false; }
-		Fixture.World->GetTimerManager().Tick(0.4f);
+		Fixture.AdvanceTimers(0.4f);
 		TestEqual(TEXT("Universal grenade releases without Blueprint gameplay"), Fixture.Count<ASovCinderStickyGrenadeProjectile>(), 1);
 		TestNull(TEXT("Grenade duplicate rejected"), Grenade->ReleaseCinderStickyGrenadeFromAim());
 		TestEqual(TEXT("Grenade spends once"), Source->TestEcho->GetEcho(), 65.f);
@@ -215,7 +221,7 @@ bool FSovTarrikProjectileLifecycleRuntimeTest::RunTest(const FString& Parameters
 		auto* Hunger = SovTarrikPayloadTests::Activate<USovTarrikHungerTestAbility>(*this, Source);
 		if (!Hunger) { return false; }
 		Hunger->FinishEchoAbility(true);
-		Fixture.World->GetTimerManager().Tick(0.4f);
+		Fixture.AdvanceTimers(0.4f);
 		TestEqual(TEXT("Cancellation clears the queued release"), Fixture.Count<ASovVelkorransHungerProjectile>(), 0);
 	}
 	return true;

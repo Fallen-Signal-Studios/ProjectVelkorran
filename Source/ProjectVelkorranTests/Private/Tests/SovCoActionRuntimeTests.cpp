@@ -54,6 +54,8 @@ namespace
 			AI = World->SpawnActor<ASovCoActionTestNPCController>();
 			Anchor = World->SpawnActor<ASovCoActionAnchor>();
 			if (!PC || !Player || !NPC || !AI || !Anchor) { return; }
+			// Transient worlds skip the controller PostInitializeComponents registration.
+			World->AddController(PC);
 			Player->TestHero = FSovGameplayTags::Get().Character_Player_Selene;
 			Player->InitializeForCoAction(); PC->Possess(Player);
 			NPC->InitializeTestCombat(0); AI->Possess(NPC);
@@ -185,9 +187,13 @@ bool FSovCoActionFallbackVisibilityTest::RunTest(const FString& Parameters)
 {
 	FCoActionWorld F; if (!TestTrue(TEXT("World fixture"), F.Ready())) { return false; }
 	if (!F.PC->PlayerCameraManager) { F.PC->PlayerCameraManager = F.World->SpawnActor<APlayerCameraManager>(); }
-	F.PC->SetViewTarget(F.Player); F.Player->SetActorLocation(FVector(-600.f, 0.f, 0.f));
+	if (!TestNotNull(TEXT("Camera manager fixture"), F.PC->PlayerCameraManager.Get())) { return false; }
+	F.PC->PlayerCameraManager->InitializeFor(F.PC);
+	F.Player->SetActorLocation(FVector(-600.f, 0.f, 0.f)); F.PC->SetViewTarget(F.Player);
+	F.PC->PlayerCameraManager->UpdateCamera(0.f);
 	F.NPC->SetActorLocation(FVector(0.f, 0.f, 96.f));
 	const FVector Destination(150.f, 50.f, 96.f);
+	TestTrue(TEXT("Visibility evaluates the registered player viewer"), F.World->GetFirstPlayerController() == F.PC);
 	TestFalse(TEXT("Visible companion cannot be teleported"), FSovCoActionTestAccess::Hidden(*F.Companion, Destination));
 	AActor* Wall = F.Wall(FVector(-200.f, 0.f, 0.f));
 	TestTrue(TEXT("Both complete capsules occluded from the player camera"), FSovCoActionTestAccess::Hidden(*F.Companion, Destination));

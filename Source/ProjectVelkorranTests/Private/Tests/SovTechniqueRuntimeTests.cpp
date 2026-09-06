@@ -268,7 +268,7 @@ bool FSovTechniqueAvatarChangedDuringGrantTest::RunTest(const FString& Parameter
 		|| !TestTrue(TEXT("Claim initial points"), Fixture.Techniques->ClaimReward(Fixture.Reward))) { return false; }
 	const TArray<UTreeSkill*> Branches = Fixture.Techniques->GetActiveTechniqueBranches();
 	if (!TestEqual(TEXT("Configured branches"), Branches.Num(), 3)) { return false; }
-	AActor* Replacement = Fixture.World->SpawnActor<AActor>();
+	AActor* Replacement = Fixture.World->SpawnActor<ASovHandoffRuntimeTestPawn>();
 	if (!TestNotNull(TEXT("Replacement avatar"), Replacement)) { return false; }
 	UAbilitySystemComponent* ASC = Fixture.Player->GetAbilitySystemComponent();
 	bool bCallbackObserved = false;
@@ -281,7 +281,7 @@ bool FSovTechniqueAvatarChangedDuringGrantTest::RunTest(const FString& Parameter
 		});
 	const bool bPurchased = Fixture.Techniques->BuyPerk(USovTechniqueTestPerkA::StaticClass(), Branches[0]);
 	ASC->OnActiveGameplayEffectAddedDelegateToSelf.Remove(Delegate);
-	TestTrue(TEXT("Real GAS callback rebound the shared ASC"), bCallbackObserved);
+	TestTrue(TEXT("Real GAS callback rebound the shared ASC"), bCallbackObserved && ASC->GetAvatarActor() == Replacement);
 	TestFalse(TEXT("Invalidated purchase reports failure"), bPurchased);
 	TestFalse(TEXT("Invalidated ledger requires explicit restore"), Fixture.Techniques->IsTechniqueStateValid());
 	TestEqual(TEXT("Rollback does not take the replacement avatar away"), ASC->GetAvatarActor(), Replacement);
@@ -307,7 +307,7 @@ bool FSovTechniqueProfileInitializationTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Rejected initialization preserves point balance"), Fixture.Techniques->GetAvailableTechniquePoints(), 4);
 	TestEqual(TEXT("Rejected initialization preserves active grants"), Fixture.Resistance(), 10.f);
 
-	AActor* Replacement = Fixture.World->SpawnActor<AActor>();
+	AActor* Replacement = Fixture.World->SpawnActor<ASovHandoffRuntimeTestPawn>();
 	if (!TestNotNull(TEXT("Replacement avatar"), Replacement)) { return false; }
 	UAbilitySystemComponent* ASC = Fixture.Player->GetAbilitySystemComponent();
 	ASC->RemoveLooseGameplayTag(Tags.Character_Player_Tarrik);
@@ -322,7 +322,7 @@ bool FSovTechniqueProfileInitializationTest::RunTest(const FString& Parameters)
 		});
 	const bool bInitialized = Fixture.Techniques->InitializeNewProtagonist(Tags.Character_Player_Selene);
 	ASC->OnAnyGameplayEffectRemovedDelegate().Remove(Delegate);
-	TestTrue(TEXT("Real outgoing-effect removal callback changed ownership"), bCallbackObserved);
+	TestTrue(TEXT("Real outgoing-effect removal callback changed ownership"), bCallbackObserved && ASC->GetAvatarActor() == Replacement);
 	TestFalse(TEXT("First-entry initialization stops after avatar replacement"), bInitialized);
 	TestFalse(TEXT("Partially cleared outgoing state requires restore"), Fixture.Techniques->IsTechniqueStateValid());
 	TestEqual(TEXT("Failed initialization preserves earned reward ledger"), Fixture.Techniques->GetEarnedTechniquePoints(), 5);
@@ -363,8 +363,10 @@ bool FSovTechniqueAugmentSelectionTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Unavailable equipment blocks changes"),F.Techniques->SelectAugmentAtSafePoint(F.Safe,Slot,USovTechniqueTestPerkB::StaticClass(),Reason));
 	ASC->RemoveLooseGameplayTag(T.State_Weapon_VerityAbsent);
 	F.Pawn->SetTestVisualReady(false);
+	TestFalse(TEXT("Fixture invalidates the public readiness gate"),F.Pawn->IsCharacterReady());
 	TestFalse(TEXT("Pending pawn readiness blocks safe-point changes"),F.Techniques->SelectAugmentAtSafePoint(F.Safe,Slot,USovTechniqueTestPerkB::StaticClass(),Reason));
 	F.Pawn->SetTestVisualReady(true);
+	TestTrue(TEXT("Fixture restores the real readiness prerequisites"),F.Pawn->IsCharacterReady());
 	F.Encounter->SetTestState(ESovEncounterState::Active);
 	TestFalse(TEXT("Combat blocks augment selection"),F.Techniques->SelectAugmentAtSafePoint(F.Safe,Slot,USovTechniqueTestPerkB::StaticClass(),Reason));
 	F.Encounter->SetTestState(ESovEncounterState::Succeeded);
@@ -404,7 +406,7 @@ bool FSovTechniqueAugmentRollbackFailureTest::RunTest(const FString& Parameters)
 	if (!TestTrue(TEXT("Establish committed first selection"),F.Techniques->SelectAugmentAtSafePoint(F.Safe,Slot,USovTechniqueTestPerkB::StaticClass(),Reason))) { return false; }
 	const auto Independent=ASC->MakeOutgoingSpec(USovTechniqueTestEffect::StaticClass(),1,ASC->MakeEffectContext());
 	const auto IndependentHandle=ASC->ApplyGameplayEffectSpecToSelf(*Independent.Data.Get());
-	AActor* Replacement=F.World->SpawnActor<AActor>(); if (!Replacement) { return false; }
+	AActor* Replacement=F.World->SpawnActor<ASovHandoffRuntimeTestPawn>(); if (!Replacement) { return false; }
 	int32 Stage=0;
 	const auto Listener=ASC->OnActiveGameplayEffectAddedDelegateToSelf.AddLambda(
 		[&](UAbilitySystemComponent* Target,const FGameplayEffectSpec& Spec,FActiveGameplayEffectHandle)

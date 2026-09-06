@@ -10,6 +10,7 @@
 #include "GAS/NarrativeAbilitySystemComponent.h"
 #include "GAS/NarrativeAttributeSetBase.h"
 #include "Misc/AutomationTest.h"
+#include "UObject/Script.h"
 #include "Subsystems/NarrativeSaveSubsystem.h"
 #include "Sovereign/SovGameplayTags.h"
 
@@ -18,6 +19,8 @@ namespace
 {
 	struct FEncounterRuntimeWorld
 	{
+		// Permit the native actor Load interface callback in this transient world.
+		FEditorScriptExecutionGuard ScriptGuard;
 		UWorld* World = nullptr;
 		FEncounterRuntimeWorld()
 		{

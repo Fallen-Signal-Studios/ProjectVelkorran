@@ -18,6 +18,7 @@ public:
 	virtual FGameplayTag GetProtagonistIdentityTag() const override;
 
 protected:
+	virtual void PostInitializeComponents() override;
 	virtual void HandleAbilitySystemReady(
 		UNarrativeAbilitySystemComponent* ReadyAbilitySystem) override;
 	virtual bool AreAdditionalCharacterSystemsReady() const override;

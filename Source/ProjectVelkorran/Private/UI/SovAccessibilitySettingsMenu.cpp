@@ -417,9 +417,9 @@ void USovAccessibilitySettingsMenu::Adjust(USovAccessibilitySettingRow* Row, int
 	{
 		if (auto* Save = GetGameInstance() ? GetGameInstance()->GetSubsystem<USovSaveSubsystem>() : nullptr)
 		{
-			const ESovSaveResult Result = Save->RetryTravelRecovery(Error);
+			const bool bRecoveryStarted = Save->RetryTravelRecovery(Error);
 			if (!IsCurrent()) { return; }
-			if (Result == ESovSaveResult::LoadStarted) { DeactivateWidget(); }
+			if (bRecoveryStarted) { DeactivateWidget(); }
 			else { PresentTravelRecovery(Error); }
 		}
 		return;

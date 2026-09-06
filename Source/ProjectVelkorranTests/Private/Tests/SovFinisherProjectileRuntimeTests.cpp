@@ -32,6 +32,9 @@ struct FSovProjectileDefenseTestAccess
 {
     static void Impact(ASovReformationDroneRocketProjectile* Rocket,AActor* Target)
     {
+#if WITH_EDITOR
+        FEditorScriptExecutionGuard AllowNativeDefenseReceipt;
+#endif
         FHitResult Hit(Target,Cast<UPrimitiveComponent>(Target->GetRootComponent()),Rocket->GetActorLocation(),FVector::ForwardVector);
         Hit.bBlockingHit=true; Rocket->ResolveImpact(Hit);
     }

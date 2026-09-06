@@ -1,6 +1,7 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "Engine/EngineBaseTypes.h"
 #include "GameFramework/PlayerController.h"
 #include "Character/PlayerDefinition.h"
 #include "CharacterCreator/NarrativeSaveWithCreatorData.h"
@@ -33,6 +34,7 @@ bool FSovNarrativeTravelSaveVetoTest::RunTest(const FString& Parameters)
 	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &IVS);
 	if (!TestNotNull(TEXT("World"), World)) { return false; }
 	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+	World->InitializeActorsForPlay(FURL());
 	ANarrativeGameMode* Mode = World->SpawnActor<ANarrativeGameMode>();
 	APlayerController* Player = World->SpawnActor<APlayerController>();
 	UNarrativeSaveSubsystem* Save = World->GetSubsystem<UNarrativeSaveSubsystem>();
@@ -71,6 +73,7 @@ bool FSovNarrativePlayerSlotPreservesSubclassTest::RunTest(const FString& Parame
 	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &IVS);
 	if (!TestNotNull(TEXT("World"), World)) { return false; }
 	GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World);
+	World->InitializeActorsForPlay(FURL());
 	const FString Slot = TEXT("SovAutomationPlayerSlot_") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
 	ON_SCOPE_EXIT
 	{

@@ -175,6 +175,7 @@ private:
 	bool bThreatMemoryManaged = false;
 	bool bRefreshingThreatMemory = false;
 	bool bThreatPerceptionWasReady = false;
+	bool bThreatPerceptionExplicitlyDeactivated = false;
 	bool bInvalidatingThreatPerception = false;
 	bool bClearingThreatTarget = false;
 	uint64 ThreatMemoryGeneration = 0;

@@ -4,6 +4,7 @@
 
 #include "Components/SovGuardComponent.h"
 #include "Components/SovTarrikEchoGenerationComponent.h"
+#include "GAS/NarrativeAbilitySystemComponent.h"
 #include "Sovereign/SovGameplayTags.h"
 
 ASovTarrikCharacter::ASovTarrikCharacter(
@@ -15,6 +16,36 @@ ASovTarrikCharacter::ASovTarrikCharacter(
 			TEXT("SovTarrikEchoGenerationComponent"));
 	GuardComponent = CreateDefaultSubobject<USovGuardComponent>(
 		TEXT("SovGuardComponent"));
+}
+
+void ASovTarrikCharacter::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+
+	// Legacy protagonist Blueprints can serialize null compatibility slots even
+	// though their concrete native class still constructs these subobjects.
+	// Restore only null slots from exact native subobjects owned by this pawn.
+	// Nonnull mismatches and extra authored components retain canonical rejection.
+	if (!GuardComponent)
+	{
+		auto* NativeGuard = Cast<USovGuardComponent>(
+			GetDefaultSubobjectByName(TEXT("SovGuardComponent")));
+		if (IsValid(NativeGuard) && NativeGuard->GetOwner() == this
+			&& NativeGuard->CreationMethod == EComponentCreationMethod::Native)
+		{
+			GuardComponent = NativeGuard;
+		}
+	}
+	if (!TarrikEchoGenerationComponent)
+	{
+		auto* NativeGenerator = Cast<USovTarrikEchoGenerationComponent>(
+			GetDefaultSubobjectByName(TEXT("SovTarrikEchoGenerationComponent")));
+		if (IsValid(NativeGenerator) && NativeGenerator->GetOwner() == this
+			&& NativeGenerator->CreationMethod == EComponentCreationMethod::Native)
+		{
+			TarrikEchoGenerationComponent = NativeGenerator;
+		}
+	}
 }
 
 FGameplayTag ASovTarrikCharacter::GetProtagonistIdentityTag() const

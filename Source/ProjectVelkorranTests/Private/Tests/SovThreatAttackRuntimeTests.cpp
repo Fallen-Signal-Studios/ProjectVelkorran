@@ -10,6 +10,7 @@
 #include "GAS/NarrativeAttributeSetBase.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "Misc/AutomationTest.h"
+#include "UObject/Script.h"
 #include "NarrativeGameplayTags.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISenseConfig_Sight.h"
@@ -33,6 +34,7 @@ namespace
 {
 struct FThreatAttackWorld
 {
+	FEditorScriptExecutionGuard ScriptGuard;
 	UWorld* World = nullptr;
 	ASovBotTestCharacter* Source = nullptr;
 	ASovBotTestCharacter* Target = nullptr;
@@ -60,10 +62,12 @@ struct FThreatAttackWorld
 		auto* Sight = NewObject<UAISenseConfig_Sight>(Perception);
 		Sight->DetectionByAffiliation.bDetectEnemies = true;
 		Perception->ConfigureSense(*Sight); Controller->SetPerceptionComponent(*Perception); Perception->RegisterComponent();
+		// Match authored stock perception: registration enables event-driven sight without Activate().
 		Controller->RefreshThreatMemory();
 	}
 	~FThreatAttackWorld() { if (World) { World->DestroyWorld(false); if (GEngine) { GEngine->DestroyWorldContext(World); } } }
-	bool Valid() const { return Source && Target && Controller && Perception; }
+	bool Valid() const { return Source && Target && Controller && Perception && Perception->IsRegistered()
+		&& Perception->IsSenseEnabled(UAISense_Sight::StaticClass()); }
 	void Sight(bool Seen)
 	{
 		FAIStimulus Stimulus(*GetDefault<UAISense_Sight>(), 1.f, Target->GetActorLocation(), Source->GetActorLocation());

@@ -1,4 +1,4 @@
-#include "../../Source/ProjectVelkorran/Private/UI/Dialogue/SovDialoguePressurePolicy.h"
+#include "../../Source/ProjectVelkorran/Public/UI/Dialogue/SovDialoguePressurePolicy.h"
 #include <cassert>
 #include <limits>
 using namespace SovDialoguePressure;

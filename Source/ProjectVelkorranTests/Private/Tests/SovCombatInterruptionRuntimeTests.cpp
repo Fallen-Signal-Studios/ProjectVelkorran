@@ -270,7 +270,8 @@ bool FSovInterruptionDroneCommittedSuicideTest::RunTest(const FString& Parameter
 	auto* Ability = SovCombatInterruptionTests::Activate<USovCombatDroneSuicideTestAbility>(*this, Source);
 	if (!Ability) { return false; }
 	Ability->StartSelfDestructRun();
-	Fixture.World->GetTimerManager().Tick(0.1f);
+	// UE ticks a timer manager once per engine frame; the fixture already primed this frame.
+	{ TGuardValue<uint64> Frame(GFrameCounter, GFrameCounter + 1); Fixture.World->GetTimerManager().Tick(0.1f); }
 	TestEqual(TEXT("First outward target receives one committed blast"), First->ResolvedHitCount, 1);
 	TestEqual(TEXT("Second outward target still receives committed blast after cancellation"), Second->ResolvedHitCount, 1);
 	TestFalse(TEXT("Old ability stays ended"), Ability->IsActive());

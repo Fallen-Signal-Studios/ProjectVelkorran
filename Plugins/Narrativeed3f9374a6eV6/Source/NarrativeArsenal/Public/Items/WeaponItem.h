@@ -204,6 +204,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item - Weapon")
 	EWeaponHandRule WeaponHand;
 
+	/** If either weapon opts in, dual wielding requires the same exact item class. Existing hand and equip rules still apply. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item - Weapon")
+	bool bRequireSameClassForDualWield = false;
+
 	/* When the weapon is wielded on its own, we'll grant this set of abilities. */
 	UPROPERTY(BlueprintReadOnly, EditAnywhere, Category = "Item - Weapon")
 	TArray<TSubclassOf<class UNarrativeGameplayAbility>> WeaponAbilities;

@@ -1,14 +1,20 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
+#include "Tests/SovRuntimeObjectTestFixtures.h"
 #include "Accessibility/SovAccessibleNarrationSubsystem.h"
 #include "UI/Dialogue/SovDialogueChoiceWidget.h"
 #include "UI/Dialogue/SovDialoguePresentationComponent.h"
 #include "UI/Dialogue/SovDialoguePresentationState.h"
 #include "Tests/SovDialogueRuntimeTestFixtures.h"
 #include "Tests/SovFrontendRuntimeTestFixtures.h"
+#include "Tests/SovHandoffRuntimeTestFixtures.h"
 #include "UI/SovNativeGameplayHUD.h"
+#include "NarrativeGameplayTags.h"
+#include "Widgets/CommonActivatableWidgetContainer.h"
 #include "Blueprint/WidgetTree.h"
 #include "Engine/Engine.h"
 #include "Engine/LocalPlayer.h"
+#include "ICommonInputModule.h"
+#include "UObject/StrongObjectPtr.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerState.h"
@@ -47,17 +53,29 @@ namespace
 	};
 	struct FDialogueWorld
 	{
+		TStrongObjectPtr<ULocalPlayer> LocalPlayer{NewObject<ULocalPlayer>(GEngine)};
 		UWorld* World;
 		APlayerController* PC;
 		UTalesComponent* Tales;
 		FDialogueWorld()
 		{
+			ICommonInputModule::GetSettings().LoadData();
 			const UWorld::InitializationValues IVS = UWorld::InitializationValues().AllowAudioPlayback(false).CreatePhysicsScene(false)
 				.RequiresHitProxies(false).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
 			World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &IVS);
 			if (GEngine) { GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World); }
 			PC = World->SpawnActor<APlayerController>();
+			MakeLocal(PC);
 			Tales = NewObject<UTalesComponent>(PC); Tales->RegisterComponent();
+		}
+		void MakeLocal(APlayerController* Controller)
+		{
+			// UPlayer resolves its controller through the world's registered controllers.
+			// Transfer the previous association instead of leaving two owners for one player.
+			if (APlayerController* Previous = LocalPlayer->PlayerController)
+			{ if (Previous != Controller && Previous->Player == LocalPlayer.Get()) { Previous->Player = nullptr; } }
+			Controller->Player = LocalPlayer.Get(); LocalPlayer->PlayerController = Controller;
+			Controller->SetAsLocalPlayerController(); World->AddController(Controller);
 		}
 		~FDialogueWorld()
 		{
@@ -72,9 +90,9 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovNarrationCompletionTest, "ProjectVelkorran.
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovNarrationCompletionTest::RunTest(const FString&)
 {
-	ULocalPlayer* Player = NewObject<ULocalPlayer>();
+	ULocalPlayer* Player = NewObject<ULocalPlayer>(GEngine);
 	USovAccessibleNarrationSubsystem* Narration = NewObject<USovAccessibleNarrationSubsystem>(Player);
-	UObject* OwnerA = NewObject<UObject>(); UObject* OwnerB = NewObject<UObject>();
+	UObject* OwnerA = NewObject<USovRuntimeTestIdentity>(); UObject* OwnerB = NewObject<USovRuntimeTestIdentity>();
 	TArray<TSharedPtr<FTestSpeech>> Backends;
 	FSovNarrationTestAccess::SetFactory(Narration, [&Backends]()
 	{
@@ -116,9 +134,9 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovNarrationFactoryReentryTest, "ProjectVelkor
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovNarrationFactoryReentryTest::RunTest(const FString&)
 {
-	ULocalPlayer* Player = NewObject<ULocalPlayer>();
+	ULocalPlayer* Player = NewObject<ULocalPlayer>(GEngine);
 	USovAccessibleNarrationSubsystem* Narration = NewObject<USovAccessibleNarrationSubsystem>(Player);
-	UObject* OldOwner = NewObject<UObject>(); UObject* NewOwner = NewObject<UObject>();
+	UObject* OldOwner = NewObject<USovRuntimeTestIdentity>(); UObject* NewOwner = NewObject<USovRuntimeTestIdentity>();
 	FGuid SharedReceipt;
 	int32 Creates = 0, Successful = 0;
 	TArray<TSharedPtr<FTestSpeech>> Backends;
@@ -162,9 +180,9 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovNarrationApplicationSuspendTest, "ProjectVe
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovNarrationApplicationSuspendTest::RunTest(const FString&)
 {
-	ULocalPlayer* Player = NewObject<ULocalPlayer>();
+	ULocalPlayer* Player = NewObject<ULocalPlayer>(GEngine);
 	auto* Narration = NewObject<USovAccessibleNarrationSubsystem>(Player);
-	auto* Owner = NewObject<UObject>(); TSharedPtr<FTestSpeech> Backend = MakeShared<FTestSpeech>();
+	auto* Owner = NewObject<USovRuntimeTestIdentity>(); TSharedPtr<FTestSpeech> Backend = MakeShared<FTestSpeech>();
 	FSovNarrationTestAccess::SetFactory(Narration, [Backend]() { return StaticCastSharedPtr<ISovAccessibleSpeech>(Backend); });
 	int32 Completed = 0, Cancelled = 0; bool bRestartAccepted = false; FGuid Request;
 	Narration->Announce(Owner, FText::FromString(TEXT("Before suspend")), Request,
@@ -287,17 +305,35 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovDialogueWidgetRecoveryTest, "ProjectVelkorr
 bool FSovDialogueWidgetRecoveryTest::RunTest(const FString&)
 {
 	FDialogueWorld W;
-	auto* PC = W.World->SpawnActor<ASovFrontendRuntimeController>();
-	auto* HUD = NewObject<USovNativeGameplayHUD>(PC); HUD->SetOwningPlayer(PC); HUD->Initialize(); HUD->TakeWidget(); HUD->NativeConstruct(); PC->StageHUD(HUD);
+	auto* PC = W.World->SpawnActor<ASovFrontendRuntimeController>(); W.MakeLocal(PC);
+	TestTrue(TEXT("Local player resolves the current controller for the actual HUD"), W.LocalPlayer->GetPlayerController(W.World) == PC);
+	auto* Player = W.World->SpawnActor<ASovHandoffRuntimeTestPawn>();
+	if (!TestNotNull(TEXT("Dialogue owner has an actual Narrative player"), Player)) { return false; }
+	PC->StagePawn(Player); PC->SetOwnedCharacter(Player);
+	TestTrue(TEXT("Native menu tag checks use the associated player"), PC->GetOwnedCharacter() == Player);
+	TestFalse(TEXT("Associated player removes the controller's unavailable-owner tag guard"),
+		PC->HasAnyMatchingGameplayTags(FGameplayTagContainer()));
+	auto* HUD = NewObject<USovNativeGameplayHUD>(PC); HUD->SetOwningPlayer(PC); HUD->Initialize();
+	// The viewport normally owns this Slate tree. Keep that ownership in the headless fixture.
+	const TSharedRef<SWidget> HUDSlate = HUD->TakeWidget(); HUD->NativeConstruct(); PC->StageHUD(HUD);
+	auto* GameLayer = HUD->GetLayerContainer(FNarrativeGameplayTags::Get().UI_Layer_Game);
+	if (!TestNotNull(TEXT("Native HUD registered its actual game layer"), GameLayer)) { return false; }
+	// This synchronous headless fixture does not tick Slate's cosmetic animation.
+	// Use the public instant transition so native activation/removal completes normally.
+	GameLayer->SetTransitionDuration(0.f);
 	W.Tales = PC->GetTalesComponent();
 	auto* Dialogue = NewObject<USovDialogueRuntimeFixture>(PC); Dialogue->Stage(W.Tales); Dialogue->NPCFinishedTalking();
 	auto* Presentation = NewObject<USovDialoguePresentationComponent>(PC);
+	PC->AddInstanceComponent(Presentation); Presentation->RegisterComponent();
+	TestTrue(TEXT("Recovery ticks a registered presentation component"), Presentation->IsRegistered());
 	FSovDialogueTestAccess::ConfigureWithoutHUD(Presentation, W.Tales, Dialogue);
 	auto* Initial = FSovDialogueTestAccess::Widget(Presentation);
 	if (!TestNotNull(TEXT("Real native game layer accepts the choice widget"), Initial)) { return false; }
+	TestTrue(TEXT("Native stack activates the initial choice widget"), Initial->IsActivated());
 	const int64 Revision = Dialogue->GetReplyPresentationRevision();
 	Initial->DeactivateWidget();
 	TestNull(TEXT("Removed widget retires its owned presentation"), FSovDialogueTestAccess::Widget(Presentation));
+	TestNull(TEXT("Native stack completes the outgoing widget transition"), GameLayer->GetActiveWidget());
 	FSovDialogueTestAccess::Tick(Presentation);
 	auto* Restored = FSovDialogueTestAccess::Widget(Presentation);
 	TestNotNull(TEXT("Unchanged graph revision reconstructs a removed widget"), Restored);

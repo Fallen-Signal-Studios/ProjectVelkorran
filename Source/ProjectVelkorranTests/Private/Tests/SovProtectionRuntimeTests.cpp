@@ -206,7 +206,11 @@ bool FSovProtectionGunfireRuntimeTest::RunTest(const FString&)
 	TestEqual(TEXT("Cooldown belongs to the enemy source"), F.Tarrik->TestEcho->GetEcho(), 30.f);
 	OtherThreat->SetActorEnableCollision(false);
 	F.Threat->SetActorEnableCollision(true);
-	F.World->Tick(LEVELTICK_TimeOnly, 5.01f);
+	// WorldSettings clamps a single oversized frame; step actual game time past
+	// the five-second per-source cooldown instead of submitting a 5-second frame.
+	const double CooldownStarted = F.World->GetTimeSeconds();
+	for (int32 Frame = 0; Frame < 101; ++Frame) { F.World->Tick(LEVELTICK_TimeOnly, .05f); }
+	TestTrue(TEXT("Actual world time advances beyond the protection cooldown"), F.World->GetTimeSeconds() - CooldownStarted > 5.0);
 	Gunfire = F.Activate();
 	if (!TestNotNull(TEXT("First source after cooldown"), Gunfire)) return false;
 	const int32 AwardsBefore = Observer->ProtectionAwardCount;
