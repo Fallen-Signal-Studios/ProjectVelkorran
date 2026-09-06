@@ -4,7 +4,6 @@
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "Save/SovCampaignSaveGame.h"
 #include "Containers/Ticker.h"
-#include "NarrativeSave.h"
 #include "SovSaveSubsystem.generated.h"
 class UNarrativeSave;
 class ASovPlayerController;
@@ -12,7 +11,6 @@ class USovCampaignDefinition;
 class UAbilitySystemComponent;
 class APawn;
 class APlayerState;
-struct FNarrativeSavePlayer;
 struct FSovObservedPlatformAccount;
 
 /** Testable platform storage seam; production delegates to Unreal's platform save API. */
@@ -78,58 +76,91 @@ public:
     UFUNCTION(BlueprintPure, Category="Campaign|Save")
     bool IsAwaitingFailureDecision() const { return bAwaitingFailureDecision; }
     UFUNCTION(BlueprintPure, Category="Campaign|Save")
-    bool IsLoadPending() const { return PendingSave != nullptr; }
+    bool IsLoadPending() const { return PendingSave != nullptr || MissionTravelRequest.IsValid(); }
+    UFUNCTION(BlueprintPure, Category="Campaign|Save") bool HasTravelRecovery() const;
+    UFUNCTION(BlueprintCallable, Category="Campaign|Save") bool RetryTravelRecovery(FString& Error) { return RetryMissionTravelRecovery(Error); }
     UFUNCTION(BlueprintPure, Category="Campaign|Save") double GetCampaignPlaySeconds() const { return PlaySeconds; }
     bool CanCapture(FString& Error) const;
     /** Controller calls after its full managed readiness transaction; failure never becomes load success. */
-    void NotifyCampaignReady(ASovPlayerController* Controller, bool bSucceeded, uint64 RestoreEpoch);
-    /** Reserve the verified origin checkpoint and request-bound player record before irreversible travel. */
-    bool PrepareMissionTravel(ASovPlayerController* Controller, USovCampaignDefinition* Destination,
-        uint64 SourceEpoch, FString& TravelURL, FString& Error);
-    void RejectMissionTravel(ASovPlayerController* Controller, uint64 SourceEpoch);
-    bool CanCommitMissionTravel(ASovPlayerController* Controller, uint64 SourceEpoch) const;
-    bool ValidateRestoredTravelIdentity(const ASovPlayerController* Controller) const;
-    bool ReadMissionTravelRecords(UWorld& World, FNarrativeSavePlayer& Records, FString& Error);
-    /** Binds the managed restoration to the exact controller, pawn, PlayerState and ASC generation. */
+    void NotifyCampaignReady(ASovPlayerController* Controller, bool bSucceeded, uint64 RestoreEpoch = 0);
     bool BindPendingRestore(ASovPlayerController* Controller, uint64 RestoreEpoch, FString& Error);
-    UFUNCTION(BlueprintPure, Category="Campaign|Save") bool HasTravelRecovery() const;
-    /** An explicit retry after the one automatic origin recovery failed; never loops automatically. */
-    UFUNCTION(BlueprintCallable, Category="Campaign|Save") ESovSaveResult RetryTravelRecovery(FString& Error);
+    bool ValidateRestoredTravelIdentity(ASovPlayerController* Controller) const;
     /** Used by GameMode to fail closed before spawning a new campaign over a rejected load. */
     bool ValidatePendingWorld(UWorld& World, FString& Error) const;
+    /** Retains the verified origin in the GameInstance before a controller requests irreversible travel. */
+    bool ArmMissionTravelRecovery(ASovPlayerController* Source, USovCampaignDefinition* Destination, FGuid& Request, FString& Error);
+    void CancelMissionTravelRecovery(const FGuid& Request);
+    bool OwnsMissionTravelRequest(const FGuid& Request, FString& Error) const;
+    TFunction<bool()> CaptureMissionTravelStorageFence(const FGuid& Request) const;
+    bool ValidateMissionTravelWorld(UWorld& World, FString& Error);
+    UFUNCTION(BlueprintPure, Category="Campaign|Save") bool IsMissionTravelPending() const { return MissionTravelRequest.IsValid(); }
+    /** Explicit retry after a failed recovery; never selects a different account's save. */
+    UFUNCTION(BlueprintCallable, Category="Campaign|Save") bool RetryMissionTravelRecovery(FString& Error);
     UPROPERTY(BlueprintAssignable, Category="Campaign|Save") FSovSaveCompleted OnSaveCompleted;
     UPROPERTY(BlueprintAssignable, Category="Campaign|Save") FSovSaveCompleted OnLoadCompleted;
+protected:
+    /** Single engine travel boundary; the retained transaction is established before this callback. */
+    virtual void StartMissionRecoveryTravel(UWorld& World, const FString& MapPackage, const FString& Options);
 private:
+    friend struct FSovTravelTransactionTestAccess;
+    friend struct FSovObjectivePresentationTestAccess;
+    void ResetRestoreOwner();
+    bool MatchesRestoreGenerations() const;
+    bool MatchesRestoreOwner(ASovPlayerController* Controller, uint64 RestoreEpoch) const;
+    friend struct FSovMissionTravelTestAccess;
+    void InitializeMissionTravelRecovery();
+    void DeinitializeMissionTravelRecovery();
+    void TickMissionTravelRecovery();
+    void NotifyMissionTravelReady(ASovPlayerController* Controller, bool bSucceeded);
+    void CompleteMissionTravelRecovery(bool bSucceeded, const FString& Error);
+    void RecordMissionTravelFailure(UWorld* World, const FString& Error);
+    void RecordMissionTravelFailureForRequest(const FGuid& Request, UWorld* World, const FString& Error);
+    void ResetMissionTravelRecovery();
+    bool BeginMissionOriginRecovery(FString& Error);
     friend class USovPlatformServicesSubsystem;
     friend struct FSovSaveTestAccess;
-    friend struct FSovTravelTransactionTestAccess;
     friend struct FSovSaveWorldLoadTestAccess;
     friend struct FSovPlatformServicesTestAccess;
-    friend struct FSovObjectivePresentationTestAccess;
+    friend struct FSovSaveOperationTestAccess;
+    /** Captured before any callback-capable boundary. Epochs reject authorization/suspend ABA. */
+    struct FOperationOwner
+    {
+        FString Namespace;
+        int32 LocalUser = INDEX_NONE;
+        uint64 SelectionEpoch = 0;
+        uint64 AuthorizationEpoch = 0;
+        uint64 SuspensionEpoch = 0;
+        bool bAvailable = false;
+        bool bRetryOperation = false;
+        TWeakObjectPtr<USovCampaignSaveGame> RetrySnapshot;
+    };
+    FOperationOwner CaptureOperationOwner() const;
+    bool IsOperationOwnerCurrent(const FOperationOwner& Owner, FString& Error, bool bRequireAvailable = true) const;
+    /** Decoded pending loads do no storage I/O; same-owner suspend/resume holds rather than cancels them. */
+    bool IsPendingLoadOwnerCurrent(FString& Error) const;
+    bool IsRetainedOwnerCurrent(const FOperationOwner& Owner, FString& Error) const;
+    ESovSaveResult OwnershipFailureResult() const;
+    bool ReadOwned(const FOperationOwner& Owner, const FString& Slot, int32 LocalUser, TArray<uint8>& Bytes,
+        FString& Error, bool bRequireAvailable = true);
+    bool WriteOwned(const FOperationOwner& Owner, const FString& Slot, int32 LocalUser, const TArray<uint8>& Bytes,
+        FString& Error, bool bRequireAvailable = true);
+    bool ExistsOwned(const FOperationOwner& Owner, const FString& Slot, bool& bExists, FString& Error);
     /** Only the native provider observer can establish authorization; never exposed to Blueprint callers. */
     void ObserveNativePlatformAccount(const FSovObservedPlatformAccount& Account);
-    struct FQueuedBoundary { ESovSaveBoundary Kind; FName Id; };
+    struct FQueuedBoundary { ESovSaveBoundary Kind; FName Id; FOperationOwner Owner; };
     bool CanCaptureInternal(FString& Error, bool bAllowEntrySuspension) const;
     ESovSaveResult CaptureAndWrite(ESovSaveSlotKind Kind, int32 SlotIndex, FName BoundaryId, FString& Error, bool bAllowEntrySuspension = false, ESovSaveBoundary Boundary = ESovSaveBoundary::ExplicitCheckpoint);
-    ESovSaveResult WriteEnvelope(USovCampaignSaveGame* Save, FString& Error);
+    ESovSaveResult WriteEnvelope(USovCampaignSaveGame* Save, FString& Error, const FOperationOwner* Operation = nullptr);
     ESovSaveResult CommitPlatformSnapshot(const TArray<uint8>& Bytes, const TArray<uint8>& ReviewedLocalBytes,
         ESovSaveSlotKind Kind, int32 SlotIndex, FString& Error);
     bool RestorePlatformProfileHint(int32 LocalUserIndex);
     bool PersistPlatformProfileHint(const FString& Namespace, int32 LocalUserIndex, FString& Error);
-    USovCampaignSaveGame* ReadBest(ESovSaveSlotKind Kind, int32 Index, int32& OutBank, bool& bDamaged, FString& Error);
-    bool ValidateEnvelope(USovCampaignSaveGame* Save, bool bValidateAssets, FString& Error) const;
+    USovCampaignSaveGame* ReadBest(ESovSaveSlotKind Kind, int32 Index, int32& OutBank, bool& bDamaged, FString& Error,
+        const FOperationOwner* Operation = nullptr);
+    bool ValidateEnvelope(USovCampaignSaveGame* Save, bool bValidateAssets, FString& Error, const FOperationOwner* Operation = nullptr) const;
     bool MatchesPendingLoadRequest(const FString& Options) const;
-    bool OwnsPendingAccount() const;
-    bool OwnsTravelSource() const;
-    bool MatchesRestoreGenerations() const;
-    bool MatchesRestoreOwner(ASovPlayerController* Controller, uint64 RestoreEpoch) const;
-    void ArmTravelFailureHook(const FGuid& Request);
-    void HandleTravelFailure(const FGuid& Request, UWorld* World, const FString& Error);
-    void ClearPendingOperation();
-    bool StartOriginRecovery(FString& Error);
-    bool RequestPendingMap(UWorld& World, FString& Error);
     void CompletePendingLoad(bool bSucceeded, const FString& Error);
-    UNarrativeSave* DecodeNarrative(USovCampaignSaveGame* Save, FString& Error) const;
+    UNarrativeSave* DecodeNarrative(USovCampaignSaveGame* Save, FString& Error, const FOperationOwner* Operation = nullptr) const;
     FString BankName(ESovSaveSlotKind Kind, int32 Index, int32 Bank) const;
     void ResolveInitialSave(UWorld& World, UNarrativeSave*& Snapshot, bool& bOverride);
     void ReportSave(ESovSaveResult Result, const FSovSaveSlotHeader& Header, const FString& Error);
@@ -139,41 +170,40 @@ private:
     UPROPERTY(Transient) TObjectPtr<USovCampaignSaveGame> PendingSave;
     UPROPERTY(Transient) TObjectPtr<USovCampaignSaveGame> FailedWrite;
     UPROPERTY(Transient) TObjectPtr<UNarrativeSave> PendingNarrative;
-    UPROPERTY(Transient) TObjectPtr<USovCampaignSaveGame> TravelRecoverySave;
-    UPROPERTY(Transient) FNarrativeSavePlayer PendingTravelRecords;
-    FGuid PendingOperationId;
-    FString PendingAccount;
-    int32 PendingUser = INDEX_NONE;
-    int32 TravelRecoveryUser = INDEX_NONE;
-    FSoftObjectPath PendingTravelMission;
-    FString PendingTravelMap;
-    bool bPendingMissionTravel = false;
-    bool bRecoveringMissionTravel = false;
-    FString TravelRecoveryReason;
-    TWeakObjectPtr<UWorld> PendingSource;
-    TWeakObjectPtr<ASovPlayerController> TravelSourceController;
-    TWeakObjectPtr<APawn> TravelSourcePawn;
-    TWeakObjectPtr<APlayerState> TravelSourcePlayerState;
-    TWeakObjectPtr<UAbilitySystemComponent> TravelSourceASC;
-    uint64 TravelSourceEpoch = 0;
-    uint64 TravelSourceASCEpoch = 0;
-    int32 TravelSourcePawnGeneration = 0;
+    TWeakObjectPtr<UWorld> PendingDestination;
+    TWeakObjectPtr<UWorld> RestoreWorld;
     TWeakObjectPtr<ASovPlayerController> RestoreController;
     TWeakObjectPtr<APawn> RestorePawn;
     TWeakObjectPtr<APlayerState> RestorePlayerState;
     TWeakObjectPtr<UAbilitySystemComponent> RestoreASC;
     uint64 PendingRestoreEpoch = 0;
     uint64 RestoreASCEpoch = 0;
-    int32 RestorePawnGeneration = 0;
-    FDelegateHandle TravelFailureHandle;
-#if WITH_AUTOMATION_TESTS
-    // Exercise the native transaction owner without requiring an authored/cooked map in unit worlds.
-    TFunction<bool(UWorld&, const FString&)> TestTravelRequest;
-#endif
-    TWeakObjectPtr<UWorld> PendingDestination;
+    uint64 RestorePawnGeneration = 0;
     TWeakObjectPtr<UWorld> RejectedLoadWorld;
     TWeakObjectPtr<ASovPlayerController> PausedController;
     TArray<FQueuedBoundary> PendingAutosaves;
+    FOperationOwner PendingLoadOwner;
+    UPROPERTY(Transient) TObjectPtr<USovCampaignSaveGame> MissionTravelOrigin;
+    UPROPERTY(Transient) TObjectPtr<UNarrativeSave> MissionTravelNarrative;
+    FOperationOwner MissionTravelOwner;
+    FGuid MissionTravelRequest;
+    FGuid MissionRecoveryRequest;
+    FName MissionTravelDestinationId;
+    FSoftObjectPath MissionTravelDestinationDefinition;
+    FString MissionTravelDestinationMap;
+    TWeakObjectPtr<UWorld> MissionTravelSourceWorld;
+    TWeakObjectPtr<UWorld> MissionTravelDestinationWorld;
+    double MissionTravelDeadline = 0;
+    bool bMissionTravelFailurePending = false;
+    bool bMissionRecoveryAttempted = false;
+    FString MissionTravelError;
+    FDelegateHandle MissionTravelFailureHandle;
+    FDelegateHandle MissionNetworkFailureHandle;
+    FOperationOwner FailedWriteOwner;
+    uint64 SelectionEpoch = 1;
+    uint64 AuthorizationEpoch = 1;
+    uint64 SuspensionEpoch = 1;
+    bool bShuttingDown = false;
     FString AccountNamespace;
     FString AuthorizedPlatformId;
     int32 AuthorizedPlatformLocalUser = INDEX_NONE;
@@ -194,6 +224,7 @@ private:
     bool bPendingWorldApplied = false;
     bool bPendingLoadFailed = false;
     FSovSaveSlotHeader AcknowledgedBoundary;
+    FOperationOwner AcknowledgedOwner;
     TWeakObjectPtr<UWorld> AcknowledgedWorld;
     double AcknowledgmentExpiresAt = 0;
     FDelegateHandle InitialSaveHandle;

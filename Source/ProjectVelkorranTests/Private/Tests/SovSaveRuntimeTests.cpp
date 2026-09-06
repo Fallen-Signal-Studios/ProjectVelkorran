@@ -58,7 +58,7 @@ struct FSovSaveTestAccess
     static void StageLoad(USovSaveSubsystem& S, const FGuid& Request, bool bFailed, double Deadline)
     {
         S.PendingSave = Envelope(S); S.PendingNarrative = NewObject<UNarrativeSave>(&S);
-        S.PendingAccount = S.AccountNamespace; S.PendingUser = S.UserIndex;
+        S.PendingLoadOwner = S.CaptureOperationOwner();
         S.PendingLoadRequest = Request; S.bPendingLoadFailed = bFailed; S.PendingLoadDeadline = Deadline;
         S.PendingLoadError = bFailed ? TEXT("Required destination participant is unavailable.") : FString();
     }

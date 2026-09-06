@@ -31,22 +31,36 @@ FString ASovCampaignGameMode::InitNewPlayer(APlayerController* NewPlayerControll
 	const FString& Options, const FString& Portal)
 {
 	FString Error = Super::InitNewPlayer(NewPlayerController, UniqueId, Options, Portal);
-	if (!Error.IsEmpty() || !InitialMission) { return Error; }
+	if (!Error.IsEmpty()) { return Error; }
+	if (USovSaveSubsystem* Slots = GetGameInstance()->GetSubsystem<USovSaveSubsystem>())
+	{ if (!Slots->ValidatePendingWorld(*GetWorld(), Error) || !Slots->ValidateMissionTravelWorld(*GetWorld(), Error)) { return Error; } }
+	if (!InitialMission)
+	{
+		if (UGameplayStatics::HasOption(OptionsString, TEXT("SovCampaignTransition"))
+			|| UGameplayStatics::HasOption(OptionsString, TEXT("SovCampaignSlotLoad")))
+		{ return TEXT("Requested campaign destination has no InitialMission definition."); }
+		return Error;
+	}
 	ASovPlayerController* PC = Cast<ASovPlayerController>(NewPlayerController);
 	UNarrativeSaveSubsystem* Save = GetWorld()->GetSubsystem<UNarrativeSaveSubsystem>();
 	if (!PC || !Save) { return TEXT("Campaign requires SovPlayerController and NarrativeSaveSubsystem."); }
 	if (Save->DidInitialLoadFail()) { return TEXT("The requested campaign save could not be validated."); }
-	if (USovSaveSubsystem* Slots = GetGameInstance()->GetSubsystem<USovSaveSubsystem>())
-	{ if (!Slots->ValidatePendingWorld(*GetWorld(), Error)) { return Error; } }
 	FNarrativeSavePlayer Records;
 	const bool bTravel = UGameplayStatics::HasOption(OptionsString, TEXT("SovCampaignTransition"));
 	bool bHasRecords = false;
+	TFunction<bool()> OwnsTravelStorage;
 	if (bTravel)
 	{
 		USovSaveSubsystem* Slots = GetGameInstance()->GetSubsystem<USovSaveSubsystem>();
-		if (!Slots || !Slots->ReadMissionTravelRecords(*GetWorld(), Records, Error))
-		{ return Error.IsEmpty() ? TEXT("Campaign travel request is unavailable or expired.") : Error; }
-		bHasRecords = true;
+		if (!Slots || !Slots->IsPlatformStorageOwnerAvailable() || Slots->IsPlatformStorageSuspended()) { return TEXT("Campaign travel storage owner is unavailable."); }
+		const FString TravelOwner = Slots->GetAccountNamespace(); const int32 TravelUser = Slots->GetLocalSaveUserIndex();
+		FGuid Request;
+		FGuid::ParseExact(UGameplayStatics::ParseOption(OptionsString, TEXT("SovMissionTravelRequest")), EGuidFormats::Digits, Request);
+		OwnsTravelStorage = Slots->CaptureMissionTravelStorageFence(Request);
+		const FString OwnedTravelSlot = FString(ASovPlayerController::TravelSaveSlot()) + TEXT("_") + TravelOwner;
+		bHasRecords = Save->ReadPlayerOnlySave(OwnedTravelSlot, Records, TravelUser, OwnsTravelStorage);
+		if (!OwnsTravelStorage()) { return TEXT("Campaign travel storage owner changed during loading."); }
+		if (!bHasRecords) { return TEXT("Campaign travel record is missing or invalid."); }
 	}
 	else if (Save->GetSaveObject() && Save->GetSaveObject()->PlayerData.IsValid())
 	{
@@ -54,8 +68,7 @@ FString ASovCampaignGameMode::InitNewPlayer(APlayerController* NewPlayerControll
 		bHasRecords = true;
 	}
 	if (!PC->StageCampaignLoad(InitialMission, bHasRecords ? &Records : nullptr, bTravel, Error)) { return Error; }
-	if (USovSaveSubsystem* Slots = GetGameInstance()->GetSubsystem<USovSaveSubsystem>())
-	{ if (!Slots->ValidatePendingWorld(*GetWorld(), Error)) { return Error; } }
+	if (OwnsTravelStorage && !OwnsTravelStorage()) { return TEXT("Campaign travel storage owner changed during staging."); }
 	return FString();
 }
 

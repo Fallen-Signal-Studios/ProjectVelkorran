@@ -1,30 +1,27 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
-using System.IO;
 using UnrealBuildTool;
+using System.IO;
 
 public class ProjectVelkorranTests : ModuleRules
 {
     public ProjectVelkorranTests(ReadOnlyTargetRules Target) : base(Target)
     {
-        PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
-        // Keep the regression translation units independent. Their reflected
-        // fixtures must never enter a Game/Shipping target through a dependency.
-        bUseUnity = false;
-        PrivateDependencyModuleNames.AddRange(new string[]
+        if (Target.Type != TargetType.Editor)
         {
-            "Core", "CoreUObject", "Engine", "ProjectVelkorran",
-            "NarrativeArsenal", "NarrativeSaveSystem", "NarrativeCommonUI",
-            "AIModule", "InputCore", "ApplicationCore", "EnhancedInput",
-            "GameplayAbilities", "GameplayTags", "GameplayTasks", "Niagara",
-            "PhysicsCore", "NavigationSystem", "AnimGraphRuntime",
-            "UMG", "CommonUI", "Slate", "SlateCore",
-            "LevelSequence", "MovieScene", "MovieSceneTracks",
-            "MassEntity", "MassCommon", "MassActors", "MassSpawner",
-            "MassRepresentation", "MassCrowd"
-        });
-        // The platform test double and two inline policies intentionally remain
-        // implementation details of the runtime module. No runtime .cpp is reused.
-        PrivateIncludePaths.Add(Path.Combine(ModuleDirectory, "../ProjectVelkorran/Private"));
+            throw new BuildException("ProjectVelkorranTests contains reflected fixtures and may only build for Editor targets.");
+        }
+        PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
+        // Test-local helper names must not depend on adaptive unity composition.
+        bUseUnity = false;
         PrivateIncludePaths.Add(Path.Combine(ModuleDirectory, "Private"));
+        PrivateDependencyModuleNames.AddRange(new string[] {
+            "Core", "CoreUObject", "Engine", "ProjectVelkorran", "NarrativeArsenal", "NarrativeSaveSystem",
+            "NarrativeCommonUI", "GameplayAbilities", "GameplayTags", "GameplayTasks", "AIModule",
+            "UMG", "CommonUI", "Slate", "SlateCore", "InputCore", "ApplicationCore", "EnhancedInput",
+            "PhysicsCore", "Niagara", "NavigationSystem", "AssetRegistry", "DeveloperSettings",
+            "LevelSequence", "MovieScene", "MovieSceneTracks", "AnimGraphRuntime",
+            "MassEntity", "MassCommon", "MassActors", "MassSpawner", "MassRepresentation", "MassCrowd",
+            "OnlineSubsystem", "OnlineSubsystemUtils"
+        });
     }
 }

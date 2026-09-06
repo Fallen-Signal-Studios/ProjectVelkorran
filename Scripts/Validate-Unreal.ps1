@@ -14,7 +14,7 @@ param(
     [string] $ProjectPath = (Join-Path $PSScriptRoot '..\ProjectVelkorran.uproject'),
     [string] $OutputDirectory,
     [string] $PythonExecutable,
-    [ValidatePattern('^ProjectVelkorran(?:\.[A-Za-z0-9_]+)*$')]
+    [ValidatePattern('^(?:ProjectVelkorran|NarrativeArsenal)(?:\.[A-Za-z0-9_]+)*$')]
     [string] $TestFilter = 'ProjectVelkorran',
     [ValidateRange(30, 86400)]
     [int] $AutomationTimeoutSeconds = 1200,

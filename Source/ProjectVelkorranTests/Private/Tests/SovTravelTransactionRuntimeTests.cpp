@@ -1,5 +1,7 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Save/SovSaveSubsystem.h"
+#include "Tests/SovMissionTravelRecoveryFixtures.h"
+#include "Kismet/GameplayStatics.h"
 #include "Campaign/SovCampaignDefinition.h"
 #include "Framework/SovCampaignGameMode.h"
 #include "Engine/Engine.h"
@@ -15,41 +17,61 @@
 #if WITH_AUTOMATION_TESTS
 struct FSovTravelTransactionTestAccess
 {
+    struct FUnusedStorage final : ISovSaveStorage
+    {
+        bool Read(const FString&, int32, TArray<uint8>&) override { return false; }
+        bool Write(const FString&, int32, const TArray<uint8>&) override { return false; }
+        bool Exists(const FString&, int32) override { return false; }
+    };
     static FGuid Stage(USovSaveSubsystem& S, UWorld& World, USovCampaignDefinition& Mission)
     {
-        S.ClearPendingOperation();
+        Clear(S);
+        S.Storage = MakeUnique<FUnusedStorage>();
         S.AccountNamespace = TEXT("travel-account-A"); S.UserIndex = 0;
-        S.PendingAccount = S.AccountNamespace; S.PendingUser = S.UserIndex;
-        S.PendingSave = NewObject<USovCampaignSaveGame>(&S);
-        S.PendingSave->Header.AccountNamespace = S.AccountNamespace;
-        S.PendingSave->Header.Kind = ESovSaveSlotKind::Checkpoint;
-        S.PendingSave->Header.MissionDefinition = FSoftObjectPath(&Mission);
-        S.PendingSave->Header.MapPackage = World.GetOutermost()->GetName();
-        S.PendingSave->Header.Generation = 23;
-        S.PendingNarrative = NewObject<UNarrativeSave>(&S);
-        S.TravelRecoverySave = S.PendingSave; S.TravelRecoveryUser = S.UserIndex;
-        S.PendingOperationId = FGuid::NewGuid(); S.PendingLoadRequest = S.PendingOperationId;
-        S.PendingTravelMission = FSoftObjectPath(&Mission); S.PendingTravelMap = S.PendingSave->Header.MapPackage;
-        S.PendingSource = &World; S.bPendingMissionTravel = true;
-        S.PendingLoadDeadline = FPlatformTime::Seconds() + 60.0;
-        return S.PendingLoadRequest;
+        S.MissionTravelOwner = S.CaptureOperationOwner();
+        S.MissionTravelOrigin = NewObject<USovCampaignSaveGame>(&S);
+        S.MissionTravelOrigin->Header.AccountNamespace = S.AccountNamespace;
+        S.MissionTravelOrigin->Header.Kind = ESovSaveSlotKind::Checkpoint;
+        S.MissionTravelOrigin->Header.MissionId = Mission.MissionId;
+        S.MissionTravelOrigin->Header.MissionDefinition = FSoftObjectPath(&Mission);
+        S.MissionTravelOrigin->Header.MapPackage = World.GetOutermost()->GetName();
+        S.MissionTravelOrigin->Header.Generation = 23;
+        S.MissionTravelNarrative = NewObject<UNarrativeSave>(&S);
+        S.MissionTravelRequest = FGuid::NewGuid();
+        S.MissionTravelDestinationId = Mission.MissionId;
+        S.MissionTravelDestinationDefinition = FSoftObjectPath(&Mission);
+        S.MissionTravelDestinationMap = S.MissionTravelOrigin->Header.MapPackage;
+        S.MissionTravelSourceWorld = &World;
+        S.MissionTravelDeadline = FPlatformTime::Seconds() + 60.0;
+        return S.MissionTravelRequest;
     }
-    static void Arm(USovSaveSubsystem& S) { S.ArmTravelFailureHook(S.PendingLoadRequest); }
+    static void Arm(USovSaveSubsystem& S) { S.InitializeMissionTravelRecovery(); }
     static void Fail(USovSaveSubsystem& S, const FGuid& Request, UWorld* World)
-    { S.HandleTravelFailure(Request, World, TEXT("Injected accepted-map failure")); }
-    static bool Failed(const USovSaveSubsystem& S) { return S.bPendingLoadFailed; }
-    static bool Matches(USovSaveSubsystem& S, const FString& URL) { return S.MatchesPendingLoadRequest(URL); }
-    static bool Recover(USovSaveSubsystem& S, FString& Error) { return S.StartOriginRecovery(Error); }
-    static void UseRecordingTransport(USovSaveSubsystem& S)
+    { S.RecordMissionTravelFailureForRequest(Request, World, TEXT("Injected accepted-map failure")); }
+    static bool Failed(const USovSaveSubsystem& S) { return S.bMissionTravelFailurePending || S.bPendingLoadFailed; }
+    static bool Matches(USovSaveSubsystem& S, const FString& URL)
     {
-        S.TestTravelRequest = [](UWorld& World, const FString& URL) { World.NextURL = URL; return true; };
+        UWorld* World = S.GetWorld();
+        auto* Mode = World ? World->GetAuthGameMode<ASovCampaignGameMode>() : nullptr;
+        if (!Mode) { return false; }
+        TGuardValue<FString> Options(Mode->OptionsString, URL);
+        FString Error;
+        if (UGameplayStatics::HasOption(URL, TEXT("SovCampaignTransition")))
+        { return S.ValidateMissionTravelWorld(*World, Error); }
+        return S.MatchesPendingLoadRequest(URL);
     }
+    static bool Recover(USovSaveSubsystem& S, FString& Error) { return S.BeginMissionOriginRecovery(Error); }
     static void CompleteFailure(USovSaveSubsystem& S) { S.CompletePendingLoad(false, TEXT("Recovery failed; retry origin checkpoint.")); }
-    static void Clear(USovSaveSubsystem& S) { S.ClearPendingOperation(); }
+    static void Clear(USovSaveSubsystem& S)
+    {
+        S.DeinitializeMissionTravelRecovery();
+        S.PendingSave = nullptr; S.PendingNarrative = nullptr; S.PendingLoadRequest.Invalidate();
+        S.PendingDestination.Reset(); S.bPendingLoadFailed = false; S.bPendingWorldApplied = false;
+    }
     static bool OriginIntact(const USovSaveSubsystem& S)
-    { return S.PendingSave == S.TravelRecoverySave && S.PendingSave && S.PendingSave->Header.Generation == 23; }
-    static FGuid Request(const USovSaveSubsystem& S) { return S.PendingLoadRequest; }
-    static FGuid Operation(const USovSaveSubsystem& S) { return S.PendingOperationId; }
+    { return S.MissionTravelOrigin && S.MissionTravelOrigin->Header.Generation == 23; }
+    static FGuid Request(const USovSaveSubsystem& S) { return S.PendingSave ? S.PendingLoadRequest : S.MissionTravelRequest; }
+    static FGuid Operation(const USovSaveSubsystem& S) { return S.MissionTravelRequest; }
     static void SwitchAccount(USovSaveSubsystem& S) { S.AccountNamespace = TEXT("travel-account-B"); }
     static void BindGenerations(USovSaveSubsystem& S, ASovPlayerCharacterBase& Pawn, UNarrativeAbilitySystemComponent& ASC)
     {
@@ -63,7 +85,7 @@ namespace
     struct FTravelWorld
     {
         TStrongObjectPtr<UGameInstance> Instance{NewObject<UGameInstance>()};
-        TStrongObjectPtr<USovSaveSubsystem> Saves{NewObject<USovSaveSubsystem>(Instance.Get())};
+        TStrongObjectPtr<USovMissionTravelTestSubsystem> Saves{NewObject<USovMissionTravelTestSubsystem>(Instance.Get())};
         TStrongObjectPtr<USovCampaignDefinition> Mission{NewObject<USovCampaignDefinition>()};
         UWorld* World = nullptr;
         FTravelWorld()
@@ -72,7 +94,7 @@ namespace
                 .CreatePhysicsScene(false).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
             World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &IVS, true);
             if (!World) { return; }
-            World->SetGameInstance(Instance.Get());
+            World->SetGameInstance(Instance.Get()); Saves->TestWorld = World;
             if (GEngine) { auto& C = GEngine->CreateNewWorldContext(EWorldType::Game); C.SetCurrentWorld(World); C.OwningGameInstance = Instance.Get(); }
             World->InitWorld(IVS);
             FURL URL; URL.AddOption(TEXT("game=/Script/ProjectVelkorran.SovCampaignGameMode"));
@@ -88,7 +110,7 @@ namespace
         bool Ready() const { return World && World->GetAuthGameMode<ASovCampaignGameMode>(); }
     };
     FString MissionURL(const FGuid& ID)
-    { return TEXT("?SovCampaignTransition=1?SovCampaignLoadRequest=") + ID.ToString(EGuidFormats::Digits); }
+    { return TEXT("?SovCampaignTransition=1?SovMissionTravelRequest=") + ID.ToString(EGuidFormats::Digits); }
 }
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovTravelRequestPhaseIsolationTest,
     "ProjectVelkorran.Campaign.Travel.RequestPhaseAndWorldIsolation",
@@ -100,16 +122,16 @@ bool FSovTravelRequestPhaseIsolationTest::RunTest(const FString& Parameters)
     const FGuid Request = FSovTravelTransactionTestAccess::Stage(*F.Saves, *F.World, *F.Mission);
     auto* GM = F.World->GetAuthGameMode<ASovCampaignGameMode>(); GM->OptionsString = MissionURL(Request);
     FString Error;
-    TestTrue(TEXT("Exact phase, mission asset, map and account admitted"), F.Saves->ValidatePendingWorld(*F.World, Error));
+    TestTrue(TEXT("Exact phase, mission asset, map and account admitted"), F.Saves->ValidateMissionTravelWorld(*F.World, Error));
     TestFalse(TEXT("A stale token cannot consume current records"), FSovTravelTransactionTestAccess::Matches(*F.Saves, MissionURL(FGuid::NewGuid())));
     TestFalse(TEXT("Same ID with wrong restore phase is refused"), FSovTravelTransactionTestAccess::Matches(*F.Saves,
         TEXT("?SovCampaignSlotLoad=1?SovCampaignLoadRequest=") + Request.ToString(EGuidFormats::Digits)));
     TestFalse(TEXT("Ambiguous URL cannot name both phases"), FSovTravelTransactionTestAccess::Matches(*F.Saves, MissionURL(Request) + TEXT("?SovCampaignSlotLoad=1")));
     GM->OptionsString = MissionURL(FGuid::NewGuid());
-    TestFalse(TEXT("Late destination is closed before campaign spawn"), F.Saves->ValidatePendingWorld(*F.World, Error));
+    TestFalse(TEXT("Late destination is closed before campaign spawn"), F.Saves->ValidateMissionTravelWorld(*F.World, Error));
     TestTrue(TEXT("Rejected stale destination preserves origin generation"), FSovTravelTransactionTestAccess::OriginIntact(*F.Saves));
     GM->OptionsString = MissionURL(Request); FSovTravelTransactionTestAccess::SwitchAccount(*F.Saves);
-    TestFalse(TEXT("Valid token cannot cross platform accounts"), F.Saves->ValidatePendingWorld(*F.World, Error));
+    TestFalse(TEXT("Valid token cannot cross platform accounts"), F.Saves->ValidateMissionTravelWorld(*F.World, Error));
     return true;
 }
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovTravelEngineFailureOwnershipTest,
@@ -143,14 +165,13 @@ bool FSovTravelRecoverySingleAttemptTest::RunTest(const FString& Parameters)
     FTravelWorld F;
     if (!TestTrue(TEXT("Campaign world initialized"), F.Ready())) { return false; }
     const FGuid Request = FSovTravelTransactionTestAccess::Stage(*F.Saves, *F.World, *F.Mission);
-    FSovTravelTransactionTestAccess::UseRecordingTransport(*F.Saves);
     F.World->NextURL = TEXT("/Game/FailedDestination") + MissionURL(Request);
     FString Error = TEXT("Destination package failed after acceptance.");
     TestTrue(TEXT("Origin recovery asks Unreal for the saved origin map"), FSovTravelTransactionTestAccess::Recover(*F.Saves, Error));
     const FGuid RecoveryRequest = FSovTravelTransactionTestAccess::Request(*F.Saves);
     TestTrue(TEXT("Phase request rotates while operation identity remains"), RecoveryRequest != Request
         && FSovTravelTransactionTestAccess::Operation(*F.Saves) == Request);
-    TestTrue(TEXT("The recovery URL includes its new phase ID"), F.World->NextURL.Contains(RecoveryRequest.ToString(EGuidFormats::Digits)));
+    TestTrue(TEXT("The recovery URL includes its new phase ID"), F.Saves->RequestedOptions.Contains(RecoveryRequest.ToString(EGuidFormats::Digits)));
     TestTrue(TEXT("Recovery keeps exact original checkpoint generation"), FSovTravelTransactionTestAccess::OriginIntact(*F.Saves));
     TestFalse(TEXT("A failed recovery cannot schedule another automatic recovery"), FSovTravelTransactionTestAccess::Recover(*F.Saves, Error));
     TestFalse(TEXT("Late original destination token no longer matches"), FSovTravelTransactionTestAccess::Matches(*F.Saves, MissionURL(Request)));

@@ -35,6 +35,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Misc/PackageName.h"
 #include "TimerManager.h"
+#include "UObject/StrongObjectPtr.h"
 
 ASovPlayerController::ASovPlayerController(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -623,6 +624,8 @@ void ASovPlayerController::FailCampaignInitialization(const FString& Message)
 
 bool ASovPlayerController::TravelToMission(USovCampaignDefinition* Destination, FString& OutError)
 {
+	TStrongObjectPtr<ASovPlayerController> KeepController(this);
+	TStrongObjectPtr<USovCampaignDefinition> KeepDestination(Destination);
 	OutError.Reset();
 	if (!CanTransitionTo(Destination, OutError, false)) { return false; }
 	const ASovCampaignGameMode* CampaignMode = GetWorld()->GetAuthGameMode<ASovCampaignGameMode>();
@@ -637,6 +640,9 @@ bool ASovPlayerController::TravelToMission(USovCampaignDefinition* Destination, 
 	USovSaveSubsystem* Slots = GetGameInstance() ? GetGameInstance()->GetSubsystem<USovSaveSubsystem>() : nullptr;
 	if (!Slots || !Slots->IsPlatformStorageOwnerAvailable() || Slots->IsPlatformStorageSuspended())
 	{ OutError = TEXT("Reconnect the campaign's storage owner before travelling."); return false; }
+	const FString TravelOwner = Slots->GetAccountNamespace();
+	const int32 TravelUser = Slots->GetLocalSaveUserIndex();
+	const FString OwnedTravelSlot = FString(TravelSaveSlot()) + TEXT("_") + TravelOwner;
 	const uint64 ExpectedEpoch = ++TransitionEpoch;
 	APawn* Source = GetPawn();
 	TransitionState = ESovCampaignTransitionState::Travelling;
@@ -651,30 +657,55 @@ bool ASovPlayerController::TravelToMission(USovCampaignDefinition* Destination, 
 		if (OutError.IsEmpty()) { OutError = TEXT("Current protagonist could not be retained for travel."); }
 		return false;
 	}
-	FString TravelURL;
-	if (!Slots->PrepareMissionTravel(this, Destination, ExpectedEpoch, TravelURL, OutError))
+	FGuid TravelRequest;
+	if (!Slots->ArmMissionTravelRecovery(this, Destination, TravelRequest, OutError))
 	{
 		if (TransitionEpoch == ExpectedEpoch)
 		{ PendingTravelMission = nullptr; TransitionState = ESovCampaignTransitionState::Idle; }
 		return false;
 	}
-	SetTransitionInputLock(true);
-	// The GI owns the checkpoint, request and watchdog before Unreal can dispatch any failure.
-	if (TransitionEpoch != ExpectedEpoch || GetPawn() != Source || PendingTravelMission != Destination
-		|| !Slots->CanCommitMissionTravel(this, ExpectedEpoch)
-		|| !GetWorld()->ServerTravel(TravelURL, true))
+	const TWeakObjectPtr<USovSaveSubsystem> TravelStorage(Slots);
+	const TWeakObjectPtr<ASovPlayerController> TravelController(this);
+	const auto OwnsTravelStorage = [TravelStorage, TravelController, TravelRequest, ExpectedEpoch, Source, Destination]()
 	{
-		Slots->RejectMissionTravel(this, ExpectedEpoch);
-		if (TransitionEpoch == ExpectedEpoch && GetPawn() == Source)
+		const auto* Current = TravelStorage.Get();
+		const auto* PC = TravelController.Get(); FString Error;
+		return Current && Current->OwnsMissionTravelRequest(TravelRequest, Error) && PC && !PC->IsActorBeingDestroyed()
+			&& PC->TransitionEpoch == ExpectedEpoch && PC->GetPawn() == Source && PC->PendingTravelMission == Destination;
+	};
+	const bool bSaved = OwnsTravelStorage() && Save->CreatePlayerOnlySaveInSlot(this, OwnedTravelSlot, TravelUser, OwnsTravelStorage);
+	if (!bSaved || !OwnsTravelStorage() || TransitionEpoch != ExpectedEpoch || GetPawn() != Source || PendingTravelMission != Destination)
+	{
+		if (TravelStorage.IsValid()) { TravelStorage->CancelMissionTravelRecovery(TravelRequest); }
+		if (TransitionEpoch == ExpectedEpoch)
+		{ PendingTravelMission = nullptr; TransitionState = ESovCampaignTransitionState::Idle; }
+		OutError = TEXT("Travel save failed or ownership changed; no map travel was requested.");
+		return false;
+	}
+	SetTransitionInputLock(true);
+	if (!OwnsTravelStorage())
+	{
+		if (TravelStorage.IsValid()) { TravelStorage->CancelMissionTravelRecovery(TravelRequest); }
+		if (TransitionEpoch == ExpectedEpoch)
+		{ PendingTravelMission = nullptr; SetTransitionInputLock(false); SetTransitionState(ESovCampaignTransitionState::Idle); }
+		OutError = TEXT("Travel ownership changed before the engine request."); return false;
+	}
+	// Our record is already committed; do not invoke Narrative's display-name LevelTransition slot path.
+	if (!GetWorld()->ServerTravel(MapPackage + TEXT("?SovCampaignTransition=1?SovMissionTravelRequest=")
+		+ TravelRequest.ToString(EGuidFormats::Digits), true))
+	{
+		if (TravelStorage.IsValid()) { TravelStorage->CancelMissionTravelRecovery(TravelRequest); }
+		if (TravelController.IsValid() && !IsActorBeingDestroyed() && TransitionEpoch == ExpectedEpoch)
 		{
 			PendingTravelMission = nullptr;
 			SetTransitionInputLock(false);
-			SetTransitionState(ESovCampaignTransitionState::Idle);
+			if (TravelController.IsValid() && !IsActorBeingDestroyed() && TransitionEpoch == ExpectedEpoch)
+			{ SetTransitionState(ESovCampaignTransitionState::Idle); }
 		}
-		OutError = TEXT("Destination travel was rejected or its owner changed; current world retained.");
+		OutError = TEXT("Unreal rejected the destination travel request.");
 		return false;
 	}
-	OnCampaignTransitionChanged.Broadcast(TransitionState, FString());
+	if (OwnsTravelStorage()) { OnCampaignTransitionChanged.Broadcast(TransitionState, FString()); }
 	return true;
 }
 

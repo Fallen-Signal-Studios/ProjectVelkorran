@@ -6,8 +6,6 @@
 #include "Abilities/SovGameplayAbility_Echo.h"
 #include "SovGameplayAbility_TarrikEcho.generated.h"
 
-struct FSovJudgementRelease;
-
 class UGameplayEffect;
 class ASovCinderStickyGrenadeProjectile;
 class ASovCinderJudgementPresentation;
@@ -475,11 +473,20 @@ protected:
 	float PostReleaseRecovery = 0.45f;
 
 private:
+	UFUNCTION()
+	void HandleAutomaticJudgementRelease();
+
+	UFUNCTION()
+	void HandleJudgementRecoveryFinished();
+
 	TSubclassOf<UGameplayEffect> ResolveJudgementDirectEffectClass() const;
 	TSubclassOf<UGameplayEffect> ResolveJudgementExplosionEffectClass() const;
 	FTransform ResolveJudgementMuzzleTransform() const;
+	bool ResolveJudgementAuthorityAimPoint(FVector& OutEye, FVector& OutAimPoint, FVector& OutForward);
+	struct FJudgementShotContext;
+	bool IsJudgementShotCurrent(const FJudgementShotContext& Shot) const;
 	bool ApplyJudgementDamage(
-		const FSovJudgementRelease& Release,
+		const FJudgementShotContext& Shot,
 		class UAbilitySystemComponent* TargetAbilitySystem,
 		const FGameplayEffectContextHandle& Context,
 		TSubclassOf<UGameplayEffect> EffectClass,
@@ -488,29 +495,30 @@ private:
 		float ShieldCoefficient,
 		float SourceModifier) const;
 	int32 ApplyJudgementExplosion(
-		const FSovJudgementRelease& Release,
+		const FJudgementShotContext& Shot,
 		const FVector& Origin,
 		const FVector& SurfaceNormal,
 		AActor* DirectHitActor,
 		AActor* ExplosionDamageCauser) const;
 	bool HasJudgementExplosionLineOfSight(
-		const FSovJudgementRelease& Release,
+		const FJudgementShotContext& Shot,
 		const FVector& Origin,
 		class UAbilitySystemComponent* TargetAbilitySystem,
 		AActor* DirectHitActor) const;
 	void ApplyJudgementPhysicsImpulse(
-		const FSovJudgementRelease& Release,
+		const FJudgementShotContext& Shot,
 		const FVector& Origin,
 		const FVector& SurfaceNormal) const;
 	bool HasJudgementPhysicsLineOfSight(
-		const FSovJudgementRelease& Release,
+		const FJudgementShotContext& Shot,
 		const FVector& Origin,
 		class UPrimitiveComponent* TargetComponent) const;
 	ASovCinderJudgementPresentation* SpawnDeferredJudgementPresentation(
+		const FJudgementShotContext& Shot,
 		const FVector& TraceStart,
 		const FVector& TraceEnd) const;
 	void FinishJudgementPresentation(
-		const FSovJudgementRelease& Release,
+		const FJudgementShotContext& Shot,
 		ASovCinderJudgementPresentation* Presentation,
 		const FVector& TraceStart,
 		const FVector& TraceEnd,
@@ -518,7 +526,10 @@ private:
 		bool bBlastTriggered,
 		bool bDirectDamageResolved,
 		int32 RadialTargetsResolved) const;
+	void BeginJudgementRecovery(const FJudgementShotContext& Shot);
 
+	FTimerHandle JudgementReleaseTimerHandle;
+	FTimerHandle JudgementRecoveryTimerHandle;
 	bool bJudgementReleaseAttempted = false;
 };
 

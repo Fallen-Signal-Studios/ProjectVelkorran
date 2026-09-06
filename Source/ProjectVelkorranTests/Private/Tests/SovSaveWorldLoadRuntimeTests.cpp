@@ -19,12 +19,10 @@ struct FSovSaveWorldLoadTestAccess
         UNarrativeSave* Snapshot, const FGuid& Request)
     {
         S.PendingSave = NewObject<USovCampaignSaveGame>(&S);
-        S.AccountNamespace = TEXT("world-load-test-account");
-        S.PendingAccount = S.AccountNamespace; S.PendingUser = S.UserIndex;
-        S.PendingSave->Header.AccountNamespace = S.AccountNamespace;
-        S.PendingSave->Header.MapPackage = Mission->Map.ToSoftObjectPath().GetLongPackageName();
+        S.PendingLoadOwner = S.CaptureOperationOwner();
         S.PendingSave->Header.MissionId = Mission->MissionId;
         S.PendingSave->Header.MissionDefinition = FSoftObjectPath(Mission);
+        S.PendingSave->Header.MapPackage = Mission->Map.ToSoftObjectPath().GetLongPackageName();
         S.PendingNarrative = Snapshot;
         S.PendingLoadRequest = Request;
         S.PendingLoadDeadline = FPlatformTime::Seconds() + 60.0;

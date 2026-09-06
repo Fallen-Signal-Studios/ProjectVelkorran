@@ -84,10 +84,10 @@ template<class T> T* Activate(FAutomationTestBase& Test, ASovAxiomRuntimeTestCha
 }
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovDroneReleaseDisableTest,
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovInterruptionDroneReleaseDisableTest,
 	"ProjectVelkorran.Campaign.CombatInterruption.Drone.ReleaseCallbackDisable",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
-bool FSovDroneReleaseDisableTest::RunTest(const FString& Parameters)
+bool FSovInterruptionDroneReleaseDisableTest::RunTest(const FString& Parameters)
 {
 	SovCombatInterruptionTests::FWorld Fixture;
 	auto* Source = Fixture.Character(FVector::ZeroVector, 1);
@@ -100,10 +100,10 @@ bool FSovDroneReleaseDisableTest::RunTest(const FString& Parameters)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovDroneReleaseRestartTest,
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovInterruptionDroneReleaseRestartTest,
 	"ProjectVelkorran.Campaign.CombatInterruption.Drone.ReleaseCallbackRestart",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
-bool FSovDroneReleaseRestartTest::RunTest(const FString& Parameters)
+bool FSovInterruptionDroneReleaseRestartTest::RunTest(const FString& Parameters)
 {
 	SovCombatInterruptionTests::FWorld Fixture;
 	auto* Source = Fixture.Character(FVector::ZeroVector, 1);
@@ -119,10 +119,10 @@ bool FSovDroneReleaseRestartTest::RunTest(const FString& Parameters)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovDroneBurstDisableTest,
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovInterruptionDroneBurstDisableTest,
 	"ProjectVelkorran.Campaign.CombatInterruption.Drone.BurstAndAvatarRetirement",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
-bool FSovDroneBurstDisableTest::RunTest(const FString& Parameters)
+bool FSovInterruptionDroneBurstDisableTest::RunTest(const FString& Parameters)
 {
 	{
 		SovCombatInterruptionTests::FWorld Fixture;
@@ -153,10 +153,10 @@ bool FSovDroneBurstDisableTest::RunTest(const FString& Parameters)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovJudgementThinCoverTest,
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovInterruptionJudgementThinCoverTest,
 	"ProjectVelkorran.Campaign.CombatInterruption.Judgement.ThinCoverAndForwardTrace",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
-bool FSovJudgementThinCoverTest::RunTest(const FString& Parameters)
+bool FSovInterruptionJudgementThinCoverTest::RunTest(const FString& Parameters)
 {
 	SovCombatInterruptionTests::FWorld Fixture;
 	auto* Source = Fixture.Character(FVector::ZeroVector, 0);
@@ -174,10 +174,10 @@ bool FSovJudgementThinCoverTest::RunTest(const FString& Parameters)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovJudgementDamageReceiptTest,
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovInterruptionJudgementDamageReceiptTest,
 	"ProjectVelkorran.Campaign.CombatInterruption.Judgement.ReceiptSurvivesImmediateHealing",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
-bool FSovJudgementDamageReceiptTest::RunTest(const FString& Parameters)
+bool FSovInterruptionJudgementDamageReceiptTest::RunTest(const FString& Parameters)
 {
 	SovCombatInterruptionTests::FWorld Fixture;
 	auto* Source = Fixture.Character(FVector::ZeroVector, 0);
@@ -198,10 +198,10 @@ bool FSovJudgementDamageReceiptTest::RunTest(const FString& Parameters)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovJudgementSourceRebindTest,
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovInterruptionJudgementSourceRebindTest,
 	"ProjectVelkorran.Campaign.CombatInterruption.Judgement.SourceRebindCannotContinueBlast",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
-bool FSovJudgementSourceRebindTest::RunTest(const FString& Parameters)
+bool FSovInterruptionJudgementSourceRebindTest::RunTest(const FString& Parameters)
 {
 	for (const bool bReturnToOriginal : {false, true})
 	{
@@ -225,10 +225,10 @@ bool FSovJudgementSourceRebindTest::RunTest(const FString& Parameters)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovJudgementTargetRebindTest,
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovInterruptionJudgementTargetRebindTest,
 	"ProjectVelkorran.Campaign.CombatInterruption.Judgement.TargetCandidateRetainsOriginalGeneration",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
-bool FSovJudgementTargetRebindTest::RunTest(const FString& Parameters)
+bool FSovInterruptionJudgementTargetRebindTest::RunTest(const FString& Parameters)
 {
 	for (int32 Mutation = 0; Mutation < 3; ++Mutation)
 	{
@@ -254,10 +254,10 @@ bool FSovJudgementTargetRebindTest::RunTest(const FString& Parameters)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovDroneCommittedSuicideTest,
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovInterruptionDroneCommittedSuicideTest,
 	"ProjectVelkorran.Campaign.CombatInterruption.Drone.CommittedSuicideSurvivesCancellation",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
-bool FSovDroneCommittedSuicideTest::RunTest(const FString& Parameters)
+bool FSovInterruptionDroneCommittedSuicideTest::RunTest(const FString& Parameters)
 {
 	SovCombatInterruptionTests::FWorld Fixture;
 	auto* Source = Fixture.Character(FVector::ZeroVector, 1);

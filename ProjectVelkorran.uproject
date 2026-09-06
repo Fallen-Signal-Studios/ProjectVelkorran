@@ -12,7 +12,8 @@
 		{
 			"Name": "ProjectVelkorranTests",
 			"Type": "Editor",
-			"LoadingPhase": "PostEngineInit"
+			"LoadingPhase": "PostEngineInit",
+			"TargetAllowList": [ "Editor" ]
 		}
 	],
 	"Plugins": [

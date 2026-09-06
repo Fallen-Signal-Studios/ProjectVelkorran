@@ -34,6 +34,25 @@ def extract_helper(path, name):
 
 
 class UnrealSourceLayoutTests(unittest.TestCase):
+    def test_native_registrations_have_unique_classes_and_names(self):
+        classes, names = {}, {}
+        for path in TEST_PRIVATE.rglob("*.cpp"):
+            for cls, name in re.findall(
+                    r'^\s*IMPLEMENT_(?:SIMPLE|COMPLEX)_AUTOMATION_TEST\s*\(\s*(\w+)\s*,\s*"([^"]+)"',
+                    path.read_text(), re.MULTILINE):
+                self.assertNotIn(cls, classes, f"{cls}: {classes.get(cls)} and {path}")
+                self.assertNotIn(name, names, f"{name}: {names.get(name)} and {path}")
+                classes[cls], names[name] = path, path
+        self.assertGreater(len(names), 0)
+
+    def test_editor_fixture_module_has_one_implementation(self):
+        implementations = []
+        for path in TEST_PRIVATE.rglob("*.cpp"):
+            if re.search(r"IMPLEMENT_MODULE\s*\([^,]+,\s*ProjectVelkorranTests\s*\)",
+                         path.read_text()):
+                implementations.append(path)
+        self.assertEqual(len(implementations), 1, implementations)
+
     def compile_source(self, source, run=False):
         compiler = shutil.which("c++") or shutil.which("clang++") or shutil.which("g++")
         if not compiler:

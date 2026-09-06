@@ -10,6 +10,7 @@
 #include "SovShieldComponent.generated.h"
 
 class UAbilitySystemComponent;
+class UNarrativeAttributeSetBase;
 class UNarrativeAbilitySystemComponent;
 class UMaterialInstanceDynamic;
 class UMaterialInterface;
@@ -72,9 +73,10 @@ public:
 
 	/** Native restore seam: discard prior-attempt timers; preserve other systems' tag counts. */
 	void ResetForCheckpoint();
-	void SetCheckpointRestoreInProgress(bool bInProgress);
-	void SetCheckpointRestoreInProgress(bool bInProgress, uint64 ExpectedBindingGeneration);
-	uint64 GetBindingGeneration() const { return BindingGeneration; }
+	void SetCheckpointRestoreInProgress(bool bInProgress, bool bResumePassiveWork = true);
+	bool IsCheckpointStateReconciled() const { return bCheckpointStateReconciled && IsInitialized(); }
+	uint64 GetCheckpointRestoreGeneration() const { return CheckpointRestoreGeneration; }
+	bool EndCheckpointRestore(uint64 Generation, bool bResumePassiveWork);
 
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Shield")
 	bool IsInitialized() const;
@@ -203,21 +205,24 @@ protected:
 
 private:
 	bool bRestoringCheckpoint = false;
-	bool bCheckpointResetPending = false;
+	bool bCheckpointStateReconciled = false;
+	uint64 CheckpointRestoreGeneration = 0;
+	bool bChangingAbilitySystem = false;
 	bool bEndingPlay = false;
 	uint64 BindingGeneration = 0;
-	uint64 LifecycleGeneration = 0;
 	uint64 BoundActorInfoEpoch = 0;
 	int32 BoundReadyEpoch = 0;
-	bool IsCurrentBinding(uint64 ExpectedGeneration) const;
-	bool HasLiveOwner() const;
-	bool IsCurrentOperation(uint64 ExpectedGeneration) const;
-	bool ValidateLifecycleCallback(uint64 ExpectedGeneration);
-	void HandleHealthAttributeChanged(const FOnAttributeChangeData& ChangeData);
-	UFUNCTION()
-	void HandleOwnerDeathChanged(AActor* KilledActor, UNarrativeAbilitySystemComponent* KilledASC, bool bIsDead);
 	UFUNCTION()
 	void HandleOwnerReadyEpochChanged(int32 ReadyEpoch);
+	uint64 BoundLifeEpoch = 0;
+	TWeakObjectPtr<const UNarrativeAttributeSetBase> BoundAttributes;
+	bool IsCurrentOperation(uint64 Generation) const;
+	bool ValidateBindingOrRetire();
+	void HandleHealthAttributeChanged(const FOnAttributeChangeData& ChangeData);
+	UFUNCTION()
+	void HandleDeathStateChanged(AActor* Actor, UNarrativeAbilitySystemComponent* ASC, bool bDead);
+	FTimerHandle ReviveRebindTimerHandle;
+	uint64 ReviveRebindGeneration = 0;
 	void TryInitializeFromOwner();
 
 	UFUNCTION()
@@ -287,8 +292,8 @@ private:
 	TArray<TObjectPtr<UMaterialInstanceDynamic>> ShieldMaterialInstances;
 
 	FDelegateHandle ShieldChangedDelegateHandle;
-	FDelegateHandle MaxShieldChangedDelegateHandle;
 	FDelegateHandle HealthChangedDelegateHandle;
+	FDelegateHandle MaxShieldChangedDelegateHandle;
 	FDelegateHandle RechargeBlockedTagChangedDelegateHandle;
 
 	FTimerHandle RechargeDelayTimerHandle;

@@ -3,7 +3,7 @@
 #include "CoreMinimal.h"
 class UGameInstance;
 
-struct FSovObservedPlatformAccount
+struct PROJECTVELKORRAN_API FSovObservedPlatformAccount
 {
     // Raw provider ID is transient only; never put this value in logs, config or save headers.
     FString StableId = TEXT("Offline.LocalProfile.0");
@@ -19,7 +19,7 @@ struct FSovObservedPlatformAccount
     bool bUsesPlatformManagedCloud = false;
 };
 /** Production uses the configured IOnlineIdentity/IOnlineUserCloud, not a filesystem pretending to be cloud. */
-class ISovPlatformServicesAdapter
+class PROJECTVELKORRAN_API ISovPlatformServicesAdapter
 {
 public:
     using FAccountChanged = TFunction<void()>;
@@ -34,4 +34,4 @@ public:
     /** Cancel consumption, not a promise that the provider can undo an already-issued request. */
     virtual void Cancel(FGuid Request) = 0;
 };
-TSharedPtr<ISovPlatformServicesAdapter> MakeSovConfiguredPlatformAdapter(UGameInstance* Instance);
+PROJECTVELKORRAN_API TSharedPtr<ISovPlatformServicesAdapter> MakeSovConfiguredPlatformAdapter(UGameInstance* Instance);
