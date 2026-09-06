@@ -482,8 +482,11 @@ private:
 	TSubclassOf<UGameplayEffect> ResolveJudgementDirectEffectClass() const;
 	TSubclassOf<UGameplayEffect> ResolveJudgementExplosionEffectClass() const;
 	FTransform ResolveJudgementMuzzleTransform() const;
-	FVector ResolveJudgementAuthorityAimPoint();
+	bool ResolveJudgementAuthorityAimPoint(FVector& OutEye, FVector& OutAimPoint, FVector& OutForward);
+	struct FJudgementShotContext;
+	bool IsJudgementShotCurrent(const FJudgementShotContext& Shot) const;
 	bool ApplyJudgementDamage(
+		const FJudgementShotContext& Shot,
 		class UAbilitySystemComponent* TargetAbilitySystem,
 		const FGameplayEffectContextHandle& Context,
 		TSubclassOf<UGameplayEffect> EffectClass,
@@ -492,24 +495,30 @@ private:
 		float ShieldCoefficient,
 		float SourceModifier) const;
 	int32 ApplyJudgementExplosion(
+		const FJudgementShotContext& Shot,
 		const FVector& Origin,
 		const FVector& SurfaceNormal,
 		AActor* DirectHitActor,
 		AActor* ExplosionDamageCauser) const;
 	bool HasJudgementExplosionLineOfSight(
+		const FJudgementShotContext& Shot,
 		const FVector& Origin,
 		class UAbilitySystemComponent* TargetAbilitySystem,
 		AActor* DirectHitActor) const;
 	void ApplyJudgementPhysicsImpulse(
+		const FJudgementShotContext& Shot,
 		const FVector& Origin,
 		const FVector& SurfaceNormal) const;
 	bool HasJudgementPhysicsLineOfSight(
+		const FJudgementShotContext& Shot,
 		const FVector& Origin,
 		class UPrimitiveComponent* TargetComponent) const;
 	ASovCinderJudgementPresentation* SpawnDeferredJudgementPresentation(
+		const FJudgementShotContext& Shot,
 		const FVector& TraceStart,
 		const FVector& TraceEnd) const;
 	void FinishJudgementPresentation(
+		const FJudgementShotContext& Shot,
 		ASovCinderJudgementPresentation* Presentation,
 		const FVector& TraceStart,
 		const FVector& TraceEnd,
@@ -517,7 +526,7 @@ private:
 		bool bBlastTriggered,
 		bool bDirectDamageResolved,
 		int32 RadialTargetsResolved) const;
-	void BeginJudgementRecovery();
+	void BeginJudgementRecovery(const FJudgementShotContext& Shot);
 
 	FTimerHandle JudgementReleaseTimerHandle;
 	FTimerHandle JudgementRecoveryTimerHandle;

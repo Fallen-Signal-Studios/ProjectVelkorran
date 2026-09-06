@@ -9,6 +9,8 @@
 #include "SovPoiseComponent.generated.h"
 
 class UAbilitySystemComponent;
+class UNarrativeAttributeSetBase;
+class UNarrativeAbilitySystemComponent;
 struct FOnAttributeChangeData;
 
 UENUM(BlueprintType)
@@ -61,7 +63,10 @@ public:
 
 	/** Clear prior-attempt owned state/timers and derive state from restored Poise. */
 	void ResetForCheckpoint();
-	void SetCheckpointRestoreInProgress(bool bInProgress) { bRestoringCheckpoint = bInProgress; }
+	void SetCheckpointRestoreInProgress(bool bInProgress, bool bResumePassiveWork = true);
+	bool IsCheckpointStateReconciled() const { return bCheckpointStateReconciled && IsInitialized(); }
+	uint64 GetCheckpointRestoreGeneration() const { return CheckpointRestoreGeneration; }
+	bool EndCheckpointRestore(uint64 Generation, bool bResumePassiveWork);
 
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Poise")
 	bool IsInitialized() const;
@@ -151,6 +156,21 @@ protected:
 
 private:
 	bool bRestoringCheckpoint = false;
+	bool bCheckpointStateReconciled = false;
+	uint64 CheckpointRestoreGeneration = 0;
+	bool bChangingAbilitySystem = false;
+	bool bEndingPlay = false;
+	uint64 BindingGeneration = 0;
+	uint64 BoundActorInfoEpoch = 0;
+	uint64 BoundLifeEpoch = 0;
+	TWeakObjectPtr<const UNarrativeAttributeSetBase> BoundAttributes;
+	bool IsCurrentOperation(uint64 Generation) const;
+	bool ValidateBindingOrRetire();
+	void HandleHealthAttributeChanged(const FOnAttributeChangeData& ChangeData);
+	UFUNCTION()
+	void HandleDeathStateChanged(AActor* Actor, UNarrativeAbilitySystemComponent* ASC, bool bDead);
+	FTimerHandle ReviveRebindTimerHandle;
+	uint64 ReviveRebindGeneration = 0;
 	void TryInitializeFromOwner();
 
 	UFUNCTION()
@@ -193,6 +213,7 @@ private:
 	TObjectPtr<UAbilitySystemComponent> AbilitySystemComponent;
 
 	FDelegateHandle PoiseChangedDelegateHandle;
+	FDelegateHandle HealthChangedDelegateHandle;
 	FDelegateHandle MaxPoiseChangedDelegateHandle;
 	FDelegateHandle RegenerationBlockedTagChangedDelegateHandle;
 	FDelegateHandle BrokenTagChangedDelegateHandle;

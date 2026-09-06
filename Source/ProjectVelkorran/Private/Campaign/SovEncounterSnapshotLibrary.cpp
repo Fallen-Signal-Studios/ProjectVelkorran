@@ -2,6 +2,7 @@
 #include "Campaign/SovEncounterSnapshotLibrary.h"
 #include "Campaign/SovEncounterPolicy.h"
 #include "AbilitySystemComponent.h"
+#include "AbilitySystemBlueprintLibrary.h"
 #include "Components/ActorComponent.h"
 #include "Components/SovEchoComponent.h"
 #include "Exertion/SovExertionComponent.h"
@@ -12,6 +13,7 @@
 #include "GAS/NarrativeAttributeSetBase.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
 #include "NarrativeSavableComponent.h"
+#include "NarrativeGameplayTags.h"
 #include "Serialization/MemoryReader.h"
 #include "Serialization/MemoryWriter.h"
 #include "Serialization/ObjectAndNameAsStringProxyArchive.h"
@@ -21,6 +23,9 @@
 
 namespace
 {
+	// Game-thread transaction admission; this is not a second resource store.
+	TSet<TWeakObjectPtr<UAbilitySystemComponent>> ResourceRestoresInProgress;
+
 	bool IsCurrentSnapshotComponent(const UActorComponent* Component, const AActor* Owner, const FName Name)
 	{
 		if (!IsValid(Component) || !IsValid(Owner) || Owner->IsActorBeingDestroyed()
@@ -70,61 +75,132 @@ bool USovEncounterSnapshotLibrary::CaptureResources(UAbilitySystemComponent* ASC
 
 bool USovEncounterSnapshotLibrary::RestoreResources(UAbilitySystemComponent* ASC, const FSovCombatResourceSnapshot& Snapshot)
 {
-	if (!IsValid(ASC) || !IsValid(ASC->GetOwnerActor()) || !ASC->GetOwnerActor()->HasAuthority()
-		|| !ASC->GetSet<UNarrativeAttributeSetBase>() || !Snapshot.IsValid()) { return false; }
-	AActor* Avatar = ASC->GetAvatarActor();
-	USovShieldComponent* ShieldComponent = Avatar ? Avatar->FindComponentByClass<USovShieldComponent>() : nullptr;
-	USovPoiseComponent* PoiseComponent = Avatar ? Avatar->FindComponentByClass<USovPoiseComponent>() : nullptr;
-	TWeakObjectPtr<USovStatusComponent> StatusComponent = Avatar ? Avatar->FindComponentByClass<USovStatusComponent>() : nullptr;
-	const bool bHadStatusComponent = StatusComponent.IsValid();
-	if (ShieldComponent) { ShieldComponent->SetCheckpointRestoreInProgress(true); }
-	if (PoiseComponent) { PoiseComponent->SetCheckpointRestoreInProgress(true); }
+	// Callbacks may mutate the caller's storage or attempt another restore. Freeze
+	// the request and reserve this ASC before publishing any resource/death event.
+	const FSovCombatResourceSnapshot FrozenSnapshot = Snapshot;
+	if (!IsInGameThread() || !IsValid(ASC) || !FrozenSnapshot.IsValid()) { return false; }
+	const TWeakObjectPtr<UAbilitySystemComponent> RestoreKey(ASC);
+	if (ResourceRestoresInProgress.Contains(RestoreKey)) { return false; }
+	TStrongObjectPtr<UAbilitySystemComponent> KeepASC(ASC);
+	TStrongObjectPtr<AActor> Owner(ASC->GetOwnerActor());
+	TStrongObjectPtr<AActor> Avatar(ASC->GetAvatarActor());
+	TStrongObjectPtr<const UNarrativeAttributeSetBase> Attributes(ASC->GetSet<UNarrativeAttributeSetBase>());
+	if (!Owner.IsValid() || !Avatar.IsValid() || !Attributes.IsValid()
+		|| !Owner->HasAuthority() || !Avatar->HasAuthority()) { return false; }
+	auto* NarrativeASC = Cast<UNarrativeAbilitySystemComponent>(ASC);
+	const uint64 ActorInfoEpoch = NarrativeASC ? NarrativeASC->GetCombatActorInfoEpoch() : 0;
+	uint64 AcceptedLifeEpoch = Attributes->GetCombatLifeEpoch();
+	bool bMayAdvanceLife = Attributes->GetHealth() <= 0.f && FrozenSnapshot.Health > 0.f;
+	TStrongObjectPtr<USovShieldComponent> Shield(Avatar->FindComponentByClass<USovShieldComponent>());
+	TStrongObjectPtr<USovPoiseComponent> Poise(Avatar->FindComponentByClass<USovPoiseComponent>());
+	TStrongObjectPtr<USovExertionComponent> Exertion(Avatar->FindComponentByClass<USovExertionComponent>());
+	TStrongObjectPtr<USovHealthRechargeComponent> Health(Avatar->FindComponentByClass<USovHealthRechargeComponent>());
+	TStrongObjectPtr<USovEchoComponent> Echo(Avatar->FindComponentByClass<USovEchoComponent>());
+	TStrongObjectPtr<USovStatusComponent> Status(Avatar->FindComponentByClass<USovStatusComponent>());
+	uint64 ShieldRestoreGeneration = 0;
+	uint64 PoiseRestoreGeneration = 0;
+	const auto StillOwnsStorage = [&]()
+	{
+		return IsValid(ASC) && IsValid(Owner.Get()) && IsValid(Avatar.Get()) && IsValid(Attributes.Get())
+			&& !Owner->IsActorBeingDestroyed() && !Avatar->IsActorBeingDestroyed()
+			&& Owner->HasAuthority() && Avatar->HasAuthority()
+			&& ASC->GetOwnerActor() == Owner.Get() && ASC->GetAvatarActor() == Avatar.Get()
+			&& UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Avatar.Get()) == ASC
+			&& ASC->GetSet<UNarrativeAttributeSetBase>() == Attributes.Get()
+			&& Attributes->GetOwningAbilitySystemComponent() == ASC
+			&& (!NarrativeASC || NarrativeASC->GetCombatActorInfoEpoch() == ActorInfoEpoch)
+			&& Avatar->FindComponentByClass<USovShieldComponent>() == Shield.Get()
+			&& Avatar->FindComponentByClass<USovPoiseComponent>() == Poise.Get()
+			&& Avatar->FindComponentByClass<USovExertionComponent>() == Exertion.Get()
+			&& Avatar->FindComponentByClass<USovHealthRechargeComponent>() == Health.Get()
+			&& Avatar->FindComponentByClass<USovEchoComponent>() == Echo.Get()
+			&& Avatar->FindComponentByClass<USovStatusComponent>() == Status.Get()
+			&& (!ShieldRestoreGeneration || (IsValid(Shield.Get()) && Shield->GetCheckpointRestoreGeneration() == ShieldRestoreGeneration))
+			&& (!PoiseRestoreGeneration || (IsValid(Poise.Get()) && Poise->GetCheckpointRestoreGeneration() == PoiseRestoreGeneration));
+	};
+	const auto StillOwnsLife = [&]()
+	{
+		return StillOwnsStorage() && Attributes->GetCombatLifeEpoch() == AcceptedLifeEpoch
+			&& FMath::IsFinite(Attributes->GetHealth())
+			&& (FrozenSnapshot.Health <= 0.f || ((bMayAdvanceLife || Attributes->GetHealth() > 0.f)
+				&& (!NarrativeASC || !NarrativeASC->IsDead())
+				&& !ASC->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_IsDead)
+				&& !ASC->HasMatchingGameplayTag(FSovGameplayTags::Get().State_Fatal)));
+	};
+	// A single 0 -> positive transition is permitted only at the explicit revive
+	// or Health write. An unrelated callback cannot consume that permission.
+	const auto AcceptControlledRevival = [&]()
+	{
+		if (!StillOwnsStorage()) { return false; }
+		const uint64 CurrentLife = Attributes->GetCombatLifeEpoch();
+		if (CurrentLife != AcceptedLifeEpoch)
+		{
+			if (!bMayAdvanceLife || CurrentLife != AcceptedLifeEpoch + 1 || Attributes->GetHealth() <= 0.f) { return false; }
+			AcceptedLifeEpoch = CurrentLife;
+			bMayAdvanceLife = false;
+		}
+		return StillOwnsLife();
+	};
+	if (!StillOwnsStorage()) { return false; }
+	ResourceRestoresInProgress.Add(RestoreKey);
+	bool bCommitted = false;
 	ON_SCOPE_EXIT
 	{
-		if (IsValid(ShieldComponent)) { ShieldComponent->SetCheckpointRestoreInProgress(false); }
-		if (IsValid(PoiseComponent)) { PoiseComponent->SetCheckpointRestoreInProgress(false); }
+		// Retire precisely our barrier even when ownership changed. Generation
+		// matching preserves a newer barrier; abort never resumes passive work.
+		if (!bCommitted)
+		{
+			if (IsValid(Shield.Get()) && ShieldRestoreGeneration) { Shield->EndCheckpointRestore(ShieldRestoreGeneration, false); }
+			if (IsValid(Poise.Get()) && PoiseRestoreGeneration) { Poise->EndCheckpointRestore(PoiseRestoreGeneration, false); }
+		}
+		ResourceRestoresInProgress.Remove(RestoreKey);
 	};
-	const auto StillOwnsAvatar = [&]() { return IsValid(ASC) && IsValid(Avatar) && ASC->GetAvatarActor() == Avatar; };
-	// Generic Narrative NPCs initialize attributes on revive; campaign players retain
-	// their existing maxima and grants. In either case restore explicit currents last.
-	if (UNarrativeAbilitySystemComponent* NarrativeASC = Cast<UNarrativeAbilitySystemComponent>(ASC))
-	{
-		if (NarrativeASC->IsDead() && Snapshot.Health > 0.f) { NarrativeASC->Revive(); }
-	}
-	if (!StillOwnsAvatar()) { return false; }
-#define SOV_RESTORE_RESOURCE(Name) { const float Desired = SovEncounterPolicy::ClampRestoredResource(Snapshot.Name, ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetMax##Name##Attribute())); ASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::Get##Name##Attribute(), Desired); if (!StillOwnsAvatar() || !FMath::IsNearlyEqual(ASC->GetNumericAttribute(UNarrativeAttributeSetBase::Get##Name##Attribute()), Desired, 0.01f)) { return false; } }
+	if (Shield.IsValid()) { Shield->SetCheckpointRestoreInProgress(true); ShieldRestoreGeneration = Shield->GetCheckpointRestoreGeneration(); }
+	if (Poise.IsValid()) { Poise->SetCheckpointRestoreInProgress(true); PoiseRestoreGeneration = Poise->GetCheckpointRestoreGeneration(); }
+	if (NarrativeASC && NarrativeASC->IsDead() && FrozenSnapshot.Health > 0.f) { NarrativeASC->Revive(); }
+	if (!AcceptControlledRevival()) { return false; }
+
+	// NPC revival may legitimately initialize authored maxima. Freeze those values
+	// after revival; later callbacks cannot silently retune half the transaction.
+	FSovCombatResourceSnapshot Desired = FrozenSnapshot;
+#define SOV_FREEZE_RESOURCE(Name) Desired.Max##Name = Attributes->GetMax##Name(); Desired.Name = SovEncounterPolicy::ClampRestoredResource(FrozenSnapshot.Name, Desired.Max##Name);
+	SOV_FREEZE_RESOURCE(Health) SOV_FREEZE_RESOURCE(Shield) SOV_FREEZE_RESOURCE(Stamina) SOV_FREEZE_RESOURCE(Poise) SOV_FREEZE_RESOURCE(Echo)
+#undef SOV_FREEZE_RESOURCE
+	if (!Desired.IsValid() || (FrozenSnapshot.Health > 0.f && Desired.Health <= 0.f)) { return false; }
+#define SOV_RESTORE_RESOURCE(Name) ASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::Get##Name##Attribute(), Desired.Name); if (!StillOwnsLife() || !FMath::IsNearlyEqual(Attributes->Get##Name(), Desired.Name, 0.01f)) { return false; }
 	SOV_RESTORE_RESOURCE(Shield)
 	SOV_RESTORE_RESOURCE(Stamina)
 	SOV_RESTORE_RESOURCE(Poise)
-	SOV_RESTORE_RESOURCE(Health)
+	ASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetHealthAttribute(), Desired.Health);
+	if (!AcceptControlledRevival() || !FMath::IsNearlyEqual(Attributes->GetHealth(), Desired.Health, 0.01f)) { return false; }
 	SOV_RESTORE_RESOURCE(Echo)
 #undef SOV_RESTORE_RESOURCE
-	if (Avatar)
-	{
-		if (USovExertionComponent* Exertion = Avatar->FindComponentByClass<USovExertionComponent>()) { Exertion->ResetForCheckpoint(); }
-		if (!StillOwnsAvatar()) { return false; }
-		if (USovHealthRechargeComponent* Health = Avatar->FindComponentByClass<USovHealthRechargeComponent>()) { Health->ResetForCheckpoint(); }
-		if (!StillOwnsAvatar()) { return false; }
-		if (USovShieldComponent* Shield = Avatar->FindComponentByClass<USovShieldComponent>()) { Shield->ResetForCheckpoint(); }
-		if (!StillOwnsAvatar()) { return false; }
-		if (USovPoiseComponent* Poise = Avatar->FindComponentByClass<USovPoiseComponent>()) { Poise->ResetForCheckpoint(); }
-		if (!StillOwnsAvatar()) { return false; }
-		if (USovEchoComponent* Echo = Avatar->FindComponentByClass<USovEchoComponent>())
-		{
-			Echo->RestoreEchoFromCheckpoint(Snapshot.Echo);
-		}
-		if (!StillOwnsAvatar()) { return false; }
-		if (bHadStatusComponent)
-		{
-			// Component records queue status effects before resource loading. Commit
-			// their saved state now, before encounter actors are unsuspended.
-			if (!StatusComponent.IsValid()
-				|| Avatar->FindComponentByClass<USovStatusComponent>() != StatusComponent.Get()
-				|| !StatusComponent->CompletePendingCheckpointRestore()
-				|| !StillOwnsAvatar()) { return false; }
-		}
-	}
-	return StillOwnsAvatar();
+	if (Exertion.IsValid()) { Exertion->ResetForCheckpoint(); }
+	if (!StillOwnsLife()) { return false; }
+	if (Health.IsValid()) { Health->ResetForCheckpoint(); }
+	if (!StillOwnsLife()) { return false; }
+	if (Shield.IsValid()) { Shield->ResetForCheckpoint(); if (!Shield->IsCheckpointStateReconciled()) { return false; } }
+	if (!StillOwnsLife()) { return false; }
+	if (Poise.IsValid()) { Poise->ResetForCheckpoint(); if (!Poise->IsCheckpointStateReconciled()) { return false; } }
+	if (!StillOwnsLife()) { return false; }
+	if (Echo.IsValid()) { Echo->RestoreEchoFromCheckpoint(Desired.Echo); }
+	if (!StillOwnsLife()) { return false; }
+	// PR34's generic-status modifier checks and queued restore barrier remain the
+	// authority; no resolved-current/base-value save format conversion is added.
+	if (Status.IsValid() && !Status->CompletePendingCheckpointRestore()) { return false; }
+	if (!StillOwnsLife()) { return false; }
+#define SOV_VERIFY_RESOURCE(Name) if (!FMath::IsNearlyEqual(Attributes->Get##Name(), Desired.Name, 0.01f) || !FMath::IsNearlyEqual(Attributes->GetMax##Name(), Desired.Max##Name, 0.01f)) { return false; }
+	SOV_VERIFY_RESOURCE(Health) SOV_VERIFY_RESOURCE(Shield) SOV_VERIFY_RESOURCE(Stamina) SOV_VERIFY_RESOURCE(Poise) SOV_VERIFY_RESOURCE(Echo)
+#undef SOV_VERIFY_RESOURCE
+	// Release is part of the transaction: zero-duration Poise recovery can publish
+	// callbacks immediately. Recheck after each release, not after a bool return
+	// value has already been evaluated by a scope-exit guard.
+	if (Shield.IsValid() && !Shield->EndCheckpointRestore(ShieldRestoreGeneration, true)) { return false; }
+	if (!StillOwnsLife()) { return false; }
+	if (Poise.IsValid() && !Poise->EndCheckpointRestore(PoiseRestoreGeneration, true)) { return false; }
+	if (!StillOwnsLife()) { return false; }
+	bCommitted = true;
+	return true;
 }
 
 bool USovEncounterSnapshotLibrary::CaptureComponent(UActorComponent* Component, FNarrativeSaveComponent& OutRecord)
