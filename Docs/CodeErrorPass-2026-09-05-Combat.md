@@ -1,5 +1,11 @@
 # Combat error pass — 5 September 2026
 
+Follow-up: [combat transaction reliability, 6 September](CombatTransactionReliability-2026-09-06.md)
+addresses the Echo startup, pickup reservation, active-melee interruption and
+weak-point receipt findings below. This document retains the historical audit;
+the follow-up distinguishes source repairs from pending UE validation and lists
+the combat liabilities not included in that batch.
+
 Source review began at merged HEAD `6b754d8`. This note distinguishes fixes in the working tree from verified source liabilities that still require implementation. It is not an Unreal compilation or playtest result. Earlier `AdversarialAudit-2026-09-05` findings were checked against the current implementation rather than assumed to remain open.
 
 ## Fixed in this pass

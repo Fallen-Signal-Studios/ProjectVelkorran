@@ -79,6 +79,9 @@ public:
 	
 	virtual int32 HandleGameplayEvent(FGameplayTag EventTag, const FGameplayEventData* Payload);
 	virtual void InitAbilityActorInfo(AActor* InOwnerActor, AActor* InAvatarActor) override;
+	virtual void ClearActorInfo() override;
+	/** Local transaction identity, including an avatar handoff away and back. Not save data. */
+	uint64 GetCombatActorInfoEpoch() const { return CombatActorInfoEpoch; }
 	virtual void HandleOutOfHealth(AActor* DamageInstigator, AActor* DamageCauser, const FGameplayEffectSpec& DamageEffectSpec, float DamageMagnitude);
 	virtual void Debug_Internal(struct FAbilitySystemComponentDebugInfo& Info) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
@@ -324,6 +327,7 @@ protected:
 	virtual void Load_Implementation() override;
 
 private:
+	uint64 CombatActorInfoEpoch = 0;
 	friend struct FSovCombatInputTestAccess;
 	uint64 InputActivationSerial = 0;
 	bool IsCombatInputWindowValid() const;

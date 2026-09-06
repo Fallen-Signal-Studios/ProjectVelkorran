@@ -15,6 +15,7 @@
 #include <Serialization/MemoryReader.h>
 #include <Serialization/MemoryWriter.h>
 #include "NarrativeLogChannels.h"
+#include "UObject/StrongObjectPtr.h"
 
 #define LOCTEXT_NAMESPACE "Inventory"
 
@@ -281,21 +282,40 @@ FItemAddResult UNarrativeInventoryComponent::TryAddItemFromClass(TSubclassOf<cla
 {
 	if (ItemClass && Quantity > 0)
 	{
+		TStrongObjectPtr<UNarrativeInventoryComponent> InventoryLifetime(this);
+		TStrongObjectPtr<AActor> OwnerLifetime(GetOwner());
+		const uint64 LoadRevision = GetCinematicLoadRevision();
+		const auto OwnsNotification = [this, &OwnerLifetime, LoadRevision]()
+		{
+			return IsValid(this) && IsValid(OwnerLifetime.Get()) && GetOwner() == OwnerLifetime.Get()
+				&& !OwnerLifetime->IsActorBeingDestroyed() && GetCinematicLoadRevision() == LoadRevision;
+		};
 		FItemAddResult AddResult = TryAddItem_Internal(ItemClass, Quantity);
+		TArray<TStrongObjectPtr<UNarrativeItem>> GrantedLifetimes;
+		for (UNarrativeItem* Stack : AddResult.Stacks)
+		{ if (IsValid(Stack)) { GrantedLifetimes.Emplace(Stack); } }
 
-		if (AddResult.AmountGiven > 0)
+		if (AddResult.AmountGiven > 0 && OwnsNotification())
 		{
 			OnItemAdded.Broadcast(AddResult);
 		}
 
 		//TODO adding items on acquired makes attachment fail in networked 
-		if (bCheckAutoUse && GetNetMode() == NM_Standalone)
+		if (bCheckAutoUse && OwnsNotification() && GetNetMode() == NM_Standalone)
 		{
-			for (auto& Stack : AddResult.Stacks)
+			TArray<TWeakObjectPtr<UNarrativeItem>> GrantedStacks;
+			for (UNarrativeItem* Stack : AddResult.Stacks) { GrantedStacks.Add(Stack); }
+			for (const TWeakObjectPtr<UNarrativeItem>& WeakStack : GrantedStacks)
 			{
-				if (Stack->ShouldUseOnAdd())
+				if (!OwnsNotification()) { break; }
+				if (!WeakStack.IsValid()) { continue; }
+				TStrongObjectPtr<UNarrativeItem> Stack(WeakStack.Get());
+				const uint64 Membership = Stack->GetInventoryMembershipRevision();
+				if (Stack->OwningInventory == this && Items.Contains(Stack.Get()) && Stack->ShouldUseOnAdd()
+					&& OwnsNotification() && IsValid(Stack.Get()) && Stack->OwningInventory == this
+					&& Items.Contains(Stack.Get()) && Stack->GetInventoryMembershipRevision() == Membership)
 				{
-					UseItem(Stack);
+					UseItem(Stack.Get());
 				}
 			}
 		}
@@ -339,6 +359,46 @@ int32 UNarrativeInventoryComponent::ConsumeItem(class UNarrativeItem* Item, cons
 	}
 
 	return 0;
+}
+
+int32 UNarrativeInventoryComponent::ConsumeItemExact(UNarrativeItem* Item, int32 Quantity,
+	uint64 ExpectedQuantityRevision, TFunction<bool()> IsOwnerCurrent)
+{
+	if (Quantity <= 0 || !IsValid(Item) || !IsValid(GetOwner()) || !GetOwner()->HasAuthority()
+		|| GetOwner()->IsActorBeingDestroyed() || !IsOwnerCurrent) { return 0; }
+	TStrongObjectPtr<UNarrativeItem> PinnedItem(Item);
+	TStrongObjectPtr<UNarrativeInventoryComponent> PinnedInventory(this);
+	TStrongObjectPtr<AActor> PinnedOwner(GetOwner());
+	const uint64 Membership = Item->GetInventoryMembershipRevision();
+	const uint64 LoadRevision = GetCinematicLoadRevision();
+	const auto CanCommit = [this, Item, Quantity, ExpectedQuantityRevision, Membership, LoadRevision, &PinnedOwner, &IsOwnerCurrent]()
+	{
+		return IsOwnerCurrent() && IsValid(this) && IsValid(PinnedOwner.Get())
+			&& GetOwner() == PinnedOwner.Get() && !PinnedOwner->IsActorBeingDestroyed()
+			&& PinnedOwner->HasAuthority() && GetCinematicLoadRevision() == LoadRevision
+			&& IsValid(Item) && Item->OwningInventory == this && Items.Contains(Item)
+			&& Item->GetInventoryMembershipRevision() == Membership
+			&& Item->GetQuantityRevision() == ExpectedQuantityRevision && Item->GetQuantity() >= Quantity;
+	};
+	if (!CanCommit() || !Item->CanBeRemoved() || !CanCommit()) { return 0; }
+	const int32 After = Item->GetQuantity() - Quantity;
+	Item->SetQuantity(After);
+	// The exact debit is already committed. Never remove a replacement/refilled stack
+	// after its quantity notification changed membership or wrote a new quantity.
+	if (After == 0 && IsValid(this) && IsValid(PinnedOwner.Get()) && GetOwner() == PinnedOwner.Get()
+		&& !PinnedOwner->IsActorBeingDestroyed() && GetCinematicLoadRevision() == LoadRevision
+		&& IsValid(Item) && Item->OwningInventory == this && Items.Contains(Item)
+		&& Item->GetInventoryMembershipRevision() == Membership
+		&& Item->GetQuantityRevision() == ExpectedQuantityRevision + 1 && Item->GetQuantity() == 0)
+	{
+		// Removal permission was already admitted. Asking the overridable permission
+		// hook again would let it refill the stack between this check and deletion.
+		RemoveOwnedItemInternal(Item);
+	}
+	if (IsValid(this) && IsValid(PinnedOwner.Get()) && GetOwner() == PinnedOwner.Get()
+		&& !PinnedOwner->IsActorBeingDestroyed() && GetCinematicLoadRevision() == LoadRevision)
+	{ OnItemRemoved.Broadcast(Item, Quantity); }
+	return Quantity;
 }
 
 int32 UNarrativeInventoryComponent::GetTotalQuantityOfItem(TSubclassOf<UNarrativeItem> ItemClass, const bool bCheckVisibility) const
@@ -931,7 +991,9 @@ UNarrativeItem* UNarrativeInventoryComponent::AddItem(TSubclassOf<class UNarrati
 	{
 		//Construct the item, initialize its values, and call all the relevant functions for replication etc
 		//UNarrativeItem* NewItem = NewObject<UNarrativeItem>(GetOwner(), Item->GetClass());
-		UNarrativeItem* NewItem = NewObject<UNarrativeItem>(GetOwner(), ItemClass);
+		TStrongObjectPtr<UNarrativeInventoryComponent> InventoryLifetime(this);
+		TStrongObjectPtr<UNarrativeItem> ItemLifetime(NewObject<UNarrativeItem>(GetOwner(), ItemClass));
+		UNarrativeItem* NewItem = ItemLifetime.Get();
 		NewItem->World = GetWorld();
 		NewItem->OwningInventory = this;
 		++NewItem->InventoryMembershipRevision;
@@ -952,10 +1014,11 @@ UNarrativeItem* UNarrativeInventoryComponent::AddItem(TSubclassOf<class UNarrati
 		}
 
 		NewItem->AddedToInventory(this, bIsLoading);
-		NewItem->MarkDirtyForReplication();
+		if (IsValid(NewItem)) { NewItem->MarkDirtyForReplication(); }
 
 		//Clients get this via an OnRep, server needs to manually call 
-		OnInventoryUpdated.Broadcast();
+		if (IsValid(this) && IsValid(GetOwner()) && !GetOwner()->IsActorBeingDestroyed())
+		{ OnInventoryUpdated.Broadcast(); }
 		
 		return NewItem;
 	}
@@ -982,87 +1045,76 @@ void UNarrativeInventoryComponent::OnRep_LootSource(class UNarrativeInventoryCom
 
 FItemAddResult UNarrativeInventoryComponent::TryAddItem_Internal(TSubclassOf<class UNarrativeItem> ItemClass, const int32 Quantity /*= 1*/)
 {
-	if (GetOwner() && GetOwner()->HasAuthority() && IsValid(ItemClass))
+	if (Quantity <= 0 || !IsValid(GetOwner()) || !GetOwner()->HasAuthority()
+		|| GetOwner()->IsActorBeingDestroyed() || !IsValid(ItemClass))
 	{
-		if (const UNarrativeItem* ItemCDO = GetDefault<UNarrativeItem>(ItemClass))
-		{
-			FText ErrorText;
-			const int32 NeedAddAmount = FMath::Min(Quantity, GetSpaceForItem(ItemClass, ErrorText));
-			int32 LeftToAdd = NeedAddAmount;
+		return FItemAddResult::AddedNone(Quantity, LOCTEXT("ErrorMessage", ""));
+	}
+	TStrongObjectPtr<UNarrativeInventoryComponent> InventoryLifetime(this);
+	TStrongObjectPtr<AActor> OwnerLifetime(GetOwner());
+	const uint64 LoadRevision = GetCinematicLoadRevision();
+	const auto OwnsGrant = [this, &OwnerLifetime, LoadRevision]()
+	{
+		return IsValid(this) && IsValid(OwnerLifetime.Get()) && GetOwner() == OwnerLifetime.Get()
+			&& !OwnerLifetime->IsActorBeingDestroyed() && OwnerLifetime->HasAuthority()
+			&& GetCinematicLoadRevision() == LoadRevision;
+	};
+	const UNarrativeItem* Defaults = GetDefault<UNarrativeItem>(ItemClass);
+	if (!IsValid(Defaults) || Defaults->GetMaxStackSize() <= 0)
+	{
+		return FItemAddResult::AddedNone(Quantity, LOCTEXT("ErrorMessage", ""));
+	}
+	const int32 MaxStackSize = Defaults->GetMaxStackSize();
+	FItemAddResult Result;
+	Result.ItemClass = ItemClass;
+	Result.AmountToGive = Quantity;
+	Result.AmountGiven = 0;
+	TArray<TStrongObjectPtr<UNarrativeItem>> GrantedLifetimes;
+	const int32 Admitted = FMath::Clamp(GetSpaceForItem(ItemClass, Result.ErrorText), 0, Quantity);
+	if (!OwnsGrant() || Admitted == 0) { return Result; }
 
-			FItemAddResult AddResult;
-			AddResult.ItemClass = ItemClass;
-			AddResult.ErrorText = ErrorText;
-			AddResult.AmountToGive = Quantity;
-			AddResult.AmountGiven = NeedAddAmount; // GetSpaceForItem will ensure we add this amount 
-
-			if (LeftToAdd <= 0)
-			{
-				return AddResult;
-			}
-
-			//Top up any existing stacks with the add amount, stopping if we ran out of items to give 
-			for (auto& Stack : FindItemsOfClass(ItemClass))
-			{
-				const int32 StackSpace = Stack->GetStackSpace();
-
-				if (StackSpace > 0)
-				{
-					const int32 OldQuantity = Stack->GetQuantity();
-					Stack->SetQuantity(Stack->GetQuantity() + LeftToAdd);
-
-					//subtract the amount we added
-					const int32 AmountGiven = Stack->GetQuantity() - OldQuantity;
-					//UE_LOG(LogTemp, Warning, TEXT("Adding %s adding %d to existing stack"), *ItemCDO->DisplayName.ToString(), AmountGiven);
-					LeftToAdd -= AmountGiven;
-
-					AddResult.Stacks.Add(Stack);
-				}
-
-				//Paranoia check - if LeftToAdd went negative we probably gave more items than we were supposed to 
-				check(LeftToAdd >= 0);
-
-				if (LeftToAdd <= 0)
-				{
-					return AddResult;
-				}
-			}
-
-			//UE_LOG(LogTemp, Warning, TEXT("Initially needed %d, now we still have %d left to add. "), *ItemCDO->DisplayName.ToString(), NeedAddAmount, LeftToAdd);
-
-			//We essentially figure out how many full stacks we need to add, and how many leftover we have 
-			const int32 MaxStackSize = ItemCDO->GetMaxStackSize();
-			const int32 FullStacksToAdd = FMath::FloorToInt((double)LeftToAdd / (double)MaxStackSize);
-			int32 Remainder = LeftToAdd % MaxStackSize;
-
-			//FString RoleString = HasAuthority() ? "Server" : "Client";
-			//UE_LOG(LogTemp, Warning, TEXT("Adding %s, Max Size: %d, StacksToAdd: %d, Remainder: %d, Add amount: %d"), *ItemCDO->DisplayName.ToString(), MaxStackSize, FullStacksToAdd, Remainder, LeftToAdd);
-
-			//Create any new required stacks 
-			for(int32 i = 0; i < FullStacksToAdd; ++i)
-			{
-				if (UNarrativeItem* NewItem = AddItem(ItemClass, MaxStackSize))
-				{
-					AddResult.Stacks.Add(NewItem);
-				}
-			}
-
-			//Add the remainder first
-			if (Remainder > 0)
-			{
-				if (UNarrativeItem* NewItem = AddItem(ItemClass, Remainder))
-				{
-					AddResult.Stacks.Add(NewItem);
-				}
-			}
-
-			return AddResult;
-		}
+	// Weak snapshots survive removal/GC during a prior stack's synchronous delegates.
+	TArray<TWeakObjectPtr<UNarrativeItem>> ExistingStacks;
+	for (UNarrativeItem* Stack : FindItemsOfClass(ItemClass)) { ExistingStacks.Add(Stack); }
+	for (const TWeakObjectPtr<UNarrativeItem>& WeakStack : ExistingStacks)
+	{
+		if (!OwnsGrant() || Result.AmountGiven == Admitted) { return Result; }
+		if (!WeakStack.IsValid()) { continue; }
+		TStrongObjectPtr<UNarrativeItem> StackLifetime(WeakStack.Get());
+		UNarrativeItem* Stack = StackLifetime.Get();
+		const uint64 Membership = Stack->GetInventoryMembershipRevision();
+		const uint64 QuantityRevision = Stack->GetQuantityRevision();
+		const int32 CapacityRemaining = FMath::Max(GetSpaceForItem(ItemClass, Result.ErrorText), 0);
+		if (!OwnsGrant()) { return Result; }
+		if (!IsValid(Stack) || Stack->OwningInventory != this || !Items.Contains(Stack)
+			|| Stack->GetInventoryMembershipRevision() != Membership
+			|| Stack->GetQuantityRevision() != QuantityRevision) { continue; }
+		const int32 OldQuantity = Stack->GetQuantity();
+		const int32 Applied = FMath::Min3(Admitted - Result.AmountGiven,
+			FMath::Max(Stack->GetMaxStackSize() - OldQuantity, 0), CapacityRemaining);
+		if (Applied <= 0) { continue; }
+		// Count this committed write before notifications can spend it, refill it,
+		// remove the stack or initiate another pickup. Net deltas are not receipts.
+		Result.AmountGiven += Applied;
+		GrantedLifetimes.Emplace(Stack);
+		Result.Stacks.Add(Stack);
+		Stack->SetQuantity(OldQuantity + Applied);
 	}
 
-	//AddItem should never be called on a client
-	return FItemAddResult::AddedNone(-1, LOCTEXT("ErrorMessage", ""));
-
+	while (OwnsGrant() && Result.AmountGiven < Admitted)
+	{
+		const int32 CapacityRemaining = FMath::Max(GetSpaceForItem(ItemClass, Result.ErrorText), 0);
+		if (!OwnsGrant()) { break; }
+		const int32 Applied = FMath::Min3(Admitted - Result.AmountGiven, MaxStackSize, CapacityRemaining);
+		if (Applied <= 0) { break; }
+		// AddItem is the native membership primitive; a non-null return proves the
+		// new stack was committed even if its AddedToInventory callback consumed it.
+		UNarrativeItem* NewItem = AddItem(ItemClass, Applied);
+		if (!NewItem) { break; }
+		Result.AmountGiven += Applied;
+		if (IsValid(NewItem)) { GrantedLifetimes.Emplace(NewItem); Result.Stacks.Add(NewItem); }
+	}
+	return Result;
 }
 
 

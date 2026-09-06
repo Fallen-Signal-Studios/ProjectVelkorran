@@ -76,3 +76,6 @@ SourceArt/
 *.tmp
 .DS_Store
 Thumbs.db
+# Host validation caches are generated, not project source.
+__pycache__/
+*.py[cod]

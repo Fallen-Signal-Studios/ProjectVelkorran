@@ -199,8 +199,14 @@ void USovGameplayAbility_SeleneAxiomNullPulse::EndAbility(
 	const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
 	const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
+	if (!IsEndAbilityValid(Handle, ActorInfo)) { return; }
 	++ActivationEpoch;
 	bNativeLifecycleReady = false;
+	if (ScopeLockCount > 0)
+	{
+		Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
+		return;
+	}
 	AuthorizedCommandNode.Reset();
 	ExpectedWeapon.Reset();
 	ClearAxiomTasksAndTimers();
@@ -251,7 +257,7 @@ float USovGameplayAbility_SeleneAxiomNullPulse::GetAxiomChargeAlpha() const
 
 bool USovGameplayAbility_SeleneAxiomNullPulse::CanReleaseAxiomPulse() const
 {
-	if (!CurrentActorInfo || !IsActive() || !bNativeLifecycleReady || !GetWorld()
+	if (!CurrentActorInfo || !IsCurrentEchoExecutionValid() || !bNativeLifecycleReady || !GetWorld()
 		|| !HasRequiredPayloadConfiguration()) { return false; }
 	const UAbilitySystemComponent* ASC = CurrentActorInfo->AbilitySystemComponent.Get();
 	ANarrativeCharacter* Avatar = Cast<ANarrativeCharacter>(CurrentActorInfo->AvatarActor.Get());
@@ -273,6 +279,7 @@ bool USovGameplayAbility_SeleneAxiomNullPulse::CanReleaseAxiomPulse() const
 	Blocking.AddTag(Sov.State_Fatal);
 	Blocking.AddTag(Sov.State_Poise_Broken);
 	Blocking.AddTag(Sov.State_Guard_Broken);
+	Blocking.AddTag(Sov.State_Status_Frozen);
 	Blocking.AddTag(Sov.State_Guarding);
 	Blocking.AddTag(Sov.Character_Player_Tarrik);
 	return ASC->HasMatchingGameplayTag(Sov.Character_Player_Selene)

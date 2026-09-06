@@ -9,6 +9,7 @@
 
 class USovEchoComponent;
 class UAbilitySystemComponent;
+class UNarrativeAttributeSetBase;
 class UWeaponItem;
 
 /** How an Echo ability validates the weapon classes authored on its child. */
@@ -92,6 +93,8 @@ public:
 	void FinishEchoAbility(bool bWasCancelled = false);
 
 protected:
+	/** Native continuations must still own this exact paid execution. */
+	bool IsCurrentEchoExecutionValid() const { return IsEchoActivationCurrent(EchoActivationEpoch); }
 	virtual void ActivateAbility(
 		const FGameplayAbilitySpecHandle Handle,
 		const FGameplayAbilityActorInfo* ActorInfo,
@@ -171,6 +174,7 @@ protected:
 	float MaximumActiveDuration = 5.0f;
 
 private:
+	bool IsEchoActivationCurrent(uint64 Epoch) const;
 	USovEchoComponent* ResolveEchoComponent(const FGameplayAbilityActorInfo* ActorInfo) const;
 	bool MeetsCharacterRequirement(const FGameplayAbilityActorInfo* ActorInfo) const;
 	void AddEchoFailureTags(FGameplayTagContainer* OptionalRelevantTags) const;
@@ -186,6 +190,15 @@ private:
 	FDelegateHandle BusyTagChangedHandle;
 	FTimerHandle MaximumDurationTimerHandle;
 	bool bEchoAbilityStarted = false;
+	uint64 EchoActivationEpoch = 0;
+	uint64 EchoActorInfoEpoch = 0;
+	uint64 EchoLifeEpoch = 0;
+	TWeakObjectPtr<const UNarrativeAttributeSetBase> EchoAttributes;
+	TWeakObjectPtr<AActor> EchoActivationAvatar;
+	TWeakObjectPtr<UAbilitySystemComponent> EchoActivationASC;
+	FGameplayAbilitySpecHandle EchoActivationSpec;
+	bool bEchoEndPending = false;
+	bool bEndingEcho = false;
 	mutable bool bAuthorityEchoSpendAttempted = false;
 	mutable bool bAuthorityEchoSpendSucceeded = false;
 	mutable FString LastActivationFailureReason;

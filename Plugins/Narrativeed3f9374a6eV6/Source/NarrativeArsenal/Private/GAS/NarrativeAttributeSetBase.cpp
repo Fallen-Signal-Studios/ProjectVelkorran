@@ -17,6 +17,8 @@
 #include "GAS/SovDamageSourcePolicy.h"
 #include "GameplayEffect.h"
 #include "GameplayEffectExtension.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
+#include "UObject/StrongObjectPtr.h"
 #include "GameplayTagContainer.h"
 #include "NarrativeGameplayTags.h"
 #include "Net/UnrealNetwork.h"
@@ -98,6 +100,7 @@ void UNarrativeAttributeSetBase::PostAttributeChange(
 	float OldValue,
 	float NewValue)
 {
+	if (Attribute == GetHealthAttribute() && OldValue <= 0.f && NewValue > 0.f) { ++CombatLifeEpoch; }
 	Super::PostAttributeChange(Attribute, OldValue, NewValue);
 
 	if (Attribute == GetXPAttribute())
@@ -142,7 +145,14 @@ bool UNarrativeAttributeSetBase::PreGameplayEffectExecute(FGameplayEffectModCall
 	const bool bCombatPacket = Data.EvaluatedData.Attribute == GetDamageAttribute()
 		|| Data.EvaluatedData.Attribute == GetPoiseDamageAttribute()
 		|| Data.EvaluatedData.Attribute == GetControlRequestAttribute();
-	if (bCombatPacket && (!FMath::IsFinite(Data.EvaluatedData.Magnitude)
+	if (bCombatPacket)
+	{
+		for (const auto& Magnitude : Data.EffectSpec.SetByCallerTagMagnitudes)
+		{
+			if (!FMath::IsFinite(Magnitude.Value)) { Data.EvaluatedData.Magnitude = 0.f; return false; }
+		}
+	}
+	if (bCombatPacket && (CombatResolutionDepth >= 32 || !FMath::IsFinite(Data.EvaluatedData.Magnitude)
 		|| UNarrativeDamageExecCalc::ShouldRejectTransaction(
 			Data.EffectSpec.GetContext().GetOriginalInstigatorAbilitySystemComponent(),
 			&Data.Target, Data.EffectSpec)))
@@ -151,11 +161,16 @@ bool UNarrativeAttributeSetBase::PreGameplayEffectExecute(FGameplayEffectModCall
 		return false;
 	}
 
+	// Heal is not a resurrection operation. Recovery/checkpoint owners restore resources explicitly.
+	if (Data.EvaluatedData.Attribute == GetHealAttribute()
+		&& (!FMath::IsFinite(Data.EvaluatedData.Magnitude) || GetHealth() <= 0.f))
+	{ Data.EvaluatedData.Magnitude = 0.f; return false; }
 	return true;
 }
 
 void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(SovCombat_ResolveAttributePacket);
 	Super::PostGameplayEffectExecute(Data);
 
 	const FGameplayEffectContextHandle Context = Data.EffectSpec.GetContext();
@@ -171,6 +186,39 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 		? SourceASC->AbilityActorInfo->AvatarActor.Get()
 		: nullptr;
 
+	// Allocation lifetime and gameplay ownership are separate. Delegates may
+	// destroy, restore or rebind their actors while this synchronous call is live.
+	TStrongObjectPtr<UNarrativeAttributeSetBase> AttributeLifetime(this);
+	TStrongObjectPtr<UNarrativeAbilitySystemComponent> TargetASCLifetime(TargetASC);
+	TStrongObjectPtr<UNarrativeAbilitySystemComponent> SourceASCLifetime(SourceASC);
+	TStrongObjectPtr<AActor> TargetActorLifetime(TargetActor);
+	TStrongObjectPtr<AActor> SourceActorLifetime(SourceActor);
+	const uint64 PacketLifeEpoch = CombatLifeEpoch;
+	const uint64 TargetActorInfoEpoch = TargetASC ? TargetASC->GetCombatActorInfoEpoch() : 0;
+	const uint64 SourceActorInfoEpoch = SourceASC ? SourceASC->GetCombatActorInfoEpoch() : 0;
+	const auto* SourceAttributes = SourceASC ? SourceASC->GetSet<UNarrativeAttributeSetBase>() : nullptr;
+	TStrongObjectPtr<const UNarrativeAttributeSetBase> SourceAttributeLifetime(SourceAttributes);
+	const uint64 SourceLifeEpoch = SourceAttributes ? SourceAttributes->GetCombatLifeEpoch() : 0;
+	const auto StillOwnsTarget = [this, PacketLifeEpoch, TargetActorInfoEpoch, TargetASC, TargetActor]()
+	{
+		return IsValid(this) && CombatLifeEpoch == PacketLifeEpoch
+			&& IsValid(TargetASC) && IsValid(TargetActor) && !TargetActor->IsActorBeingDestroyed()
+			&& TargetASC->GetAvatarActor() == TargetActor
+			&& TargetASC->GetCombatActorInfoEpoch() == TargetActorInfoEpoch
+			&& TargetASC->GetSet<UNarrativeAttributeSetBase>() == this
+			&& UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(TargetActor) == TargetASC;
+	};
+	const auto StillOwnsSource = [SourceASC, SourceActor, SourceActorInfoEpoch, SourceAttributes, SourceLifeEpoch]()
+	{
+		return IsValid(SourceASC) && IsValid(SourceActor) && !SourceActor->IsActorBeingDestroyed()
+			&& SourceASC->GetAvatarActor() == SourceActor
+			&& SourceASC->GetCombatActorInfoEpoch() == SourceActorInfoEpoch
+			&& (!SourceAttributes || (IsValid(SourceAttributes)
+				&& SourceASC->GetSet<UNarrativeAttributeSetBase>() == SourceAttributes
+				&& SourceAttributes->GetCombatLifeEpoch() == SourceLifeEpoch))
+			&& UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(SourceActor) == SourceASC;
+	};
+
 	AController* SourceController = nullptr;
 	if (ANarrativeCharacter* SourceCharacter = Cast<ANarrativeCharacter>(SourceActor))
 	{
@@ -180,33 +228,38 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 	{
 		SourceController = SourceASC->AbilityActorInfo->PlayerController.Get();
 	}
+	TStrongObjectPtr<AController> SourceControllerLifetime(SourceController);
 
 	const auto NotifyAppliedDamage = [
 		SourceASC,
 		TargetASC,
 		SourceActor,
 		TargetActor,
-		SourceController](
+		SourceController, &StillOwnsTarget, &StillOwnsSource](
 			const float AppliedDamage,
 			const FGameplayEffectSpec& NotificationSpec)
 	{
-		if (AppliedDamage <= KINDA_SMALL_NUMBER)
+		if (AppliedDamage <= KINDA_SMALL_NUMBER || !StillOwnsTarget() || !StillOwnsSource())
 		{
 			return;
 		}
 
 		if (ANarrativePlayerController* PlayerController = Cast<ANarrativePlayerController>(SourceController))
 		{
-			if (TargetActor && TargetActor != SourceActor)
+			const APawn* SourcePawn = Cast<APawn>(SourceActor);
+			if (IsValid(PlayerController) && !PlayerController->IsActorBeingDestroyed()
+				&& (!SourcePawn || SourcePawn->GetController() == PlayerController)
+				&& TargetActor != SourceActor)
 			{
 				PlayerController->NotifyDealtDamage(TargetActor, AppliedDamage);
 			}
 		}
 
-		if (SourceASC && TargetASC && SourceASC != TargetASC)
+		if (StillOwnsSource() && StillOwnsTarget() && SourceASC != TargetASC)
 		{
 			TargetASC->DamagedBy(SourceASC, AppliedDamage, NotificationSpec);
-			SourceASC->DealtDamage(TargetASC, AppliedDamage, NotificationSpec);
+			if (StillOwnsSource() && StillOwnsTarget())
+			{ SourceASC->DealtDamage(TargetASC, AppliedDamage, NotificationSpec); }
 		}
 	};
 
@@ -215,6 +268,8 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 	const bool bControlPacket = Data.EvaluatedData.Attribute == GetControlRequestAttribute();
 	if (bBodyPacket || bPoisePacket || bControlPacket)
 	{
+		SovCombatTransaction::FScopedCallbackBudget WorkScope(SovCombatTransaction::ThreadCallbackBudget());
+		TGuardValue<uint32> ResolutionScope(CombatResolutionDepth, CombatResolutionDepth + 1);
 		FGameplayTagContainer TargetTagsAtEntry;
 		Data.Target.GetOwnedGameplayTags(TargetTagsAtEntry);
 		const bool bPeriodicDelivery = Data.EffectSpec.GetPeriod() > 0.f;
@@ -225,7 +280,8 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 		if (bBodyPacket) { SetDamage(0.f); }
 		if (bPoisePacket) { SetPoiseDamage(0.f); }
 		if (bControlPacket) { SetControlRequest(0.f); }
-		if (IncomingDamage + IncomingPoise + IncomingControl <= KINDA_SMALL_NUMBER)
+		if (!WorkScope.IsAdmitted() || !StillOwnsTarget() || GetHealth() <= 0.f
+			|| IncomingDamage + IncomingPoise + IncomingControl <= KINDA_SMALL_NUMBER)
 		{
 			return;
 		}
@@ -240,6 +296,8 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 		AActor* DamageCauser = Context.GetEffectCauser()
 			? Context.GetEffectCauser()
 			: DamageInstigator;
+		TStrongObjectPtr<AActor> DamageInstigatorLifetime(DamageInstigator);
+		TStrongObjectPtr<AActor> DamageCauserLifetime(DamageCauser);
 
 		FSovDamageResult Result;
 		Result.TransactionId = FGuid::NewGuid();
@@ -248,6 +306,7 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 		Result.TargetTagsBeforeDamage = MoveTemp(TargetTagsAtEntry);
 		Result.SourceActor = DamageInstigator;
 		Result.TargetActor = TargetActor;
+		Result.InitializeNativeReceipt(this);
 		if (IsValid(DamageInstigator) && DamageInstigator->HasAuthority())
 		{
 			const UObject* ReceiptCandidates[] = {Context.GetSourceObject(), Context.GetEffectCauser()};
@@ -340,12 +399,12 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 			}
 		}
 
-		const auto SendSovEvent = [TargetActor, DamageInstigator, &Context](
+		const auto SendSovEvent = [TargetActor, DamageInstigator, &Context, &StillOwnsTarget](
 			const FGameplayTag& EventTag,
 			const float Magnitude,
 			const FGameplayTagContainer* PayloadTargetTags)
 		{
-			if (!TargetActor || !EventTag.IsValid())
+			if (!StillOwnsTarget() || !EventTag.IsValid())
 			{
 				return;
 			}
@@ -378,7 +437,7 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 					false,
 					DefaultPoiseCoefficient),
 				0.f);
-			RoutedPoiseDamage = IncomingDamage * PoiseCoefficient;
+			RoutedPoiseDamage = SovCombatTransaction::BoundedProduct(IncomingDamage, PoiseCoefficient);
 		}
 
 		RoutedPoiseDamage = FMath::IsFinite(RoutedPoiseDamage) ? FMath::Max(RoutedPoiseDamage, 0.f) : 0.f;
@@ -397,7 +456,7 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 			if (const auto* Settings = UNarrativeGameUserSettings::GetSovSettings())
 			{
 				const float Scale = Settings->GetIncomingDamageScale();
-				RoutedDamage *= FMath::IsFinite(Scale) ? FMath::Clamp(Scale, 0.f, 10.f) : 1.f;
+				RoutedDamage = SovCombatTransaction::BoundedProduct(RoutedDamage, FMath::IsFinite(Scale) ? FMath::Clamp(Scale, 0.f, 10.f) : 1.f);
 				Result.ResolvedDamage = RoutedDamage;
 			}
 		}
@@ -471,10 +530,6 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 					? FMath::Max(CombatSettings->DeflectionStaminaDamage, 0.f)
 					: 8.f);
 			Result.AppliedStaminaDamage = FMath::Min(OldStamina, DeflectionCost);
-			SetStamina(FMath::Clamp(
-				OldStamina - Result.AppliedStaminaDamage,
-				0.f,
-				GetMaxStamina()));
 
 			Result.DefenseKind = ESovDefenseKind::Deflection;
 			Result.bDeflected = true;
@@ -493,10 +548,6 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 					? FMath::Max(CombatSettings->PerfectGuardStaminaDamage, 0.f)
 					: 5.f;
 				Result.AppliedStaminaDamage = FMath::Min(OldStamina, PerfectGuardCost);
-				SetStamina(FMath::Clamp(
-					OldStamina - Result.AppliedStaminaDamage,
-					0.f,
-					GetMaxStamina()));
 
 				Result.DefenseKind = ESovDefenseKind::Guard;
 				Result.bGuarded = true;
@@ -504,7 +555,7 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 				RoutedPoiseDamage = 0.f;
 				// The timing remains successful, but spending the last Stamina ends
 				// Guard through the normal replicated broken-state pipeline.
-				Result.bGuardBroken = GetStamina() <= KINDA_SMALL_NUMBER;
+				Result.bGuardBroken = OldStamina - Result.AppliedStaminaDamage <= KINDA_SMALL_NUMBER;
 			}
 			else if (bGuardCandidate)
 			{
@@ -526,19 +577,17 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 					|| OldStamina - RequestedGuardCost > KINDA_SMALL_NUMBER;
 
 				Result.AppliedStaminaDamage = FMath::Min(OldStamina, RequestedGuardCost);
-				SetStamina(FMath::Clamp(OldStamina - Result.AppliedStaminaDamage, 0.f, GetMaxStamina()));
 
 				if (!bHeavyAttack && bCanPayGuardCost)
 				{
 					Result.DefenseKind = ESovDefenseKind::Guard;
 					Result.bGuarded = true;
-					RoutedDamage *= CombatSettings
+					RoutedDamage = SovCombatTransaction::BoundedProduct(RoutedDamage, CombatSettings
 						? FMath::Clamp(CombatSettings->GuardDamageMultiplier, 0.f, 1.f)
-						: 0.25f;
-					RoutedPoiseDamage *= CombatSettings
+						: 0.25f);
+					RoutedPoiseDamage = SovCombatTransaction::BoundedProduct(RoutedPoiseDamage, CombatSettings
 						? FMath::Clamp(CombatSettings->GuardPoiseMultiplier, 0.f, 1.f)
-						: 0.25f;
-					SendSovEvent(Tags.Event_Guard_Blocked, IncomingDamage, nullptr);
+						: 0.25f);
 				}
 				else
 				{
@@ -547,18 +596,15 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 			}
 		}
 
-		if (Result.bGuardBroken)
-		{
-			OnGuardBroken.Broadcast(
-				DamageInstigator,
-				DamageCauser,
-				Data.EffectSpec,
-				Result.AppliedStaminaDamage);
-		}
+		if (!StillOwnsTarget()) { return; }
+		Result.AppliedStaminaDamage = FMath::Min(FMath::Max(GetStamina(), 0.f), Result.AppliedStaminaDamage);
+		if (Result.AppliedStaminaDamage > 0.f)
+		{ SetStamina(FMath::Clamp(GetStamina() - Result.AppliedStaminaDamage, 0.f, GetMaxStamina())); }
+		if (!StillOwnsTarget()) { return; }
 
 		const float OldShield = FMath::Max(GetShield(), 0.f);
-		const float OldHealth = FMath::Max(GetHealth(), 0.f);
-		const float OldPoise = FMath::Max(GetPoise(), 0.f);
+		const float HealthAtRouting = FMath::Max(GetHealth(), 0.f);
+		const float PoiseAtRouting = FMath::Max(GetPoise(), 0.f);
 
 		const bool bFatalPolicy = EffectAssetTags.HasTagExact(Tags.Damage_Fatal);
 		if (bFatalPolicy || EffectAssetTags.HasTagExact(Tags.Damage_BypassShield))
@@ -577,6 +623,7 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 					DefaultPartialBypass),
 				0.f,
 				1.f);
+			if (!FMath::IsFinite(Result.ShieldBypassRatio)) { Result.ShieldBypassRatio = 0.f; }
 		}
 
 		const float ShieldCoefficient = FMath::Max(
@@ -593,28 +640,30 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 					false,
 					1.f),
 				0.f);
-		const float ShieldEligibleBase = RoutedDamage * (1.f - Result.ShieldBypassRatio);
-		Result.RequestedShieldDamage = ShieldEligibleBase * ShieldCoefficient;
+		const double ShieldEligibleBase = static_cast<double>(RoutedDamage) * (1.0 - Result.ShieldBypassRatio);
+		const double RequestedShieldDamage = ShieldEligibleBase * ShieldCoefficient;
+		Result.RequestedShieldDamage = SovCombatTransaction::BoundedProduct(ShieldEligibleBase, ShieldCoefficient);
 		Result.bShieldWasTargeted = GetMaxShield() > KINDA_SMALL_NUMBER
 			&& Result.ShieldBypassRatio < 1.f
 			&& Result.RequestedShieldDamage > KINDA_SMALL_NUMBER;
 		Result.AppliedShieldDamage = FMath::Min(OldShield, Result.RequestedShieldDamage);
 
-		float OverflowBase = 0.f;
+		double OverflowBase = 0.0;
 		if (OldShield <= KINDA_SMALL_NUMBER)
 		{
 			OverflowBase = ShieldEligibleBase;
 		}
 		else if (ShieldCoefficient > KINDA_SMALL_NUMBER
-			&& Result.RequestedShieldDamage > OldShield)
+			&& RequestedShieldDamage > OldShield)
 		{
 			OverflowBase =
-				(Result.RequestedShieldDamage - OldShield) / ShieldCoefficient;
+				(RequestedShieldDamage - OldShield) / ShieldCoefficient;
 		}
-		const float RequestedHealthDamage = (
-			(RoutedDamage * Result.ShieldBypassRatio) + OverflowBase) * HealthCoefficient;
-		Result.AppliedHealthDamage = FMath::Min(OldHealth, RequestedHealthDamage);
-		Result.HealthOverkillDamage = FMath::Max(RequestedHealthDamage - OldHealth, 0.f);
+		const float RequestedHealthDamage = SovCombatTransaction::BoundedProduct(
+			(static_cast<double>(RoutedDamage) * Result.ShieldBypassRatio) + OverflowBase, HealthCoefficient);
+		Result.AppliedHealthDamage = FMath::Min(HealthAtRouting, RequestedHealthDamage);
+		Result.HealthOverkillDamage = FMath::Max(RequestedHealthDamage - HealthAtRouting, 0.f);
+		float HealthDamageLimit = RequestedHealthDamage;
 
 		bool bSourceAllowsStatus = true;
 		if (IsValid(DamageInstigator) && DamageInstigator->HasAuthority())
@@ -625,57 +674,80 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 				const auto* Policy = IsValid(Component) ? Cast<ISovDamageSourcePolicy>(Component) : nullptr;
 				if (!Policy) { continue; }
 				const float ShieldLimit = Result.AppliedShieldDamage, HealthLimit = Result.AppliedHealthDamage;
-				const float PoiseLimit = FMath::Min(RoutedPoiseDamage, OldPoise);
+				const float PoiseLimit = FMath::Min(RoutedPoiseDamage, PoiseAtRouting);
 				float LimitedShield = ShieldLimit, LimitedHealth = HealthLimit, LimitedPoise = PoiseLimit;
 				bSourceAllowsStatus &= Policy->LimitSovDamage(TargetActor, Context, LimitedShield, LimitedHealth, LimitedPoise);
 				// Native policies can reduce their own contribution, never amplify damage or heal.
 				Result.AppliedShieldDamage = FMath::IsFinite(LimitedShield) ? FMath::Clamp(LimitedShield, 0.f, ShieldLimit) : 0.f;
 				Result.AppliedHealthDamage = FMath::IsFinite(LimitedHealth) ? FMath::Clamp(LimitedHealth, 0.f, HealthLimit) : 0.f;
 				RoutedPoiseDamage = FMath::IsFinite(LimitedPoise) ? FMath::Clamp(LimitedPoise, 0.f, PoiseLimit) : 0.f;
-				if (Result.AppliedHealthDamage < HealthLimit) { Result.HealthOverkillDamage = 0.f; }
+				// A policy approves this concrete contribution, even if it did not
+				// reduce the routing snapshot. A later Shield callback may heal the
+				// target but cannot enlarge the source's approved Health budget.
+				HealthDamageLimit = Result.AppliedHealthDamage;
+				if (Result.AppliedHealthDamage < HealthLimit)
+				{ Result.HealthOverkillDamage = 0.f; }
 				if (Result.AppliedShieldDamage <= 0.f && ShieldLimit > 0.f) { Result.bShieldWasTargeted = false; }
 			}
 		}
 
+		// Attribute setters can run synchronous GAS delegates. Each remaining debit
+		// therefore starts from the current resource, never a snapshot taken before
+		// another setter. Keep typed results local to this packet: a nested kill or
+		// heal must not be counted as this packet's applied damage/fatal transition.
+		if (!StillOwnsTarget()) { return; }
+		const float ShieldBeforeCommit = FMath::Max(GetShield(), 0.f);
+		Result.AppliedShieldDamage = FMath::Min(ShieldBeforeCommit, Result.AppliedShieldDamage);
+		Result.bShieldBroken = ShieldBeforeCommit > 0.f && Result.AppliedShieldDamage >= ShieldBeforeCommit;
 		if (Result.AppliedShieldDamage > 0.f)
-		{
-			SetShield(FMath::Clamp(OldShield - Result.AppliedShieldDamage, 0.f, GetMaxShield()));
-		}
+		{ SetShield(FMath::Clamp(ShieldBeforeCommit - Result.AppliedShieldDamage, 0.f, GetMaxShield())); }
 		Result.bShouldRestartShieldRecharge = EffectAssetTags.HasTagExact(Tags.Damage_RestartShieldRecharge)
 			|| Result.bShieldWasTargeted;
-		Result.bShieldBroken = OldShield > 0.f && GetShield() <= 0.f;
-		if (Result.bShieldBroken)
-		{
-			OnShieldBroken.Broadcast(
-				DamageInstigator,
-				DamageCauser,
-				Data.EffectSpec,
-				Result.AppliedShieldDamage);
-			SendSovEvent(Tags.Event_Shield_Broken, Result.AppliedShieldDamage, nullptr);
-		}
-
+		if (!StillOwnsTarget()) { return; }
+		const float HealthBeforeCommit = FMath::Max(GetHealth(), 0.f);
+		Result.AppliedHealthDamage = FMath::Min(HealthBeforeCommit, HealthDamageLimit);
+		Result.HealthOverkillDamage = FMath::Max(HealthDamageLimit - HealthBeforeCommit, 0.f);
+		Result.bFatal = HealthBeforeCommit > 0.f && Result.AppliedHealthDamage >= HealthBeforeCommit;
 		if (Result.AppliedHealthDamage > 0.f)
-		{
-			SetHealth(FMath::Clamp(OldHealth - Result.AppliedHealthDamage, 0.f, GetMaxHealth()));
-		}
-
-		if (RoutedPoiseDamage > KINDA_SMALL_NUMBER && OldPoise > 0.f)
+		{ SetHealth(FMath::Clamp(HealthBeforeCommit - Result.AppliedHealthDamage, 0.f, GetMaxHealth())); }
+		if (!StillOwnsTarget()) { return; }
+		const float PoiseBeforeCommit = FMath::Max(GetPoise(), 0.f);
+		if (GetHealth() > 0.f && RoutedPoiseDamage > KINDA_SMALL_NUMBER && PoiseBeforeCommit > 0.f)
 		{
 			const bool bPoiseCannotBreak = Data.Target.HasMatchingGameplayTag(Tags.State_Poise_Recovering)
 				|| Data.Target.HasMatchingGameplayTag(Tags.State_Poise_SuperArmor)
 				|| Data.Target.HasMatchingGameplayTag(Tags.State_InterruptProtected);
 			const float PoiseFloor = bPoiseCannotBreak
-				? FMath::Min(GetMaxPoise(), FMath::Max(GetMaxPoise() * 0.01f, 1.f))
+				? FMath::Min(PoiseBeforeCommit, FMath::Min(GetMaxPoise(), FMath::Max(GetMaxPoise() * 0.01f, 1.f)))
 				: 0.f;
-			SetPoise(FMath::Clamp(OldPoise - RoutedPoiseDamage, PoiseFloor, GetMaxPoise()));
-			Result.AppliedPoiseDamage = FMath::Max(OldPoise - GetPoise(), 0.f);
+			const float NewPoise = FMath::Clamp(PoiseBeforeCommit - RoutedPoiseDamage, PoiseFloor, GetMaxPoise());
+			Result.AppliedPoiseDamage = FMath::Max(PoiseBeforeCommit - NewPoise, 0.f);
+			Result.bPoiseBroken = NewPoise <= 0.f;
+			SetPoise(NewPoise);
+		}
+		const float AppliedDamage = SovCombatTransaction::BoundedProduct(
+			static_cast<double>(Result.AppliedShieldDamage) + Result.AppliedHealthDamage, 1.0);
+		// All explicit gameplay notifications run after resource writes. Nested
+		// same-target hits remain synchronous, preserving native payload receipts.
+
+		if (StillOwnsTarget() && Result.bGuardBroken)
+		{
+			OnGuardBroken.Broadcast(
+				DamageInstigator,
+				DamageCauser,
+				Data.EffectSpec,
+				Result.AppliedStaminaDamage);
 		}
 
-		const float AppliedDamage = Result.AppliedShieldDamage + Result.AppliedHealthDamage;
-		Result.bPoiseBroken = OldPoise > 0.f && GetPoise() <= 0.f;
-		Result.bFatal = OldHealth > 0.f && GetHealth() <= 0.f;
+		if (Result.bGuarded && !Result.bPerfectDefense)
+		{ SendSovEvent(Tags.Event_Guard_Blocked, IncomingDamage, nullptr); }
+		if (StillOwnsTarget() && Result.bShieldBroken)
+		{
+			OnShieldBroken.Broadcast(DamageInstigator, DamageCauser, Data.EffectSpec, Result.AppliedShieldDamage);
+			SendSovEvent(Tags.Event_Shield_Broken, Result.AppliedShieldDamage, nullptr);
+		}
 
-		if (Result.bPoiseBroken)
+		if (StillOwnsTarget() && Result.bPoiseBroken)
 		{
 			OnPoiseBroken.Broadcast(
 				DamageInstigator,
@@ -688,7 +760,7 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 		// is exact: a Freeze-only immunity must not silently become immunity to every status.
 		FGameplayTagContainer CurrentTargetTags;
 		Data.Target.GetOwnedGameplayTags(CurrentTargetTags);
-		if (!bSourceAllowsStatus || CurrentTargetTags.HasTagExact(Tags.Status_Immunity)
+		if (!StillOwnsTarget() || GetHealth() <= 0.f || !bSourceAllowsStatus || CurrentTargetTags.HasTagExact(Tags.Status_Immunity)
 			|| CurrentTargetTags.HasTag(Tags.Status_Immunity_All)) { Result.RequestedStatusTags.Reset(); }
 		else
 		{
@@ -705,7 +777,8 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 		}
 		const float RequestedStatusMagnitude = Data.EffectSpec.GetSetByCallerMagnitude(
 			Tags.SetByCaller_Status_Magnitude, false, 1.f);
-		Result.bStatusApplicationRequested = !Result.bFatal && SovCombatTransaction::AcceptStatusRequest(
+		Result.bStatusApplicationRequested = StillOwnsTarget() && GetHealth() > 0.f
+			&& !Result.bFatal && SovCombatTransaction::AcceptStatusRequest(
 			!Result.RequestedStatusTags.IsEmpty() && FMath::IsFinite(RequestedStatusMagnitude)
 				&& RequestedStatusMagnitude > KINDA_SMALL_NUMBER,
 			Result.bPerfectDefense, Result.bGuarded,
@@ -738,6 +811,8 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 				// consumers deduplicate with (RequestId, StatusTag).
 				for (const FGameplayTag& RequestedStatusTag : Result.RequestedStatusTags)
 				{
+					// Each leaf can invoke callbacks that retire this life or avatar.
+					if (!StillOwnsTarget() || GetHealth() <= 0.f) { break; }
 					FSovStatusApplicationRequest Request;
 					Request.RequestId = Result.TransactionId;
 					Request.StatusTag = RequestedStatusTag;
@@ -749,18 +824,24 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 					Request.Context = Context;
 					Request.SourceAbilityTags = SourceAbilityTags;
 					Request.bRequiresAppliedDamage = !bControlPacket;
+					Request.OriginatingDamageReceipt = Result.NativeConsumptionReceipt;
 					TargetASC->StatusApplicationRequested(Request);
 				}
 			}
 
 			// Preserve the original aggregate gameplay-event contract while
 			// project listeners migrate to the lossless typed delegate.
-			SendSovEvent(
-				Tags.Event_Status_ApplicationRequested,
-				StatusMagnitude,
-				&Result.RequestedStatusTags);
+			if (StillOwnsTarget() && GetHealth() > 0.f)
+			{
+				SendSovEvent(
+					Tags.Event_Status_ApplicationRequested,
+					StatusMagnitude,
+					&Result.RequestedStatusTags);
+			}
 		}
 
+		// Only this packet's still-current zero crossing owns death and kill rewards.
+		Result.bFatal = Result.bFatal && StillOwnsTarget() && GetHealth() <= 0.f;
 		if (Result.bFatal)
 		{
 			OnOutOfHealth.Broadcast(
@@ -769,7 +850,8 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 				Data.EffectSpec,
 				AppliedDamage);
 
-			if (SourceASC && SourceASC != TargetASC)
+			Result.bFatal = Result.bFatal && StillOwnsTarget() && GetHealth() <= 0.f;
+			if (Result.bFatal && StillOwnsSource() && SourceASC != TargetASC)
 			{
 				FGameplayEventData EventData;
 				EventData.EventTag = FNarrativeGameplayTags::Get().GameplayEvent_KilledEnemy;
@@ -780,11 +862,15 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 			}
 		}
 
-		if (TargetASC)
+		Result.bFatal = Result.bFatal && StillOwnsTarget() && GetHealth() <= 0.f;
+		if (StillOwnsTarget())
 		{
 			TargetASC->DamageResolvedAsTarget(Result);
 		}
-		if (SourceASC && SourceASC != TargetASC)
+		// Target-result listeners may restore the same avatar before source-side
+		// kill/Echo consumers run. Do not carry fatal ownership into that new life.
+		Result.bFatal = Result.bFatal && StillOwnsTarget() && GetHealth() <= 0.f;
+		if (StillOwnsSource() && SourceASC != TargetASC)
 		{
 			SourceASC->DamageResolvedAsSource(Result);
 		}
@@ -820,11 +906,12 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 		const float RequestedHeal = FMath::Max(GetHeal(), 0.f);
 		SetHeal(0.f);
 
+		if (!StillOwnsTarget() || GetHealth() <= 0.f || !FMath::IsFinite(RequestedHeal)) { return; }
 		const float OldHealth = GetHealth();
-		SetHealth(FMath::Clamp(OldHealth + RequestedHeal, 0.f, GetMaxHealth()));
-		const float AppliedHeal = GetHealth() - OldHealth;
+		const float AppliedHeal = FMath::Min(RequestedHeal, FMath::Max(GetMaxHealth() - OldHealth, 0.f));
+		SetHealth(FMath::Clamp(OldHealth + AppliedHeal, 0.f, GetMaxHealth()));
 
-		if (AppliedHeal > 0.f && SourceASC && TargetASC)
+		if (AppliedHeal > 0.f && StillOwnsTarget() && StillOwnsSource())
 		{
 			TargetASC->HealedBy(SourceASC, AppliedHeal, Data.EffectSpec);
 		}

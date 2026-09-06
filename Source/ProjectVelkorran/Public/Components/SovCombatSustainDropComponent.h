@@ -93,8 +93,9 @@ private:
 
 	void TryInitializeFromOwner();
 	bool IsEligiblePlayerSource(const AActor* SourceActor) const;
+	bool IsCurrentFatalTarget(const FSovDamageResult& Result) const;
 	bool IsEligibleFatalDamage(const FSovDamageResult& Result) const;
-	void SpawnConfiguredDrops();
+	void SpawnConfiguredDrops(const FSovDamageResult& Result);
 	FTransform MakePickupSpawnTransform(const FVector& LocalOffset) const;
 
 	UPROPERTY(Transient)

@@ -418,6 +418,7 @@ bool USovStatusComponent::IsRequestStructurallyValid(
 	const AActor* OwnerActor = GetOwner();
 	const FSovGameplayTags& Tags = FSovGameplayTags::Get();
 	return IsValid(OwnerActor)
+		&& Request.IsCurrentDamageOrigin()
 		&& Request.RequestId.IsValid()
 		&& Request.StatusTag.IsValid()
 		&& Request.StatusTag != Tags.Status_Apply
@@ -1681,6 +1682,7 @@ void USovStatusComponent::HandleStatusApplicationRequested(
 	AActor* OwnerActor = GetOwner();
 	if (!IsValid(OwnerActor)
 		|| !OwnerActor->HasAuthority()
+		|| !Request.IsCurrentDamageOrigin()
 		|| Request.TargetActor.Get() != OwnerActor
 		|| !IsValid(AbilitySystemComponent.Get())
 		|| AbilitySystemComponent->GetAvatarActor() != OwnerActor)

@@ -1,6 +1,8 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Abilities/SovGameplayAbility_TarrikEcho.h"
 #include "AbilitySystemComponent.h"
+#include "AbilitySystemBlueprintLibrary.h"
+#include "GAS/NarrativeAttributeSetBase.h"
 #include "Engine/World.h"
 #include "NarrativeGameplayTags.h"
 #include "Sovereign/SovGameplayTags.h"
@@ -33,6 +35,7 @@ void USovGameplayAbility_TarrikEchoBase::EndAbility(
 	const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
 	const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
+	if (!IsEndAbilityValid(Handle, ActorInfo)) { return; }
 	++TarrikActivationSerial; // invalidate callbacks before any Blueprint Ended hook
 	if (UWorld* World = GetWorld())
 	{
@@ -44,10 +47,12 @@ void USovGameplayAbility_TarrikEchoBase::EndAbility(
 
 bool USovGameplayAbility_TarrikEchoBase::IsTarrikReleaseContextValid() const
 {
-	if (!IsActive() || !CurrentActorInfo || !CurrentActorInfo->IsNetAuthority()
+	if (!IsCurrentEchoExecutionValid() || !CurrentActorInfo || !CurrentActorInfo->IsNetAuthority()
 		|| !IsValid(CurrentActorInfo->AvatarActor.Get())) { return false; }
 	const UAbilitySystemComponent* ASC = CurrentActorInfo->AbilitySystemComponent.Get();
-	if (!IsValid(ASC)) { return false; }
+	if (!IsValid(ASC) || ASC->GetAvatarActor() != CurrentActorInfo->AvatarActor.Get()
+		|| UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(CurrentActorInfo->AvatarActor.Get()) != ASC
+		|| ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()) <= 0.f) { return false; }
 	const FSovGameplayTags& Sov = FSovGameplayTags::Get();
 	const FNarrativeGameplayTags& Narrative = FNarrativeGameplayTags::Get();
 	return ASC->HasMatchingGameplayTag(Sov.Character_Player_Tarrik)
@@ -60,6 +65,8 @@ bool USovGameplayAbility_TarrikEchoBase::IsTarrikReleaseContextValid() const
 		&& !ASC->HasMatchingGameplayTag(Narrative.State_Movement_Ragdoll)
 		&& !ASC->HasMatchingGameplayTag(Sov.State_Guard_Broken)
 		&& !ASC->HasMatchingGameplayTag(Sov.State_Poise_Broken)
+		&& !ASC->HasMatchingGameplayTag(Sov.State_Status_Frozen)
+		&& ASC->GetGameplayTagCount(Narrative.State_Busy) <= 1
 		&& MeetsWeaponRequirement(CurrentSpecHandle, CurrentActorInfo);
 }
 

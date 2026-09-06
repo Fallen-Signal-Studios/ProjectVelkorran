@@ -22,6 +22,7 @@
 #include "PhysicalMaterials/PhysicalMaterial.h"
 #include "TimerManager.h"
 #include "UnrealFramework/NarrativeCharacter.h"
+#include "UObject/StrongObjectPtr.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogSovWeakPoint, Log, All);
 
@@ -514,10 +515,9 @@ ESovWeakPointHitResolution USovWeakPointComponent::ResolveWeakPointHit(
 	if (!GetOwner()
 		|| !GetOwner()->HasAuthority()
 		|| bRestoringState || bUninitializingState
-		|| !DamageResult.TransactionId.IsValid()
+		|| !DamageResult.IsCurrentTargetLife()
 		|| DamageResult.TargetActor.Get() != GetOwner()
 		|| DamageResult.SourceActor.Get() == GetOwner()
-		|| ResolvedHitTransactions.Contains(DamageResult.TransactionId)
 		|| DamageResult.bGuarded || DamageResult.bDeflected
 		|| !FMath::IsFinite(DamageResult.AppliedShieldDamage + DamageResult.AppliedHealthDamage)
 		|| DamageResult.AppliedShieldDamage + DamageResult.AppliedHealthDamage <= 0.0f)
@@ -532,6 +532,9 @@ ESovWeakPointHitResolution USovWeakPointComponent::ResolveWeakPointHit(
 	}
 
 	OutWeakPointId = MatchingZone->ZoneId;
+	// Retire even hits received while already broken. Reset cannot turn their
+	// retained copies into fresh hits, and a restored life rejects the receipt.
+	if (!DamageResult.ConsumeNativeReceipt(this)) { return ESovWeakPointHitResolution::NotWeakPoint; }
 	if (IsWeakPointBroken(MatchingZone->ZoneId))
 	{
 		return ESovWeakPointHitResolution::AlreadyBroken;
@@ -539,7 +542,8 @@ ESovWeakPointHitResolution USovWeakPointComponent::ResolveWeakPointHit(
 
 	const uint32 Epoch = StateEpoch;
 	const FName ZoneId = MatchingZone->ZoneId;
-	ResolvedHitTransactions.Add(DamageResult.TransactionId);
+	TStrongObjectPtr<USovWeakPointComponent> ComponentLifetime(this);
+	TStrongObjectPtr<AActor> OwnerLifetime(GetOwner());
 	// Periodic contexts can retain the original bone, but are not another precision impact.
 	if (!DamageResult.bPeriodicDamage)
 	{
@@ -562,9 +566,11 @@ ESovWeakPointHitResolution USovWeakPointComponent::ResolveWeakPointHit(
 	PendingBreak.HitZone = DamageResult.HitZone;
 	PendingBreak.WeakPointId = ZoneId;
 	SetWeakPointBroken(ZoneId, true);
-	if (Epoch != StateEpoch || !IsWeakPointBroken(ZoneId)) { return ESovWeakPointHitResolution::NotWeakPoint; }
+	if (Epoch != StateEpoch || !DamageResult.IsCurrentTargetLife() || !IsWeakPointBroken(ZoneId))
+	{ return ESovWeakPointHitResolution::NotWeakPoint; }
 	OnWeakPointBroken.Broadcast(ZoneId, DamageResult);
-	return ESovWeakPointHitResolution::NewlyBroken;
+	return Epoch == StateEpoch && DamageResult.IsCurrentTargetLife() && IsWeakPointBroken(ZoneId)
+		? ESovWeakPointHitResolution::NewlyBroken : ESovWeakPointHitResolution::NotWeakPoint;
 }
 
 bool USovWeakPointComponent::ConsumeWeakPointBreak(
@@ -574,7 +580,8 @@ bool USovWeakPointComponent::ConsumeWeakPointBreak(
 	OutWeakPointId = NAME_None;
 	if (!GetOwner()
 		|| !GetOwner()->HasAuthority()
-		|| DamageResult.TargetActor.Get() != GetOwner())
+		|| DamageResult.TargetActor.Get() != GetOwner()
+		|| !DamageResult.IsCurrentTargetLife())
 	{
 		return false;
 	}
@@ -601,7 +608,8 @@ bool USovWeakPointComponent::ConsumeWeakPointBreak(
 bool USovWeakPointComponent::ConsumeWeakPointHit(const FSovDamageResult& DamageResult, FName& OutWeakPointId)
 {
 	OutWeakPointId = NAME_None;
-	if (!GetOwner() || !GetOwner()->HasAuthority() || DamageResult.TargetActor.Get() != GetOwner()) return false;
+	if (!GetOwner() || !GetOwner()->HasAuthority() || DamageResult.TargetActor.Get() != GetOwner()
+		|| !DamageResult.IsCurrentTargetLife()) return false;
 	for (int32 Index = 0; Index < PendingHits.Num(); ++Index)
 	{
 		const FPendingWeakPointBreak& Hit = PendingHits[Index];

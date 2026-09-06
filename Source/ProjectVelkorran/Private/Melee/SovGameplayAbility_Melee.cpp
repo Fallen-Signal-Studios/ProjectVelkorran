@@ -23,6 +23,22 @@
 #include "UnrealFramework/NarrativeGameUserSettings.h"
 #include "UObject/StrongObjectPtr.h"
 #include "Weapons/WeaponVisual.h"
+namespace
+{
+    const FGameplayTagContainer& MeleeTransactionInterruptions()
+    {
+        static const FGameplayTagContainer Tags=[]()
+        {
+            const auto& N=FNarrativeGameplayTags::Get(); const auto& S=FSovGameplayTags::Get();
+            FGameplayTagContainer Result;
+            for (FGameplayTag Tag : {N.State_IsDead,N.State_Interacting,N.State_SequencerControlled,
+                N.State_Movement_Ragdoll,N.State_Weapon_Equipping,S.State_Fatal,S.State_Poise_Broken,
+                S.State_Guard_Broken,S.State_Status_Frozen,S.State_Weapon_VerityAbsent}) { Result.AddTag(Tag); }
+            return Result;
+        }();
+        return Tags;
+    }
+}
 USovGameplayEffect_MeleeDamage::USovGameplayEffect_MeleeDamage()
 {
     DurationPolicy=EGameplayEffectDurationType::Instant; FGameplayEffectExecutionDefinition Execution;
@@ -39,12 +55,16 @@ USovGameplayAbility_Melee::USovGameplayAbility_Melee()
     ActivationBlockedTags.AddTag(N.State_SequencerControlled); ActivationBlockedTags.AddTag(N.State_Movement_Ragdoll);
     ActivationBlockedTags.AddTag(T.State_Fatal); ActivationBlockedTags.AddTag(T.State_Poise_Broken);
     ActivationBlockedTags.AddTag(T.State_Guarding); ActivationBlockedTags.AddTag(T.State_Deflecting);
+    ActivationBlockedTags.AppendTags(MeleeTransactionInterruptions());
 }
 bool USovGameplayAbility_Melee::CanActivateAbility(const FGameplayAbilitySpecHandle Handle,const FGameplayAbilityActorInfo* Info,
     const FGameplayTagContainer* SourceTags,const FGameplayTagContainer* TargetTags,FGameplayTagContainer* Relevant) const
 {
     FString Error;
-    return Info&&Info->IsNetAuthority()&&Info->AvatarActor.IsValid()&&Info->AbilitySystemComponent.IsValid()
+    const auto* ASC=Info?Info->AbilitySystemComponent.Get():nullptr;
+    const float Health=ASC?ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()):0.f;
+    return !bEndingMelee&&Info&&Info->IsNetAuthority()&&Info->AvatarActor.IsValid()&&Info->AbilitySystemComponent.IsValid()
+        &&FMath::IsFinite(Health)&&Health>0.f
         && AttackDefinition&&AttackDefinition->Validate(Error)&&Super::CanActivateAbility(Handle,Info,SourceTags,TargetTags,Relevant);
 }
 USkeletalMeshComponent* USovGameplayAbility_Melee::ResolveMeleeTraceMesh_Implementation() const
@@ -55,9 +75,13 @@ USkeletalMeshComponent* USovGameplayAbility_Melee::ResolveMeleeTraceMesh_Impleme
 }
 bool USovGameplayAbility_Melee::ContextValid() const
 {
-    return IsActive()&&ActionAvatar.IsValid()&&ActionASC.IsValid()&&!ActionAvatar->IsActorBeingDestroyed()
+    const auto* NarrativeASC=Cast<UNarrativeAbilitySystemComponent>(ActionASC.Get());
+    return !bMeleeEndPending&&!bEndingMelee&&IsActive()&&ActionAvatar.IsValid()&&ActionASC.IsValid()&&!ActionAvatar->IsActorBeingDestroyed()
         &&CurrentActorInfo&&CurrentActorInfo->IsNetAuthority()&&CurrentActorInfo->AvatarActor.Get()==ActionAvatar.Get()
         &&CurrentActorInfo->AbilitySystemComponent.Get()==ActionASC.Get()&&ActionASC->GetAvatarActor()==ActionAvatar.Get()
+        &&(!NarrativeASC||NarrativeASC->GetCombatActorInfoEpoch()==ActionActorInfoEpoch)
+        &&ActionAttributes.IsValid()&&ActionASC->GetSet<UNarrativeAttributeSetBase>()==ActionAttributes.Get()
+        &&ActionAttributes->GetCombatLifeEpoch()==ActionLifeEpoch
         &&UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(ActionAvatar.Get())==ActionASC.Get()
         &&ActionASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute())>0.f
         &&!ActionASC->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_IsDead)
@@ -65,9 +89,36 @@ bool USovGameplayAbility_Melee::ContextValid() const
         &&!ActionASC->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_Weapon_Equipping)
         &&!ActionASC->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_SequencerControlled)
         &&!ActionASC->HasMatchingGameplayTag(FSovGameplayTags::Get().State_Weapon_VerityAbsent)
+        &&!ActionASC->HasAnyMatchingGameplayTags(MeleeTransactionInterruptions())
+        &&ActionASC->GetGameplayTagCount(FNarrativeGameplayTags::Get().State_Busy)<=1
         &&AttackDefinition&&AttackDefinition->Nodes.IsValidIndex(NodeIndex)
         &&((!bStartedUnarmed&&ActionWeapon.IsValid()&&GetOwnerEquippedWeapon(IsMainhand())==ActionWeapon.Get())
             ||(bStartedUnarmed&&bAllowUnarmed&&!GetOwnerEquippedWeapon(IsMainhand())));
+}
+void USovGameplayAbility_Melee::BindInterruptions()
+{
+    UnbindInterruptions();
+    if (!ActionASC.IsValid()) { return; }
+    FGameplayTagContainer Tags=MeleeTransactionInterruptions(); Tags.AddTag(FNarrativeGameplayTags::Get().State_Busy);
+    for (FGameplayTag Tag:Tags)
+    {
+        InterruptionHandles.Add(Tag,ActionASC->RegisterGameplayTagEvent(Tag,EGameplayTagEventType::AnyCountChange)
+            .AddUObject(this,&ThisClass::HandleInterruption));
+    }
+    if (!ContextValid()) { FinishMelee(); }
+}
+void USovGameplayAbility_Melee::UnbindInterruptions()
+{
+    if (ActionASC.IsValid())
+    {
+        for (const auto& Entry:InterruptionHandles)
+        { ActionASC->RegisterGameplayTagEvent(Entry.Key,EGameplayTagEventType::AnyCountChange).Remove(Entry.Value); }
+    }
+    InterruptionHandles.Reset();
+}
+void USovGameplayAbility_Melee::HandleInterruption(FGameplayTag Tag,int32 Count)
+{
+    if (Count>(Tag==FNarrativeGameplayTags::Get().State_Busy?1:0)) { FinishMelee(); }
 }
 bool USovGameplayAbility_Melee::NodeGeometryValid() const
 {
@@ -84,15 +135,50 @@ bool USovGameplayAbility_Melee::IsCurrentNodeHeavy() const
 void USovGameplayAbility_Melee::ActivateAbility(const FGameplayAbilitySpecHandle Handle,const FGameplayAbilityActorInfo* Info,
     const FGameplayAbilityActivationInfo Activation,const FGameplayEventData* Event)
 {
-    Super::ActivateAbility(Handle,Info,Activation,Event); if (!IsActive()||!Info||!Info->IsNetAuthority()) { return; }
-    ActionASC=Info->AbilitySystemComponent; ActionAvatar=Info->AvatarActor;
-    ActionWeapon=GetOwnerEquippedWeapon(IsMainhand()); bStartedUnarmed=!ActionWeapon.IsValid(); ActionMesh=ResolveMeleeTraceMesh(); NodeIndex=0;
+    const uint64 Epoch=++MeleeActivationEpoch;
+    TStrongObjectPtr<USovGameplayAbility_Melee> ActionLifetime(this);
+    bMeleeEndPending=false;
+    const TWeakObjectPtr<AActor> Avatar=Info?Info->AvatarActor.Get():nullptr;
+    const TWeakObjectPtr<UAbilitySystemComponent> ASC=Info?Info->AbilitySystemComponent.Get():nullptr;
+    const auto* NarrativeASC=Cast<UNarrativeAbilitySystemComponent>(ASC.Get());
+    const uint64 ActorInfoEpoch=NarrativeASC?NarrativeASC->GetCombatActorInfoEpoch():0;
+    const TWeakObjectPtr<const UNarrativeAttributeSetBase> Attributes=ASC.IsValid()?ASC->GetSet<UNarrativeAttributeSetBase>():nullptr;
+    const uint64 LifeEpoch=Attributes.IsValid()?Attributes->GetCombatLifeEpoch():0;
+    const auto ContinueActivation=[this,Epoch,Handle,Avatar,ASC,ActorInfoEpoch,Attributes,LifeEpoch]()
+    {
+        const auto* NativeASC=Cast<UNarrativeAbilitySystemComponent>(ASC.Get());
+        if (MeleeActivationEpoch==Epoch&&!bMeleeEndPending&&!bEndingMelee&&IsActive()
+            &&CurrentActorInfo&&CurrentSpecHandle==Handle&&CurrentActorInfo->IsNetAuthority()
+            &&Avatar.IsValid()&&!Avatar->IsActorBeingDestroyed()&&ASC.IsValid()
+            &&CurrentActorInfo->AvatarActor==Avatar&&CurrentActorInfo->AbilitySystemComponent==ASC
+            &&(!NativeASC||NativeASC->GetCombatActorInfoEpoch()==ActorInfoEpoch)
+            &&Attributes.IsValid()&&ASC->GetSet<UNarrativeAttributeSetBase>()==Attributes.Get()
+            &&Attributes->GetCombatLifeEpoch()==LifeEpoch
+            &&ASC->GetAvatarActor()==Avatar.Get()) { return true; }
+        if (MeleeActivationEpoch==Epoch&&IsActive()) { FinishMelee(); }
+        return false;
+    };
+    Super::ActivateAbility(Handle,Info,Activation,Event);
+    if (!ContinueActivation()) { return; }
+    ActionASC=ASC; ActionAvatar=Avatar; ActionActorInfoEpoch=ActorInfoEpoch;
+    ActionAttributes=Attributes; ActionLifeEpoch=LifeEpoch;
+    const TWeakObjectPtr<UWeaponItem> Weapon=GetOwnerEquippedWeapon(IsMainhand());
+    if (!ContinueActivation()) { return; }
+    ActionWeapon=Weapon; bStartedUnarmed=!Weapon.IsValid(); NodeIndex=0;
+    USkeletalMeshComponent* Mesh=ResolveMeleeTraceMesh();
+    if (!ContinueActivation()) { return; }
+    ActionMesh=Mesh;
     FGuid ExpectedAttack;
     if (!GetSovAttackIdentity(ActionAvatar.Get(),ExpectedAttack)) { FinishMelee(); return; }
-    const bool bCommitted=NodeGeometryValid()&&CommitAbility(Handle,Info,Activation);
+    const bool bGeometryValid=NodeGeometryValid();
+    if (!ContinueActivation()) { return; }
+    const bool bCommitted=bGeometryValid&&CommitAbility(Handle,Info,Activation);
+    if (!ContinueActivation()) { return; }
     FGuid CurrentAttack;
     if (!GetSovAttackIdentity(GetAvatarActorFromActorInfo(),CurrentAttack)||CurrentAttack!=ExpectedAttack) { return; }
     if (!bCommitted||!ContextValid()) { FinishMelee(); return; }
+    BindInterruptions();
+    if (!ContinueActivation()||!ContextValid()) { return; }
     BeginNode(0);
 }
 bool USovGameplayAbility_Melee::BeginNode(int32 Index)
@@ -111,7 +197,13 @@ bool USovGameplayAbility_Melee::BeginNode(int32 Index)
     if (bCharging)
     {
         ChargeStarted=GetWorld()->GetTimeSeconds();
-        GetWorld()->GetTimerManager().SetTimer(ChargeTimer,this,&ThisClass::ReleaseCharge,Node.MaximumChargeSeconds,false);
+        const uint64 Epoch=MeleeActivationEpoch;
+        GetWorld()->GetTimerManager().SetTimer(ChargeTimer,FTimerDelegate::CreateWeakLambda(this,[this,Epoch,ExpectedAttack]()
+        {
+            FGuid CurrentAttack;
+            if (MeleeActivationEpoch==Epoch&&ContextValid()&&GetSovAttackIdentity(ActionAvatar.Get(),CurrentAttack)
+                &&CurrentAttack==ExpectedAttack) { ReleaseCharge(); }
+        }),Node.MaximumChargeSeconds,false);
     }
     else { StartAttackWindow(); }
     FGuid CurrentAttack;
@@ -121,7 +213,9 @@ bool USovGameplayAbility_Melee::BeginNode(int32 Index)
 }
 void USovGameplayAbility_Melee::InputReleased(const FGameplayAbilitySpecHandle Handle,const FGameplayAbilityActorInfo* Info,const FGameplayAbilityActivationInfo Activation)
 {
-    Super::InputReleased(Handle,Info,Activation); if (IsActive()&&bCharging) { ReleaseCharge(); }
+    const uint64 Epoch=MeleeActivationEpoch;
+    Super::InputReleased(Handle,Info,Activation);
+    if (MeleeActivationEpoch==Epoch&&ContextValid()&&bCharging) { ReleaseCharge(); }
 }
 void USovGameplayAbility_Melee::ReleaseCharge()
 {
@@ -141,20 +235,38 @@ void USovGameplayAbility_Melee::ApplyAimCorrection()
     const auto* Settings=UNarrativeGameUserSettings::GetSovSettings();
     const float Strength=Settings?Settings->GetMeleeAimAssistStrength():0.f;
     if (Strength<=0.f||!ContextValid()) { return; }
-    const auto& Node=AttackDefinition->Nodes[NodeIndex]; const FVector Source=ActionAvatar->GetActorLocation();
-    AActor* Best=nullptr; float BestAngle=Node.MaximumAimCorrection;
-    TArray<AActor*> Candidates;
+    const uint64 Epoch=MeleeActivationEpoch;
+    const TWeakObjectPtr<AActor> SourceAvatar=ActionAvatar;
+    FGuid ExpectedAttack;
+    if (!GetSovAttackIdentity(SourceAvatar.Get(),ExpectedAttack)) { return; }
+    const auto StillOwnsAttack=[this,Epoch,SourceAvatar,ExpectedAttack]()
+    {
+        FGuid CurrentAttack;
+        return MeleeActivationEpoch==Epoch&&ContextValid()&&ActionAvatar==SourceAvatar
+            &&GetSovAttackIdentity(SourceAvatar.Get(),CurrentAttack)&&CurrentAttack==ExpectedAttack;
+    };
+    // Team policy is virtual and can reenter GAS. Do not retain node references
+    // or mutate a replacement avatar after that callback.
+    const auto Node=AttackDefinition->Nodes[NodeIndex]; const FVector Source=SourceAvatar->GetActorLocation();
+    TWeakObjectPtr<AActor> Best; float BestAngle=Node.MaximumAimCorrection;
+    TArray<TWeakObjectPtr<AActor>> Candidates;
     if (const auto* Targeting=ActionAvatar->FindComponentByClass<USovTargetingComponent>())
     { if (AActor* Locked=Targeting->GetLockedTarget()) { Candidates.Add(Locked); } }
     TArray<FOverlapResult> Overlaps; FCollisionObjectQueryParams Objects; Objects.AddObjectTypesToQuery(ECC_Pawn);
     GetWorld()->OverlapMultiByObjectType(Overlaps,Source,FQuat::Identity,Objects,FCollisionShape::MakeSphere(250.f),FCollisionQueryParams(SCENE_QUERY_STAT(SovMeleeAim),false,ActionAvatar.Get()));
     for (const auto& Hit:Overlaps) { if (Hit.GetActor()) { Candidates.AddUnique(Hit.GetActor()); } }
     float DesiredYaw=0.f;
-    for (AActor* Candidate:Candidates)
+    for (const TWeakObjectPtr<AActor>& WeakCandidate:Candidates)
     {
+        if (!StillOwnsAttack()) { return; }
+        if (!WeakCandidate.IsValid()||WeakCandidate->IsActorBeingDestroyed()) { continue; }
+        TStrongObjectPtr<AActor> CandidateLifetime(WeakCandidate.Get()); AActor* Candidate=CandidateLifetime.Get();
         const auto* ASC=UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Candidate);
-        if (!IsValid(Candidate)||!ASC||ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute())<=0.f
-            ||UArsenalStatics::GetAttitude(ActionAvatar.Get(),Candidate)!=ETeamAttitude::Hostile
+        if (!ASC||ASC->GetAvatarActor()!=Candidate
+            ||ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute())<=0.f) { continue; }
+        const ETeamAttitude::Type Attitude=UArsenalStatics::GetAttitude(SourceAvatar.Get(),Candidate);
+        if (!StillOwnsAttack()) { return; }
+        if (!IsValid(Candidate)||Candidate->IsActorBeingDestroyed()||Attitude!=ETeamAttitude::Hostile
             ||FVector::DistSquared(Source,Candidate->GetActorLocation())>FMath::Square(250.f)) { continue; }
         const float Yaw=FMath::FindDeltaAngleDegrees(ActionAvatar->GetActorRotation().Yaw,(Candidate->GetActorLocation()-Source).Rotation().Yaw);
         if (FMath::Abs(Yaw)>BestAngle) { continue; }
@@ -164,7 +276,7 @@ void USovGameplayAbility_Melee::ApplyAimCorrection()
             &&SovSelenePayload::ResolveTarget(Hit.GetActor())!=Candidate) { continue; }
         Best=Candidate; BestAngle=FMath::Abs(Yaw); DesiredYaw=Yaw;
     }
-    if (Best)
+    if (Best.IsValid()&&!Best->IsActorBeingDestroyed()&&StillOwnsAttack())
     {
         FRotator Rotation=ActionAvatar->GetActorRotation();
         Rotation.Yaw+=static_cast<float>(SovMelee::AimCorrection(DesiredYaw,Node.MaximumAimCorrection,Strength));
@@ -246,7 +358,8 @@ void USovGameplayAbility_Melee::OnStep(float Elapsed)
         const auto* Evade=Spec?Cast<USovGameplayAbility_Evade>(Spec->Ability):nullptr;
         if (!Spec||!Evade||!Evade->CanActivateAfterCombatCancel(Spec->Handle,CurrentActorInfo,this,Node.DefensiveCancelCost)) { return; }
         const auto Handle=Spec->Handle; TWeakObjectPtr<AActor> Avatar=ActionAvatar;
-        if (!TryCommitDefensiveCancel(Node.DefensiveCancelCost)||!ContextValid()) { return; }
+        const uint64 Epoch=MeleeActivationEpoch;
+        if (!TryCommitDefensiveCancel(Node.DefensiveCancelCost)||MeleeActivationEpoch!=Epoch||!ContextValid()) { return; }
         FinishMelee();
         if (IsValid(ASC)&&Avatar.IsValid()&&ASC->GetAvatarActor()==Avatar.Get()) { ASC->TryActivateAbility(Handle,false); }
     }
@@ -258,13 +371,19 @@ void USovGameplayAbility_Melee::FinishMelee()
 void USovGameplayAbility_Melee::EndAbility(const FGameplayAbilitySpecHandle Handle,const FGameplayAbilityActorInfo* Info,
     const FGameplayAbilityActivationInfo Activation,bool bReplicate,bool bCancelled)
 {
-    if (!IsEndAbilityValid(Handle,Info)) { return; }
+    if (bEndingMelee||!IsEndAbilityValid(Handle,Info)) { return; }
+    ++MeleeActivationEpoch;
+    bMeleeEndPending=true;
+    if (ScopeLockCount>0) { Super::EndAbility(Handle,Info,Activation,bReplicate,bCancelled); return; }
+    TStrongObjectPtr<USovGameplayAbility_Melee> ActionLifetime(this);
+    TGuardValue<bool> Ending(bEndingMelee,true);
+    UnbindInterruptions();
     if (GetWorld()) { GetWorld()->GetTimerManager().ClearTimer(ChargeTimer); }
     auto* ASC=Cast<UNarrativeAbilitySystemComponent>(ActionASC.Get());
     if (ASC) { ASC->ClearCombatInputWindow(this,InputWindow); }
     InputWindow.Invalidate(); bCharging=false;
     if (SweepTask) { SweepTask->EndTask(); SweepTask=nullptr; }
-    ActionAvatar.Reset(); ActionASC.Reset(); ActionMesh.Reset(); ActionWeapon.Reset(); AttackReceipt=nullptr; NodeIndex=INDEX_NONE;
+    ActionAvatar.Reset(); ActionASC.Reset(); ActionAttributes.Reset(); ActionMesh.Reset(); ActionWeapon.Reset(); AttackReceipt=nullptr; NodeIndex=INDEX_NONE;
     if (IsValid(ASC)&&ASC->GetAnimatingAbility()==this) { ASC->CurrentMontageStop(.1f); }
     Super::EndAbility(Handle,Info,Activation,bReplicate,bCancelled);
 }

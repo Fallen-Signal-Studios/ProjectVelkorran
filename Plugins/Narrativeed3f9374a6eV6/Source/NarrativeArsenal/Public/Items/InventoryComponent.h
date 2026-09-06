@@ -348,6 +348,10 @@ public:
 	Useful for things like eating food, using ammo, etc.*/
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	virtual int32 ConsumeItem(class UNarrativeItem* Item, const int32 Quantity = 1);
+	/** Native exact-payment operation. Permission callbacks cannot substitute an item/write/owner.
+	 * Returns Quantity or zero; observers see only a fully admitted resource debit. */
+	int32 ConsumeItemExact(UNarrativeItem* Item, int32 Quantity, uint64 ExpectedQuantityRevision,
+		TFunction<bool()> IsOwnerCurrent);
 
 	/** See how much of an item we have - will iterate all stacks of the item. */
 	UFUNCTION(BlueprintCallable, Category = "Inventory")

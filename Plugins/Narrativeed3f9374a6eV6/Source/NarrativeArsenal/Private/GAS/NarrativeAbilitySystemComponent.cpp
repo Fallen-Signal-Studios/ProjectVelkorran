@@ -77,6 +77,14 @@ int32 UNarrativeAbilitySystemComponent::HandleGameplayEvent(FGameplayTag EventTa
 	return TriggeredCount;
 }
 
+void UNarrativeAbilitySystemComponent::ClearActorInfo()
+{
+	// Retire callbacks before GAS can execute cleanup or bind another avatar.
+	++CombatActorInfoEpoch;
+	ClearCombatInputBuffer();
+	Super::ClearActorInfo();
+}
+
 void UNarrativeAbilitySystemComponent::InitAbilityActorInfo(AActor* InOwnerActor, AActor* InAvatarActor)
 {
 	if (GetAvatarActor() != InAvatarActor) { ClearCombatInputBuffer(); }
@@ -93,6 +101,7 @@ void UNarrativeAbilitySystemComponent::InitAbilityActorInfo(AActor* InOwnerActor
 	*/
 	if (!GetAvatarActor())
 	{
+		++CombatActorInfoEpoch;
 		Super::InitAbilityActorInfo(InOwnerActor, InAvatarActor);
 	}
 	else if (ANarrativeCharacter* NewAvatarChar = Cast<ANarrativeCharacter>(InAvatarActor))
@@ -100,6 +109,7 @@ void UNarrativeAbilitySystemComponent::InitAbilityActorInfo(AActor* InOwnerActor
 		//Make sure we're a new Avatar actor. 
 		if (NewAvatarChar != GetAvatarActor())
 		{
+			++CombatActorInfoEpoch;
 			Super::InitAbilityActorInfo(InOwnerActor, InAvatarActor);
 		}
 	}

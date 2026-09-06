@@ -6,21 +6,22 @@
 #include "Components/SovEchoComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "Sovereign/SovGameplayTags.h"
+#include "UObject/StrongObjectPtr.h"
 
 void ASovEchoCombatSustainPickup::InitializeEcho(const float InEchoAmount)
 {
-	if (!HasAuthority())
+	if (!HasAuthority() || bGrantInProgress || IsClaimed())
 	{
 		return;
 	}
 
-	EchoAmount = FMath::Max(InEchoAmount, 0.01f);
+	EchoAmount = FMath::IsFinite(InEchoAmount) ? FMath::Max(InEchoAmount, 0.f) : 0.f;
 }
 
 bool ASovEchoCombatSustainPickup::TryGrantTo(
 	ASovPlayerCharacterBase* CollectingPlayer)
 {
-	if (!IsValid(CollectingPlayer))
+	if (!IsValid(CollectingPlayer) || !FMath::IsFinite(EchoAmount) || EchoAmount <= 0.f)
 	{
 		return false;
 	}
@@ -30,6 +31,7 @@ bool ASovEchoCombatSustainPickup::TryGrantTo(
 	{
 		return false;
 	}
+	TStrongObjectPtr<USovEchoComponent> EchoLifetime(EchoComponent);
 	if (EchoComponent->GetEcho()
 		>= EchoComponent->GetMaxEcho() - KINDA_SMALL_NUMBER)
 	{
@@ -39,7 +41,7 @@ bool ASovEchoCombatSustainPickup::TryGrantTo(
 	}
 
 	const float GrantedEcho = EchoComponent->AddEcho(
-		FMath::Max(EchoAmount, 0.01f),
+		EchoAmount,
 		FSovGameplayTags::Get().Echo_Source_CombatSustainPickup);
 	return GrantedEcho > KINDA_SMALL_NUMBER;
 }

@@ -7,6 +7,9 @@
 #include "GameplayTagContainer.h"
 #include "SovCombatTypes.generated.h"
 
+class UNarrativeAttributeSetBase;
+struct FSovDamageConsumptionReceipt;
+
 /** The action-state defense that intercepted a Sovereign damage transaction. */
 UENUM(BlueprintType)
 enum class ESovDefenseKind : uint8
@@ -41,6 +44,15 @@ struct NARRATIVEARSENAL_API FSovStatusApplicationRequest
 {
 	GENERATED_BODY()
 
+	/** Direct authoritative requests have no damage origin. Damage-produced
+	 * requests must still belong to the target life captured by their publisher. */
+	bool IsCurrentDamageOrigin() const;
+
+private:
+	friend class UNarrativeAttributeSetBase;
+	TSharedPtr<FSovDamageConsumptionReceipt> OriginatingDamageReceipt;
+
+public:
 	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Status")
 	FGuid RequestId;
 
@@ -85,6 +97,19 @@ struct NARRATIVEARSENAL_API FSovDamageResult
 {
 	GENERATED_BODY()
 
+	/** Copies share one bounded native receipt; a channel separates one consumer's uses. */
+	bool ConsumeNativeReceipt(const UObject* Consumer, uint8 Channel = 0) const;
+	bool HasNativeReceipt() const;
+	/** False after target restoration, avatar replacement, attribute-set removal or destruction. */
+	bool IsCurrentTargetLife() const;
+
+private:
+	friend class UNarrativeAttributeSetBase;
+	/** Only the canonical damage publisher may mint this game-thread receipt. */
+	void InitializeNativeReceipt(const UNarrativeAttributeSetBase* TargetAttributes);
+	TSharedPtr<FSovDamageConsumptionReceipt> NativeConsumptionReceipt;
+
+public:
 	/** Unique identity for this resolved application, even when an Effect Context is reused. */
 	UPROPERTY(BlueprintReadOnly, Category = "Sovereign|Damage")
 	FGuid TransactionId;
@@ -216,3 +241,14 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
 	FSovStatusApplicationRequestedSignature,
 	const FSovStatusApplicationRequest&, Request);
+
+/** Reflected copies must retain native consumption ownership, not only UPROPERTY fields. */
+template<> struct TStructOpsTypeTraits<FSovDamageResult> : TStructOpsTypeTraitsBase2<FSovDamageResult>
+{
+	enum { WithCopy = true };
+};
+
+template<> struct TStructOpsTypeTraits<FSovStatusApplicationRequest> : TStructOpsTypeTraitsBase2<FSovStatusApplicationRequest>
+{
+	enum { WithCopy = true };
+};
