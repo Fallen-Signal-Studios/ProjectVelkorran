@@ -25,7 +25,17 @@
 
 #define LOCTEXT_NAMESPACE "SovAccessibleRecords"
 USovAccessibleRecordMenu::USovAccessibleRecordMenu() { InputConfig=ENarrativeWidgetInputMode::Menu; bIsBackHandler=true; }
-void USovAccessibleRecordMenu::SetSceneHistoryMode(bool bValue) { if(bRetiring) { return; } ++ViewGeneration; bSceneHistory=bValue; Selection=0; RebuildRecords(); ShowRecord(true); }
+void USovAccessibleRecordMenu::SetSceneHistoryMode(bool bValue) { if(bRetiring) { return; } ++ViewGeneration; bSceneHistory=bValue; bObjectiveReview=false; Selection=0; RebuildRecords(); ShowRecord(true); }
+void USovAccessibleRecordMenu::SetObjectiveReviewMode()
+{
+	if(bRetiring) { return; } const uint64 Expected=++ViewGeneration;
+	bObjectiveReview=true; bSceneHistory=false; Selection=0;
+	// OpenMenu can activate before its caller selects the requested review mode.
+	// Retire any initial default-view readout before announcing current objectives.
+	if(GetOwningLocalPlayer()) { if(auto* Narrator=GetOwningLocalPlayer()->GetSubsystem<USovAccessibleNarrationSubsystem>()) { Narrator->Cancel(this); } }
+	if(Expected!=ViewGeneration || bRetiring) { return; }
+	RebuildRecords(); ShowRecord(true);
+}
 FText USovAccessibleRecordMenu::DescribeEvidence(const USovEvidenceDefinition* Definition,ESovEvidenceStage Stage)
 {
 	if (!Definition || Stage==ESovEvidenceStage::Unknown) { return LOCTEXT("Unavailable","No acquired record available."); }
@@ -70,7 +80,15 @@ void USovAccessibleRecordMenu::NativeConstruct()
 	{
 		BoundCampaign=PC->FindComponentByClass<USovCampaignStateComponent>();
 		if(BoundCampaign) { BoundCampaign->OnEvidenceRecorded.AddUniqueDynamic(this,&ThisClass::EvidenceChanged); BoundCampaign->OnCampaignStateRestored.AddUniqueDynamic(this,&ThisClass::CampaignRestored); BoundCampaign->OnMissionChanged.AddUniqueDynamic(this,&ThisClass::MissionChanged); }
-		if(auto* Frontend=PC->FindComponentByClass<USovFrontendComponent>()) { BoundPresentation=Frontend->GetPresentation(); if(BoundPresentation) { BoundPresentation->OnSceneHistoryChanged.AddUniqueDynamic(this,&ThisClass::HistoryChanged); } }
+		if(auto* Frontend=PC->FindComponentByClass<USovFrontendComponent>())
+		{
+			BoundPresentation=Frontend->GetPresentation();
+			if(BoundPresentation)
+			{
+				BoundPresentation->OnSceneHistoryChanged.AddUniqueDynamic(this,&ThisClass::HistoryChanged);
+				BoundPresentation->OnObjectiveViewChanged.AddUniqueDynamic(this,&ThisClass::ObjectivesChanged);
+			}
+		}
 		BoundCues=PC->FindComponentByClass<USovNarrativeCueComponent>();
 		if(BoundCues) { BoundCues->OnCueEnded.AddUniqueDynamic(this,&ThisClass::CueEnded); }
 	}
@@ -81,7 +99,11 @@ void USovAccessibleRecordMenu::NativeDestruct()
 {
 	bRetiring=true; const uint64 Expected=++ViewGeneration;
 	if(BoundSettings) { BoundSettings->OnUserSettingsChanged.RemoveDynamic(this,&ThisClass::SettingsChanged); }
-	if(BoundPresentation) { BoundPresentation->OnSceneHistoryChanged.RemoveDynamic(this,&ThisClass::HistoryChanged); }
+	if(BoundPresentation)
+	{
+		BoundPresentation->OnSceneHistoryChanged.RemoveDynamic(this,&ThisClass::HistoryChanged);
+		BoundPresentation->OnObjectiveViewChanged.RemoveDynamic(this,&ThisClass::ObjectivesChanged);
+	}
 	if(BoundCues) { BoundCues->OnCueEnded.RemoveDynamic(this,&ThisClass::CueEnded); }
 	if(BoundCampaign) { BoundCampaign->OnEvidenceRecorded.RemoveDynamic(this,&ThisClass::EvidenceChanged); BoundCampaign->OnCampaignStateRestored.RemoveDynamic(this,&ThisClass::CampaignRestored); BoundCampaign->OnMissionChanged.RemoveDynamic(this,&ThisClass::MissionChanged); }
 	BoundPresentation=nullptr; BoundCampaign=nullptr; BoundCues=nullptr;
@@ -126,7 +148,23 @@ FReply USovAccessibleRecordMenu::NativeOnKeyDown(const FGeometry& Geometry, cons
 void USovAccessibleRecordMenu::RebuildRecords()
 {
 	Records.Reset(); APlayerController* PC=GetOwningPlayer(); if(!PC) { return; }
-	if(bSceneHistory)
+	if(bObjectiveReview)
+	{
+		// Consume the same authorized view as the HUD, including whole rows that
+		// cannot fit its height budget. Never enumerate undiscovered campaign beats.
+		if(BoundPresentation)
+		{
+			for(const auto& Entry:BoundPresentation->GetObjectiveReviewEntries())
+			{
+				const FText Kind=Entry.bOptional ? LOCTEXT("OptionalObjective","Optional") : LOCTEXT("MainObjective","Main objective");
+				const FText State=Entry.State==ESovObjectiveState::Active ? LOCTEXT("ActiveObjective","Active") : LOCTEXT("AvailableObjective","Available");
+				FText Record=FText::Format(LOCTEXT("ObjectiveRecord","{0} · {1}\n\n{2}"),Kind,State,Entry.Text);
+				if(!Entry.FailureRule.IsEmpty()) { Record=FText::Format(LOCTEXT("ObjectiveFailureRule","{0}\n\n{1}"),Record,Entry.FailureRule); }
+				Records.Add(Record);
+			}
+		}
+	}
+	else if(bSceneHistory)
 	{
 		// These summaries are the existing save-backed archive, including important interrupted cues.
 		// Reading a summary does not pretend its original audio completed or mutate repetition history.
@@ -164,7 +202,8 @@ void USovAccessibleRecordMenu::ShowRecord(bool bAnnounce)
 	if (ScrollHint) { ScrollHint->SetFont(Font); ScrollHint->SetColorAndOpacity(FSlateColor(FLinearColor::White)); }
 	for(auto* Button:{PreviousButton.Get(),NextButton.Get(),ReadButton.Get(),CloseButton.Get()})
 	{ if(auto* Label=Cast<UTextBlock>(Button->GetContent())) { Label->SetFont(Font); Label->SetColorAndOpacity(FSlateColor(FLinearColor::White)); } Button->SetBackgroundColor(FLinearColor::Black); }
-	Heading->SetText(FText::Format(LOCTEXT("Heading","{0} — {1} of {2}"),bSceneHistory ? LOCTEXT("SceneHistory","Recent dialogue and unheard records") : LOCTEXT("Evidence","Acquired evidence"),FText::AsNumber(Records.Num() ? Selection+1 : 0),FText::AsNumber(Records.Num())));
+	const FText Title=bObjectiveReview ? LOCTEXT("CurrentObjectives","Current objectives") : bSceneHistory ? LOCTEXT("SceneHistory","Recent dialogue and unheard records") : LOCTEXT("Evidence","Acquired evidence");
+	Heading->SetText(FText::Format(LOCTEXT("Heading","{0} — {1} of {2}"),Title,FText::AsNumber(Records.Num() ? Selection+1 : 0),FText::AsNumber(Records.Num())));
 	const FText NewBody = Records.IsValidIndex(Selection) ? Records[Selection] : LOCTEXT("Empty","No records available to the current protagonist in this view.");
 	const bool bNewRecord = !Body->GetText().EqualTo(NewBody);
 	Body->SetText(NewBody);
@@ -202,6 +241,14 @@ void USovAccessibleRecordMenu::HistoryChanged()
 	}
 }
 void USovAccessibleRecordMenu::CueEnded(USovNarrativeCue*, bool) { HistoryChanged(); }
+void USovAccessibleRecordMenu::ObjectivesChanged()
+{
+	if(!bObjectiveReview || bRetiring || !IsActivated()) { return; }
+	const uint64 Expected=++ViewGeneration;
+	if(GetOwningLocalPlayer()) { if(auto* Narrator=GetOwningLocalPlayer()->GetSubsystem<USovAccessibleNarrationSubsystem>()) { Narrator->Cancel(this); } }
+	if(Expected!=ViewGeneration || bRetiring || !IsActivated()) { return; }
+	RebuildRecords(); ShowRecord(false);
+}
 void USovAccessibleRecordMenu::EvidenceChanged(const FSovEvidenceAcquisition& Value)
 {
 	if(!bSceneHistory && IsActivated())

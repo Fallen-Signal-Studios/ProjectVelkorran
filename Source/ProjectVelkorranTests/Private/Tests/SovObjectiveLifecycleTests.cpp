@@ -20,6 +20,9 @@ struct FSovObjectiveLifecycleTestAccess
 	{ State.Missions.FindChecked(Mission).SelectedChoices.Add(TEXT("ProtectionPriority"), Outcome); }
 	static void CorruptObjectiveOrder(USovCampaignStateComponent& State) { State.ObjectiveJournal[0].AfterBeatSequence = 9999; }
 	static void CorruptEvidenceOrder(USovCampaignStateComponent& State) { State.ObjectiveJournal.Last().AfterEvidenceCount = 0; }
+	static void SetProjectionLead(USovCampaignStateComponent& State, FGameplayTag Lead) { State.ActiveProtagonist = Lead; }
+	static ESovObjectiveState StoredState(const USovCampaignStateComponent& State, FName Mission, FName Beat)
+	{ return State.Missions.FindChecked(Mission).ObjectiveStates.FindChecked(Beat); }
 	static void MakeLegacy(USovCampaignStateComponent& State)
 	{
 		State.SavedSchemaVersion = 1; State.ObjectiveJournal.Reset();
@@ -116,6 +119,51 @@ bool FSovObjectiveLifecycleRuntimeTest::RunTest(const FString& Parameters)
 	if (!Reloaded) { return false; }
 	TestTrue(TEXT("Ordered objective journal validates"), Reloaded->IsStateValid());
 	TestEqual(TEXT("Failed state survives reload"), Reloaded->GetObjectiveState(Mission->MissionId, TEXT("OptionalRescue")), ESovObjectiveState::Failed);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovActiveObjectiveKnowledgeProjectionTest, "ProjectVelkorran.Campaign.Objectives.ActiveStateRequiresCurrentLeadKnowledge",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovActiveObjectiveKnowledgeProjectionTest::RunTest(const FString& Parameters)
+{
+	FObjectiveWorld F; if (!F.PC || !F.Pawn) { AddError(TEXT("Fixture failed")); return false; }
+	auto* Mission = F.Mission(); auto* State = F.PC->State.Get();
+	const auto& Tags = FSovGameplayTags::Get();
+	const FName RescueId(TEXT("OptionalRescue"));
+	Mission->Beats[0].GrantedKnowledge.AddTag(Tags.Echo_Source_WeakPointBreak);
+	Mission->Beats[1].RequiredKnowledge.AddTag(Tags.Echo_Source_WeakPointBreak);
+	FSovCampaignBeatDefinition Completed = Mission->Beats[1]; Completed.BeatId = TEXT("KnownRecordCompleted");
+	Mission->Beats.Add(Completed);
+	TestFalse(TEXT("Knowledge-gated objective deliberately permits either protagonist"), Mission->Beats[1].RequiredProtagonist.IsValid());
+	TestEqual(TEXT("Begin informed lead's mission"), State->BeginMission(Mission), ESovCampaignResult::Applied);
+	TestEqual(TEXT("Learn objective knowledge"), State->CompleteBeat(TEXT("SurvivorsReached")), ESovCampaignResult::Applied);
+	TestEqual(TEXT("Record completed history with the same knowledge gate"), State->CompleteBeat(Completed.BeatId), ESovCampaignResult::Applied);
+	if (!TestEqual(TEXT("Informed lead activates rescue"), State->TransitionObjective(RescueId, ESovObjectiveState::Active), ESovCampaignResult::Applied)
+		|| !TestFalse(TEXT("Activation has a durable receipt"), State->GetObjectiveJournal().IsEmpty())) { return false; }
+	const TArray<uint8> BeforeProjection = F.Save(State);
+	const int32 BeatEvents = State->GetJournal().Num(), ObjectiveEvents = State->GetObjectiveJournal().Num();
+	const FGuid ActivationEvent = State->GetObjectiveJournal().Last().EventId;
+	// Isolate the projection after a lead change. The full authored handoff and its
+	// companion/possession receipts are exercised by the separate handoff suites.
+	FSovObjectiveLifecycleTestAccess::SetProjectionLead(*State, Tags.Character_Player_Selene);
+	F.Pawn->TestHero = Tags.Character_Player_Selene;
+	TestFalse(TEXT("Incoming lead has not learned the rescue knowledge"), State->HasKnowledge(F.Pawn->TestHero, Mission->Beats[1].RequiredKnowledge));
+	TestEqual(TEXT("Active rescue is hidden from uninformed lead"), State->GetObjectiveState(Mission->MissionId, RescueId), ESovObjectiveState::Inactive);
+	TestFalse(TEXT("Hidden rescue is not actionable"), State->GetActionableObjectiveIds().Contains(RescueId));
+	TestEqual(TEXT("Uninformed lead cannot reactivate rescue"), State->TransitionObjective(RescueId, ESovObjectiveState::Active), ESovCampaignResult::PrerequisiteMissing);
+	TestEqual(TEXT("Uninformed lead cannot fail rescue"), State->TransitionObjective(RescueId, ESovObjectiveState::Failed), ESovCampaignResult::PrerequisiteMissing);
+	TestEqual(TEXT("Uninformed lead cannot skip rescue"), State->TransitionObjective(RescueId, ESovObjectiveState::Skipped), ESovCampaignResult::PrerequisiteMissing);
+	TestEqual(TEXT("Uninformed lead cannot complete rescue"), State->CompleteBeat(RescueId), ESovCampaignResult::KnowledgeMissing);
+	TestEqual(TEXT("Historical success remains succeeded"), State->GetObjectiveState(Mission->MissionId, Completed.BeatId), ESovObjectiveState::Succeeded);
+	TestEqual(TEXT("Projection preserves stored activation"), FSovObjectiveLifecycleTestAccess::StoredState(*State, Mission->MissionId, RescueId), ESovObjectiveState::Active);
+	TestEqual(TEXT("Rejected requests add no beat history"), State->GetJournal().Num(), BeatEvents);
+	TestEqual(TEXT("Rejected requests add no lifecycle history"), State->GetObjectiveJournal().Num(), ObjectiveEvents);
+	TestEqual(TEXT("Original activation receipt survives"), State->GetObjectiveJournal().Last().EventId, ActivationEvent);
+	FSovObjectiveLifecycleTestAccess::SetProjectionLead(*State, Tags.Character_Player_Tarrik);
+	F.Pawn->TestHero = Tags.Character_Player_Tarrik;
+	TestEqual(TEXT("Returning informed lead sees existing active rescue"), State->GetObjectiveState(Mission->MissionId, RescueId), ESovObjectiveState::Active);
+	TestTrue(TEXT("Returning informed lead can act on rescue"), State->GetActionableObjectiveIds().Contains(RescueId));
+	TestTrue(TEXT("Projection and rejected requests leave serialized history unchanged"), !BeforeProjection.IsEmpty() && F.Save(State) == BeforeProjection);
 	return true;
 }
 

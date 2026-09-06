@@ -159,6 +159,7 @@ TSharedRef<SWidget> USovAccessibilitySettingsMenu::RebuildWidget()
 		AddRow("Recovery.Retry", LOCTEXT("RetryRecovery", "Retry checkpoint recovery"));
 		AddRow("bMenuNarration", LOCTEXT("Narration", "Menu and dialogue narration"));
 		AddRow("UIScale", LOCTEXT("UIScale", "UI text scale"), 1.f, 2.f, .25f);
+		AddRow("bShowObjectiveText", LOCTEXT("ShowObjectiveText", "Show objective text"));
 		AddRow("SubtitleScale", LOCTEXT("SubtitleScale", "Subtitle text scale"), 1.f, 2.5f, .25f);
 		AddRow("bSubtitles", LOCTEXT("Subtitles", "Speech subtitles"));
 		AddRow("bClosedCaptions", LOCTEXT("Captions", "Important sound captions"));
@@ -171,6 +172,7 @@ TSharedRef<SWidget> USovAccessibilitySettingsMenu::RebuildWidget()
 		AddRow("Audio.Tinnitus",LOCTEXT("TinnitusAudio","Tinnitus-like tones volume"),0,1,.1f);
 		AddRow("Audio.DynamicRange",LOCTEXT("AudioRange","Audio dynamic range"),0,2,1);
 		AddRow("Review.Evidence", LOCTEXT("ReviewEvidence", "Review acquired evidence summaries"));
+		AddRow("Review.Objectives", LOCTEXT("ReviewObjectives", "Review current objectives"));
 		AddRow("Review.History", LOCTEXT("ReviewHistory", "Review recent dialogue and unheard records"));
 		AddRow("SubtitleBackgroundOpacity", LOCTEXT("SubtitleBackground", "Subtitle background opacity"), 0.f, 1.f, .1f);
 		AddRow("bSubtitleSpeakerNames", LOCTEXT("SpeakerNames", "Subtitle speaker names"));
@@ -431,7 +433,13 @@ void USovAccessibilitySettingsMenu::Adjust(USovAccessibilitySettingRow* Row, int
 	if(Name.StartsWith(TEXT("Review.")))
 	{
 		if(auto* PC=Cast<ANarrativePlayerController>(GetOwningPlayer()))
-		{ if(auto* HUD=PC->GetNarrativeGameplayHUD()) { if(auto* Review=Cast<USovAccessibleRecordMenu>(HUD->OpenMenu(USovAccessibleRecordMenu::StaticClass(),FNarrativeGameplayTags::Get().UI_Layer_Modal))) { Review->SetSceneHistoryMode(Key=="Review.History"); } } }
+		{
+			if(auto* HUD=PC->GetNarrativeGameplayHUD())
+			{
+				if(auto* Review=Cast<USovAccessibleRecordMenu>(HUD->OpenMenu(USovAccessibleRecordMenu::StaticClass(),FNarrativeGameplayTags::Get().UI_Layer_Modal)))
+				{ if(Key=="Review.Objectives") { Review->SetObjectiveReviewMode(); } else { Review->SetSceneHistoryMode(Key=="Review.History"); } }
+			}
+		}
 		return;
 	}
 	if(Name.StartsWith(TEXT("Audio.")))

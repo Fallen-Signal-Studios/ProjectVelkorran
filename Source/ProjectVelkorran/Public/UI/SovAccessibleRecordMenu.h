@@ -22,6 +22,7 @@ class PROJECTVELKORRAN_API USovAccessibleRecordMenu : public UNarrativeMenu
 public:
 	USovAccessibleRecordMenu();
 	void SetSceneHistoryMode(bool bValue);
+	void SetObjectiveReviewMode();
 	static FText DescribeEvidence(const USovEvidenceDefinition* Definition,ESovEvidenceStage Stage);
 protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;
@@ -35,6 +36,7 @@ protected:
 private:
 	friend struct FSovAccessibilityFrontendTestAccess;
 	friend struct FSovNarrativeCueTestAccess;
+	friend struct FSovObjectivePresentationTestAccess;
 	void RebuildRecords();
 	void ShowRecord(bool bAnnounce);
 	UFUNCTION() void Previous();
@@ -43,6 +45,7 @@ private:
 	UFUNCTION() void Close();
 	UFUNCTION() void SettingsChanged(const FSovUserSettingsSnapshot& Value);
 	UFUNCTION() void HistoryChanged();
+	UFUNCTION() void ObjectivesChanged();
 	UFUNCTION() void CueEnded(USovNarrativeCue* Cue, bool bInterrupted);
 	UFUNCTION() void EvidenceChanged(const FSovEvidenceAcquisition& Value);
 	UFUNCTION() void CampaignRestored(bool bValid);
@@ -61,6 +64,7 @@ private:
 	UPROPERTY(Transient) TObjectPtr<USovNarrativeCueComponent> BoundCues;
 	TArray<FText> Records;
 	bool bSceneHistory = false;
+	bool bObjectiveReview = false;
 	int32 Selection = 0;
 	uint64 ViewGeneration = 0;
 	bool bRetiring = false;

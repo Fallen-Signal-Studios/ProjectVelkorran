@@ -19,6 +19,8 @@
 #include "Framework/Application/SlateApplication.h"
 #include "Save/SovSaveSubsystem.h"
 #include "Engine/GameInstance.h"
+#include "Characters/SovPlayerCharacterBase.h"
+#include "Platform/SovPlatformServicesSubsystem.h"
 
 #define LOCTEXT_NAMESPACE "SovNativeFrontend"
 USovFrontendComponent::USovFrontendComponent()
@@ -40,7 +42,8 @@ void USovFrontendComponent::RefreshFrontend()
 {
     auto* PC = Cast<ASovPlayerController>(GetOwner());
     if (bEnding || !IsActive() || !PC || !PC->IsLocalController() || !PC->GetLocalPlayer()
-        || IsRunningCommandlet() || !FSlateApplication::IsInitialized()) { return; }
+        || IsRunningCommandlet() || !FSlateApplication::IsInitialized())
+    { UnbindObjectives(); return; }
     if (!Presentation)
     {
         Presentation = CreateWidget<USovAccessibilityPresentation>(PC, USovAccessibilityPresentation::StaticClass());
@@ -63,6 +66,8 @@ void USovFrontendComponent::RefreshFrontend()
     }
     if (bRecoveryMenuPending && Save && Save->HasTravelRecovery() && !Save->IsLoadPending() && OpenAccessibilitySettings())
     { bRecoveryMenuPending = false; SetupMenu->PresentTravelRecovery(RecoveryMessage); }
+    BindObjectives(PC, PC->GetCampaignState());
+    RefreshObjectives(false);
     auto* Settings = USovGameUserSettings::Get();
     UWorld* World = GetWorld();
     if (Settings && World && World->bAllowAudioPlayback)
@@ -86,6 +91,115 @@ void USovFrontendComponent::RefreshFrontend()
         { PausedController = PC; bOwnSetupPause = PC->AcquireSystemPause(TEXT("AccessibilitySetup")); }
     }
     else { ReleaseSetupPause(); }
+}
+void USovFrontendComponent::BindObjectives(ASovPlayerController* Controller, USovCampaignStateComponent* Campaign)
+{
+    auto* Platform = GetWorld() && GetWorld()->GetGameInstance()
+        ? GetWorld()->GetGameInstance()->GetSubsystem<USovPlatformServicesSubsystem>() : nullptr;
+    if (ObjectiveController.Get() == Controller && BoundCampaign.Get() == Campaign && ObjectivePlatform.Get() == Platform) { return; }
+    UnbindObjectives();
+    if (bEnding || !IsValid(Controller) || !IsValid(Campaign) || Campaign->GetOwner() != Controller) { return; }
+    ObjectiveController = Controller; BoundCampaign = Campaign; ObjectivePlatform = Platform;
+    ObjectiveAccountNamespace = BoundSave.IsValid() ? BoundSave->GetAccountNamespace() : FString();
+    ObjectiveAccountUserIndex = BoundSave.IsValid() ? BoundSave->GetLocalSaveUserIndex() : INDEX_NONE;
+    Controller->OnCampaignTransitionChanged.AddUniqueDynamic(this, &ThisClass::OnObjectiveTransitionChanged);
+    Campaign->OnObjectiveStateChanged.AddUniqueDynamic(this, &ThisClass::OnObjectiveChanged);
+    Campaign->OnBeatCommitted.AddUniqueDynamic(this, &ThisClass::OnObjectiveBeatCommitted);
+    Campaign->OnEvidenceRecorded.AddUniqueDynamic(this, &ThisClass::OnObjectiveEvidenceRecorded);
+    Campaign->OnMissionChanged.AddUniqueDynamic(this, &ThisClass::OnObjectiveMissionChanged);
+    Campaign->OnCampaignStateRestored.AddUniqueDynamic(this, &ThisClass::OnObjectiveStateRestored);
+    if (Platform) { Platform->OnPlatformAccountChanged.AddUniqueDynamic(this, &ThisClass::OnObjectiveAccountChanged); }
+}
+void USovFrontendComponent::UnbindObjectives()
+{
+    if (ObjectiveController.IsValid())
+    { ObjectiveController->OnCampaignTransitionChanged.RemoveDynamic(this, &ThisClass::OnObjectiveTransitionChanged); }
+    if (BoundCampaign.IsValid())
+    {
+        BoundCampaign->OnObjectiveStateChanged.RemoveDynamic(this, &ThisClass::OnObjectiveChanged);
+        BoundCampaign->OnBeatCommitted.RemoveDynamic(this, &ThisClass::OnObjectiveBeatCommitted);
+        BoundCampaign->OnEvidenceRecorded.RemoveDynamic(this, &ThisClass::OnObjectiveEvidenceRecorded);
+        BoundCampaign->OnMissionChanged.RemoveDynamic(this, &ThisClass::OnObjectiveMissionChanged);
+        BoundCampaign->OnCampaignStateRestored.RemoveDynamic(this, &ThisClass::OnObjectiveStateRestored);
+    }
+    if (ObjectivePlatform.IsValid())
+    { ObjectivePlatform->OnPlatformAccountChanged.RemoveDynamic(this, &ThisClass::OnObjectiveAccountChanged); }
+    ObjectiveController.Reset(); BoundCampaign.Reset(); ObjectivePlatform.Reset();
+    ObjectiveAccountNamespace.Reset(); ObjectiveAccountUserIndex = INDEX_NONE;
+    bObjectiveAccountInvalidated = false; bObjectiveAccountChanged = false; bObjectiveUpdatePending = true;
+    if (Presentation) { Presentation->ClearObjectives(); }
+}
+void USovFrontendComponent::RefreshObjectives(bool bForce)
+{
+    if (!Presentation) { return; }
+    auto* PC = ObjectiveController.Get();
+    auto* Campaign = BoundCampaign.Get();
+    const auto* Pawn = PC ? Cast<ASovPlayerCharacterBase>(PC->GetPawn()) : nullptr;
+    auto* Mission = Campaign ? Campaign->GetActiveMission() : nullptr;
+    if (BoundSave.IsValid() && !ObjectiveAccountNamespace.IsEmpty()
+        && (BoundSave->GetAccountNamespace() != ObjectiveAccountNamespace || BoundSave->GetLocalSaveUserIndex() != ObjectiveAccountUserIndex))
+    { bObjectiveAccountInvalidated = true; bObjectiveAccountChanged = true; }
+    if ((BoundSave.IsValid() && !BoundSave->IsPlatformStorageOwnerAvailable())
+        || (ObjectivePlatform.IsValid() && ObjectivePlatform->IsAccountSelectionDeferred())) { bObjectiveAccountInvalidated = true; }
+    else if (bObjectiveAccountInvalidated && !bObjectiveAccountChanged && BoundSave.IsValid()
+        && BoundSave->GetAccountNamespace() == ObjectiveAccountNamespace && BoundSave->GetLocalSaveUserIndex() == ObjectiveAccountUserIndex)
+    { bObjectiveAccountInvalidated = false; bObjectiveUpdatePending = true; }
+    if (bEnding || !IsActive() || !PC || PC != GetOwner() || !PC->IsLocalController()
+        || !Campaign || !Campaign->IsStateValid() || !IsValid(Mission) || !IsValid(Pawn)
+        || PC->GetCampaignTransitionState() != ESovCampaignTransitionState::Idle
+        || Pawn->GetProtagonistIdentityTag() != Campaign->GetActiveProtagonist()
+        || !Campaign->GetActiveProtagonist().IsValid() || bObjectiveAccountInvalidated
+        || (BoundSave.IsValid() && (BoundSave->IsLoadPending() || !BoundSave->IsPlatformStorageOwnerAvailable()))
+        || (ObjectivePlatform.IsValid() && ObjectivePlatform->IsAccountSelectionDeferred()))
+    { Presentation->ClearObjectives(); bObjectiveUpdatePending = true; return; }
+    if (!bForce && !bObjectiveUpdatePending && ObjectiveViewGeneration == Presentation->GetObjectiveViewGeneration()) { return; }
+    bObjectiveUpdatePending = false;
+    TArray<FSovObjectivePresentationEntry> Entries;
+    for (FName Id : Campaign->GetActionableObjectiveIds())
+    {
+        const auto* Beat = Mission->FindBeat(Id);
+        const ESovObjectiveState State = Campaign->GetObjectiveState(Mission->MissionId, Id);
+        if (!Beat || Beat->ObjectiveText.IsEmpty()
+            || (State != ESovObjectiveState::Available && State != ESovObjectiveState::Active)
+            || !Campaign->HasKnowledge(Campaign->GetActiveProtagonist(), Beat->RequiredKnowledge)
+            || (Beat->RequiredProtagonist.IsValid() && Beat->RequiredProtagonist != Campaign->GetActiveProtagonist())) { continue; }
+        FSovObjectivePresentationEntry Entry;
+        Entry.BeatId = Id; Entry.Text = Beat->ObjectiveText; Entry.State = State;
+        Entry.bOptional = Beat->bOptional; Entry.bCanonGate = Beat->bCanonGate;
+        if (Beat->bOptional && !Beat->FailureReasonId.IsNone()) { Entry.FailureRule = Beat->FailureRuleText; }
+        Entries.Add(MoveTemp(Entry));
+    }
+    // Keep authored order within each priority. Empty/internal beats and undiscovered
+    // facts never enter the view, including its overflow count.
+    Entries.StableSort([](const FSovObjectivePresentationEntry& A, const FSovObjectivePresentationEntry& B)
+    {
+        if (A.State != B.State) { return A.State == ESovObjectiveState::Active; }
+        if (A.bOptional != B.bOptional) { return !A.bOptional; }
+        return A.bCanonGate && !B.bCanonGate;
+    });
+    ObjectiveViewGeneration = Presentation->GetObjectiveViewGeneration();
+    Presentation->PresentObjectives(Entries);
+}
+void USovFrontendComponent::OnObjectiveChanged(FName, FName, ESovObjectiveState) { RefreshObjectives(); }
+void USovFrontendComponent::OnObjectiveBeatCommitted(const FSovCampaignJournalEntry&) { RefreshObjectives(); }
+void USovFrontendComponent::OnObjectiveEvidenceRecorded(const FSovEvidenceAcquisition&) { RefreshObjectives(); }
+void USovFrontendComponent::OnObjectiveMissionChanged(FName, bool) { RefreshObjectives(); }
+void USovFrontendComponent::OnObjectiveStateRestored(bool bValid)
+{
+    if (bValid)
+    {
+        ObjectiveAccountNamespace = BoundSave.IsValid() ? BoundSave->GetAccountNamespace() : FString();
+        ObjectiveAccountUserIndex = BoundSave.IsValid() ? BoundSave->GetLocalSaveUserIndex() : INDEX_NONE;
+        bObjectiveAccountInvalidated = false; bObjectiveAccountChanged = false;
+    }
+    RefreshObjectives();
+}
+void USovFrontendComponent::OnObjectiveTransitionChanged(ESovCampaignTransitionState, const FString&) { RefreshObjectives(); }
+void USovFrontendComponent::OnObjectiveAccountChanged(bool, bool)
+{
+    // Offline desktop play can have an authorized local profile without an online
+    // sign-in. The native storage-owner and deferred-selection fences are decisive.
+    RefreshObjectives();
 }
 void USovFrontendComponent::BindProducers(UTalesComponent* Tales, USovNarrativeCueComponent* Cues, UNarrativeAbilitySystemComponent* ASC)
 {
@@ -234,6 +348,7 @@ void USovFrontendComponent::OnLoadCompleted(ESovSaveResult Result, const FSovSav
     { RecoveryMessage = Message; bRecoveryMenuPending = true; }
     else if (Result == ESovSaveResult::Success)
     { RecoveryMessage.Reset(); bRecoveryMenuPending = false; }
+    RefreshObjectives();
 }
 void USovFrontendComponent::Unbind()
 {
@@ -257,7 +372,7 @@ void USovFrontendComponent::Unbind()
 }
 void USovFrontendComponent::EndPlay(const EEndPlayReason::Type Reason)
 {
-    bEnding = true; Unbind(); ReleaseSetupPause();
+    bEnding = true; UnbindObjectives(); Unbind(); ReleaseSetupPause();
     if (BoundSave.IsValid()) { BoundSave->OnLoadCompleted.RemoveDynamic(this, &ThisClass::OnLoadCompleted); }
     BoundSave.Reset(); bRecoveryMenuPending = false; RecoveryMessage.Reset();
     if (SetupMenu) { SetupMenu->DeactivateWidget(); SetupMenu = nullptr; }
