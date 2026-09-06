@@ -1,6 +1,10 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Validation/SovValidateCampaignCommandlet.h"
 #include "Validation/SovCampaignDependencyPolicy.h"
+#include "Validation/SovCampaignContentValidation.h"
+#include "Engine/AssetManager.h"
+#include "GameplayEffect.h"
+#include "Tales/NarrativeEvent.h"
 #include "Campaign/SovCampaignDefinition.h"
 #include "Framework/SovPlayerController.h"
 #include "Misc/PackageName.h"
@@ -85,9 +89,28 @@ namespace
 		FAssetRegistryModule& Module = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry"));
 		IAssetRegistry& Registry = Module.Get(); Registry.SearchAllAssets(true);
 		TArray<FName> Pending = RootPackages;
+        int32 ImplicitRootErrors = 0;
+        if (bShippingValidation)
+        {
+            TArray<FName> AlwaysCookPackages; FString CookRootError;
+            UAssetManager* Manager = UAssetManager::GetIfInitialized();
+            if (!Manager || !SovCampaignContentValidation::GatherAlwaysCookPackages(*Manager, AlwaysCookPackages, CookRootError))
+            {
+                UE_LOG(LogSovMission, Error, TEXT("Could not validate effective production AlwaysCook roots: %s"),
+                    Manager ? *CookRootError : TEXT("AssetManager is not initialized."));
+                ++ImplicitRootErrors;
+            }
+            else
+            {
+                for (FName Package : AlwaysCookPackages) { Pending.AddUnique(Package); }
+                UE_LOG(LogSovMission, Display, TEXT("Included %d effective production AlwaysCook packages as campaign validation roots."), AlwaysCookPackages.Num());
+            }
+        }
+        TMap<FName, FName> DependencyParents;
+        for (FName Root : Pending) { DependencyParents.Add(Root, NAME_None); }
 		TSet<FName> Visited; TSet<UObject*> VisitedAssets; TMap<FName, UObject*> EvidenceIds, CueIds;
 		TArray<TStrongObjectPtr<UObject>> RetainedAssets;
-		int32 Errors = 0;
+		int32 Errors = ImplicitRootErrors;
 		const TArray<FString> ExcludedRoots = { TEXT("/Operations/"), TEXT("/NarrativeOperations/"), TEXT("/Prototype/"), TEXT("/Prototypes/") };
 		const TArray<FString> LegacySegments = { TEXT("/Crafting/"), TEXT("/Vendors/"), TEXT("/Morality/"), TEXT("/Rarity/") };
 		while (!Pending.IsEmpty())
@@ -114,15 +137,32 @@ namespace
 						&& !KnownClass->IsChildOf(USovEvidenceDefinition::StaticClass()) && !KnownClass->IsChildOf(USovMeleeAttackDefinition::StaticClass())
 						&& !KnownClass->IsChildOf(USovStatusDefinition::StaticClass())
 						&& !KnownClass->IsChildOf(USovCorruptionProfile::StaticClass()) && !KnownClass->IsChildOf(UDialogue::StaticClass())
-						&& !KnownClass->IsChildOf(UBlueprint::StaticClass())) { continue; }
+						&& !KnownClass->IsChildOf(UBlueprint::StaticClass())
+                        && !KnownClass->IsChildOf(UGameplayEffect::StaticClass())
+                        && !KnownClass->IsChildOf(UNarrativeEvent::StaticClass())) { continue; }
 					UObject* Asset = Data.GetAsset();
 					if (!Asset) { UE_LOG(LogSovMission, Error, TEXT("Could not load dependency asset %s."), *Data.GetObjectPathString()); ++Errors; continue; }
 					RetainedAssets.Emplace(Asset);
+                    if (bShippingValidation)
+                    {
+                        const FString ProhibitedReason = SovCampaignContentValidation::ProhibitedAssetReason(Asset);
+                        if (!ProhibitedReason.IsEmpty())
+                        {
+                            UE_LOG(LogSovMission, Error, TEXT("Campaign dependency contains prohibited system: %s (%s). Dependency chain: %s"),
+                                *Asset->GetPathName(), *ProhibitedReason,
+                                *SovCampaignContentValidation::DescribeDependencyChain(Package, DependencyParents));
+                            ++Errors;
+                        }
+                    }
 					Errors += ValidateNativeAsset(Asset, Missions, bShippingValidation, VisitedAssets, EvidenceIds, CueIds);
 				}
 			}
 			TArray<FName> Dependencies;
 			Registry.GetDependencies(Package, Dependencies, UE::AssetRegistry::EDependencyCategory::Package);
+            for (FName Dependency : Dependencies)
+            {
+                if (!DependencyParents.Contains(Dependency)) { DependencyParents.Add(Dependency, Package); }
+            }
 			Pending.Append(Dependencies);
 		}
 		for (const auto& Item : EvidenceIds)
@@ -134,7 +174,7 @@ namespace
 				{ UE_LOG(LogSovMission, Error, TEXT("%s: supporting evidence %s is absent from the dependency closure. Include dynamic assets with -AdditionalAssets."), *Evidence->GetPathName(), *Supporting.ToString()); ++Errors; }
 			}
 		}
-		UE_LOG(LogSovMission, Display, TEXT("Examined %d on-disk dependency packages. Dynamic string loads and semantic Blueprint behavior need separate validation."), Visited.Num());
+		UE_LOG(LogSovMission, Display, TEXT("Examined %d on-disk dependency packages. Known legacy XP/currency/multiplayer systems were checked when shipping validation was requested. Arbitrary dynamic string loads, renamed standalone event graphs and semantic Blueprint behavior need separate validation."), Visited.Num());
 		return Errors;
 	}
 }
@@ -150,14 +190,12 @@ USovValidateCampaignCommandlet::USovValidateCampaignCommandlet()
 
 int32 USovValidateCampaignCommandlet::Main(const FString& Params)
 {
-	FString MissionArgument;
-	if (!FParse::Value(*Params, TEXT("Missions="), MissionArgument) || MissionArgument.IsEmpty())
+	TArray<FString> Paths;
+	if (!SovCampaignContentValidation::ParseAssetListArgument(Params, TEXT("Missions="), Paths))
 	{
 		UE_LOG(LogSovMission, Error, TEXT("Supply -Missions=/Game/Missions/DA_M01.DA_M01,/Game/Missions/DA_M02.DA_M02 (the complete shipping mission set)."));
 		return 2;
 	}
-	TArray<FString> Paths;
-	MissionArgument.ParseIntoArray(Paths, TEXT(","), true);
 	TMap<FName, USovCampaignDefinition*> Missions;
 	TArray<TStrongObjectPtr<UObject>> RetainedRoots;
 	TSet<FPrimaryAssetId> PrimaryIds;
@@ -270,10 +308,9 @@ int32 USovValidateCampaignCommandlet::Main(const FString& Params)
 	}
 	if (!Missions.Contains(TEXT("M01_Mantle")) || !Missions.Contains(TEXT("M02_OneDegree")))
 	{ UE_LOG(LogSovMission, Error, TEXT("Opening campaign manifest must contain M01_Mantle and M02_OneDegree.")); ++Errors; }
-	FString AdditionalArgument;
-	if (FParse::Value(*Params, TEXT("AdditionalAssets="), AdditionalArgument))
+	TArray<FString> AdditionalPaths;
+	if (SovCampaignContentValidation::ParseAssetListArgument(Params, TEXT("AdditionalAssets="), AdditionalPaths))
 	{
-		TArray<FString> AdditionalPaths; AdditionalArgument.ParseIntoArray(AdditionalPaths, TEXT(","), true);
 		for (FString& Path : AdditionalPaths)
 		{
 			Path.TrimStartAndEndInline(); UObject* Asset = LoadObject<UObject>(nullptr, *Path);
@@ -282,6 +319,6 @@ int32 USovValidateCampaignCommandlet::Main(const FString& Params)
 		}
 	}
 	Errors += ValidateDependencyClosure(RootPackages, Missions, bShippingValidation);
-	UE_LOG(LogSovMission, Display, TEXT("Native mission preflight: %d assets, %d errors. Melee, corruption, status, evidence, cue and Narrative dialogue graph validators ran over dependency assets. Use -ShippingValidation for string-table IDs and excluded dependency roots; -AdditionalAssets includes dynamic-only content. Map actors, World Partition coverage, ability cleanup, Blueprint compilation, translation coverage, cook/package and playthroughs require separate gates. This commandlet alone does not qualify a shipping candidate."), Missions.Num(), Errors);
+	UE_LOG(LogSovMission, Display, TEXT("Native mission preflight: %d assets, %d errors. Melee, corruption, status, evidence, cue and Narrative dialogue graph validators ran over dependency assets. Use -ShippingValidation for string-table IDs, excluded systems and effective production AlwaysCook dependency roots; -AdditionalAssets includes dynamic-only content. Map actors, World Partition coverage, ability cleanup, Blueprint compilation, translation coverage, cook/package and playthroughs require separate gates. This commandlet alone does not qualify a shipping candidate."), Missions.Num(), Errors);
 	return Errors == 0 ? 0 : 1;
 }
