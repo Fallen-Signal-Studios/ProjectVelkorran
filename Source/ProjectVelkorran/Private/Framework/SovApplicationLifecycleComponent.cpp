@@ -167,7 +167,10 @@ void USovApplicationLifecycleComponent::ApplyInterruption()
     // Campaign initialization needs its world timers. It already locks input and has no
     // ready protagonist to resume. Acquire our simulation pause when it reaches Idle.
     const auto Transition = PC->GetCampaignTransitionState();
-    const bool bCanPause = Transition == ESovCampaignTransitionState::Idle || Transition == ESovCampaignTransitionState::Failed;
+    // Accepted travel still has a live source pawn/AI until engine teardown. Destination
+    // initialization states remain unpaused so their managed readiness tasks can finish.
+    const bool bCanPause = Transition == ESovCampaignTransitionState::Idle || Transition == ESovCampaignTransitionState::Failed
+        || Transition == ESovCampaignTransitionState::Travelling;
     if (bCanPause && !bOwnPause) { bOwnPause = PC->AcquireSystemPause(LifecyclePause); }
     else if (!bCanPause && bOwnPause) { bOwnPause = false; PC->ReleaseSystemPause(LifecyclePause); }
     if (!IsApplicationUnavailable() && bCanPause && PC->GetNarrativeGameplayHUD()
