@@ -6,6 +6,8 @@
 #include "Tales/DialogueSM.h"
 #include "GAS/SovCombatTypes.h"
 #include "Save/SovCampaignSaveGame.h"
+#include "Campaign/SovCampaignStateComponent.h"
+#include "Framework/SovPlayerController.h"
 #include "SovFrontendComponent.generated.h"
 class UTalesComponent;
 class USovNarrativeCue;
@@ -14,6 +16,7 @@ class UNarrativeAbilitySystemComponent;
 class USovAccessibilityPresentation;
 class USovAccessibilitySettingsMenu;
 class USovSaveSubsystem;
+class USovPlatformServicesSubsystem;
 
 /** Binds native frontend consumers to existing Tales, cue and combat producers. */
 UCLASS(ClassGroup=(Sovereign), meta=(BlueprintSpawnableComponent))
@@ -33,7 +36,18 @@ protected:
     virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 private:
     friend struct FSovFrontendTestAccess;
+    friend struct FSovObjectivePresentationTestAccess;
     void BindProducers(UTalesComponent* Tales, USovNarrativeCueComponent* Cues, UNarrativeAbilitySystemComponent* ASC);
+    void BindObjectives(ASovPlayerController* Controller, USovCampaignStateComponent* Campaign);
+    void UnbindObjectives();
+    void RefreshObjectives(bool bForce = true);
+    UFUNCTION() void OnObjectiveChanged(FName MissionId, FName BeatId, ESovObjectiveState State);
+    UFUNCTION() void OnObjectiveBeatCommitted(const FSovCampaignJournalEntry& Entry);
+    UFUNCTION() void OnObjectiveEvidenceRecorded(const FSovEvidenceAcquisition& Evidence);
+    UFUNCTION() void OnObjectiveMissionChanged(FName MissionId, bool bSucceeded);
+    UFUNCTION() void OnObjectiveStateRestored(bool bValid);
+    UFUNCTION() void OnObjectiveTransitionChanged(ESovCampaignTransitionState State, const FString& Message);
+    UFUNCTION() void OnObjectiveAccountChanged(bool bSignedIn, bool bSelectionDeferred);
     void RetirePreviousSpeech(UDialogue* NewDialogue);
     UFUNCTION() void OnNPCLine(UDialogue* Dialogue, UDialogueNode_NPC* Node, const FDialogueLine& Line, const FSpeakerInfo& Speaker);
     UFUNCTION() void OnPlayerLine(UDialogue* Dialogue, UDialogueNode_Player* Node, const FDialogueLine& Line);
@@ -55,6 +69,15 @@ private:
     TWeakObjectPtr<USovNarrativeCueComponent> BoundCues;
     TWeakObjectPtr<UNarrativeAbilitySystemComponent> BoundASC;
     TWeakObjectPtr<USovSaveSubsystem> BoundSave;
+    TWeakObjectPtr<USovCampaignStateComponent> BoundCampaign;
+    TWeakObjectPtr<ASovPlayerController> ObjectiveController;
+    TWeakObjectPtr<USovPlatformServicesSubsystem> ObjectivePlatform;
+    FString ObjectiveAccountNamespace;
+    int32 ObjectiveAccountUserIndex = INDEX_NONE;
+    bool bObjectiveAccountInvalidated = false;
+    bool bObjectiveAccountChanged = false;
+    bool bObjectiveUpdatePending = true;
+    uint64 ObjectiveViewGeneration = 0;
     bool bRecoveryMenuPending = false;
     FString RecoveryMessage;
     TWeakObjectPtr<UDialogue> SpeechDialogue;

@@ -120,6 +120,10 @@ bool FSovAccessibilityNativeControl::RunTest(const FString& Parameters)
 	Menu->Adjust(Row,-1); TestEqual(TEXT("Control wraps bounded range"),Settings->GetSettingsSnapshot().UIScale,2.f);
 	Row=FSovAccessibilityFrontendTestAccess::Row(Menu,Settings,"bClosedCaptions",0,1,1); Menu->Adjust(Row,1);
 	TestFalse(TEXT("Native toggle consumed in snapshot"),Settings->GetSettingsSnapshot().bClosedCaptions);
+	Row=FSovAccessibilityFrontendTestAccess::Row(Menu,Settings,"bShowObjectiveText",0,1,1); Menu->Adjust(Row,1);
+	TestFalse(TEXT("Objective text can be hidden through native settings"),Settings->GetSettingsSnapshot().bShowObjectiveText);
+	Menu->Adjust(Row,1);
+	TestTrue(TEXT("Objective text can be restored through native settings"),Settings->GetSettingsSnapshot().bShowObjectiveText);
 	Row=FSovAccessibilityFrontendTestAccess::Row(Menu,Settings,"DialoguePressureMode",0,2,1); Menu->Adjust(Row,1);
 	TestEqual(TEXT("Reflected enum uses actual settings"),Settings->GetSettingsSnapshot().DialoguePressureMode,ESovDialoguePressureMode::Extended);
 	Row=FSovAccessibilityFrontendTestAccess::Row(Menu,Settings,"Cloud.Enabled",0,1,1);

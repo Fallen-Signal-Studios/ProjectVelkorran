@@ -31,7 +31,11 @@ namespace
 		{
 			if (const auto* State = Record->ObjectiveStates.Find(Beat.BeatId))
 			{
-				if (*State == ESovObjectiveState::Active && Beat.RequiredProtagonist.IsValid() && Beat.RequiredProtagonist != Lead)
+				// Activation belongs to durable mission history; presenting or acting
+				// on it still requires the current lead to know the objective.
+				if (*State == ESovObjectiveState::Active
+					&& ((Beat.RequiredProtagonist.IsValid() && Beat.RequiredProtagonist != Lead)
+						|| !Knowledge.HasAllExact(Beat.RequiredKnowledge)))
 				{ return ESovObjectiveState::Inactive; }
 				return *State;
 			}

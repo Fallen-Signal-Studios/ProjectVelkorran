@@ -105,6 +105,7 @@ private:
     friend struct FSovTravelTransactionTestAccess;
     friend struct FSovSaveWorldLoadTestAccess;
     friend struct FSovPlatformServicesTestAccess;
+    friend struct FSovObjectivePresentationTestAccess;
     /** Only the native provider observer can establish authorization; never exposed to Blueprint callers. */
     void ObserveNativePlatformAccount(const FSovObservedPlatformAccount& Account);
     struct FQueuedBoundary { ESovSaveBoundary Kind; FName Id; };
