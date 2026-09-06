@@ -12,6 +12,7 @@ param(
     [Parameter(Mandatory = $true)] [string] $EngineRoot,
     [string] $ProjectPath = (Join-Path $PSScriptRoot '..\ProjectVelkorran.uproject'),
     [string] $ArchiveDirectory,
+    [string[]] $MapPackages = @('/Game/Maps/Development/L_TarrikCombat', '/Game/Maps/Development/L_SeleneCombat'),
     [switch] $SkipBuild,
     [switch] $ExcludeMetaHumanAuthoringData
 )
@@ -21,6 +22,12 @@ $ErrorActionPreference = 'Stop'
 $ProjectPath = (Resolve-Path -LiteralPath $ProjectPath).Path
 $EngineRoot = (Resolve-Path -LiteralPath $EngineRoot).Path
 $ProjectDirectory = Split-Path -Parent $ProjectPath
+if (-not $MapPackages -or $MapPackages.Count -eq 0) { throw 'Supply at least one project map package.' }
+foreach ($MapPackage in $MapPackages) {
+    if ($MapPackage -notmatch '^/Game/[A-Za-z0-9_]+(?:/[A-Za-z0-9_]+)*$') { throw "Invalid project map package: $MapPackage" }
+    $MapFile = Join-Path $ProjectDirectory ('Content\' + $MapPackage.Substring(6).Replace('/', '\') + '.umap')
+    if (-not (Test-Path -LiteralPath $MapFile -PathType Leaf)) { throw "Missing authored map: $MapPackage" }
+}
 $ProjectDescriptor = Get-Content -LiteralPath $ProjectPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $EngineVersion = Get-Content -LiteralPath (Join-Path $EngineRoot 'Engine\Build\Build.version') -Raw -Encoding UTF8 | ConvertFrom-Json
 if ([IO.Path]::GetFileName($ProjectPath) -ne 'ProjectVelkorran.uproject' -or $ProjectDescriptor.EngineAssociation -ne '5.7') {
@@ -56,7 +63,7 @@ try {
         'BuildCookRun', "-project=$ProjectPath", '-nop4', '-unattended', '-utf8output', '-installed',
         '-skipbuild', '-nocompile', '-nocompileuat', '-cook', '-stage', '-pak', '-archive',
         '-targetplatform=Win64', '-clientconfig=Development',
-        '-map=/Game/Maps/Development/L_TarrikCombat+/Game/Maps/Development/L_SeleneCombat',
+        ('-map=' + ($MapPackages -join '+')),
         "-archivedirectory=$ArchiveDirectory"
     )
     # GroomComponent dynamically loads both built-in solvers, while the groom's

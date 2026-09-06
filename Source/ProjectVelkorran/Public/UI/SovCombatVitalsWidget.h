@@ -9,6 +9,7 @@ class APawn;
 class UBorder;
 class UTextBlock;
 class UProgressBar;
+class UVerticalBox;
 
 struct FSovCombatVitalValue
 {
@@ -36,6 +37,8 @@ protected:
     virtual TSharedRef<SWidget> RebuildWidget() override;
 private:
     UPROPERTY(Transient) TObjectPtr<UBorder> Panel;
+    UPROPERTY(Transient) TObjectPtr<UBorder> EchoPanel;
+    UPROPERTY(Transient) TArray<TObjectPtr<UVerticalBox>> VitalRows;
     UPROPERTY(Transient) TArray<TObjectPtr<UTextBlock>> ValueLabels;
     UPROPERTY(Transient) TArray<TObjectPtr<UProgressBar>> Bars;
     FSovCombatVitalsSnapshot Displayed;

@@ -68,41 +68,63 @@ bool USovCombatVitalsWidget::ReadCurrentVitals(const ASovPlayerController* Contr
 
 TSharedRef<SWidget> USovCombatVitalsWidget::RebuildWidget()
 {
-    ValueLabels.Reset(); Bars.Reset(); Displayed = {}; DisplayedScale = -1.f;
+    ValueLabels.Reset(); Bars.Reset(); VitalRows.Reset(); Displayed = {}; DisplayedScale = -1.f;
+    Panel = nullptr; EchoPanel = nullptr;
     if (WidgetTree)
     {
         auto* SafeZone = WidgetTree->ConstructWidget<USafeZone>();
         WidgetTree->RootWidget = SafeZone;
         auto* Canvas = WidgetTree->ConstructWidget<UCanvasPanel>(); SafeZone->SetContent(Canvas);
-        Panel = WidgetTree->ConstructWidget<UBorder>(); Panel->SetPadding(FMargin(12.f, 8.f));
-        Panel->SetRenderTransformPivot(FVector2D(0.f, 1.f));
-        auto* PanelSlot = Canvas->AddChildToCanvas(Panel);
-        PanelSlot->SetAnchors(FAnchors(0.f, 1.f)); PanelSlot->SetAlignment(FVector2D(0.f, 1.f));
-        PanelSlot->SetAutoSize(true); PanelSlot->SetPosition(FVector2D(24.f, -24.f));
-        auto* Width = WidgetTree->ConstructWidget<USizeBox>(); Width->SetWidthOverride(300.f); Panel->SetContent(Width);
-        auto* Rows = WidgetTree->ConstructWidget<UVerticalBox>(); Width->SetContent(Rows);
+        const auto MakePanel = [&](const FName Name, const bool bEcho)
+        {
+            auto* Border = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), Name);
+            Border->SetPadding(FMargin(12.f, 8.f));
+            const FVector2D Corner(bEcho ? 1.f : 0.f, 1.f);
+            Border->SetRenderTransformPivot(Corner);
+            auto* CanvasSlot = Canvas->AddChildToCanvas(Border);
+            CanvasSlot->SetAnchors(FAnchors(bEcho ? 1.f : 0.f, 1.f)); CanvasSlot->SetAlignment(Corner);
+            CanvasSlot->SetAutoSize(true);
+            // The authored weapon/ammo group occupies the bottom-right 24px margin.
+            // Reserve a separate band above it; RefreshVitals also scales that clearance.
+            CanvasSlot->SetPosition(bEcho ? FVector2D(-24.f, -168.f) : FVector2D(24.f, -24.f));
+            auto* Width = WidgetTree->ConstructWidget<USizeBox>(); Width->SetWidthOverride(300.f); Border->SetContent(Width);
+            auto* Rows = WidgetTree->ConstructWidget<UVerticalBox>(); Width->SetContent(Rows);
+            Border->SetVisibility(ESlateVisibility::Collapsed);
+            return Border;
+        };
+        Panel = MakePanel(TEXT("SurvivalVitalsPanel"), false);
+        EchoPanel = MakePanel(TEXT("EchoVitalsPanel"), true);
+        auto* SurvivalRows = CastChecked<UVerticalBox>(CastChecked<USizeBox>(Panel->GetContent())->GetContent());
+        auto* EchoRows = CastChecked<UVerticalBox>(CastChecked<USizeBox>(EchoPanel->GetContent())->GetContent());
+        const FName RowNames[] = {TEXT("HealthVitalRow"), TEXT("ShieldVitalRow"), TEXT("StaminaVitalRow"),
+                                 TEXT("PoiseVitalRow"), TEXT("EchoVitalRow")};
         for (int32 Index = 0; Index < 5; ++Index)
         {
+            auto* Row = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), RowNames[Index]);
+            auto* Rows = Index == 4 ? EchoRows : SurvivalRows;
+            Rows->AddChildToVerticalBox(Row)->SetPadding(FMargin(0.f, Index == 0 || Index == 4 ? 0.f : 5.f, 0.f, 0.f));
             auto* Label = WidgetTree->ConstructWidget<UTextBlock>();
             Label->SetFont(FCoreStyle::GetDefaultFontStyle("Regular", 16));
             Label->SetColorAndOpacity(FSlateColor(FLinearColor::White));
-            Rows->AddChildToVerticalBox(Label)->SetPadding(FMargin(0.f, Index == 0 ? 0.f : 5.f, 0.f, 2.f));
+            Row->AddChildToVerticalBox(Label)->SetPadding(FMargin(0.f, 0.f, 0.f, 2.f));
             auto* Height = WidgetTree->ConstructWidget<USizeBox>(); Height->SetHeightOverride(6.f);
             auto* Bar = WidgetTree->ConstructWidget<UProgressBar>(); Height->SetContent(Bar);
-            Rows->AddChildToVerticalBox(Height);
-            ValueLabels.Add(Label); Bars.Add(Bar);
+            Row->AddChildToVerticalBox(Height);
+            VitalRows.Add(Row); ValueLabels.Add(Label); Bars.Add(Bar);
         }
-        Panel->SetVisibility(ESlateVisibility::Collapsed);
     }
     return Super::RebuildWidget();
 }
 
 void USovCombatVitalsWidget::RefreshVitals()
 {
-    if (!Panel || ValueLabels.Num() != 5 || Bars.Num() != 5) { return; }
+    if (!Panel || !EchoPanel || VitalRows.Num() != 5 || ValueLabels.Num() != 5 || Bars.Num() != 5) { return; }
     FSovCombatVitalsSnapshot Current;
     if (!ReadCurrentVitals(Cast<ASovPlayerController>(GetOwningPlayer()), Current))
-    { Panel->SetVisibility(ESlateVisibility::Collapsed); Displayed = {}; return; }
+    {
+        Panel->SetVisibility(ESlateVisibility::Collapsed); EchoPanel->SetVisibility(ESlateVisibility::Collapsed);
+        Displayed = {}; return;
+    }
     const auto* UserSettings = USovGameUserSettings::Get();
     const auto Settings = UserSettings ? UserSettings->GetSettingsSnapshot() : FSovUserSettingsSnapshot();
     const float Scale = FMath::IsFinite(Settings.UIScale) ? FMath::Clamp(Settings.UIScale, .75f, 2.f) : 1.f;
@@ -110,7 +132,11 @@ void USovCombatVitalsWidget::RefreshVitals()
     if (bRestyle)
     {
         Panel->SetRenderScale(FVector2D(Scale));
-        Panel->SetBrushColor(FLinearColor(.025f, .035f, .055f, Settings.bHighContrastHUD ? 1.f : .9f));
+        EchoPanel->SetRenderScale(FVector2D(Scale));
+        const FLinearColor Background(.025f, .035f, .055f, Settings.bHighContrastHUD ? 1.f : .9f);
+        Panel->SetBrushColor(Background); EchoPanel->SetBrushColor(Background);
+        if (auto* EchoSlot = Cast<UCanvasPanelSlot>(EchoPanel->Slot))
+        { EchoSlot->SetPosition(FVector2D(-24.f, -24.f - 144.f * FMath::Max(1.f, Scale))); }
         DisplayedScale = Scale; bDisplayedHighContrast = Settings.bHighContrastHUD;
     }
     const FText Names[] = {LOCTEXT("Health", "Health"), LOCTEXT("Shield", "Shield"), LOCTEXT("Stamina", "Stamina"),
@@ -130,7 +156,16 @@ void USovCombatVitalsWidget::RefreshVitals()
             Bars[Index]->SetFillColorAndOpacity(Settings.bHighContrastHUD ? FLinearColor::White : Colors[Index]);
         }
     }
+    const auto& Stamina = Current.Values[2];
+    const bool bStaminaChanging = Displayed.Pawn == Current.Pawn &&
+        (!FMath::IsNearlyEqual(Stamina.Current, Displayed.Values[2].Current)
+            || !FMath::IsNearlyEqual(Stamina.Maximum, Displayed.Values[2].Maximum));
+    const bool bShowStamina = Stamina.Current < Stamina.Maximum - KINDA_SMALL_NUMBER || bStaminaChanging;
+    VitalRows[2]->SetVisibility(bShowStamina ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+    // Keep health (including damage outside combat) visible. A complete six-second fade must
+    // consume a real participation/threat owner; weapon draw or damage alone cannot prove safety.
     Displayed = Current;
     Panel->SetVisibility(ESlateVisibility::HitTestInvisible);
+    EchoPanel->SetVisibility(ESlateVisibility::HitTestInvisible);
 }
 #undef LOCTEXT_NAMESPACE

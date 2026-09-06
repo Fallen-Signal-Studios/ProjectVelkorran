@@ -1,6 +1,6 @@
 # M12–M13 proving route
 
-Status: integration work order; no authored maps, cooked build or playthrough has been verified in this checkout. Authority: Sovereign Call: Origins TDD v2.0, revised 14 August 2026, §§9.12, 13.4 and 17.2–17.5, together with the approved project deviations in `CampaignV2ChangeLog.md`.
+Status: integration work order for the full canonical M12-M13 slice. The separate technical checkpoint/travel prototype is qualified in `TDDReviewRoute-2026-09-06.md`; the full-TDD planning estimate is in `TDDAlignment-2026-09-06.md`. That prototype does not complete the six segments below. Authority: Sovereign Call: Origins TDD v2.0, revised 14 August 2026, §§9.12, 13.4 and 17.2–17.5, together with the approved project deviations in `CampaignV2ChangeLog.md`.
 
 The next content gate is the 50–60 minute lower Aurelion terminal excerpt from M12–M13. Use real campaign assets and a temporary review save with the curated late-game ability subset. The source fixtures are regression tests; they do not supply this route.
 
