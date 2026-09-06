@@ -19,6 +19,10 @@ struct FSovSaveWorldLoadTestAccess
         UNarrativeSave* Snapshot, const FGuid& Request)
     {
         S.PendingSave = NewObject<USovCampaignSaveGame>(&S);
+        S.AccountNamespace = TEXT("world-load-test-account");
+        S.PendingAccount = S.AccountNamespace; S.PendingUser = S.UserIndex;
+        S.PendingSave->Header.AccountNamespace = S.AccountNamespace;
+        S.PendingSave->Header.MapPackage = Mission->Map.ToSoftObjectPath().GetLongPackageName();
         S.PendingSave->Header.MissionId = Mission->MissionId;
         S.PendingSave->Header.MissionDefinition = FSoftObjectPath(Mission);
         S.PendingNarrative = Snapshot;
@@ -88,6 +92,7 @@ bool FSovSaveAcceptedWorldRejectionTest::RunTest(const FString& Parameters)
 
     TStrongObjectPtr<USovCampaignDefinition> Mission(NewObject<USovCampaignDefinition>());
     Mission->MissionId = TEXT("M01_SerializerRegression");
+    Mission->Map = TSoftObjectPtr<UWorld>(FSoftObjectPath(FailedWorld));
     Mode->InitialMission = Mission.Get(); FreshMode->InitialMission = Mission.Get();
     const FGuid Request = FGuid::NewGuid();
     Mode->OptionsString = TEXT("?SovCampaignSlotLoad=1?SovCampaignLoadRequest=") + Request.ToString(EGuidFormats::Digits);

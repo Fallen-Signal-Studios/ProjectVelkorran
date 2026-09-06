@@ -41,23 +41,12 @@ FString ASovCampaignGameMode::InitNewPlayer(APlayerController* NewPlayerControll
 	FNarrativeSavePlayer Records;
 	const bool bTravel = UGameplayStatics::HasOption(OptionsString, TEXT("SovCampaignTransition"));
 	bool bHasRecords = false;
-	TFunction<bool()> OwnsTravelStorage;
 	if (bTravel)
 	{
 		USovSaveSubsystem* Slots = GetGameInstance()->GetSubsystem<USovSaveSubsystem>();
-		if (!Slots || !Slots->IsPlatformStorageOwnerAvailable() || Slots->IsPlatformStorageSuspended()) { return TEXT("Campaign travel storage owner is unavailable."); }
-		const FString TravelOwner = Slots->GetAccountNamespace(); const int32 TravelUser = Slots->GetLocalSaveUserIndex();
-		const TWeakObjectPtr<USovSaveSubsystem> TravelStorage(Slots);
-		OwnsTravelStorage = [TravelStorage, TravelOwner, TravelUser]()
-		{
-			const auto* Current = TravelStorage.Get();
-			return Current && Current->IsPlatformStorageOwnerAvailable() && !Current->IsPlatformStorageSuspended() && Current->GetAccountNamespace() == TravelOwner
-				&& Current->GetLocalSaveUserIndex() == TravelUser;
-		};
-		const FString OwnedTravelSlot = FString(ASovPlayerController::TravelSaveSlot()) + TEXT("_") + TravelOwner;
-		bHasRecords = Save->ReadPlayerOnlySave(OwnedTravelSlot, Records, TravelUser, OwnsTravelStorage);
-		if (!OwnsTravelStorage()) { return TEXT("Campaign travel storage owner changed during loading."); }
-		if (!bHasRecords) { return TEXT("Campaign travel record is missing or invalid."); }
+		if (!Slots || !Slots->ReadMissionTravelRecords(*GetWorld(), Records, Error))
+		{ return Error.IsEmpty() ? TEXT("Campaign travel request is unavailable or expired.") : Error; }
+		bHasRecords = true;
 	}
 	else if (Save->GetSaveObject() && Save->GetSaveObject()->PlayerData.IsValid())
 	{
@@ -65,7 +54,8 @@ FString ASovCampaignGameMode::InitNewPlayer(APlayerController* NewPlayerControll
 		bHasRecords = true;
 	}
 	if (!PC->StageCampaignLoad(InitialMission, bHasRecords ? &Records : nullptr, bTravel, Error)) { return Error; }
-	if (OwnsTravelStorage && !OwnsTravelStorage()) { return TEXT("Campaign travel storage owner changed during staging."); }
+	if (USovSaveSubsystem* Slots = GetGameInstance()->GetSubsystem<USovSaveSubsystem>())
+	{ if (!Slots->ValidatePendingWorld(*GetWorld(), Error)) { return Error; } }
 	return FString();
 }
 

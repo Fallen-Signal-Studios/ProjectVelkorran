@@ -53,6 +53,7 @@ public:
 	bool StageCampaignLoad(USovCampaignDefinition* Mission, const FNarrativeSavePlayer* Records, bool bFromTravel, FString& OutError);
 	void InitializeCampaignPawn(ASovPlayerCharacterBase* Pawn);
 	static bool ValidateMissionPawn(USovCampaignDefinition* Mission, FString& OutError, FGameplayTag Lead = FGameplayTag());
+	uint64 GetCampaignTransitionEpoch() const { return TransitionEpoch; }
 	static const TCHAR* TravelSaveSlot() { return TEXT("SovCampaignTravel"); }
 	virtual FGuid GetActorGUID_Implementation() const override;
 	virtual void SetActorGUID_Implementation(const FGuid& SavedGUID) override;
@@ -67,6 +68,7 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Campaign", meta=(ClampMin="1",ClampMax="120")) float InitializationTimeoutSeconds = 30.f;
 
 private:
+	friend class USovSaveSubsystem;
 	friend struct FSovLifecycleTestAccess;
 	friend struct FSovTransitionCallbackTestAccess;
 	UPROPERTY(VisibleAnywhere, Category="Narrative") TObjectPtr<class USovNarrativeCueComponent> NarrativeCues;
@@ -77,7 +79,7 @@ private:
 	bool CanReleaseSystemPause() const;
 	TSet<FName> SystemPauseOwners;
 	bool bExternalPauseRequested = false;
-	bool PrepareTransitionCheckpoint(FName BoundaryId, FString& OutError);
+	bool PrepareTransitionCheckpoint(FName BoundaryId, FString& OutError, bool bRequireDurable = false);
 	bool CanTransitionTo(USovCampaignDefinition* Destination, FString& OutError, bool bRequireDifferentProtagonist = true) const;
 	ASovPlayerCharacterBase* SpawnCampaignPawn(USovCampaignDefinition* Mission, const FTransform& Transform, FGameplayTag Lead = FGameplayTag());
 	bool StartPawnHandoff(USovCampaignDefinition* Destination, FGameplayTag Lead, const FTransform& Transform, FName HandoffBeat, const FGuid& HandoffRequest, FString& OutError);
@@ -88,6 +90,8 @@ private:
 	void SetTransitionState(ESovCampaignTransitionState State, const FString& Message = FString());
 	UPROPERTY(SaveGame) FGuid CampaignControllerGuid;
 	UPROPERTY(SaveGame) TObjectPtr<USovCampaignDefinition> PendingTravelMission;
+	UPROPERTY(SaveGame) FGuid PendingTravelOperationId;
+	UPROPERTY(SaveGame) int64 PendingTravelOriginGeneration = 0;
 	UPROPERTY(Transient) TObjectPtr<USovCampaignDefinition> PendingMission;
 	FGameplayTag PendingProtagonist;
 	FName PendingHandoffBeat;

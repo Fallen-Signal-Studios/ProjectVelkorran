@@ -10,6 +10,7 @@
 #include "Campaign/SovEncounterDirector.h"
 #include "Characters/SovPlayerCharacterBase.h"
 #include "Engine/GameInstance.h"
+#include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Framework/SovCampaignGameMode.h"
@@ -17,6 +18,7 @@
 #include "Framework/SovPlayerState.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GAS/NarrativeAttributeSetBase.h"
+#include "GAS/NarrativeAbilitySystemComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/EngineVersion.h"
 #include "Misc/App.h"
@@ -110,7 +112,7 @@ void USovSaveSubsystem::Deinitialize()
     UNarrativeSaveSubsystem::OnInitialSaveRequested.Remove(InitialSaveHandle);
     FTSTicker::GetCoreTicker().RemoveTicker(TickHandle);
     AcknowledgeSaveFailure();
-    PendingSave = nullptr; PendingNarrative = nullptr; Storage.Reset();
+    ClearPendingOperation(); TravelRecoverySave = nullptr; Storage.Reset();
     Super::Deinitialize();
 }
 bool USovSaveSubsystem::SelectPlatformUser(const FString& Id, int32 LocalUserIndex, FString& Error)
@@ -613,6 +615,9 @@ ESovSaveResult USovSaveSubsystem::LoadSlot(ESovSaveSlotKind Kind, int32 Index, F
     if (!PC || !PC->HasAuthority() || PC->GetWorld()->GetNetMode() != NM_Standalone)
     { Error = TEXT("Campaign load requires the standalone local controller."); return ESovSaveResult::UnsafeState; }
     TGuardValue<bool> Mutation(bBusy, true);
+    const FString LoadOwner = AccountNamespace; const int32 LoadUser = UserIndex;
+    TStrongObjectPtr<ASovPlayerController> KeepLoadController(PC);
+    const TWeakObjectPtr<UWorld> LoadSource(PC->GetWorld());
     int32 Bank; bool Damaged;
     PendingSave = ReadBest(Kind, Index, Bank, Damaged, Error);
     if (!PendingSave) { return Damaged ? ESovSaveResult::CorruptSave : ESovSaveResult::MissingSave; }
@@ -626,15 +631,26 @@ ESovSaveResult USovSaveSubsystem::LoadSlot(ESovSaveSlotKind Kind, int32 Index, F
     if (!ValidateEnvelope(PendingSave, true, Error)) { PendingSave = nullptr; return ESovSaveResult::IncompatibleSave; }
     PendingNarrative = DecodeNarrative(PendingSave, Error);
     if (!PendingNarrative) { PendingSave = nullptr; return ESovSaveResult::IncompatibleSave; }
+    if (AccountNamespace != LoadOwner || UserIndex != LoadUser || !IsPlatformStorageOwnerAvailable()
+        || bPlatformSuspended || !IsValid(PC) || PC != Controller() || PC->GetWorld() != LoadSource.Get())
+    { ClearPendingOperation(); Error = TEXT("Load ownership changed during save preflight."); return ESovSaveResult::UnsafeState; }
     bPendingWorldApplied = false; bPendingLoadFailed = false; PendingDestination.Reset();
-    PendingLoadError.Reset(); PendingLoadRequest = FGuid::NewGuid();
+    PendingAccount = AccountNamespace; PendingUser = UserIndex; PendingSource = PC->GetWorld();
+    PendingLoadError.Reset(); PendingLoadRequest = FGuid::NewGuid(); PendingOperationId = PendingLoadRequest;
     PendingLoadDeadline = FPlatformTime::Seconds() + LoadTimeoutSeconds;
     const FString Destination = PendingSave->Header.MapPackage + TEXT("?SovCampaignSlotLoad=1?SovCampaignLoadRequest=")
         + PendingLoadRequest.ToString(EGuidFormats::Digits);
+    const FGuid Request = PendingLoadRequest;
     AcknowledgeSaveFailure();
+    if (PendingLoadRequest != Request || !OwnsPendingAccount() || !IsValid(PC) || PC != Controller() || PC->GetWorld() != LoadSource.Get())
+    {
+        if (PendingLoadRequest == Request) { ClearPendingOperation(); }
+        Error = TEXT("Load ownership changed while releasing the save-failure pause."); return ESovSaveResult::UnsafeState;
+    }
+    ArmTravelFailureHook(PendingLoadRequest);
     if (!PC->GetWorld()->ServerTravel(Destination, true))
     {
-        PendingSave = nullptr; PendingNarrative = nullptr; PendingLoadRequest.Invalidate(); PendingLoadDeadline = 0;
+        ClearPendingOperation();
         Error = TEXT("Saved-map travel was rejected; current world retained."); return ESovSaveResult::TravelFailed;
     }
     // Acceptance starts asynchronous map/managed-pawn restoration. Success notification occurs only at CharacterReady.
@@ -644,7 +660,21 @@ void USovSaveSubsystem::ResolveInitialSave(UWorld& World, UNarrativeSave*& Snaps
 {
     if (World.GetGameInstance() != GetGameInstance()) { return; }
     const AGameModeBase* GM = World.GetAuthGameMode();
-    if (!GM || !UGameplayStatics::HasOption(GM->OptionsString, TEXT("SovCampaignSlotLoad"))) { return; }
+    if (!GM) { return; }
+    if (UGameplayStatics::HasOption(GM->OptionsString, TEXT("SovCampaignTransition")))
+    {
+        FString Error;
+        if (!MatchesPendingLoadRequest(GM->OptionsString) || !ValidatePendingWorld(World, Error))
+        { bOverride = true; Snapshot = nullptr; return; }
+        if (bPendingWorldApplied)
+        {
+            bPendingLoadFailed = true; PendingLoadError = TEXT("The destination attempted to initialize its travel world twice.");
+            bOverride = true; Snapshot = nullptr; return;
+        }
+        PendingDestination = &World; bPendingWorldApplied = true;
+        return; // New destination world, with only the request-bound player record staged by GameMode.
+    }
+    if (!UGameplayStatics::HasOption(GM->OptionsString, TEXT("SovCampaignSlotLoad"))) { return; }
     // A timed-out or superseded slot travel must never fall through to a new campaign.
     // Reject stale callbacks without consuming or failing a newer request.
     bOverride = true; Snapshot = nullptr;
@@ -663,53 +693,323 @@ void USovSaveSubsystem::ResolveInitialSave(UWorld& World, UNarrativeSave*& Snaps
 bool USovSaveSubsystem::MatchesPendingLoadRequest(const FString& Options) const
 {
     FGuid Request;
-    return PendingSave && PendingLoadRequest.IsValid()
-        && UGameplayStatics::HasOption(Options, TEXT("SovCampaignSlotLoad"))
+    const bool bMissionURL = UGameplayStatics::HasOption(Options, TEXT("SovCampaignTransition"));
+    const bool bSlotURL = UGameplayStatics::HasOption(Options, TEXT("SovCampaignSlotLoad"));
+    return PendingSave && PendingLoadRequest.IsValid() && bMissionURL != bSlotURL
+        && bMissionURL == bPendingMissionTravel
         && FGuid::ParseExact(UGameplayStatics::ParseOption(Options, TEXT("SovCampaignLoadRequest")), EGuidFormats::Digits, Request)
         && Request == PendingLoadRequest;
+}
+bool USovSaveSubsystem::OwnsPendingAccount() const
+{
+    return PendingSave && IsPlatformStorageOwnerAvailable() && !bPlatformSuspended
+        && PendingAccount == AccountNamespace && PendingUser == UserIndex
+        && PendingSave->Header.AccountNamespace == PendingAccount;
 }
 bool USovSaveSubsystem::ValidatePendingWorld(UWorld& World, FString& Error) const
 {
     const AGameModeBase* Mode = World.GetAuthGameMode();
-    if (Mode && UGameplayStatics::HasOption(Mode->OptionsString, TEXT("SovCampaignSlotLoad"))
-        && !MatchesPendingLoadRequest(Mode->OptionsString))
-    { Error = TEXT("This saved-map request has expired or was replaced. Select a valid recovery save."); return false; }
+    const bool bRequested = Mode && (UGameplayStatics::HasOption(Mode->OptionsString, TEXT("SovCampaignSlotLoad"))
+        || UGameplayStatics::HasOption(Mode->OptionsString, TEXT("SovCampaignTransition")));
+    if (bRequested && !MatchesPendingLoadRequest(Mode->OptionsString))
+    { Error = TEXT("This campaign travel request has expired or was replaced. Select a valid recovery save."); return false; }
     if (bPendingLoadFailed && RejectedLoadWorld.Get() == &World)
     { Error = TEXT("This campaign world failed restoration; choose a valid recovery save."); return false; }
     if (!PendingSave) { return true; }
-    const auto* GM = Cast<ASovCampaignGameMode>(World.GetAuthGameMode());
+    const auto* GM = Cast<ASovCampaignGameMode>(Mode);
     const auto* Narrative = World.GetSubsystem<UNarrativeSaveSubsystem>();
-    if (bPendingLoadFailed || !GM || !GM->InitialMission || GM->InitialMission->MissionId != PendingSave->Header.MissionId
-        || FSoftObjectPath(GM->InitialMission) != PendingSave->Header.MissionDefinition
+    const FSoftObjectPath ExpectedMission = bPendingMissionTravel ? PendingTravelMission : PendingSave->Header.MissionDefinition;
+    const FString ExpectedMap = bPendingMissionTravel ? PendingTravelMap : PendingSave->Header.MapPackage;
+    // The world package, mission asset, account and phase must all name the accepted request.
+    FString ActualMap = World.GetOutermost()->GetName();
+    if (World.WorldType == EWorldType::PIE && !World.StreamingLevelsPrefix.IsEmpty())
+    {
+        FString ShortName = FPackageName::GetShortName(ActualMap);
+        ShortName.RemoveFromStart(World.StreamingLevelsPrefix);
+        ActualMap = FPackageName::GetLongPackagePath(ActualMap) + TEXT("/") + ShortName;
+    }
+    if ((PendingDestination.IsValid() && PendingDestination.Get() != &World) || !bRequested || !OwnsPendingAccount() || bPendingLoadFailed || !GM || !GM->InitialMission
+        || FSoftObjectPath(GM->InitialMission) != ExpectedMission
+        || GM->InitialMission->Map.ToSoftObjectPath().GetLongPackageName() != ExpectedMap
+        || ActualMap != ExpectedMap
         || (Narrative && Narrative->DidInitialLoadFail()))
-    { Error = TEXT("Saved destination initialization failed. Choose a last known-good autosave; the source banks remain intact."); return false; }
+    { Error = TEXT("Campaign destination, storage owner or snapshot initialization failed. The origin save banks remain intact."); return false; }
     return true;
 }
-void USovSaveSubsystem::NotifyCampaignReady(ASovPlayerController* PC, bool bSucceeded)
+bool USovSaveSubsystem::BindPendingRestore(ASovPlayerController* PC, uint64 RestoreEpoch, FString& Error)
 {
-    if (!PendingSave || !PC || PC->GetWorld() != PendingDestination.Get()
-        || !PC->GetWorld()->GetAuthGameMode()
+    if (!PendingSave) { return true; }
+    if (!PC || PC != Controller() || !PC->GetWorld() || PC->GetWorld() != PendingDestination.Get()
+        || !ValidatePendingWorld(*PC->GetWorld(), Error)) { return false; }
+    if (PendingRestoreEpoch != 0)
+    {
+        if (MatchesRestoreOwner(PC, RestoreEpoch)) { return true; }
+        Error = TEXT("The pending save belongs to a different managed pawn restoration."); return false;
+    }
+    auto* ASC = Cast<UNarrativeAbilitySystemComponent>(PC->GetAbilitySystemComponent());
+    const auto* Pawn = Cast<ASovPlayerCharacterBase>(PC->GetPawn());
+    if (!Pawn || !ASC || ASC->GetAvatarActor() != PC->GetPawn() || !PC->GetPlayerState<APlayerState>())
+    { Error = TEXT("Managed restoration requires its exact initialized player, pawn and ASC."); return false; }
+    RestoreController = PC; RestorePawn = PC->GetPawn(); RestoreASC = ASC;
+    RestorePlayerState = PC->GetPlayerState<APlayerState>(); PendingRestoreEpoch = RestoreEpoch;
+    RestoreASCEpoch = ASC->GetCombatActorInfoEpoch(); RestorePawnGeneration = Pawn->GetCharacterInitializationGeneration();
+    return true;
+}
+bool USovSaveSubsystem::MatchesRestoreGenerations() const
+{
+    const auto* ASC = Cast<UNarrativeAbilitySystemComponent>(RestoreASC.Get());
+    const auto* Pawn = Cast<ASovPlayerCharacterBase>(RestorePawn.Get());
+    return ASC && Pawn && ASC->GetCombatActorInfoEpoch() == RestoreASCEpoch
+        && Pawn->GetCharacterInitializationGeneration() == RestorePawnGeneration;
+}
+bool USovSaveSubsystem::MatchesRestoreOwner(ASovPlayerController* PC, uint64 RestoreEpoch) const
+{
+    return PC && PC == Controller() && PC == RestoreController.Get() && !PC->IsActorBeingDestroyed()
+        && PC->GetWorld() == PendingDestination.Get()
+        && PendingRestoreEpoch == RestoreEpoch && RestorePawn.IsValid() && PC->GetPawn() == RestorePawn.Get()
+        && RestorePlayerState.IsValid() && PC->GetPlayerState<APlayerState>() == RestorePlayerState.Get()
+        && RestoreASC.IsValid() && PC->GetAbilitySystemComponent() == RestoreASC.Get()
+        && RestoreASC->GetAvatarActor() == RestorePawn.Get() && MatchesRestoreGenerations();
+}
+void USovSaveSubsystem::NotifyCampaignReady(ASovPlayerController* PC, bool bSucceeded, uint64 RestoreEpoch)
+{
+    if (!PendingSave || !MatchesRestoreOwner(PC, RestoreEpoch) || !PC->GetWorld()->GetAuthGameMode()
         || !MatchesPendingLoadRequest(PC->GetWorld()->GetAuthGameMode()->OptionsString)) { return; }
     FString Error;
-    const bool Good = bSucceeded && bPendingWorldApplied && ValidatePendingWorld(*PC->GetWorld(), Error)
-        && PC->GetPawn() && Cast<ASovPlayerCharacterBase>(PC->GetPawn())
-        && CastChecked<ASovPlayerCharacterBase>(PC->GetPawn())->IsCharacterReady();
-    if (!Good && Error.IsEmpty()) { Error = TEXT("Campaign restoration failed; choose a compatible autosave."); }
-    CompletePendingLoad(Good, Error);
+    const auto* Pawn = Cast<ASovPlayerCharacterBase>(PC->GetPawn());
+    const bool Good = bSucceeded && (bPendingMissionTravel || bPendingWorldApplied)
+        && PC->GetCampaignTransitionEpoch() == RestoreEpoch && ValidatePendingWorld(*PC->GetWorld(), Error)
+        && Pawn && Pawn->IsCharacterReady();
+    if (Good) { CompletePendingLoad(true, FString()); return; }
+    // Failure/recovery may travel again. Wait until managed initialization and delegates unwind.
+    bPendingLoadFailed = true;
+    PendingLoadError = Error.IsEmpty() ? TEXT("Managed campaign restoration failed.") : Error;
+}
+void USovSaveSubsystem::ClearPendingOperation()
+{
+    if (ASovPlayerController* Source = TravelSourceController.Get())
+    {
+        if (Source->GetCampaignTransitionEpoch() == TravelSourceEpoch && Source->PendingTravelOperationId == PendingOperationId)
+        { Source->PendingTravelOperationId.Invalidate(); Source->PendingTravelOriginGeneration = 0; }
+    }
+    if (GEngine) { GEngine->OnTravelFailure().Remove(TravelFailureHandle); }
+    TravelFailureHandle.Reset();
+    PendingSave = nullptr; PendingNarrative = nullptr; PendingTravelRecords = FNarrativeSavePlayer();
+    PendingDestination.Reset(); PendingSource.Reset(); PendingLoadRequest.Invalidate(); PendingOperationId.Invalidate();
+    PendingLoadDeadline = 0; PendingLoadError.Reset(); PendingAccount.Reset(); PendingUser = INDEX_NONE;
+    PendingTravelMission.Reset(); PendingTravelMap.Reset(); bPendingMissionTravel = false; bRecoveringMissionTravel = false;
+    TravelSourceController.Reset(); TravelSourcePawn.Reset(); TravelSourcePlayerState.Reset(); TravelSourceASC.Reset(); TravelSourceEpoch = 0; TravelSourceASCEpoch = 0; TravelSourcePawnGeneration = 0;
+    RestoreController.Reset(); RestorePawn.Reset(); RestorePlayerState.Reset(); RestoreASC.Reset(); PendingRestoreEpoch = 0; RestoreASCEpoch = 0; RestorePawnGeneration = 0;
+    bPendingWorldApplied = false; bPendingLoadFailed = false;
 }
 void USovSaveSubsystem::CompletePendingLoad(bool bSucceeded, const FString& Error)
 {
     if (!PendingSave) { return; }
     const auto Header = PendingSave->Header;
-    if (bSucceeded) { PlaySeconds = Header.PlaySeconds; RejectedLoadWorld.Reset(); }
+    const bool bRecovered = bRecoveringMissionTravel;
+    if (bSucceeded) { PlaySeconds = Header.PlaySeconds; RejectedLoadWorld.Reset(); TravelRecoverySave = nullptr; }
     else { RejectedLoadWorld = PendingDestination; }
     PendingAutosaves.Reset();
-    PendingSave = nullptr; PendingNarrative = nullptr; PendingDestination.Reset();
-    PendingLoadRequest.Invalidate(); PendingLoadDeadline = 0; PendingLoadError.Reset();
-    bPendingWorldApplied = false; bPendingLoadFailed = !bSucceeded;
-    // All ownership is released before observers may request a different recovery slot.
-    OnLoadCompleted.Broadcast(bSucceeded ? ESovSaveResult::Success : ESovSaveResult::RecoveryAvailable, Header, Error);
+    ClearPendingOperation();
+    bPendingLoadFailed = !bSucceeded;
+    FString Message = Error;
+    if (bSucceeded && bRecovered)
+    { Message = TravelRecoveryReason + TEXT(" Returned to the verified origin checkpoint."); }
+    // Terminal ownership is released before observers can retry. Recovery is a successful LOAD,
+    // never a claim that the failed destination mission was entered.
+    OnLoadCompleted.Broadcast(bSucceeded ? ESovSaveResult::Success : ESovSaveResult::RecoveryAvailable, Header, Message);
 }
+bool USovSaveSubsystem::OwnsTravelSource() const
+{
+    ASovPlayerController* PC = TravelSourceController.Get();
+    const auto* ASC = Cast<UNarrativeAbilitySystemComponent>(TravelSourceASC.Get());
+    const auto* Pawn = Cast<ASovPlayerCharacterBase>(TravelSourcePawn.Get());
+    return ASC && Pawn && ASC->GetCombatActorInfoEpoch() == TravelSourceASCEpoch
+        && Pawn->GetCharacterInitializationGeneration() == TravelSourcePawnGeneration && OwnsPendingAccount() && bPendingMissionTravel && PC && PC == Controller() && !PC->IsActorBeingDestroyed()
+        && PC->GetWorld() == PendingSource.Get() && PC->GetCampaignTransitionEpoch() == TravelSourceEpoch
+        && PC->GetCampaignTransitionState() == ESovCampaignTransitionState::Travelling
+        && TravelSourcePawn.IsValid() && PC->GetPawn() == TravelSourcePawn.Get()
+        && TravelSourcePlayerState.IsValid() && PC->GetPlayerState<APlayerState>() == TravelSourcePlayerState.Get()
+        && TravelSourceASC.IsValid() && PC->GetAbilitySystemComponent() == TravelSourceASC.Get()
+        && TravelSourceASC->GetAvatarActor() == TravelSourcePawn.Get();
+}
+bool USovSaveSubsystem::PrepareMissionTravel(ASovPlayerController* PC, USovCampaignDefinition* Destination,
+    uint64 SourceEpoch, FString& TravelURL, FString& Error)
+{
+    TravelURL.Reset();
+    if (bBusy || PendingSave || bAwaitingFailureDecision || !PC || PC != Controller() || !Destination
+        || !PC->HasAuthority() || !PC->GetWorld() || PC->GetWorld()->GetNetMode() != NM_Standalone
+        || !IsPlatformStorageOwnerAvailable() || bPlatformSuspended)
+    { Error = TEXT("Finish the current save operation before mission travel."); return false; }
+    TGuardValue<bool> Mutation(bBusy, true);
+    const FString Owner = AccountNamespace; const int32 LocalUser = UserIndex;
+    APawn* SourcePawn = PC->GetPawn(); APlayerState* SourcePS = PC->GetPlayerState<APlayerState>();
+    auto* SourceASC = Cast<UNarrativeAbilitySystemComponent>(PC->GetAbilitySystemComponent());
+    auto* SourcePlayer = Cast<ASovPlayerCharacterBase>(SourcePawn);
+    if (!IsValid(SourcePawn) || !IsValid(SourcePS) || !SourceASC || !SourcePlayer)
+    { Error = TEXT("Mission travel requires its initialized protagonist owners."); return false; }
+    TStrongObjectPtr<ASovPlayerController> KeepController(PC);
+    TStrongObjectPtr<APawn> KeepSourcePawn(SourcePawn);
+    TStrongObjectPtr<APlayerState> KeepSourcePS(SourcePS);
+    TStrongObjectPtr<UNarrativeAbilitySystemComponent> KeepSourceASC(SourceASC);
+    TStrongObjectPtr<USovCampaignDefinition> KeepDestination(Destination);
+    const uint64 SourceASCEpoch = SourceASC->GetCombatActorInfoEpoch();
+    const int32 SourcePawnGeneration = SourcePlayer->GetCharacterInitializationGeneration();
+    USovCampaignDefinition* OriginMission = PC->GetCampaignState()->GetActiveMission();
+    int32 Bank; bool Damaged;
+    TStrongObjectPtr<USovCampaignSaveGame> Origin(ReadBest(ESovSaveSlotKind::Checkpoint, 0, Bank, Damaged, Error));
+    if (!Origin.IsValid() || Damaged || !OriginMission
+        || Origin->Header.MissionDefinition != FSoftObjectPath(OriginMission)
+        || Origin->Header.BoundaryKind != ESovSaveBoundary::LongTransition || Origin->Header.BoundaryId != Destination->MissionId
+        || Origin->Header.ActiveProtagonist != PC->GetCampaignState()->GetActiveProtagonist()
+        || !ValidateEnvelope(Origin.Get(), true, Error))
+    { Error = TEXT("Mission travel needs a verified origin checkpoint for this transition. Retry the checkpoint write before leaving."); return false; }
+    TStrongObjectPtr<UNarrativeSave> OriginNarrative(DecodeNarrative(Origin.Get(), Error));
+    if (!OriginNarrative.IsValid()) { return false; }
+    // Required asset preflight may dispatch code. Install no transaction for a replacement owner.
+    if (!IsValid(PC) || PC != Controller() || PC->GetPawn() != SourcePawn || !IsValid(Destination) || PC->PendingTravelMission != Destination
+        || PC->GetPlayerState<APlayerState>() != SourcePS || PC->GetAbilitySystemComponent() != SourceASC
+        || !IsValid(SourcePawn) || !IsValid(SourcePS) || !IsValid(SourceASC)
+        || SourceASC->GetCombatActorInfoEpoch() != SourceASCEpoch || SourcePlayer->GetCharacterInitializationGeneration() != SourcePawnGeneration
+        || SourceASC->GetAvatarActor() != SourcePawn || PC->GetCampaignTransitionEpoch() != SourceEpoch
+        || PC->GetCampaignTransitionState() != ESovCampaignTransitionState::Travelling
+        || AccountNamespace != Owner || UserIndex != LocalUser || !IsPlatformStorageOwnerAvailable() || bPlatformSuspended)
+    { Error = TEXT("Travel ownership changed during checkpoint preflight."); return false; }
+    PendingSave = Origin.Get(); PendingNarrative = OriginNarrative.Get();
+    PendingAccount = Owner; PendingUser = LocalUser;
+    PendingOperationId = FGuid::NewGuid(); PendingLoadRequest = PendingOperationId;
+    PendingSource = PC->GetWorld(); TravelSourceController = PC; TravelSourcePawn = SourcePawn;
+    TravelSourcePlayerState = SourcePS; TravelSourceASC = SourceASC; TravelSourceEpoch = SourceEpoch;
+    TravelSourceASCEpoch = SourceASCEpoch; TravelSourcePawnGeneration = SourcePawnGeneration;
+    PendingTravelMission = FSoftObjectPath(Destination); PendingTravelMap = Destination->Map.ToSoftObjectPath().GetLongPackageName();
+    bPendingMissionTravel = true; bPendingLoadFailed = false; bPendingWorldApplied = false;
+    PendingLoadDeadline = FPlatformTime::Seconds() + LoadTimeoutSeconds;
+    PC->PendingTravelOperationId = PendingOperationId;
+    PC->PendingTravelOriginGeneration = Origin->Header.Generation;
+    const FGuid Request = PendingLoadRequest;
+    auto* Narrative = PC->GetWorld()->GetSubsystem<UNarrativeSaveSubsystem>();
+    const FString Slot = FString(ASovPlayerController::TravelSaveSlot()) + TEXT("_") + Owner;
+    const auto StillSource = [this, Request]() { return PendingLoadRequest == Request && OwnsTravelSource(); };
+    // The transient player slot remains durable, while only the exact request may consume its readback.
+    // No destination performs an unversioned account-slot lookup.
+    if (!Narrative || !Narrative->CreatePlayerOnlySaveInSlot(PC, Slot, LocalUser, StillSource)
+        || !StillSource() || !Narrative->ReadPlayerOnlySave(Slot, PendingTravelRecords, LocalUser, StillSource) || !StillSource())
+    {
+        if (PendingLoadRequest == Request) { ClearPendingOperation(); }
+        Error = TEXT("Travel player record failed validation or its owner changed; origin checkpoint retained."); return false;
+    }
+    TravelRecoverySave = Origin.Get(); TravelRecoveryUser = LocalUser;
+    PendingAutosaves.Reset();
+    ArmTravelFailureHook(Request);
+    TravelURL = PendingTravelMap + TEXT("?SovCampaignTransition=1?SovCampaignLoadRequest=") + Request.ToString(EGuidFormats::Digits);
+    return true;
+}
+bool USovSaveSubsystem::CanCommitMissionTravel(ASovPlayerController* PC, uint64 SourceEpoch) const
+{
+    return PC == TravelSourceController.Get() && SourceEpoch == TravelSourceEpoch && OwnsTravelSource() && !bPendingLoadFailed;
+}
+bool USovSaveSubsystem::ValidateRestoredTravelIdentity(const ASovPlayerController* PC) const
+{
+    return PC && bPendingMissionTravel && OwnsPendingAccount() && PendingOperationId.IsValid()
+        && PC->PendingTravelOperationId == PendingOperationId
+        && PC->PendingTravelOriginGeneration == PendingSave->Header.Generation
+        && FSoftObjectPath(PC->PendingTravelMission) == PendingTravelMission;
+}
+void USovSaveSubsystem::RejectMissionTravel(ASovPlayerController* PC, uint64 SourceEpoch)
+{
+    if (!bPendingMissionTravel || TravelSourceController.Get() != PC || TravelSourceEpoch != SourceEpoch) { return; }
+    ClearPendingOperation(); // Immediate rejection retains the live origin and its durable checkpoint.
+    TravelRecoverySave = nullptr;
+}
+bool USovSaveSubsystem::ReadMissionTravelRecords(UWorld& World, FNarrativeSavePlayer& Records, FString& Error)
+{
+    Records = FNarrativeSavePlayer();
+    if (!bPendingMissionTravel || !ValidatePendingWorld(World, Error) || !PendingTravelRecords.IsValid()
+        || (PendingDestination.IsValid() && PendingDestination.Get() != &World))
+    { if (Error.IsEmpty()) { Error = TEXT("No matching campaign travel player record is available."); } return false; }
+    PendingDestination = &World;
+    Records = PendingTravelRecords;
+    return true;
+}
+void USovSaveSubsystem::ArmTravelFailureHook(const FGuid& Request)
+{
+    if (!GEngine) { return; }
+    GEngine->OnTravelFailure().Remove(TravelFailureHandle);
+    TravelFailureHandle = GEngine->OnTravelFailure().AddWeakLambda(this,
+        [this, Request](UWorld* World, ETravelFailure::Type Failure, const FString& Error)
+        { HandleTravelFailure(Request, World, FString::Printf(TEXT("Unreal travel failure %d: %s"), static_cast<int32>(Failure), *Error)); });
+}
+void USovSaveSubsystem::HandleTravelFailure(const FGuid& Request, UWorld* World, const FString& Error)
+{
+    // The engine event has no URL. Restrict it to the currently owned phase and known worlds;
+    // a copied delegate from an older request cannot fail a later request.
+    if (!PendingSave || Request != PendingLoadRequest || !World || World->GetGameInstance() != GetGameInstance()
+        || (World != PendingSource.Get() && World != PendingDestination.Get())) { return; }
+    bPendingLoadFailed = true; PendingLoadError = Error;
+    // Never start another travel from inside Unreal's failure broadcast.
+}
+bool USovSaveSubsystem::HasTravelRecovery() const
+{
+    return TravelRecoverySave && !PendingSave && IsPlatformStorageOwnerAvailable() && !bPlatformSuspended
+        && TravelRecoverySave->Header.AccountNamespace == AccountNamespace && TravelRecoveryUser == UserIndex;
+}
+bool USovSaveSubsystem::RequestPendingMap(UWorld& World, FString& Error)
+{
+    const FString URL = PendingSave->Header.MapPackage + TEXT("?SovCampaignSlotLoad=1?SovCampaignLoadRequest=")
+        + PendingLoadRequest.ToString(EGuidFormats::Digits);
+    PendingSource = &World;
+    ArmTravelFailureHook(PendingLoadRequest);
+    bool bAccepted = false;
+#if WITH_AUTOMATION_TESTS
+    if (TestTravelRequest) { bAccepted = TestTravelRequest(World, URL); }
+    else
+#endif
+    { bAccepted = World.ServerTravel(URL, true); }
+    if (!bAccepted)
+    { Error = TEXT("Unreal rejected origin checkpoint recovery. Retry recovery or select a compatible save."); return false; }
+    return true;
+}
+bool USovSaveSubsystem::StartOriginRecovery(FString& Error)
+{
+    if (!PendingSave || !bPendingMissionTravel || !OwnsPendingAccount())
+    { Error = TEXT("Origin recovery is waiting for the original platform account. Reconnect it and retry recovery."); return false; }
+    UWorld* World = GetWorld();
+    if (!World && PendingSource.IsValid()) { World = PendingSource.Get(); }
+    if (!World || World->GetGameInstance() != GetGameInstance() || World->GetNetMode() != NM_Standalone)
+    { Error = TEXT("Origin recovery requires a usable standalone world. Reopen the campaign checkpoint from the front end."); return false; }
+    TravelRecoveryReason = Error;
+    // Cancel only this phase's queued request. Never erase an unrelated replacement URL.
+    if (World->NextURL.Contains(PendingLoadRequest.ToString(EGuidFormats::Digits)))
+    { World->NextURL.Reset(); World->NextSwitchCountdown = 0.f; }
+    bPendingMissionTravel = false; bRecoveringMissionTravel = true;
+    PendingLoadRequest = FGuid::NewGuid(); // Operation ID remains stable; old destination callbacks now expire.
+    PendingTravelRecords = FNarrativeSavePlayer(); PendingDestination.Reset();
+    RestoreController.Reset(); RestorePawn.Reset(); RestoreASC.Reset(); RestorePlayerState.Reset(); PendingRestoreEpoch = 0; RestoreASCEpoch = 0; RestorePawnGeneration = 0;
+    bPendingWorldApplied = false; bPendingLoadFailed = false; PendingLoadError.Reset();
+    PendingLoadDeadline = FPlatformTime::Seconds() + LoadTimeoutSeconds;
+    return RequestPendingMap(*World, Error);
+}
+ESovSaveResult USovSaveSubsystem::RetryTravelRecovery(FString& Error)
+{
+    if (bBusy || PendingSave || bAwaitingFailureDecision) { return ESovSaveResult::Busy; }
+    if (!HasTravelRecovery())
+    { Error = TEXT("Restore the original account to retry its retained origin checkpoint."); return ESovSaveResult::MissingAccount; }
+    TGuardValue<bool> Mutation(bBusy, true);
+    TStrongObjectPtr<USovCampaignSaveGame> Origin(TravelRecoverySave);
+    const int32 OriginUser = TravelRecoveryUser;
+    if (!ValidateEnvelope(Origin.Get(), true, Error)) { return ESovSaveResult::IncompatibleSave; }
+    TStrongObjectPtr<UNarrativeSave> Snapshot(DecodeNarrative(Origin.Get(), Error));
+    UWorld* World = GetWorld();
+    if (!Snapshot.IsValid() || !World || World->GetNetMode() != NM_Standalone || !HasTravelRecovery()
+        || TravelRecoverySave != Origin.Get() || UserIndex != OriginUser)
+    { Error = TEXT("Origin recovery preflight failed or its account changed."); return ESovSaveResult::UnsafeState; }
+    PendingSave = Origin.Get(); PendingNarrative = Snapshot.Get(); PendingAccount = AccountNamespace; PendingUser = UserIndex;
+    PendingOperationId = FGuid::NewGuid(); PendingLoadRequest = FGuid::NewGuid(); bRecoveringMissionTravel = true;
+    bPendingLoadFailed = false; bPendingWorldApplied = false; PendingLoadDeadline = FPlatformTime::Seconds() + LoadTimeoutSeconds;
+    if (!RequestPendingMap(*World, Error)) { CompletePendingLoad(false, Error); return ESovSaveResult::TravelFailed; }
+    return ESovSaveResult::LoadStarted;
+}
+
 void USovSaveSubsystem::ReportSave(ESovSaveResult Result, const FSovSaveSlotHeader& Header, const FString& Error)
 {
     if (Result == ESovSaveResult::WriteFailed || Result == ESovSaveResult::ReadbackFailed)
@@ -762,7 +1062,9 @@ bool USovSaveSubsystem::Tick(float DeltaSeconds)
     ASovPlayerController* PC = Controller();
     if (PC && PC->GetPawn() && PC->GetCampaignState()->GetActiveMission() && !UGameplayStatics::IsGamePaused(PC))
     { PlaySeconds += DeltaSeconds; }
-    if (PendingSave && bPendingWorldApplied && !bPendingLoadFailed && PendingDestination.IsValid())
+    if (PendingSave && !OwnsPendingAccount() && !bPendingLoadFailed)
+    { bPendingLoadFailed = true; PendingLoadError = TEXT("The original campaign storage owner is unavailable. Reconnect it before retrying recovery."); }
+    if (PendingSave && (bPendingWorldApplied || bPendingMissionTravel) && !bPendingLoadFailed && PendingDestination.IsValid())
     {
         const auto* Narrative = PendingDestination->GetSubsystem<UNarrativeSaveSubsystem>();
         if (Narrative && Narrative->DidInitialLoadFail())
@@ -773,8 +1075,9 @@ bool USovSaveSubsystem::Tick(float DeltaSeconds)
     }
     if (PendingSave && (bPendingLoadFailed || FPlatformTime::Seconds() > PendingLoadDeadline))
     {
-        const FString Error = PendingLoadError.IsEmpty()
-            ? TEXT("Saved-map initialization timed out. Choose a last known-good autosave.") : PendingLoadError;
+        FString Error = PendingLoadError.IsEmpty()
+            ? TEXT("Campaign travel initialization timed out.") : PendingLoadError;
+        if (bPendingMissionTravel && StartOriginRecovery(Error)) { return true; }
         CompletePendingLoad(false, Error);
         return true;
     }
