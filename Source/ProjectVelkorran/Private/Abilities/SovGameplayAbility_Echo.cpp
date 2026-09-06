@@ -4,15 +4,19 @@
 
 #include "Abilities/GameplayAbilityTargetTypes.h"
 #include "AbilitySystemComponent.h"
+#include "AbilitySystemBlueprintLibrary.h"
 #include "Components/SovEchoComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
 #include "GameFramework/Controller.h"
+#include "GAS/NarrativeAbilitySystemComponent.h"
+#include "GAS/NarrativeAttributeSetBase.h"
 #include "Items/WeaponItem.h"
 #include "NarrativeGameplayTags.h"
 #include "Sovereign/SovGameplayTags.h"
 #include "TimerManager.h"
 #include "UnrealFramework/NarrativeCharacter.h"
+#include "UObject/StrongObjectPtr.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogSovEchoAbility, Log, All);
 
@@ -30,10 +34,12 @@ USovGameplayAbility_EchoBase::USovGameplayAbility_EchoBase()
 	ActivationBlockedTags.AddTag(NarrativeTags.State_Interacting);
 	ActivationBlockedTags.AddTag(NarrativeTags.State_SequencerControlled);
 	ActivationBlockedTags.AddTag(NarrativeTags.State_Movement_Ragdoll);
+	ActivationBlockedTags.AddTag(NarrativeTags.State_Weapon_Equipping);
 	ActivationBlockedTags.AddTag(SovTags.State_Fatal);
 	ActivationBlockedTags.AddTag(SovTags.State_Guarding);
 	ActivationBlockedTags.AddTag(SovTags.State_Guard_Broken);
 	ActivationBlockedTags.AddTag(SovTags.State_Poise_Broken);
+	ActivationBlockedTags.AddTag(SovTags.State_Status_Frozen);
 	ActivationBlockedTags.AddTag(SovTags.State_EchoAbility_Active);
 	ActivationOwnedTags.AddTag(NarrativeTags.State_Busy);
 	ActivationOwnedTags.AddTag(SovTags.State_EchoAbility_Active);
@@ -47,6 +53,7 @@ bool USovGameplayAbility_EchoBase::CanActivateAbility(
 	FGameplayTagContainer* OptionalRelevantTags) const
 {
 	LastActivationFailureReason.Reset();
+	if (bEndingEcho) { return false; }
 	FGameplayTagContainer LocalRelevantTags;
 	FGameplayTagContainer* RelevantTags = OptionalRelevantTags
 		? OptionalRelevantTags
@@ -108,6 +115,14 @@ bool USovGameplayAbility_EchoBase::CheckCost(
 	if (!Super::CheckCost(Handle, ActorInfo, OptionalRelevantTags))
 	{
 		LastActivationFailureReason = TEXT("the inherited GAS cost check failed");
+		return false;
+	}
+	const auto* ASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
+	const float Health = ASC ? ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()) : 0.f;
+	if (!FMath::IsFinite(Health) || Health <= 0.f)
+	{
+		LastActivationFailureReason = TEXT("the avatar has no living Health even if its death tag is not published yet");
+		if (OptionalRelevantTags) { OptionalRelevantTags->AddTag(FNarrativeGameplayTags::Get().Ability_ActivateFail_TagsBlocked); }
 		return false;
 	}
 
@@ -193,16 +208,21 @@ void USovGameplayAbility_EchoBase::ApplyCost(
 		Super::ApplyCost(Handle, ActorInfo, ActivationInfo);
 		return;
 	}
-	if (bAuthorityEchoSpendAttempted)
+	const uint64 Epoch = EchoActivationEpoch;
+	if (bAuthorityEchoSpendAttempted || !IsEchoActivationCurrent(Epoch))
 	{
 		return;
 	}
 	bAuthorityEchoSpendAttempted = true;
 
-	USovEchoComponent* EchoComponent = ResolveEchoComponent(ActorInfo);
+	TStrongObjectPtr<USovEchoComponent> EchoComponent(ResolveEchoComponent(ActorInfo));
 	const float Cost = GetEchoCost();
-	bAuthorityEchoSpendSucceeded = IsValid(EchoComponent)
-		&& EchoComponent->TrySpendEcho(Cost, EchoSpendTag);
+	if (!IsEchoActivationCurrent(Epoch)) { return; }
+	const bool bSpent = IsValid(EchoComponent.Get()) && EchoComponent->TrySpendEcho(Cost, EchoSpendTag);
+	// A debit observer may end or replace this activation. Never write an old
+	// payment result into the replacement instance or register stale target data.
+	if (!IsEchoActivationCurrent(Epoch)) { return; }
+	bAuthorityEchoSpendSucceeded = bSpent;
 	if (!bAuthorityEchoSpendSucceeded)
 	{
 		UE_LOG(
@@ -216,6 +236,24 @@ void USovGameplayAbility_EchoBase::ApplyCost(
 	}
 
 	Super::ApplyCost(Handle, ActorInfo, ActivationInfo);
+}
+
+bool USovGameplayAbility_EchoBase::IsEchoActivationCurrent(uint64 Epoch) const
+{
+	const auto* NarrativeASC = Cast<UNarrativeAbilitySystemComponent>(EchoActivationASC.Get());
+	const float Health = EchoActivationASC.IsValid()
+		? EchoActivationASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()) : 0.f;
+	return EchoActivationEpoch == Epoch && !bEchoEndPending && !bEndingEcho && IsActive()
+		&& FMath::IsFinite(Health) && Health > 0.f
+		&& CurrentActorInfo && CurrentSpecHandle == EchoActivationSpec
+		&& EchoActivationAvatar.IsValid() && !EchoActivationAvatar->IsActorBeingDestroyed()
+		&& EchoActivationASC.IsValid() && CurrentActorInfo->AvatarActor == EchoActivationAvatar
+		&& EchoAttributes.IsValid() && EchoActivationASC->GetSet<UNarrativeAttributeSetBase>() == EchoAttributes.Get()
+		&& EchoAttributes->GetCombatLifeEpoch() == EchoLifeEpoch
+		&& CurrentActorInfo->AbilitySystemComponent == EchoActivationASC
+		&& EchoActivationASC->GetAvatarActor() == EchoActivationAvatar.Get()
+		&& (!NarrativeASC || NarrativeASC->GetCombatActorInfoEpoch() == EchoActorInfoEpoch)
+		&& UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(EchoActivationAvatar.Get()) == EchoActivationASC.Get();
 }
 
 float USovGameplayAbility_EchoBase::GetCurrentEcho() const
@@ -286,10 +324,28 @@ void USovGameplayAbility_EchoBase::ActivateAbility(
 	const FGameplayAbilityActivationInfo ActivationInfo,
 	const FGameplayEventData* TriggerEventData)
 {
+	TStrongObjectPtr<USovGameplayAbility_EchoBase> ActionLifetime(this);
+	const uint64 Epoch = ++EchoActivationEpoch;
+	bEchoEndPending = false;
+	EchoActivationAvatar = ActorInfo ? ActorInfo->AvatarActor.Get() : nullptr;
+	EchoActivationASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
+	const auto* NarrativeASC = Cast<UNarrativeAbilitySystemComponent>(EchoActivationASC.Get());
+	EchoActorInfoEpoch = NarrativeASC ? NarrativeASC->GetCombatActorInfoEpoch() : 0;
+	EchoAttributes = EchoActivationASC.IsValid() ? EchoActivationASC->GetSet<UNarrativeAttributeSetBase>() : nullptr;
+	EchoLifeEpoch = EchoAttributes.IsValid() ? EchoAttributes->GetCombatLifeEpoch() : 0;
+	EchoActivationSpec = Handle;
 	bEchoAbilityStarted = false;
 	bAuthorityEchoSpendAttempted = false;
 	bAuthorityEchoSpendSucceeded = ActorInfo && !ActorInfo->IsNetAuthority();
-	if (!ActorInfo || !CommitAbility(Handle, ActorInfo, ActivationInfo))
+	const auto ContinueActivation = [this, Epoch]()
+	{
+		if (IsEchoActivationCurrent(Epoch)) { return true; }
+		if (EchoActivationEpoch == Epoch && IsActive()) { FinishEchoAbility(true); }
+		return false;
+	};
+	const bool bCommitted = ActorInfo && CommitAbility(Handle, ActorInfo, ActivationInfo);
+	if (!ContinueActivation()) { return; }
+	if (!bCommitted)
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
@@ -300,19 +356,15 @@ void USovGameplayAbility_EchoBase::ActivateAbility(
 		return;
 	}
 
+	// Close payment-time interruption before Narrative can invoke authored startup.
+	BindCancellationTags(ActorInfo->AbilitySystemComponent.Get());
+	if (!ContinueActivation()) { return; }
+
 	// Narrative binds its target-data callback and invokes the generic Blueprint
 	// ActivateAbility event here. Payment has already succeeded, so even an
 	// accidentally implemented K2 event cannot execute an unpaid payload.
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
-	if (!IsActive())
-	{
-		return;
-	}
-	BindCancellationTags(ActorInfo->AbilitySystemComponent.Get());
-	if (!IsActive())
-	{
-		return;
-	}
+	if (!ContinueActivation()) { return; }
 
 	bEchoAbilityStarted = true;
 	if (MaximumActiveDuration > KINDA_SMALL_NUMBER)
@@ -321,8 +373,8 @@ void USovGameplayAbility_EchoBase::ActivateAbility(
 		{
 			World->GetTimerManager().SetTimer(
 				MaximumDurationTimerHandle,
-				this,
-				&ThisClass::HandleMaximumDurationExpired,
+				FTimerDelegate::CreateWeakLambda(this, [this, Epoch]()
+				{ if (IsEchoActivationCurrent(Epoch)) { HandleMaximumDurationExpired(); } }),
 				MaximumActiveDuration,
 				false);
 		}
@@ -332,21 +384,16 @@ void USovGameplayAbility_EchoBase::ActivateAbility(
 	{
 		ReceiveEchoAbilityStarted(ActorInfo->IsNetAuthority());
 	}
-	if (!IsActive())
-	{
-		return;
-	}
+	if (!ContinueActivation()) { return; }
 	if (ActorInfo->IsLocallyControlled())
 	{
 		ReceiveEchoAbilityLocalPresentation();
 	}
-	if (!IsActive())
-	{
-		return;
-	}
+	if (!ContinueActivation()) { return; }
 	if (ActorInfo->IsNetAuthority())
 	{
 		ReceiveEchoAbilityAuthorityCommitted(GetEchoCost());
+		ContinueActivation();
 	}
 }
 
@@ -357,6 +404,17 @@ void USovGameplayAbility_EchoBase::EndAbility(
 	const bool bReplicateEndAbility,
 	const bool bWasCancelled)
 {
+	if (bEndingEcho || !IsEndAbilityValid(Handle, ActorInfo)) { return; }
+	++EchoActivationEpoch;
+	bEchoEndPending = true;
+	if (ScopeLockCount > 0)
+	{
+		// Narrative retires native dispatch immediately and queues virtual teardown.
+		Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
+		return;
+	}
+	TStrongObjectPtr<USovGameplayAbility_EchoBase> ActionLifetime(this);
+	TGuardValue<bool> Ending(bEndingEcho, true);
 	UnbindCancellationTags();
 	if (UWorld* World = GetWorld())
 	{
@@ -369,6 +427,10 @@ void USovGameplayAbility_EchoBase::EndAbility(
 	bEchoAbilityStarted = false;
 	bAuthorityEchoSpendAttempted = false;
 	bAuthorityEchoSpendSucceeded = false;
+	EchoActivationAvatar.Reset();
+	EchoActivationASC.Reset();
+	EchoAttributes.Reset();
+	EchoActivationSpec = FGameplayAbilitySpecHandle();
 	if (bShouldBroadcastEnd)
 	{
 		ReceiveEchoAbilityEnded(bWasCancelled);
@@ -418,7 +480,7 @@ bool USovGameplayAbility_EchoBase::MeetsWeaponRequirement(
 
 	const auto IsAllowedWeapon = [this](const UWeaponItem* Weapon)
 	{
-		if (!IsValid(Weapon))
+		if (!IsValid(Weapon) || !Weapon->IsWielded())
 		{
 			return false;
 		}
@@ -504,9 +566,11 @@ void USovGameplayAbility_EchoBase::BindCancellationTags(
 	TagsToObserve.AddTag(NarrativeTags.State_Interacting);
 	TagsToObserve.AddTag(NarrativeTags.State_SequencerControlled);
 	TagsToObserve.AddTag(NarrativeTags.State_Movement_Ragdoll);
+	TagsToObserve.AddTag(NarrativeTags.State_Weapon_Equipping);
 	TagsToObserve.AddTag(SovTags.State_Fatal);
 	TagsToObserve.AddTag(SovTags.State_Guard_Broken);
 	TagsToObserve.AddTag(SovTags.State_Poise_Broken);
+	TagsToObserve.AddTag(SovTags.State_Status_Frozen);
 
 	for (const FGameplayTag& Tag : TagsToObserve)
 	{

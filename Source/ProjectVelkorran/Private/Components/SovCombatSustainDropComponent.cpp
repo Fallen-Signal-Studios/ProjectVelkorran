@@ -2,6 +2,7 @@
 
 #include "Components/SovCombatSustainDropComponent.h"
 
+#include "AbilitySystemBlueprintLibrary.h"
 #include "ArsenalStatics.h"
 #include "Combat/Pickups/SovAmmoCombatSustainPickup.h"
 #include "Combat/Pickups/SovEchoCombatSustainPickup.h"
@@ -9,8 +10,10 @@
 #include "GameFramework/Controller.h"
 #include "GameFramework/Pawn.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
+#include "GAS/NarrativeAttributeSetBase.h"
 #include "Items/AmmoItem.h"
 #include "UnrealFramework/NarrativeCharacter.h"
+#include "UObject/StrongObjectPtr.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogSovCombatSustainDrops, Log, All);
 
@@ -50,6 +53,11 @@ void USovCombatSustainDropComponent::EndPlay(
 void USovCombatSustainDropComponent::InitializeWithAbilitySystem(
 	UNarrativeAbilitySystemComponent* InAbilitySystemComponent)
 {
+	if (InAbilitySystemComponent && (!IsValid(GetOwner())
+		|| !IsValid(InAbilitySystemComponent)
+		|| InAbilitySystemComponent->GetAvatarActor() != GetOwner()
+		|| UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner()) != InAbilitySystemComponent))
+	{ return; }
 	if (AbilitySystemComponent == InAbilitySystemComponent)
 	{
 		return;
@@ -82,7 +90,10 @@ void USovCombatSustainDropComponent::InitializeWithAbilitySystem(
 
 bool USovCombatSustainDropComponent::IsInitialized() const
 {
-	return IsValid(AbilitySystemComponent.Get());
+	return IsValid(AbilitySystemComponent.Get()) && IsValid(GetOwner())
+		&& !GetOwner()->IsActorBeingDestroyed()
+		&& AbilitySystemComponent->GetAvatarActor() == GetOwner()
+		&& UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner()) == AbilitySystemComponent.Get();
 }
 
 void USovCombatSustainDropComponent::HandleAbilitySystemInitialized()
@@ -102,15 +113,22 @@ void USovCombatSustainDropComponent::TryInitializeFromOwner()
 void USovCombatSustainDropComponent::HandleDamageResolved(
 	const FSovDamageResult& Result)
 {
-	if (!IsEligibleFatalDamage(Result))
+	if (!IsCurrentFatalTarget(Result) || !Result.ConsumeNativeReceipt(this))
 	{
 		return;
 	}
+	TStrongObjectPtr<USovCombatSustainDropComponent> ComponentLifetime(this);
+	TStrongObjectPtr<AActor> OwnerLifetime(GetOwner());
+	TStrongObjectPtr<AActor> SourceLifetime(Result.SourceActor.Get());
+	TStrongObjectPtr<UNarrativeAbilitySystemComponent> ASCLifetime(AbilitySystemComponent.Get());
+	// Consume before mutable team-policy callbacks. A recursive notification
+	// cannot reserve this result twice, and a callback cannot revive its lease.
+	if (!IsEligibleFatalDamage(Result) || !IsCurrentFatalTarget(Result)) { return; }
 
 	// Claim the death before spawning either pickup. A missing or invalid class
 	// must not allow a repeated fatal notification to duplicate the other drop.
 	bDropsSpawnedForCurrentDeath = true;
-	SpawnConfiguredDrops();
+	SpawnConfiguredDrops(Result);
 }
 
 void USovCombatSustainDropComponent::HandleDeathStateChanged(
@@ -118,8 +136,8 @@ void USovCombatSustainDropComponent::HandleDeathStateChanged(
 	UNarrativeAbilitySystemComponent* KilledActorASC,
 	const bool bIsDead)
 {
-	if (KilledActor != GetOwner()
-		&& KilledActorASC != AbilitySystemComponent.Get())
+	if (!IsInitialized() || KilledActor != GetOwner()
+		|| KilledActorASC != AbilitySystemComponent.Get())
 	{
 		return;
 	}
@@ -176,6 +194,19 @@ bool USovCombatSustainDropComponent::IsEligiblePlayerSource(
 	return false;
 }
 
+bool USovCombatSustainDropComponent::IsCurrentFatalTarget(
+	const FSovDamageResult& Result) const
+{
+	const AActor* Owner = GetOwner();
+	return IsInitialized()
+		&& Owner->HasAuthority()
+		&& Result.TargetActor.Get() == Owner
+		&& Result.bFatal
+		&& Result.IsCurrentTargetLife()
+		&& AbilitySystemComponent->GetSet<UNarrativeAttributeSetBase>()
+		&& AbilitySystemComponent->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()) <= 0.f;
+}
+
 bool USovCombatSustainDropComponent::IsEligibleFatalDamage(
 	const FSovDamageResult& Result) const
 {
@@ -183,20 +214,17 @@ bool USovCombatSustainDropComponent::IsEligibleFatalDamage(
 	const AActor* SourceActor = Result.SourceActor.Get();
 	return bCombatSustainDropsEnabled
 		&& !bDropsSpawnedForCurrentDeath
-		&& IsValid(Owner)
-		&& Owner->HasAuthority()
-		&& Result.TargetActor.Get() == Owner
-		&& Result.bFatal
+		&& IsCurrentFatalTarget(Result)
 		&& IsEligiblePlayerSource(SourceActor)
 		&& UArsenalStatics::GetAttitude(SourceActor, Owner)
 			== ETeamAttitude::Hostile;
 }
 
-void USovCombatSustainDropComponent::SpawnConfiguredDrops()
+void USovCombatSustainDropComponent::SpawnConfiguredDrops(const FSovDamageResult& Result)
 {
 	UWorld* World = GetWorld();
 	AActor* Owner = GetOwner();
-	if (!IsValid(World) || !IsValid(Owner) || !Owner->HasAuthority())
+	if (!IsValid(World) || !IsValid(Owner) || !IsCurrentFatalTarget(Result))
 	{
 		return;
 	}
@@ -231,7 +259,10 @@ void USovCombatSustainDropComponent::SpawnConfiguredDrops()
 		}
 	}
 
-	if (bDropEcho
+	// Deferred construction of the first pickup can run authored callbacks.
+	// Never continue a retired death's work after that callback restores its owner.
+	if (IsCurrentFatalTarget(Result)
+		&& bDropEcho
 		&& EchoPickupClass
 		&& EchoAmount > KINDA_SMALL_NUMBER)
 	{

@@ -185,6 +185,7 @@ private:
 	FTimerHandle DispatchWatchdog;
 	uint32 DispatchTaskEpoch = 0;
 	bool bDispatchRecallPending = false;
+	bool bEndingDispatch = false;
 
 };
 

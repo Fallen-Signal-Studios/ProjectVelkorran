@@ -4,8 +4,11 @@
 
 #include "ArsenalStatics.h"
 #include "AbilitySystemComponent.h"
+#include "AbilitySystemBlueprintLibrary.h"
+#include "UObject/StrongObjectPtr.h"
 #include "GAS/NarrativeGameplayAbility.h"
 #include "GAS/NarrativeAttributeSetBase.h"
+#include "GAS/NarrativeAbilitySystemComponent.h"
 #include "GAS/SovCombatTransactionPolicy.h"
 #include "GAS/SovDamageChannelPolicy.h"
 #include "GameplayEffect.h"
@@ -164,8 +167,26 @@ bool UNarrativeDamageExecCalc::ShouldRejectTransaction(
 	const UAbilitySystemComponent* TargetASC,
 	const FGameplayEffectSpec& Spec)
 {
+	// Team queries can execute authored code, including nested damage. Bound
+	// admission itself, before a packet reaches the AttributeSet resolver.
+	SovCombatTransaction::FScopedCallbackBudget AdmissionScope(SovCombatTransaction::ThreadCallbackBudget());
+	if (!AdmissionScope.IsAdmitted() || !IsValid(TargetASC)) { return true; }
 	AActor* SourceActor = SourceASC ? SourceASC->GetAvatarActor() : nullptr;
 	AActor* TargetActor = TargetASC ? TargetASC->GetAvatarActor() : nullptr;
+	const UNarrativeAttributeSetBase* TargetAttributes = TargetASC->GetSet<UNarrativeAttributeSetBase>();
+	const uint64 TargetLifeEpoch = TargetAttributes ? TargetAttributes->GetCombatLifeEpoch() : 0;
+	const auto* SourceAttributes = SourceASC ? SourceASC->GetSet<UNarrativeAttributeSetBase>() : nullptr;
+	const uint64 SourceLifeEpoch = SourceAttributes ? SourceAttributes->GetCombatLifeEpoch() : 0;
+	const auto* NarrativeTargetASC = Cast<UNarrativeAbilitySystemComponent>(TargetASC);
+	const auto* NarrativeSourceASC = Cast<UNarrativeAbilitySystemComponent>(SourceASC);
+	const uint64 TargetActorInfoEpoch = NarrativeTargetASC ? NarrativeTargetASC->GetCombatActorInfoEpoch() : 0;
+	const uint64 SourceActorInfoEpoch = NarrativeSourceASC ? NarrativeSourceASC->GetCombatActorInfoEpoch() : 0;
+	TStrongObjectPtr<const UAbilitySystemComponent> SourceLifetime(SourceASC);
+	TStrongObjectPtr<const UAbilitySystemComponent> TargetLifetime(TargetASC);
+	TStrongObjectPtr<const UNarrativeAttributeSetBase> AttributeLifetime(TargetAttributes);
+	TStrongObjectPtr<const UNarrativeAttributeSetBase> SourceAttributeLifetime(SourceAttributes);
+	TStrongObjectPtr<AActor> SourceActorLifetime(SourceActor);
+	TStrongObjectPtr<AActor> TargetActorLifetime(TargetActor);
 	FGameplayTagContainer EffectTags;
 	Spec.GetAllAssetTags(EffectTags);
 	const FSovGameplayTags& SovTags = FSovGameplayTags::Get();
@@ -192,7 +213,22 @@ bool UNarrativeDamageExecCalc::ShouldRejectTransaction(
 		}
 	}
 
-	return false;
+	// A team callback must not admit the old packet into a restored life, a
+	// different avatar, or an AttributeSet that was removed during admission.
+	return !IsValid(TargetASC) || !IsValid(TargetActor) || TargetActor->IsActorBeingDestroyed()
+		|| TargetASC->GetAvatarActor() != TargetActor
+		|| (NarrativeTargetASC && NarrativeTargetASC->GetCombatActorInfoEpoch() != TargetActorInfoEpoch)
+		|| UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(TargetActor) != TargetASC
+		|| (TargetAttributes && (!IsValid(TargetAttributes)
+			|| TargetASC->GetSet<UNarrativeAttributeSetBase>() != TargetAttributes
+			|| TargetAttributes->GetCombatLifeEpoch() != TargetLifeEpoch || TargetAttributes->GetHealth() <= 0.f))
+		|| (SourceASC && (!IsValid(SourceASC) || !IsValid(SourceActor) || SourceActor->IsActorBeingDestroyed()
+			|| SourceASC->GetAvatarActor() != SourceActor
+			|| (NarrativeSourceASC && NarrativeSourceASC->GetCombatActorInfoEpoch() != SourceActorInfoEpoch)
+			|| (SourceAttributes && (!IsValid(SourceAttributes)
+				|| SourceASC->GetSet<UNarrativeAttributeSetBase>() != SourceAttributes
+				|| SourceAttributes->GetCombatLifeEpoch() != SourceLifeEpoch))
+			|| UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(SourceActor) != SourceASC));
 }
 
 float UNarrativeDamageExecCalc::GetAcceptedChannelFraction(const UAbilitySystemComponent* TargetASC,

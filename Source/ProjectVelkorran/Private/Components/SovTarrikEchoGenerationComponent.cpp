@@ -896,13 +896,14 @@ void USovTarrikEchoGenerationComponent::HandleDamageResolvedAsSource(const FSovD
 {
 	AActor* Target = Result.TargetActor.Get();
 	if (!GetOwner() || !GetOwner()->HasAuthority() || Result.SourceActor.Get() != GetOwner()
-		|| !IsValid(Target) || !Result.TransactionId.IsValid()
+		|| !IsValid(Target) || !Result.IsCurrentTargetLife() || !Result.TransactionId.IsValid()
 		|| ConsumedCombatTransactions.Contains(Result.TransactionId)) return;
 	ConsumedCombatTransactions.Add(Result.TransactionId);
 	const FSovGameplayTags& Tags = FSovGameplayTags::Get();
 	const UGameplayAbility* SourceAbility = Result.EffectContext.GetAbility();
 	if (Result.bFromEchoAbility || (SourceAbility && SourceAbility->GetAssetTags().HasTag(Tags.Ability_Echo))
-		|| UArsenalStatics::GetAttitude(GetOwner(), Target) != ETeamAttitude::Hostile) return;
+		|| UArsenalStatics::GetAttitude(GetOwner(), Target) != ETeamAttitude::Hostile
+		|| !Result.IsCurrentTargetLife()) return;
 
 	const uint32 ExpectedScope = ResourceScopeEpoch;
 	bool bHeavyReward = false;
@@ -922,9 +923,9 @@ void USovTarrikEchoGenerationComponent::HandleDamageResolvedAsSource(const FSovD
 	}
 	// All reward eligibility is captured before delegates can cause reentrant damage.
 	if (bHeavyReward) AwardTarrikEcho(8.0f, Tags.Echo_Source_HeavyMultiHit, ESovTarrikEchoAwardType::HeavyMultiHit, Target);
-	if (ResourceScopeEpoch != ExpectedScope) return;
+	if (ResourceScopeEpoch != ExpectedScope || !Result.IsCurrentTargetLife()) return;
 	if (Result.bPoiseBroken) AwardTarrikEcho(15.0f, Tags.Echo_Source_PoiseBreak, ESovTarrikEchoAwardType::PoiseBreak, Target);
-	if (ResourceScopeEpoch != ExpectedScope) return;
+	if (ResourceScopeEpoch != ExpectedScope || !Result.IsCurrentTargetLife()) return;
 	if (Result.bFatal && Result.AppliedHealthDamage > 0.0f
 		&& Result.TargetTagsBeforeDamage.HasTag(Tags.State_CommandTarget_Window))
 		AwardTarrikEcho(8.0f, Tags.Echo_Source_CommandTargetKill, ESovTarrikEchoAwardType::CommandTargetKill, Target);

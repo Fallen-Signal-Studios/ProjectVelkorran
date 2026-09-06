@@ -8,12 +8,15 @@
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
+#include "GAS/NarrativeAttributeSetBase.h"
 #include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
 #include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraSystem.h"
 #include "Sound/SoundBase.h"
+#include "UObject/StrongObjectPtr.h"
+#include "UnrealFramework/NarrativePlayerController.h"
 
 ASovCombatSustainPickup::ASovCombatSustainPickup()
 {
@@ -149,7 +152,7 @@ void ASovCombatSustainPickup::HandlePickupOverlap(
 	const bool bFromSweep,
 	const FHitResult& SweepResult)
 {
-	if (!HasAuthority() || bClaimed)
+	if (!HasAuthority() || bClaimed || bGrantInProgress || IsActorBeingDestroyed())
 	{
 		return;
 	}
@@ -161,19 +164,31 @@ void ASovCombatSustainPickup::HandlePickupOverlap(
 			? CollectingPlayer->GetNarrativeAbilitySystemComponent()
 			: nullptr;
 	if (!IsValid(CollectingPlayer)
+		|| CollectingPlayer->IsActorBeingDestroyed()
 		|| CollectingPlayer->GetPlayerController() == nullptr
+		|| CollectingPlayer->GetPlayerController()->GetPawn() != CollectingPlayer
 		|| !IsValid(PlayerAbilitySystem)
+		|| PlayerAbilitySystem->GetAvatarActor() != CollectingPlayer
 		|| PlayerAbilitySystem->IsDead()
-		|| !TryGrantTo(CollectingPlayer))
+		|| !FMath::IsFinite(PlayerAbilitySystem->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()))
+		|| PlayerAbilitySystem->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()) <= 0.f)
 	{
 		return;
 	}
+	// Reserve before the derived grant: both Echo and inventory dispatch synchronous
+	// callbacks. A failed/partial grant releases the reservation without consuming
+	// the pack; a committed grant remains spent even if its recipient dies in a callback.
+	TStrongObjectPtr<ASovCombatSustainPickup> PickupLifetime(this);
+	TStrongObjectPtr<ASovPlayerCharacterBase> RecipientLifetime(CollectingPlayer);
+	TGuardValue<bool> GrantScope(bGrantInProgress, true);
+	const bool bFullyGranted = TryGrantTo(CollectingPlayer);
+	if (!bFullyGranted || IsActorBeingDestroyed()) { return; }
 
 	bClaimed = true;
-	PickupSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	if (IsValid(PickupSphere)) { PickupSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision); }
 	ForceNetUpdate();
 	MulticastPlayCollectionPresentation();
-	SetLifeSpan(FMath::Max(CollectionCleanupDelay, 0.05f));
+	if (!IsActorBeingDestroyed()) { SetLifeSpan(FMath::Max(CollectionCleanupDelay, 0.05f)); }
 }
 
 void ASovCombatSustainPickup::OnRep_Claimed()

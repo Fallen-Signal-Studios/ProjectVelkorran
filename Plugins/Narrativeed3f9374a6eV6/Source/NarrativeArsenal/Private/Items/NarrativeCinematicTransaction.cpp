@@ -5,6 +5,7 @@
 #include "Items/EquippableItem.h"
 #include "Items/NarrativeCinematicTransactionPolicy.h"
 #include "Components/EquipmentComponent.h"
+#include "UObject/StrongObjectPtr.h"
 
 bool UNarrativeInventoryComponent::OwnsCinematicItem(const UNarrativeItem* Item) const
 {
@@ -16,14 +17,24 @@ bool UNarrativeInventoryComponent::RemoveOwnedItemInternal(UNarrativeItem* Item)
 {
     // Callers validate authority/permission and their exact write receipt immediately before this primitive.
     // There is no second overridable permission callback between validation and membership mutation.
-    if (!GetOwner() || !GetOwner()->HasAuthority() || !IsValid(Item) || Item->OwningInventory != this || !Items.Contains(Item)) { return false; }
+    if (!IsValid(GetOwner()) || !GetOwner()->HasAuthority() || GetOwner()->IsActorBeingDestroyed()
+        || !IsValid(Item) || Item->OwningInventory != this || !Items.Contains(Item)) { return false; }
+    TStrongObjectPtr<UNarrativeInventoryComponent> InventoryLifetime(this);
+    TStrongObjectPtr<UNarrativeItem> ItemLifetime(Item);
+    TStrongObjectPtr<AActor> OwnerLifetime(GetOwner());
+    const uint64 LoadRevision = GetCinematicLoadRevision();
+    const auto OwnsNotification = [this, &OwnerLifetime, LoadRevision]()
+    {
+        return IsValid(this) && IsValid(OwnerLifetime.Get()) && GetOwner() == OwnerLifetime.Get()
+            && !OwnerLifetime->IsActorBeingDestroyed() && GetCinematicLoadRevision() == LoadRevision;
+    };
     const int32 RemovedQuantity = Item->GetQuantity();
     ++Item->InventoryMembershipRevision; Items.RemoveSingle(Item);
     if (ItemGUIDMap.FindRef(Item->ItemGUID) == Item) { ItemGUIDMap.Remove(Item->ItemGUID); }
     ReplicatedItems.Items.RemoveSingle(FNarrativeItemEntry(Item)); ReplicatedItems.MarkArrayDirty(); ++ReplicatedItemsKey;
     Item->RemovedFromInventory(this);
-    if (RemovedQuantity != 0) { OnItemRemoved.Broadcast(Item, RemovedQuantity); }
-    OnInventoryUpdated.Broadcast();
+    if (RemovedQuantity != 0 && OwnsNotification()) { OnItemRemoved.Broadcast(Item, RemovedQuantity); }
+    if (OwnsNotification()) { OnInventoryUpdated.Broadcast(); }
     return !Items.Contains(Item) && Item->OwningInventory != this;
 }
 

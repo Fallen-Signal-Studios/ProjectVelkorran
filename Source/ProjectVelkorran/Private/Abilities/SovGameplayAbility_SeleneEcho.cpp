@@ -59,6 +59,7 @@ void USovGameplayAbility_SeleneEchoBase::EndAbility(const FGameplayAbilitySpecHa
 	const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo,
 	bool bReplicateEndAbility, bool bWasCancelled)
 {
+	if (!IsEndAbilityValid(Handle, ActorInfo)) { return; }
 	++NativePayloadEpoch;
 	NativeSourceWeapon.Reset();
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
@@ -75,7 +76,7 @@ FSovSelenePayloadContext USovGameplayAbility_SeleneEchoBase::MakeNativePayloadCo
 }
 bool USovGameplayAbility_SeleneEchoBase::CanExecuteNativePayload(uint32 Epoch) const
 {
-	if (Epoch != NativePayloadEpoch || !IsActive() || !CurrentActorInfo || !GetWorld()
+	if (Epoch != NativePayloadEpoch || !IsCurrentEchoExecutionValid() || !CurrentActorInfo || !GetWorld()
 		|| !HasRequiredPayloadConfiguration() || !SovSelenePayload::ValidSource(MakeNativePayloadContext())
 		|| !MeetsWeaponRequirement(CurrentSpecHandle, CurrentActorInfo)) { return false; }
 	const UAbilitySystemComponent* ASC = CurrentActorInfo->AbilitySystemComponent.Get();

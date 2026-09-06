@@ -41,6 +41,9 @@ class NARRATIVEARSENAL_API UNarrativeAttributeSetBase : public UAttributeSet
 public:
 	UNarrativeAttributeSetBase();
 
+	/** Native receipts retire when this same attribute set starts another life. */
+	uint64 GetCombatLifeEpoch() const { return CombatLifeEpoch; }
+
 	// UAttributeSet
 	virtual void PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue) override;
 	virtual void PostAttributeChange(const FGameplayAttribute& Attribute, float OldValue, float NewValue) override;
@@ -156,6 +159,10 @@ public:
 	FNarrativeAttributeEvent OnGuardBroken;
 
 protected:
+	/** Fail closed on pathological recursive combat callbacks; ordinary nested hits stay synchronous. */
+	uint32 CombatResolutionDepth = 0;
+	/** An explicit zero-to-positive Health restore starts a new life even on the same ASC/avatar. */
+	uint64 CombatLifeEpoch = 0;
 	// Maintains the current percentage when a maximum attribute changes.
 	void AdjustAttributeForMaxChange(
 		FGameplayAttributeData& AffectedAttribute,

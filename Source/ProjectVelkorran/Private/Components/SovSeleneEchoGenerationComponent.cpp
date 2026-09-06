@@ -373,6 +373,7 @@ void USovSeleneEchoGenerationComponent::HandlePerfectDeflection(
 	AActor* Owner = GetOwner();
 	if (!IsValid(Owner)
 		|| !Owner->HasAuthority()
+		|| !DamageResult.IsCurrentTargetLife()
 		|| !DamageResult.TransactionId.IsValid()
 		|| DamageResult.TargetActor.Get() != GetOwner()
 		|| !DamageResult.bPerfectDefense
@@ -396,7 +397,8 @@ void USovSeleneEchoGenerationComponent::HandlePerfectDeflection(
 	if (!CanGenerateSeleneEcho()
 		|| !IsValid(LogicalAttacker)
 		|| LogicalAttacker->GetWorld() != GetWorld()
-		|| !IsHostileTarget(LogicalAttacker))
+		|| !IsHostileTarget(LogicalAttacker)
+		|| !DamageResult.IsCurrentTargetLife())
 	{
 		return;
 	}
@@ -415,7 +417,7 @@ void USovSeleneEchoGenerationComponent::HandleDamageResolvedAsSource(
 	AActor* Target = DamageResult.TargetActor.Get();
 	if (!GetOwner() || !GetOwner()->HasAuthority() || ResolveLogicalDamageSource(DamageResult) != GetOwner()
 		|| !IsValid(Target) || Target == GetOwner() || Target->GetWorld() != GetWorld()
-		|| !DamageResult.TransactionId.IsValid()
+		|| !DamageResult.IsCurrentTargetLife() || !DamageResult.TransactionId.IsValid()
 		|| ConsumedDamageTransactions.Contains(DamageResult.TransactionId)) return;
 	ConsumedDamageTransactions.Add(DamageResult.TransactionId);
 
@@ -425,7 +427,11 @@ void USovSeleneEchoGenerationComponent::HandleDamageResolvedAsSource(
 	const bool bPrecision = WeakPoints && WeakPoints->ConsumeWeakPointHit(DamageResult, BrokenWeakPointId);
 	FName IgnoredBreak;
 	if (WeakPoints) WeakPoints->ConsumeWeakPointBreak(DamageResult, IgnoredBreak);
-	if (!IsHostileTarget(Target) || IsEchoAbilityDamage(DamageResult) || !CanGenerateSeleneEcho())
+	const bool bHostile = IsHostileTarget(Target);
+	// A team policy or earlier multicast receiver can restore the same actor/ASC.
+	// Its pointer identity is unchanged, but this damage belongs to an older life.
+	if (!DamageResult.IsCurrentTargetLife()) return;
+	if (!bHostile || IsEchoAbilityDamage(DamageResult) || !CanGenerateSeleneEcho())
 	{
 		ResetPrecisionChain();
 		return;
@@ -452,7 +458,7 @@ void USovSeleneEchoGenerationComponent::HandleDamageResolvedAsSource(
 				ESovSeleneEchoAwardType::MarkedOrExposedKill, NAME_None, Target);
 		}
 	}
-	if (ResourceScopeEpoch != ExpectedScope) return;
+	if (ResourceScopeEpoch != ExpectedScope || !DamageResult.IsCurrentTargetLife()) return;
 	if (!bPrecision)
 	{
 		if (DamageResult.AppliedHealthDamage + DamageResult.AppliedShieldDamage > 0.0f)
@@ -465,7 +471,7 @@ void USovSeleneEchoGenerationComponent::HandleDamageResolvedAsSource(
 		FMath::Max(PrecisionChainWindow, 0.05f), MaximumPrecisionChainBonusLinks);
 	AwardEcho(GetWeakPointHitEchoReward(), Tags.Echo_Source_WeakPointHit,
 		ESovSeleneEchoAwardType::WeakPointHit, BrokenWeakPointId, Target);
-	if (bBonus && ResourceScopeEpoch == ExpectedScope)
+	if (bBonus && ResourceScopeEpoch == ExpectedScope && DamageResult.IsCurrentTargetLife())
 		AwardEcho(PrecisionChainEchoReward, Tags.Echo_Source_PrecisionChain,
 			ESovSeleneEchoAwardType::PrecisionChain, BrokenWeakPointId, Target);
 }
