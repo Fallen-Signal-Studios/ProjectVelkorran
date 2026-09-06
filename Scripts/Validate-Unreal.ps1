@@ -19,7 +19,9 @@ param(
     [ValidateRange(30, 86400)]
     [int] $AutomationTimeoutSeconds = 1200,
     [switch] $BuildOnly,
-    [switch] $SkipBuild
+    [switch] $SkipBuild,
+    [switch] $BuildGame,
+    [switch] $NonUnity
 )
 
 Set-StrictMode -Version Latest
@@ -107,6 +109,7 @@ function Assert-ContentAvailable {
 try {
     if ($env:OS -ne 'Windows_NT') { throw 'This runner requires Windows and a UE 5.7 Win64 installation.' }
     if ($BuildOnly -and $SkipBuild) { throw '-BuildOnly and -SkipBuild cannot be combined.' }
+    if ($SkipBuild -and ($BuildGame -or $NonUnity)) { throw '-BuildGame and -NonUnity require a build.' }
     if (-not (Test-Path -LiteralPath $ProjectPath -PathType Leaf)) { throw "Project file not found: $ProjectPath" }
     $ProjectPath = (Resolve-Path -LiteralPath $ProjectPath).Path
     $script:ProjectDirectory = Split-Path -Parent $ProjectPath
@@ -153,25 +156,6 @@ try {
     $runName = (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [guid]::NewGuid().ToString('N').Substring(0, 8)
     $script:RunDirectory = Join-Path ([IO.Path]::GetFullPath($OutputDirectory)) $runName
     $null = New-Item -ItemType Directory -Path $script:RunDirectory -Force
-    $summary = [ordered]@{
-        project = $ProjectPath; engine = $EngineRoot; testFilter = $TestFilter
-        build = 'not run'; automation = 'not run'; logs = $script:RunDirectory
-    }
-
-    if (-not $SkipBuild) {
-        $buildExit = Invoke-LoggedProcess -Executable $buildScript -BatchFile -LogName 'Build' -Arguments @(
-            'ProjectVelkorranEditor', 'Win64', 'Development', "-Project=$ProjectPath", '-WaitMutex'
-        )
-        $summary.build = "exit $buildExit"
-        $summary | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $script:RunDirectory 'summary.json') -Encoding UTF8
-        if ($buildExit -ne 0) { Write-Warning "Unreal build failed with exit code $buildExit."; exit $buildExit }
-    }
-    if ($BuildOnly) { Write-Host "Build succeeded. Automation was not run. Logs: $script:RunDirectory"; exit 0 }
-
-    if (-not (Test-Path -LiteralPath $editorExecutable -PathType Leaf)) { throw "UnrealEditor-Cmd.exe not found: $editorExecutable" }
-    Assert-ContentAvailable -Directory (Join-Path $script:ProjectDirectory 'Content') -Label 'Project'
-    Assert-ContentAvailable -Directory (Join-Path (Split-Path -Parent $narrativeDescriptor) 'Content') -Label 'NarrativePro'
-    if ($SkipBuild) { Write-Warning 'Build skipped. You are responsible for ensuring editor binaries contain the current source and tests.' }
     if ([string]::IsNullOrWhiteSpace($PythonExecutable)) {
         $PythonExecutable = Join-Path $engineDirectory 'Binaries\ThirdParty\Python3\Win64\python.exe'
         if (-not (Test-Path -LiteralPath $PythonExecutable -PathType Leaf)) {
@@ -181,6 +165,57 @@ try {
         }
     }
     if (-not (Test-Path -LiteralPath $PythonExecutable -PathType Leaf)) { throw "Python executable not found: $PythonExecutable" }
+    $summary = [ordered]@{
+        project = $ProjectPath; engine = $EngineRoot; testFilter = $TestFilter
+        build = 'not run'; gameBuild = 'not run'; automation = 'not run'; logs = $script:RunDirectory
+        engineVersion = $version; nonUnity = [bool]$NonUnity; sourceIntegrity = 'not checked'
+        binariesBuiltThisRun = $false; packagedBuild = 'not run'
+        sourceManifest = 'source-before.json'
+    }
+
+    $manifestTool = Join-Path $PSScriptRoot 'Capture-SourceManifest.py'
+    $beforeManifest = Join-Path $script:RunDirectory 'source-before.json'
+    $captureExit = Invoke-LoggedProcess -Executable $PythonExecutable -LogName 'SourceBefore' -TimeoutSeconds 120 -Arguments @(
+        $manifestTool, '--source-root', $script:ProjectDirectory, '--filter', $TestFilter, '--output', $beforeManifest
+    )
+    if ($captureExit -ne 0) { throw 'Could not capture build inputs and native registrations.' }
+
+    function Confirm-SourceUnchanged {
+        $afterManifest = Join-Path $script:RunDirectory 'source-after.json'
+        $verifyExit = Invoke-LoggedProcess -Executable $PythonExecutable -LogName 'SourceAfter' -TimeoutSeconds 120 -Arguments @(
+            $manifestTool, '--source-root', $script:ProjectDirectory, '--filter', $TestFilter,
+            '--verify', $beforeManifest, '--output', $afterManifest
+        )
+        if ($verifyExit -ne 0) { throw 'Source changed during validation. This run cannot qualify the current source.' }
+    }
+
+    if (-not $SkipBuild) {
+        $buildTargets = @('ProjectVelkorranEditor')
+        if ($BuildGame) { $buildTargets += 'ProjectVelkorran' }
+        foreach ($buildTarget in $buildTargets) {
+            $buildArguments = @($buildTarget, 'Win64', 'Development', "-Project=$ProjectPath", '-WaitMutex')
+            if ($NonUnity) { $buildArguments += '-DisableUnity' }
+            $logName = if ($buildTarget -eq 'ProjectVelkorranEditor') { 'Build' } else { 'BuildGame' }
+            $buildExit = Invoke-LoggedProcess -Executable $buildScript -BatchFile -LogName $logName -Arguments $buildArguments
+            if ($buildTarget -eq 'ProjectVelkorranEditor') { $summary.build = "exit $buildExit" }
+            else { $summary.gameBuild = "exit $buildExit" }
+            $summary | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $script:RunDirectory 'summary.json') -Encoding UTF8
+            if ($buildExit -ne 0) { Write-Warning "$buildTarget build failed with exit code $buildExit."; exit $buildExit }
+        }
+        $summary.binariesBuiltThisRun = $true
+    }
+    if ($BuildOnly) {
+        Confirm-SourceUnchanged
+        $summary.sourceIntegrity = 'unchanged during build; content and packaging not qualified'
+        $summary | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $script:RunDirectory 'summary.json') -Encoding UTF8
+        Write-Host "Build succeeded. Automation was not run. Logs: $script:RunDirectory"
+        exit 0
+    }
+
+    if (-not (Test-Path -LiteralPath $editorExecutable -PathType Leaf)) { throw "UnrealEditor-Cmd.exe not found: $editorExecutable" }
+    Assert-ContentAvailable -Directory (Join-Path $script:ProjectDirectory 'Content') -Label 'Project'
+    Assert-ContentAvailable -Directory (Join-Path (Split-Path -Parent $narrativeDescriptor) 'Content') -Label 'NarrativePro'
+    if ($SkipBuild) { Write-Warning 'Build skipped. You are responsible for ensuring editor binaries contain the current source and tests.' }
     $reportChecker = Join-Path $PSScriptRoot 'Check-UnrealReport.py'
     if (-not (Test-Path -LiteralPath $reportChecker -PathType Leaf)) { throw "Report coverage checker not found: $reportChecker" }
 
@@ -193,7 +228,7 @@ try {
             "-ReportExportPath=$reportDirectory", "-AbsLog=$editorLog"
         )
     $summary.automation = "process exit $editorExit; report not yet validated"
-    $summary | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $script:RunDirectory 'summary.json') -Encoding UTF8
+    $summary | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $script:RunDirectory 'summary.json') -Encoding UTF8
     if ($editorExit -ne 0) { Write-Warning "Unreal automation process failed with exit code $editorExit."; exit $editorExit }
 
     $reportPath = Join-Path $reportDirectory 'index.json'
@@ -226,8 +261,10 @@ try {
             '--filter', $TestFilter, '--output', $coveragePath
         )
     if ($coverageExit -ne 0) { throw "Automation source coverage validation failed (exit $coverageExit). Inspect ReportCoverage.stdout.log and coverage.json." }
+    Confirm-SourceUnchanged
+    $summary.sourceIntegrity = if ($SkipBuild) { 'unchanged during automation; binary freshness unverified' } else { 'unchanged during build and automation' }
     $summary.automation = "passed $($selectedTests.Count) matching tests; warnings=$($report.succeededWithWarnings)"
-    $summary | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $script:RunDirectory 'summary.json') -Encoding UTF8
+    $summary | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $script:RunDirectory 'summary.json') -Encoding UTF8
     Write-Host "Validation passed: $($selectedTests.Count) matching automation tests. Report: $reportPath"
     exit 0
 }

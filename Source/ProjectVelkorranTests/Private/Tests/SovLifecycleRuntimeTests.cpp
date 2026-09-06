@@ -45,7 +45,7 @@ namespace
             { auto& Context = GEngine->CreateNewWorldContext(EWorldType::Game); Context.SetCurrentWorld(World); Context.OwningGameInstance = Instance.Get(); }
             World->InitWorld(WorldInitialization);
             World->UpdateWorldComponents(!FPlatformProperties::RequiresCookedData(), false);
-            FURL URL; URL.AddOption(TEXT("game=/Script/ProjectVelkorran.SovLifecycleTestGameMode"));
+            FURL URL; URL.AddOption(TEXT("game=/Script/ProjectVelkorranTests.SovLifecycleTestGameMode"));
             if (World->SetGameMode(URL))
             {
                 Mode = World->GetAuthGameMode<ASovLifecycleTestGameMode>(); Mode->InitGameState();

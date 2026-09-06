@@ -14,6 +14,7 @@
 #include "Corruption/SovCorruptionProfile.h"
 #include "Melee/SovMeleeAttackDefinition.h"
 #include "Narrative/SovNarrativeCue.h"
+#include "Status/SovStatusDefinition.h"
 #include "Narrative/SovNarrativeValidationLibrary.h"
 #include "Tales/Dialogue.h"
 #include "Engine/Blueprint.h"
@@ -63,6 +64,12 @@ namespace
 			if (!Evidence->Interpretation.IsEmpty()) { CheckText(Evidence->Interpretation,TEXT("Evidence interpretation")); }
 			for (FName Mission : Evidence->RelevantMissions) { if (!Missions.Contains(Mission)) { Fail(TEXT("Evidence relevant mission is absent from the manifest.")); } }
 		}
+		else if (auto* Status = Cast<USovStatusDefinition>(Asset))
+		{
+			if (!Status->IsStructurallyValid())
+			{ Fail(TEXT("Invalid status contract: check request/state tags, duration, stacking, cleanse, UI priority, presentation, recovery immunity and checkpoint policy.")); }
+			CheckText(Status->DisplayName, TEXT("Status display name"));
+		}
 		else if (auto* Melee = Cast<USovMeleeAttackDefinition>(Asset)) { if (!Melee->Validate(Error)) { Fail(Error); } }
 		else if (auto* Corruption = Cast<USovCorruptionProfile>(Asset)) { if (!Corruption->ValidateProfile(Error)) { Fail(Error); } }
 		else if (auto* Dialogue = Cast<UDialogue>(Asset)) { CheckDialogue(Dialogue, nullptr); }
@@ -105,6 +112,7 @@ namespace
 					const UClass* KnownClass = FindObject<UClass>(nullptr, *Data.AssetClassPath.ToString());
 					if (KnownClass && !KnownClass->IsChildOf(USovNarrativeCue::StaticClass())
 						&& !KnownClass->IsChildOf(USovEvidenceDefinition::StaticClass()) && !KnownClass->IsChildOf(USovMeleeAttackDefinition::StaticClass())
+						&& !KnownClass->IsChildOf(USovStatusDefinition::StaticClass())
 						&& !KnownClass->IsChildOf(USovCorruptionProfile::StaticClass()) && !KnownClass->IsChildOf(UDialogue::StaticClass())
 						&& !KnownClass->IsChildOf(UBlueprint::StaticClass())) { continue; }
 					UObject* Asset = Data.GetAsset();
@@ -193,6 +201,19 @@ int32 USovValidateCampaignCommandlet::Main(const FString& Params)
 			if (bShippingValidation && !HasStableText(Beat.ObjectiveText))
 			{ UE_LOG(LogSovMission, Error, TEXT("%s/%s: shipping objective requires a non-empty string-table entry."), *Path, *Beat.BeatId.ToString()); ++Errors; }
 		}
+		if (bShippingValidation)
+		{
+			for (const FSovCampaignBeatDefinition& Beat : Mission->Beats)
+			{
+				if (!Beat.FailureReasonId.IsNone() && !HasStableText(Beat.FailureRuleText))
+				{ UE_LOG(LogSovMission, Error, TEXT("%s/%s: failure rule requires a non-empty string-table entry."), *Path, *Beat.BeatId.ToString()); ++Errors; }
+			}
+			for (const FSovCampaignChoiceGroup& Group : Mission->ChoiceGroups)
+			{
+				if (!HasStableText(Group.ReconciliationNote))
+				{ UE_LOG(LogSovMission, Error, TEXT("%s/%s: reconciliation note requires a non-empty string-table entry."), *Path, *Group.GroupId.ToString()); ++Errors; }
+			}
+		}
 		const FPrimaryAssetId PrimaryId = Mission->GetPrimaryAssetId();
 		if (!PrimaryId.IsValid() || PrimaryIds.Contains(PrimaryId))
 		{ UE_LOG(LogSovMission, Error, TEXT("%s: missing or duplicate primary asset ID."), *Path); ++Errors; }
@@ -261,6 +282,6 @@ int32 USovValidateCampaignCommandlet::Main(const FString& Params)
 		}
 	}
 	Errors += ValidateDependencyClosure(RootPackages, Missions, bShippingValidation);
-	UE_LOG(LogSovMission, Display, TEXT("Native mission preflight: %d assets, %d errors. Melee, corruption, evidence, cue and Narrative dialogue graph validators ran over dependency assets. Use -ShippingValidation for string-table IDs and excluded dependency roots; -AdditionalAssets includes dynamic-only content. Map actors, Blueprint compilation, translation coverage and playthroughs require separate gates."), Missions.Num(), Errors);
+	UE_LOG(LogSovMission, Display, TEXT("Native mission preflight: %d assets, %d errors. Melee, corruption, status, evidence, cue and Narrative dialogue graph validators ran over dependency assets. Use -ShippingValidation for string-table IDs and excluded dependency roots; -AdditionalAssets includes dynamic-only content. Map actors, World Partition coverage, ability cleanup, Blueprint compilation, translation coverage, cook/package and playthroughs require separate gates. This commandlet alone does not qualify a shipping candidate."), Missions.Num(), Errors);
 	return Errors == 0 ? 0 : 1;
 }
