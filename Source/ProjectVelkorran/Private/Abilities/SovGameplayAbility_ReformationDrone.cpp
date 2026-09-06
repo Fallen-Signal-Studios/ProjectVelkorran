@@ -12,6 +12,7 @@
 #include "Characters/SovDroneNPCBase.h"
 #include "CollisionQueryParams.h"
 #include "Combat/SovNativeDamageReceipt.h"
+#include "Combat/SovDamageTargetSnapshot.h"
 #include "Combat/SovProtectionInterceptReceipt.h"
 #include "Combat/SovThreatTargeting.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -122,6 +123,7 @@ bool USovGameplayAbility_ReformationDroneWeaponBase::CanActivateAbility(
 	const FGameplayTagContainer* TargetTags,
 	FGameplayTagContainer* OptionalRelevantTags) const
 {
+	if (bEndingAbility || bEndRequested) { return false; }
 	if (!Super::CanActivateAbility(
 			Handle,
 			ActorInfo,
@@ -184,6 +186,9 @@ void USovGameplayAbility_ReformationDroneWeaponBase::ActivateAbility(
 	const FGameplayAbilityActivationInfo ActivationInfo,
 	const FGameplayEventData* TriggerEventData)
 {
+	const uint64 Activation = ++DroneActivationSerial;
+	UnbindDroneCancellation();
+	bEndRequested = false;
 	bPayloadStarted = false;
 	bPayloadFinished = false;
 	bAbilityStarted = false;
@@ -191,6 +196,12 @@ void USovGameplayAbility_ReformationDroneWeaponBase::ActivateAbility(
 	CharacterOwner = ActorInfo
 		? Cast<ANarrativeCharacter>(ActorInfo->AvatarActor.Get())
 		: nullptr;
+	DroneSourceASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
+	DroneSourceAvatar = ActorInfo ? ActorInfo->AvatarActor.Get() : nullptr;
+	const auto* NarrativeASC = Cast<UNarrativeAbilitySystemComponent>(DroneSourceASC.Get());
+	DroneActorInfoEpoch = NarrativeASC ? NarrativeASC->GetCombatActorInfoEpoch() : 0;
+	DroneReadyEpoch = NarrativeASC ? NarrativeASC->GetCharacterReadyEpoch() : 0;
+	BindDroneCancellation(DroneSourceASC.Get());
 
 	if (!ActorInfo
 		|| !ActorInfo->IsNetAuthority()
@@ -200,6 +211,8 @@ void USovGameplayAbility_ReformationDroneWeaponBase::ActivateAbility(
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
+	if (!IsDroneActivationCurrent(Activation)) { return; }
+	if (!CanContinueWeaponPayload()) { CancelDroneWeaponAbility(); return; }
 
 	if (UWorld* World = GetWorld())
 	{
@@ -208,19 +221,20 @@ void USovGameplayAbility_ReformationDroneWeaponBase::ActivateAbility(
 	}
 
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
-	if (!IsActive())
+	if (!IsDroneActivationCurrent(Activation))
 	{
 		return;
 	}
+	if (!CanContinueWeaponPayload()) { CancelDroneWeaponAbility(); return; }
 
 	bAbilityStarted = true;
 	StartAttackMontage();
-	if (!IsActive())
+	if (!IsDroneActivationCurrent(Activation))
 	{
 		return;
 	}
 	ReceiveDroneWeaponStarted();
-	if (!IsActive())
+	if (!IsDroneActivationCurrent(Activation))
 	{
 		return;
 	}
@@ -240,21 +254,21 @@ void USovGameplayAbility_ReformationDroneWeaponBase::ActivateAbility(
 			{
 				World->GetTimerManager().SetTimer(
 					PayloadReleaseTimerHandle,
-					this,
-					&ThisClass::HandleAutomaticPayloadRelease,
+					FTimerDelegate::CreateWeakLambda(this, [this, Activation]()
+					{ if (IsDroneActivationCurrent(Activation)) { HandleAutomaticPayloadRelease(); } }),
 					ReleaseDelay,
 					false);
 			}
 		}
-		if (!IsActive())
+		if (!IsDroneActivationCurrent(Activation))
 		{
 			return;
 		}
 
 		World->GetTimerManager().SetTimer(
 			MaximumDurationTimerHandle,
-			this,
-			&ThisClass::HandleMaximumDurationExpired,
+			FTimerDelegate::CreateWeakLambda(this, [this, Activation]()
+			{ if (IsDroneActivationCurrent(Activation)) { HandleMaximumDurationExpired(); } }),
 			FMath::Max(MaximumActiveDuration, 0.1f),
 			false);
 	}
@@ -267,11 +281,20 @@ void USovGameplayAbility_ReformationDroneWeaponBase::EndAbility(
 	const bool bReplicateEndAbility,
 	const bool bWasCancelled)
 {
+	if (!IsEndAbilityValid(Handle, ActorInfo)) { return; }
+	FenceDroneEndRequest();
+	if (ScopeLockCount > 0)
+	{
+		WaitingToExecute.Add(FPostLockDelegate::CreateUObject(this, &ThisClass::EndAbility,
+			Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled));
+		return;
+	}
 	if (bEndingAbility)
 	{
 		return;
 	}
 	bEndingAbility = true;
+	UnbindDroneCancellation();
 
 	if (UWorld* World = GetWorld())
 	{
@@ -297,6 +320,7 @@ void USovGameplayAbility_ReformationDroneWeaponBase::EndAbility(
 		bReplicateEndAbility,
 		bWasCancelled);
 	bEndingAbility = false;
+	bEndRequested = false;
 }
 
 bool USovGameplayAbility_ReformationDroneWeaponBase::
@@ -333,20 +357,21 @@ bool USovGameplayAbility_ReformationDroneWeaponBase::
 	}
 	if (bPayloadStarted)
 	{
-		return true;
+		return CanContinueWeaponPayload();
 	}
 	if (!CanContinueWeaponPayload())
 	{
 		return false;
 	}
 
+	const uint64 Activation = DroneActivationSerial;
 	bPayloadStarted = true;
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(PayloadReleaseTimerHandle);
 	}
 	ReceiveDroneWeaponPayloadReleased();
-	return IsActive();
+	return IsDroneActivationCurrent(Activation) && CanContinueWeaponPayload();
 }
 
 void USovGameplayAbility_ReformationDroneWeaponBase::NotifyPayloadFinished()
@@ -380,10 +405,11 @@ void USovGameplayAbility_ReformationDroneWeaponBase::NotifyPayloadFinished()
 
 	if (UWorld* World = GetWorld())
 	{
+		const uint64 Activation = DroneActivationSerial;
 		World->GetTimerManager().SetTimer(
 			RecoveryTimerHandle,
-			this,
-			&ThisClass::HandleRecoveryFinished,
+			FTimerDelegate::CreateWeakLambda(this, [this, Activation]()
+			{ if (IsDroneActivationCurrent(Activation)) { HandleRecoveryFinished(); } }),
 			Recovery,
 			false);
 		return;
@@ -409,8 +435,7 @@ void USovGameplayAbility_ReformationDroneWeaponBase::CancelDroneWeaponAbility()
 
 bool USovGameplayAbility_ReformationDroneWeaponBase::CanContinueWeaponPayload() const
 {
-	if (!IsActive()
-		|| bEndingAbility
+	if (!IsDroneActivationCurrent(DroneActivationSerial)
 		|| bPayloadFinished
 		|| !CurrentActorInfo
 		|| !CurrentActorInfo->IsNetAuthority()
@@ -421,7 +446,16 @@ bool USovGameplayAbility_ReformationDroneWeaponBase::CanContinueWeaponPayload() 
 
 	const UAbilitySystemComponent* AbilitySystem =
 		CurrentActorInfo->AbilitySystemComponent.Get();
-	if (!IsValid(AbilitySystem))
+	const auto* NarrativeASC = Cast<UNarrativeAbilitySystemComponent>(AbilitySystem);
+	if (!IsValid(AbilitySystem)
+		|| AbilitySystem != DroneSourceASC.Get()
+		|| AbilitySystem->GetAvatarActor() != DroneSourceAvatar.Get()
+		|| CurrentActorInfo->AvatarActor.Get() != DroneSourceAvatar.Get()
+		|| !IsValid(DroneSourceAvatar.Get()) || DroneSourceAvatar->IsActorBeingDestroyed()
+		|| UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(DroneSourceAvatar.Get()) != AbilitySystem
+		|| (NarrativeASC && (NarrativeASC->GetCombatActorInfoEpoch() != DroneActorInfoEpoch
+			|| NarrativeASC->GetCharacterReadyEpoch() != DroneReadyEpoch))
+		|| AbilitySystem->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()) <= 0.f)
 	{
 		return false;
 	}
@@ -438,6 +472,50 @@ bool USovGameplayAbility_ReformationDroneWeaponBase::CanContinueWeaponPayload() 
 		&& !AbilitySystem->HasMatchingGameplayTag(SovTags.State_Poise_Broken)
 		&& !AbilitySystem->HasMatchingGameplayTag(SovTags.State_Status_Frozen)
 		&& !AbilitySystem->HasMatchingGameplayTag(SovTags.State_Status_DeviceDisabled);
+}
+
+bool USovGameplayAbility_ReformationDroneWeaponBase::IsDroneActivationCurrent(
+	const uint64 ExpectedSerial) const
+{
+	return ExpectedSerial == DroneActivationSerial && IsActive() && !bEndingAbility && !bEndRequested;
+}
+
+void USovGameplayAbility_ReformationDroneWeaponBase::FenceDroneEndRequest()
+{
+	if (!bEndRequested) { bEndRequested = true; ++DroneActivationSerial; }
+}
+
+void USovGameplayAbility_ReformationDroneWeaponBase::BindDroneCancellation(UAbilitySystemComponent* AbilitySystem)
+{
+	if (!IsValid(AbilitySystem)) { return; }
+	const uint64 Activation = DroneActivationSerial;
+	for (const FGameplayTag& Tag : ActivationBlockedTags)
+	{
+		// This ability owns IsFiring itself. Every other blocking transition
+		// retires a windup/burst even if the tag disappears in the same callback.
+		if (ActivationOwnedTags.HasTagExact(Tag)) { continue; }
+		const FDelegateHandle Handle = AbilitySystem->RegisterGameplayTagEvent(Tag, EGameplayTagEventType::NewOrRemoved)
+			.AddWeakLambda(this, [this, Activation](FGameplayTag, int32 Count)
+			{ if (Count > 0 && IsDroneActivationCurrent(Activation)) { CancelDroneWeaponAbility(); } });
+		DroneCancellationHandles.Emplace(Tag, Handle);
+	}
+	DroneHealthHandle = AbilitySystem->GetGameplayAttributeValueChangeDelegate(UNarrativeAttributeSetBase::GetHealthAttribute())
+		.AddWeakLambda(this, [this, Activation](const FOnAttributeChangeData& Change)
+		{ if (Change.NewValue <= 0.f && IsDroneActivationCurrent(Activation)) { CancelDroneWeaponAbility(); } });
+}
+
+void USovGameplayAbility_ReformationDroneWeaponBase::UnbindDroneCancellation()
+{
+	if (UAbilitySystemComponent* ASC = DroneSourceASC.Get())
+	{
+		for (const auto& Binding : DroneCancellationHandles)
+		{
+			ASC->RegisterGameplayTagEvent(Binding.Key, EGameplayTagEventType::NewOrRemoved).Remove(Binding.Value);
+		}
+		ASC->GetGameplayAttributeValueChangeDelegate(UNarrativeAttributeSetBase::GetHealthAttribute()).Remove(DroneHealthHandle);
+	}
+	DroneCancellationHandles.Reset();
+	DroneHealthHandle.Reset();
 }
 
 FTransform USovGameplayAbility_ReformationDroneWeaponBase::ResolveMuzzleTransform(
@@ -530,7 +608,8 @@ bool USovGameplayAbility_ReformationDroneWeaponBase::ApplyPointDamage(
 	const float PoiseDamage,
 	USovProtectionInterceptReceipt* ProtectionReceipt) const
 {
-	if (!CurrentActorInfo || !CurrentActorInfo->IsNetAuthority())
+	const uint64 Activation = DroneActivationSerial;
+	if (!CanContinueWeaponPayload())
 	{
 		return false;
 	}
@@ -538,6 +617,8 @@ bool USovGameplayAbility_ReformationDroneWeaponBase::ApplyPointDamage(
 	UAbilitySystemComponent* SourceASC = CurrentActorInfo->AbilitySystemComponent.Get();
 	AActor* SourceActor = CurrentActorInfo->AvatarActor.Get();
 	UAbilitySystemComponent* TargetASC = ResolveAbilitySystemFromActor(Hit.GetActor());
+	AActor* TargetAvatar = IsValid(TargetASC) ? TargetASC->GetAvatarActor() : nullptr;
+	const FSovDamageTargetSnapshot Target(TargetASC);
 	if (!IsValid(SourceASC)
 		|| !IsValid(SourceActor)
 		|| !IsValid(TargetASC)
@@ -549,6 +630,8 @@ bool USovGameplayAbility_ReformationDroneWeaponBase::ApplyPointDamage(
 	{
 		return false;
 	}
+	if (!IsDroneActivationCurrent(Activation) || !CanContinueWeaponPayload()
+		|| !IsValid(TargetAvatar) || !Target.IsCurrent()) { return false; }
 
 	FGameplayEffectContextHandle Context = SourceASC->MakeEffectContext();
 	Context.SetAbility(this);
@@ -593,6 +676,7 @@ bool USovGameplayAbility_ReformationDroneWeaponBase::ApplyPointDamage(
 
 	UNarrativeAbilitySystemComponent* NarrativeSource = Cast<UNarrativeAbilitySystemComponent>(SourceASC);
 	TStrongObjectPtr<USovNativeDamageReceipt> Receipt(NewObject<USovNativeDamageReceipt>());
+	Receipt->bRequireNativeProof = true;
 	Receipt->ExpectedTarget = TargetASC->GetAvatarActor(); Receipt->ExpectedContext = DamageSpec->GetContext().Get();
 	if (NarrativeSource)
 	{
@@ -660,12 +744,13 @@ bool USovGameplayAbility_ReformationDroneWeaponBase::IsTargetAlive(
 void USovGameplayAbility_ReformationDroneWeaponBase::
 	HandleAutomaticPayloadRelease()
 {
+	const uint64 Activation = DroneActivationSerial;
 	if (!TryBeginWeaponPayloadRelease())
 	{
-		CancelDroneWeaponAbility();
+		if (IsDroneActivationCurrent(Activation)) { CancelDroneWeaponAbility(); }
 		return;
 	}
-	if (!IsActive() || bPayloadFinished)
+	if (!IsDroneActivationCurrent(Activation) || bPayloadFinished)
 	{
 		return;
 	}
@@ -777,6 +862,7 @@ USovGameplayAbility_ReformationDroneGunfire::
 
 void USovGameplayAbility_ReformationDroneGunfire::FireGunBurstFromAim()
 {
+	const uint64 Activation = GetDroneActivationSerial();
 	if (!IsActive()
 		|| !CurrentActorInfo
 		|| !CurrentActorInfo->IsNetAuthority()
@@ -787,12 +873,12 @@ void USovGameplayAbility_ReformationDroneGunfire::FireGunBurstFromAim()
 	if (!HasRequiredPayloadConfiguration()
 		|| !TryBeginWeaponPayloadRelease())
 	{
-		CancelDroneWeaponAbility();
+		if (IsDroneActivationCurrent(Activation)) { CancelDroneWeaponAbility(); }
 		return;
 	}
 	// The release event may itself call this function. Respect that inner call
 	// instead of resetting and firing a duplicate burst on the outer stack.
-	if (!IsActive() || HasWeaponPayloadFinished() || bBurstStarted)
+	if (!IsDroneActivationCurrent(Activation) || !CanContinueWeaponPayload() || HasWeaponPayloadFinished() || bBurstStarted)
 	{
 		return;
 	}
@@ -810,6 +896,15 @@ void USovGameplayAbility_ReformationDroneGunfire::EndAbility(
 	const bool bReplicateEndAbility,
 	const bool bWasCancelled)
 {
+	if (!IsEndAbilityValid(Handle, ActorInfo)) { return; }
+	FenceDroneEndRequest();
+	if (ScopeLockCount > 0)
+	{
+		WaitingToExecute.Add(FPostLockDelegate::CreateUObject(this, &ThisClass::EndAbility,
+			Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled));
+		return;
+	}
+
 	++BurstEpoch;
 	if (UWorld* World = GetWorld())
 	{
@@ -880,6 +975,7 @@ void USovGameplayAbility_ReformationDroneGunfire::FireNextBurstShot()
 	}
 
 	const uint32 ExpectedBurstEpoch = BurstEpoch;
+	const uint64 Activation = GetDroneActivationSerial();
 	const int32 ShotIndex = ShotsFired;
 	ANarrativeCharacter* SourceCharacter = Cast<ANarrativeCharacter>(GetAvatarActorFromActorInfo());
 	AAIController* SourceController = SourceCharacter ? Cast<AAIController>(SourceCharacter->GetController()) : nullptr;
@@ -915,6 +1011,7 @@ void USovGameplayAbility_ReformationDroneGunfire::FireNextBurstShot()
 	TStrongObjectPtr<USovProtectionInterceptReceipt> ProtectionReceipt(BlockingHit
 		? USovProtectionInterceptReceipt::TryCreateForDroneShot(SourceCharacter, IntendedFocus, *BlockingHit,
 			TraceStart, UnblockedEnd, FMath::Max(TraceRadius, 0.f)) : nullptr);
+	if (!IsDroneActivationCurrent(Activation) || !CanContinueWeaponPayload()) { return; }
 	const bool bDamagedTarget = BlockingHit
 		&& ApplyPointDamage(*BlockingHit, DamagePerShot, PoiseDamagePerShot, ProtectionReceipt.Get());
 	// Typed damage/reward callbacks may end this ability, start a new activation,
@@ -927,6 +1024,7 @@ void USovGameplayAbility_ReformationDroneGunfire::FireNextBurstShot()
 		BlockingHit,
 		bDamagedTarget,
 		ShotIndex);
+	if (!IsDroneActivationCurrent(Activation) || BurstEpoch != ExpectedBurstEpoch || !CanContinueWeaponPayload()) { return; }
 
 	++ShotsFired;
 	if (ShotsFired >= BurstShotCount)
@@ -939,8 +1037,8 @@ void USovGameplayAbility_ReformationDroneGunfire::FireNextBurstShot()
 	{
 		World->GetTimerManager().SetTimer(
 			BurstTimerHandle,
-			this,
-			&ThisClass::FireNextBurstShot,
+			FTimerDelegate::CreateWeakLambda(this, [this, Activation, ExpectedBurstEpoch]()
+			{ if (IsDroneActivationCurrent(Activation) && BurstEpoch == ExpectedBurstEpoch) { FireNextBurstShot(); } }),
 			FMath::Max(TimeBetweenShots, 0.01f),
 			false);
 		return;
@@ -1096,6 +1194,7 @@ float USovGameplayAbility_ReformationDroneRocketLauncher::
 ASovReformationDroneRocketProjectile*
 USovGameplayAbility_ReformationDroneRocketLauncher::LaunchRocketFromAim()
 {
+	const uint64 Activation = GetDroneActivationSerial();
 	if (!IsActive()
 		|| !CurrentActorInfo
 		|| !CurrentActorInfo->IsNetAuthority()
@@ -1107,10 +1206,10 @@ USovGameplayAbility_ReformationDroneRocketLauncher::LaunchRocketFromAim()
 	if (!HasRequiredPayloadConfiguration()
 		|| !TryBeginWeaponPayloadRelease())
 	{
-		CancelDroneWeaponAbility();
+		if (IsDroneActivationCurrent(Activation)) { CancelDroneWeaponAbility(); }
 		return nullptr;
 	}
-	if (!IsActive() || HasWeaponPayloadFinished() || bRocketReleaseAttempted)
+	if (!IsDroneActivationCurrent(Activation) || !CanContinueWeaponPayload() || HasWeaponPayloadFinished() || bRocketReleaseAttempted)
 	{
 		return nullptr;
 	}
@@ -1118,7 +1217,7 @@ USovGameplayAbility_ReformationDroneRocketLauncher::LaunchRocketFromAim()
 	const int32 MuzzleIndex = NextMuzzleIndex;
 	if (!SovThreatTargeting::CanUseActorFocus(GetAvatarActorFromActorInfo()))
 	{
-		CancelDroneWeaponAbility(); return nullptr;
+		if (IsDroneActivationCurrent(Activation)) { CancelDroneWeaponAbility(); } return nullptr;
 	}
 	const FTransform MuzzleTransform = ResolveMuzzleTransform(MuzzleIndex);
 	const FVector AimPoint = ResolveAuthorityAimPoint(RocketAimTraceDistance);
@@ -1131,10 +1230,12 @@ USovGameplayAbility_ReformationDroneRocketLauncher::LaunchRocketFromAim()
 		LaunchDirection.ToOrientationQuat(),
 		MuzzleTransform.GetLocation(),
 		FVector::OneVector);
+	AActor* HomingTarget = ResolveHomingTarget();
+	if (!IsDroneActivationCurrent(Activation) || !CanContinueWeaponPayload()) { return nullptr; }
 	return LaunchRocket(
 		SpawnTransform,
 		LaunchDirection * RocketSpeed,
-		ResolveHomingTarget());
+		HomingTarget);
 }
 
 ASovReformationDroneRocketProjectile*
@@ -1143,6 +1244,7 @@ USovGameplayAbility_ReformationDroneRocketLauncher::LaunchRocket(
 	FVector InitialVelocity,
 	AActor* HomingTarget)
 {
+	const uint64 Activation = GetDroneActivationSerial();
 	if (!IsActive()
 		|| !CurrentActorInfo
 		|| !CurrentActorInfo->IsNetAuthority()
@@ -1153,12 +1255,12 @@ USovGameplayAbility_ReformationDroneRocketLauncher::LaunchRocket(
 	if (!HasRequiredPayloadConfiguration()
 		|| !TryBeginWeaponPayloadRelease())
 	{
-		CancelDroneWeaponAbility();
+		if (IsDroneActivationCurrent(Activation)) { CancelDroneWeaponAbility(); }
 		return nullptr;
 	}
 	// A Blueprint release event is allowed to launch the rocket. If it did,
 	// this outer/manual call must not launch a second projectile.
-	if (!IsActive() || HasWeaponPayloadFinished() || bRocketReleaseAttempted)
+	if (!IsDroneActivationCurrent(Activation) || !CanContinueWeaponPayload() || HasWeaponPayloadFinished() || bRocketReleaseAttempted)
 	{
 		return nullptr;
 	}
@@ -1178,7 +1280,7 @@ USovGameplayAbility_ReformationDroneRocketLauncher::LaunchRocket(
 			Error,
 			TEXT("%s rejected an invalid Reformation drone rocket release."),
 			*GetNameSafe(Avatar));
-		CancelDroneWeaponAbility();
+		if (IsDroneActivationCurrent(Activation)) { CancelDroneWeaponAbility(); }
 		return nullptr;
 	}
 
@@ -1193,7 +1295,7 @@ USovGameplayAbility_ReformationDroneRocketLauncher::LaunchRocket(
 	InitialVelocity = InitialVelocity.GetClampedToMaxSize(MaximumRocketSpeed);
 	if (InitialVelocity.IsNearlyZero())
 	{
-		CancelDroneWeaponAbility();
+		if (IsDroneActivationCurrent(Activation)) { CancelDroneWeaponAbility(); }
 		return nullptr;
 	}
 
@@ -1206,8 +1308,12 @@ USovGameplayAbility_ReformationDroneRocketLauncher::LaunchRocket(
 			ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 	if (!IsValid(Rocket))
 	{
-		CancelDroneWeaponAbility();
+		if (IsDroneActivationCurrent(Activation)) { CancelDroneWeaponAbility(); }
 		return nullptr;
+	}
+	if (!IsDroneActivationCurrent(Activation) || !CanContinueWeaponPayload())
+	{
+		Rocket->Destroy(); return nullptr;
 	}
 
 	UObject* SourceObject = GetCurrentSourceObject();
@@ -1227,6 +1333,10 @@ USovGameplayAbility_ReformationDroneRocketLauncher::LaunchRocket(
 		}
 	}
 
+	if (!IsDroneActivationCurrent(Activation) || !CanContinueWeaponPayload())
+	{
+		Rocket->Destroy(); return nullptr;
+	}
 	Rocket->InitializeRocket(
 		CurrentActorInfo->AbilitySystemComponent.Get(),
 		Avatar,
@@ -1250,12 +1360,16 @@ USovGameplayAbility_ReformationDroneRocketLauncher::LaunchRocket(
 	UGameplayStatics::FinishSpawningActor(Rocket, ServerSpawnTransform);
 	if (!IsValid(Rocket) || Rocket->IsActorBeingDestroyed())
 	{
-		CancelDroneWeaponAbility();
+		if (IsDroneActivationCurrent(Activation)) { CancelDroneWeaponAbility(); }
 		return nullptr;
 	}
+	if (!IsDroneActivationCurrent(Activation) || !CanContinueWeaponPayload())
+	{
+		Rocket->Destroy(); return nullptr;
+	}
 
-	NotifyPayloadFinished();
 	++NextMuzzleIndex;
+	NotifyPayloadFinished();
 	return Rocket;
 }
 
@@ -1340,6 +1454,15 @@ void USovGameplayAbility_ReformationDroneSelfDestruct::EndAbility(
 	const bool bReplicateEndAbility,
 	const bool bWasCancelled)
 {
+	if (!IsEndAbilityValid(Handle, ActorInfo)) { return; }
+	FenceDroneEndRequest();
+	if (ScopeLockCount > 0)
+	{
+		WaitingToExecute.Add(FPostLockDelegate::CreateUObject(this, &ThisClass::EndAbility,
+			Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled));
+		return;
+	}
+
 	if (bEndingSelfDestructAbility)
 	{
 		return;
@@ -1431,6 +1554,7 @@ float USovGameplayAbility_ReformationDroneSelfDestruct::
 void USovGameplayAbility_ReformationDroneSelfDestruct::
 	StartSelfDestructRun()
 {
+	const uint64 Activation = GetDroneActivationSerial();
 	if (!IsActive()
 		|| !CurrentActorInfo
 		|| !CurrentActorInfo->IsNetAuthority()
@@ -1441,12 +1565,12 @@ void USovGameplayAbility_ReformationDroneSelfDestruct::
 	if (!HasRequiredPayloadConfiguration()
 		|| !TryBeginWeaponPayloadRelease())
 	{
-		CancelDroneWeaponAbility();
+		if (IsDroneActivationCurrent(Activation)) { CancelDroneWeaponAbility(); }
 		return;
 	}
 	// The payload-released Blueprint event may have called this function
 	// recursively. Respect that inner run instead of starting a second one.
-	if (!IsActive()
+	if (!IsDroneActivationCurrent(Activation) || !CanContinueWeaponPayload()
 		|| HasWeaponPayloadFinished()
 		|| bPursuitStarted)
 	{
@@ -1465,30 +1589,36 @@ void USovGameplayAbility_ReformationDroneSelfDestruct::
 			Warning,
 			TEXT("%s could not begin self destruct: no living hostile target was available."),
 			*GetNameSafe(SourceDrone));
-		CancelDroneWeaponAbility();
+		if (IsDroneActivationCurrent(Activation)) { CancelDroneWeaponAbility(); }
 		return;
 	}
 
 	bPursuitStarted = true;
 	PursuitTarget = TargetActor;
 	PursuitStartTime = World->GetTimeSeconds();
-	ActivePresentation = SpawnPresentation(SourceDrone);
+	ASovReformationDroneSelfDestructPresentation* NewPresentation = SpawnPresentation(SourceDrone);
+	if (!IsDroneActivationCurrent(Activation) || !CanContinueWeaponPayload())
+	{
+		if (IsValid(NewPresentation)) { NewPresentation->CancelPresentation(); }
+		return;
+	}
+	ActivePresentation = NewPresentation;
 	ReceivePursuitAcquired(TargetActor);
-	if (!IsActive() || bWarningStarted || bDetonationCommitted)
+	if (!IsDroneActivationCurrent(Activation) || bWarningStarted || bDetonationCommitted)
 	{
 		return;
 	}
 	if (!CanContinueWeaponPayload() || !SovThreatTargeting::CanTrack(SourceDrone, TargetActor))
 	{
-		CancelDroneWeaponAbility();
+		if (IsDroneActivationCurrent(Activation)) { CancelDroneWeaponAbility(); }
 		return;
 	}
 	// Arm validation before MoveTo: an AlreadyAtGoal result enters the
 	// warning synchronously and still needs prompt fuse interruption checks.
 	World->GetTimerManager().SetTimer(
 		PursuitUpdateTimerHandle,
-		this,
-		&ThisClass::UpdatePursuit,
+		FTimerDelegate::CreateWeakLambda(this, [this, Activation]()
+		{ if (IsDroneActivationCurrent(Activation)) { UpdatePursuit(); } }),
 		FMath::Max(PursuitUpdateInterval, 0.02f),
 		true);
 	if (FVector::DistSquared(
@@ -1499,7 +1629,7 @@ void USovGameplayAbility_ReformationDroneSelfDestruct::
 		// Best-effort claim of the AI movement lane stops an existing StateTree
 		// path, but an in-range drone never depends on navigation succeeding.
 		RequestPursuitMove(TargetActor);
-		if (!IsActive())
+		if (!IsDroneActivationCurrent(Activation))
 		{
 			return;
 		}
@@ -1508,7 +1638,7 @@ void USovGameplayAbility_ReformationDroneSelfDestruct::
 	}
 
 	const bool bMoveRequested = RequestPursuitMove(TargetActor);
-	if (!IsActive())
+	if (!IsDroneActivationCurrent(Activation))
 	{
 		return;
 	}
@@ -1519,7 +1649,7 @@ void USovGameplayAbility_ReformationDroneSelfDestruct::
 			Warning,
 			TEXT("%s could not request self-destruct pursuit movement. Check its AIController, NavMovement, and path configuration."),
 			*GetNameSafe(SourceDrone));
-		CancelDroneWeaponAbility();
+		if (IsDroneActivationCurrent(Activation)) { CancelDroneWeaponAbility(); }
 		return;
 	}
 	if (bWarningStarted)
@@ -1530,6 +1660,7 @@ void USovGameplayAbility_ReformationDroneSelfDestruct::
 
 void USovGameplayAbility_ReformationDroneSelfDestruct::UpdatePursuit()
 {
+	const uint64 Activation = GetDroneActivationSerial();
 	if (!IsActive()
 		|| !bPursuitStarted
 		|| bDetonationCommitted)
@@ -1538,7 +1669,7 @@ void USovGameplayAbility_ReformationDroneSelfDestruct::UpdatePursuit()
 	}
 	if (!CanContinueWeaponPayload())
 	{
-		CancelDroneWeaponAbility();
+		if (IsDroneActivationCurrent(Activation)) { CancelDroneWeaponAbility(); }
 		return;
 	}
 	// Continue validating interrupt states while the fuse is active, but do not
@@ -1573,6 +1704,7 @@ void USovGameplayAbility_ReformationDroneSelfDestruct::UpdatePursuit()
 	}
 
 	const double Now = World->GetTimeSeconds();
+	if (!IsDroneActivationCurrent(Activation) || !CanContinueWeaponPayload()) { return; }
 	if (Now - PursuitStartTime >= MaximumPursuitDuration)
 	{
 		if (bDetonateWhenPursuitTimesOut)
@@ -1620,7 +1752,7 @@ void USovGameplayAbility_ReformationDroneSelfDestruct::UpdatePursuit()
 		&& Now - LastMoveRequestTime >= MoveRetryInterval
 		&& !RequestPursuitMove(TargetActor))
 	{
-		CancelDroneWeaponAbility();
+		if (IsDroneActivationCurrent(Activation)) { CancelDroneWeaponAbility(); }
 	}
 }
 
@@ -1696,6 +1828,7 @@ AActor* USovGameplayAbility_ReformationDroneSelfDestruct::
 bool USovGameplayAbility_ReformationDroneSelfDestruct::RequestPursuitMove(
 	AActor* TargetActor)
 {
+	const uint64 Activation = GetDroneActivationSerial();
 	AAIController* AIController = Cast<AAIController>(GetOwningController());
 	if (!IsValid(AIController) || !IsValid(TargetActor)
 		|| !SovThreatTargeting::CanTrack(GetAvatarActorFromActorInfo(), TargetActor))
@@ -1715,14 +1848,21 @@ bool USovGameplayAbility_ReformationDroneSelfDestruct::RequestPursuitMove(
 	MoveRequest.SetReachTestIncludesAgentRadius(false);
 	const FPathFollowingRequestResult MoveResult =
 		AIController->MoveTo(MoveRequest, nullptr);
-	OwnedPursuitMoveRequestId = MoveResult.MoveId;
-	if (!IsActive() || !SovThreatTargeting::CanTrack(GetAvatarActorFromActorInfo(), TargetActor))
+	if (!IsDroneActivationCurrent(Activation) || !CanContinueWeaponPayload()
+		|| !SovThreatTargeting::CanTrack(GetAvatarActorFromActorInfo(), TargetActor))
 	{
 		// Replacing a previous AI request may synchronously notify StateTree/BT.
 		// If that ended the ability, do not leave the newly issued move running.
-		AbortOwnedPursuitMove();
+		UPathFollowingComponent* Following = AIController->GetPathFollowingComponent();
+		if (IsValid(Following) && MoveResult.MoveId.IsValid()
+			&& Following->GetCurrentRequestId().IsEquivalent(MoveResult.MoveId))
+		{
+			Following->AbortMove(*this, FPathFollowingResultFlags::OwnerFinished,
+				MoveResult.MoveId, EPathFollowingVelocityMode::Reset);
+		}
 		return false;
 	}
+	OwnedPursuitMoveRequestId = MoveResult.MoveId;
 	if (MoveResult.Code == EPathFollowingRequestResult::AlreadyAtGoal)
 	{
 		OwnedPursuitMoveRequestId = FAIRequestID::InvalidRequest;
@@ -1741,6 +1881,7 @@ bool USovGameplayAbility_ReformationDroneSelfDestruct::RequestPursuitMove(
 void USovGameplayAbility_ReformationDroneSelfDestruct::
 	EnterDetonationWarning()
 {
+	const uint64 Activation = GetDroneActivationSerial();
 	if (!IsActive()
 		|| !bPursuitStarted
 		|| bWarningStarted
@@ -1756,7 +1897,7 @@ void USovGameplayAbility_ReformationDroneSelfDestruct::
 		return;
 	}
 	AbortOwnedPursuitMove();
-	if (!IsActive() || bDetonationCommitted)
+	if (!IsDroneActivationCurrent(Activation) || bDetonationCommitted)
 	{
 		return;
 	}
@@ -1765,8 +1906,9 @@ void USovGameplayAbility_ReformationDroneSelfDestruct::
 	{
 		ActivePresentation->EnterWarning(DetonationWarningDuration);
 	}
+	if (!IsDroneActivationCurrent(Activation) || !CanContinueWeaponPayload()) { return; }
 	ReceiveDetonationWarningBegan(DetonationWarningDuration);
-	if (!IsActive() || bDetonationCommitted)
+	if (!IsDroneActivationCurrent(Activation) || bDetonationCommitted)
 	{
 		return;
 	}
@@ -1778,8 +1920,8 @@ void USovGameplayAbility_ReformationDroneSelfDestruct::
 
 	World->GetTimerManager().SetTimer(
 		DetonationWarningTimerHandle,
-		this,
-		&ThisClass::HandleDetonationWarningExpired,
+		FTimerDelegate::CreateWeakLambda(this, [this, Activation]()
+		{ if (IsDroneActivationCurrent(Activation)) { HandleDetonationWarningExpired(); } }),
 		FMath::Max(DetonationWarningDuration, 0.05f),
 		false);
 }
@@ -1820,36 +1962,39 @@ void USovGameplayAbility_ReformationDroneSelfDestruct::CommitDetonation()
 	}
 	const float SelfDamageEffectLevel =
 		static_cast<float>(GetAbilityLevel());
+	const uint64 Activation = GetDroneActivationSerial();
+	const auto* NarrativeSource = Cast<UNarrativeAbilitySystemComponent>(SourceASC);
+	const uint64 SourceEpoch = NarrativeSource ? NarrativeSource->GetCombatActorInfoEpoch() : 0;
+	const int32 ReadyEpoch = NarrativeSource ? NarrativeSource->GetCharacterReadyEpoch() : 0;
+	const FSovDamageTargetSnapshot CommittedSource(SourceASC);
+	AbortOwnedPursuitMove();
+	if (!IsDroneActivationCurrent(Activation) || !CanContinueWeaponPayload()) { return; }
 	bDetonationCommitted = true;
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(PursuitUpdateTimerHandle);
 		World->GetTimerManager().ClearTimer(DetonationWarningTimerHandle);
 	}
-	AbortOwnedPursuitMove();
 
 	const FVector ExplosionLocation = SourceDrone->GetActorLocation();
 	ASovReformationDroneSelfDestructPresentation* Presentation =
 		ActivePresentation.Get();
-	if (IsValid(Presentation))
-	{
-		// Freeze immutable state before any damage callback can synchronously
-		// kill the source and cancel this ability.
-		Presentation->PrepareDetonation(
-			ExplosionLocation,
-			ExplosionRadius);
-	}
-	const bool bDamagedAnyTarget = ApplyExplosionDamage(ExplosionLocation);
+	const bool bDamagedAnyTarget = ApplyExplosionDamage(ExplosionLocation, Presentation);
 	if (IsValid(Presentation))
 	{
 		Presentation->FinalizeDetonation(bDamagedAnyTarget);
 	}
+	// The committed blast may outlive death/cancellation, but it never kills a
+	// replacement avatar or crosses a checkpoint restoration on this ASC.
+	if (!CommittedSource.IsCurrent() || !IsValid(SourceASC) || !IsValid(SourceDrone) || SourceASC->GetAvatarActor() != SourceDrone
+		|| (NarrativeSource && (NarrativeSource->GetCombatActorInfoEpoch() != SourceEpoch
+			|| NarrativeSource->GetCharacterReadyEpoch() != ReadyEpoch))) { return; }
 	if (!IsTargetAlive(SourceASC))
 	{
 		// A reactive effect may have killed the drone during the outward pass.
 		// Narrative normally ends the ability synchronously, but finish it here
 		// as a fallback so no firing tag or watchdog remains active.
-		if (IsActive())
+		if (IsDroneActivationCurrent(Activation))
 		{
 			NotifyPayloadFinished();
 		}
@@ -1876,7 +2021,7 @@ void USovGameplayAbility_ReformationDroneSelfDestruct::CommitDetonation()
 		{
 			ProjectDrone->ClearDeathExplosionSuppression();
 		}
-		if (IsActive())
+		if (IsDroneActivationCurrent(Activation))
 		{
 			UE_LOG(
 				LogSovReformationDroneAbility,
@@ -1890,7 +2035,7 @@ void USovGameplayAbility_ReformationDroneSelfDestruct::CommitDetonation()
 	// This is normally already inactive because Narrative death cancels active
 	// abilities. Keep the native lifecycle correct if a character-specific
 	// death implementation defers that cancellation.
-	if (IsActive())
+	if (IsDroneActivationCurrent(Activation))
 	{
 		NotifyPayloadFinished();
 	}
@@ -1919,7 +2064,7 @@ void USovGameplayAbility_ReformationDroneSelfDestruct::
 }
 
 bool USovGameplayAbility_ReformationDroneSelfDestruct::ApplyExplosionDamage(
-	const FVector& ExplosionLocation) const
+	const FVector& ExplosionLocation, ASovReformationDroneSelfDestructPresentation* Presentation) const
 {
 	UWorld* World = GetWorld();
 	UAbilitySystemComponent* SourceASC = CurrentActorInfo
@@ -1946,6 +2091,25 @@ bool USovGameplayAbility_ReformationDroneSelfDestruct::ApplyExplosionDamage(
 	// reactive effects) and end this instanced ability. Capture every value that
 	// depends on live ability state before invoking the first target callback.
 	const float EffectLevel = static_cast<float>(GetAbilityLevel());
+	const auto ReleaseExplosionRadius = ExplosionRadius;
+	const auto ReleaseExplosionDamage = ExplosionDamage;
+	const auto ReleaseExplosionPoiseDamage = ExplosionPoiseDamage;
+	const auto ReleaseMinimumExplosionDamageFraction = MinimumExplosionDamageFraction;
+	const auto bReleaseRequiresLineOfSight = bExplosionRequiresLineOfSight;
+	const auto ReleaseDamageEffectClass = DamageEffectClass;
+	const auto ReleaseAbilityIdentityTag = AbilityIdentityTag;
+	const auto ReleaseDamageChannels = DamageChannels;
+	const auto ReleaseAttackClassifications = AttackClassifications;
+	const auto* NarrativeSource = Cast<UNarrativeAbilitySystemComponent>(SourceASC);
+	const uint64 SourceEpoch = NarrativeSource ? NarrativeSource->GetCombatActorInfoEpoch() : 0;
+	const int32 ReadyEpoch = NarrativeSource ? NarrativeSource->GetCharacterReadyEpoch() : 0;
+	const FSovDamageTargetSnapshot CommittedSource(SourceASC);
+	auto IsSourceCurrent = [SourceASC, SourceActor, NarrativeSource, SourceEpoch, ReadyEpoch, CommittedSource]()
+	{
+		return CommittedSource.IsCurrent() && IsValid(SourceASC) && IsValid(SourceActor) && SourceASC->GetAvatarActor() == SourceActor
+			&& (!NarrativeSource || (NarrativeSource->GetCombatActorInfoEpoch() == SourceEpoch
+				&& NarrativeSource->GetCharacterReadyEpoch() == ReadyEpoch));
+	};
 
 	FCollisionObjectQueryParams ObjectQuery;
 	ObjectQuery.AddObjectTypesToQuery(ECC_Pawn);
@@ -1967,16 +2131,17 @@ bool USovGameplayAbility_ReformationDroneSelfDestruct::ApplyExplosionDamage(
 		ExplosionLocation,
 		FQuat::Identity,
 		ObjectQuery,
-		FCollisionShape::MakeSphere(FMath::Max(ExplosionRadius, 1.0f)),
+		FCollisionShape::MakeSphere(FMath::Max(ReleaseExplosionRadius, 1.0f)),
 		QueryParams);
 
 	TSet<UAbilitySystemComponent*> UniqueTargets;
+	TArray<FSovDamageTargetSnapshot> Targets;
 	for (const FOverlapResult& Overlap : Overlaps)
 	{
 		if (UAbilitySystemComponent* TargetASC =
 			ResolveAbilitySystemFromActor(Overlap.GetActor()))
 		{
-			UniqueTargets.Add(TargetASC);
+			if (!UniqueTargets.Contains(TargetASC)) { UniqueTargets.Add(TargetASC); Targets.Emplace(TargetASC); }
 		}
 	}
 
@@ -1986,9 +2151,13 @@ bool USovGameplayAbility_ReformationDroneSelfDestruct::ApplyExplosionDamage(
 		SourceObject = SourceActor;
 	}
 	const FSovGameplayTags& SovTags = FSovGameplayTags::Get();
+	if (IsValid(Presentation)) { Presentation->PrepareDetonation(ExplosionLocation, ReleaseExplosionRadius); }
 	bool bDamagedAnyTarget = false;
-	for (UAbilitySystemComponent* TargetASC : UniqueTargets)
+	for (const FSovDamageTargetSnapshot& Target : Targets)
 	{
+		if (!IsSourceCurrent()) { break; }
+		if (!Target.IsCurrent()) { continue; }
+		UAbilitySystemComponent* TargetASC = Target.AbilitySystem.Get();
 		AActor* TargetActor = IsValid(TargetASC)
 			? TargetASC->GetAvatarActor()
 			: nullptr;
@@ -1999,7 +2168,7 @@ bool USovGameplayAbility_ReformationDroneSelfDestruct::ApplyExplosionDamage(
 			|| !IsTargetAlive(TargetASC)
 			|| SourceTeam->GetTeamAttitudeTowards(*TargetActor)
 				!= ETeamAttitude::Hostile
-			|| (bExplosionRequiresLineOfSight
+			|| (bReleaseRequiresLineOfSight
 				&& !HasExplosionLineOfSight(
 					SourceActor,
 					TargetActor,
@@ -2009,12 +2178,14 @@ bool USovGameplayAbility_ReformationDroneSelfDestruct::ApplyExplosionDamage(
 			continue;
 		}
 
+		if (!IsSourceCurrent() || !Target.IsCurrent()) { continue; }
+
 		FGameplayEffectContextHandle Context = SourceASC->MakeEffectContext();
 		Context.AddInstigator(SourceActor, SourceActor);
 		Context.AddSourceObject(SourceObject);
 		Context.AddOrigin(ExplosionLocation);
 		FGameplayEffectSpecHandle SpecHandle = SourceASC->MakeOutgoingSpec(
-			DamageEffectClass,
+			ReleaseDamageEffectClass,
 			EffectLevel,
 			Context);
 		FGameplayEffectSpec* DamageSpec = SpecHandle.Data.Get();
@@ -2027,57 +2198,44 @@ bool USovGameplayAbility_ReformationDroneSelfDestruct::ApplyExplosionDamage(
 			FVector::Distance(
 				ExplosionLocation,
 				TargetActor->GetActorLocation())
-				/ FMath::Max(ExplosionRadius, 1.0f),
+				/ FMath::Max(ReleaseExplosionRadius, 1.0f),
 			0.0f,
 			1.0f);
 		const float FalloffScalar = FMath::Lerp(
 			1.0f,
-			MinimumExplosionDamageFraction,
+			ReleaseMinimumExplosionDamageFraction,
 			DistanceAlpha);
-		DamageSpec->AddDynamicAssetTag(AbilityIdentityTag);
-		for (const FGameplayTag& Tag : DamageChannels)
+		DamageSpec->AddDynamicAssetTag(ReleaseAbilityIdentityTag);
+		for (const FGameplayTag& Tag : ReleaseDamageChannels)
 		{
 			DamageSpec->AddDynamicAssetTag(Tag);
 		}
-		for (const FGameplayTag& Tag : AttackClassifications)
+		for (const FGameplayTag& Tag : ReleaseAttackClassifications)
 		{
 			DamageSpec->AddDynamicAssetTag(Tag);
 		}
 		DamageSpec->SetSetByCallerMagnitude(
 			FNarrativeGameplayTags::Get().SetByCaller_Damage,
-			ExplosionDamage);
+			ReleaseExplosionDamage);
 		DamageSpec->SetSetByCallerMagnitude(
 			SovTags.SetByCaller_Damage_SourceModifier,
 			FalloffScalar);
-		if (ExplosionPoiseDamage > KINDA_SMALL_NUMBER)
+		if (ReleaseExplosionPoiseDamage > KINDA_SMALL_NUMBER)
 		{
 			DamageSpec->SetSetByCallerMagnitude(
 				SovTags.SetByCaller_Damage_PoiseDamage,
-				ExplosionPoiseDamage * FalloffScalar);
+				ReleaseExplosionPoiseDamage * FalloffScalar);
 		}
 
-		const float OldShield = TargetASC->GetNumericAttribute(
-			UNarrativeAttributeSetBase::GetShieldAttribute());
-		const float OldHealth = TargetASC->GetNumericAttribute(
-			UNarrativeAttributeSetBase::GetHealthAttribute());
-		const float OldPoise = TargetASC->GetNumericAttribute(
-			UNarrativeAttributeSetBase::GetPoiseAttribute());
-		const float OldStamina = TargetASC->GetNumericAttribute(
-			UNarrativeAttributeSetBase::GetStaminaAttribute());
+		TStrongObjectPtr<USovNativeDamageReceipt> Receipt(NewObject<USovNativeDamageReceipt>());
+		Receipt->bRequireNativeProof = true;
+		Receipt->ExpectedTarget = TargetActor;
+		Receipt->ExpectedContext = DamageSpec->GetContext().Get();
+		auto* ReceiptSource = Cast<UNarrativeAbilitySystemComponent>(SourceASC);
+		if (ReceiptSource) { ReceiptSource->OnDamageResolvedAsSource.AddDynamic(Receipt.Get(), &USovNativeDamageReceipt::ReceiveResult); }
 		SourceASC->ApplyGameplayEffectSpecToTarget(*DamageSpec, TargetASC);
-		bDamagedAnyTarget = bDamagedAnyTarget
-			|| TargetASC->GetNumericAttribute(
-				UNarrativeAttributeSetBase::GetShieldAttribute())
-				< OldShield - KINDA_SMALL_NUMBER
-			|| TargetASC->GetNumericAttribute(
-				UNarrativeAttributeSetBase::GetHealthAttribute())
-				< OldHealth - KINDA_SMALL_NUMBER
-			|| TargetASC->GetNumericAttribute(
-				UNarrativeAttributeSetBase::GetPoiseAttribute())
-				< OldPoise - KINDA_SMALL_NUMBER
-			|| TargetASC->GetNumericAttribute(
-				UNarrativeAttributeSetBase::GetStaminaAttribute())
-				< OldStamina - KINDA_SMALL_NUMBER;
+		if (IsValid(ReceiptSource)) { ReceiptSource->OnDamageResolvedAsSource.RemoveDynamic(Receipt.Get(), &USovNativeDamageReceipt::ReceiveResult); }
+		bDamagedAnyTarget |= Receipt->bAppliedDamage;
 	}
 	return bDamagedAnyTarget;
 }

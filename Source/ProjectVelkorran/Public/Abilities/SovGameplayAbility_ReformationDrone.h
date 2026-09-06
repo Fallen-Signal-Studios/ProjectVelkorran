@@ -78,6 +78,10 @@ protected:
 
 	/** Returns whether the source is still allowed to release another shot. */
 	bool CanContinueWeaponPayload() const;
+	uint64 GetDroneActivationSerial() const { return DroneActivationSerial; }
+	bool IsDroneActivationCurrent(uint64 ExpectedSerial) const;
+	/** Retire continuations immediately, including while GAS defers EndAbility. */
+	void FenceDroneEndRequest();
 
 	/** Lets concrete weapon implementations observe base lifecycle state safely. */
 	bool HasWeaponPayloadFinished() const { return bPayloadFinished; }
@@ -180,6 +184,8 @@ private:
 	void HandleMontageInterrupted();
 
 	void StartAttackMontage();
+	void BindDroneCancellation(UAbilitySystemComponent* AbilitySystem);
+	void UnbindDroneCancellation();
 
 	UPROPERTY(Transient)
 	TObjectPtr<UAbilityTask_PlayMontageAndWait> MontageTask;
@@ -192,6 +198,14 @@ private:
 	bool bPayloadFinished = false;
 	bool bAbilityStarted = false;
 	bool bEndingAbility = false;
+	bool bEndRequested = false;
+	uint64 DroneActivationSerial = 0;
+	uint64 DroneActorInfoEpoch = 0;
+	int32 DroneReadyEpoch = 0;
+	TWeakObjectPtr<UAbilitySystemComponent> DroneSourceASC;
+	TWeakObjectPtr<AActor> DroneSourceAvatar;
+	TArray<TPair<FGameplayTag, FDelegateHandle>> DroneCancellationHandles;
+	FDelegateHandle DroneHealthHandle;
 };
 
 /** Server-owned hitscan burst with replicated per-shot presentation. */
@@ -459,7 +473,7 @@ private:
 	void EnterDetonationWarning();
 	void CommitDetonation();
 	void AbortOwnedPursuitMove();
-	bool ApplyExplosionDamage(const FVector& ExplosionLocation) const;
+	bool ApplyExplosionDamage(const FVector& ExplosionLocation, ASovReformationDroneSelfDestructPresentation* Presentation) const;
 	bool HasExplosionLineOfSight(
 		AActor* InSourceActor,
 		AActor* TargetActor,
