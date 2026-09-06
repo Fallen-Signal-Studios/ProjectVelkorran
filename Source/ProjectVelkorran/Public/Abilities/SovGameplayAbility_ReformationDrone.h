@@ -15,7 +15,10 @@ class UAbilitySystemComponent;
 class UAbilityTask_PlayMontageAndWait;
 class UAnimMontage;
 class UGameplayEffect;
+class UNarrativeAttributeSetBase;
+class UPathFollowingComponent;
 class USovProtectionInterceptReceipt;
+struct FOnAttributeChangeData;
 
 /**
  * Shared server-authoritative shell for integral Reformation drone weapons.
@@ -62,6 +65,14 @@ protected:
 
 	virtual bool HasRequiredPayloadConfiguration() const;
 	virtual void ExecuteAutomaticPayload();
+	/** Called once after the base has invalidated the action, before GAS end callbacks. */
+	virtual void CleanupWeaponPayload();
+
+	uint64 GetWeaponActivationEpoch() const { return WeaponActivationEpoch; }
+	UWorld* GetWeaponActionWorld() const { return ActionWorld.Get(); }
+	bool IsWeaponActivationCurrent(uint64 ExpectedEpoch) const;
+	/** Cancels only the specified activation if its original combat owner is stale. */
+	bool ValidateWeaponContinuation(uint64 ExpectedEpoch);
 
 	/**
 	 * Enters the payload phase exactly once. Manual Blueprint release calls and
@@ -165,13 +176,13 @@ protected:
 
 private:
 	UFUNCTION()
-	void HandleAutomaticPayloadRelease();
+	void HandleAutomaticPayloadRelease(uint64 ExpectedEpoch);
 
 	UFUNCTION()
-	void HandleRecoveryFinished();
+	void HandleRecoveryFinished(uint64 ExpectedEpoch);
 
 	UFUNCTION()
-	void HandleMaximumDurationExpired();
+	void HandleMaximumDurationExpired(uint64 ExpectedEpoch);
 
 	UFUNCTION()
 	void HandleMontageCompleted();
@@ -180,6 +191,12 @@ private:
 	void HandleMontageInterrupted();
 
 	void StartAttackMontage();
+	bool HasCurrentWeaponOwner() const;
+	void BindInterruptions();
+	void UnbindInterruptions();
+	void HandleInterruption(FGameplayTag Tag, int32 Count, uint64 ExpectedEpoch);
+	void HandleHealthChanged(const FOnAttributeChangeData& Change, uint64 ExpectedEpoch);
+	uint64 AdvanceWeaponActivationEpoch();
 
 	UPROPERTY(Transient)
 	TObjectPtr<UAbilityTask_PlayMontageAndWait> MontageTask;
@@ -192,6 +209,16 @@ private:
 	bool bPayloadFinished = false;
 	bool bAbilityStarted = false;
 	bool bEndingAbility = false;
+	bool bEndPending = false;
+	uint64 WeaponActivationEpoch = 0;
+	TWeakObjectPtr<UAbilitySystemComponent> ActionASC;
+	TWeakObjectPtr<AActor> ActionAvatar;
+	TWeakObjectPtr<UWorld> ActionWorld;
+	TWeakObjectPtr<const UNarrativeAttributeSetBase> ActionAttributes;
+	uint64 ActionActorInfoEpoch = 0;
+	uint64 ActionLifeEpoch = 0;
+	TMap<FGameplayTag, FDelegateHandle> InterruptionHandles;
+	FDelegateHandle HealthChangedHandle;
 };
 
 /** Server-owned hitscan burst with replicated per-shot presentation. */
@@ -208,12 +235,7 @@ public:
 	void FireGunBurstFromAim();
 
 protected:
-	virtual void EndAbility(
-		const FGameplayAbilitySpecHandle Handle,
-		const FGameplayAbilityActorInfo* ActorInfo,
-		const FGameplayAbilityActivationInfo ActivationInfo,
-		bool bReplicateEndAbility,
-		bool bWasCancelled) override;
+	virtual void CleanupWeaponPayload() override;
 
 	virtual bool HasRequiredPayloadConfiguration() const override;
 	virtual void ExecuteAutomaticPayload() override;
@@ -247,7 +269,7 @@ protected:
 
 private:
 	UFUNCTION()
-	void FireNextBurstShot();
+	void FireNextBurstShot(uint64 ExpectedEpoch);
 
 	void SpawnGunshotPresentation(
 		const FVector& TraceStart,
@@ -371,12 +393,7 @@ protected:
 		const FGameplayAbilityActivationInfo ActivationInfo,
 		const FGameplayEventData* TriggerEventData) override;
 
-	virtual void EndAbility(
-		const FGameplayAbilitySpecHandle Handle,
-		const FGameplayAbilityActorInfo* ActorInfo,
-		const FGameplayAbilityActivationInfo ActivationInfo,
-		bool bReplicateEndAbility,
-		bool bWasCancelled) override;
+	virtual void CleanupWeaponPayload() override;
 
 	virtual bool HasRequiredPayloadConfiguration() const override;
 	virtual void ExecuteAutomaticPayload() override;
@@ -449,17 +466,30 @@ protected:
 
 private:
 	UFUNCTION()
-	void UpdatePursuit();
+	void UpdatePursuit(uint64 ExpectedEpoch);
 
 	UFUNCTION()
-	void HandleDetonationWarningExpired();
+	void HandleDetonationWarningExpired(uint64 ExpectedEpoch);
 
 	AActor* ResolvePursuitTarget() const;
 	bool RequestPursuitMove(AActor* TargetActor);
 	void EnterDetonationWarning();
 	void CommitDetonation();
 	void AbortOwnedPursuitMove();
-	bool ApplyExplosionDamage(const FVector& ExplosionLocation) const;
+	struct FCommittedExplosion
+	{
+		TSubclassOf<UGameplayEffect> EffectClass;
+		FGameplayTag Identity;
+		FGameplayTagContainer Channels;
+		FGameplayTagContainer Classifications;
+		float Radius = 0.f;
+		float Damage = 0.f;
+		float Poise = 0.f;
+		float MinimumFraction = 0.f;
+		bool bRequiresLOS = true;
+	};
+	bool ApplyExplosionDamage(const FVector& ExplosionLocation, UAbilitySystemComponent* SourceASC,
+		AActor* SourceActor, float EffectLevel, const FCommittedExplosion& Payload) const;
 	bool HasExplosionLineOfSight(
 		AActor* InSourceActor,
 		AActor* TargetActor,
@@ -469,7 +499,10 @@ private:
 		UAbilitySystemComponent* InSourceAbilitySystem,
 		AActor* InSourceActor,
 		float InEffectLevel,
-		const FVector& ExplosionLocation) const;
+		const FVector& ExplosionLocation,
+		TSubclassOf<UGameplayEffect> CommittedEffectClass,
+		FGameplayTag CommittedIdentity,
+		const FGameplayTagContainer& CommittedChannels) const;
 	ASovReformationDroneSelfDestructPresentation* SpawnPresentation(
 		AActor* SourceDrone) const;
 	TSubclassOf<ASovReformationDroneSelfDestructPresentation>
@@ -482,10 +515,10 @@ private:
 	FTimerHandle PursuitUpdateTimerHandle;
 	FTimerHandle DetonationWarningTimerHandle;
 	FAIRequestID OwnedPursuitMoveRequestId = FAIRequestID::InvalidRequest;
+	TWeakObjectPtr<UPathFollowingComponent> OwnedPathFollowing;
 	double PursuitStartTime = 0.0;
 	double LastMoveRequestTime = 0.0;
 	bool bPursuitStarted = false;
 	bool bWarningStarted = false;
 	bool bDetonationCommitted = false;
-	bool bEndingSelfDestructAbility = false;
 };

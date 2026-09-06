@@ -82,7 +82,7 @@ struct FAutomationTestBase { void AddError(const char*); bool TestTrue(const cha
 template<class T> T* Cast(void* p) { return static_cast<T*>(p); }
 """
         for hero in ("Tarrik", "Selene"):
-            path = PRIVATE / "Tests" / f"Sov{hero}PayloadRuntimeTests.cpp"
+            path = ROOT / "Source/ProjectVelkorranTests/Private/Tests" / f"Sov{hero}PayloadRuntimeTests.cpp"
             text = path.read_text()
             namespace = re.search(r"namespace (Sov\w+PayloadTests)\s*\{", text)
             self.assertIsNotNone(namespace, f"Helper namespace missing in {path}")

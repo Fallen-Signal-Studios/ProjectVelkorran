@@ -8,6 +8,12 @@
 			"Name": "ProjectVelkorran",
 			"Type": "Runtime",
 			"LoadingPhase": "Default"
+		},
+		{
+			"Name": "ProjectVelkorranTests",
+			"Type": "Editor",
+			"LoadingPhase": "PostEngineInit",
+			"TargetAllowList": [ "Editor" ]
 		}
 	],
 	"Plugins": [
