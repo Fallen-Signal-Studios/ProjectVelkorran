@@ -282,11 +282,17 @@ float USovEchoComponent::RestoreEchoFromCheckpoint(const float AuthoredValue)
 		return GetEcho();
 	}
 
+	ResetCheckpointActivity();
+	SetEchoInternal(AuthoredValue);
+	return GetEcho();
+}
+
+void USovEchoComponent::ResetCheckpointActivity()
+{
+	if (!CanWriteEcho()) { return; }
 	const float CurrentWorldTime = GetWorldTimeSeconds();
 	LastActivityWorldTime = CurrentWorldTime;
 	LastDecayUpdateWorldTime = CurrentWorldTime;
-	SetEchoInternal(AuthoredValue);
-	return GetEcho();
 }
 
 void USovEchoComponent::BeginEncounter()

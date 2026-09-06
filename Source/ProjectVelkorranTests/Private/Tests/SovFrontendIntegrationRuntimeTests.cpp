@@ -84,18 +84,18 @@ bool FSovFrontendTalesIntegrationTest::RunTest(const FString&)
 	USovDialogueRuntimeFixture* Second = W.Dialogue();
 	Second->RootDialogue->Line.Text = FText::FromString(TEXT("Replacement scene text.")); W.Start(Second);
 	TestEqual(TEXT("Replacement scene cannot remain queued behind an unfinished old scene"), W.Presentation->GetCurrentSpeechText().ToString(), FString(TEXT("Replacement scene text.")));
-	TestEqual(TEXT("Scene history belongs only to the replacement"), W.Presentation->GetSceneHistory().Num(), 1);
+	TestEqual(TEXT("Previous scene remains available in recent dialogue review"), W.Presentation->GetSceneHistory().Num(), 2);
 	W.Tales->OnNPCDialogueLineFinished.Broadcast(First, First->RootDialogue, First->RootDialogue->Line, FSpeakerInfo());
 	W.Tales->OnDialogueFinished.Broadcast(First, false, EExitDialogueReason::EDR_NoLines);
 	TestEqual(TEXT("Old line/scene completion cannot clear its successor"), W.Presentation->GetCurrentSpeechText().ToString(), FString(TEXT("Replacement scene text.")));
 	W.Start(First);
-	TestEqual(TEXT("A stale producer cannot append history to the current scene"), W.Presentation->GetSceneHistory().Num(), 1);
+	TestEqual(TEXT("A stale producer cannot append history to the current scene"), W.Presentation->GetSceneHistory().Num(), 2);
 	W.Tales->OnNPCDialogueLineFinished.Broadcast(Second, Second->RootDialogue, Second->RootDialogue->Line, FSpeakerInfo());
 	TestFalse(TEXT("Line finish preserves its minimum readable interval"), W.Presentation->GetCurrentSpeechText().IsEmpty());
 	W.Presentation->Advance(3.f);
 	TestTrue(TEXT("Finished native subtitle retires after readable time"), W.Presentation->GetCurrentSpeechText().IsEmpty());
 	W.Tales->OnDialogueFinished.Broadcast(Second, false, EExitDialogueReason::EDR_NoLines);
-	TestTrue(TEXT("Current scene exit clears its history"), W.Presentation->GetSceneHistory().IsEmpty());
+	TestEqual(TEXT("Current scene exit retains final information for review"), W.Presentation->GetSceneHistory().Num(), 2);
 	FSovFrontendTestAccess::End(W.Frontend); W.Start(Second);
 	TestTrue(TEXT("Teardown unbinds the actual Tales producer"), W.Presentation->GetSceneHistory().IsEmpty());
 	return true;
@@ -115,6 +115,10 @@ bool FSovFrontendCueDamageIntegrationTest::RunTest(const FString&)
 	FSovDamageResult Damage; Damage.TargetActor = W.Pawn; Damage.bShieldBroken = true;
 	W.ASC->OnDamageResolvedAsTarget.Broadcast(Damage);
 	TestEqual(TEXT("Actual combat damage delegate produces non-color caption"), W.Presentation->GetCurrentCaptionText().ToString(), FString(TEXT("Shield broken")));
+	FSovDamageResult Chip; Chip.TargetActor = W.Pawn; Chip.AppliedHealthDamage = 1.f;
+	for (int32 Hit = 0; Hit < 20; ++Hit) { W.ASC->OnDamageResolvedAsTarget.Broadcast(Chip); }
+	TestEqual(TEXT("Repeated chip damage cannot replace the critical break warning"), W.Presentation->GetCurrentCaptionText().ToString(), FString(TEXT("Shield broken")));
+	TestEqual(TEXT("Repeated chip damage coalesces to one pending history entry"), W.Presentation->GetSceneHistory().Num(), 3);
 	Damage.TargetActor = W.PC; Damage.bShieldBroken = false; Damage.bPerfectDefense = true;
 	W.ASC->OnDamageResolvedAsTarget.Broadcast(Damage);
 	TestEqual(TEXT("Another avatar's damage cannot overwrite local feedback"), W.Presentation->GetCurrentCaptionText().ToString(), FString(TEXT("Shield broken")));
@@ -148,6 +152,43 @@ bool FSovNativeHUDIntegrationTest::RunTest(const FString&)
 	TestNotNull(TEXT("Native host registers existing menu layer"), HUD->GetLayerContainer(Tags.UI_Layer_Menu));
 	TestNotNull(TEXT("Native host registers existing modal layer"), HUD->GetLayerContainer(Tags.UI_Layer_Modal));
 	TestTrue(TEXT("Menu/modal have independent stacks in the same CommonUI host"), HUD->GetLayerContainer(Tags.UI_Layer_Menu) != HUD->GetLayerContainer(Tags.UI_Layer_Modal));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovFinalDialogueRetentionTest, "ProjectVelkorran.UI.Frontend.FinalLineSurvivesDialogueEnd",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovFinalDialogueRetentionTest::RunTest(const FString&)
+{
+	FFrontendWorld W; auto* Dialogue = W.Dialogue(); W.Start(Dialogue);
+	W.Tales->OnNPCDialogueLineFinished.Broadcast(Dialogue, Dialogue->RootDialogue, Dialogue->RootDialogue->Line, FSpeakerInfo());
+	W.Tales->OnDialogueFinished.Broadcast(Dialogue, false, EExitDialogueReason::EDR_NoLines);
+	TestFalse(TEXT("Final line remains readable after graph completion"), W.Presentation->GetCurrentSpeechText().IsEmpty());
+	W.Presentation->Advance(1.f);
+	TestFalse(TEXT("Scene completion cannot bypass the minimum readable interval"), W.Presentation->GetCurrentSpeechText().IsEmpty());
+	W.Presentation->Advance(2.f);
+	TestTrue(TEXT("Finished final page eventually retires"), W.Presentation->GetCurrentSpeechText().IsEmpty());
+	TestEqual(TEXT("Final line remains accessible in recent dialogue review"), W.Presentation->GetSceneHistory().Num(), 1);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCaptionPriorityLifetimeTest, "ProjectVelkorran.UI.Frontend.CaptionPriorityAndReadableLifetime",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCaptionPriorityLifetimeTest::RunTest(const FString&)
+{
+	FFrontendWorld W;
+	W.Presentation->PresentCaption(FText::FromString(TEXT("Critical warning")), 3.f, FVector::ZeroVector, ESovCaptionPriority::Critical);
+	W.Presentation->Advance(2.f);
+	for (int32 Count = 0; Count < 50; ++Count)
+	{
+		W.Presentation->PresentCaption(FText::FromString(TEXT("Critical warning")), 3.f, FVector::ZeroVector, ESovCaptionPriority::Critical);
+		W.Presentation->PresentCaption(FText::FromString(TEXT("Chip damage")), 3.f, FVector::ZeroVector, ESovCaptionPriority::Routine);
+	}
+	TestEqual(TEXT("Duplicates never replace the live critical page"), W.Presentation->GetCurrentCaptionText().ToString(), FString(TEXT("Critical warning")));
+	TestEqual(TEXT("Burst duplicates retain only distinct records"), W.Presentation->GetSceneHistory().Num(), 2);
+	W.Presentation->Advance(1.1f);
+	TestEqual(TEXT("Coalescing does not restart the critical lifetime or starve its queued successor"), W.Presentation->GetCurrentCaptionText().ToString(), FString(TEXT("Chip damage")));
+	W.Presentation->PresentCaption(FText::FromString(TEXT("Guard broken")), 3.f, FVector::ZeroVector, ESovCaptionPriority::Critical);
+	TestEqual(TEXT("New critical warning immediately preempts routine feedback"), W.Presentation->GetCurrentCaptionText().ToString(), FString(TEXT("Guard broken")));
 	return true;
 }
 #endif

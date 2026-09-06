@@ -58,6 +58,7 @@ class PROJECTVELKORRAN_API USovAccessibilitySettingsMenu : public UNarrativeMenu
 public:
 	USovAccessibilitySettingsMenu();
 	void SetFirstBoot(bool bValue);
+	void PresentTravelRecovery(const FString& Message);
 	void Adjust(USovAccessibilitySettingRow* Row, int32 Direction);
 	FText ValueText(const USovAccessibilitySettingRow* Row) const;
 	bool IsRowEnabled(const USovAccessibilitySettingRow* Row) const;
@@ -85,6 +86,7 @@ private:
 	UPROPERTY(Transient) TObjectPtr<USovGameUserSettings> BoundSettings;
 	UPROPERTY(Transient) TObjectPtr<USovPlatformServicesSubsystem> PlatformServices;
 	FGuid CloudRequest;
+	FText RecoveryMessage;
 	int32 CloudManualSlot = 0;
 	bool bFirstBoot = false;
 	bool bHDREnabled = true;

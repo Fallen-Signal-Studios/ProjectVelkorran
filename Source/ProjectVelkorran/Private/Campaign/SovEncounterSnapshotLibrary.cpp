@@ -1,8 +1,10 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Campaign/SovEncounterSnapshotLibrary.h"
 #include "Campaign/SovEncounterPolicy.h"
-#include "AbilitySystemComponent.h"
+#include "Campaign/SovResourceSnapshotPolicy.h"
 #include "AbilitySystemBlueprintLibrary.h"
+#include "UnrealFramework/NarrativePlayerCharacter.h"
+#include "AbilitySystemComponent.h"
 #include "Components/ActorComponent.h"
 #include "Components/SovEchoComponent.h"
 #include "Exertion/SovExertionComponent.h"
@@ -23,9 +25,6 @@
 
 namespace
 {
-	// Game-thread transaction admission; this is not a second resource store.
-	TSet<TWeakObjectPtr<UAbilitySystemComponent>> ResourceRestoresInProgress;
-
 	bool IsCurrentSnapshotComponent(const UActorComponent* Component, const AActor* Owner, const FName Name)
 	{
 		if (!IsValid(Component) || !IsValid(Owner) || Owner->IsActorBeingDestroyed()
@@ -36,15 +35,65 @@ namespace
 		TInlineComponentArray<UActorComponent*> Components(Owner);
 		return Components.Contains(Component);
 	}
+
+	// Only resource-current aggregators with an independently reconstructable
+	// constant additive magnitude are supported. Inhibited/conditional, captured
+	// attribute, custom calculation and override/multiply effects fail closed.
+	bool CurrentResourceOffsets(UAbilitySystemComponent* ASC, const TArray<FGameplayAttribute>& Attributes,
+		TArray<float>& OutOffsets, bool& bHasModifiers)
+	{
+		OutOffsets.Init(0.f, Attributes.Num());
+		bHasModifiers = false;
+		for (const FActiveGameplayEffectHandle Handle : ASC->GetActiveEffects(FGameplayEffectQuery()))
+		{
+			const FActiveGameplayEffect* Active = ASC->GetActiveGameplayEffect(Handle);
+			if (!Active || !Active->Spec.Def || Active->Spec.GetPeriod() > 0.f) { continue; }
+			const UGameplayEffect* Definition = Active->Spec.Def;
+			for (int32 Index = 0; Index < Definition->Modifiers.Num(); ++Index)
+			{
+				const FGameplayModifierInfo& Modifier = Definition->Modifiers[Index];
+				const int32 ResourceIndex = Attributes.IndexOfByKey(Modifier.Attribute);
+				if (ResourceIndex == INDEX_NONE) { continue; }
+				bHasModifiers = true;
+				if (!Active->Spec.Modifiers.IsValidIndex(Index)
+					|| !FMath::IsFinite(Active->Spec.GetPeriod()) || Active->Spec.GetPeriod() < 0.f
+					|| Active->bIsInhibited || Modifier.ModifierOp != EGameplayModOp::Additive
+					|| Modifier.ModifierMagnitude.GetMagnitudeCalculationType() != EGameplayEffectMagnitudeCalculation::ScalableFloat
+					|| !Modifier.SourceTags.IsEmpty() || !Modifier.TargetTags.IsEmpty()
+					|| !Modifier.SourceTags.TagQuery.IsEmpty() || !Modifier.TargetTags.TagQuery.IsEmpty()
+					|| !Definition->Executions.IsEmpty()) { return false; }
+				const float Magnitude = Active->Spec.GetModifierMagnitude(Index, true);
+				OutOffsets[ResourceIndex] += Magnitude;
+				if (!FMath::IsFinite(Magnitude) || !FMath::IsFinite(OutOffsets[ResourceIndex])) { return false; }
+			}
+		}
+		return true;
+	}
+
+	TArray<FGameplayAttribute> ResourceAttributes()
+	{
+		return { UNarrativeAttributeSetBase::GetShieldAttribute(), UNarrativeAttributeSetBase::GetStaminaAttribute(),
+			UNarrativeAttributeSetBase::GetPoiseAttribute(), UNarrativeAttributeSetBase::GetHealthAttribute(),
+			UNarrativeAttributeSetBase::GetEchoAttribute() };
+	}
+	TSet<TWeakObjectPtr<UAbilitySystemComponent>> RestoringResourceOwners;
+
 }
 
 bool FSovCombatResourceSnapshot::IsValid() const
 {
-	return SovEncounterPolicy::ValidResource(Health, MaxHealth)
+	if (SchemaVersion != 1 && SchemaVersion != 2) { return false; }
+	const bool bCurrentsValid = SovEncounterPolicy::ValidResource(Health, MaxHealth)
 		&& SovEncounterPolicy::ValidResource(Shield, MaxShield)
 		&& SovEncounterPolicy::ValidResource(Stamina, MaxStamina)
 		&& SovEncounterPolicy::ValidResource(Poise, MaxPoise)
 		&& SovEncounterPolicy::ValidResource(Echo, MaxEcho);
+	return bCurrentsValid && (SchemaVersion == 1 || (
+		SovResourceSnapshotPolicy::ValidBase(BaseHealth, BaseMaxHealth)
+		&& SovResourceSnapshotPolicy::ValidBase(BaseShield, BaseMaxShield)
+		&& SovResourceSnapshotPolicy::ValidBase(BaseStamina, BaseMaxStamina)
+		&& SovResourceSnapshotPolicy::ValidBase(BasePoise, BaseMaxPoise)
+		&& SovResourceSnapshotPolicy::ValidBase(BaseEcho, BaseMaxEcho)));
 }
 
 bool FSovProtagonistSnapshot::IsValid() const
@@ -59,9 +108,13 @@ bool FSovProtagonistSnapshot::IsValid() const
 
 bool USovEncounterSnapshotLibrary::CaptureResources(UAbilitySystemComponent* ASC, FSovCombatResourceSnapshot& OutSnapshot)
 {
-	if (!IsValid(ASC) || !ASC->GetSet<UNarrativeAttributeSetBase>()) { return false; }
+	if (!IsValid(ASC) || !ASC->GetSet<UNarrativeAttributeSetBase>() || RestoringResourceOwners.Contains(ASC)) { return false; }
+	TArray<float> Offsets;
+	bool bHasModifiers = false;
+	if (!CurrentResourceOffsets(ASC, ResourceAttributes(), Offsets, bHasModifiers)) { return false; }
 	FSovCombatResourceSnapshot Result;
-#define SOV_CAPTURE_RESOURCE(Name) Result.Name = ASC->GetNumericAttribute(UNarrativeAttributeSetBase::Get##Name##Attribute()); Result.Max##Name = ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetMax##Name##Attribute());
+	Result.SchemaVersion = 2;
+#define SOV_CAPTURE_RESOURCE(Name) Result.Name = ASC->GetNumericAttribute(UNarrativeAttributeSetBase::Get##Name##Attribute()); Result.Max##Name = ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetMax##Name##Attribute()); Result.Base##Name = ASC->GetNumericAttributeBase(UNarrativeAttributeSetBase::Get##Name##Attribute()); Result.BaseMax##Name = ASC->GetNumericAttributeBase(UNarrativeAttributeSetBase::GetMax##Name##Attribute());
 	SOV_CAPTURE_RESOURCE(Health)
 	SOV_CAPTURE_RESOURCE(Shield)
 	SOV_CAPTURE_RESOURCE(Stamina)
@@ -69,7 +122,40 @@ bool USovEncounterSnapshotLibrary::CaptureResources(UAbilitySystemComponent* ASC
 	SOV_CAPTURE_RESOURCE(Echo)
 #undef SOV_CAPTURE_RESOURCE
 	if (!Result.IsValid()) { return false; }
+	const float Bases[] = { Result.BaseShield, Result.BaseStamina, Result.BasePoise, Result.BaseHealth, Result.BaseEcho };
+	const float Currents[] = { Result.Shield, Result.Stamina, Result.Poise, Result.Health, Result.Echo };
+	const float Maxima[] = { Result.MaxShield, Result.MaxStamina, Result.MaxPoise, Result.MaxHealth, Result.MaxEcho };
+	for (int32 Index = 0; Index < Offsets.Num(); ++Index)
+	{
+		if (!FMath::IsNearlyEqual(Currents[Index], static_cast<float>(SovResourceSnapshotPolicy::Resolved(
+			Bases[Index], Offsets[Index], Maxima[Index])), .01f)) { return false; }
+	}
 	OutSnapshot = Result;
+	return true;
+}
+
+bool USovEncounterSnapshotLibrary::RebaseAuthoredResourceCurrents(UAbilitySystemComponent* ASC, FSovCombatResourceSnapshot& InOutSnapshot)
+{
+	if (!IsValid(ASC) || !ASC->GetSet<UNarrativeAttributeSetBase>() || !InOutSnapshot.IsValid()
+		|| RestoringResourceOwners.Contains(ASC)) { return false; }
+	TArray<float> Offsets;
+	bool bHasModifiers = false;
+	if (!CurrentResourceOffsets(ASC, ResourceAttributes(), Offsets, bHasModifiers)) { return false; }
+	FSovCombatResourceSnapshot Result = InOutSnapshot;
+	Result.SchemaVersion = 2;
+	int32 Index = 0;
+#define SOV_REBASE_RESOURCE(Name) \
+	if (!FMath::IsNearlyEqual(Result.Max##Name, ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetMax##Name##Attribute()), .01f)) { return false; } \
+	if (InOutSnapshot.SchemaVersion == 1 || !FMath::IsNearlyEqual(static_cast<float>(SovResourceSnapshotPolicy::Resolved(Result.Base##Name, Offsets[Index], Result.Max##Name)), Result.Name, .01f)) { Result.Base##Name = Result.Name - Offsets[Index]; } \
+	Result.BaseMax##Name = ASC->GetNumericAttributeBase(UNarrativeAttributeSetBase::GetMax##Name##Attribute()); ++Index;
+	SOV_REBASE_RESOURCE(Shield)
+	SOV_REBASE_RESOURCE(Stamina)
+	SOV_REBASE_RESOURCE(Poise)
+	SOV_REBASE_RESOURCE(Health)
+	SOV_REBASE_RESOURCE(Echo)
+#undef SOV_REBASE_RESOURCE
+	if (!Result.IsValid()) { return false; }
+	InOutSnapshot = Result;
 	return true;
 }
 
@@ -80,7 +166,7 @@ bool USovEncounterSnapshotLibrary::RestoreResources(UAbilitySystemComponent* ASC
 	const FSovCombatResourceSnapshot FrozenSnapshot = Snapshot;
 	if (!IsInGameThread() || !IsValid(ASC) || !FrozenSnapshot.IsValid()) { return false; }
 	const TWeakObjectPtr<UAbilitySystemComponent> RestoreKey(ASC);
-	if (ResourceRestoresInProgress.Contains(RestoreKey)) { return false; }
+	if (RestoringResourceOwners.Contains(RestoreKey)) { return false; }
 	TStrongObjectPtr<UAbilitySystemComponent> KeepASC(ASC);
 	TStrongObjectPtr<AActor> Owner(ASC->GetOwnerActor());
 	TStrongObjectPtr<AActor> Avatar(ASC->GetAvatarActor());
@@ -89,6 +175,9 @@ bool USovEncounterSnapshotLibrary::RestoreResources(UAbilitySystemComponent* ASC
 		|| !Owner->HasAuthority() || !Avatar->HasAuthority()) { return false; }
 	auto* NarrativeASC = Cast<UNarrativeAbilitySystemComponent>(ASC);
 	const uint64 ActorInfoEpoch = NarrativeASC ? NarrativeASC->GetCombatActorInfoEpoch() : 0;
+	const int32 ReadyEpoch = NarrativeASC ? NarrativeASC->GetCharacterReadyEpoch() : 0;
+	const auto* Player = Cast<ANarrativePlayerCharacter>(Avatar.Get());
+	const int32 InitializationGeneration = Player ? Player->GetCharacterInitializationGeneration() : 0;
 	uint64 AcceptedLifeEpoch = Attributes->GetCombatLifeEpoch();
 	bool bMayAdvanceLife = Attributes->GetHealth() <= 0.f && FrozenSnapshot.Health > 0.f;
 	TStrongObjectPtr<USovShieldComponent> Shield(Avatar->FindComponentByClass<USovShieldComponent>());
@@ -108,7 +197,9 @@ bool USovEncounterSnapshotLibrary::RestoreResources(UAbilitySystemComponent* ASC
 			&& UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Avatar.Get()) == ASC
 			&& ASC->GetSet<UNarrativeAttributeSetBase>() == Attributes.Get()
 			&& Attributes->GetOwningAbilitySystemComponent() == ASC
-			&& (!NarrativeASC || NarrativeASC->GetCombatActorInfoEpoch() == ActorInfoEpoch)
+			&& (!NarrativeASC || (NarrativeASC->GetCombatActorInfoEpoch() == ActorInfoEpoch
+				&& NarrativeASC->GetCharacterReadyEpoch() == ReadyEpoch))
+			&& (!Player || Player->GetCharacterInitializationGeneration() == InitializationGeneration)
 			&& Avatar->FindComponentByClass<USovShieldComponent>() == Shield.Get()
 			&& Avatar->FindComponentByClass<USovPoiseComponent>() == Poise.Get()
 			&& Avatar->FindComponentByClass<USovExertionComponent>() == Exertion.Get()
@@ -142,7 +233,7 @@ bool USovEncounterSnapshotLibrary::RestoreResources(UAbilitySystemComponent* ASC
 		return StillOwnsLife();
 	};
 	if (!StillOwnsStorage()) { return false; }
-	ResourceRestoresInProgress.Add(RestoreKey);
+	RestoringResourceOwners.Add(RestoreKey);
 	bool bCommitted = false;
 	ON_SCOPE_EXIT
 	{
@@ -153,28 +244,51 @@ bool USovEncounterSnapshotLibrary::RestoreResources(UAbilitySystemComponent* ASC
 			if (IsValid(Shield.Get()) && ShieldRestoreGeneration) { Shield->EndCheckpointRestore(ShieldRestoreGeneration, false); }
 			if (IsValid(Poise.Get()) && PoiseRestoreGeneration) { Poise->EndCheckpointRestore(PoiseRestoreGeneration, false); }
 		}
-		ResourceRestoresInProgress.Remove(RestoreKey);
+		RestoringResourceOwners.Remove(RestoreKey);
 	};
 	if (Shield.IsValid()) { Shield->SetCheckpointRestoreInProgress(true); ShieldRestoreGeneration = Shield->GetCheckpointRestoreGeneration(); }
 	if (Poise.IsValid()) { Poise->SetCheckpointRestoreInProgress(true); PoiseRestoreGeneration = Poise->GetCheckpointRestoreGeneration(); }
+	TArray<float> PreflightOffsets; bool bPreflightModifiers = false;
+	if (!CurrentResourceOffsets(ASC, ResourceAttributes(), PreflightOffsets, bPreflightModifiers)
+		|| (FrozenSnapshot.SchemaVersion == 1 && bPreflightModifiers)) { return false; }
 	if (NarrativeASC && NarrativeASC->IsDead() && FrozenSnapshot.Health > 0.f) { NarrativeASC->Revive(); }
 	if (!AcceptControlledRevival()) { return false; }
 
-	// NPC revival may legitimately initialize authored maxima. Freeze those values
-	// after revival; later callbacks cannot silently retune half the transaction.
-	FSovCombatResourceSnapshot Desired = FrozenSnapshot;
-#define SOV_FREEZE_RESOURCE(Name) Desired.Max##Name = Attributes->GetMax##Name(); Desired.Name = SovEncounterPolicy::ClampRestoredResource(FrozenSnapshot.Name, Desired.Max##Name);
-	SOV_FREEZE_RESOURCE(Health) SOV_FREEZE_RESOURCE(Shield) SOV_FREEZE_RESOURCE(Stamina) SOV_FREEZE_RESOURCE(Poise) SOV_FREEZE_RESOURCE(Echo)
-#undef SOV_FREEZE_RESOURCE
-	if (!Desired.IsValid() || (FrozenSnapshot.Health > 0.f && Desired.Health <= 0.f)) { return false; }
-#define SOV_RESTORE_RESOURCE(Name) ASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::Get##Name##Attribute(), Desired.Name); if (!StillOwnsLife() || !FMath::IsNearlyEqual(Attributes->Get##Name(), Desired.Name, 0.01f)) { return false; }
-	SOV_RESTORE_RESOURCE(Shield)
-	SOV_RESTORE_RESOURCE(Stamina)
-	SOV_RESTORE_RESOURCE(Poise)
-	ASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetHealthAttribute(), Desired.Health);
-	if (!AcceptControlledRevival() || !FMath::IsNearlyEqual(Attributes->GetHealth(), Desired.Health, 0.01f)) { return false; }
-	SOV_RESTORE_RESOURCE(Echo)
-#undef SOV_RESTORE_RESOURCE
+	const TArray<FGameplayAttribute> ResourceFields = ResourceAttributes();
+	const TArray<FGameplayAttribute> Maxima = {
+		UNarrativeAttributeSetBase::GetMaxShieldAttribute(), UNarrativeAttributeSetBase::GetMaxStaminaAttribute(),
+		UNarrativeAttributeSetBase::GetMaxPoiseAttribute(), UNarrativeAttributeSetBase::GetMaxHealthAttribute(),
+		UNarrativeAttributeSetBase::GetMaxEchoAttribute() };
+	TArray<float> Offsets; bool bHasModifiers = false;
+	if (!CurrentResourceOffsets(ASC, ResourceFields, Offsets, bHasModifiers)
+		|| (FrozenSnapshot.SchemaVersion == 1 && !SovResourceSnapshotPolicy::CanRestoreLegacy(bHasModifiers))) { return false; }
+	const float Currents[] = { FrozenSnapshot.Shield, FrozenSnapshot.Stamina, FrozenSnapshot.Poise, FrozenSnapshot.Health, FrozenSnapshot.Echo };
+	const float Bases[] = { FrozenSnapshot.BaseShield, FrozenSnapshot.BaseStamina, FrozenSnapshot.BasePoise, FrozenSnapshot.BaseHealth, FrozenSnapshot.BaseEcho };
+	const float SavedMaxima[] = { FrozenSnapshot.MaxShield, FrozenSnapshot.MaxStamina, FrozenSnapshot.MaxPoise, FrozenSnapshot.MaxHealth, FrozenSnapshot.MaxEcho };
+	TArray<float> DesiredBases, ExpectedCurrents, ExpectedMaxima;
+	for (int32 Index = 0; Index < ResourceFields.Num(); ++Index)
+	{
+		const float Maximum = ASC->GetNumericAttribute(Maxima[Index]);
+		if (!FMath::IsFinite(Maximum) || Maximum < 0.f) { return false; }
+		float Base = FrozenSnapshot.SchemaVersion == 1
+			? SovEncounterPolicy::ClampRestoredResource(Currents[Index], Maximum)
+			: static_cast<float>(SovResourceSnapshotPolicy::RestoredBase(Bases[Index], SavedMaxima[Index], Maximum));
+		// A dead snapshot cannot become a living avatar because a transient
+		// penalty expired or a grant was reconstructed during load.
+		if (Index == 3 && FrozenSnapshot.Health == 0.f) { Base = FMath::Min(Base, -Offsets[Index]); }
+		const float Expected = static_cast<float>(SovResourceSnapshotPolicy::Resolved(Base, Offsets[Index], Maximum));
+		if (!FMath::IsFinite(Base) || !FMath::IsFinite(Expected)) { return false; }
+		DesiredBases.Add(Base); ExpectedCurrents.Add(Expected); ExpectedMaxima.Add(Maximum);
+	}
+	if (FrozenSnapshot.Health > 0.f && ExpectedCurrents[3] <= 0.f) { return false; }
+	for (int32 Index = 0; Index < ResourceFields.Num(); ++Index)
+	{
+		if (!StillOwnsLife()) { return false; }
+		ASC->SetNumericAttributeBase(ResourceFields[Index], DesiredBases[Index]);
+		if (!(Index == 3 ? AcceptControlledRevival() : StillOwnsLife())
+			|| !FMath::IsNearlyEqual(ASC->GetNumericAttributeBase(ResourceFields[Index]), DesiredBases[Index], .01f)
+			|| !FMath::IsNearlyEqual(ASC->GetNumericAttribute(ResourceFields[Index]), ExpectedCurrents[Index], .01f)) { return false; }
+	}
 	if (Exertion.IsValid()) { Exertion->ResetForCheckpoint(); }
 	if (!StillOwnsLife()) { return false; }
 	if (Health.IsValid()) { Health->ResetForCheckpoint(); }
@@ -183,15 +297,25 @@ bool USovEncounterSnapshotLibrary::RestoreResources(UAbilitySystemComponent* ASC
 	if (!StillOwnsLife()) { return false; }
 	if (Poise.IsValid()) { Poise->ResetForCheckpoint(); if (!Poise->IsCheckpointStateReconciled()) { return false; } }
 	if (!StillOwnsLife()) { return false; }
-	if (Echo.IsValid()) { Echo->RestoreEchoFromCheckpoint(Desired.Echo); }
+	if (Echo.IsValid()) { Echo->ResetCheckpointActivity(); }
 	if (!StillOwnsLife()) { return false; }
-	// PR34's generic-status modifier checks and queued restore barrier remain the
-	// authority; no resolved-current/base-value save format conversion is added.
+	// Retain PR34's status safety restriction alongside the explicit v2 resource bases.
 	if (Status.IsValid() && !Status->CompletePendingCheckpointRestore()) { return false; }
 	if (!StillOwnsLife()) { return false; }
-#define SOV_VERIFY_RESOURCE(Name) if (!FMath::IsNearlyEqual(Attributes->Get##Name(), Desired.Name, 0.01f) || !FMath::IsNearlyEqual(Attributes->GetMax##Name(), Desired.Max##Name, 0.01f)) { return false; }
-	SOV_VERIFY_RESOURCE(Health) SOV_VERIFY_RESOURCE(Shield) SOV_VERIFY_RESOURCE(Stamina) SOV_VERIFY_RESOURCE(Poise) SOV_VERIFY_RESOURCE(Echo)
-#undef SOV_VERIFY_RESOURCE
+	const auto VerifyResourceVector = [&]()
+	{
+		TArray<float> FinalOffsets; bool bFinalModifiers = false;
+		if (!CurrentResourceOffsets(ASC, ResourceFields, FinalOffsets, bFinalModifiers)) { return false; }
+		for (int32 Index = 0; Index < ResourceFields.Num(); ++Index)
+		{
+			if (!FMath::IsNearlyEqual(FinalOffsets[Index], Offsets[Index], .01f)
+				|| !FMath::IsNearlyEqual(ASC->GetNumericAttribute(Maxima[Index]), ExpectedMaxima[Index], .01f)
+				|| !FMath::IsNearlyEqual(ASC->GetNumericAttributeBase(ResourceFields[Index]), DesiredBases[Index], .01f)
+				|| !FMath::IsNearlyEqual(ASC->GetNumericAttribute(ResourceFields[Index]), ExpectedCurrents[Index], .01f)) { return false; }
+		}
+		return true;
+	};
+	if (!VerifyResourceVector()) { return false; }
 	// Release is part of the transaction: zero-duration Poise recovery can publish
 	// callbacks immediately. Recheck after each release, not after a bool return
 	// value has already been evaluated by a scope-exit guard.
@@ -199,6 +323,7 @@ bool USovEncounterSnapshotLibrary::RestoreResources(UAbilitySystemComponent* ASC
 	if (!StillOwnsLife()) { return false; }
 	if (Poise.IsValid() && !Poise->EndCheckpointRestore(PoiseRestoreGeneration, true)) { return false; }
 	if (!StillOwnsLife()) { return false; }
+	if (!VerifyResourceVector()) { return false; }
 	bCommitted = true;
 	return true;
 }

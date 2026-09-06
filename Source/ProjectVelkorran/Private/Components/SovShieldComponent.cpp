@@ -106,6 +106,7 @@ bool USovShieldComponent::InitializeWithAbilitySystem(UAbilitySystemComponent* I
 	const auto* RequestedNarrativeASC = Cast<UNarrativeAbilitySystemComponent>(InAbilitySystemComponent);
 	const uint64 RequestedActorEpoch = RequestedNarrativeASC ? RequestedNarrativeASC->GetCombatActorInfoEpoch() : 0;
 	const uint64 RequestedLifeEpoch = Attributes->GetCombatLifeEpoch();
+	const int32 RequestedReadyEpoch = RequestedNarrativeASC ? RequestedNarrativeASC->GetCharacterReadyEpoch() : 0;
 	TGuardValue<bool> ChangingGuard(bChangingAbilitySystem, true);
 	UninitializeFromAbilitySystem();
 	// Tag-removal observers may retire this avatar during teardown.
@@ -114,12 +115,14 @@ bool USovShieldComponent::InitializeWithAbilitySystem(UAbilitySystemComponent* I
 		|| UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Owner) != InAbilitySystemComponent
 		|| InAbilitySystemComponent->GetSet<UNarrativeAttributeSetBase>() != Attributes
 		|| !IsValid(Attributes) || Attributes->GetCombatLifeEpoch() != RequestedLifeEpoch
-		|| (RequestedNarrativeASC && RequestedNarrativeASC->GetCombatActorInfoEpoch() != RequestedActorEpoch)) { return false; }
+		|| (RequestedNarrativeASC && (RequestedNarrativeASC->GetCombatActorInfoEpoch() != RequestedActorEpoch
+			|| RequestedNarrativeASC->GetCharacterReadyEpoch() != RequestedReadyEpoch))) { return false; }
 	AbilitySystemComponent = InAbilitySystemComponent;
 	BoundAttributes = Attributes;
 	BoundLifeEpoch = Attributes->GetCombatLifeEpoch();
 	const auto* EpochASC = Cast<UNarrativeAbilitySystemComponent>(InAbilitySystemComponent);
 	BoundActorInfoEpoch = EpochASC ? EpochASC->GetCombatActorInfoEpoch() : 0;
+	BoundReadyEpoch = EpochASC ? EpochASC->GetCharacterReadyEpoch() : 0;
 	const uint64 Generation = ++BindingGeneration;
 	bWarnedMissingAttributeSet = false;
 
@@ -150,6 +153,7 @@ bool USovShieldComponent::InitializeWithAbilitySystem(UAbilitySystemComponent* I
 	{
 		NarrativeASC->OnDamageResolvedAsTarget.AddUniqueDynamic(this, &ThisClass::HandleDamageResolved);
 		NarrativeASC->OnDeathStateChanged.AddUniqueDynamic(this, &ThisClass::HandleDeathStateChanged);
+		NarrativeASC->OnCharacterReadyEpochChanged.AddUniqueDynamic(this, &ThisClass::HandleOwnerReadyEpochChanged);
 	}
 
 	bHasRecordedShieldDamage = false;
@@ -234,7 +238,8 @@ bool USovShieldComponent::IsInitialized() const
 		&& ASC->GetSet<UNarrativeAttributeSetBase>() == Attributes
 		&& Attributes->GetOwningAbilitySystemComponent() == ASC
 		&& Attributes->GetCombatLifeEpoch() == BoundLifeEpoch
-		&& (!NarrativeASC || NarrativeASC->GetCombatActorInfoEpoch() == BoundActorInfoEpoch);
+		&& (!NarrativeASC || (NarrativeASC->GetCombatActorInfoEpoch() == BoundActorInfoEpoch
+			&& NarrativeASC->GetCharacterReadyEpoch() == BoundReadyEpoch));
 }
 
 bool USovShieldComponent::IsCurrentOperation(const uint64 Generation) const
@@ -250,7 +255,8 @@ bool USovShieldComponent::ValidateBindingOrRetire()
 		&& AbilitySystemComponent->GetAvatarActor() == GetOwner()
 		&& UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner()) == AbilitySystemComponent
 		&& AbilitySystemComponent->GetSet<UNarrativeAttributeSetBase>() == BoundAttributes.Get()
-		&& (!NarrativeASC || NarrativeASC->GetCombatActorInfoEpoch() == BoundActorInfoEpoch))
+		&& (!NarrativeASC || (NarrativeASC->GetCombatActorInfoEpoch() == BoundActorInfoEpoch
+			&& NarrativeASC->GetCharacterReadyEpoch() == BoundReadyEpoch)))
 	{
 		// A new life cannot write, but must retain its explicit revive observer
 		// until all Narrative death observers finish initializing attributes.
@@ -550,6 +556,7 @@ void USovShieldComponent::UninitializeFromAbilitySystem()
 	{
 		NarrativeASC->OnDamageResolvedAsTarget.RemoveDynamic(this, &ThisClass::HandleDamageResolved);
 		NarrativeASC->OnDeathStateChanged.RemoveDynamic(this, &ThisClass::HandleDeathStateChanged);
+		NarrativeASC->OnCharacterReadyEpochChanged.RemoveDynamic(this, &ThisClass::HandleOwnerReadyEpochChanged);
 	}
 
 	AbilitySystemComponent = nullptr;
@@ -1344,4 +1351,15 @@ bool USovShieldComponent::CanWriteShield() const
 float USovShieldComponent::GetWorldTimeSeconds() const
 {
 	return IsValid(GetWorld()) ? GetWorld()->GetTimeSeconds() : 0.0f;
+}
+
+void USovShieldComponent::HandleOwnerReadyEpochChanged(const int32 ReadyEpoch)
+{
+    const auto* ASC = Cast<UNarrativeAbilitySystemComponent>(AbilitySystemComponent);
+    if (!bEndingPlay && IsValid(ASC) && ASC->GetAvatarActor() == GetOwner()
+        && ASC->GetCharacterReadyEpoch() == ReadyEpoch && ReadyEpoch != BoundReadyEpoch)
+    {
+        ++CheckpointRestoreGeneration;
+        InitializeWithAbilitySystem(AbilitySystemComponent);
+    }
 }

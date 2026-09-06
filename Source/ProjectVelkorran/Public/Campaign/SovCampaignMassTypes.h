@@ -76,7 +76,7 @@ struct FSovCampaignMassState
 
 /** Explicit corridor route. No navigation, perception, combat, damage or missions run on a proxy. */
 USTRUCT()
-struct FSovCampaignMassRouteFragment : public FMassFragment
+struct PROJECTVELKORRAN_API FSovCampaignMassRouteFragment : public FMassFragment
 {
 	GENERATED_BODY()
 	UPROPERTY() TArray<FVector> Points;

@@ -4,6 +4,10 @@
 #include <cmath>
 namespace SovFinisher
 {
+inline bool CanCommitOutcome(bool AcceptedDamage, bool SameTargetGeneration, bool Pending, bool AlreadyCommitted)
+{
+    return AcceptedDamage && SameTargetGeneration && Pending && !AlreadyCommitted;
+}
 inline bool Vulnerable(bool Alive, bool PoiseBroken, double Health, double Maximum, double Threshold)
 {
     return Alive && std::isfinite(Health) && std::isfinite(Maximum) && Health > 0. && Maximum > 0.

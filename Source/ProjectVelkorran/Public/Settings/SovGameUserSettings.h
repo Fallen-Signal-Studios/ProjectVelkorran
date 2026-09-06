@@ -45,6 +45,7 @@ struct PROJECTVELKORRAN_API FSovUserSettingsSnapshot
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bReduceCorruptionEffects = false;
 	// Local accessibility preferences: never part of the eleven-byte gameplay export.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) float UIScale = 1.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bShowObjectiveText = true;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) float SubtitleScale = 1.f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bSubtitles = true;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bClosedCaptions = true;

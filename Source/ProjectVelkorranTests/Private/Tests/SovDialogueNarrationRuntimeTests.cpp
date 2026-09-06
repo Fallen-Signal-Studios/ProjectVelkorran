@@ -4,11 +4,15 @@
 #include "UI/Dialogue/SovDialoguePresentationComponent.h"
 #include "UI/Dialogue/SovDialoguePresentationState.h"
 #include "Tests/SovDialogueRuntimeTestFixtures.h"
+#include "Tests/SovFrontendRuntimeTestFixtures.h"
+#include "UI/SovNativeGameplayHUD.h"
 #include "Blueprint/WidgetTree.h"
 #include "Engine/Engine.h"
 #include "Engine/LocalPlayer.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
+#include "GameFramework/PlayerState.h"
+#include "GameFramework/WorldSettings.h"
 #include "Misc/AutomationTest.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
@@ -24,6 +28,8 @@ struct FSovDialogueTestAccess
 	static void ConfigureWithoutHUD(USovDialoguePresentationComponent* C, UTalesComponent* Tales, UDialogue* Dialogue)
 	{ C->Tales = Tales; C->OnReplies(Dialogue, Dialogue->AvailableResponses); }
 	static bool HasLivePressure(USovDialoguePresentationComponent* C) { return C->State->Pressure.Active; }
+	static USovDialogueChoiceWidget* Widget(USovDialoguePresentationComponent* C) { return C->ChoiceWidget; }
+	static void Tick(USovDialoguePresentationComponent* C) { C->TickComponent(.1f, LEVELTICK_All, nullptr); }
 };
 
 namespace
@@ -231,6 +237,75 @@ bool FSovNativeDialogueWidgetTest::RunTest(const FString&)
 	TestFalse(TEXT("An unlaid-out native tree is not fabricated reading readiness"), Widget->IsTextPresented());
 	Widget->Retire();
 	TestFalse(TEXT("Removed presentation cannot become ready"), Widget->IsTextPresented());
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovPausedDialogueCompletionTest, "ProjectVelkorran.UI.Dialogue.QueuedMediaCompletionAcrossWorldPause",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovPausedDialogueCompletionTest::RunTest(const FString&)
+{
+	FDialogueWorld W; auto* Dialogue = NewObject<USovDialogueRuntimeFixture>(W.PC); Dialogue->Stage(W.Tales);
+	UDialogueLineCompletionToken* Token = Dialogue->CompletionToken();
+	APlayerState* Pauser = W.World->SpawnActor<APlayerState>();
+	W.World->GetWorldSettings()->SetPauserPlayerState(Pauser);
+	TestTrue(TEXT("Fixture uses actual world pause independent of dialogue suspension"), W.World->IsPaused());
+	Token->Complete(); Token->Complete(); Dialogue->TickDialogue(.5f);
+	TestTrue(TEXT("Queued media completion remains owned by its line while paused"), Dialogue->HasDeferredCompletion());
+	TestEqual(TEXT("Pause cannot execute graph completion"), Dialogue->FinishedLines, 0);
+	TestFalse(TEXT("Pause cannot expose the next choices"), Dialogue->AreRepliesPresented());
+	W.World->GetWorldSettings()->SetPauserPlayerState(nullptr);
+	Dialogue->TickDialogue(.1f);
+	TestEqual(TEXT("Foreground drains exactly one owned completion"), Dialogue->FinishedLines, 1);
+	TestTrue(TEXT("Native graph progresses to its actual reply presentation"), Dialogue->AreRepliesPresented());
+	Token->Complete(); Dialogue->TickDialogue(.1f);
+	TestEqual(TEXT("Duplicate queued callbacks cannot finish a successor"), Dialogue->FinishedLines, 1);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovRetiredDialogueCompletionTest, "ProjectVelkorran.UI.Dialogue.RetiredMediaCannotFinishReusedNode",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovRetiredDialogueCompletionTest::RunTest(const FString&)
+{
+	FDialogueWorld W; auto* Dialogue = NewObject<USovDialogueRuntimeFixture>(W.PC); Dialogue->Stage(W.Tales);
+	UDialogueLineCompletionToken* Retired = Dialogue->CompletionToken();
+	TestTrue(TEXT("Authored walk-and-talk suspension accepted"), Dialogue->SetPlaybackSuspended(true));
+	Retired->Complete(); TestTrue(TEXT("Explicit suspension retains completion too"), Dialogue->HasDeferredCompletion());
+	Dialogue->RestartPrompt();
+	TestFalse(TEXT("Restart retires the deferred predecessor before reusing its node"), Dialogue->HasDeferredCompletion());
+	Dialogue->SetPlaybackSuspended(false); Retired->Complete(); Dialogue->TickDialogue(.1f);
+	TestEqual(TEXT("Same node identity cannot rescue a retired line revision"), Dialogue->FinishedLines, 0);
+	Dialogue->CompletionToken()->Complete();
+	TestEqual(TEXT("Current line still completes through the production graph"), Dialogue->FinishedLines, 1);
+	auto* Replacement = NewObject<USovDialogueRuntimeFixture>(W.PC); Replacement->Stage(W.Tales);
+	Retired->Complete();
+	TestEqual(TEXT("Old dialogue cannot complete replacement owner"), Replacement->FinishedLines, 0);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovDialogueWidgetRecoveryTest, "ProjectVelkorran.UI.Dialogue.RemovedWidgetRebuildsCurrentChoices",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovDialogueWidgetRecoveryTest::RunTest(const FString&)
+{
+	FDialogueWorld W;
+	auto* PC = W.World->SpawnActor<ASovFrontendRuntimeController>();
+	auto* HUD = NewObject<USovNativeGameplayHUD>(PC); HUD->SetOwningPlayer(PC); HUD->Initialize(); HUD->TakeWidget(); HUD->NativeConstruct(); PC->StageHUD(HUD);
+	W.Tales = PC->GetTalesComponent();
+	auto* Dialogue = NewObject<USovDialogueRuntimeFixture>(PC); Dialogue->Stage(W.Tales); Dialogue->NPCFinishedTalking();
+	auto* Presentation = NewObject<USovDialoguePresentationComponent>(PC);
+	FSovDialogueTestAccess::ConfigureWithoutHUD(Presentation, W.Tales, Dialogue);
+	auto* Initial = FSovDialogueTestAccess::Widget(Presentation);
+	if (!TestNotNull(TEXT("Real native game layer accepts the choice widget"), Initial)) { return false; }
+	const int64 Revision = Dialogue->GetReplyPresentationRevision();
+	Initial->DeactivateWidget();
+	TestNull(TEXT("Removed widget retires its owned presentation"), FSovDialogueTestAccess::Widget(Presentation));
+	FSovDialogueTestAccess::Tick(Presentation);
+	auto* Restored = FSovDialogueTestAccess::Widget(Presentation);
+	TestNotNull(TEXT("Unchanged graph revision reconstructs a removed widget"), Restored);
+	TestEqual(TEXT("Presentation recovery cannot advance the narrative graph"), Dialogue->GetReplyPresentationRevision(), Revision);
+	if (Restored) { TestEqual(TEXT("Recreated native widget retains all choices"), FSovDialogueTestAccess::ButtonCount(Restored), 2); Restored->DeactivateWidget(); }
+	Dialogue->RetireRevision(); FSovDialogueTestAccess::Tick(Presentation);
+	TestNull(TEXT("Retired graph choices cannot be resurrected"), FSovDialogueTestAccess::Widget(Presentation));
+	PC->StageHUD(nullptr);
 	return true;
 }
 #endif

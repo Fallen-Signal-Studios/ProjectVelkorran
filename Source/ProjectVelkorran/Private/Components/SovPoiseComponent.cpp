@@ -82,6 +82,7 @@ bool USovPoiseComponent::InitializeWithAbilitySystem(UAbilitySystemComponent* In
 	const auto* RequestedNarrativeASC = Cast<UNarrativeAbilitySystemComponent>(InAbilitySystemComponent);
 	const uint64 RequestedActorEpoch = RequestedNarrativeASC ? RequestedNarrativeASC->GetCombatActorInfoEpoch() : 0;
 	const uint64 RequestedLifeEpoch = Attributes->GetCombatLifeEpoch();
+	const int32 RequestedReadyEpoch = RequestedNarrativeASC ? RequestedNarrativeASC->GetCharacterReadyEpoch() : 0;
 	TGuardValue<bool> ChangingGuard(bChangingAbilitySystem, true);
 	UninitializeFromAbilitySystem();
 	if (!IsValid(Owner) || Owner->IsActorBeingDestroyed() || bEndingPlay || !IsValid(InAbilitySystemComponent)
@@ -89,12 +90,14 @@ bool USovPoiseComponent::InitializeWithAbilitySystem(UAbilitySystemComponent* In
 		|| UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Owner) != InAbilitySystemComponent
 		|| InAbilitySystemComponent->GetSet<UNarrativeAttributeSetBase>() != Attributes
 		|| !IsValid(Attributes) || Attributes->GetCombatLifeEpoch() != RequestedLifeEpoch
-		|| (RequestedNarrativeASC && RequestedNarrativeASC->GetCombatActorInfoEpoch() != RequestedActorEpoch)) { return false; }
+		|| (RequestedNarrativeASC && (RequestedNarrativeASC->GetCombatActorInfoEpoch() != RequestedActorEpoch
+			|| RequestedNarrativeASC->GetCharacterReadyEpoch() != RequestedReadyEpoch))) { return false; }
 	AbilitySystemComponent = InAbilitySystemComponent;
 	BoundAttributes = Attributes;
 	BoundLifeEpoch = Attributes->GetCombatLifeEpoch();
 	const auto* EpochASC = Cast<UNarrativeAbilitySystemComponent>(InAbilitySystemComponent);
 	BoundActorInfoEpoch = EpochASC ? EpochASC->GetCombatActorInfoEpoch() : 0;
+	BoundReadyEpoch = EpochASC ? EpochASC->GetCharacterReadyEpoch() : 0;
 	const uint64 Generation = ++BindingGeneration;
 	bWarnedMissingAttributeSet = false;
 
@@ -109,6 +112,7 @@ bool USovPoiseComponent::InitializeWithAbilitySystem(UAbilitySystemComponent* In
 	if (auto* NarrativeASC = Cast<UNarrativeAbilitySystemComponent>(AbilitySystemComponent))
 	{
 		NarrativeASC->OnDeathStateChanged.AddUniqueDynamic(this, &ThisClass::HandleDeathStateChanged);
+		NarrativeASC->OnCharacterReadyEpochChanged.AddUniqueDynamic(this, &ThisClass::HandleOwnerReadyEpochChanged);
 	}
 
 	PoiseChangedDelegateHandle = AbilitySystemComponent
@@ -230,7 +234,8 @@ bool USovPoiseComponent::IsInitialized() const
 		&& ASC->GetSet<UNarrativeAttributeSetBase>() == Attributes
 		&& Attributes->GetOwningAbilitySystemComponent() == ASC
 		&& Attributes->GetCombatLifeEpoch() == BoundLifeEpoch
-		&& (!NarrativeASC || NarrativeASC->GetCombatActorInfoEpoch() == BoundActorInfoEpoch);
+		&& (!NarrativeASC || (NarrativeASC->GetCombatActorInfoEpoch() == BoundActorInfoEpoch
+			&& NarrativeASC->GetCharacterReadyEpoch() == BoundReadyEpoch));
 }
 
 bool USovPoiseComponent::IsCurrentOperation(const uint64 Generation) const
@@ -246,7 +251,8 @@ bool USovPoiseComponent::ValidateBindingOrRetire()
 		&& AbilitySystemComponent->GetAvatarActor() == GetOwner()
 		&& UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner()) == AbilitySystemComponent
 		&& AbilitySystemComponent->GetSet<UNarrativeAttributeSetBase>() == BoundAttributes.Get()
-		&& (!NarrativeASC || NarrativeASC->GetCombatActorInfoEpoch() == BoundActorInfoEpoch))
+		&& (!NarrativeASC || (NarrativeASC->GetCombatActorInfoEpoch() == BoundActorInfoEpoch
+			&& NarrativeASC->GetCharacterReadyEpoch() == BoundReadyEpoch)))
 	{
 		ClearLifecycleTimers(); RemoveOwnedStateTags(); return false;
 	}
@@ -415,6 +421,7 @@ void USovPoiseComponent::UninitializeFromAbilitySystem()
 	if (auto* NarrativeASC = Cast<UNarrativeAbilitySystemComponent>(PreviousASC))
 	{
 		NarrativeASC->OnDeathStateChanged.RemoveDynamic(this, &ThisClass::HandleDeathStateChanged);
+		NarrativeASC->OnCharacterReadyEpochChanged.RemoveDynamic(this, &ThisClass::HandleOwnerReadyEpochChanged);
 	}
 	TArray<FGameplayTag> PreviousOwnedTags;
 	if (bAppliedPressuredTag) { PreviousOwnedTags.Add(PressuredTag); }
@@ -1132,4 +1139,15 @@ float USovPoiseComponent::GetTimerRemaining(const FTimerHandle& TimerHandle) con
 	}
 
 	return 0.0f;
+}
+
+void USovPoiseComponent::HandleOwnerReadyEpochChanged(const int32 ReadyEpoch)
+{
+    const auto* ASC = Cast<UNarrativeAbilitySystemComponent>(AbilitySystemComponent);
+    if (!bEndingPlay && IsValid(ASC) && ASC->GetAvatarActor() == GetOwner()
+        && ASC->GetCharacterReadyEpoch() == ReadyEpoch && ReadyEpoch != BoundReadyEpoch)
+    {
+        ++CheckpointRestoreGeneration;
+        InitializeWithAbilitySystem(AbilitySystemComponent);
+    }
 }

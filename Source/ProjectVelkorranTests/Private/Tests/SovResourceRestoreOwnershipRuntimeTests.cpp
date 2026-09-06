@@ -47,6 +47,7 @@ FSovCombatResourceSnapshot Snapshot(ASovPassiveDefenseTestActor* Actor)
 	FSovCombatResourceSnapshot Result;
 	USovEncounterSnapshotLibrary::CaptureResources(Actor->OwnedASC, Result);
 	Result.Health = 70.f; Result.Shield = 25.f; Result.Poise = 35.f; Result.Stamina = 45.f; Result.Echo = 20.f;
+	USovEncounterSnapshotLibrary::RebaseAuthoredResourceCurrents(Actor->OwnedASC, Result);
 	return Result;
 }
 }

@@ -1406,29 +1406,15 @@ bool USovGameplayAbility_TarrikCinderJudgement::ApplyJudgementDamage(
 			PoiseDamage);
 	}
 
-	const float OldShield = TargetAbilitySystem->GetNumericAttribute(
-		UNarrativeAttributeSetBase::GetShieldAttribute());
-	const float OldHealth = TargetAbilitySystem->GetNumericAttribute(
-		UNarrativeAttributeSetBase::GetHealthAttribute());
-	const float OldPoise = TargetAbilitySystem->GetNumericAttribute(
-		UNarrativeAttributeSetBase::GetPoiseAttribute());
-	const float OldStamina = TargetAbilitySystem->GetNumericAttribute(
-		UNarrativeAttributeSetBase::GetStaminaAttribute());
+	TStrongObjectPtr<USovNativeDamageReceipt> Receipt(NewObject<USovNativeDamageReceipt>());
+	Receipt->bRequireNativeProof = true;
+	Receipt->ExpectedTarget = TargetAbilitySystem->GetAvatarActor();
+	Receipt->ExpectedContext = DamageSpec->GetContext().Get();
+	auto* NarrativeSource = Cast<UNarrativeAbilitySystemComponent>(SourceASC);
+	if (NarrativeSource) { NarrativeSource->OnDamageResolvedAsSource.AddDynamic(Receipt.Get(), &USovNativeDamageReceipt::ReceiveResult); }
 	SourceASC->ApplyGameplayEffectSpecToTarget(*DamageSpec, TargetAbilitySystem);
-	if (!TargetStillCurrent()) { return false; }
-
-	return TargetAbilitySystem->GetNumericAttribute(
-			UNarrativeAttributeSetBase::GetShieldAttribute())
-			< OldShield - KINDA_SMALL_NUMBER
-		|| TargetAbilitySystem->GetNumericAttribute(
-			UNarrativeAttributeSetBase::GetHealthAttribute())
-			< OldHealth - KINDA_SMALL_NUMBER
-		|| TargetAbilitySystem->GetNumericAttribute(
-			UNarrativeAttributeSetBase::GetPoiseAttribute())
-			< OldPoise - KINDA_SMALL_NUMBER
-		|| TargetAbilitySystem->GetNumericAttribute(
-			UNarrativeAttributeSetBase::GetStaminaAttribute())
-			< OldStamina - KINDA_SMALL_NUMBER;
+	if (IsValid(NarrativeSource)) { NarrativeSource->OnDamageResolvedAsSource.RemoveDynamic(Receipt.Get(), &USovNativeDamageReceipt::ReceiveResult); }
+	return Receipt->bAppliedDamage;
 }
 
 int32 USovGameplayAbility_TarrikCinderJudgement::ApplyJudgementExplosion(

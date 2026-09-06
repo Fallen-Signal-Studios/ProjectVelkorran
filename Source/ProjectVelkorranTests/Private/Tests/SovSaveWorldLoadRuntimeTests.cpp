@@ -22,6 +22,7 @@ struct FSovSaveWorldLoadTestAccess
         S.PendingLoadOwner = S.CaptureOperationOwner();
         S.PendingSave->Header.MissionId = Mission->MissionId;
         S.PendingSave->Header.MissionDefinition = FSoftObjectPath(Mission);
+        S.PendingSave->Header.MapPackage = Mission->Map.ToSoftObjectPath().GetLongPackageName();
         S.PendingNarrative = Snapshot;
         S.PendingLoadRequest = Request;
         S.PendingLoadDeadline = FPlatformTime::Seconds() + 60.0;
@@ -89,6 +90,7 @@ bool FSovSaveAcceptedWorldRejectionTest::RunTest(const FString& Parameters)
 
     TStrongObjectPtr<USovCampaignDefinition> Mission(NewObject<USovCampaignDefinition>());
     Mission->MissionId = TEXT("M01_SerializerRegression");
+    Mission->Map = TSoftObjectPtr<UWorld>(FSoftObjectPath(FailedWorld));
     Mode->InitialMission = Mission.Get(); FreshMode->InitialMission = Mission.Get();
     const FGuid Request = FGuid::NewGuid();
     Mode->OptionsString = TEXT("?SovCampaignSlotLoad=1?SovCampaignLoadRequest=") + Request.ToString(EGuidFormats::Digits);

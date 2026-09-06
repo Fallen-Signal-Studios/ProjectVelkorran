@@ -110,6 +110,7 @@ bool FSovManagedReadinessRestoreTest::RunTest(const FString& Parameters)
 	if (!TestNotNull(TEXT("Shared PlayerState ASC"), ASC)) { return false; }
 	TestTrue(TEXT("Actual resources captured"), USovEncounterSnapshotLibrary::CaptureResources(ASC, Snapshot.Resources));
 	Snapshot.Resources.Health = 77.f; Snapshot.Resources.Shield = 22.f; Snapshot.Resources.Echo = 17.f;
+	TestTrue(TEXT("Authored currents update explicit snapshot bases"), USovEncounterSnapshotLibrary::RebaseAuthoredResourceCurrents(ASC, Snapshot.Resources));
 	TestTrue(TEXT("Native actor record captured without disk I/O"), Save->CreateActorRecord(Pawn, Snapshot.PawnRecord));
 	TestTrue(TEXT("Real skill component record captured"), USovEncounterSnapshotLibrary::CaptureComponent(PS->GetSkillTreeComponent(), Snapshot.SkillTreeRecord));
 	TestTrue(TEXT("Snapshot satisfies native identity/schema validation"), Snapshot.IsValid());

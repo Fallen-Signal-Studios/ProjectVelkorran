@@ -13,6 +13,7 @@ class ASovFrontendRuntimeController : public ASovPlayerController
 public:
 	ASovFrontendRuntimeController(const FObjectInitializer& Initializer) : Super(Initializer) {}
 	void StagePawn(APawn* Pawn) { SetPawn(Pawn); }
+	void StageHUD(UNarrativeGameplayHUD* HUD) { GameplayHUD = HUD; }
 };
 
 UCLASS(Transient, NotBlueprintable)

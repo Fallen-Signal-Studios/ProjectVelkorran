@@ -74,9 +74,11 @@ void USovNativeDamageReceipt::ReceiveResult(const FSovDamageResult& Result)
 {
 	if (Result.TargetActor != ExpectedTarget.Get()
 		|| (ExpectedContext ? Result.EffectContext.Get() != ExpectedContext : Result.EffectContext.GetSourceObject() != this)) { return; }
-	bAppliedDamage = Result.AppliedHealthDamage > 0.0f || Result.AppliedShieldDamage > 0.0f || Result.AppliedPoiseDamage > 0.0f;
-	bAcceptedControl = Result.bStatusApplicationRequested;
-	bPoiseBroken = Result.bPoiseBroken;
+	if (bRequireNativeProof && (!Result.HasNativeReceipt() || !Result.IsCurrentTargetLife()
+		|| !Result.ConsumeNativeReceipt(this))) { return; }
+	bAppliedDamage |= Result.AppliedHealthDamage > 0.0f || Result.AppliedShieldDamage > 0.0f || Result.AppliedPoiseDamage > 0.0f;
+	bAcceptedControl |= Result.bStatusApplicationRequested;
+	bPoiseBroken |= Result.bPoiseBroken;
 }
 
 bool SovSelenePayload::ValidSource(const FSovSelenePayloadContext& Context)

@@ -1633,10 +1633,10 @@ PRAGMA_ENABLE_DEPRECATION_WARNINGS
 		}
 		if (Period == 0.f)
 		{
-			// Narrative's campaign resource snapshot stores resolved currents, not
-			// the unmodified bases beneath arbitrary GE aggregators. Reapplying a
-			// continuous resource modifier after that snapshot would apply it twice.
-			// Reject unsupported authoring instead of silently changing resources.
+			// Campaign v2 resource snapshots preserve GAS bases, but generic
+			// Narrative saves and deferred player readiness do not yet reconstruct
+			// arbitrary resource status aggregators as one operation. Keep this
+			// admission restriction until all resource/status paths share that contract.
 			const FGameplayAttribute SavedResourceAttributes[] = {
 				UNarrativeAttributeSetBase::GetHealthAttribute(), UNarrativeAttributeSetBase::GetMaxHealthAttribute(),
 				UNarrativeAttributeSetBase::GetShieldAttribute(), UNarrativeAttributeSetBase::GetMaxShieldAttribute(),

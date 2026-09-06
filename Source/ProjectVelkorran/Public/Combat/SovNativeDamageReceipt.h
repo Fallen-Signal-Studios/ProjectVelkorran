@@ -12,6 +12,8 @@ class PROJECTVELKORRAN_API USovNativeDamageReceipt : public UObject
 public:
 	TWeakObjectPtr<AActor> ExpectedTarget;
 	const FGameplayEffectContext* ExpectedContext = nullptr;
+	/** Durable outcomes require native transaction proof, not just matching public fields. */
+	bool bRequireNativeProof = false;
 	bool bAcceptedControl = false;
 	bool bAppliedDamage = false;
 	bool bPoiseBroken = false;

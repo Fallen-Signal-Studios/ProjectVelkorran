@@ -119,6 +119,7 @@ bool FSovStatusCheckpointManagedReadinessTest::RunTest(const FString& Parameters
 	FSovCombatResourceSnapshot Resources;
 	if (!USovEncounterSnapshotLibrary::CaptureResources(ASC, Resources)) { AddError(TEXT("Resource capture failed")); return false; }
 	Resources.Health = 77.f;
+	TestTrue(TEXT("Authored currents update explicit snapshot bases"), USovEncounterSnapshotLibrary::RebaseAuthoredResourceCurrents(ASC, Resources));
 	TestTrue(TEXT("Resource boundary accepts the queue awaiting managed readiness"), USovEncounterSnapshotLibrary::RestoreResources(ASC, Resources));
 	TestFalse(TEXT("Resource restoration does not publish public readiness"), Pawn->IsCharacterReady());
 	TestFalse(TEXT("Status remains pending until the actual readiness event"), Status->HasActiveStatus(Tag));
@@ -143,6 +144,7 @@ bool FSovStatusCheckpointNativeResourceBoundaryTest::RunTest(const FString& Para
 	FSovCombatResourceSnapshot Resources;
 	if (!USovEncounterSnapshotLibrary::CaptureResources(Fixture.ASC, Resources)) { AddError(TEXT("Resource capture failed")); return false; }
 	Resources.Health = 73.f;
+	TestTrue(TEXT("Authored currents update explicit snapshot bases"), USovEncounterSnapshotLibrary::RebaseAuthoredResourceCurrents(Fixture.ASC, Resources));
 	Fixture.ASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetHealthAttribute(), 11.f);
 	TestTrue(TEXT("Native Narrative status record queues"), USovEncounterSnapshotLibrary::RestoreComponent(Fixture.Status, Record)
 		&& Fixture.Status->WasSaveRecordLoadAccepted());
@@ -277,6 +279,7 @@ bool FSovStatusCheckpointRetiredResourceBoundaryTest::RunTest(const FString& Par
 	FSovCombatResourceSnapshot Resources;
 	if (!USovEncounterSnapshotLibrary::CaptureResources(Fixture.ASC, Resources)) { AddError(TEXT("Resource capture failed")); return false; }
 	Resources.Health = 71.f;
+	TestTrue(TEXT("Authored currents update explicit snapshot bases"), USovEncounterSnapshotLibrary::RebaseAuthoredResourceCurrents(Fixture.ASC, Resources));
 	const FDelegateHandle Changed = Fixture.ASC->GetGameplayAttributeValueChangeDelegate(UNarrativeAttributeSetBase::GetHealthAttribute()).AddLambda(
 		[&](const FOnAttributeChangeData&)
 		{

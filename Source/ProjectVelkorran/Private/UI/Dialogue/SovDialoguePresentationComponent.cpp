@@ -168,7 +168,13 @@ void USovDialoguePresentationComponent::CancelPresentation()
 	if (OldWidget) { OldWidget->Retire(); }
 }
 
-void USovDialoguePresentationComponent::OnWidgetRemoved() { CancelPresentation(); }
+void USovDialoguePresentationComponent::OnWidgetRemoved()
+{
+	// CommonUI may replace the widget without changing the Tales reply revision.
+	// Retire its callbacks now and let the next tick reconstruct only the still-current graph choices.
+	SeenRevision = INDEX_NONE;
+	CancelPresentation();
+}
 void USovDialoguePresentationComponent::OnDialogueBegan(UDialogue* Dialogue)
 { if (PresentedDialogue.Get() != Dialogue) { CancelPresentation(); } }
 void USovDialoguePresentationComponent::OnDialogueFinished(UDialogue* Dialogue, bool, EExitDialogueReason)
@@ -218,7 +224,8 @@ void USovDialoguePresentationComponent::TickComponent(float DeltaTime, ELevelTic
 	if (!IsCurrent())
 	{
 		if (PresentedDialogue.IsValid()) { CancelPresentation(); }
-		if (Tales && IsValid(Tales->GetCurrentDialogue()) && Tales->GetCurrentDialogue()->AreRepliesPresented()
+		if (!bEndingPlay && GetWorld() && !UGameplayStatics::IsGamePaused(GetWorld())
+			&& Tales && IsValid(Tales->GetCurrentDialogue()) && !Tales->GetCurrentDialogue()->IsPlaybackSuspended() && Tales->GetCurrentDialogue()->AreRepliesPresented()
 			&& (SeenDialogue != Tales->GetCurrentDialogue() || SeenRevision != Tales->GetCurrentDialogue()->GetReplyPresentationRevision()))
 		{ RefreshChoices(); }
 		return;
@@ -259,7 +266,7 @@ FText USovDialoguePresentationComponent::TimerDescription() const
 
 void USovDialoguePresentationComponent::AnnounceChoices()
 {
-	if (!IsCurrent() || State->bSuspended || !ChoiceWidget || !ChoiceWidget->IsTextPresented()) { return; }
+	if (!IsCurrent() || State->bSuspended || IsPresentationPaused() || !ChoiceWidget || !ChoiceWidget->IsTextPresented()) { return; }
 	USovAccessibleNarrationSubsystem* Speech = Narrator();
 	if (!Speech || !Speech->IsSupported()) { State->bUnsupported = true; return; }
 	FText Announcement = FText::Format(LOCTEXT("ChoiceIntroduction", "{0}. {1} choices. {2}"),
@@ -289,6 +296,7 @@ void USovDialoguePresentationComponent::FinishAnnouncement(FGuid Request, bool b
 		|| !State->bAnnouncementPending || !Request.IsValid() || Request != State->SpeechRequest) { return; }
 	State->bAnnouncementPending = false;
 	State->SpeechRequest.Invalidate();
+	if (IsPresentationPaused()) { SuspendPresentation(); return; }
 	if (!bCompleted || State->bSuspended)
 	{
 		State->Pressure.SetSpeechComplete(Generation, false);
@@ -306,7 +314,7 @@ void USovDialoguePresentationComponent::OnFocusedChoice(int32 Index)
 {
 	if (!IsCurrent() || !State->Choices.IsValidIndex(Index)) { return; }
 	State->SelectedIndex = Index;
-	if (!State->bNarration || State->bSuspended || !State->bFullAnnouncementComplete) { return; }
+	if (!State->bNarration || State->bSuspended || IsPresentationPaused() || !State->bFullAnnouncementComplete) { return; }
 	USovAccessibleNarrationSubsystem* Speech = Narrator();
 	if (!Speech || !Speech->IsSupported()) { State->bUnsupported = true; State->Pressure.SetSpeechComplete(Generation, false); return; }
 	// Suspend pressure while a changed selection is spoken. No per-second speech spam.

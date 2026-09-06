@@ -8,6 +8,7 @@
 #include "SovCombatTypes.generated.h"
 
 class UNarrativeAttributeSetBase;
+class UAbilitySystemComponent;
 struct FSovDamageConsumptionReceipt;
 
 /** The action-state defense that intercepted a Sovereign damage transaction. */
@@ -100,8 +101,9 @@ struct NARRATIVEARSENAL_API FSovDamageResult
 	/** Copies share one bounded native receipt; a channel separates one consumer's uses. */
 	bool ConsumeNativeReceipt(const UObject* Consumer, uint8 Channel = 0) const;
 	bool HasNativeReceipt() const;
-	/** False after target restoration, avatar replacement, attribute-set removal or destruction. */
-	bool IsCurrentTargetLife() const;
+	/** False after target restoration, avatar replacement, attribute-set removal or destruction.
+	 * An expected ASC also fences consumers rebound to another ASC on the same avatar. */
+	bool IsCurrentTargetLife(const UAbilitySystemComponent* ExpectedTargetASC = nullptr) const;
 
 private:
 	friend class UNarrativeAttributeSetBase;

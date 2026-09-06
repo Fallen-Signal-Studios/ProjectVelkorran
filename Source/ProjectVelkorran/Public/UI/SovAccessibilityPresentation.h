@@ -3,14 +3,20 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "Settings/SovGameUserSettings.h"
+#include "UI/SovObjectivePresentationTypes.h"
 #include "SovAccessibilityPresentation.generated.h"
 
 class UBorder;
 class UCanvasPanel;
 class UCanvasPanelSlot;
 class UTextBlock;
+class USizeBox;
 class UPlayerInteractionComponent;
 class UNarrativeInteractableComponent;
+class ANarrativeCharacter;
+
+UENUM(BlueprintType)
+enum class ESovCaptionPriority : uint8 { Routine, Important, Critical };
 
 USTRUCT(BlueprintType)
 struct FSovSceneSubtitleEntry
@@ -23,8 +29,10 @@ struct FSovSceneSubtitleEntry
 	float Duration = 5.f;
 	bool bCinematic = false;
 	bool bFinished = false;
+	ESovCaptionPriority CaptionPriority = ESovCaptionPriority::Routine;
 };
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSovSceneHistoryChanged);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSovObjectiveViewChanged);
 
 /** Native, split-screen-relative presentation. No material/widget asset is required. */
 UCLASS()
@@ -34,13 +42,25 @@ class PROJECTVELKORRAN_API USovAccessibilityPresentation : public UUserWidget
 public:
 	USovAccessibilityPresentation(const FObjectInitializer& Initializer);
 	UFUNCTION(BlueprintCallable, Category="Sovereign|Accessibility") void PresentSpeech(const FText& Speaker, const FText& Text, float Duration, const FVector& SpeakerLocation, bool bCinematic);
-	UFUNCTION(BlueprintCallable, Category="Sovereign|Accessibility") void PresentCaption(const FText& Text, float Duration, const FVector& SourceLocation);
-	/** Line-end does not erase a page before its readable interval. Scene-end force-clears below. */
+	UFUNCTION(BlueprintCallable, Category="Sovereign|Accessibility") void PresentCaption(const FText& Text, float Duration, const FVector& SourceLocation, ESovCaptionPriority Priority = ESovCaptionPriority::Important);
+	/** Line-end and normal dialogue completion preserve the remaining readable pages. */
 	UFUNCTION(BlueprintCallable, Category="Sovereign|Accessibility") void ClearSpeech();
+	/** A replacement scene may take the speech surface immediately; its predecessor stays in recent history. */
+	void RetireSpeechPresentation();
 	UFUNCTION(BlueprintCallable, Category="Sovereign|Accessibility") void ClearSceneHistory();
 	UFUNCTION(BlueprintPure, Category="Sovereign|Accessibility") TArray<FSovSceneSubtitleEntry> GetSceneHistory() const { return History; }
 	UFUNCTION(BlueprintPure, Category="Sovereign|Accessibility") FText GetCurrentCaptionText() const { return CaptionRemaining > 0.f ? ActiveCaption.Text : FText::GetEmpty(); }
 	UFUNCTION(BlueprintPure, Category="Sovereign|Accessibility") FText GetCurrentSpeechText() const { return ActiveSpeech.Text; }
+	/** Frontend supplies only current, actionable goals; this surface never owns quest state. */
+	void PresentObjectives(const TArray<FSovObjectivePresentationEntry>& Entries, int32 AdditionalCount = 0);
+	void ClearObjectives();
+	UFUNCTION(BlueprintPure, Category="Sovereign|Objectives") TArray<FSovObjectivePresentationEntry> GetPresentedObjectives() const { return Objectives; }
+	/** Same authorized cache as the HUD, including goals deferred by row/height limits. */
+	UFUNCTION(BlueprintPure, Category="Sovereign|Objectives") TArray<FSovObjectivePresentationEntry> GetObjectiveReviewEntries() const { return ObjectiveReviewEntries; }
+	UPROPERTY(BlueprintAssignable, Category="Sovereign|Objectives") FSovObjectiveViewChanged OnObjectiveViewChanged;
+	UFUNCTION(BlueprintPure, Category="Sovereign|Objectives") int32 GetAdditionalObjectiveCount() const { return AdditionalObjectiveCount + Objectives.Num() - VisibleObjectiveRows; }
+	uint64 GetObjectiveViewGeneration() const { return ObjectiveViewGeneration; }
+	static constexpr int32 MaximumObjectiveRows = 3;
 	UPROPERTY(BlueprintAssignable,Category="Sovereign|Accessibility") FSovSceneHistoryChanged OnSceneHistoryChanged;
 	static TArray<FString> PaginateText(const FString& Text, int32 CharactersPerLine, int32 MaximumLines);
 	static FLinearColor TeamTint(const FSovUserSettingsSnapshot& Settings);
@@ -54,8 +74,16 @@ protected:
 private:
 	friend struct FSovFrontendTestAccess;
 	friend struct FSovAccessibilityFrontendTestAccess;
+	friend struct FSovObjectivePresentationTestAccess;
 	void BeginEntry(const FSovSceneSubtitleEntry& Entry);
+	void BeginCaption(const FSovSceneSubtitleEntry& Entry);
+	void QueueCaption(const FSovSceneSubtitleEntry& Entry);
+	void RefreshWeakPointMarkers(APlayerController* Player);
+	void RegisterMarkerCharacter(AActor* Actor);
+	void ResetMarkerRegistry();
 	void RefreshText();
+	void RefreshObjectiveText();
+	void LayoutObjectives(float SafeWidth, float SafeHeight);
 	float GetSafeTextWidth() const;
 	FText DirectionText(const FVector& Location) const;
 	UFUNCTION() void SettingsChanged(const FSovUserSettingsSnapshot& Value);
@@ -66,11 +94,22 @@ private:
 	UPROPERTY(Transient) TObjectPtr<UTextBlock> SubtitleText;
 	UPROPERTY(Transient) TObjectPtr<UBorder> CaptionBackground;
 	UPROPERTY(Transient) TObjectPtr<UTextBlock> CaptionText;
+	UPROPERTY(Transient) TObjectPtr<UBorder> ObjectiveBackground;
+	UPROPERTY(Transient) TObjectPtr<UTextBlock> ObjectiveText;
+	UPROPERTY(Transient) TObjectPtr<USizeBox> ObjectiveSize;
+	UPROPERTY(Transient) TArray<TObjectPtr<UTextBlock>> ObjectiveRows;
+	UPROPERTY(Transient) TObjectPtr<UTextBlock> ObjectiveOverflow;
+	UPROPERTY(Transient) TArray<FSovObjectivePresentationEntry> Objectives;
+	UPROPERTY(Transient) TArray<FSovObjectivePresentationEntry> ObjectiveReviewEntries;
+	int32 AdditionalObjectiveCount = 0;
+	int32 VisibleObjectiveRows = 0;
+	uint64 ObjectiveViewGeneration = 0;
 	UPROPERTY(Transient) TObjectPtr<UCanvasPanelSlot> SubtitleSlot;
 	UPROPERTY(Transient) TObjectPtr<USovGameUserSettings> BoundSettings;
 	UPROPERTY(Transient) TObjectPtr<UPlayerInteractionComponent> Interaction;
 	UPROPERTY(Transient) TArray<FSovSceneSubtitleEntry> History;
 	UPROPERTY(Transient) TArray<FSovSceneSubtitleEntry> PendingSpeech;
+	UPROPERTY(Transient) TArray<FSovSceneSubtitleEntry> PendingCaptions;
 	TWeakObjectPtr<UNarrativeInteractableComponent> FocusedInteractable;
 	FSovUserSettingsSnapshot Settings;
 	FSovSceneSubtitleEntry ActiveSpeech;
@@ -84,6 +123,12 @@ private:
 	float CaptionRemaining = 0.f;
 	float MarkerRefreshRemaining = 0.f;
 	float LastLayoutWidth = 0.f;
+	float LastLayoutHeight = 0.f;
 	struct FMarker { FVector Location; FText Text; bool bThreat = false; bool bNavigation = false; };
 	TArray<FMarker> Markers;
+	TWeakObjectPtr<UWorld> MarkerWorld;
+	FDelegateHandle ActorSpawnedHandle;
+	TArray<TWeakObjectPtr<ANarrativeCharacter>> MarkerCharacters;
+	TArray<TWeakObjectPtr<ANarrativeCharacter>> RetainedMarkerCharacters;
+	size_t MarkerCursor = 0;
 };

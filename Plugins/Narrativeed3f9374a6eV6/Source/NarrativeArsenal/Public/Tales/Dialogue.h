@@ -167,6 +167,18 @@ struct NARRATIVEARSENAL_API FDialoguePlayParams
 
 };
 
+/** A media callback belongs to one line, even after the audio/sequence queues its completion. */
+UCLASS(Transient, NotBlueprintable)
+class NARRATIVEARSENAL_API UDialogueLineCompletionToken : public UObject
+{
+	GENERATED_BODY()
+public:
+	TWeakObjectPtr<class UDialogue> Dialogue;
+	TWeakObjectPtr<class UDialogueNode> Node;
+	int64 Revision = INDEX_NONE;
+	UFUNCTION() void Complete();
+};
+
 //Created at runtime, but also used as a template, similar to UWidgetTrees in UWidgetBlueprints. 
 UCLASS(Blueprintable, BlueprintType, meta = (DisplayName="Dialogue"))
 class NARRATIVEARSENAL_API UDialogue : public UObject
@@ -422,6 +434,13 @@ public:
 	virtual bool WantsCinematicBars_Implementation() const;
 
 protected:
+	friend class UDialogueLineCompletionToken;
+	void BeginLineCompletionOwnership();
+	void RetireLineCompletionOwnership();
+	bool IsCurrentLineCompletion(const UDialogueLineCompletionToken* Token) const;
+	void CompleteOwnedLine(UDialogueLineCompletionToken* Token);
+	UPROPERTY(Transient) TObjectPtr<UDialogueLineCompletionToken> LineCompletionToken;
+	UPROPERTY(Transient) TObjectPtr<UDialogueLineCompletionToken> DeferredLineCompletion;
 
 
 	/*

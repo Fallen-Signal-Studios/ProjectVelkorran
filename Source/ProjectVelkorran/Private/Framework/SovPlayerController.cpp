@@ -34,8 +34,8 @@
 #include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/PackageName.h"
-#include "UObject/StrongObjectPtr.h"
 #include "TimerManager.h"
+#include "UObject/StrongObjectPtr.h"
 
 ASovPlayerController::ASovPlayerController(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -228,11 +228,11 @@ bool ASovPlayerController::HandoffToMission(USovCampaignDefinition* Destination,
 	return StartPawnHandoff(Destination, Destination->Protagonist, SpawnTransform, NAME_None, FGuid(), OutError);
 }
 
-bool ASovPlayerController::PrepareTransitionCheckpoint(FName BoundaryId, FString& OutError)
+bool ASovPlayerController::PrepareTransitionCheckpoint(FName BoundaryId, FString& OutError, bool bRequireDurable)
 {
 	USovSaveSubsystem* Slots = GetGameInstance() ? GetGameInstance()->GetSubsystem<USovSaveSubsystem>() : nullptr;
 	APawn* Source = GetPawn(); const uint64 ExpectedEpoch = TransitionEpoch;
-	if (!Slots || (!Slots->ConsumeAcknowledgedBoundary(ESovSaveBoundary::LongTransition, BoundaryId)
+	if (!Slots || ((bRequireDurable || !Slots->ConsumeAcknowledgedBoundary(ESovSaveBoundary::LongTransition, BoundaryId))
 		&& Slots->WriteCheckpoint(ESovSaveBoundary::LongTransition, BoundaryId, OutError) != ESovSaveResult::Success))
 	{ if (OutError.IsEmpty()) { OutError = TEXT("A safe transition checkpoint could not be written."); } return false; }
 	if (TransitionEpoch != ExpectedEpoch || GetPawn() != Source || TransitionState != ESovCampaignTransitionState::Idle)
@@ -407,22 +407,33 @@ void ASovPlayerController::PollCampaignInitialization(uint64 ExpectedEpoch)
 	USovCampaignDefinition* const RestoringMission = PendingMission;
 	UNarrativeAbilitySystemComponent* const RestoringASC = RestoringPawn->GetNarrativeAbilitySystemComponent();
 	ASovPlayerState* const RestoringPS = GetPlayerState<ASovPlayerState>();
-	const auto StillRestoring = [this, ExpectedEpoch, RestoringPawn, RestoringMission, RestoringASC, RestoringPS]()
+	const uint64 RestoringASCEpoch = RestoringASC ? RestoringASC->GetCombatActorInfoEpoch() : 0;
+	const int32 RestoringPawnGeneration = RestoringPawn->GetCharacterInitializationGeneration();
+	const auto StillRestoring = [this, ExpectedEpoch, RestoringPawn, RestoringMission, RestoringASC, RestoringPS, RestoringASCEpoch, RestoringPawnGeneration]()
 	{
 		return IsValid(this) && !IsActorBeingDestroyed() && TransitionEpoch == ExpectedEpoch && IsValid(RestoringPawn) && PendingPawn == RestoringPawn
 			&& GetPawn() == RestoringPawn && PendingMission == RestoringMission
 			&& IsValid(RestoringPS) && GetPlayerState<ASovPlayerState>() == RestoringPS && RestoringPawn->GetPlayerState<ASovPlayerState>() == RestoringPS
 			&& IsValid(RestoringASC) && GetAbilitySystemComponent() == RestoringASC
-			&& RestoringASC->GetAvatarActor() == RestoringPawn;
+			&& RestoringASC->GetAvatarActor() == RestoringPawn && RestoringASC->GetCombatActorInfoEpoch() == RestoringASCEpoch
+			&& RestoringPawn->GetCharacterInitializationGeneration() == RestoringPawnGeneration;
 	};
-	const auto FailCurrentRestore = [this, ExpectedEpoch, RestoringPawn, RestoringMission, RestoringPS, RestoringASC](const FString& Reason)
+	const auto FailCurrentRestore = [this, ExpectedEpoch, RestoringPawn, RestoringMission, RestoringPS, RestoringASC, RestoringASCEpoch, RestoringPawnGeneration](const FString& Reason)
 	{
 		// An old callback may report an error after possession or a new transition took ownership.
 		if (IsValid(this) && !IsActorBeingDestroyed() && TransitionEpoch == ExpectedEpoch && PendingPawn == RestoringPawn
 			&& PendingMission == RestoringMission && GetPawn() == RestoringPawn && GetPlayerState<ASovPlayerState>() == RestoringPS
+			&& IsValid(RestoringPawn) && RestoringPawn->GetCharacterInitializationGeneration() == RestoringPawnGeneration
+			&& IsValid(RestoringASC) && RestoringASC->GetCombatActorInfoEpoch() == RestoringASCEpoch
 			&& (!GetAbilitySystemComponent() || GetAbilitySystemComponent() == RestoringASC)
 			&& (!IsValid(RestoringASC) || !RestoringASC->GetAvatarActor() || RestoringASC->GetAvatarActor() == RestoringPawn)) { FailCampaignInitialization(Reason); }
 	};
+	FString OwnershipError;
+	if (USovSaveSubsystem* Slots = GetGameInstance() ? GetGameInstance()->GetSubsystem<USovSaveSubsystem>() : nullptr)
+	{
+		if (!Slots->BindPendingRestore(this, ExpectedEpoch, OwnershipError))
+		{ FailCurrentRestore(OwnershipError); return; }
+	}
 	ASovPlayerState* PS = RestoringPS;
 	UNarrativeSaveSubsystem* Save = GetWorld()->GetSubsystem<UNarrativeSaveSubsystem>();
 	FSovProtagonistSnapshot Snapshot;
@@ -468,8 +479,12 @@ void ASovPlayerController::PollCampaignInitialization(uint64 ExpectedEpoch)
 		{ FailCurrentRestore(TEXT("Campaign controller record could not be deserialized.")); return; }
 		if (!StillRestoring()) { FailCurrentRestore(TEXT("Ownership changed during quest restore.")); return; }
 		if (bFromLevelTravel) { SetControlRotation(DestinationRotation); }
-		if (bFromLevelTravel && PendingTravelMission != PendingMission)
-		{ FailCurrentRestore(TEXT("Travel record does not name this map's mission.")); return; }
+		if (bFromLevelTravel)
+		{
+			const auto* Slots = GetGameInstance() ? GetGameInstance()->GetSubsystem<USovSaveSubsystem>() : nullptr;
+			if (PendingTravelMission != PendingMission || !Slots || !Slots->ValidateRestoredTravelIdentity(this))
+			{ FailCurrentRestore(TEXT("Travel record does not name the accepted operation, source checkpoint and mission.")); return; }
+		}
 	}
 	const ESovCampaignResult Started = PendingHandoffRequest.IsValid()
 		? CampaignState->CompleteAuthoredHandoff(PendingHandoffBeat, PendingHandoffRequest)
@@ -486,7 +501,7 @@ void ASovPlayerController::PollCampaignInitialization(uint64 ExpectedEpoch)
 	{ FailCurrentRestore(TEXT("Campaign readiness was invalidated while restoring.")); return; }
 	if (!ConvergenceCompanionState->CommitStaged(RestoringPawn, Error) || !StillRestoring())
 	{ FailCurrentRestore(Error.IsEmpty() ? TEXT("The protagonist companion could not commit.") : Error); return; }
-	PendingTravelMission = nullptr;
+	PendingTravelMission = nullptr; PendingTravelOperationId.Invalidate(); PendingTravelOriginGeneration = 0;
 	PendingPawn = nullptr;
 	PendingMission = nullptr;
 	PendingProtagonist = FGameplayTag(); PendingHandoffBeat = NAME_None; PendingHandoffRequest.Invalidate();
@@ -497,12 +512,14 @@ void ASovPlayerController::PollCampaignInitialization(uint64 ExpectedEpoch)
 	OriginControllerRecord = FNarrativeActorRecord();
 	OriginMission = nullptr;
 	const ESovCampaignTransitionState CompletingState = TransitionState;
-	const auto StillCompleting = [this, ExpectedEpoch, RestoringPawn, RestoringMission, RestoringASC, PS](ESovCampaignTransitionState ExpectedState)
+	const auto StillCompleting = [this, ExpectedEpoch, RestoringPawn, RestoringMission, RestoringASC, PS, RestoringASCEpoch, RestoringPawnGeneration](ESovCampaignTransitionState ExpectedState)
 	{
 		return IsValid(this) && !IsActorBeingDestroyed() && TransitionEpoch == ExpectedEpoch && TransitionState == ExpectedState
 			&& !PendingPawn && !PendingMission && IsValid(RestoringPawn) && RestoringPawn->IsCharacterReady()
 			&& GetPawn() == RestoringPawn && RestoringPawn->GetController() == this && GetPlayerState<ASovPlayerState>() == PS
 			&& IsValid(RestoringASC) && GetAbilitySystemComponent() == RestoringASC && RestoringASC->GetAvatarActor() == RestoringPawn
+			&& RestoringASC->GetCombatActorInfoEpoch() == RestoringASCEpoch
+			&& RestoringPawn->GetCharacterInitializationGeneration() == RestoringPawnGeneration
 			&& CampaignState && CampaignState->GetActiveMission() == RestoringMission;
 	};
 	SetTransitionInputLock(false);
@@ -515,7 +532,7 @@ void ASovPlayerController::PollCampaignInitialization(uint64 ExpectedEpoch)
 	if (!StillCompleting(ESovCampaignTransitionState::Idle)) { return; }
 	if (USovSaveSubsystem* Slots = GetGameInstance() ? GetGameInstance()->GetSubsystem<USovSaveSubsystem>() : nullptr)
 	{
-		Slots->NotifyCampaignReady(this, true);
+		Slots->NotifyCampaignReady(this, true, ExpectedEpoch);
 		if (!StillCompleting(ESovCampaignTransitionState::Idle)) { return; }
 		if (Started == ESovCampaignResult::Applied)
 		{ Slots->QueueAutosave(ESovSaveBoundary::MissionStart, RestoringMission->MissionId); }
@@ -528,6 +545,7 @@ void ASovPlayerController::FailCampaignInitialization(const FString& Message)
 {
 	if (!IsValid(this) || IsActorBeingDestroyed() || bFailureInProgress) { return; }
 	TGuardValue<bool> FailureGuard(bFailureInProgress, true);
+	const uint64 FailedRestoreEpoch = TransitionEpoch;
 	const uint64 FailureEpoch = ++TransitionEpoch;
 	ASovPlayerCharacterBase* ExpectedPending = PendingPawn;
 	USovCampaignDefinition* ExpectedMission = PendingMission;
@@ -539,7 +557,7 @@ void ASovPlayerController::FailCampaignInitialization(const FString& Message)
 			&& PendingPawn == ExpectedPending && PendingMission == ExpectedMission && GetPawn() == ExpectedPossession
 			&& GetPlayerState<ASovPlayerState>() == ExpectedPS;
 	};
-	const auto PublishFailure = [this, &OwnsFailure, &ExpectedPending](const FString& Reason)
+	const auto PublishFailure = [this, &OwnsFailure, &ExpectedPending, FailedRestoreEpoch](const FString& Reason)
 	{
 		if (!OwnsFailure()) { return; }
 		if (IsValid(ExpectedPending)) { ExpectedPending->FailCampaignInitialization(); }
@@ -547,7 +565,7 @@ void ASovPlayerController::FailCampaignInitialization(const FString& Message)
 		SetTransitionState(ESovCampaignTransitionState::Failed, Reason);
 		if (!OwnsFailure() || TransitionState != ESovCampaignTransitionState::Failed) { return; }
 		if (USovSaveSubsystem* Slots = GetGameInstance() ? GetGameInstance()->GetSubsystem<USovSaveSubsystem>() : nullptr)
-		{ Slots->NotifyCampaignReady(this, false); }
+		{ Slots->NotifyCampaignReady(this, false, FailedRestoreEpoch); }
 	};
 	ConvergenceCompanionState->RollbackStaged();
 	if (!OwnsFailure()) { return; }
@@ -616,7 +634,7 @@ bool ASovPlayerController::TravelToMission(USovCampaignDefinition* Destination, 
 	const FString MapPackage = Destination->Map.ToSoftObjectPath().GetLongPackageName();
 	if (MapPackage.IsEmpty() || !FPackageName::DoesPackageExist(MapPackage))
 	{ OutError = TEXT("Destination map is missing or not cooked."); return false; }
-	if (!PrepareTransitionCheckpoint(Destination->MissionId, OutError)) { return false; }
+	if (!PrepareTransitionCheckpoint(Destination->MissionId, OutError, true)) { return false; }
 	UNarrativeSaveSubsystem* Save = GetWorld()->GetSubsystem<UNarrativeSaveSubsystem>();
 	if (!Save) { OutError = TEXT("Narrative save subsystem is unavailable."); return false; }
 	USovSaveSubsystem* Slots = GetGameInstance() ? GetGameInstance()->GetSubsystem<USovSaveSubsystem>() : nullptr;

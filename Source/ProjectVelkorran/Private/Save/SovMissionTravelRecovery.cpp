@@ -47,6 +47,7 @@ void USovSaveSubsystem::DeinitializeMissionTravelRecovery()
 
 void USovSaveSubsystem::ResetMissionTravelRecovery()
 {
+    ResetRestoreOwner();
     MissionTravelOrigin = nullptr; MissionTravelNarrative = nullptr;
     MissionTravelOwner = FOperationOwner(); MissionTravelRequest.Invalidate(); MissionRecoveryRequest.Invalidate();
     MissionTravelSourceWorld.Reset(); MissionTravelDestinationWorld.Reset();
@@ -91,7 +92,16 @@ bool USovSaveSubsystem::ArmMissionTravelRecovery(ASovPlayerController* Source, U
     MissionTravelDestinationMap = Destination->Map.ToSoftObjectPath().GetLongPackageName();
     MissionTravelRequest = FGuid::NewGuid(); MissionTravelDeadline = FPlatformTime::Seconds() + SovMissionTravelRecovery::TimeoutSeconds;
     Request = MissionTravelRequest;
+    Source->PendingTravelOperationId = Request;
+    Source->PendingTravelOriginGeneration = Origin->Header.Generation;
     return true;
+}
+
+bool USovSaveSubsystem::ValidateRestoredTravelIdentity(ASovPlayerController* PC) const
+{
+    return PC && MissionTravelRequest.IsValid() && !bMissionRecoveryAttempted && MissionTravelOrigin
+        && PC->PendingTravelOperationId == MissionTravelRequest
+        && PC->PendingTravelOriginGeneration == MissionTravelOrigin->Header.Generation;
 }
 
 void USovSaveSubsystem::CancelMissionTravelRecovery(const FGuid& Request)
@@ -123,7 +133,7 @@ bool USovSaveSubsystem::ValidateMissionTravelWorld(UWorld& World, FString& Error
     if (!Mode || !UGameplayStatics::HasOption(Mode->OptionsString, TEXT("SovCampaignTransition"))) { return true; }
     const FGuid Request = SovMissionTravelRecovery::RequestFrom(Mode->OptionsString, TEXT("SovMissionTravelRequest"));
     if (World.GetGameInstance() != GetGameInstance() || !Request.IsValid() || Request != MissionTravelRequest
-        || bMissionRecoveryAttempted)
+        || bMissionRecoveryAttempted || UGameplayStatics::HasOption(Mode->OptionsString, TEXT("SovCampaignSlotLoad")))
     { Error = TEXT("The mission travel request expired; select a verified recovery save."); return false; }
     MissionTravelDestinationWorld = &World;
     if (!IsRetainedOwnerCurrent(MissionTravelOwner, Error) || bPlatformSuspended || !Mode->InitialMission
@@ -142,6 +152,12 @@ bool USovSaveSubsystem::ValidateMissionTravelWorld(UWorld& World, FString& Error
 
 void USovSaveSubsystem::RecordMissionTravelFailure(UWorld* World, const FString& Error)
 {
+    RecordMissionTravelFailureForRequest(MissionTravelRequest, World, Error);
+}
+
+void USovSaveSubsystem::RecordMissionTravelFailureForRequest(const FGuid& Request, UWorld* World, const FString& Error)
+{
+    if (!Request.IsValid() || Request != MissionTravelRequest) { return; }
     if (!MissionTravelRequest.IsValid() || !World || World->GetGameInstance() != GetGameInstance()) { return; }
     const auto* Mode = World->GetAuthGameMode<ASovCampaignGameMode>();
     const FString Options = Mode ? Mode->OptionsString : World->URL.ToString();
@@ -182,7 +198,8 @@ void USovSaveSubsystem::NotifyMissionTravelReady(ASovPlayerController* PC, bool 
 bool USovSaveSubsystem::BeginMissionOriginRecovery(FString& Error)
 {
     UWorld* World = GetWorld();
-    if (!World || bBusy || PendingSave || !MissionTravelOrigin || !MissionTravelNarrative
+    if (!World || bBusy || PendingSave || !MissionTravelRequest.IsValid() || bMissionRecoveryAttempted
+        || !MissionTravelOrigin || !MissionTravelNarrative
         || !IsRetainedOwnerCurrent(MissionTravelOwner, Error) || bPlatformSuspended)
     { if (Error.IsEmpty()) { Error = TEXT("Origin recovery cannot start until the original storage owner and world are available."); } return false; }
     TGuardValue<bool> Busy(bBusy, true);
@@ -197,6 +214,7 @@ bool USovSaveSubsystem::BeginMissionOriginRecovery(FString& Error)
         || MissionTravelOrigin != KeepOrigin.Get() || MissionTravelNarrative != KeepNarrative.Get() || GetWorld() != World)
     { if (Error.IsEmpty()) { Error = TEXT("Recovery ownership changed while preparing the attempt snapshot."); } return false; }
     bMissionRecoveryAttempted = true; bMissionTravelFailurePending = false; MissionTravelDeadline = 0;
+    ResetRestoreOwner();
     PendingSave = MissionTravelOrigin; PendingNarrative = Attempt.Get();
     PendingLoadOwner = CaptureOperationOwner(); PendingLoadRequest = FGuid::NewGuid(); MissionRecoveryRequest = PendingLoadRequest;
     PendingLoadDeadline = FPlatformTime::Seconds() + SovMissionTravelRecovery::TimeoutSeconds;
@@ -249,8 +267,16 @@ bool USovSaveSubsystem::RetryMissionTravelRecovery(FString& Error)
         || MissionTravelOwner.SelectionEpoch != SelectionEpoch)
     { Error = TEXT("Explicit origin retry requires the original selected account and no active load."); return false; }
     MissionTravelOwner = CaptureOperationOwner(); MissionTravelRequest = FGuid::NewGuid();
+    bMissionRecoveryAttempted = false;
     const FGuid Request = MissionTravelRequest;
     if (BeginMissionOriginRecovery(Error)) { return true; }
-    if (MissionTravelRequest == Request) { MissionTravelRequest.Invalidate(); }
+    if (MissionTravelRequest == Request) { MissionTravelRequest.Invalidate(); bMissionRecoveryAttempted = true; }
     return false;
+}
+
+bool USovSaveSubsystem::HasTravelRecovery() const
+{
+    return MissionTravelOrigin && MissionTravelNarrative
+        && MissionTravelOwner.Namespace == AccountNamespace && MissionTravelOwner.LocalUser == UserIndex
+        && MissionTravelOwner.SelectionEpoch == SelectionEpoch && IsPlatformStorageOwnerAvailable();
 }

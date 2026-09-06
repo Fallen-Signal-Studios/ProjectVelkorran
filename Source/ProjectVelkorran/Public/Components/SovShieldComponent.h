@@ -211,6 +211,9 @@ private:
 	bool bEndingPlay = false;
 	uint64 BindingGeneration = 0;
 	uint64 BoundActorInfoEpoch = 0;
+	int32 BoundReadyEpoch = 0;
+	UFUNCTION()
+	void HandleOwnerReadyEpochChanged(int32 ReadyEpoch);
 	uint64 BoundLifeEpoch = 0;
 	TWeakObjectPtr<const UNarrativeAttributeSetBase> BoundAttributes;
 	bool IsCurrentOperation(uint64 Generation) const;

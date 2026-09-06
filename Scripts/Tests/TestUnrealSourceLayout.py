@@ -1,6 +1,7 @@
 """Host checks for known unity/UHT source-layout hazards, not an Unreal build."""
 
 from pathlib import Path
+import json
 import re
 import shutil
 import subprocess
@@ -10,6 +11,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 PRIVATE = ROOT / "Source/ProjectVelkorran/Private"
+TEST_PRIVATE = ROOT / "Source/ProjectVelkorranTests/Private"
 
 
 def extract_helper(path, name):
@@ -32,6 +34,25 @@ def extract_helper(path, name):
 
 
 class UnrealSourceLayoutTests(unittest.TestCase):
+    def test_native_registrations_have_unique_classes_and_names(self):
+        classes, names = {}, {}
+        for path in TEST_PRIVATE.rglob("*.cpp"):
+            for cls, name in re.findall(
+                    r'^\s*IMPLEMENT_(?:SIMPLE|COMPLEX)_AUTOMATION_TEST\s*\(\s*(\w+)\s*,\s*"([^"]+)"',
+                    path.read_text(), re.MULTILINE):
+                self.assertNotIn(cls, classes, f"{cls}: {classes.get(cls)} and {path}")
+                self.assertNotIn(name, names, f"{name}: {names.get(name)} and {path}")
+                classes[cls], names[name] = path, path
+        self.assertGreater(len(names), 0)
+
+    def test_editor_fixture_module_has_one_implementation(self):
+        implementations = []
+        for path in TEST_PRIVATE.rglob("*.cpp"):
+            if re.search(r"IMPLEMENT_MODULE\s*\([^,]+,\s*ProjectVelkorranTests\s*\)",
+                         path.read_text()):
+                implementations.append(path)
+        self.assertEqual(len(implementations), 1, implementations)
+
     def compile_source(self, source, run=False):
         compiler = shutil.which("c++") or shutil.which("clang++") or shutil.which("g++")
         if not compiler:
@@ -82,7 +103,7 @@ struct FAutomationTestBase { void AddError(const char*); bool TestTrue(const cha
 template<class T> T* Cast(void* p) { return static_cast<T*>(p); }
 """
         for hero in ("Tarrik", "Selene"):
-            path = ROOT / "Source/ProjectVelkorranTests/Private/Tests" / f"Sov{hero}PayloadRuntimeTests.cpp"
+            path = TEST_PRIVATE / "Tests" / f"Sov{hero}PayloadRuntimeTests.cpp"
             text = path.read_text()
             namespace = re.search(r"namespace (Sov\w+PayloadTests)\s*\{", text)
             self.assertIsNotNone(namespace, f"Helper namespace missing in {path}")
@@ -92,6 +113,38 @@ template<class T> T* Cast(void* p) { return static_cast<T*>(p); }
             registrations = text.split("IMPLEMENT_SIMPLE_AUTOMATION_TEST", 1)[1]
             self.assertNotRegex(registrations, r"(?<![:\w])(?:Activate\s*<|Shield\s*\()")
         self.compile_source(source)
+
+    def test_reflected_fixtures_are_excluded_from_game_modules(self):
+        project = json.loads((ROOT / "ProjectVelkorran.uproject").read_text())
+        module = next(item for item in project["Modules"] if item["Name"] == "ProjectVelkorranTests")
+        self.assertEqual(module["Type"], "Editor")
+        self.assertEqual(module["LoadingPhase"], "PostEngineInit")
+        fixture_count = 0
+        for source_root in (ROOT / "Source", ROOT / "Plugins"):
+            for path in source_root.rglob("*.h"):
+                if "Tests" not in path.parts:
+                    continue
+                if re.search(r"\bUCLASS\s*\(", path.read_text()):
+                    fixture_count += 1
+                    self.assertIn(TEST_PRIVATE, path.parents, str(path))
+        self.assertGreater(fixture_count, 20, "Inspect the actual reflected test fixtures")
+        for path in (ROOT / "Source").glob("*.Target.cs"):
+            text = path.read_text()
+            if "TargetType.Editor" not in text:
+                self.assertNotIn('"ProjectVelkorranTests"', text, str(path))
+        for path in (ROOT / "Source").rglob("*.Build.cs"):
+            if path.parent.name != "ProjectVelkorranTests":
+                self.assertNotIn('"ProjectVelkorranTests"', path.read_text(), str(path))
+
+    def test_fixture_script_paths_follow_their_reflected_module(self):
+        fixtures = set()
+        for path in (TEST_PRIVATE / "Tests").glob("*.h"):
+            fixtures.update(re.findall(r"class\s+[UA]([A-Za-z0-9_]+)\s*:", path.read_text()))
+        self.assertIn("SovLifecycleTestGameMode", fixtures)
+        for path in (TEST_PRIVATE / "Tests").glob("*.cpp"):
+            for module, name in re.findall(r"/Script/([A-Za-z0-9_]+)\.([A-Za-z0-9_]+)", path.read_text()):
+                if name in fixtures:
+                    self.assertEqual(module, "ProjectVelkorranTests", str(path))
 
     def test_living_policies_do_not_change_with_unity_composition(self):
         prefix = """

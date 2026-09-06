@@ -5,6 +5,7 @@
 #include "Engine/GameInstance.h"
 
 #include "Campaign/SovCampaignPolicy.h"
+#include "Campaign/SovObjectivePolicy.h"
 #include "Companions/SovCoActionAnchor.h"
 #include "Campaign/SovEvidenceSourceComponent.h"
 #include "Cinematics/SovCampaignCinematicComponent.h"
@@ -17,6 +18,56 @@
 #include "Tales/TalesComponent.h"
 #include "Serialization/MemoryReader.h"
 #include "Serialization/ObjectAndNameAsStringProxyArchive.h"
+
+namespace
+{
+	using EObjectivePolicyState = SovObjectivePolicy::State;
+	static_assert(static_cast<uint8>(ESovObjectiveState::Superseded) == static_cast<uint8>(EObjectivePolicyState::Superseded), "Objective state order must match the portable policy.");
+
+	ESovObjectiveState ObjectiveStateFor(const FSovCampaignBeatDefinition& Beat, const FSovCampaignMissionRecord* Record,
+		FGameplayTag Lead, const TMap<FGameplayTag, FGameplayTag>& Facts, const FGameplayTagContainer& Knowledge)
+	{
+		if (Record)
+		{
+			if (const auto* State = Record->ObjectiveStates.Find(Beat.BeatId))
+			{
+				// Activation belongs to durable mission history; presenting or acting
+				// on it still requires the current lead to know the objective.
+				if (*State == ESovObjectiveState::Active
+					&& ((Beat.RequiredProtagonist.IsValid() && Beat.RequiredProtagonist != Lead)
+						|| !Knowledge.HasAllExact(Beat.RequiredKnowledge)))
+				{ return ESovObjectiveState::Inactive; }
+				return *State;
+			}
+			if (Record->CompletedBeats.Contains(Beat.BeatId)) { return ESovObjectiveState::Succeeded; }
+		}
+		if (Beat.RequiredProtagonist.IsValid() && Beat.RequiredProtagonist != Lead) { return ESovObjectiveState::Inactive; }
+		for (FName Prior : Beat.PrerequisiteBeats)
+		{ if (!Record || !Record->CompletedBeats.Contains(Prior)) { return ESovObjectiveState::Inactive; } }
+		for (FName Group : Beat.RequiredChoiceGroups)
+		{ if (!Record || !Record->SelectedChoices.Contains(Group)) { return ESovObjectiveState::Inactive; } }
+		for (const auto& Required : Beat.RequiredState)
+		{ const auto* Value = Facts.Find(Required.Key); if (!Value || *Value != Required.Value) { return ESovObjectiveState::Inactive; } }
+		return Knowledge.HasAllExact(Beat.RequiredKnowledge) ? ESovObjectiveState::Available : ESovObjectiveState::Inactive;
+	}
+
+	bool ObjectiveTransitionAllowed(const FSovCampaignBeatDefinition& Beat, ESovObjectiveState From, ESovObjectiveState To)
+	{
+		return SovObjectivePolicy::CanTransition(static_cast<EObjectivePolicyState>(From), static_cast<EObjectivePolicyState>(To),
+			Beat.bOptional, Beat.bCanonGate, !Beat.ChoiceGroupId.IsNone(), !Beat.FailureReasonId.IsNone());
+	}
+
+	void RecordObjectiveSuccess(const USovCampaignDefinition& Definition, const FSovCampaignBeatDefinition& Beat, FSovCampaignMissionRecord& Record)
+	{
+		Record.ObjectiveStates.Add(Beat.BeatId, ESovObjectiveState::Succeeded);
+		if (!Beat.ChoiceGroupId.IsNone())
+		{
+			Record.SelectedChoices.Add(Beat.ChoiceGroupId, Beat.BeatId);
+			for (const auto& Other : Definition.Beats)
+			{ if (Other.ChoiceGroupId == Beat.ChoiceGroupId && Other.BeatId != Beat.BeatId) { Record.ObjectiveStates.Add(Other.BeatId, ESovObjectiveState::Superseded); } }
+		}
+	}
+}
 
 USovCampaignStateComponent::USovCampaignStateComponent()
 {
@@ -45,6 +96,79 @@ bool USovCampaignStateComponent::IsMissionComplete(FName MissionId) const
 {
 	const FSovCampaignMissionRecord* Record = Missions.Find(MissionId);
 	return bStateValid && Record && Record->bSucceeded;
+}
+
+ESovObjectiveState USovCampaignStateComponent::GetObjectiveState(FName MissionId, FName BeatId) const
+{
+	const auto* Definition = MissionDefinitions.Find(MissionId);
+	const auto* Beat = Definition && Definition->Get() ? (*Definition)->FindBeat(BeatId) : nullptr;
+	if (!bStateValid || !Beat) { return ESovObjectiveState::Inactive; }
+	const auto* Record = Missions.Find(MissionId);
+	const auto* Knowledge = CharacterKnowledge.Find(GetActiveProtagonist());
+	const ESovObjectiveState State = ObjectiveStateFor(*Beat, Record, GetActiveProtagonist(), StateValues,
+		Knowledge ? Knowledge->Knowledge : FGameplayTagContainer());
+	if ((!ActiveMission || ActiveMission->MissionId != MissionId) && !SovObjectivePolicy::IsTerminal(static_cast<EObjectivePolicyState>(State)))
+	{ return ESovObjectiveState::Inactive; }
+	return State;
+}
+
+FName USovCampaignStateComponent::GetSelectedChoice(FName MissionId, FName GroupId) const
+{
+	const auto* Record = bStateValid ? Missions.Find(MissionId) : nullptr;
+	const auto* Selected = Record ? Record->SelectedChoices.Find(GroupId) : nullptr;
+	return Selected ? *Selected : NAME_None;
+}
+
+TArray<FName> USovCampaignStateComponent::GetActionableObjectiveIds() const
+{
+	TArray<FName> Result;
+	if (!bStateValid || !ActiveMission) { return Result; }
+	for (const auto& Beat : ActiveMission->Beats)
+	{
+		const auto State = GetObjectiveState(ActiveMission->MissionId, Beat.BeatId);
+		if (State == ESovObjectiveState::Available || State == ESovObjectiveState::Active) { Result.Add(Beat.BeatId); }
+	}
+	return Result;
+}
+
+ESovCampaignResult USovCampaignStateComponent::TransitionObjective(FName BeatId, ESovObjectiveState State)
+{
+	if (!HasAuthorityOwner()) { return ESovCampaignResult::NotAuthority; }
+	if (bMutating) { return ESovCampaignResult::Busy; }
+	FString Error;
+	if (!ActiveMission || !ActiveMission->ValidateDefinition(Error) || !DoesCurrentPawnMatch(GetActiveProtagonist()) || ObjectiveJournal.Num() >= 4096)
+	{ return ESovCampaignResult::Invalid; }
+	const auto* Beat = ActiveMission->FindBeat(BeatId);
+	if (!Beat || (Beat->RequiredProtagonist.IsValid() && Beat->RequiredProtagonist != GetActiveProtagonist())) { return ESovCampaignResult::Invalid; }
+	const ESovObjectiveState Previous = GetObjectiveState(ActiveMission->MissionId, BeatId);
+	if (Previous == State && State != ESovObjectiveState::Inactive && State != ESovObjectiveState::Available) { return ESovCampaignResult::AlreadyApplied; }
+	if (!ObjectiveTransitionAllowed(*Beat, Previous, State))
+	{ return Previous == ESovObjectiveState::Inactive ? ESovCampaignResult::PrerequisiteMissing : ESovCampaignResult::ObjectiveClosed; }
+	FSovObjectiveJournalEntry Entry;
+	Entry.EventId = FGuid::NewGuid(); Entry.Sequence = ObjectiveJournal.Num() + 1;
+	Entry.AfterBeatSequence = Journal.Num(); Entry.AfterEvidenceCount = Evidence.Num();
+	Entry.MissionId = ActiveMission->MissionId; Entry.BeatId = BeatId; Entry.Protagonist = GetActiveProtagonist();
+	Entry.PreviousState = Previous; Entry.State = State;
+	Entry.ReasonId = State == ESovObjectiveState::Failed ? Beat->FailureReasonId : NAME_None;
+	TGuardValue<bool> Mutation(bMutating, true);
+	Missions.FindOrAdd(Entry.MissionId).ObjectiveStates.Add(BeatId, State);
+	ObjectiveJournal.Add(Entry);
+	OnObjectiveStateChanged.Broadcast(Entry.MissionId, BeatId, State);
+	if (State == ESovObjectiveState::Failed || State == ESovObjectiveState::Skipped)
+	{
+		if (auto* GI = GetWorld() ? GetWorld()->GetGameInstance() : nullptr)
+		{ if (auto* Save = GI->GetSubsystem<USovSaveSubsystem>()) { Save->QueueAutosave(ESovSaveBoundary::ExplicitCheckpoint, BeatId); } }
+	}
+	return ESovCampaignResult::Applied;
+}
+
+ESovCampaignResult USovCampaignStateComponent::ResolveChoice(FName GroupId, FName OutcomeBeatId)
+{
+	if (!HasAuthorityOwner()) { return ESovCampaignResult::NotAuthority; }
+	if (bMutating) { return ESovCampaignResult::Busy; }
+	const auto* Beat = ActiveMission ? ActiveMission->FindBeat(OutcomeBeatId) : nullptr;
+	if (GroupId.IsNone() || !Beat || Beat->ChoiceGroupId != GroupId || !ActiveMission->FindChoiceGroup(GroupId)) { return ESovCampaignResult::Invalid; }
+	return CompleteBeat(OutcomeBeatId);
 }
 
 bool USovCampaignStateComponent::CanEnterMission(const USovCampaignDefinition* Definition) const
@@ -119,6 +243,14 @@ ESovCampaignResult USovCampaignStateComponent::CompleteBeatInternal(FName BeatId
 		|| (!HandoffRequestId.IsValid() && !DoesCurrentPawnMatch(GetActiveProtagonist()))) { return ESovCampaignResult::Invalid; }
 	const FSovCampaignBeatDefinition* Beat = ActiveMission->FindBeat(BeatId);
 	if (!Beat || (Beat->RequiredProtagonist.IsValid() && Beat->RequiredProtagonist != GetActiveProtagonist())) { return ESovCampaignResult::Invalid; }
+	const auto ObjectiveState = GetObjectiveState(ActiveMission->MissionId, BeatId);
+	if (SovObjectivePolicy::IsTerminal(static_cast<EObjectivePolicyState>(ObjectiveState)) && ObjectiveState != ESovObjectiveState::Succeeded)
+	{ return ESovCampaignResult::ObjectiveClosed; }
+	if (!Beat->ChoiceGroupId.IsNone())
+	{
+		const FName Selected = GetSelectedChoice(ActiveMission->MissionId, Beat->ChoiceGroupId);
+		if (!Selected.IsNone() && Selected != BeatId) { return ESovCampaignResult::ObjectiveClosed; }
+	}
 	if (Beat->bRequiresCinematicProof)
 	{
 		if (!IsValid(CinematicSource) || !CinematicSource->HasCommitReceipt(this, BeatId, bSkipPresentation)) { return ESovCampaignResult::Invalid; }
@@ -132,6 +264,7 @@ ESovCampaignResult USovCampaignStateComponent::CompleteBeatInternal(FName BeatId
 	else if (HandoffRequestId.IsValid()) { return ESovCampaignResult::Invalid; }
 	bool bPrerequisitesMet = true;
 	for (FName Prior : Beat->PrerequisiteBeats) { bPrerequisitesMet &= IsBeatComplete(ActiveMission->MissionId, Prior); }
+	for (FName Group : Beat->RequiredChoiceGroups) { bPrerequisitesMet &= !GetSelectedChoice(ActiveMission->MissionId, Group).IsNone(); }
 	for (const FSovCampaignStateWrite& Required : Beat->RequiredState)
 	{ bPrerequisitesMet &= GetStateValue(Required.Key) == Required.Value; }
 	const auto Policy = SovCampaignPolicy::CompleteBeat(true, true, IsBeatComplete(ActiveMission->MissionId, BeatId),
@@ -226,6 +359,7 @@ ESovCampaignResult USovCampaignStateComponent::CompleteBeatInternal(FName BeatId
 		CharacterKnowledge.FindOrAdd(Entry.Protagonist).Knowledge.AppendTags(Beat->GrantedKnowledge);
 		FSovCampaignMissionRecord& Record = Missions.FindOrAdd(Entry.MissionId);
 		Record.CompletedBeats.AddUnique(BeatId);
+		RecordObjectiveSuccess(*ActiveMission, *Beat, Record);
 		bool bAllMandatoryComplete = true;
 		for (const FSovCampaignBeatDefinition& Required : ActiveMission->Beats)
 		{ if (!Required.bOptional && !Record.CompletedBeats.Contains(Required.BeatId)) { bAllMandatoryComplete = false; } }
@@ -244,6 +378,12 @@ ESovCampaignResult USovCampaignStateComponent::CompleteBeatInternal(FName BeatId
 	}
 	for (const auto& Acquisition : CriticalAcquisitions) { OnEvidenceRecorded.Broadcast(Acquisition); }
 	OnBeatCommitted.Broadcast(Entry);
+	OnObjectiveStateChanged.Broadcast(Entry.MissionId, Entry.BeatId, ESovObjectiveState::Succeeded);
+	if (!Beat->ChoiceGroupId.IsNone())
+	{
+		for (const auto& Other : ActiveMission->Beats)
+		{ if (Other.ChoiceGroupId == Beat->ChoiceGroupId && Other.BeatId != BeatId) { OnObjectiveStateChanged.Broadcast(Entry.MissionId, Other.BeatId, ESovObjectiveState::Superseded); } }
+	}
 	if (bMissionJustSucceeded) { OnMissionChanged.Broadcast(Entry.MissionId, true); }
 	if (bMissionJustSucceeded)
 	{ if (USovGameUserSettings* Settings = USovGameUserSettings::Get()) { Settings->UnlockSovereignFromCampaign(this); } }
@@ -253,9 +393,11 @@ ESovCampaignResult USovCampaignStateComponent::CompleteBeatInternal(FName BeatId
 		{
 			if (Beat->bCanonGate || bMissionJustSucceeded)
 			{ Slots->QueueAutosave(ESovSaveBoundary::CanonGate, Entry.BeatId); }
+			else if (!Beat->ChoiceGroupId.IsNone())
+			{ Slots->QueueAutosave(ESovSaveBoundary::ExplicitCheckpoint, Entry.BeatId); }
 			for (const auto& Next : ActiveMission->Beats)
 			{
-				if (!Next.bInteractiveChoice || IsBeatComplete(ActiveMission->MissionId, Next.BeatId)) { continue; }
+				if (!Next.bInteractiveChoice || GetObjectiveState(ActiveMission->MissionId, Next.BeatId) != ESovObjectiveState::Available) { continue; }
 				bool bReady = true;
 				for (FName Prior : Next.PrerequisiteBeats) { bReady &= IsBeatComplete(ActiveMission->MissionId, Prior); }
 				if (bReady) { Slots->QueueAutosave(ESovSaveBoundary::BeforeChoice, Next.BeatId); }
@@ -386,10 +528,10 @@ void USovCampaignStateComponent::PrepareForSave_Implementation()
 
 bool USovCampaignStateComponent::ValidateSavedState() const
 {
-	if (SavedSchemaVersion != 1 || Missions.Num() != MissionDefinitions.Num()) { return false; }
+	if (SavedSchemaVersion != 2 || Missions.Num() != MissionDefinitions.Num() || ObjectiveJournal.Num() > 4096) { return false; }
 	if (!ActiveMission)
 	{
-		return Missions.IsEmpty() && Journal.IsEmpty() && Evidence.IsEmpty() && CharacterKnowledge.IsEmpty()
+		return Missions.IsEmpty() && Journal.IsEmpty() && ObjectiveJournal.IsEmpty() && Evidence.IsEmpty() && CharacterKnowledge.IsEmpty()
 			&& StateValues.IsEmpty() && ProtectedStateKeys.IsEmpty() && ViewedCinematics.IsEmpty() && !ActiveProtagonist.IsValid();
 	}
 	const auto& Tags = FSovGameplayTags::Get();
@@ -433,6 +575,7 @@ bool USovCampaignStateComponent::ValidateSavedState() const
 	TMap<FGuid, FSovEvidenceAcquisition> Sources;
 	TArray<FSovEvidenceAcquisition> ReplayedEvidence;
 	int32 EvidenceIndex = 0;
+	int32 ObjectiveIndex = 0;
 	FName LastMission;
 	const auto MissionSucceeded = [&Replay, this](FName Id)
 	{
@@ -443,8 +586,41 @@ bool USovCampaignStateComponent::ValidateSavedState() const
 		{ if (!Beat.bOptional && !Record->CompletedBeats.Contains(Beat.BeatId)) { return false; } }
 		return true;
 	};
+	// Evidence may unlock an objective between two beat commits. Preserve that exact order,
+	// including transitions before the first beat and in a newly entered successor mission.
+	const auto ReplayObjectiveEvents = [&](int32 Position)
+	{
+		while (ObjectiveIndex < ObjectiveJournal.Num() && ObjectiveJournal[ObjectiveIndex].AfterBeatSequence == Position
+			&& ObjectiveJournal[ObjectiveIndex].AfterEvidenceCount == EvidenceIndex)
+		{
+			const auto& Item = ObjectiveJournal[ObjectiveIndex++];
+			const auto* DefinitionPtr = MissionDefinitions.Find(Item.MissionId);
+			const auto* Definition = DefinitionPtr ? DefinitionPtr->Get() : nullptr;
+			const auto* Beat = Definition ? Definition->FindBeat(Item.BeatId) : nullptr;
+			if (!Beat || Item.Sequence != ObjectiveIndex || !Item.EventId.IsValid() || Events.Contains(Item.EventId)
+				|| Item.Protagonist != LeadFor(Definition)
+				|| (Beat->RequiredProtagonist.IsValid() && Beat->RequiredProtagonist != Item.Protagonist)) { return false; }
+			const FName NextMission = Position < Journal.Num() ? Journal[Position].MissionId : ActiveMission->MissionId;
+			if (LastMission.IsNone()) { if (Item.MissionId != NextMission) { return false; } }
+			else if (Item.MissionId != LastMission)
+			{
+				if (Item.MissionId != NextMission || Replay.Contains(Item.MissionId) || !MissionSucceeded(LastMission)
+					|| !MissionDefinitions.FindChecked(LastMission)->AllowedSuccessorMissions.Contains(Item.MissionId)) { return false; }
+			}
+			for (FName Required : Definition->RequiredPriorConsequenceIds)
+			{ if (!SeenConsequences.Contains(Required)) { return false; } }
+			auto& Progress = Replay.FindOrAdd(Item.MissionId);
+			const auto Previous = ObjectiveStateFor(*Beat, &Progress, Item.Protagonist, Facts, Knowledge.FindOrAdd(Item.Protagonist));
+			if (Previous != Item.PreviousState || !ObjectiveTransitionAllowed(*Beat, Previous, Item.State)
+				|| Item.ReasonId != (Item.State == ESovObjectiveState::Failed ? Beat->FailureReasonId : NAME_None)) { return false; }
+			Progress.ObjectiveStates.Add(Item.BeatId, Item.State);
+			Events.Add(Item.EventId); LastMission = Item.MissionId;
+		}
+		return true;
+	};
 	for (int32 Position = 0; Position <= Journal.Num(); ++Position)
 	{
+		if (!ReplayObjectiveEvents(Position)) { return false; }
 		while (EvidenceIndex < Evidence.Num() && Evidence[EvidenceIndex].AfterJournalSequence == Position)
 		{
 			const FSovEvidenceAcquisition& Item = Evidence[EvidenceIndex++];
@@ -486,6 +662,7 @@ bool USovCampaignStateComponent::ValidateSavedState() const
 				if (Item.CopyDestination == NarrativeIdentity(Hero) || Item.WitnessIds.Contains(NarrativeIdentity(Hero)))
 				{ Knowledge.FindOrAdd(Hero).AppendTags(Item.GrantedKnowledge); }
 			}
+			if (!ReplayObjectiveEvents(Position)) { return false; }
 		}
 		if (Position == Journal.Num()) { break; }
 		const FSovCampaignJournalEntry& Entry = Journal[Position];
@@ -547,7 +724,11 @@ bool USovCampaignStateComponent::ValidateSavedState() const
 		LastMission = Entry.MissionId;
 		FSovCampaignMissionRecord& Progress = Replay.FindOrAdd(Entry.MissionId);
 		if (Progress.CompletedBeats.Contains(Entry.BeatId)) { return false; }
+		if (const auto* State = Progress.ObjectiveStates.Find(Entry.BeatId);
+			State && SovObjectivePolicy::IsTerminal(static_cast<EObjectivePolicyState>(*State))) { return false; }
+		if (!Beat->ChoiceGroupId.IsNone() && Progress.SelectedChoices.Contains(Beat->ChoiceGroupId)) { return false; }
 		for (const FName Prior : Beat->PrerequisiteBeats) { if (!Progress.CompletedBeats.Contains(Prior)) { return false; } }
+		for (FName Group : Beat->RequiredChoiceGroups) { if (!Progress.SelectedChoices.Contains(Group)) { return false; } }
 		for (const auto& Required : Beat->RequiredState)
 		{ const FGameplayTag* Value = Facts.Find(Required.Key); if (!Value || *Value != Required.Value) { return false; } }
 		if (!Knowledge.FindOrAdd(Entry.Protagonist).HasAllExact(Beat->RequiredKnowledge)) { return false; }
@@ -561,11 +742,12 @@ bool USovCampaignStateComponent::ValidateSavedState() const
 		}
 		Knowledge.FindOrAdd(Entry.Protagonist).AppendTags(Beat->GrantedKnowledge);
 		Progress.CompletedBeats.Add(Entry.BeatId);
+		RecordObjectiveSuccess(*Definition, *Beat, Progress);
 		Events.Add(Entry.EventId);
 		if (Entry.HandoffToProtagonist.IsValid()) { ReplayedLeads.Add(Entry.MissionId, Entry.HandoffToProtagonist); }
 	}
 	for (FName Id : Viewed) { if (ManagedCinematics.Contains(Id) && !ManagedViewed.Contains(Id)) { return false; } }
-    if (EvidenceIndex != Evidence.Num() || GetActiveProtagonist() != LeadFor(ActiveMission)) { return false; }
+    if (EvidenceIndex != Evidence.Num() || ObjectiveIndex != ObjectiveJournal.Num() || GetActiveProtagonist() != LeadFor(ActiveMission)) { return false; }
 	for (FName Required : ActiveMission->RequiredPriorConsequenceIds)
 	{ if (!SeenConsequences.Contains(Required)) { return false; } }
 	for (const auto& Entry : Journal)
@@ -590,6 +772,12 @@ bool USovCampaignStateComponent::ValidateSavedState() const
 		const TArray<FName>& Completed = Replayed ? Replayed->CompletedBeats : Empty;
 		if (!Replayed && Pair.Key != ActiveMission->MissionId) { return false; }
 		if (Pair.Value.CompletedBeats.Num() != Completed.Num() || Pair.Value.bSucceeded != MissionSucceeded(Pair.Key)) { return false; }
+		if (Pair.Value.ObjectiveStates.Num() != (Replayed ? Replayed->ObjectiveStates.Num() : 0)
+			|| Pair.Value.SelectedChoices.Num() != (Replayed ? Replayed->SelectedChoices.Num() : 0)) { return false; }
+		for (const auto& State : Pair.Value.ObjectiveStates)
+		{ const auto* Expected = Replayed ? Replayed->ObjectiveStates.Find(State.Key) : nullptr; if (!Expected || *Expected != State.Value) { return false; } }
+		for (const auto& Choice : Pair.Value.SelectedChoices)
+		{ const auto* Expected = Replayed ? Replayed->SelectedChoices.Find(Choice.Key) : nullptr; if (!Expected || *Expected != Choice.Value) { return false; } }
 		TSet<FName> Seen;
 		for (const FName Id : Pair.Value.CompletedBeats)
 		{ if (!Completed.Contains(Id) || Seen.Contains(Id)) { return false; } Seen.Add(Id); }
@@ -615,6 +803,7 @@ void USovCampaignStateComponent::Load_Implementation()
 {
 	if (!GetOwner() || !GetOwner()->HasAuthority() || bMutating) { return; }
 	TGuardValue<bool> Mutation(bMutating, true);
+	if (SavedSchemaVersion == 1 && !MigrateLegacyObjectives()) { bStateValid = false; OnCampaignStateRestored.Broadcast(false); return; }
 	bStateValid = ValidateSavedState();
 	OnCampaignStateRestored.Broadcast(bStateValid);
 }
@@ -650,5 +839,30 @@ bool USovCampaignStateComponent::ValidateSerializedSave(const TArray<uint8>& Byt
 void USovCampaignStateComponent::Serialize(FArchive& Ar)
 {
 	if (Ar.IsSaveGame() && Ar.IsSaving() && (bMutating || !bStateValid)) { Ar.SetError(); return; }
+	if (Ar.IsSaveGame() && Ar.IsLoading())
+	{
+		// Legacy archives do not contain these fields. Loading into a reused owner
+		// must not retain objective history from the campaign being replaced.
+		ObjectiveJournal.Reset();
+		for (auto& Pair : Missions) { Pair.Value.ObjectiveStates.Reset(); Pair.Value.SelectedChoices.Reset(); }
+	}
 	Super::Serialize(Ar);
+	if (Ar.IsSaveGame() && Ar.IsLoading() && SavedSchemaVersion == 1 && !MigrateLegacyObjectives()) { Ar.SetError(); }
+}
+
+bool USovCampaignStateComponent::MigrateLegacyObjectives()
+{
+	if (SavedSchemaVersion != 1 || !ObjectiveJournal.IsEmpty()) { return false; }
+	// Schema 1 had only completed-beat membership. Never invent a player choice or
+	// accept injected lifecycle state while migrating that completion-only contract.
+	for (const auto& Pair : Missions)
+	{
+		const auto* Definition = MissionDefinitions.Find(Pair.Key);
+		if (!Definition || !Definition->Get() || !(*Definition)->ChoiceGroups.IsEmpty()
+			|| !Pair.Value.ObjectiveStates.IsEmpty() || !Pair.Value.SelectedChoices.IsEmpty()) { return false; }
+	}
+	for (auto& Pair : Missions)
+	{ for (FName BeatId : Pair.Value.CompletedBeats) { Pair.Value.ObjectiveStates.Add(BeatId, ESovObjectiveState::Succeeded); } }
+	SavedSchemaVersion = 2;
+	return true;
 }

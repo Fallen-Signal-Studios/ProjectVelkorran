@@ -115,6 +115,7 @@ bool FSovRecoveryFatalTest::RunTest(const FString& Parameters)
 	FSovRecoveryTestAccess::Resolve(Recovery);
 	TestEqual(TEXT("Unverified fatal cannot mint a companion rescue"), Recovery->GetRecoveryState(), ESovRecoveryState::Retrying);
 	FSovCombatResourceSnapshot Resources; USovEncounterSnapshotLibrary::CaptureResources(F.ASC, Resources); Resources.Health = 35.f;
+	TestTrue(TEXT("Authored currents update explicit snapshot bases"), USovEncounterSnapshotLibrary::RebaseAuthoredResourceCurrents(F.ASC, Resources));
 	TestTrue(TEXT("Real resource restore revives without resetting the player's definition"), USovEncounterSnapshotLibrary::RestoreResources(F.ASC, Resources));
 	TestEqual(TEXT("Restored Health remains the explicit fraction"), F.ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()), 35.f);
 	TestEqual(TEXT("Revive retires the pending retry epoch"), Recovery->GetRecoveryState(), ESovRecoveryState::Ready);

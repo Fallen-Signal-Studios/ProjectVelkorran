@@ -17,6 +17,7 @@
 #include "Framework/SovPlayerState.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GAS/NarrativeAttributeSetBase.h"
+#include "GAS/NarrativeAbilitySystemComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/EngineVersion.h"
 #include "Misc/App.h"
@@ -796,6 +797,7 @@ ESovSaveResult USovSaveSubsystem::LoadSlot(ESovSaveSlotKind Kind, int32 Index, F
     if (!IsOperationOwnerCurrent(Owner, Error) || !SourceController.IsValid() || !SourceWorld.IsValid()
         || Controller() != PC || PC->GetWorld() != SourceWorld.Get())
     { PendingSave = nullptr; PendingNarrative = nullptr; return ESovSaveResult::UnsafeState; }
+    ResetRestoreOwner();
     PendingLoadOwner = Owner;
     bPendingWorldApplied = false; bPendingLoadFailed = false; PendingDestination.Reset();
     PendingLoadError.Reset(); PendingLoadRequest = FGuid::NewGuid();
@@ -842,6 +844,7 @@ bool USovSaveSubsystem::MatchesPendingLoadRequest(const FString& Options) const
     FGuid Request;
     return PendingSave && PendingLoadRequest.IsValid()
         && UGameplayStatics::HasOption(Options, TEXT("SovCampaignSlotLoad"))
+        && !UGameplayStatics::HasOption(Options, TEXT("SovCampaignTransition"))
         && FGuid::ParseExact(UGameplayStatics::ParseOption(Options, TEXT("SovCampaignLoadRequest")), EGuidFormats::Digits, Request)
         && Request == PendingLoadRequest;
 }
@@ -857,14 +860,62 @@ bool USovSaveSubsystem::ValidatePendingWorld(UWorld& World, FString& Error) cons
     if (!IsPendingLoadOwnerCurrent(Error)) { return false; }
     const auto* GM = Cast<ASovCampaignGameMode>(World.GetAuthGameMode());
     const auto* Narrative = World.GetSubsystem<UNarrativeSaveSubsystem>();
-    if (bPendingLoadFailed || !GM || !GM->InitialMission || GM->InitialMission->MissionId != PendingSave->Header.MissionId
+    if (bPendingLoadFailed || !GM || !MatchesPendingLoadRequest(GM->OptionsString) || !GM->InitialMission
+        || GM->InitialMission->Map.ToSoftObjectPath().GetLongPackageName() != PendingSave->Header.MapPackage
+        || FPackageName::GetLongPackagePath(World.GetOutermost()->GetName()) + TEXT("/")
+            + UGameplayStatics::GetCurrentLevelName(&World, true) != PendingSave->Header.MapPackage
+        || GM->InitialMission->MissionId != PendingSave->Header.MissionId
         || FSoftObjectPath(GM->InitialMission) != PendingSave->Header.MissionDefinition
         || (Narrative && Narrative->DidInitialLoadFail()))
     { Error = TEXT("Saved destination initialization failed. Choose a last known-good autosave; the source banks remain intact."); return false; }
     return true;
 }
-void USovSaveSubsystem::NotifyCampaignReady(ASovPlayerController* PC, bool bSucceeded)
+void USovSaveSubsystem::ResetRestoreOwner()
 {
+    RestoreWorld.Reset(); RestoreController.Reset(); RestorePawn.Reset(); RestorePlayerState.Reset(); RestoreASC.Reset();
+    PendingRestoreEpoch = 0; RestoreASCEpoch = 0; RestorePawnGeneration = 0;
+}
+bool USovSaveSubsystem::BindPendingRestore(ASovPlayerController* PC, uint64 RestoreEpoch, FString& Error)
+{
+    if (!IsLoadPending()) { return true; }
+    if (!PC || PC != Controller() || !PC->GetWorld() || RestoreEpoch == 0
+        || (PendingSave ? (PC->GetWorld() != PendingDestination.Get() || !ValidatePendingWorld(*PC->GetWorld(), Error))
+                        : !ValidateMissionTravelWorld(*PC->GetWorld(), Error))) { return false; }
+    if (PendingRestoreEpoch != 0)
+    {
+        if (MatchesRestoreOwner(PC, RestoreEpoch)) { return true; }
+        Error = TEXT("The pending save belongs to a different managed pawn restoration."); return false;
+    }
+    auto* ASC = Cast<UNarrativeAbilitySystemComponent>(PC->GetAbilitySystemComponent());
+    const auto* Pawn = Cast<ASovPlayerCharacterBase>(PC->GetPawn());
+    if (!Pawn || !ASC || ASC->GetAvatarActor() != PC->GetPawn() || !PC->GetPlayerState<APlayerState>())
+    { Error = TEXT("Managed restoration requires its exact initialized player, pawn and ASC."); return false; }
+    RestoreWorld = PC->GetWorld(); RestoreController = PC; RestorePawn = PC->GetPawn(); RestoreASC = ASC;
+    RestorePlayerState = PC->GetPlayerState<APlayerState>(); PendingRestoreEpoch = RestoreEpoch;
+    RestoreASCEpoch = ASC->GetCombatActorInfoEpoch(); RestorePawnGeneration = Pawn->GetCharacterInitializationGeneration();
+    return true;
+}
+bool USovSaveSubsystem::MatchesRestoreGenerations() const
+{
+    const auto* ASC = Cast<UNarrativeAbilitySystemComponent>(RestoreASC.Get());
+    const auto* Pawn = Cast<ASovPlayerCharacterBase>(RestorePawn.Get());
+    return ASC && Pawn && ASC->GetCombatActorInfoEpoch() == RestoreASCEpoch
+        && Pawn->GetCharacterInitializationGeneration() == RestorePawnGeneration;
+}
+bool USovSaveSubsystem::MatchesRestoreOwner(ASovPlayerController* PC, uint64 RestoreEpoch) const
+{
+    return PC && PC == Controller() && PC == RestoreController.Get() && !PC->IsActorBeingDestroyed()
+        && PC->GetWorld() == RestoreWorld.Get()
+        && PendingRestoreEpoch == RestoreEpoch && RestorePawn.IsValid() && PC->GetPawn() == RestorePawn.Get()
+        && RestorePlayerState.IsValid() && PC->GetPlayerState<APlayerState>() == RestorePlayerState.Get()
+        && RestoreASC.IsValid() && PC->GetAbilitySystemComponent() == RestoreASC.Get()
+        && RestoreASC->GetAvatarActor() == RestorePawn.Get() && MatchesRestoreGenerations();
+}
+void USovSaveSubsystem::NotifyCampaignReady(ASovPlayerController* PC, bool bSucceeded, uint64 RestoreEpoch)
+{
+    // A reused pawn/ASC address does not identify the same managed restoration.
+    if (IsLoadPending() && ((PendingRestoreEpoch != 0 && !MatchesRestoreOwner(PC, RestoreEpoch))
+        || (bSucceeded && (PendingRestoreEpoch == 0 || !PC || PC->GetCampaignTransitionEpoch() != RestoreEpoch)))) { return; }
     NotifyMissionTravelReady(PC, bSucceeded);
     if (!PendingSave || !PC || PC->GetWorld() != PendingDestination.Get()
         || !PC->GetWorld()->GetAuthGameMode()
@@ -887,6 +938,7 @@ void USovSaveSubsystem::CompletePendingLoad(bool bSucceeded, const FString& Erro
     // Recovery owns the exact pending-load GUID; retire it before clearing that identity.
     CompleteMissionTravelRecovery(bSucceeded, CompletionError);
     PendingAutosaves.Reset();
+    ResetRestoreOwner();
     PendingSave = nullptr; PendingNarrative = nullptr; PendingDestination.Reset();
     PendingLoadRequest.Invalidate(); PendingLoadDeadline = 0; PendingLoadError.Reset();
     bPendingWorldApplied = false; bPendingLoadFailed = !bSucceeded;

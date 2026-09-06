@@ -23,7 +23,7 @@ bool USovFinisherTargetComponent::IsAvailableFor(AActor* Attacker) const
 {
     if (static_cast<uint8>(TargetKind)>static_cast<uint8>(ESovFinisherTargetKind::Boss)
         || !FMath::IsFinite(PhaseDamage) || PhaseDamage<0.f
-        || !IsValid(GetOwner()) || !GetOwner()->HasAuthority() || !IsValid(Attacker) || ReservedBy.IsValid()
+        || !IsValid(GetOwner()) || !GetOwner()->HasAuthority() || !IsValid(Attacker) || ReservedBy.IsValid() || PendingOutcome.IsValid()
         || GetOwner()==Attacker || UArsenalStatics::GetAttitude(Attacker, GetOwner())!=ETeamAttitude::Hostile) { return false; }
     const auto* ASC=UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner());
     const auto& T=FSovGameplayTags::Get();
@@ -57,15 +57,32 @@ bool USovFinisherTargetComponent::IsReservedTargetValid(const USovGameplayAbilit
 }
 void USovFinisherTargetComponent::Release(const USovGameplayAbility_Finisher* Ability, const FGuid& Value)
 { if (OwnsLease(Ability, Value)) { ReservedBy.Reset(); Reservation.Invalidate(); ReservedPhase=FGameplayTag(); } }
-bool USovFinisherTargetComponent::CommitPhase(const USovGameplayAbility_Finisher* Ability, const FGuid& Value)
+bool USovFinisherTargetComponent::BeginPhaseOutcome(const USovGameplayAbility_Finisher* Ability, const FGuid& Value, FGuid& OutOutcome)
 {
-    if (!OwnsLease(Ability, Value) || !ReservedPhase.IsValid() || ResolvedPhases.HasTagExact(ReservedPhase)) { return false; }
-    ResolvedPhases.AddTag(ReservedPhase); return true;
+    if (!OwnsLease(Ability, Value) || PendingOutcome.IsValid() || !ReservedPhase.IsValid()
+        || ResolvedPhases.HasTagExact(ReservedPhase)) { return false; }
+    PendingOutcome=FGuid::NewGuid(); PendingPhase=ReservedPhase; OutOutcome=PendingOutcome; return true;
+}
+bool USovFinisherTargetComponent::CommitPhaseOutcome(const FGuid& Outcome, FGameplayTag Phase,
+    bool bAcceptedDamage, bool bSameTargetGeneration)
+{
+    if (!SovFinisher::CanCommitOutcome(bAcceptedDamage, bSameTargetGeneration,
+        Outcome.IsValid() && PendingOutcome==Outcome && PendingPhase==Phase && Phase.IsValid(),
+        ResolvedPhases.HasTagExact(Phase))) { return false; }
+    ResolvedPhases.AddTag(Phase);
+    // Clear before publishing. Reentrant saves now see both damage and outcome.
+    FinishPhaseOutcome(Outcome);
+    return true;
+}
+void USovFinisherTargetComponent::FinishPhaseOutcome(const FGuid& Outcome)
+{
+    if (Outcome.IsValid() && PendingOutcome==Outcome) { PendingOutcome.Invalidate(); PendingPhase=FGameplayTag(); }
 }
 void USovFinisherTargetComponent::Load_Implementation()
 {
     // Active action ownership is transient. Loading never replays the phase event.
     ReservedBy.Reset(); Reservation.Invalidate(); ReservedPhase=FGameplayTag();
+    PendingOutcome.Invalidate(); PendingPhase=FGameplayTag();
 }
 void USovFinisherTargetComponent::EndPlay(const EEndPlayReason::Type Reason)
-{ ReservedBy.Reset(); Reservation.Invalidate(); Super::EndPlay(Reason); }
+{ ReservedBy.Reset(); Reservation.Invalidate(); PendingOutcome.Invalidate(); PendingPhase=FGameplayTag(); Super::EndPlay(Reason); }
