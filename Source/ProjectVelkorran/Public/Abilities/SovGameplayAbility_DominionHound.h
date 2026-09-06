@@ -140,6 +140,14 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Dominion Hound|Command Link")
 	bool BlocksCommandLinkSeverAtActivation() const;
 
+	/** True when weapon-equipping state prevents a Hound attack. */
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Dominion Hound|State")
+	bool BlocksWeaponEquippingAtActivation() const;
+
+	/** Uses this ability's exact GAS blocker container against the supplied ASC. */
+	bool HasAnyActivationBlockingState(
+		const UAbilitySystemComponent* AbilitySystem) const;
+
 protected:
 	virtual void ActivateAbility(
 		const FGameplayAbilitySpecHandle Handle,
@@ -422,6 +430,10 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Dominion Hound|Charge")
 	bool IsUsingNativeMovement() const { return bUseNativeMovement; }
+
+	/** Mirrors the movement-state gate used by CanActivateAbility. */
+	bool HasRequiredMovementStateForActivation(
+		const AActor* AvatarActor) const;
 
 protected:
 	virtual bool CanActivateAbility(

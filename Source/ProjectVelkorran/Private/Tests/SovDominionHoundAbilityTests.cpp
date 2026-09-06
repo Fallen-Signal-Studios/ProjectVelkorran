@@ -3,6 +3,7 @@
 #include "Abilities/SovGameplayAbility_DominionHound.h"
 #include "Effects/SovGameplayEffect_DominionHound.h"
 #include "GAS/NarrativeCombatAbility.h"
+#include "GAS/NarrativeAbilitySystemComponent.h"
 #include "Misc/AutomationTest.h"
 #include "NarrativeGameplayTags.h"
 #include "Sovereign/SovGameplayTags.h"
@@ -68,6 +69,9 @@ bool FSovDominionHoundAbilityContractTest::RunTest(const FString& Parameters)
 	TestTrue(
 		TEXT("Pounce identity tag is registered"),
 		SovTags.Ability_NPC_DominionHound_Pounce.IsValid());
+	TestTrue(
+		TEXT("Weapon-equipping state tag is available to Hound CDOs"),
+		NarrativeTags.State_Weapon_Equipping.IsValid());
 	TestTrue(
 		TEXT("Bite carries its stable identity"),
 		Bite->GetHoundAbilityTag()
@@ -148,6 +152,9 @@ bool FSovDominionHoundAbilityContractTest::RunTest(const FString& Parameters)
 			*FString::Printf(TEXT("%s accepts activation only from the server"), AttackName),
 			Ability->GetNetSecurityPolicy()
 				== EGameplayAbilityNetSecurityPolicy::ServerOnly);
+		TestTrue(
+			*FString::Printf(TEXT("%s blocks weapon-equipping state"), AttackName),
+			Ability->BlocksWeaponEquippingAtActivation());
 		TestFalse(
 			*FString::Printf(TEXT("%s does not require ammunition"), AttackName),
 			Ability->RequiresAmmoForAttack());
@@ -229,6 +236,47 @@ bool FSovDominionHoundAbilityContractTest::RunTest(const FString& Parameters)
 	TestTrue(
 		TEXT("Horn Charge GAS blockers contain the Severed tag"),
 		HornCharge->BlocksCommandLinkSeverAtActivation());
+
+	UNarrativeAbilitySystemComponent* StateTestAbilitySystem =
+		NewObject<UNarrativeAbilitySystemComponent>(GetTransientPackage());
+	TestNotNull(
+		TEXT("Hound state-blocker contract ASC exists"),
+		StateTestAbilitySystem);
+	if (StateTestAbilitySystem)
+	{
+		TestFalse(
+			TEXT("An untagged Hound has no activation-blocking state"),
+			HornCharge->HasAnyActivationBlockingState(
+				StateTestAbilitySystem));
+		const TArray<FGameplayTag> SharedBlockers = {
+			NarrativeTags.State_IsDead,
+			NarrativeTags.State_Busy,
+			NarrativeTags.State_Interacting,
+			NarrativeTags.State_SequencerControlled,
+			NarrativeTags.State_Movement_Ragdoll,
+			NarrativeTags.State_Weapon_Equipping,
+			NarrativeTags.State_Weapon_BlockFiring,
+			NarrativeTags.State_Weapon_IsFiring,
+			SovTags.State_Fatal,
+			SovTags.State_Poise_Broken,
+			SovTags.State_Status_Frozen,
+			SovTags.State_Status_DeviceDisabled,
+			SovTags.State_CommandLink_Severed};
+		for (const FGameplayTag& Blocker : SharedBlockers)
+		{
+			StateTestAbilitySystem->AddLooseGameplayTag(Blocker);
+			TestTrue(
+				*FString::Printf(
+					TEXT("Horn Charge selection honors blocker %s"),
+					*Blocker.ToString()),
+				HornCharge->HasAnyActivationBlockingState(
+					StateTestAbilitySystem));
+			StateTestAbilitySystem->RemoveLooseGameplayTag(Blocker);
+		}
+	}
+	TestFalse(
+		TEXT("Native Horn Charge requires a grounded Character avatar"),
+		HornCharge->HasRequiredMovementStateForActivation(nullptr));
 	TestFalse(
 		TEXT("Sever does not interrupt an ordinary Pounce"),
 		Pounce->IsInterruptedByCommandLinkSever());

@@ -54,18 +54,13 @@ Close the editor and perform a full `ProjectVelkorranEditor Win64 Development` b
 
 If the command source is a different actor from the component owner, call `Activate Command Link(CommandSource)` from authority. Passing no source uses the owner. Assigning actors or calling activation from a client is invalid.
 
-### 2. Connect Axiom Null Pulse
+### 2. Axiom Null Pulse integration
 
-Keep the existing authority-owned pulse validation, Shield disruption, recharge-block, and optional Device Disabled work. In `GA_Selene_AxiomNullPulse`:
+The command-link portion of `GA_Selene_AxiomNullPulse` is native and requires no Blueprint gameplay graph. On authority, activation records the server charge start and releases automatically at full charge. A deliberate normal early end releases at the clamped partial-charge size; cancellation, death, and other interrupt paths release nothing. The pulse uses the server pawn eye point and control rotation, discovers command-link owners without relying on collision, snapshots and deduplicates them before callbacks, and processes each link at most once per ability activation. Full charge releases the pulse and ends the ability normally so its Busy state does not linger until the watchdog.
 
-1. Use `Echo Ability Authority Committed`; do not run this logic from local presentation, montage notifies, Gameplay Cues, or generic `Event ActivateAbility`.
-2. From the existing server-validated pulse target loop, identify the actual command-node actor that owns `USovCommandLinkComponent`.
-3. Call `Try Sever Axiom Command Link`, passing that command node. The helper revalidates authority, active ability state, world, maximum range, and component presence; the component validates hostility against the affected participant snapshot.
-4. Switch on the returned `ESovCommandLinkSeverResolution` only when presentation or encounter branching needs the distinction. `NewlySevered` is the sole success. The native helper automatically routes that transaction to `USovSeleneEchoGenerationComponent`; Blueprint must not add Echo.
-5. Continue applying the normal Shield/recharge/device payload according to its own validated target rules. Those results neither cause nor substitute for Sever.
-6. Finish the Echo ability through the existing `Finish Echo Ability` path after all authority targets are processed.
+Keep the Blueprint child presentation-only. Do not call `Try Sever Axiom Command Link`, add Echo, scan for links, or finish the ability from `Event ActivateAbility`: that event runs synchronously during base activation, before the native authority charge timer is armed. The public release/helper functions remain safe authority-only seams for diagnostics or a future native-validated payload integration, but the shipped Blueprint does not need them.
 
-Call the helper once per unique command node. Duplicate calls are safe because the component is idempotent, but deduplicating the pulse list avoids redundant presentation branches. Passing a linked hound instead of the actor that owns the component returns `Invalid`; resolve the command node in encounter data rather than searching every actor in Blueprint.
+`NewlySevered` is the sole successful command-link result. Native code routes its transaction to `USovSeleneEchoGenerationComponent`; repeat calls and re-entrant callbacks cannot repay or reprocess the activation. Shield collapse, recharge blocking, and optional Device Disabled remain independent payloads and neither cause nor substitute for Sever.
 
 ### 3. Author weak-point reveal zones
 

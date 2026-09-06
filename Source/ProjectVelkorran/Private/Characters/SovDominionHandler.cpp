@@ -28,31 +28,41 @@ namespace
 				UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Actor))
 			: nullptr;
 	}
+}
 
-	bool HasExactHornChargeAbility(
+FGameplayAbilitySpecHandle
+	ASovDominionHandler::FindSingleInactiveExactHornChargeAbility(
 		const UNarrativeAbilitySystemComponent* AbilitySystem)
+{
+	FGameplayAbilitySpecHandle MatchedHandle;
+	if (!IsValid(AbilitySystem))
 	{
-		if (!IsValid(AbilitySystem))
-		{
-			return false;
-		}
+		return MatchedHandle;
+	}
 
-		const FGameplayTag HornChargeTag =
-			FSovGameplayTags::Get().Ability_NPC_DominionHound_HornCharge;
-		for (const FGameplayAbilitySpec& Spec :
-			AbilitySystem->GetActivatableAbilities())
+	const FGameplayTag HornChargeTag =
+		FSovGameplayTags::Get().Ability_NPC_DominionHound_HornCharge;
+	int32 MatchCount = 0;
+	for (const FGameplayAbilitySpec& Spec :
+		AbilitySystem->GetActivatableAbilities())
+	{
+		if (!Spec.IsActive() && !Spec.PendingRemove
+			&& !Spec.RemoveAfterActivation
+			&& IsValid(Cast<USovGameplayAbility_DominionHoundHornCharge>(
+				Spec.Ability))
+			&& Spec.Ability->GetAssetTags().HasTagExact(HornChargeTag))
 		{
-			if (!Spec.IsActive()
-				&& IsValid(Cast<USovGameplayAbility_DominionHoundHornCharge>(
-					Spec.Ability))
-				&& Spec.Ability->GetAssetTags().HasTagExact(HornChargeTag))
+			MatchedHandle = Spec.Handle;
+			if (++MatchCount > 1)
 			{
-				return true;
+				return FGameplayAbilitySpecHandle();
 			}
 		}
-
-		return false;
 	}
+
+	return MatchCount == 1
+		? MatchedHandle
+		: FGameplayAbilitySpecHandle();
 }
 
 ASovDominionHandler::ASovDominionHandler(
@@ -204,6 +214,24 @@ bool ASovDominionHandler::IsCommandableHound(
 	{
 		return false;
 	}
+	const FGameplayAbilitySpecHandle HornChargeHandle =
+		FindSingleInactiveExactHornChargeAbility(HoundAbilitySystem);
+	const FGameplayAbilitySpec* HornChargeSpec = HornChargeHandle.IsValid()
+		? HoundAbilitySystem->FindAbilitySpecFromHandle(HornChargeHandle)
+		: nullptr;
+	const USovGameplayAbility_DominionHoundHornCharge* HornChargeAbility =
+		HornChargeSpec
+		? Cast<USovGameplayAbility_DominionHoundHornCharge>(
+			HornChargeSpec->Ability)
+		: nullptr;
+	if (!IsValid(HornChargeAbility)
+		|| HornChargeAbility->HasAnyActivationBlockingState(
+			HoundAbilitySystem)
+		|| !HornChargeAbility->HasRequiredMovementStateForActivation(
+			Candidate))
+	{
+		return false;
+	}
 
 	const FNarrativeGameplayTags& NarrativeTags =
 		FNarrativeGameplayTags::Get();
@@ -221,7 +249,6 @@ bool ASovDominionHandler::IsCommandableHound(
 				SovTags.State_CommandLink_HoundChargeAuthorized))
 		&& HoundAbilitySystem->HasMatchingGameplayTag(
 			SovTags.State_CommandLink_Active)
-		&& HasExactHornChargeAbility(HoundAbilitySystem)
 		&& HasCommandLineOfSightTo(Candidate);
 }
 
@@ -301,162 +328,142 @@ bool ASovDominionHandler::TryActivateExactHornCharge(
 		FSovGameplayTags::Get().Ability_NPC_DominionHound_HornCharge;
 	const FGameplayTag AuthorizationTag =
 		FSovGameplayTags::Get().State_CommandLink_HoundChargeAuthorized;
-	TArray<FGameplayAbilitySpecHandle> HornChargeHandles;
-	for (const FGameplayAbilitySpec& Spec :
-		HoundAbilitySystem->GetActivatableAbilities())
+	const FGameplayAbilitySpecHandle Handle =
+		FindSingleInactiveExactHornChargeAbility(HoundAbilitySystem);
+	if (!Handle.IsValid())
 	{
-		if (!Spec.IsActive()
-			&& IsValid(Cast<USovGameplayAbility_DominionHoundHornCharge>(
-				Spec.Ability))
-			&& Spec.Ability->GetAssetTags().HasTagExact(HornChargeTag))
-		{
-			HornChargeHandles.Add(Spec.Handle);
-		}
+		return false;
 	}
 
-	for (const FGameplayAbilitySpecHandle& Handle : HornChargeHandles)
+	if (!CanIssueHoundCommands()
+		|| CommandLinkComponent->GetLinkInstanceId()
+			!= ExpectedLinkInstanceId
+		|| !IsCommandableHound(Candidate))
 	{
-		if (!CanIssueHoundCommands()
-			|| CommandLinkComponent->GetLinkInstanceId()
-				!= ExpectedLinkInstanceId
-			|| !IsCommandableHound(Candidate))
-		{
-			return false;
-		}
+		return false;
+	}
 
-		// The active link makes the specialist move eligible. The short-lived tag
-		// satisfies GAS requirements, while a private native scope opened below
-		// proves this exact activation came from the Handler command pipeline.
-		HoundAbilitySystem->AddLooseGameplayTag(AuthorizationTag);
-		if (!IsValid(HoundAbilitySystem)
-			|| !IsValid(Candidate)
-			|| HoundAbilitySystem->GetAvatarActor() != Candidate
-			|| !CanIssueHoundCommands()
-			|| CommandLinkComponent->GetLinkInstanceId()
-				!= ExpectedLinkInstanceId
-			|| !IsCommandableHound(Candidate, true))
+	// The active link makes the specialist move eligible. The short-lived tag
+	// satisfies GAS requirements, while a private native scope opened below
+	// proves this exact activation came from the Handler command pipeline.
+	HoundAbilitySystem->AddLooseGameplayTag(AuthorizationTag);
+	if (!IsValid(HoundAbilitySystem)
+		|| !IsValid(Candidate)
+		|| HoundAbilitySystem->GetAvatarActor() != Candidate
+		|| !CanIssueHoundCommands()
+		|| CommandLinkComponent->GetLinkInstanceId()
+			!= ExpectedLinkInstanceId
+		|| FindSingleInactiveExactHornChargeAbility(HoundAbilitySystem)
+			!= Handle
+		|| !IsCommandableHound(Candidate, true))
+	{
+		if (IsValid(HoundAbilitySystem))
 		{
-			if (IsValid(HoundAbilitySystem))
-			{
-				HoundAbilitySystem->RemoveLooseGameplayTag(AuthorizationTag);
-			}
-			return false;
-		}
-
-		// Tag listeners execute synchronously while the private native dispatch
-		// scope is closed. They may observe the tag, but cannot activate the move.
-		FGameplayAbilitySpec* PendingSpec =
-			HoundAbilitySystem->FindAbilitySpecFromHandle(Handle);
-		USovGameplayAbility_DominionHoundHornCharge* PendingHornAbility =
-			PendingSpec
-			? Cast<USovGameplayAbility_DominionHoundHornCharge>(
-				PendingSpec->GetPrimaryInstance())
-			: nullptr;
-		if (!PendingSpec
-			|| PendingSpec->IsActive()
-			|| !IsValid(Cast<USovGameplayAbility_DominionHoundHornCharge>(
-				PendingSpec->Ability))
-			|| !PendingSpec->Ability->GetAssetTags().HasTagExact(HornChargeTag)
-			|| !IsValid(PendingHornAbility))
-		{
-			if (PendingSpec && PendingSpec->IsActive())
-			{
-				HoundAbilitySystem->CancelAbilityHandle(Handle);
-			}
-			if (!IsValid(HoundAbilitySystem))
-			{
-				return false;
-			}
 			HoundAbilitySystem->RemoveLooseGameplayTag(AuthorizationTag);
-			if (!IsValid(HoundAbilitySystem))
-			{
-				return false;
-			}
-			continue;
 		}
+		return false;
+	}
 
-		PendingHornAbility->SetHandlerOrderDispatchInProgress(true);
-		const bool bActivated =
-			HoundAbilitySystem->TryActivateAbility(Handle, false);
-		if (IsValid(PendingHornAbility))
+	// Tag listeners execute synchronously while the private native dispatch
+	// scope is closed. They may observe the tag, but cannot activate the move.
+	FGameplayAbilitySpec* PendingSpec =
+		HoundAbilitySystem->FindAbilitySpecFromHandle(Handle);
+	USovGameplayAbility_DominionHoundHornCharge* PendingHornAbility =
+		PendingSpec
+		? Cast<USovGameplayAbility_DominionHoundHornCharge>(
+			PendingSpec->GetPrimaryInstance())
+		: nullptr;
+	if (!PendingSpec
+		|| PendingSpec->IsActive()
+		|| !IsValid(Cast<USovGameplayAbility_DominionHoundHornCharge>(
+			PendingSpec->Ability))
+		|| !PendingSpec->Ability->GetAssetTags().HasTagExact(HornChargeTag)
+		|| !IsValid(PendingHornAbility))
+	{
+		if (PendingSpec && PendingSpec->IsActive())
 		{
-			PendingHornAbility->SetHandlerOrderDispatchInProgress(false);
+			HoundAbilitySystem->CancelAbilityHandle(Handle);
 		}
 		if (IsValid(HoundAbilitySystem))
 		{
 			HoundAbilitySystem->RemoveLooseGameplayTag(AuthorizationTag);
 		}
-		else
-		{
-			return false;
-		}
-		if (!IsValid(HoundAbilitySystem))
-		{
-			return false;
-		}
-
-		const bool bLinkStillCurrent = CanIssueHoundCommands()
-			&& CommandLinkComponent->GetLinkInstanceId()
-				== ExpectedLinkInstanceId;
-		const bool bCandidateStillLinked = IsValid(Candidate)
-			&& HoundAbilitySystem->GetAvatarActor() == Candidate
-			&& IsValid(CommandLinkComponent)
-			&& CommandLinkComponent->ContainsLinkedActor(Candidate);
-		if (!bLinkStillCurrent || !bCandidateStillLinked)
-		{
-			if (bActivated)
-			{
-				HoundAbilitySystem->CancelAbilityHandle(Handle);
-			}
-			if (!bLinkStillCurrent)
-			{
-				return false;
-			}
-			continue;
-		}
-		if (!bActivated)
-		{
-			continue;
-		}
-
-		const FGameplayAbilitySpec* ActivatedSpec =
-			HoundAbilitySystem->FindAbilitySpecFromHandle(Handle);
-		const USovGameplayAbility_DominionHoundHornCharge* HoundAbility =
-			ActivatedSpec
-			? Cast<USovGameplayAbility_DominionHoundHornCharge>(
-				ActivatedSpec->GetPrimaryInstance())
-			: nullptr;
-		if (!ActivatedSpec
-			|| !ActivatedSpec->IsActive()
-			|| !IsValid(Cast<USovGameplayAbility_DominionHoundHornCharge>(
-				ActivatedSpec->Ability))
-			|| !ActivatedSpec->Ability->GetAssetTags().HasTagExact(HornChargeTag)
-			|| !IsValid(HoundAbility)
-			|| !HoundAbility->IsActive())
-		{
-			continue;
-		}
-
-		OutChargeTarget = HoundAbility->GetCurrentAttackTarget();
-		if (!IsValid(OutChargeTarget))
-		{
-			HoundAbilitySystem->CancelAbilityHandle(Handle);
-			OutChargeTarget = nullptr;
-			continue;
-		}
-		if (!CanIssueHoundCommands()
-			|| CommandLinkComponent->GetLinkInstanceId()
-				!= ExpectedLinkInstanceId
-			|| !CommandLinkComponent->ContainsLinkedActor(Candidate))
-		{
-			HoundAbilitySystem->CancelAbilityHandle(Handle);
-			OutChargeTarget = nullptr;
-			return false;
-		}
-		return true;
+		return false;
 	}
 
-	return false;
+	PendingHornAbility->SetHandlerOrderDispatchInProgress(true);
+	const bool bActivated =
+		HoundAbilitySystem->TryActivateAbility(Handle, false);
+	if (IsValid(PendingHornAbility))
+	{
+		PendingHornAbility->SetHandlerOrderDispatchInProgress(false);
+	}
+	if (!IsValid(HoundAbilitySystem))
+	{
+		return false;
+	}
+	HoundAbilitySystem->RemoveLooseGameplayTag(AuthorizationTag);
+	if (!IsValid(HoundAbilitySystem))
+	{
+		return false;
+	}
+
+	const bool bLinkStillCurrent = CanIssueHoundCommands()
+		&& CommandLinkComponent->GetLinkInstanceId()
+			== ExpectedLinkInstanceId;
+	const bool bCandidateStillLinked = IsValid(Candidate)
+		&& HoundAbilitySystem->GetAvatarActor() == Candidate
+		&& IsValid(CommandLinkComponent)
+		&& CommandLinkComponent->ContainsLinkedActor(Candidate);
+	if (!bLinkStillCurrent || !bCandidateStillLinked)
+	{
+		if (bActivated)
+		{
+			HoundAbilitySystem->CancelAbilityHandle(Handle);
+		}
+		return false;
+	}
+	if (!bActivated)
+	{
+		return false;
+	}
+
+	const FGameplayAbilitySpec* ActivatedSpec =
+		HoundAbilitySystem->FindAbilitySpecFromHandle(Handle);
+	const USovGameplayAbility_DominionHoundHornCharge* HoundAbility =
+		ActivatedSpec
+		? Cast<USovGameplayAbility_DominionHoundHornCharge>(
+			ActivatedSpec->GetPrimaryInstance())
+		: nullptr;
+	if (!ActivatedSpec
+		|| !ActivatedSpec->IsActive()
+		|| !IsValid(Cast<USovGameplayAbility_DominionHoundHornCharge>(
+			ActivatedSpec->Ability))
+		|| !ActivatedSpec->Ability->GetAssetTags().HasTagExact(HornChargeTag)
+		|| !IsValid(HoundAbility)
+		|| !HoundAbility->IsActive())
+	{
+		HoundAbilitySystem->CancelAbilityHandle(Handle);
+		return false;
+	}
+
+	OutChargeTarget = HoundAbility->GetCurrentAttackTarget();
+	if (!IsValid(OutChargeTarget))
+	{
+		HoundAbilitySystem->CancelAbilityHandle(Handle);
+		OutChargeTarget = nullptr;
+		return false;
+	}
+	if (!CanIssueHoundCommands()
+		|| CommandLinkComponent->GetLinkInstanceId()
+			!= ExpectedLinkInstanceId
+		|| !CommandLinkComponent->ContainsLinkedActor(Candidate))
+	{
+		HoundAbilitySystem->CancelAbilityHandle(Handle);
+		OutChargeTarget = nullptr;
+		return false;
+	}
+	return true;
 }
 
 TArray<AActor*> ASovDominionHandler::BuildCommandableHoundCandidates() const

@@ -8,12 +8,43 @@
 #include "Components/SovWeakPointComponent.h"
 #include "GameplayEffect.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
+#include "NarrativeGameplayTags.h"
 #include "Net/UnrealNetwork.h"
 #include "Sovereign/SovGameplayTags.h"
 #include "UnrealFramework/NarrativeCharacter.h"
 #include "UnrealFramework/NarrativeTeamAgentInterface.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogSovCommandLink, Log, All);
+
+namespace
+{
+	bool CanServeAsCommandLinkEndpoint(
+		AActor* Actor,
+		const UWorld* ExpectedWorld)
+	{
+		if (!IsValid(Actor) || Actor->GetWorld() != ExpectedWorld)
+		{
+			return false;
+		}
+
+		UAbilitySystemComponent* AbilitySystem =
+			UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Actor);
+		if (!IsValid(AbilitySystem))
+		{
+			// Authored devices may own links without participating in GAS.
+			return true;
+		}
+
+		const UNarrativeAbilitySystemComponent* NarrativeAbilitySystem =
+			Cast<UNarrativeAbilitySystemComponent>(AbilitySystem);
+		return (!IsValid(NarrativeAbilitySystem)
+				|| !NarrativeAbilitySystem->IsDead())
+			&& !AbilitySystem->HasMatchingGameplayTag(
+				FNarrativeGameplayTags::Get().State_IsDead)
+			&& !AbilitySystem->HasMatchingGameplayTag(
+				FSovGameplayTags::Get().State_Fatal);
+	}
+}
 
 USovCommandLinkComponent::USovCommandLinkComponent()
 {
@@ -48,7 +79,7 @@ void USovCommandLinkComponent::BeginPlay()
 		}
 	}
 
-	if (!HasValidCommandLinkConfiguration())
+	if (bStartsActive && !HasValidCommandLinkConfiguration())
 	{
 		UE_LOG(
 			LogSovCommandLink,
@@ -181,6 +212,29 @@ bool USovCommandLinkComponent::UnregisterLinkedActor(AActor* Actor)
 	return true;
 }
 
+bool USovCommandLinkComponent::ConfigureLinkId(const FName InLinkId)
+{
+	if (!GetOwner() || !GetOwner()->HasAuthority()
+		|| bCommandLinkMutationInProgress
+		|| ReplicationState.State != ESovCommandLinkState::Inactive
+		|| ReplicationState.LinkInstanceId.IsValid()
+		|| InLinkId == NAME_None)
+	{
+		return false;
+	}
+
+	if (LinkId == InLinkId && ReplicationState.LinkId == InLinkId)
+	{
+		return true;
+	}
+
+	LinkId = InLinkId;
+	ReplicationState.LinkId = InLinkId;
+	++ReplicationState.Revision;
+	WakeOwnerForReplication();
+	return true;
+}
+
 bool USovCommandLinkComponent::ActivateCommandLink(AActor* InCommandSource)
 {
 	if (!GetOwner() || !GetOwner()->HasAuthority()
@@ -198,7 +252,11 @@ bool USovCommandLinkComponent::ActivateCommandLink(AActor* InCommandSource)
 	AActor* ResolvedSource = IsValid(InCommandSource)
 		? InCommandSource
 		: GetOwner();
-	if (!IsValid(ResolvedSource) || ResolvedSource->GetWorld() != GetWorld())
+	// A reset may be requested synchronously from the death-deactivation
+	// callback. Refuse to mint a fresh instance until both authoritative
+	// endpoints are alive again; actors without an ASC remain valid devices.
+	if (!CanServeAsCommandLinkEndpoint(GetOwner(), GetWorld())
+		|| !CanServeAsCommandLinkEndpoint(ResolvedSource, GetWorld()))
 	{
 		return false;
 	}
@@ -376,14 +434,7 @@ TArray<AActor*> USovCommandLinkComponent::BuildParticipantSnapshot() const
 	TArray<AActor*> Participants;
 	const auto IsLiveParticipant = [this](AActor* Actor)
 	{
-		if (!IsValid(Actor) || Actor->GetWorld() != GetWorld())
-		{
-			return false;
-		}
-		const UNarrativeAbilitySystemComponent* NarrativeAbilitySystem =
-			Cast<UNarrativeAbilitySystemComponent>(ResolveAbilitySystem(Actor));
-		return !IsValid(NarrativeAbilitySystem)
-			|| !NarrativeAbilitySystem->IsDead();
+		return CanServeAsCommandLinkEndpoint(Actor, GetWorld());
 	};
 
 	if (bIncludeOwnerAsParticipant && IsLiveParticipant(GetOwner()))
@@ -880,7 +931,7 @@ void USovCommandLinkComponent::RevealParticipantWeakPoints(
 {
 	for (AActor* Participant : Participants)
 	{
-		if (IsValid(Participant))
+		if (CanServeAsCommandLinkEndpoint(Participant, GetWorld()))
 		{
 			if (USovWeakPointComponent* WeakPoints =
 				Participant->FindComponentByClass<USovWeakPointComponent>())

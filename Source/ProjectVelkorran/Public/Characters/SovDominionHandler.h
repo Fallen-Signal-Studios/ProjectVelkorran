@@ -8,6 +8,8 @@
 
 class USovCommandLinkComponent;
 class USovGameplayAbility_DominionHandlerCommandHound;
+class UNarrativeAbilitySystemComponent;
+struct FGameplayAbilitySpecHandle;
 
 /**
  * Native gameplay profile for the Dominion Handler commander.
@@ -94,6 +96,7 @@ protected:
 
 private:
 	friend class USovGameplayAbility_DominionHandlerCommandHound;
+	friend class FSovDominionHandlerHornChargeSpecMultiplicityTest;
 
 	/**
 	 * Activates exactly one linked hound's Horn Charge ability.
@@ -116,6 +119,8 @@ private:
 		AActor* Candidate,
 		const FGuid& ExpectedLinkInstanceId,
 		AActor*& OutChargeTarget) const;
+	static FGameplayAbilitySpecHandle FindSingleInactiveExactHornChargeAbility(
+		const UNarrativeAbilitySystemComponent* AbilitySystem);
 	TArray<AActor*> BuildCommandableHoundCandidates() const;
 	uint64 GetCommandAttemptSequenceFor(
 		const AActor* Candidate,

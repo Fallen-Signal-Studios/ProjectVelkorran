@@ -161,6 +161,17 @@ public:
 	USovGameplayAbility_SeleneAxiomNullPulse();
 
 	/**
+	 * Releases the authority-owned command-link portion of the pulse immediately.
+	 * Native code also calls this automatically at full charge and from a normal
+	 * early ability end, so Blueprint payload graphs do not need to invoke it.
+	 * Repeated calls during one activation are safe no-ops.
+	 *
+	 * @return Number of command links that completed a new Sever transition.
+	 */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Echo Ability|Axiom")
+	int32 ReleaseAxiomNullPulseCommandLinks();
+
+	/**
 	 * Attempts the command-link portion of Null Pulse against one command node
 	 * already selected by the authoritative pulse payload. Shield collapse,
 	 * recharge suppression, and device disable remain independently authored.
@@ -170,7 +181,41 @@ public:
 		AActor* CommandNode,
 		FSovCommandLinkSeverResult& OutResult);
 
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Echo Ability|Axiom")
+	float GetAxiomFullChargeDuration() const
+	{
+		return FMath::Max(FullChargeDuration, 0.0f);
+	}
+
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Echo Ability|Axiom")
+	float GetAxiomPulseRange(float ChargeAlpha) const;
+
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Echo Ability|Axiom")
+	float GetAxiomPulseHalfAngleDegrees(float ChargeAlpha) const;
+
+#if WITH_AUTOMATION_TESTS
+	static bool IsLocationInsideAxiomPulse(
+		const FVector& PulseOrigin,
+		const FVector& PulseDirection,
+		const FVector& CandidateLocation,
+		float PulseRange,
+		float PulseHalfAngleDegrees);
+#endif
+
 protected:
+	virtual void ActivateAbility(
+		const FGameplayAbilitySpecHandle Handle,
+		const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayAbilityActivationInfo ActivationInfo,
+		const FGameplayEventData* TriggerEventData) override;
+
+	virtual void EndAbility(
+		const FGameplayAbilitySpecHandle Handle,
+		const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayAbilityActivationInfo ActivationInfo,
+		bool bReplicateEndAbility,
+		bool bWasCancelled) override;
+
 	virtual bool HasRequiredPayloadConfiguration() const override;
 
 	/** Must route through NarrativeDamageExecCalc with HealthCoefficient set to zero. */
@@ -204,6 +249,21 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Payload", meta = (ClampMin = "0.0", Units = "s"))
 	float MaximumShieldSuppressionDuration = 4.0f;
+
+private:
+	float GetAuthorityChargeAlpha() const;
+	void HandleAxiomFullChargeReached();
+	int32 ProcessAuthorityCommandLinkPulse(float ChargeAlpha);
+	static bool IsLocationInsideDirectedPulse(
+		const FVector& PulseOrigin,
+		const FVector& PulseDirection,
+		const FVector& CandidateLocation,
+		float PulseRange,
+		float PulseHalfAngleDegrees);
+
+	FTimerHandle AxiomFullChargeTimerHandle;
+	double AuthorityChargeStartTimeSeconds = 0.0;
+	bool bAuthorityCommandLinkPulseProcessed = false;
 };
 
 /** Verity lane technique: an advancing wave that Chills and conditionally Freezes. */

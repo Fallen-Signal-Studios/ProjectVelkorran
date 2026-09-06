@@ -13,6 +13,15 @@
 
 USovGameplayAbility_SeleneDeflection::USovGameplayAbility_SeleneDeflection()
 {
+	// This native CDO can be constructed before NarrativeArsenal's module
+	// startup has populated the shared gameplay-tag singletons. Initialize the
+	// registrars before this CDO captures its input, state, and identity tags.
+	if (!FNarrativeGameplayTags::Get().Narrative_Input_AltAttack.IsValid())
+	{
+		FNarrativeGameplayTags::InitializeNativeTags();
+	}
+	FSovGameplayTags::InitializeNativeTags();
+
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 	NetSecurityPolicy = EGameplayAbilityNetSecurityPolicy::ServerOnlyTermination;

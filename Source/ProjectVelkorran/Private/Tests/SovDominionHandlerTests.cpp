@@ -5,11 +5,14 @@
 #include "Characters/SovDominionHandler.h"
 #include "Characters/SovNPCCharacterBase.h"
 #include "Components/SovCommandLinkComponent.h"
+#include "GAS/NarrativeAbilitySystemComponent.h"
 #include "GAS/NarrativeCombatAbility.h"
+#include "GameplayAbilitySpec.h"
 #include "Misc/AutomationTest.h"
 #include "NarrativeGameplayTags.h"
 #include "Sovereign/SovGameplayTags.h"
 #include "UObject/Class.h"
+#include "UObject/UObjectGlobals.h"
 
 #include <type_traits>
 
@@ -277,6 +280,67 @@ bool FSovDominionHandlerProfileContractTest::RunTest(
 			TEXT("Sever interrupts the link-gated Horn Charge"),
 			HornCharge->IsInterruptedByCommandLinkSever());
 	}
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSovDominionHandlerHornChargeSpecMultiplicityTest,
+	"ProjectVelkorran.Campaign.DominionHandler.HornChargeSpecMultiplicity",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+
+bool FSovDominionHandlerHornChargeSpecMultiplicityTest::RunTest(
+	const FString& Parameters)
+{
+	UNarrativeAbilitySystemComponent* AbilitySystem =
+		NewObject<UNarrativeAbilitySystemComponent>(GetTransientPackage());
+	TestNotNull(TEXT("Test ability system exists"), AbilitySystem);
+	if (!AbilitySystem)
+	{
+		return false;
+	}
+
+	TArray<FGameplayAbilitySpec>& Specs =
+		AbilitySystem->GetActivatableAbilities();
+	Specs.Emplace(USovGameplayAbility_DominionHoundBite::StaticClass());
+	TestFalse(
+		TEXT("An unrelated Hound attack is not a Horn Charge candidate"),
+		ASovDominionHandler::FindSingleInactiveExactHornChargeAbility(
+			AbilitySystem).IsValid());
+
+	const FGameplayAbilitySpec& UniqueHornSpec = Specs.Emplace_GetRef(
+		USovGameplayAbility_DominionHoundHornCharge::StaticClass());
+	const FGameplayAbilitySpecHandle UniqueHornHandle = UniqueHornSpec.Handle;
+	TestTrue(
+		TEXT("Exactly one inactive exact Horn Charge is accepted"),
+		ASovDominionHandler::FindSingleInactiveExactHornChargeAbility(
+			AbilitySystem) == UniqueHornHandle);
+
+	FGameplayAbilitySpec& DuplicateHornSpec = Specs.Emplace_GetRef(
+		USovGameplayAbility_DominionHoundHornCharge::StaticClass());
+	TestFalse(
+		TEXT("Duplicate inactive exact Horn Charge grants fail closed"),
+		ASovDominionHandler::FindSingleInactiveExactHornChargeAbility(
+			AbilitySystem).IsValid());
+
+	DuplicateHornSpec.ActiveCount = 1;
+	TestTrue(
+		TEXT("Only inactive exact Horn Charge specs participate in selection"),
+		ASovDominionHandler::FindSingleInactiveExactHornChargeAbility(
+			AbilitySystem) == UniqueHornHandle);
+
+	DuplicateHornSpec.ActiveCount = 0;
+	DuplicateHornSpec.PendingRemove = true;
+	TestTrue(
+		TEXT("Pending-removal Horn Charge specs do not participate in selection"),
+		ASovDominionHandler::FindSingleInactiveExactHornChargeAbility(
+			AbilitySystem) == UniqueHornHandle);
+	DuplicateHornSpec.PendingRemove = false;
+	DuplicateHornSpec.RemoveAfterActivation = true;
+	TestTrue(
+		TEXT("Remove-after-activation Horn Charge specs do not participate in selection"),
+		ASovDominionHandler::FindSingleInactiveExactHornChargeAbility(
+			AbilitySystem) == UniqueHornHandle);
 
 	return true;
 }

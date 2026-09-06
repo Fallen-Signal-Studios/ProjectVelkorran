@@ -4,9 +4,13 @@
 
 #include "AbilitySystemComponent.h"
 #include "Components/SovSeleneEchoGenerationComponent.h"
+#include "Engine/World.h"
+#include "EngineUtils.h"
+#include "GameFramework/Controller.h"
 #include "GameplayEffect.h"
 #include "NarrativeGameplayTags.h"
 #include "Sovereign/SovGameplayTags.h"
+#include "TimerManager.h"
 #include "Weapons/NarrativeProjectile.h"
 
 USovGameplayAbility_SeleneEchoBase::USovGameplayAbility_SeleneEchoBase()
@@ -124,6 +128,273 @@ USovGameplayAbility_SeleneAxiomNullPulse::USovGameplayAbility_SeleneAxiomNullPul
 		"AxiomNullPulseDescription",
 		"Charge Axiom and release a directed EMP pulse that collapses Shields, suppresses recharge, and disables eligible combat systems.");
 }
+
+void USovGameplayAbility_SeleneAxiomNullPulse::ActivateAbility(
+	const FGameplayAbilitySpecHandle Handle,
+	const FGameplayAbilityActorInfo* ActorInfo,
+	const FGameplayAbilityActivationInfo ActivationInfo,
+	const FGameplayEventData* TriggerEventData)
+{
+	bAuthorityCommandLinkPulseProcessed = false;
+	const AActor* Avatar = ActorInfo ? ActorInfo->AvatarActor.Get() : nullptr;
+	AuthorityChargeStartTimeSeconds = ActorInfo && ActorInfo->IsNetAuthority()
+		&& IsValid(Avatar) && Avatar->GetWorld()
+		? Avatar->GetWorld()->GetTimeSeconds()
+		: 0.0;
+
+	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
+	if (!IsActive() || !ActorInfo || !ActorInfo->IsNetAuthority())
+	{
+		return;
+	}
+
+	if (UWorld* World = GetWorld())
+	{
+		const float ChargeDuration = GetAxiomFullChargeDuration();
+		if (ChargeDuration <= KINDA_SMALL_NUMBER)
+		{
+			HandleAxiomFullChargeReached();
+		}
+		else
+		{
+			World->GetTimerManager().SetTimer(
+				AxiomFullChargeTimerHandle,
+				this,
+				&ThisClass::HandleAxiomFullChargeReached,
+				ChargeDuration,
+				false);
+		}
+	}
+}
+
+void USovGameplayAbility_SeleneAxiomNullPulse::EndAbility(
+	const FGameplayAbilitySpecHandle Handle,
+	const FGameplayAbilityActorInfo* ActorInfo,
+	const FGameplayAbilityActivationInfo ActivationInfo,
+	const bool bReplicateEndAbility,
+	const bool bWasCancelled)
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(AxiomFullChargeTimerHandle);
+	}
+
+	// A deliberate release before full charge still emits a server-validated
+	// pulse. Interruptions, death, and other cancellation paths emit nothing.
+	if (!bWasCancelled && ActorInfo && ActorInfo->IsNetAuthority()
+		&& IsActive() && !bAuthorityCommandLinkPulseProcessed)
+	{
+		ReleaseAxiomNullPulseCommandLinks();
+	}
+
+	Super::EndAbility(
+		Handle,
+		ActorInfo,
+		ActivationInfo,
+		bReplicateEndAbility,
+		bWasCancelled);
+
+	// GAS can defer EndAbility while an ability scope lock is held. Preserve the
+	// release ledger until the deferred end actually closes this activation;
+	// otherwise the queued call could process the same pulse a second time.
+	if (!IsActive())
+	{
+		AuthorityChargeStartTimeSeconds = 0.0;
+		bAuthorityCommandLinkPulseProcessed = false;
+	}
+}
+
+float USovGameplayAbility_SeleneAxiomNullPulse::GetAxiomPulseRange(
+	const float ChargeAlpha) const
+{
+	return FMath::Lerp(
+		FMath::Max(MinimumPulseRange, 0.0f),
+		FMath::Max(MaximumPulseRange, MinimumPulseRange),
+		FMath::Clamp(ChargeAlpha, 0.0f, 1.0f));
+}
+
+float USovGameplayAbility_SeleneAxiomNullPulse::GetAxiomPulseHalfAngleDegrees(
+	const float ChargeAlpha) const
+{
+	return FMath::Lerp(
+		FMath::Clamp(MinimumPulseHalfAngleDegrees, 0.0f, 90.0f),
+		FMath::Clamp(
+			MaximumPulseHalfAngleDegrees,
+			MinimumPulseHalfAngleDegrees,
+			90.0f),
+		FMath::Clamp(ChargeAlpha, 0.0f, 1.0f));
+}
+
+int32 USovGameplayAbility_SeleneAxiomNullPulse::ReleaseAxiomNullPulseCommandLinks()
+{
+	if (bAuthorityCommandLinkPulseProcessed
+		|| !CurrentActorInfo
+		|| !CurrentActorInfo->IsNetAuthority()
+		|| !IsActive())
+	{
+		return 0;
+	}
+
+	// Commit the per-activation ledger before invoking any link callbacks. A
+	// Sever delegate may synchronously end or otherwise re-enter this ability.
+	bAuthorityCommandLinkPulseProcessed = true;
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(AxiomFullChargeTimerHandle);
+	}
+	return ProcessAuthorityCommandLinkPulse(GetAuthorityChargeAlpha());
+}
+
+float USovGameplayAbility_SeleneAxiomNullPulse::GetAuthorityChargeAlpha() const
+{
+	const UWorld* World = GetWorld();
+	const float ChargeDuration = GetAxiomFullChargeDuration();
+	if (!World || ChargeDuration <= KINDA_SMALL_NUMBER)
+	{
+		return 1.0f;
+	}
+
+	return FMath::Clamp(
+		static_cast<float>(
+			(World->GetTimeSeconds() - AuthorityChargeStartTimeSeconds)
+			/ ChargeDuration),
+		0.0f,
+		1.0f);
+}
+
+void USovGameplayAbility_SeleneAxiomNullPulse::HandleAxiomFullChargeReached()
+{
+	ReleaseAxiomNullPulseCommandLinks();
+
+	// Full charge is the terminal point for this one-shot ability.  The
+	// Blueprint child only owns cosmetic presentation, so close the native
+	// lifecycle here instead of leaving Busy active until the watchdog cancels
+	// the ability.  A Sever callback may have ended the ability re-entrantly.
+	if (IsActive())
+	{
+		FinishEchoAbility(false);
+	}
+}
+
+int32 USovGameplayAbility_SeleneAxiomNullPulse::ProcessAuthorityCommandLinkPulse(
+	const float ChargeAlpha)
+{
+	AActor* Avatar = CurrentActorInfo
+		? CurrentActorInfo->AvatarActor.Get()
+		: nullptr;
+	UWorld* World = IsValid(Avatar) ? Avatar->GetWorld() : nullptr;
+	if (!World || !Avatar->HasAuthority())
+	{
+		return 0;
+	}
+
+	FVector PulseOrigin = Avatar->GetActorLocation();
+	FRotator PulseRotation = Avatar->GetActorRotation();
+	Avatar->GetActorEyesViewPoint(PulseOrigin, PulseRotation);
+	if (AController* Controller = GetOwningController())
+	{
+		PulseRotation = Controller->GetControlRotation();
+	}
+
+	const float PulseRange = GetAxiomPulseRange(ChargeAlpha);
+	const float PulseHalfAngle = GetAxiomPulseHalfAngleDegrees(ChargeAlpha);
+	const FVector PulseDirection = PulseRotation.Vector();
+	TArray<TWeakObjectPtr<AActor>> CommandNodes;
+
+	// Command nodes are an authored, sparse encounter set. Iterating their
+	// component owners is collision-independent (important for non-colliding
+	// relays) and never trusts client target data. Snapshot before mutation so
+	// callbacks may destroy or spawn actors without perturbing this pulse pass.
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		AActor* CommandNode = *It;
+		if (!IsValid(CommandNode) || CommandNode == Avatar
+			|| !CommandNode->FindComponentByClass<USovCommandLinkComponent>()
+			|| !IsLocationInsideDirectedPulse(
+				PulseOrigin,
+				PulseDirection,
+				CommandNode->GetActorLocation(),
+				PulseRange,
+				PulseHalfAngle))
+		{
+			continue;
+		}
+		CommandNodes.AddUnique(CommandNode);
+	}
+
+	int32 NewlySeveredCount = 0;
+	for (const TWeakObjectPtr<AActor>& CommandNodePtr : CommandNodes)
+	{
+		AActor* CommandNode = CommandNodePtr.Get();
+		if (!IsValid(CommandNode))
+		{
+			continue;
+		}
+		FSovCommandLinkSeverResult Result;
+		if (TrySeverAxiomCommandLink(CommandNode, Result)
+			== ESovCommandLinkSeverResolution::NewlySevered)
+		{
+			++NewlySeveredCount;
+		}
+	}
+
+	return NewlySeveredCount;
+}
+
+bool USovGameplayAbility_SeleneAxiomNullPulse::IsLocationInsideDirectedPulse(
+	const FVector& PulseOrigin,
+	const FVector& PulseDirection,
+	const FVector& CandidateLocation,
+	const float PulseRange,
+	const float PulseHalfAngleDegrees)
+{
+	if (PulseOrigin.ContainsNaN() || PulseDirection.ContainsNaN()
+		|| CandidateLocation.ContainsNaN() || !FMath::IsFinite(PulseRange)
+		|| !FMath::IsFinite(PulseHalfAngleDegrees)
+		|| PulseRange <= KINDA_SMALL_NUMBER)
+	{
+		return false;
+	}
+
+	const FVector SafeDirection = PulseDirection.GetSafeNormal();
+	if (SafeDirection.IsNearlyZero())
+	{
+		return false;
+	}
+
+	const FVector ToCandidate = CandidateLocation - PulseOrigin;
+	const double DistanceSquared = ToCandidate.SizeSquared();
+	if (DistanceSquared > FMath::Square(static_cast<double>(PulseRange)))
+	{
+		return false;
+	}
+	if (DistanceSquared <= UE_DOUBLE_SMALL_NUMBER)
+	{
+		return true;
+	}
+
+	const double MinimumDot = FMath::Cos(FMath::DegreesToRadians(
+		FMath::Clamp(PulseHalfAngleDegrees, 0.0f, 90.0f)));
+	return FVector::DotProduct(SafeDirection, ToCandidate.GetSafeNormal())
+		+ KINDA_SMALL_NUMBER >= MinimumDot;
+}
+
+#if WITH_AUTOMATION_TESTS
+bool USovGameplayAbility_SeleneAxiomNullPulse::IsLocationInsideAxiomPulse(
+	const FVector& PulseOrigin,
+	const FVector& PulseDirection,
+	const FVector& CandidateLocation,
+	const float PulseRange,
+	const float PulseHalfAngleDegrees)
+{
+	return IsLocationInsideDirectedPulse(
+		PulseOrigin,
+		PulseDirection,
+		CandidateLocation,
+		PulseRange,
+		PulseHalfAngleDegrees);
+}
+#endif
 
 ESovCommandLinkSeverResolution
 USovGameplayAbility_SeleneAxiomNullPulse::TrySeverAxiomCommandLink(

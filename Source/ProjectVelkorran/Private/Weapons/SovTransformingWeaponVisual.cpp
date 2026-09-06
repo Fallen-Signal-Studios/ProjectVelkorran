@@ -3,6 +3,7 @@
 #include "Weapons/SovTransformingWeaponVisual.h"
 
 #include "AbilitySystemComponent.h"
+#include "AbilitySystemBlueprintLibrary.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
 #include "Animation/AnimSequenceBase.h"
@@ -19,6 +20,7 @@
 #include "NiagaraSystem.h"
 #include "TimerManager.h"
 #include "UnrealFramework/NarrativeCharacter.h"
+#include "Weapons/WeaponAnimPose.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogSovTransformingWeaponVisual, Log, All);
 
@@ -62,6 +64,7 @@ void ASovTransformingWeaponVisual::Tick(const float DeltaSeconds)
 void ASovTransformingWeaponVisual::EndPlay(
 	const EEndPlayReason::Type EndPlayReason)
 {
+	ResetMeleeDamageWindow();
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(PhaseTimerHandle);
@@ -439,6 +442,7 @@ void ASovTransformingWeaponVisual::OnWielded()
 
 void ASovTransformingWeaponVisual::OnHolstered()
 {
+	ResetMeleeDamageWindow();
 	Super::OnHolstered();
 	RefreshDynamicMaterials();
 	ApplyTransitionState();
@@ -458,6 +462,235 @@ bool ASovTransformingWeaponVisual::IsWeaponReady() const
 		&& TransitionState.Phase == ESovWeaponTransitionPhase::Ready
 		&& AttachState.WieldedSlot.IsValid()
 		&& AttachState.WieldedSlot == TransitionState.TargetWieldSlot;
+}
+
+bool ASovTransformingWeaponVisual::BeginMeleeDamageWindow(
+	const FGameplayEventData& GameplayEvent,
+	const bool bCanHitMultipleTargets)
+{
+	// GA_Attack_Combo_Melee deliberately generates hits only on authority.
+	// Do not also generate predicted-client hits and double-submit target data.
+	const ANarrativeCharacter* EventCharacter =
+		Cast<ANarrativeCharacter>(GameplayEvent.Instigator.Get());
+	const UAnimNotifyRefObject* NotifyObject =
+		Cast<UAnimNotifyRefObject>(GameplayEvent.OptionalObject.Get());
+	if (!IsValid(CharacterOwner)
+		|| EventCharacter != CharacterOwner
+		|| !CharacterOwner->HasAuthority()
+		|| !CharacterOwner->IsAlive()
+		|| !IsWeaponReady()
+		|| !IsValid(NotifyObject)
+		|| !GetWorld())
+	{
+		UE_LOG(LogSovTransformingWeaponVisual, Verbose,
+			TEXT("%s melee begin rejected: event=%s instigator=%s characterOwner=%s ownerValid=%d ownerMatches=%d authority=%d alive=%d ready=%d notifyObject=%s notifyValid=%d worldValid=%d."),
+			*GetNameSafe(this), *GameplayEvent.EventTag.ToString(),
+			*GetNameSafe(GameplayEvent.Instigator.Get()), *GetNameSafe(CharacterOwner),
+			IsValid(CharacterOwner), EventCharacter == CharacterOwner,
+			IsValid(CharacterOwner) && CharacterOwner->HasAuthority(),
+			IsValid(CharacterOwner) && CharacterOwner->IsAlive(), IsWeaponReady(),
+			*GetNameSafe(GameplayEvent.OptionalObject.Get()), IsValid(NotifyObject),
+			GetWorld() != nullptr);
+		return false;
+	}
+
+	const FAnimNotifyEventReference& NotifyReference = NotifyObject->NotifyEventReference;
+	const FAnimNotifyEvent* Notify = NotifyReference.GetNotify();
+	const UAnimMontage* NotifyMontage =
+		Cast<UAnimMontage>(NotifyReference.GetSourceObject());
+	UAnimInstance* AnimInstance = CharacterOwner->GetMesh()
+		? CharacterOwner->GetMesh()->GetAnimInstance() : nullptr;
+	FAnimMontageInstance* MontageInstance = AnimInstance
+		? AnimInstance->GetActiveMontageInstance() : nullptr;
+	if (!Notify || !NotifyMontage || !MontageInstance
+		|| !MontageInstance->IsActive()
+		|| MontageInstance->Montage != NotifyMontage)
+	{
+		UE_LOG(LogSovTransformingWeaponVisual, Verbose,
+			TEXT("%s melee begin rejected: notifyValid=%d notifySource=%s sourceMontage=%s currentMontage=%s instanceActive=%d position=%.3f."),
+			*GetNameSafe(this), Notify != nullptr,
+			*GetNameSafe(NotifyReference.GetSourceObject()), *GetNameSafe(NotifyMontage),
+			*GetNameSafe(MontageInstance ? MontageInstance->Montage.Get() : nullptr),
+			MontageInstance && MontageInstance->IsActive(),
+			MontageInstance ? MontageInstance->GetPosition() : -1.0f);
+		return false;
+	}
+
+	// Duplicate delivery of the same begin must not clear per-swing hit history.
+	if (MeleeDamageOwner.Get() == CharacterOwner
+		&& MeleeDamageMontageInstanceId == MontageInstance->GetInstanceID()
+		&& CurrentNotifyEvent.GetNotify() == Notify)
+	{
+		return bMeleeDamageWindowActive;
+	}
+
+	ResetMeleeDamageWindow();
+	CacheAnimationTransform(NotifyReference);
+	CacheCollisionData(false);
+	const FDamageStateDataContainer* CachedNotify = CachedDamageStateData.Find(Notify);
+	if (!CachedNotify || CachedNotify->DamageStateDatas.IsEmpty() || CollisionData.IsEmpty())
+	{
+		UE_LOG(LogSovTransformingWeaponVisual, Warning,
+			TEXT("%s could not begin melee damage: cached notify samples or capsule collision are missing."),
+			*GetNameSafe(this));
+		ResetMeleeDamageWindow();
+		return false;
+	}
+
+	MeleeDamageOwner = CharacterOwner;
+	MeleeDamageMontage = MontageInstance->Montage.Get();
+	MeleeDamageMontageInstanceId = MontageInstance->GetInstanceID();
+	bMeleeCanHitMultipleTargets = bCanHitMultipleTargets;
+	bMeleeDamageWindowActive = true;
+	FTimerManagerTimerParameters TimerParameters;
+	TimerParameters.bLoop = true;
+	TimerParameters.bMaxOncePerFrame = true;
+	TimerParameters.FirstDelay = 0.0f;
+	GetWorld()->GetTimerManager().SetTimer(
+		MeleeDamageTimerHandle, this,
+		&ASovTransformingWeaponVisual::CheckMeleeDamageCollision,
+		0.01f, TimerParameters);
+	UE_LOG(LogSovTransformingWeaponVisual, Verbose,
+		TEXT("%s melee begin accepted: owner=%s montage=%s instance=%d position=%.3f notifyStart=%.3f notifyEnd=%.3f samples=%d colliders=%d multipleTargets=%d."),
+		*GetNameSafe(this), *GetNameSafe(CharacterOwner), *GetNameSafe(NotifyMontage),
+		MeleeDamageMontageInstanceId, MontageInstance->GetPosition(),
+		Notify->GetTriggerTime(), Notify->GetEndTriggerTime(),
+		CachedNotify->DamageStateDatas.Num(), CollisionData.Num(), bMeleeCanHitMultipleTargets);
+	CheckMeleeDamageCollision();
+	return true;
+}
+
+FAnimMontageInstance* ASovTransformingWeaponVisual::GetMeleeDamageMontageInstance() const
+{
+	if (!IsValid(CharacterOwner)
+		|| MeleeDamageOwner.Get() != CharacterOwner
+		|| !CharacterOwner->HasAuthority()
+		|| !CharacterOwner->IsAlive()
+		|| !IsWeaponReady()
+		|| !CurrentNotifyEvent.GetNotify())
+	{
+		return nullptr;
+	}
+
+	UAnimInstance* AnimInstance = CharacterOwner->GetMesh()
+		? CharacterOwner->GetMesh()->GetAnimInstance() : nullptr;
+	FAnimMontageInstance* MontageInstance = AnimInstance
+		? AnimInstance->GetActiveMontageInstance() : nullptr;
+	return MontageInstance && MontageInstance->IsActive()
+		&& MontageInstance->Montage == MeleeDamageMontage.Get()
+		&& MontageInstance->GetInstanceID() == MeleeDamageMontageInstanceId
+		? MontageInstance : nullptr;
+}
+
+void ASovTransformingWeaponVisual::CheckMeleeDamageCollision()
+{
+	if (!bMeleeDamageWindowActive)
+	{
+		return;
+	}
+	if (!GetMeleeDamageMontageInstance())
+	{
+		ResetMeleeDamageWindow();
+		return;
+	}
+
+	const uint32 WindowGeneration = MeleeDamageWindowGeneration;
+	TArray<FHitResult> Hits;
+	PerformCollisionCheck(Hits);
+	static const FGameplayTag HitEventTag = FGameplayTag::RequestGameplayTag(
+		FName(TEXT("GameplayEvent.Attack.HitTarget")));
+	for (const FHitResult& Hit : Hits)
+	{
+		// Preserve the Blueprint's single-target rule: overlaps do not stop it.
+		AActor* HitActor = Hit.GetActor();
+		if (!IsValid(HitActor) || (!bMeleeCanHitMultipleTargets && !Hit.bBlockingHit))
+		{
+			continue;
+		}
+		// The base sweep only caches actors when there is a blocking hit. Keep
+		// our own per-window set so overlap-only results are also delivered once.
+		const TWeakObjectPtr<AActor> HitActorKey(HitActor);
+		if (MeleeDispatchedHitActors.Contains(HitActorKey))
+		{
+			continue;
+		}
+		// Record before dispatch: damage callbacks may re-enter this window.
+		MeleeDispatchedHitActors.Add(HitActorKey);
+		if (!bMeleeCanHitMultipleTargets)
+		{
+			bMeleeDamageWindowActive = false;
+			GetWorld()->GetTimerManager().ClearTimer(MeleeDamageTimerHandle);
+		}
+
+		// Match BP_WeaponVisualBase's payload: tag and one hit's target data only.
+		// The listening ability remains responsible for effects and replication.
+		FGameplayEventData Payload;
+		Payload.EventTag = HitEventTag;
+		Payload.TargetData = UAbilitySystemBlueprintLibrary::AbilityTargetDataFromHitResult(Hit);
+		UE_LOG(LogSovTransformingWeaponVisual, Verbose,
+			TEXT("%s melee hit dispatched: owner=%s target=%s blocking=%d bone=%s event=%s."),
+			*GetNameSafe(this), *GetNameSafe(CharacterOwner), *GetNameSafe(HitActor),
+			Hit.bBlockingHit, *Hit.BoneName.ToString(), *HitEventTag.ToString());
+		UAbilitySystemBlueprintLibrary::SendGameplayEventToActor(
+			CharacterOwner, HitEventTag, Payload);
+		if (!IsValid(this) || MeleeDamageWindowGeneration != WindowGeneration)
+		{
+			return;
+		}
+		if (!bMeleeDamageWindowActive)
+		{
+			return;
+		}
+		if (!GetMeleeDamageMontageInstance())
+		{
+			ResetMeleeDamageWindow();
+			return;
+		}
+	}
+
+	// A missed end notify cannot leave a live timer on a later montage section.
+	FAnimMontageInstance* MontageInstance = GetMeleeDamageMontageInstance();
+	if (!MontageInstance || MontageInstance->GetPosition() >= CurrentNotifyEvent.GetNotify()->GetEndTriggerTime())
+	{
+		ResetMeleeDamageWindow();
+	}
+}
+
+void ASovTransformingWeaponVisual::EndMeleeDamageWindow()
+{
+	const uint32 WindowGeneration = MeleeDamageWindowGeneration;
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(MeleeDamageTimerHandle);
+	}
+	// Like BPBase's disable event, consume remaining samples before cleanup.
+	CheckMeleeDamageCollision();
+	if (MeleeDamageWindowGeneration == WindowGeneration)
+	{
+		ResetMeleeDamageWindow();
+	}
+}
+
+void ASovTransformingWeaponVisual::ResetMeleeDamageWindow()
+{
+	++MeleeDamageWindowGeneration;
+	bMeleeDamageWindowActive = false;
+	MeleeDispatchedHitActors.Reset();
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(MeleeDamageTimerHandle);
+	}
+	CleanupAttackData();
+	// CleanupAttackData returns early for an uncached notify. Reset these even
+	// after failed initialization so no old sweep origin leaks into a new swing.
+	for (FWeaponCollisionData& Data : CollisionData)
+	{
+		Data.LastLocation = FVector::ZeroVector;
+	}
+	CurrentNotifyEvent = FAnimNotifyEventReference();
+	MeleeDamageOwner.Reset();
+	MeleeDamageMontage.Reset();
+	MeleeDamageMontageInstanceId = INDEX_NONE;
 }
 
 float ASovTransformingWeaponVisual::GetTransitionProgress() const
@@ -736,6 +969,12 @@ void ASovTransformingWeaponVisual::RecoverFromDeathInterruption()
 
 void ASovTransformingWeaponVisual::ApplyTransitionState()
 {
+	if (!IsWeaponReady())
+	{
+		// Physical transitions cancel attacks; unlike a normal notify end, they
+		// must not produce an extra tail hit while holstering or dying.
+		ResetMeleeDamageWindow();
+	}
 	// TransitionState and AttachState are separate replicated packets. Wait for
 	// Narrative's owner graph before marking a phase as locally presented so a
 	// late visual can still reconstruct the correct animation and gate.

@@ -15,12 +15,42 @@
 #include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
+#include "NarrativeGameplayTags.h"
 #include "Net/UnrealNetwork.h"
 #include "PhysicalMaterials/PhysicalMaterial.h"
+#include "Sovereign/SovGameplayTags.h"
 #include "TimerManager.h"
 #include "UnrealFramework/NarrativeCharacter.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogSovWeakPoint, Log, All);
+
+namespace
+{
+	/**
+	 * Reveal presentation is derived from the same matchable zones used by the
+	 * damage resolver. A socket-only entry is presentation authoring, not a
+	 * gameplay weak point, and must never create a phantom target.
+	 */
+	bool HasWeakPointGameplayMatcher(const FSovWeakPointZone& Zone)
+	{
+		return Zone.HitBones.ContainsByPredicate(
+			[](const FName BoneName)
+			{
+				return BoneName != NAME_None;
+			})
+			|| Zone.PhysicalMaterials.ContainsByPredicate(
+				[](const TObjectPtr<UPhysicalMaterial>& PhysicalMaterial)
+				{
+					return IsValid(PhysicalMaterial.Get());
+				});
+	}
+
+	bool IsRevealableWeakPointZone(const FSovWeakPointZone& Zone)
+	{
+		return Zone.ZoneId != NAME_None
+			&& HasWeakPointGameplayMatcher(Zone);
+	}
+}
 
 USovWeakPointComponent::USovWeakPointComponent()
 {
@@ -142,20 +172,33 @@ bool USovWeakPointComponent::RevealWeakPoints(
 	AActor* RevealInstigator)
 {
 	AActor* Owner = GetOwner();
+	const UNarrativeAbilitySystemComponent* NarrativeAbilitySystem =
+		AbilitySystemComponent.Get();
 	if (!IsValid(Owner)
 		|| !Owner->HasAuthority()
-		|| (IsValid(AbilitySystemComponent.Get())
-			&& AbilitySystemComponent->IsDead())
+		|| (IsValid(NarrativeAbilitySystem)
+			&& (NarrativeAbilitySystem->IsDead()
+				|| NarrativeAbilitySystem->HasMatchingGameplayTag(
+					FNarrativeGameplayTags::Get().State_IsDead)
+				|| NarrativeAbilitySystem->HasMatchingGameplayTag(
+					FSovGameplayTags::Get().State_Fatal)))
 		|| !FMath::IsFinite(Duration)
 		|| Duration <= KINDA_SMALL_NUMBER)
 	{
 		return false;
 	}
 
+	TSet<FName> SeenZoneIds;
 	const bool bHasUnbrokenZone = WeakPointZones.ContainsByPredicate(
-		[this](const FSovWeakPointZone& Zone)
+		[this, &SeenZoneIds](const FSovWeakPointZone& Zone)
 		{
-			return Zone.ZoneId != NAME_None
+			if (Zone.ZoneId == NAME_None
+				|| SeenZoneIds.Contains(Zone.ZoneId))
+			{
+				return false;
+			}
+			SeenZoneIds.Add(Zone.ZoneId);
+			return IsRevealableWeakPointZone(Zone)
 				&& !IsWeakPointBroken(Zone.ZoneId);
 		});
 	if (!bHasUnbrokenZone)
@@ -211,8 +254,14 @@ void USovWeakPointComponent::ClearWeakPointReveal()
 
 bool USovWeakPointComponent::IsWeakPointRevealActive() const
 {
-	if (IsValid(AbilitySystemComponent.Get())
-		&& AbilitySystemComponent->IsDead())
+	const UNarrativeAbilitySystemComponent* NarrativeAbilitySystem =
+		AbilitySystemComponent.Get();
+	if (IsValid(NarrativeAbilitySystem)
+		&& (NarrativeAbilitySystem->IsDead()
+			|| NarrativeAbilitySystem->HasMatchingGameplayTag(
+				FNarrativeGameplayTags::Get().State_IsDead)
+			|| NarrativeAbilitySystem->HasMatchingGameplayTag(
+				FSovGameplayTags::Get().State_Fatal)))
 	{
 		return false;
 	}
@@ -242,12 +291,19 @@ TArray<FName> USovWeakPointComponent::GetRevealedWeakPointIds() const
 		return RevealedIds;
 	}
 
+	TSet<FName> SeenZoneIds;
 	for (const FSovWeakPointZone& Zone : WeakPointZones)
 	{
-		if (Zone.ZoneId != NAME_None
+		if (Zone.ZoneId == NAME_None
+			|| SeenZoneIds.Contains(Zone.ZoneId))
+		{
+			continue;
+		}
+		SeenZoneIds.Add(Zone.ZoneId);
+		if (IsRevealableWeakPointZone(Zone)
 			&& !IsWeakPointBroken(Zone.ZoneId))
 		{
-			RevealedIds.AddUnique(Zone.ZoneId);
+			RevealedIds.Add(Zone.ZoneId);
 		}
 	}
 	return RevealedIds;
@@ -260,7 +316,7 @@ bool USovWeakPointComponent::HasValidWeakPointConfiguration() const
 	{
 		if (Zone.ZoneId == NAME_None
 			|| SeenZoneIds.Contains(Zone.ZoneId)
-			|| (Zone.HitBones.IsEmpty() && Zone.PhysicalMaterials.IsEmpty()))
+			|| !HasWeakPointGameplayMatcher(Zone))
 		{
 			return false;
 		}
@@ -350,9 +406,16 @@ void USovWeakPointComponent::ResetWeakPoints()
 	ClearWeakPointReveal();
 
 	TArray<FName> DesiredBrokenIds;
+	TSet<FName> SeenZoneIds;
 	for (const FSovWeakPointZone& Zone : WeakPointZones)
 	{
-		if (Zone.bStartsBroken && Zone.ZoneId != NAME_None)
+		if (Zone.ZoneId == NAME_None
+			|| SeenZoneIds.Contains(Zone.ZoneId))
+		{
+			continue;
+		}
+		SeenZoneIds.Add(Zone.ZoneId);
+		if (Zone.bStartsBroken && IsRevealableWeakPointZone(Zone))
 		{
 			DesiredBrokenIds.AddUnique(Zone.ZoneId);
 		}
@@ -395,11 +458,20 @@ void USovWeakPointComponent::RefreshWeakPointRevealPresentation()
 		return;
 	}
 
+	const TArray<FName> RevealedWeakPointIds = GetRevealedWeakPointIds();
+	TSet<FName> InspectedZoneIds;
 	const bool bHasPresentationMaterial = WeakPointZones.ContainsByPredicate(
-		[this](const FSovWeakPointZone& Zone)
+		[this, &RevealedWeakPointIds, &InspectedZoneIds](
+			const FSovWeakPointZone& Zone)
 		{
-			return Zone.ZoneId != NAME_None
-				&& !IsWeakPointBroken(Zone.ZoneId)
+			if (Zone.ZoneId == NAME_None
+				|| InspectedZoneIds.Contains(Zone.ZoneId))
+			{
+				return false;
+			}
+			InspectedZoneIds.Add(Zone.ZoneId);
+			return IsRevealableWeakPointZone(Zone)
+				&& RevealedWeakPointIds.Contains(Zone.ZoneId)
 				&& (IsValid(Zone.RevealDecalMaterialOverride.Get())
 					|| IsValid(WeakPointRevealDecalMaterial.Get()));
 		});
@@ -410,12 +482,16 @@ void USovWeakPointComponent::RefreshWeakPointRevealPresentation()
 	}
 
 	RefreshDecalReceiverBindings();
+	TSet<FName> PresentedZoneIds;
 	for (const FSovWeakPointZone& Zone : WeakPointZones)
 	{
-		if (Zone.ZoneId == NAME_None || IsWeakPointBroken(Zone.ZoneId))
+		if (!IsRevealableWeakPointZone(Zone)
+			|| !RevealedWeakPointIds.Contains(Zone.ZoneId)
+			|| PresentedZoneIds.Contains(Zone.ZoneId))
 		{
 			continue;
 		}
+		PresentedZoneIds.Add(Zone.ZoneId);
 
 		UMaterialInterface* SourceMaterial =
 			IsValid(Zone.RevealDecalMaterialOverride.Get())
@@ -829,6 +905,15 @@ void USovWeakPointComponent::ApplyAuthoredStartingState()
 				*GetNameSafe(GetOwner()),
 				*Zone.ZoneId.ToString());
 		}
+		if (!HasWeakPointGameplayMatcher(Zone))
+		{
+			UE_LOG(
+				LogSovWeakPoint,
+				Warning,
+				TEXT("%s Weak Point zone %s has no valid hit bone or physical material; it cannot break or reveal."),
+				*GetNameSafe(GetOwner()),
+				*Zone.ZoneId.ToString());
+		}
 		SeenZoneIds.Add(Zone.ZoneId);
 	}
 
@@ -843,9 +928,16 @@ void USovWeakPointComponent::ClearPendingBreaks()
 const FSovWeakPointZone* USovWeakPointComponent::FindMatchingZone(
 	const FSovDamageResult& DamageResult) const
 {
+	TSet<FName> SeenZoneIds;
 	for (const FSovWeakPointZone& Zone : WeakPointZones)
 	{
-		if (Zone.ZoneId != NAME_None
+		if (Zone.ZoneId == NAME_None
+			|| SeenZoneIds.Contains(Zone.ZoneId))
+		{
+			continue;
+		}
+		SeenZoneIds.Add(Zone.ZoneId);
+		if (IsRevealableWeakPointZone(Zone)
 			&& (MatchesBone(Zone, DamageResult)
 				|| MatchesPhysicalMaterial(Zone, DamageResult)))
 		{

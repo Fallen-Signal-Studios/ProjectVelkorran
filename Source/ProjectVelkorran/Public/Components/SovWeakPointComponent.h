@@ -141,7 +141,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Weak Point")
 	TArray<FName> GetBrokenWeakPointIds() const { return BrokenWeakPointIds; }
 
-	/** Begins or extends a replicated reveal of every currently unbroken zone. */
+	/**
+	 * Begins or extends a replicated reveal of every currently unbroken,
+	 * uniquely identified zone that owns a real damage matcher.
+	 */
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Weak Point|Reveal")
 	bool RevealWeakPoints(
 		float Duration,
@@ -175,7 +178,7 @@ public:
 		return FMath::Max(RevealFadeOutDuration, 0.0f);
 	}
 
-	/** Returns the unbroken zone IDs visible during the current reveal. */
+	/** Returns unique, matchable, unbroken zone IDs visible during the reveal. */
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Weak Point|Reveal")
 	TArray<FName> GetRevealedWeakPointIds() const;
 

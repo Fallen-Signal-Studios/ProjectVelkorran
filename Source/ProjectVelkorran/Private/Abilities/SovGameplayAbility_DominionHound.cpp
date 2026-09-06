@@ -101,6 +101,15 @@ namespace
 USovGameplayAbility_DominionHoundAttackBase::
 	USovGameplayAbility_DominionHoundAttackBase()
 {
+	// Native ability CDOs may be constructed before NarrativeArsenal's normal
+	// module startup has populated the shared gameplay-tag singletons. Bootstrap
+	// them before this CDO captures identity, input, state, or authorization tags.
+	if (!FNarrativeGameplayTags::Get().Narrative_Input_Attack.IsValid())
+	{
+		FNarrativeGameplayTags::InitializeNativeTags();
+	}
+	FSovGameplayTags::InitializeNativeTags();
+
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerOnly;
 	NetSecurityPolicy = EGameplayAbilityNetSecurityPolicy::ServerOnly;
@@ -110,9 +119,13 @@ USovGameplayAbility_DominionHoundAttackBase::
 	const FNarrativeGameplayTags& NarrativeTags = FNarrativeGameplayTags::Get();
 	const FSovGameplayTags& SovTags = FSovGameplayTags::Get();
 	ActivationBlockedTags.AddTag(NarrativeTags.State_IsDead);
+	ActivationBlockedTags.AddTag(NarrativeTags.State_Busy);
 	ActivationBlockedTags.AddTag(NarrativeTags.State_Interacting);
 	ActivationBlockedTags.AddTag(NarrativeTags.State_SequencerControlled);
 	ActivationBlockedTags.AddTag(NarrativeTags.State_Movement_Ragdoll);
+	// UNarrativeCombatAbility's constructor runs before the bootstrap above, so
+	// explicitly restore its equipping blocker in cold CDO load orders.
+	ActivationBlockedTags.AddTag(NarrativeTags.State_Weapon_Equipping);
 	ActivationBlockedTags.AddTag(NarrativeTags.State_Weapon_BlockFiring);
 	ActivationBlockedTags.AddTag(NarrativeTags.State_Weapon_IsFiring);
 	ActivationBlockedTags.AddTag(SovTags.State_Fatal);
@@ -141,6 +154,21 @@ bool USovGameplayAbility_DominionHoundAttackBase::
 {
 	return ActivationBlockedTags.HasTagExact(
 		FSovGameplayTags::Get().State_CommandLink_Severed);
+}
+
+bool USovGameplayAbility_DominionHoundAttackBase::
+	BlocksWeaponEquippingAtActivation() const
+{
+	return ActivationBlockedTags.HasTagExact(
+		FNarrativeGameplayTags::Get().State_Weapon_Equipping);
+}
+
+bool USovGameplayAbility_DominionHoundAttackBase::
+	HasAnyActivationBlockingState(
+		const UAbilitySystemComponent* AbilitySystem) const
+{
+	return !IsValid(AbilitySystem)
+		|| AbilitySystem->HasAnyMatchingGameplayTags(ActivationBlockedTags);
 }
 
 bool USovGameplayAbility_DominionHoundAttackBase::CanActivateAbility(
@@ -1349,6 +1377,21 @@ USovGameplayAbility_DominionHoundHornCharge::
 	DefaultBotAttackRange = 1650.0f;
 }
 
+bool USovGameplayAbility_DominionHoundHornCharge::
+	HasRequiredMovementStateForActivation(const AActor* AvatarActor) const
+{
+	if (!bUseNativeMovement)
+	{
+		return true;
+	}
+
+	const ACharacter* Character = Cast<ACharacter>(AvatarActor);
+	const UCharacterMovementComponent* Movement = IsValid(Character)
+		? Character->GetCharacterMovement()
+		: nullptr;
+	return IsValid(Movement) && Movement->IsMovingOnGround();
+}
+
 bool USovGameplayAbility_DominionHoundHornCharge::CanActivateAbility(
 	const FGameplayAbilitySpecHandle Handle,
 	const FGameplayAbilityActorInfo* ActorInfo,
@@ -1366,23 +1409,15 @@ bool USovGameplayAbility_DominionHoundHornCharge::CanActivateAbility(
 		return false;
 	}
 
-	if (bUseNativeMovement)
+	if (!HasRequiredMovementStateForActivation(
+			ActorInfo ? ActorInfo->AvatarActor.Get() : nullptr))
 	{
-		const ACharacter* Character = ActorInfo
-			? Cast<ACharacter>(ActorInfo->AvatarActor.Get())
-			: nullptr;
-		const UCharacterMovementComponent* Movement = IsValid(Character)
-			? Character->GetCharacterMovement()
-			: nullptr;
-		if (!IsValid(Movement) || !Movement->IsMovingOnGround())
+		if (OptionalRelevantTags)
 		{
-			if (OptionalRelevantTags)
-			{
-				OptionalRelevantTags->AddTag(
-					FNarrativeGameplayTags::Get().Ability_ActivateFail_TagsMissing);
-			}
-			return false;
+			OptionalRelevantTags->AddTag(
+				FNarrativeGameplayTags::Get().Ability_ActivateFail_TagsMissing);
 		}
+		return false;
 	}
 
 	return true;

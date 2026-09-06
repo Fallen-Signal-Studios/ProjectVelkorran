@@ -21,6 +21,16 @@ namespace
 USovGameplayAbility_DominionHandlerCommandHound::
 	USovGameplayAbility_DominionHandlerCommandHound()
 {
+	// Native ability CDOs can be constructed while dependent modules are still
+	// registering their classes, before NarrativeArsenal's StartupModule has
+	// populated its gameplay-tag singletons. Initialize on first use so this
+	// CDO never captures invalid tags; both paths remain safe on later calls.
+	if (!FNarrativeGameplayTags::Get().Narrative_Input_Ability1.IsValid())
+	{
+		FNarrativeGameplayTags::InitializeNativeTags();
+	}
+	FSovGameplayTags::InitializeNativeTags();
+
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerOnly;
 	NetSecurityPolicy = EGameplayAbilityNetSecurityPolicy::ServerOnly;

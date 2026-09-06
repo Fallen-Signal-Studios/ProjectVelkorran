@@ -15,6 +15,13 @@ FNarrativeGameplayTags FNarrativeGameplayTags::GameplayTags;
 
 void FNarrativeGameplayTags::InitializeNativeTags()
 {
+	// Project native CDOs may request these tags before this module's normal
+	// StartupModule pass. Keep that early initialization safe and idempotent.
+	if (GameplayTags.Narrative_Input_Ability1.IsValid())
+	{
+		return;
+	}
+
 	UGameplayTagsManager& Manager = UGameplayTagsManager::Get();
 
 	GameplayTags.AddAllTags(Manager);
