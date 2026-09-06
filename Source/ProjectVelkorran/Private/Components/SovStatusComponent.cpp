@@ -10,6 +10,7 @@
 #include "Effects/SovGameplayEffect_CinderGrenade.h"
 #include "Effects/SovGameplayEffect_Status.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
+#include "GAS/NarrativeAttributeSetBase.h"
 #include "GameFramework/Actor.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/GameStateBase.h"
@@ -17,14 +18,60 @@
 #include "GameFramework/PawnMovementComponent.h"
 #include "NarrativeGameplayTags.h"
 #include "Net/UnrealNetwork.h"
+#include "Serialization/MemoryReader.h"
+#include "Serialization/ObjectAndNameAsStringProxyArchive.h"
 #include "Sovereign/SovGameplayTags.h"
 #include "UnrealFramework/NarrativeCharacter.h"
+#include "UnrealFramework/NarrativePlayerCharacter.h"
+#include "UObject/StrongObjectPtr.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogSovStatus, Log, All);
 
 namespace
 {
 	constexpr float MinimumStatusDuration = 0.01f;
+	constexpr int32 MaximumCheckpointStatuses = 64;
+	constexpr int32 MaximumCheckpointSourceTags = 16;
+	constexpr int32 MaximumCheckpointBytes = 256 * 1024;
+
+	// Allocation lifetime and gameplay ownership are separate: an ASC may move
+	// away and back, or the same avatar may die/revive, inside one GE callback.
+	struct FStatusRestoreOwner
+	{
+		TStrongObjectPtr<USovStatusComponent> Component;
+		TStrongObjectPtr<AActor> Actor;
+		TStrongObjectPtr<UNarrativeAbilitySystemComponent> ASC;
+		TStrongObjectPtr<const UNarrativeAttributeSetBase> Attributes;
+		uint64 ActorInfoEpoch;
+		uint64 LifeEpoch;
+		int32 PlayerInitializationGeneration;
+
+		FStatusRestoreOwner(USovStatusComponent* InComponent, UNarrativeAbilitySystemComponent* InASC)
+			: Component(InComponent), Actor(InComponent->GetOwner()), ASC(InASC),
+			  Attributes(InASC->GetSet<UNarrativeAttributeSetBase>()),
+			  ActorInfoEpoch(InASC->GetCombatActorInfoEpoch()),
+			  LifeEpoch(Attributes.IsValid() ? Attributes->GetCombatLifeEpoch() : 0),
+			  PlayerInitializationGeneration(Cast<ANarrativePlayerCharacter>(InComponent->GetOwner())
+				? Cast<ANarrativePlayerCharacter>(InComponent->GetOwner())->GetCharacterInitializationGeneration() : 0) {}
+
+		bool IsCurrent() const
+		{
+			const ANarrativePlayerCharacter* Player = Cast<ANarrativePlayerCharacter>(Actor.Get());
+			return IsValid(Component.Get()) && IsValid(Actor.Get()) && IsValid(ASC.Get())
+				&& !Actor->IsActorBeingDestroyed() && Actor->HasAuthority()
+				&& Component->GetOwner() == Actor.Get()
+				&& Actor->FindComponentByClass<USovStatusComponent>() == Component.Get()
+				&& Component->IsInitialized() && ASC->GetAvatarActor() == Actor.Get()
+				&& UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Actor.Get()) == ASC.Get()
+				&& ASC->GetCombatActorInfoEpoch() == ActorInfoEpoch
+				&& (!Player || (Player->IsCharacterReady()
+					&& Player->GetCharacterInitializationGeneration() == PlayerInitializationGeneration))
+				&& ASC->GetSet<UNarrativeAttributeSetBase>() == Attributes.Get()
+				&& (!Attributes.IsValid() || (Attributes->GetOwningAbilitySystemComponent() == ASC.Get()
+					&& Attributes->GetCombatLifeEpoch() == LifeEpoch && Attributes->GetHealth() > 0.f))
+				&& !ASC->IsDead();
+		}
+	};
 
 	FGameplayTagContainer FilterSourceAbilityTags(
 		const FGameplayTagContainer& CandidateTags)
@@ -63,7 +110,10 @@ void USovStatusComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
-	BuildDefinitionRegistry();
+	if (DefinitionRegistry.IsEmpty())
+	{
+		BuildDefinitionRegistry();
+	}
 	if (ANarrativeCharacter* NarrativeOwner = Cast<ANarrativeCharacter>(GetOwner()))
 	{
 		NarrativeOwner->OnASCInitialized.AddUniqueDynamic(
@@ -75,6 +125,7 @@ void USovStatusComponent::BeginPlay()
 
 void USovStatusComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	CleanupCheckpointLifecycle();
 	if (ANarrativeCharacter* NarrativeOwner = Cast<ANarrativeCharacter>(GetOwner()))
 	{
 		NarrativeOwner->OnASCInitialized.RemoveDynamic(
@@ -90,7 +141,8 @@ bool USovStatusComponent::InitializeWithAbilitySystem(
 	UNarrativeAbilitySystemComponent* InAbilitySystemComponent)
 {
 	AActor* OwnerActor = GetOwner();
-	if (!IsValid(OwnerActor)
+	if (bRestoringCheckpoint || bClearingOwnedEffects || bChangingAbilitySystem
+		|| !IsValid(OwnerActor)
 		|| !IsValid(InAbilitySystemComponent)
 		|| InAbilitySystemComponent->GetAvatarActor() != OwnerActor)
 	{
@@ -110,11 +162,18 @@ bool USovStatusComponent::InitializeWithAbilitySystem(
 
 	if (AbilitySystemComponent == InAbilitySystemComponent)
 	{
+		BindCheckpointLifecycle();
 		ApplyPendingCheckpointRestore();
 		return true;
 	}
 
 	UninitializeFromAbilitySystem();
+	if (!IsValid(OwnerActor) || OwnerActor->IsActorBeingDestroyed()
+		|| !IsValid(InAbilitySystemComponent)
+		|| InAbilitySystemComponent->GetAvatarActor() != OwnerActor)
+	{
+		return false;
+	}
 	if (DefinitionRegistry.IsEmpty())
 	{
 		BuildDefinitionRegistry();
@@ -128,6 +187,7 @@ bool USovStatusComponent::InitializeWithAbilitySystem(
 		this,
 		&ThisClass::HandleDeathStateChanged);
 
+	BindCheckpointLifecycle();
 	ApplyPendingCheckpointRestore();
 	return true;
 }
@@ -151,8 +211,7 @@ void USovStatusComponent::TryInitializeFromOwner()
 		Cast<UNarrativeAbilitySystemComponent>(
 			UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(OwnerActor));
 	if (IsValid(OwnerASC)
-		&& OwnerASC->GetAvatarActor() == OwnerActor
-		&& OwnerASC != AbilitySystemComponent.Get())
+		&& OwnerASC->GetAvatarActor() == OwnerActor)
 	{
 		InitializeWithAbilitySystem(OwnerASC);
 	}
@@ -160,6 +219,15 @@ void USovStatusComponent::TryInitializeFromOwner()
 
 void USovStatusComponent::UninitializeFromAbilitySystem()
 {
+	if (bChangingAbilitySystem)
+	{
+		return;
+	}
+	TGuardValue<bool> ChangingGuard(bChangingAbilitySystem, true);
+	TStrongObjectPtr<UNarrativeAbilitySystemComponent> PreviousASC(AbilitySystemComponent.Get());
+	AbilitySystemComponent = nullptr;
+	TMap<FGameplayTag, FRuntimeStatusRecord> OldStatuses = MoveTemp(ActiveStatuses);
+	TMap<FGameplayTag, FActiveGameplayEffectHandle> OldImmunities = MoveTemp(RecoveryImmunityHandles);
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(DeferredDeathCleanupTimer);
@@ -171,8 +239,14 @@ void USovStatusComponent::UninitializeFromAbilitySystem()
 	bDeferredDeathCleanupPending = false;
 	StatusExpiryTimers.Empty();
 
-	UNarrativeAbilitySystemComponent* PreviousASC = AbilitySystemComponent.Get();
-	if (IsValid(PreviousASC))
+	ReplayLedger.Empty();
+	ReplayLedgerOrder.Empty();
+	if (GetOwner() && GetOwner()->HasAuthority() && !ReplicatedStatusPresentation.IsEmpty())
+	{
+		ReplicatedStatusPresentation.Empty();
+		MarkReplicatedPresentationDirty();
+	}
+	if (IsValid(PreviousASC.Get()))
 	{
 		PreviousASC->OnStatusApplicationRequested.RemoveDynamic(
 			this,
@@ -183,7 +257,7 @@ void USovStatusComponent::UninitializeFromAbilitySystem()
 
 		if (GetOwner() && GetOwner()->HasAuthority())
 		{
-			for (const TPair<FGameplayTag, FRuntimeStatusRecord>& Pair : ActiveStatuses)
+			for (const TPair<FGameplayTag, FRuntimeStatusRecord>& Pair : OldStatuses)
 			{
 				if (Pair.Value.EffectHandle.IsValid())
 				{
@@ -191,7 +265,7 @@ void USovStatusComponent::UninitializeFromAbilitySystem()
 				}
 			}
 			for (const TPair<FGameplayTag, FActiveGameplayEffectHandle>& Pair :
-				RecoveryImmunityHandles)
+				OldImmunities)
 			{
 				if (Pair.Value.IsValid())
 				{
@@ -201,18 +275,6 @@ void USovStatusComponent::UninitializeFromAbilitySystem()
 		}
 	}
 
-	ActiveStatuses.Empty();
-	RecoveryImmunityHandles.Empty();
-	ReplayLedger.Empty();
-	ReplayLedgerOrder.Empty();
-	if (GetOwner()
-		&& GetOwner()->HasAuthority()
-		&& !ReplicatedStatusPresentation.IsEmpty())
-	{
-		ReplicatedStatusPresentation.Empty();
-		MarkReplicatedPresentationDirty();
-	}
-	AbilitySystemComponent = nullptr;
 }
 
 void USovStatusComponent::BuildDefinitionRegistry()
@@ -494,6 +556,13 @@ bool USovStatusComponent::IsDefinitionEligible(
 ESovStatusApplicationResult USovStatusComponent::ApplyStatus(
 	const FSovStatusApplicationRequest& Request)
 {
+	// Reserve mutation during restore/teardown before entering callback-bearing
+	// GAS code. Do not publish recursive rejection callbacks while reserved.
+	if (bRestoringCheckpoint || bClearingOwnedEffects || bChangingAbilitySystem
+		|| bAwaitingRestoreBoundary || bCompletingRestoreBoundary || bCheckpointLifecycleEnding)
+	{
+		return ESovStatusApplicationResult::RejectedInvalidRequest;
+	}
 	if (!IsRequestStructurallyValid(Request))
 	{
 		BroadcastApplicationResult(
@@ -729,6 +798,7 @@ ESovStatusApplicationResult USovStatusComponent::ApplyStatus(
 		Request.SourceAbilityTags);
 	NewRecord.EffectHandle = NewEffectHandle;
 	NewRecord.Magnitude = NewMagnitude;
+	NewRecord.EffectLevel = Request.EffectLevel;
 	NewRecord.AppliedDuration = EffectiveDuration;
 	NewRecord.StackCount = NewStackCount;
 	NewRecord.bInfinite = Definition->DurationPolicy
@@ -842,6 +912,7 @@ FActiveGameplayEffectHandle USovStatusComponent::ApplyDefinitionEffect(
 	{
 		return FActiveGameplayEffectHandle();
 	}
+	const FStatusRestoreOwner EffectOwner(this, AbilitySystemComponent.Get());
 
 	TSubclassOf<UGameplayEffect> EffectClass = Definition.EffectClass;
 	if (!EffectClass)
@@ -911,6 +982,10 @@ FActiveGameplayEffectHandle USovStatusComponent::ApplyDefinitionEffect(
 			EffectiveMagnitude * FMath::Max(StackCount, 1));
 	}
 
+	if (bRestoringCheckpoint && !EffectOwner.IsCurrent())
+	{
+		return FActiveGameplayEffectHandle();
+	}
 	return ApplyingASC->ApplyGameplayEffectSpecToTarget(
 		*Spec,
 		AbilitySystemComponent.Get());
@@ -1010,7 +1085,9 @@ bool USovStatusComponent::RemoveStatus(
 	const FGameplayTag StatusTag,
 	const bool bApplyRecoveryImmunity)
 {
-	if (!IsInitialized() || !GetOwner() || !GetOwner()->HasAuthority())
+	if (bRestoringCheckpoint || bClearingOwnedEffects || bChangingAbilitySystem
+		|| bAwaitingRestoreBoundary || bCompletingRestoreBoundary || bCheckpointLifecycleEnding
+		|| !IsInitialized() || !GetOwner() || !GetOwner()->HasAuthority())
 	{
 		return false;
 	}
@@ -1026,7 +1103,9 @@ int32 USovStatusComponent::CleanseStatuses(
 	const FGameplayTag CleanseTag,
 	AActor* SourceActorFilter)
 {
-	if (!IsInitialized()
+	if (bRestoringCheckpoint || bClearingOwnedEffects || bChangingAbilitySystem
+		|| bAwaitingRestoreBoundary || bCompletingRestoreBoundary || bCheckpointLifecycleEnding
+		|| !IsInitialized()
 		|| !GetOwner()
 		|| !GetOwner()->HasAuthority()
 		|| !CleanseTag.IsValid())
@@ -1061,29 +1140,52 @@ int32 USovStatusComponent::CleanseStatuses(
 }
 
 void USovStatusComponent::ClearAllTrackedEffects(
-	const EStatusRemovalPolicy RemovalPolicy)
+	const EStatusRemovalPolicy /*RemovalPolicy*/)
 {
-	TArray<FGameplayTag> StatusTags;
-	ActiveStatuses.GenerateKeyArray(StatusTags);
-	for (const FGameplayTag& StatusTag : StatusTags)
+	if (bClearingOwnedEffects)
 	{
-		RemoveStatusInternal(StatusTag, RemovalPolicy);
+		return;
 	}
-
-	// Recovery immunities are component-owned runtime state, not semantic
-	// checkpoint data. Death and restore must not leak them into the next state.
-	if (IsValid(AbilitySystemComponent.Get()))
+	TGuardValue<bool> ClearingGuard(bClearingOwnedEffects, true);
+	TStrongObjectPtr<UNarrativeAbilitySystemComponent> OldASC(AbilitySystemComponent.Get());
+	// Detach ownership before removing any GE: removal delegates may destroy
+	// the component, replace actor info, or trigger another cleanup.
+	TMap<FGameplayTag, FRuntimeStatusRecord> OldStatuses = MoveTemp(ActiveStatuses);
+	TMap<FGameplayTag, FActiveGameplayEffectHandle> OldImmunities = MoveTemp(RecoveryImmunityHandles);
+	if (UWorld* World = GetWorld())
 	{
-		for (const TPair<FGameplayTag, FActiveGameplayEffectHandle>& Pair :
-			RecoveryImmunityHandles)
+		for (TPair<FGameplayTag, FTimerHandle>& Pair : StatusExpiryTimers)
 		{
-			if (Pair.Value.IsValid())
-			{
-				AbilitySystemComponent->RemoveActiveGameplayEffect(Pair.Value);
-			}
+			World->GetTimerManager().ClearTimer(Pair.Value);
 		}
 	}
-	RecoveryImmunityHandles.Empty();
+	StatusExpiryTimers.Empty();
+	ReplicatedStatusPresentation.Empty();
+	MarkReplicatedPresentationDirty();
+	for (const TPair<FGameplayTag, FRuntimeStatusRecord>& Pair : OldStatuses)
+	{
+		if (IsValid(OldASC.Get()) && Pair.Value.EffectHandle.IsValid())
+		{
+			OldASC->RemoveActiveGameplayEffect(Pair.Value.EffectHandle);
+		}
+		const USovStatusDefinition* Definition = Pair.Value.Definition.Get();
+		if (!bRestoringCheckpoint && IsValid(Definition) && IsValid(GetOwner())
+			&& !GetOwner()->IsActorBeingDestroyed())
+		{
+			// Bulk teardown is never expiry/cleanse and grants no recovery immunity.
+			OnStatusChanged.Broadcast(Pair.Key, Definition->StateTag,
+				ESovStatusChangeReason::Removed, 0, Pair.Value.SourceActor.Get());
+			SendLifecycleEvent(FSovGameplayTags::Get().Event_Status_Removed,
+				Pair.Key, Definition->StateTag, Pair.Value.SourceActor.Get(), Pair.Value.Magnitude);
+		}
+	}
+	for (const TPair<FGameplayTag, FActiveGameplayEffectHandle>& Pair : OldImmunities)
+	{
+		if (IsValid(OldASC.Get()) && Pair.Value.IsValid())
+		{
+			OldASC->RemoveActiveGameplayEffect(Pair.Value);
+		}
+	}
 }
 
 void USovStatusComponent::ApplyRecoveryImmunity(
@@ -1419,8 +1521,155 @@ void USovStatusComponent::OnRep_ReplicatedStatusPresentation()
 	LastObservedPresentation = MoveTemp(NewObservedPresentation);
 }
 
+void USovStatusComponent::PrepareForSave_Implementation()
+{
+	if (DefinitionRegistry.IsEmpty())
+	{
+		BuildDefinitionRegistry();
+	}
+	SavedCheckpointState = CaptureCheckpointState();
+}
+
+void USovStatusComponent::Load_Implementation()
+{
+	bLastSaveRecordLoadAccepted = StageNativeCheckpointState(SavedCheckpointState);
+}
+
+bool USovStatusComponent::LoadMissingSaveRecord()
+{
+	// Saves made before this component joined Narrative contain no status row.
+	// Absence means an empty semantic snapshot, never "keep today's debuffs".
+	SavedCheckpointState = FSovStatusCheckpointState();
+	bLastSaveRecordLoadAccepted = StageNativeCheckpointState(SavedCheckpointState);
+	return bLastSaveRecordLoadAccepted;
+}
+
+bool USovStatusComponent::ValidateSaveRecord(const TArray<uint8>& RecordBytes) const
+{
+	if (bRestoringCheckpoint || bClearingOwnedEffects || bChangingAbilitySystem
+		|| RecordBytes.IsEmpty() || RecordBytes.Num() > MaximumCheckpointBytes)
+	{
+		return false;
+	}
+	// Decode off-owner, using the fixed native class, never an authored component
+	// subclass. Invalid semantic data must not touch live GEs, timers or actors.
+	TStrongObjectPtr<USovStatusComponent> Probe(NewObject<USovStatusComponent>(GetTransientPackage()));
+	Probe->SavedCheckpointState.SchemaVersion = INDEX_NONE;
+	FMemoryReader Reader(RecordBytes, true);
+	Reader.ArMaxSerializeSize = MaximumCheckpointBytes;
+	FObjectAndNameAsStringProxyArchive Archive(Reader, false);
+	Archive.ArMaxSerializeSize = MaximumCheckpointBytes;
+	Archive.ArIsSaveGame = true;
+	Probe->Serialize(Archive);
+	if (Archive.IsError() || Reader.IsError() || Reader.Tell() != Reader.TotalSize())
+	{
+		return false;
+	}
+	if (DefinitionRegistry.IsEmpty())
+	{
+		Probe->StatusDefinitionOverrides = StatusDefinitionOverrides;
+		Probe->BuildDefinitionRegistry();
+		return Probe->ValidateCheckpointState(Probe->SavedCheckpointState);
+	}
+	return ValidateCheckpointState(Probe->SavedCheckpointState);
+}
+
+bool USovStatusComponent::ValidateCheckpointState(const FSovStatusCheckpointState& State) const
+{
+	if (State.SchemaVersion != CheckpointSchemaVersion
+		|| State.Statuses.Num() > MaximumCheckpointStatuses)
+	{
+		return false;
+	}
+	TSet<FGameplayTag> SeenTags;
+	for (const FSovStatusCheckpointRecord& Record : State.Statuses)
+	{
+		const USovStatusDefinition* Definition = ResolveDefinition(Record.RequestTag);
+		if (!IsValid(Definition) || !Definition->IsStructurallyValid()
+			|| Record.RequestTag == FSovGameplayTags::Get().Status_Apply_Corruption
+			|| (Definition->DurationPolicy != ESovStatusDurationPolicy::Timed
+				&& Definition->DurationPolicy != ESovStatusDurationPolicy::Infinite)
+			|| Record.RequestTag != Definition->RequestTag || SeenTags.Contains(Record.RequestTag)
+			|| Record.DefinitionId != Definition->GetPrimaryAssetId()
+			|| Record.DefinitionSchemaVersion != Definition->SchemaVersion
+			|| (Definition->CheckpointBehavior != ESovStatusCheckpointBehavior::PersistRemainingDuration
+				&& Definition->CheckpointBehavior != ESovStatusCheckpointBehavior::PersistFullDuration)
+			|| Record.StackCount < 1 || Record.StackCount > Definition->MaximumStacks
+			|| !FMath::IsFinite(Record.Magnitude) || Record.Magnitude <= KINDA_SMALL_NUMBER
+			|| !FMath::IsFinite(Record.Magnitude * Record.StackCount)
+			|| !FMath::IsFinite(Record.EffectLevel) || Record.EffectLevel <= 0.f
+			|| !FMath::IsFinite(Record.RemainingDuration)
+			|| !FMath::IsFinite(Record.RemainingDuration + (GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f))
+			|| Record.bInfinite != (Definition->DurationPolicy == ESovStatusDurationPolicy::Infinite)
+			|| (Record.bInfinite ? Record.RemainingDuration != 0.f : Record.RemainingDuration < MinimumStatusDuration)
+			|| Record.SourceAbilityTags.Num() > MaximumCheckpointSourceTags
+			|| FilterSourceAbilityTags(Record.SourceAbilityTags) != Record.SourceAbilityTags)
+		{
+			return false;
+		}
+		SeenTags.Add(Record.RequestTag);
+		TSubclassOf<UGameplayEffect> EffectClass = Definition->EffectClass;
+		if (!EffectClass)
+		{
+			EffectClass = Record.bInfinite ? USovGameplayEffect_StatusInfinite::StaticClass() : USovGameplayEffect_Status::StaticClass();
+		}
+		const UGameplayEffect* Effect = EffectClass.GetDefaultObject();
+		if (!IsValid(Effect)
+			|| Effect->DurationPolicy != (Record.bInfinite ? EGameplayEffectDurationType::Infinite : EGameplayEffectDurationType::HasDuration))
+		{
+			return false;
+		}
+		const float Period = Effect->Period.GetValueAtLevel(Record.EffectLevel);
+		// Restoring a periodic status must not grant a free execution per load.
+		// Component-owned semantic stacks also must not merge with unrelated GEs.
+PRAGMA_DISABLE_DEPRECATION_WARNINGS
+		const bool bAggregatesEffects = Effect->StackingType != EGameplayEffectStackingType::None;
+PRAGMA_ENABLE_DEPRECATION_WARNINGS
+		if (!FMath::IsFinite(Period) || Period < 0.f || bAggregatesEffects
+			|| (Period > 0.f && Effect->bExecutePeriodicEffectOnApplication)
+			|| (Period == 0.f && !Effect->Executions.IsEmpty()))
+		{
+			return false;
+		}
+		if (Period == 0.f)
+		{
+			// Narrative's campaign resource snapshot stores resolved currents, not
+			// the unmodified bases beneath arbitrary GE aggregators. Reapplying a
+			// continuous resource modifier after that snapshot would apply it twice.
+			// Reject unsupported authoring instead of silently changing resources.
+			const FGameplayAttribute SavedResourceAttributes[] = {
+				UNarrativeAttributeSetBase::GetHealthAttribute(), UNarrativeAttributeSetBase::GetMaxHealthAttribute(),
+				UNarrativeAttributeSetBase::GetShieldAttribute(), UNarrativeAttributeSetBase::GetMaxShieldAttribute(),
+				UNarrativeAttributeSetBase::GetStaminaAttribute(), UNarrativeAttributeSetBase::GetMaxStaminaAttribute(),
+				UNarrativeAttributeSetBase::GetPoiseAttribute(), UNarrativeAttributeSetBase::GetMaxPoiseAttribute(),
+				UNarrativeAttributeSetBase::GetEchoAttribute(), UNarrativeAttributeSetBase::GetMaxEchoAttribute()};
+			for (const FGameplayModifierInfo& Modifier : Effect->Modifiers)
+			{
+				for (const FGameplayAttribute& Attribute : SavedResourceAttributes)
+				{
+					if (Modifier.Attribute == Attribute)
+					{
+						return false;
+					}
+				}
+			}
+		}
+	}
+	return true;
+}
+
 FSovStatusCheckpointState USovStatusComponent::CaptureCheckpointState() const
 {
+	if (bRestoringCheckpoint)
+	{
+		return RestoringCheckpointState;
+	}
+	// Accepted queued data is the semantic truth until ASC readiness permits
+	// commit. Saving again in this window must not overwrite it with an empty map.
+	if (bHasPendingCheckpointState)
+	{
+		return PendingCheckpointState;
+	}
 	FSovStatusCheckpointState State;
 	State.SchemaVersion = CheckpointSchemaVersion;
 	const float WorldTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
@@ -1437,12 +1686,14 @@ FSovStatusCheckpointState USovStatusComponent::CaptureCheckpointState() const
 
 		FSovStatusCheckpointRecord Record;
 		Record.DefinitionId = Definition->GetPrimaryAssetId();
+		Record.DefinitionSchemaVersion = Definition->SchemaVersion;
 		Record.RequestTag = Definition->RequestTag;
 		Record.StackCount = FMath::Clamp(
 			Pair.Value.StackCount,
 			1,
 			FMath::Max(Definition->MaximumStacks, 1));
 		Record.Magnitude = FMath::Max(Pair.Value.Magnitude, 0.0f);
+		Record.EffectLevel = Pair.Value.EffectLevel;
 		Record.SourceAbilityTags = Pair.Value.SourceAbilityTags;
 		Record.bInfinite = Pair.Value.bInfinite;
 		if (!Record.bInfinite)
@@ -1471,148 +1722,198 @@ FSovStatusCheckpointState USovStatusComponent::CaptureCheckpointState() const
 bool USovStatusComponent::RestoreCheckpointState(
 	const FSovStatusCheckpointState& State)
 {
-	if (!GetOwner()
+	if (bRestoringCheckpoint || bClearingOwnedEffects || bChangingAbilitySystem
+		|| bCompletingRestoreBoundary || bCheckpointLifecycleEnding
+		|| !IsValid(GetOwner()) || GetOwner()->IsActorBeingDestroyed()
 		|| !GetOwner()->HasAuthority()
-		|| State.SchemaVersion != CheckpointSchemaVersion)
+		|| GetOwner()->FindComponentByClass<USovStatusComponent>() != this)
 	{
 		return false;
 	}
+	if (DefinitionRegistry.IsEmpty())
+	{
+		BuildDefinitionRegistry();
+	}
+	if (!ValidateCheckpointState(State))
+	{
+		return false;
+	}
+	BindCheckpointLifecycle();
 
-	if (!IsInitialized() || IsTargetDead() || bDeferredDeathCleanupPending)
+	if (!IsCheckpointTargetReady() || bAwaitingRestoreBoundary)
 	{
 		PendingCheckpointState = State;
 		bHasPendingCheckpointState = true;
 		return true;
 	}
-	return ApplyCheckpointStateNow(State);
+	const bool bApplied = ApplyCheckpointStateNow(State);
+	if (bApplied)
+	{
+		bHasPendingCheckpointState = false;
+		PendingCheckpointState = FSovStatusCheckpointState();
+	}
+	return bApplied;
 }
 
 void USovStatusComponent::ApplyPendingCheckpointRestore()
 {
-	if (!bHasPendingCheckpointState
-		|| !IsInitialized()
-		|| IsTargetDead()
-		|| bDeferredDeathCleanupPending)
+	if (bRestoringCheckpoint || bClearingOwnedEffects || bChangingAbilitySystem
+		|| !bHasPendingCheckpointState
+		|| !IsCheckpointTargetReady() || bAwaitingRestoreBoundary)
 	{
 		return;
 	}
 
 	const FSovStatusCheckpointState State = PendingCheckpointState;
-	bHasPendingCheckpointState = false;
-	PendingCheckpointState = FSovStatusCheckpointState();
-	ApplyCheckpointStateNow(State);
+	if (ApplyCheckpointStateNow(State))
+	{
+		bHasPendingCheckpointState = false;
+		PendingCheckpointState = FSovStatusCheckpointState();
+		bLastSaveRecordLoadAccepted = true;
+	}
+	else
+	{
+		bLastSaveRecordLoadAccepted = false;
+		UE_LOG(LogSovStatus, Warning, TEXT("Pending checkpoint status restore failed for %s; snapshot retained."), *GetNameSafe(GetOwner()));
+	}
 }
 
 bool USovStatusComponent::ApplyCheckpointStateNow(
 	const FSovStatusCheckpointState& State)
 {
-	if (!IsInitialized()
-		|| !GetOwner()
-		|| !GetOwner()->HasAuthority()
-		|| State.SchemaVersion != CheckpointSchemaVersion)
+	if (bRestoringCheckpoint || bClearingOwnedEffects || bChangingAbilitySystem
+		|| !IsCheckpointTargetReady() || bAwaitingRestoreBoundary
+		|| !GetOwner() || !GetOwner()->HasAuthority() || !ValidateCheckpointState(State))
 	{
 		return false;
 	}
 
-	bRestoringCheckpoint = true;
+	const FStatusRestoreOwner Owner(this, AbilitySystemComponent.Get());
+	if (!Owner.IsCurrent())
+	{
+		return false;
+	}
+	// Copy the caller's state before callback-bearing teardown. Never retain
+	// pointers into ActiveStatuses or a caller-owned snapshot across GAS calls.
+	const FSovStatusCheckpointState Snapshot = State;
+	RestoringCheckpointState = Snapshot;
+	TGuardValue<bool> RestoreGuard(bRestoringCheckpoint, true);
+	TArray<FSovStatusPresentationEntry> PreviousPresentation = ReplicatedStatusPresentation;
+	for (const FSovStatusPresentationEntry& Staged : PendingCheckpointPresentation)
+	{
+		if (!PreviousPresentation.ContainsByPredicate([&Staged](const FSovStatusPresentationEntry& Entry)
+			{ return Entry.RequestTag == Staged.RequestTag; }))
+		{
+			PreviousPresentation.Add(Staged);
+		}
+	}
+	TArray<TStrongObjectPtr<USovStatusDefinition>> Definitions;
+	for (const FSovStatusCheckpointRecord& Record : Snapshot.Statuses)
+	{
+		Definitions.Emplace(ResolveDefinition(Record.RequestTag));
+	}
 	ClearAllTrackedEffects(EStatusRemovalPolicy::CheckpointRestore);
+	if (!Owner.IsCurrent() || !ValidateCheckpointState(Snapshot))
+	{
+		return false;
+	}
 	ReplayLedger.Empty();
 	ReplayLedgerOrder.Empty();
 
-	TArray<FGameplayTag> RestoredTags;
-	for (const FSovStatusCheckpointRecord& SavedRecord : State.Statuses)
+	for (int32 Index = 0; Index < Snapshot.Statuses.Num(); ++Index)
 	{
-		USovStatusDefinition* Definition = ResolveDefinition(
-			SavedRecord.RequestTag);
-		if (!IsValid(Definition)
-			|| !Definition->IsStructurallyValid()
-			|| Definition->CheckpointBehavior
-				== ESovStatusCheckpointBehavior::ClearOnCheckpoint
-			|| SavedRecord.StackCount <= 0
-			|| !FMath::IsFinite(SavedRecord.Magnitude)
-			|| SavedRecord.Magnitude <= KINDA_SMALL_NUMBER
-			|| (Definition->DurationPolicy == ESovStatusDurationPolicy::Timed
-				&& (!FMath::IsFinite(SavedRecord.RemainingDuration)
-					|| SavedRecord.RemainingDuration < MinimumStatusDuration)))
-		{
-			continue;
-		}
-
+		const FSovStatusCheckpointRecord& SavedRecord = Snapshot.Statuses[Index];
+		USovStatusDefinition* Definition = Definitions[Index].Get();
 		FSovStatusApplicationRequest Request;
 		Request.RequestId = FGuid::NewGuid();
 		Request.StatusTag = Definition->RequestTag;
-		Request.SourceActor = GetOwner();
-		Request.TargetActor = GetOwner();
+		Request.SourceActor = Owner.Actor.Get();
+		Request.TargetActor = Owner.Actor.Get();
 		Request.Magnitude = SavedRecord.Magnitude;
 		Request.SourceAbilityTags = SavedRecord.SourceAbilityTags;
-		Request.Duration = Definition->DurationPolicy
-			== ESovStatusDurationPolicy::Timed
-			? SavedRecord.RemainingDuration
-			: 0.0f;
-		Request.EffectLevel = 1.0f;
-		Request.Context = AbilitySystemComponent->MakeEffectContext();
-
-		const ESovStatusApplicationResult Result = ApplyStatus(Request);
-		if (Result != ESovStatusApplicationResult::Applied
-			&& Result != ESovStatusApplicationResult::Refreshed)
+		Request.Duration = SavedRecord.RemainingDuration;
+		Request.EffectLevel = SavedRecord.EffectLevel;
+		// These are already-resolved values, not a fresh attack. No resistance,
+		// immunity, reward, replay, reapplication or second stack GE pass.
+		const FActiveGameplayEffectHandle Handle = ApplyDefinitionEffect(*Definition,
+			Request, SavedRecord.Magnitude, SavedRecord.RemainingDuration, SavedRecord.StackCount);
+		if (!Owner.IsCurrent() || !Handle.IsValid()
+			|| !Owner.ASC->GetActiveGameplayEffect(Handle) || !ValidateCheckpointState(Snapshot))
 		{
-			continue;
+			// Exact handles only. Never strip another system's matching tag.
+			if (IsValid(Owner.ASC.Get()) && Handle.IsValid())
+			{
+				Owner.ASC->RemoveActiveGameplayEffect(Handle);
+			}
+			ClearAllTrackedEffects(EStatusRemovalPolicy::CheckpointRestore);
+			return false;
 		}
 
-		if (FRuntimeStatusRecord* RuntimeRecord =
-			ActiveStatuses.Find(Definition->RequestTag))
+		FRuntimeStatusRecord RuntimeRecord;
+		RuntimeRecord.Definition = Definition;
+		RuntimeRecord.SourceAbilityTags = SavedRecord.SourceAbilityTags;
+		RuntimeRecord.EffectHandle = Handle;
+		RuntimeRecord.Magnitude = SavedRecord.Magnitude;
+		RuntimeRecord.EffectLevel = SavedRecord.EffectLevel;
+		RuntimeRecord.AppliedDuration = SavedRecord.RemainingDuration;
+		RuntimeRecord.StackCount = SavedRecord.StackCount;
+		RuntimeRecord.bInfinite = SavedRecord.bInfinite;
+		RuntimeRecord.EndWorldTime = SavedRecord.bInfinite ? 0.f
+			: (GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f) + SavedRecord.RemainingDuration;
+		// Actor attribution is intentionally absent; only stable ability tags persist.
+		ActiveStatuses.Add(SavedRecord.RequestTag, RuntimeRecord);
+		UpsertReplicatedPresentation(*Definition, RuntimeRecord);
+		if (!SavedRecord.bInfinite)
 		{
-			const int32 RestoredStackCount = FMath::Clamp(
-				SavedRecord.StackCount,
-				1,
-				FMath::Max(Definition->MaximumStacks, 1));
-			if (RestoredStackCount != RuntimeRecord->StackCount)
+			ScheduleExpiry(SavedRecord.RequestTag, SavedRecord.RemainingDuration);
+		}
+		if (SavedRecord.RequestTag == FSovGameplayTags::Get().Status_Apply_Freeze)
+		{
+			if (APawn* Pawn = Cast<APawn>(Owner.Actor.Get()))
 			{
-				const FActiveGameplayEffectHandle RestoredEffectHandle =
-					ApplyDefinitionEffect(
-						*Definition,
-						Request,
-						SavedRecord.Magnitude,
-						Request.Duration,
-						RestoredStackCount);
-				if (RestoredEffectHandle.IsValid())
+				if (UPawnMovementComponent* Movement = Pawn->GetMovementComponent())
 				{
-					if (RuntimeRecord->EffectHandle.IsValid()
-						&& !(RuntimeRecord->EffectHandle == RestoredEffectHandle))
-					{
-						AbilitySystemComponent->RemoveActiveGameplayEffect(
-							RuntimeRecord->EffectHandle);
-					}
-					RuntimeRecord->EffectHandle = RestoredEffectHandle;
-					RuntimeRecord->StackCount = RestoredStackCount;
+					Movement->StopMovementImmediately();
+				}
+				if (Owner.IsCurrent() && IsValid(Pawn->GetController()))
+				{
+					Pawn->GetController()->StopMovement();
 				}
 			}
-			// Checkpoints deliberately serialize no raw actor identity. Story
-			// attribution belongs to the consequence system, not a transient GE.
-			RuntimeRecord->SourceActor.Reset();
-			UpsertReplicatedPresentation(*Definition, *RuntimeRecord);
-			RestoredTags.Add(Definition->RequestTag);
+		}
+		if (!Owner.IsCurrent())
+		{
+			ClearAllTrackedEffects(EStatusRemovalPolicy::CheckpointRestore);
+			return false;
 		}
 	}
-	bRestoringCheckpoint = false;
-
-	for (const FGameplayTag& RequestTag : RestoredTags)
+	// Publish only once all records are installed. Keep the mutation reservation
+	// through notification so a listener cannot nest a competing restore.
+	for (const FSovStatusPresentationEntry& Previous : PreviousPresentation)
 	{
-		if (const FRuntimeStatusRecord* RuntimeRecord =
-			ActiveStatuses.Find(RequestTag))
+		if (!ActiveStatuses.Contains(Previous.RequestTag))
 		{
-			if (USovStatusDefinition* Definition =
-				RuntimeRecord->Definition.Get())
+			OnStatusChanged.Broadcast(Previous.RequestTag, Previous.StateTag,
+				ESovStatusChangeReason::Removed, 0, nullptr);
+			if (!Owner.IsCurrent())
 			{
-				OnStatusChanged.Broadcast(
-					Definition->RequestTag,
-					Definition->StateTag,
-					ESovStatusChangeReason::Restored,
-					RuntimeRecord->StackCount,
-					nullptr);
+				ClearAllTrackedEffects(EStatusRemovalPolicy::CheckpointRestore);
+				return false;
 			}
 		}
 	}
+	for (int32 Index = 0; Index < Snapshot.Statuses.Num(); ++Index)
+	{
+		OnStatusChanged.Broadcast(Snapshot.Statuses[Index].RequestTag,
+			Definitions[Index]->StateTag, ESovStatusChangeReason::Restored,
+			Snapshot.Statuses[Index].StackCount, nullptr);
+		if (!Owner.IsCurrent())
+		{
+			ClearAllTrackedEffects(EStatusRemovalPolicy::CheckpointRestore);
+			return false;
+		}
+	}
+	PendingCheckpointPresentation.Reset();
 	return true;
 }
 

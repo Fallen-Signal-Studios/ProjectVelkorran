@@ -28,6 +28,27 @@ class NARRATIVESAVESYSTEM_API INarrativeSavableComponent
 public:
     /** Lower phases deserialize first within their existing actor owner. */
     virtual ENarrativeRestorePhase GetSaveRestorePhase() const { return ENarrativeRestorePhase::Interactables; }
+	/**
+	 * Native, side-effect-free preflight of a serialized component record. Implementations
+	 * may decode into detached temporary state, but must not deserialize into this live
+	 * component or change its owner/effects. Runs before any actor restore mutation.
+	 * Existing native and Blueprint-only savables retain their previous behavior.
+	 */
+	virtual bool ValidateSaveRecord(const TArray<uint8>& RecordBytes) const { return true; }
+
+	/**
+	 * Native completion result queried after the existing Load event. True also permits
+	 * an accepted, owner-bound restore waiting for initialization; it does not certify
+	 * that asynchronous restoration has completed. False rejects the actor load.
+	 */
+	virtual bool WasSaveRecordLoadAccepted() const { return true; }
+
+	/**
+	 * Native opt-in compatibility hook for an existing component absent from an older
+	 * actor record. Runs in this component's restore phase. The default does nothing;
+	 * it must not dispatch Load against unrelated, stale serialized member state.
+	 */
+	virtual bool LoadMissingSaveRecord() { return true; }
 	/** Required by default. Use only for cosmetic/DLC state whose absence cannot change canon or progression. */
 	UFUNCTION(BlueprintNativeEvent)
 	bool IsOptionalSaveRecord() const;

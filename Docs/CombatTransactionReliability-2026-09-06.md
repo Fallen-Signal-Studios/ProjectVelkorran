@@ -121,9 +121,9 @@ Before accepting the slice:
 
 ## Remaining work deliberately outside this batch
 
-- Generic status checkpoint capture/restore still needs integration with the
-  canonical Narrative save lifecycle. This batch only secures damage-origin
-  status delivery, not persistence.
+- This combat batch only secures damage-origin status delivery. The subsequent
+  [checkpoint-safe status slice](CheckpointSafeStatusRestoration-2026-09-06.md)
+  integrates capture/restore with Narrative, with its own pending engine gate.
 - Save ownership, asynchronous travel failure recovery and save-safe deferred
   finisher outcomes require a separate transaction slice.
 - Some hero reward histories still use GUID ledgers. Target-life fencing here

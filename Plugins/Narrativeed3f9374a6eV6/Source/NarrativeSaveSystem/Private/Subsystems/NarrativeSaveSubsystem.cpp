@@ -3,6 +3,7 @@
 
 #include "Subsystems/NarrativeSaveSubsystem.h"
 #include "NarrativeSave.h"
+#include "Components/ActorComponent.h"
 #include "UObject/StrongObjectPtr.h"
 #include "Kismet/GameplayStatics.h"
 #include <EngineUtils.h>
@@ -19,6 +20,23 @@
 #include <Serialization/MemoryWriter.h>
 #include <Serialization/MemoryReader.h>
 #include <Serialization/ObjectAndNameAsStringProxyArchive.h>
+
+namespace
+{
+	bool IsCurrentSaveActor(const AActor* Actor)
+	{
+		return IsValid(Actor) && !Actor->IsActorBeingDestroyed();
+	}
+
+	bool IsCurrentSaveComponent(const AActor* Actor, const UActorComponent* Component,
+		const FName ExpectedName = NAME_None)
+	{
+		if (!IsCurrentSaveActor(Actor) || !IsValid(Component) || Component->GetOwner() != Actor
+			|| (!ExpectedName.IsNone() && Component->GetFName() != ExpectedName)) { return false; }
+		TInlineComponentArray<UActorComponent*> Components(Actor);
+		return Components.Contains(Component);
+	}
+}
 
 
 
@@ -695,25 +713,27 @@ void UNarrativeSaveSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 
 bool UNarrativeSaveSubsystem::CreateActorRecord(AActor* Actor, FNarrativeActorRecord& ActorRecord) const
 {
-	if (!IsValid(Actor)) { return false; }
+	if (!IsCurrentSaveActor(Actor)) { return false; }
+	TStrongObjectPtr<AActor> KeepActor(Actor);
 	FNarrativeActorRecord Candidate;
 	if (Actor->Implements<UNarrativeStableActor>())
 	{
 		Candidate.ActorGUID = INarrativeStableActor::Execute_GetActorGUID(Actor);
-		if (!IsValid(Actor) || !Candidate.ActorGUID.IsValid()) { return false; }
+		if (!IsCurrentSaveActor(Actor) || !Candidate.ActorGUID.IsValid()) { return false; }
 	}
 	if (Actor->Implements<UNarrativeSavableActor>())
 	{
 		Candidate.bNeedsDynamicSpawn = INarrativeSavableActor::Execute_ShouldRespawn(Actor);
-		if (!IsValid(Actor)) { return false; }
+		if (!IsCurrentSaveActor(Actor)) { return false; }
 		Candidate.bOptional = INarrativeSavableActor::Execute_IsOptionalSaveRecord(Actor);
-		if (!IsValid(Actor)) { return false; }
+		if (!IsCurrentSaveActor(Actor)) { return false; }
 		INarrativeSavableActor::Execute_PrepareForSave(Actor);
-		if (!IsValid(Actor)) { return false; }
+		if (!IsCurrentSaveActor(Actor)) { return false; }
 	}
 	Candidate.ActorName = Actor->GetFName();
 	Candidate.ActorSoftClass = Actor->GetClass();
     if (const auto* Policy = Cast<INarrativeSavableActor>(Actor)) { Candidate.RestorePhase = Policy->GetSaveRestorePhase(); }
+	if (!IsCurrentSaveActor(Actor)) { return false; }
 	Candidate.bNetStartup = Actor->IsNetStartupActor();
 	Candidate.Transform = FTransform::Identity;
 	if (Actor->GetRootComponent() && Actor->GetRootComponent()->Mobility == EComponentMobility::Movable)
@@ -724,123 +744,226 @@ bool UNarrativeSaveSubsystem::CreateActorRecord(AActor* Actor, FNarrativeActorRe
 	// Full snapshots must overwrite existing state even when the captured value equals its archetype default.
 	Ar.ArNoDelta = true;
 	Actor->Serialize(Ar);
-	if (Ar.IsError() || !IsValid(Actor)) { return false; }
+	if (Ar.IsError() || !IsCurrentSaveActor(Actor)) { return false; }
 	TInlineComponentArray<UActorComponent*> Components(Actor);
+	TArray<TStrongObjectPtr<UActorComponent>> ComponentPins;
+	TSet<FName> CurrentNames;
 	for (UActorComponent* Component : Components)
 	{
+		if (!IsValid(Component)) { continue; }
+		ComponentPins.Emplace(Component);
+		if (Component->Implements<UNarrativeSavableComponent>())
+		{
+			const FName Name = Component->GetFName();
+			if (Name.IsNone() || CurrentNames.Contains(Name)) { return false; }
+			CurrentNames.Add(Name);
+		}
+	}
+	for (const auto& ComponentPin : ComponentPins)
+	{
+		UActorComponent* Component = ComponentPin.Get();
 		if (!IsValid(Component) || !Component->Implements<UNarrativeSavableComponent>()) { continue; }
+		const FName ComponentName = Component->GetFName();
+		if (!IsCurrentSaveComponent(Actor, Component, ComponentName)) { return false; }
 		INarrativeSavableComponent::Execute_PrepareForSave(Component);
-		if (!IsValid(Actor) || !IsValid(Component)) { return false; }
+		if (!IsCurrentSaveComponent(Actor, Component, ComponentName)) { return false; }
 		FNarrativeSaveComponent Record;
-		Record.ComponentName = Component->GetFName();
+		Record.ComponentName = ComponentName;
 		Record.ComponentClass = Component->GetClass();
         if (const auto* Policy = Cast<INarrativeSavableComponent>(Component)) { Record.RestorePhase = Policy->GetSaveRestorePhase(); }
+		if (!IsCurrentSaveComponent(Actor, Component, ComponentName)) { return false; }
 		Record.bOptional = INarrativeSavableComponent::Execute_IsOptionalSaveRecord(Component);
-		if (!IsValid(Actor) || !IsValid(Component)) { return false; }
+		if (!IsCurrentSaveComponent(Actor, Component, ComponentName)) { return false; }
 		FMemoryWriter Writer(Record.ByteData);
 		FObjectAndNameAsStringProxyArchive ComponentAr(Writer, true);
 		ComponentAr.ArIsSaveGame = true;
 		ComponentAr.ArNoDelta = true;
 		Component->Serialize(ComponentAr);
-		if (ComponentAr.IsError() || !IsValid(Actor) || !IsValid(Component)) { return false; }
+		if (ComponentAr.IsError() || !IsCurrentSaveComponent(Actor, Component, ComponentName)) { return false; }
+		if (const auto* Policy = Cast<INarrativeSavableComponent>(Component))
+		{
+			if (!Policy->ValidateSaveRecord(Record.ByteData)
+				|| !IsCurrentSaveComponent(Actor, Component, ComponentName)) { return false; }
+		}
 		Candidate.SavedComponents.Add(MoveTemp(Record));
 	}
+	if (!IsCurrentSaveActor(Actor)) { return false; }
 	ActorRecord = MoveTemp(Candidate); // Never replace a caller's last good record on capture failure.
 	return true;
 }
 
-bool UNarrativeSaveSubsystem::ValidateRecordForActor(const AActor* Actor, const FNarrativeActorRecord& Record) const
+bool UNarrativeSaveSubsystem::ValidateRecordForActor(const AActor* Actor, const FNarrativeActorRecord& InputRecord) const
 {
-    if (!IsValid(Actor) || !Record.IsValid() || static_cast<uint8>(Record.RestorePhase) > static_cast<uint8>(ENarrativeRestorePhase::MissionResume)
+    if (!IsCurrentSaveActor(Actor)) { return false; }
+    // Snapshot-wide preflight can also receive a value from a live map. Native
+    // validators are read-only, but synchronous class loading may dispatch callbacks.
+    const FNarrativeActorRecord Record = InputRecord;
+    if (!Record.IsValid() || static_cast<uint8>(Record.RestorePhase) > static_cast<uint8>(ENarrativeRestorePhase::MissionResume)
         || Record.Transform.ContainsNaN()) { return false; }
+    TStrongObjectPtr<AActor> KeepActor(const_cast<AActor*>(Actor));
+    TInlineComponentArray<UActorComponent*> Components(Actor);
+    TArray<TStrongObjectPtr<UActorComponent>> ComponentPins;
+    TSet<FName> CurrentNames;
+    for (UActorComponent* Component : Components)
+    {
+        if (!IsValid(Component)) { continue; }
+        ComponentPins.Emplace(Component);
+        if (Component->Implements<UNarrativeSavableComponent>())
+        {
+            const FName Name = Component->GetFName();
+            if (Name.IsNone() || CurrentNames.Contains(Name)) { return false; }
+            CurrentNames.Add(Name);
+        }
+    }
     if (!Record.ActorSoftClass.IsNull())
     {
         UClass* Class = Record.ActorSoftClass.LoadSynchronous();
-        if (!Class || !Actor->IsA(Class)) { return false; }
+        if (!IsCurrentSaveActor(Actor) || !Class || !Actor->IsA(Class)) { return false; }
     }
     TSet<FName> SeenNames;
-    TInlineComponentArray<UActorComponent*> Components(Actor);
     for (const auto& Saved : Record.SavedComponents)
     {
         if (Saved.ComponentName.IsNone() || SeenNames.Contains(Saved.ComponentName)
             || static_cast<uint8>(Saved.RestorePhase) > static_cast<uint8>(ENarrativeRestorePhase::MissionResume)) { return false; }
         SeenNames.Add(Saved.ComponentName);
         const UActorComponent* Found = nullptr;
-        for (UActorComponent* Component : Components)
-        { if (IsValid(Component) && Component->GetFName() == Saved.ComponentName && Component->Implements<UNarrativeSavableComponent>()) { Found = Component; break; } }
+        for (const auto& ComponentPin : ComponentPins)
+        {
+            const UActorComponent* Component = ComponentPin.Get();
+            if (IsCurrentSaveComponent(Actor, Component, Saved.ComponentName)
+                && Component->Implements<UNarrativeSavableComponent>()) { Found = Component; break; }
+        }
         UClass* SavedClass = Saved.ComponentClass.IsNull() ? nullptr : Saved.ComponentClass.LoadSynchronous();
-        if ((!Found || (!Saved.ComponentClass.IsNull() && (!SavedClass || !Found->IsA(SavedClass)))) && !Saved.bOptional) { return false; }
+        if (!IsCurrentSaveActor(Actor)) { return false; }
+        if (!Found || (!Saved.ComponentClass.IsNull() && (!SavedClass || !Found->IsA(SavedClass))))
+        { if (Saved.bOptional) { continue; } return false; }
+        if (!IsCurrentSaveComponent(Actor, Found, Saved.ComponentName)) { return false; }
+        if (const auto* Policy = Cast<INarrativeSavableComponent>(Found))
+        {
+            const bool bAccepted = Policy->ValidateSaveRecord(Saved.ByteData);
+            if (!bAccepted || !IsCurrentSaveComponent(Actor, Found, Saved.ComponentName)) { return false; }
+        }
     }
-    return true;
+    return IsCurrentSaveActor(Actor);
 }
 
 bool UNarrativeSaveSubsystem::LoadActorFromRecord(AActor* Actor, const FNarrativeActorRecord& ActorRecord) const
 {
-	if (!ValidateRecordForActor(Actor, ActorRecord)) { return false; }
-	if (ActorRecord.bNetStartup && ActorRecord.bDestroyed) { return Actor->Destroy(); }
-	if ((ActorRecord.bHasTransform || !ActorRecord.Transform.Equals(FTransform::Identity))
+	if (!IsCurrentSaveActor(Actor)) { return false; }
+	TStrongObjectPtr<AActor> KeepActor(Actor);
+	// Callers may pass a live save-map value. Load events must not invalidate this request.
+	const FNarrativeActorRecord StableRecord = ActorRecord;
+	TInlineComponentArray<UActorComponent*> InitialComponents(Actor);
+	TArray<TStrongObjectPtr<UActorComponent>> ComponentPins;
+	for (UActorComponent* Component : InitialComponents)
+	{ if (IsValid(Component)) { ComponentPins.Emplace(Component); } }
+	if (!ValidateRecordForActor(Actor, StableRecord)) { return false; }
+	if (StableRecord.bNetStartup && StableRecord.bDestroyed) { return Actor->Destroy(); }
+
+	struct FComponentRestoreJob
+	{
+		TWeakObjectPtr<UActorComponent> Component;
+		FName ComponentName;
+		int32 RecordIndex = INDEX_NONE;
+		ENarrativeRestorePhase Phase = ENarrativeRestorePhase::Interactables;
+	};
+	TArray<FComponentRestoreJob> Jobs;
+	TSet<FName> RecordedNames;
+	for (int32 Index = 0; Index < StableRecord.SavedComponents.Num(); ++Index)
+	{
+		const FNarrativeSaveComponent& Record = StableRecord.SavedComponents[Index];
+		RecordedNames.Add(Record.ComponentName);
+		UActorComponent* Found = nullptr;
+		for (const auto& ComponentPin : ComponentPins)
+		{
+			UActorComponent* Component = ComponentPin.Get();
+			if (IsCurrentSaveComponent(Actor, Component, Record.ComponentName)
+				&& Component->Implements<UNarrativeSavableComponent>()) { Found = Component; break; }
+		}
+		UClass* SavedClass = Record.ComponentClass.IsNull() ? nullptr : Record.ComponentClass.LoadSynchronous();
+		if (!IsCurrentSaveActor(Actor)) { return false; }
+		if (!Found || (!Record.ComponentClass.IsNull() && (!SavedClass || !Found->IsA(SavedClass))))
+		{
+			if (!Record.bOptional) { return false; }
+			UE_LOG(LogSaveSystem, Warning, TEXT("Skipping unavailable optional save component %s"), *Record.ComponentName.ToString());
+			continue;
+		}
+		if (!IsCurrentSaveComponent(Actor, Found, Record.ComponentName)) { return false; }
+		auto& Job = Jobs.AddDefaulted_GetRef();
+		Job.Component = Found;
+		Job.ComponentName = Record.ComponentName;
+		Job.RecordIndex = Index;
+		const auto* Policy = Cast<INarrativeSavableComponent>(Found);
+		Job.Phase = Policy ? Policy->GetSaveRestorePhase() : Record.RestorePhase;
+		if (!IsCurrentSaveComponent(Actor, Found, Record.ComponentName)
+			|| static_cast<uint8>(Job.Phase) > static_cast<uint8>(ENarrativeRestorePhase::MissionResume)) { return false; }
+	}
+	// Native components added after an old save may opt into an explicit empty-state
+	// restore. Keep them in the same phase order as records that actually exist.
+	for (const auto& ComponentPin : ComponentPins)
+	{
+		UActorComponent* Component = ComponentPin.Get();
+		if (!IsValid(Component) || RecordedNames.Contains(Component->GetFName())) { continue; }
+		const auto* Policy = Cast<INarrativeSavableComponent>(Component);
+		if (!Policy) { continue; }
+		if (!IsCurrentSaveComponent(Actor, Component)) { return false; }
+		auto& Job = Jobs.AddDefaulted_GetRef();
+		Job.Component = Component;
+		Job.ComponentName = Component->GetFName();
+		Job.Phase = Policy->GetSaveRestorePhase();
+		if (!IsCurrentSaveComponent(Actor, Component, Job.ComponentName)
+			|| static_cast<uint8>(Job.Phase) > static_cast<uint8>(ENarrativeRestorePhase::MissionResume)) { return false; }
+	}
+	Jobs.StableSort([](const FComponentRestoreJob& A, const FComponentRestoreJob& B)
+	{
+		return A.Phase < B.Phase; // Preserve the previous relative order of legacy records.
+	});
+	if ((StableRecord.bHasTransform || !StableRecord.Transform.Equals(FTransform::Identity))
 		&& Actor->GetRootComponent() && Actor->GetRootComponent()->Mobility == EComponentMobility::Movable)
-	{ Actor->SetActorTransform(ActorRecord.Transform, false, nullptr, ETeleportType::TeleportPhysics); }
-	if (!IsValid(Actor)) { return false; }
-	FMemoryReader Reader(ActorRecord.ByteData);
+	{ Actor->SetActorTransform(StableRecord.Transform, false, nullptr, ETeleportType::TeleportPhysics); }
+	if (!IsCurrentSaveActor(Actor)) { return false; }
+	FMemoryReader Reader(StableRecord.ByteData);
 	FObjectAndNameAsStringProxyArchive Ar(Reader, true);
 	Ar.ArIsSaveGame = true;
 	Actor->Serialize(Ar);
-	if (Ar.IsError() || !IsValid(Actor)) { return false; }
+	if (Ar.IsError() || !IsCurrentSaveActor(Actor)) { return false; }
 	if (Actor->Implements<UNarrativeSavableActor>())
 	{
-		INarrativeSavableActor::Execute_SetActorGUID(Actor, ActorRecord.ActorGUID);
-		if (!IsValid(Actor)) { return false; }
+		INarrativeSavableActor::Execute_SetActorGUID(Actor, StableRecord.ActorGUID);
+		if (!IsCurrentSaveActor(Actor)) { return false; }
 		RefreshStableActorIdentity(Actor);
+		if (!IsCurrentSaveActor(Actor)) { return false; }
 		INarrativeSavableActor::Execute_Load(Actor);
-		if (!IsValid(Actor)) { return false; }
+		if (!IsCurrentSaveActor(Actor)) { return false; }
 	}
-	TArray<FNarrativeSaveComponent> OrderedComponents = ActorRecord.SavedComponents;
-    const auto CurrentPhase = [Actor](const FNarrativeSaveComponent& Record)
-    {
-        TInlineComponentArray<UActorComponent*> Components(Actor);
-        for (UActorComponent* Component : Components)
-        {
-            if (IsValid(Component) && Component->GetFName() == Record.ComponentName)
-            { if (const auto* Policy = Cast<INarrativeSavableComponent>(Component)) { return Policy->GetSaveRestorePhase(); } }
-        }
-        return Record.RestorePhase;
-    };
-    OrderedComponents.StableSort([&CurrentPhase](const FNarrativeSaveComponent& A, const FNarrativeSaveComponent& B)
-    {
-        return CurrentPhase(A) < CurrentPhase(B); // Neutral legacy components preserve their previous relative order.
-    });
-    for (const FNarrativeSaveComponent& Record : OrderedComponents)
-    {
-		bool bFoundComponent = false;
-		TInlineComponentArray<UActorComponent*> Components(Actor);
-		for (UActorComponent* Component : Components)
+	for (const FComponentRestoreJob& Job : Jobs)
+	{
+		UActorComponent* Component = Job.Component.Get();
+		// Never resolve the record into a replacement with the same name after an actor
+		// or earlier component callback. Only the exact preflighted instance may load.
+		if (!IsCurrentSaveComponent(Actor, Component, Job.ComponentName)) { return false; }
+		if (Job.RecordIndex == INDEX_NONE)
 		{
-			if (!IsValid(Component) || Component->GetFName() != Record.ComponentName
-				|| !Component->Implements<UNarrativeSavableComponent>()) { continue; }
-			bFoundComponent = true;
-			if (!Record.ComponentClass.IsNull())
-			{
-				UClass* SavedClass = Record.ComponentClass.LoadSynchronous();
-				if (!SavedClass || !Component->IsA(SavedClass))
-				{ if (Record.bOptional) { break; } return false; }
-			}
-			FMemoryReader ComponentReader(Record.ByteData);
-			FObjectAndNameAsStringProxyArchive ComponentAr(ComponentReader, true);
-			ComponentAr.ArIsSaveGame = true;
-			Component->Serialize(ComponentAr);
-			if (ComponentAr.IsError() || !IsValid(Actor) || !IsValid(Component)) { return false; }
-			INarrativeSavableComponent::Execute_Load(Component);
-			if (!IsValid(Actor) || !IsValid(Component)) { return false; }
-			break;
+			auto* Policy = Cast<INarrativeSavableComponent>(Component);
+			if (!Policy || !Policy->LoadMissingSaveRecord()
+				|| !IsCurrentSaveComponent(Actor, Component, Job.ComponentName)) { return false; }
+			continue;
 		}
-		if (!bFoundComponent)
+		const FNarrativeSaveComponent& Record = StableRecord.SavedComponents[Job.RecordIndex];
+		FMemoryReader ComponentReader(Record.ByteData);
+		FObjectAndNameAsStringProxyArchive ComponentAr(ComponentReader, true);
+		ComponentAr.ArIsSaveGame = true;
+		Component->Serialize(ComponentAr);
+		if (ComponentAr.IsError() || !IsCurrentSaveComponent(Actor, Component, Job.ComponentName)) { return false; }
+		INarrativeSavableComponent::Execute_Load(Component);
+		if (!IsCurrentSaveComponent(Actor, Component, Job.ComponentName)) { return false; }
+		if (const auto* Policy = Cast<INarrativeSavableComponent>(Component))
 		{
-			if (!Record.bOptional) { return false; }
-			UE_LOG(LogSaveSystem, Warning, TEXT("Skipping missing optional save component %s"), *Record.ComponentName.ToString());
+			if (!Policy->WasSaveRecordLoadAccepted()
+				|| !IsCurrentSaveComponent(Actor, Component, Job.ComponentName)) { return false; }
 		}
 	}
-	return true;
+	return IsCurrentSaveActor(Actor);
 }
 
 void UNarrativeSaveSubsystem::InitializeSaveSystem(UWorld& InWorld)
