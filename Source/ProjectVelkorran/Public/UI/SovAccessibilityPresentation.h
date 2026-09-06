@@ -11,6 +11,10 @@ class UCanvasPanelSlot;
 class UTextBlock;
 class UPlayerInteractionComponent;
 class UNarrativeInteractableComponent;
+class ANarrativeCharacter;
+
+UENUM(BlueprintType)
+enum class ESovCaptionPriority : uint8 { Routine, Important, Critical };
 
 USTRUCT(BlueprintType)
 struct FSovSceneSubtitleEntry
@@ -23,6 +27,7 @@ struct FSovSceneSubtitleEntry
 	float Duration = 5.f;
 	bool bCinematic = false;
 	bool bFinished = false;
+	ESovCaptionPriority CaptionPriority = ESovCaptionPriority::Routine;
 };
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FSovSceneHistoryChanged);
 
@@ -34,9 +39,11 @@ class PROJECTVELKORRAN_API USovAccessibilityPresentation : public UUserWidget
 public:
 	USovAccessibilityPresentation(const FObjectInitializer& Initializer);
 	UFUNCTION(BlueprintCallable, Category="Sovereign|Accessibility") void PresentSpeech(const FText& Speaker, const FText& Text, float Duration, const FVector& SpeakerLocation, bool bCinematic);
-	UFUNCTION(BlueprintCallable, Category="Sovereign|Accessibility") void PresentCaption(const FText& Text, float Duration, const FVector& SourceLocation);
-	/** Line-end does not erase a page before its readable interval. Scene-end force-clears below. */
+	UFUNCTION(BlueprintCallable, Category="Sovereign|Accessibility") void PresentCaption(const FText& Text, float Duration, const FVector& SourceLocation, ESovCaptionPriority Priority = ESovCaptionPriority::Important);
+	/** Line-end and normal dialogue completion preserve the remaining readable pages. */
 	UFUNCTION(BlueprintCallable, Category="Sovereign|Accessibility") void ClearSpeech();
+	/** A replacement scene may take the speech surface immediately; its predecessor stays in recent history. */
+	void RetireSpeechPresentation();
 	UFUNCTION(BlueprintCallable, Category="Sovereign|Accessibility") void ClearSceneHistory();
 	UFUNCTION(BlueprintPure, Category="Sovereign|Accessibility") TArray<FSovSceneSubtitleEntry> GetSceneHistory() const { return History; }
 	UFUNCTION(BlueprintPure, Category="Sovereign|Accessibility") FText GetCurrentCaptionText() const { return CaptionRemaining > 0.f ? ActiveCaption.Text : FText::GetEmpty(); }
@@ -55,6 +62,11 @@ private:
 	friend struct FSovFrontendTestAccess;
 	friend struct FSovAccessibilityFrontendTestAccess;
 	void BeginEntry(const FSovSceneSubtitleEntry& Entry);
+	void BeginCaption(const FSovSceneSubtitleEntry& Entry);
+	void QueueCaption(const FSovSceneSubtitleEntry& Entry);
+	void RefreshWeakPointMarkers(APlayerController* Player);
+	void RegisterMarkerCharacter(AActor* Actor);
+	void ResetMarkerRegistry();
 	void RefreshText();
 	float GetSafeTextWidth() const;
 	FText DirectionText(const FVector& Location) const;
@@ -71,6 +83,7 @@ private:
 	UPROPERTY(Transient) TObjectPtr<UPlayerInteractionComponent> Interaction;
 	UPROPERTY(Transient) TArray<FSovSceneSubtitleEntry> History;
 	UPROPERTY(Transient) TArray<FSovSceneSubtitleEntry> PendingSpeech;
+	UPROPERTY(Transient) TArray<FSovSceneSubtitleEntry> PendingCaptions;
 	TWeakObjectPtr<UNarrativeInteractableComponent> FocusedInteractable;
 	FSovUserSettingsSnapshot Settings;
 	FSovSceneSubtitleEntry ActiveSpeech;
@@ -86,4 +99,9 @@ private:
 	float LastLayoutWidth = 0.f;
 	struct FMarker { FVector Location; FText Text; bool bThreat = false; bool bNavigation = false; };
 	TArray<FMarker> Markers;
+	TWeakObjectPtr<UWorld> MarkerWorld;
+	FDelegateHandle ActorSpawnedHandle;
+	TArray<TWeakObjectPtr<ANarrativeCharacter>> MarkerCharacters;
+	TArray<TWeakObjectPtr<ANarrativeCharacter>> RetainedMarkerCharacters;
+	size_t MarkerCursor = 0;
 };

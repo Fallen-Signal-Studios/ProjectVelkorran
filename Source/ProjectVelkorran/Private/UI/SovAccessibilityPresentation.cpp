@@ -1,6 +1,7 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "UI/SovAccessibilityPresentation.h"
 #include "UI/SovAccessibilityPolicy.h"
+#include "UI/SovPlayerInformationPolicy.h"
 #include "Blueprint/WidgetLayoutLibrary.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/Border.h"
@@ -105,7 +106,7 @@ void USovAccessibilityPresentation::NativeDestruct()
 {
 	if (BoundSettings) { BoundSettings->OnUserSettingsChanged.RemoveDynamic(this,&ThisClass::SettingsChanged); }
 	if (Interaction) { Interaction->OnFoundInteractable.RemoveDynamic(this,&ThisClass::FoundInteractable); Interaction->OnLostInteractable.RemoveDynamic(this,&ThisClass::LostInteractable); }
-	FocusedInteractable.Reset(); Interaction = nullptr; BoundSettings = nullptr; ClearSceneHistory(); Super::NativeDestruct();
+	FocusedInteractable.Reset(); Interaction = nullptr; BoundSettings = nullptr; ResetMarkerRegistry(); ClearSceneHistory(); Super::NativeDestruct();
 }
 void USovAccessibilityPresentation::FoundInteractable(UNarrativeInteractableComponent* Value) { FocusedInteractable = Value; }
 void USovAccessibilityPresentation::LostInteractable(UNarrativeInteractableComponent* Value) { if (FocusedInteractable == Value) { FocusedInteractable.Reset(); } }
@@ -134,16 +135,49 @@ void USovAccessibilityPresentation::BeginEntry(const FSovSceneSubtitleEntry& Ent
 	SpeechPages = PaginateText(Entry.Text.ToString(), Characters, Settings.SubtitleMaximumLines); PageIndex = 0;
 	PageRemaining = FMath::Max(2.f, Entry.Duration / FMath::Max(1,SpeechPages.Num())); RefreshText();
 }
-void USovAccessibilityPresentation::PresentCaption(const FText& Text, float Duration, const FVector& Location)
+void USovAccessibilityPresentation::PresentCaption(const FText& Text, float Duration, const FVector& Location, ESovCaptionPriority Priority)
 {
-	if (Text.IsEmpty() || !FMath::IsFinite(Duration) || Location.ContainsNaN()) { return; }
-	ActiveCaption.Text = Text; ActiveCaption.Location = Location; ActiveCaption.bCaption = true;
+	if (Text.IsEmpty() || !FMath::IsFinite(Duration) || Location.ContainsNaN() || Priority > ESovCaptionPriority::Critical) { return; }
+	// Repeated damage updates direction, never restarts the reading clock or floods history.
+	if (CaptionRemaining > 0.f && ActiveCaption.Text.EqualTo(Text))
+	{ ActiveCaption.Location = Location; ActiveCaption.CaptionPriority = FMath::Max(ActiveCaption.CaptionPriority, Priority); return; }
+	for (auto& Pending : PendingCaptions)
+	{
+		if (Pending.Text.EqualTo(Text))
+		{ Pending.Location = Location; Pending.CaptionPriority = FMath::Max(Pending.CaptionPriority, Priority); return; }
+	}
+	FSovSceneSubtitleEntry Entry; Entry.Text = Text; Entry.Location = Location; Entry.bCaption = true;
+	Entry.Duration = FMath::Clamp(Duration, 3.f, 30.f); Entry.CaptionPriority = Priority;
+	if (SovPlayerInformationPolicy::CanPreempt(int(ActiveCaption.CaptionPriority), int(Priority), CaptionRemaining > 0.f))
+	{
+		if (CaptionRemaining > 0.f) { QueueCaption(ActiveCaption); }
+		BeginCaption(Entry);
+	}
+	else { QueueCaption(Entry); }
+	History.Add(Entry); if (History.Num() > 64) { History.RemoveAt(0); }
+	RefreshText(); OnSceneHistoryChanged.Broadcast();
+}
+void USovAccessibilityPresentation::QueueCaption(const FSovSceneSubtitleEntry& Entry)
+{
+	if (PendingCaptions.Num() >= 8)
+	{
+		int32 Lowest = 0;
+		for (int32 Index = 1; Index < PendingCaptions.Num(); ++Index)
+		{ if (PendingCaptions[Index].CaptionPriority < PendingCaptions[Lowest].CaptionPriority) { Lowest = Index; } }
+		// A routine event cannot evict a critical warning, even under a sustained burst.
+		if (Entry.CaptionPriority <= PendingCaptions[Lowest].CaptionPriority) { return; }
+		PendingCaptions.RemoveAt(Lowest);
+	}
+	PendingCaptions.Add(Entry);
+}
+void USovAccessibilityPresentation::BeginCaption(const FSovSceneSubtitleEntry& Entry)
+{
+	ActiveCaption = Entry;
 	const float Width=GetSafeTextWidth();
 	const int32 Characters=Width>0 ? FMath::Min(Settings.SubtitleCharactersPerLine,FMath::Max(1,FMath::FloorToInt(Width*.8f/(27.f*Settings.SubtitleScale)))) : Settings.SubtitleCharactersPerLine;
-	CaptionPages=PaginateText(Text.ToString(),Characters,Settings.SubtitleMaximumLines); CaptionPageIndex=0;
-	CaptionPageDuration=FMath::Max(3.f,FMath::Clamp(Duration,3.f,30.f)/FMath::Max(1,CaptionPages.Num()));
-	CaptionRemaining=CaptionPageDuration; History.Add(ActiveCaption); if (History.Num() > 64) { History.RemoveAt(0); } RefreshText();
-	OnSceneHistoryChanged.Broadcast();
+	CaptionPages=PaginateText(Entry.Text.ToString(),Characters,Settings.SubtitleMaximumLines); CaptionPageIndex=0;
+	CaptionPageDuration=FMath::Max(3.f,Entry.Duration/FMath::Max(1,CaptionPages.Num()));
+	CaptionRemaining=CaptionPageDuration;
 }
 void USovAccessibilityPresentation::ClearSpeech()
 {
@@ -152,7 +186,9 @@ void USovAccessibilityPresentation::ClearSpeech()
 	else { ActiveSpeech.bFinished = true; }
 }
 void USovAccessibilityPresentation::ClearSceneHistory()
-{ History.Reset(); PendingSpeech.Reset(); SpeechPages.Reset(); CaptionPages.Reset(); Markers.Reset(); ActiveSpeech = FSovSceneSubtitleEntry(); ActiveCaption = FSovSceneSubtitleEntry(); CaptionRemaining = 0; RefreshText(); OnSceneHistoryChanged.Broadcast(); }
+{ History.Reset(); PendingSpeech.Reset(); PendingCaptions.Reset(); SpeechPages.Reset(); CaptionPages.Reset(); Markers.Reset(); ActiveSpeech = FSovSceneSubtitleEntry(); ActiveCaption = FSovSceneSubtitleEntry(); CaptionRemaining = 0; RefreshText(); OnSceneHistoryChanged.Broadcast(); }
+void USovAccessibilityPresentation::RetireSpeechPresentation()
+{ PendingSpeech.Reset(); SpeechPages.Reset(); ActiveSpeech = FSovSceneSubtitleEntry(); PageRemaining = 0.f; RefreshText(); }
 FText USovAccessibilityPresentation::DirectionText(const FVector& Location) const
 {
 	const APlayerController* PC = GetOwningPlayer(); if (!PC || !Settings.bSubtitleDirections) { return FText::GetEmpty(); }
@@ -216,18 +252,19 @@ void USovAccessibilityPresentation::NativeTick(const FGeometry& Geometry, float 
 		CaptionRemaining=FMath::Max(0.f,CaptionRemaining-DeltaSeconds);
 		if (CaptionRemaining<=0.f && CaptionPages.IsValidIndex(CaptionPageIndex+1)) { ++CaptionPageIndex; CaptionRemaining=CaptionPageDuration; }
 	}
+	if (CaptionRemaining <= 0.f && !PendingCaptions.IsEmpty())
+	{
+		int32 Next = 0;
+		for (int32 Index = 1; Index < PendingCaptions.Num(); ++Index)
+		{ if (PendingCaptions[Index].CaptionPriority > PendingCaptions[Next].CaptionPriority) { Next = Index; } }
+		const FSovSceneSubtitleEntry Entry = PendingCaptions[Next]; PendingCaptions.RemoveAt(Next); BeginCaption(Entry);
+	}
 	RefreshText();
 	MarkerRefreshRemaining -= DeltaSeconds; if (MarkerRefreshRemaining > 0) { return; } MarkerRefreshRemaining = .25f; Markers.Reset();
 	APlayerController* PC = GetOwningPlayer(); if (!PC) { return; }
 	if (Settings.bWeakPointOutlines)
 	{
-		int32 Inspected = 0;
-		for (TActorIterator<ANarrativeCharacter> It(GetWorld()); It && Inspected++ < 256 && Markers.Num() < 32; ++It)
-		{
-			if (*It == PC->GetPawn() || FVector::DistSquared(It->GetActorLocation(),PC->GetFocalLocation()) > FMath::Square(5000.f) || !PC->LineOfSightTo(*It)) { continue; }
-			if (const auto* Weak = It->FindComponentByClass<USovWeakPointComponent>())
-			{ for (const FVector& Anchor : Weak->GetRevealedWeakPointAnchors()) { if (Markers.Num() >= 32) { break; } Markers.Add({Anchor,LOCTEXT("WeakPoint","Weak point"),true,false}); } }
-		}
+		RefreshWeakPointMarkers(PC);
 	}
 	if (auto* Navigation = PC->FindComponentByClass<UNarrativeNavigationComponent>())
 	{
@@ -238,6 +275,61 @@ void USovAccessibilityPresentation::NativeTick(const FGeometry& Geometry, float 
 			FText Subtitle; const FText Title = Marker->GetMarkerDisplayText(Navigation,Domain,Subtitle);
 			Markers.Add({Marker->GetMarkerTransform().GetLocation(),Title,false,true});
 		}
+	}
+}
+void USovAccessibilityPresentation::RegisterMarkerCharacter(AActor* Actor)
+{
+	if (auto* Character = Cast<ANarrativeCharacter>(Actor)) { MarkerCharacters.AddUnique(Character); }
+}
+void USovAccessibilityPresentation::ResetMarkerRegistry()
+{
+	if (MarkerWorld.IsValid() && ActorSpawnedHandle.IsValid()) { MarkerWorld->RemoveOnActorSpawnedHandler(ActorSpawnedHandle); }
+	ActorSpawnedHandle.Reset(); MarkerWorld.Reset(); MarkerCharacters.Reset(); RetainedMarkerCharacters.Reset(); MarkerCursor = 0;
+}
+void USovAccessibilityPresentation::RefreshWeakPointMarkers(APlayerController* PC)
+{
+	UWorld* World = GetWorld(); if (!World || !PC) { return; }
+	if (MarkerWorld.Get() != World)
+	{
+		ResetMarkerRegistry(); MarkerWorld = World;
+		// One roster build per world; subsequent spawns join without rescanning the world's actor list.
+		for (TActorIterator<ANarrativeCharacter> It(World); It; ++It) { RegisterMarkerCharacter(*It); }
+		ActorSpawnedHandle = World->AddOnActorSpawnedHandler(FOnActorSpawned::FDelegate::CreateUObject(this, &ThisClass::RegisterMarkerCharacter));
+	}
+	TArray<TWeakObjectPtr<ANarrativeCharacter>> Candidates = RetainedMarkerCharacters;
+	const int32 Count = FMath::Min(256, MarkerCharacters.Num());
+	for (int32 Inspected = 0; Inspected < Count; ++Inspected)
+	{ Candidates.AddUnique(MarkerCharacters[int32(SovPlayerInformationPolicy::TakeNext(size_t(MarkerCharacters.Num()), MarkerCursor))]); }
+	if (MarkerCursor == 0)
+	{ MarkerCharacters.RemoveAll([](const auto& Character) { return !Character.IsValid() || Character->IsActorBeingDestroyed(); }); }
+
+	FVector View; FRotator Rotation; PC->GetPlayerViewPoint(View, Rotation);
+	struct FVisibleAnchor { FVector Location; TWeakObjectPtr<ANarrativeCharacter> Character; double Rank; };
+	TArray<FVisibleAnchor> Visible;
+	for (const auto& Candidate : Candidates)
+	{
+		ANarrativeCharacter* Character = Candidate.Get();
+		if (!Character || Character->IsActorBeingDestroyed() || Character == PC->GetPawn()
+			|| FVector::DistSquared(Character->GetActorLocation(), View) > FMath::Square(5000.f)) { continue; }
+		const auto* Weak = Character->FindComponentByClass<USovWeakPointComponent>();
+		if (!Weak) { continue; }
+		const TArray<FVector> Anchors = Weak->GetRevealedWeakPointAnchors();
+		if (Anchors.IsEmpty() || !PC->LineOfSightTo(Character)) { continue; }
+		for (const FVector& Anchor : Anchors)
+		{
+			const FVector Delta = Anchor - View;
+			const double Facing = FVector::DotProduct(Delta.GetSafeNormal(), Rotation.Vector());
+			if (Anchor.ContainsNaN() || Facing <= 0.) { continue; }
+			// Center-of-view relevance wins, then distance; only admitted, revealed anchors participate.
+			Visible.Add({Anchor, Character, (1. - Facing) * 25000000. + Delta.SizeSquared()});
+		}
+	}
+	Visible.StableSort([](const FVisibleAnchor& A, const FVisibleAnchor& B) { return A.Rank < B.Rank; });
+	RetainedMarkerCharacters.Reset();
+	for (int32 Index = 0; Index < FMath::Min(32, Visible.Num()); ++Index)
+	{
+		Markers.Add({Visible[Index].Location, LOCTEXT("WeakPoint", "Weak point"), true, false});
+		RetainedMarkerCharacters.AddUnique(Visible[Index].Character);
 	}
 }
 int32 USovAccessibilityPresentation::NativePaint(const FPaintArgs& Args, const FGeometry& Geometry, const FSlateRect& CullingRect, FSlateWindowElementList& Elements, int32 Layer, const FWidgetStyle& Style, bool bParentEnabled) const

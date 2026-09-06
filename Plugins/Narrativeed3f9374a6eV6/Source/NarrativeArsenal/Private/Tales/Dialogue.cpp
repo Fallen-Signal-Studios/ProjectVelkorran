@@ -198,6 +198,7 @@ void UDialogue::Deinitialize()
 	}
 
 	bDeinitialized = true;
+	RetireLineCompletionOwnership();
 	bRepliesPresented = false;
 	++ReplyPresentationRevision;
 	bPlaybackSuspended = false;
@@ -421,7 +422,7 @@ bool UDialogue::SkipCurrentLine()
 
 bool UDialogue::CanSkipCurrentLine() const
 {
-	if (bPlaybackSuspended || bDeinitialized || bCurrentLineFinished || bLineCompletionInProgress) { return false; }
+	if (bPlaybackSuspended || (GetWorld() && GetWorld()->IsPaused()) || bDeinitialized || bCurrentLineFinished || bLineCompletionInProgress) { return false; }
 	if (OwningComp)
 	{
 		if (CurrentNode && CurrentNode->bIsSkippable)
@@ -433,15 +434,51 @@ bool UDialogue::CanSkipCurrentLine() const
 	return false;
 }
 
+void UDialogueLineCompletionToken::Complete()
+{ if (Dialogue.IsValid()) { Dialogue->CompleteOwnedLine(this); } }
+
+void UDialogue::RetireLineCompletionOwnership()
+{
+	UDialogueLineCompletionToken* Previous = LineCompletionToken;
+	LineCompletionToken = nullptr; DeferredLineCompletion = nullptr;
+	if (!Previous) { return; }
+	if (DialogueAudio) { DialogueAudio->OnAudioFinished.RemoveAll(Previous); }
+	if (DialogueSequencePlayer && DialogueSequencePlayer->GetSequencePlayer())
+	{ DialogueSequencePlayer->GetSequencePlayer()->OnFinished.RemoveAll(Previous); }
+}
+void UDialogue::BeginLineCompletionOwnership()
+{
+	RetireLineCompletionOwnership();
+	LineCompletionToken = NewObject<UDialogueLineCompletionToken>(this);
+	LineCompletionToken->Dialogue = this; LineCompletionToken->Node = CurrentNode;
+	LineCompletionToken->Revision = ReplyPresentationRevision;
+}
+bool UDialogue::IsCurrentLineCompletion(const UDialogueLineCompletionToken* Token) const
+{
+	return Token && Token == LineCompletionToken && !bDeinitialized && !bCurrentLineFinished
+		&& Token->Node.IsValid() && Token->Node.Get() == CurrentNode && Token->Revision == ReplyPresentationRevision
+		&& IsValid(OwningComp) && OwningComp->GetCurrentDialogue() == this;
+}
+void UDialogue::CompleteOwnedLine(UDialogueLineCompletionToken* Token)
+{
+	if (!IsCurrentLineCompletion(Token) || bLineCompletionInProgress) { return; }
+	if (bPlaybackSuspended || (GetWorld() && GetWorld()->IsPaused()))
+	{ DeferredLineCompletion = Token; return; }
+	DeferredLineCompletion = nullptr;
+	EndCurrentLine();
+}
 void UDialogue::EndCurrentLine()
 {
-	if (bPlaybackSuspended || bDeinitialized || bCurrentLineFinished || bLineCompletionInProgress) { return; }
+	if (bDeinitialized || bCurrentLineFinished || bLineCompletionInProgress || !IsValid(OwningComp) || OwningComp->GetCurrentDialogue() != this) { return; }
+	if (bPlaybackSuspended || (GetWorld() && GetWorld()->IsPaused()))
+	{ if (IsCurrentLineCompletion(LineCompletionToken)) { DeferredLineCompletion = LineCompletionToken; } return; }
 	if (CurrentNode)
 	{		
 		//Unbind all listeners for line ending, they need to be reset up when the next line plays 
 		if (DialogueAudio)
 		{
 			DialogueAudio->OnAudioFinished.RemoveAll(this);
+			if (LineCompletionToken) { DialogueAudio->OnAudioFinished.RemoveAll(LineCompletionToken); }
 		}
 
 		if (DialogueSequencePlayer)
@@ -449,6 +486,7 @@ void UDialogue::EndCurrentLine()
 			if (ULevelSequencePlayer* SP = DialogueSequencePlayer->GetSequencePlayer())
 			{
 				SP->OnFinished.RemoveAll(this);
+				if (LineCompletionToken) { SP->OnFinished.RemoveAll(LineCompletionToken); }
 			}
 		}
 
@@ -592,6 +630,7 @@ void UDialogue::ClientReceiveDialogueChunk(const TArray<FName>& NPCReplyIDs, con
 {	
 	if (OwningComp && !OwningComp->HasAuthority())
 	{
+		RetireLineCompletionOwnership();
 		bRepliesPresented = false;
 		++ReplyPresentationRevision;
 		
@@ -666,7 +705,13 @@ void UDialogue::ExitDialogue(const EExitDialogueReason Reason)
 
 void UDialogue::TickDialogue_Implementation(const float DeltaTime)
 {
-	if (bPlaybackSuspended || bDeinitialized) { return; }
+	if (bPlaybackSuspended || bDeinitialized || (GetWorld() && GetWorld()->IsPaused())) { return; }
+	if (DeferredLineCompletion)
+	{
+		UDialogueLineCompletionToken* Pending = DeferredLineCompletion; DeferredLineCompletion = nullptr;
+		CompleteOwnedLine(Pending);
+		return;
+	}
 	if (CurrentDialogueSequence)
 	{
 		CurrentDialogueSequence->Tick(DeltaTime);
@@ -1205,15 +1250,18 @@ void UDialogue::PlayNPCDialogueNode(class UDialogueNode_NPC* NPCReply)
 		++ReplyPresentationRevision;
 		CurrentNode = NPCReply;
 		bCurrentLineFinished=false;
+		BeginLineCompletionOwnership();
+		UDialogueLineCompletionToken* StartedLine = LineCompletionToken;
 		CurrentLine = NPCReply->GetRandomLine(OwningComp->GetNetMode() == NM_Standalone);
 		ReplaceStringVariables(NPCReply, CurrentLine, CurrentLine.Text);
+		if (!IsCurrentLineCompletion(StartedLine)) { return; }
 
 		CurrentSpeaker = GetSpeaker(NPCReply->GetSpeakerID());
 
 		ProcessNodeEvents(NPCReply, true);
 
 		//ProcessNodeEvents can result in a call to deinit, nulling out owning comp. Check if this occured
-		if (!OwningComp)
+		if (!IsCurrentLineCompletion(StartedLine))
 		{
 			return;
 		}
@@ -1227,16 +1275,20 @@ void UDialogue::PlayNPCDialogueNode(class UDialogueNode_NPC* NPCReply)
 
 		//Actual playing of the node is inside a BlueprintNativeEvent so designers can override how NPC dialogues are played 
 		PlayNPCDialogue(NPCReply, CurrentLine, CurrentSpeaker);
+		if (!IsCurrentLineCompletion(StartedLine)) { return; }
 
 		if (OwningComp)
 		{
 			//Call delegates and BPNativeEvents
 			OwningComp->OnNPCDialogueLineStarted.Broadcast(this, NPCReply, CurrentLine, CurrentSpeaker);
 		}
+		if (!IsCurrentLineCompletion(StartedLine)) { return; }
 
 		OnNPCDialogueLineStarted(NPCReply, CurrentLine, CurrentSpeaker);
+		if (!IsCurrentLineCompletion(StartedLine)) { return; }
 
 		const float Duration = GetLineDuration(CurrentNode, CurrentLine);
+		if (!IsCurrentLineCompletion(StartedLine)) { return; }
 
 		if (!FMath::IsNearlyEqual(Duration, -1.f))
 		{
@@ -1244,7 +1296,7 @@ void UDialogue::PlayNPCDialogueNode(class UDialogueNode_NPC* NPCReply)
 			{
 				GetWorld()->GetTimerManager().ClearTimer(TimerHandle_NPCReplyFinished);
 				//Give the reply time to play, then play the next one! 
-				GetWorld()->GetTimerManager().SetTimer(TimerHandle_NPCReplyFinished, this, &UDialogue::FinishNPCDialogue, Duration, false);
+				GetWorld()->GetTimerManager().SetTimer(TimerHandle_NPCReplyFinished, StartedLine, &UDialogueLineCompletionToken::Complete, Duration, false);
 			}
 			else
 			{
@@ -1274,11 +1326,13 @@ void UDialogue::PlayPlayerDialogueNode(class UDialogueNode_Player* PlayerReply)
 
 		CurrentNode = PlayerReply;
 		bCurrentLineFinished=false;
+		BeginLineCompletionOwnership();
+		UDialogueLineCompletionToken* StartedLine = LineCompletionToken;
 		
 		ProcessNodeEvents(PlayerReply, true);
 
 		//ProcessNodeEvents can result in a call to deinit, nulling out owning comp. Check if this occured
-		if (!OwningComp)
+		if (!IsCurrentLineCompletion(StartedLine))
 		{
 			return;
 		}
@@ -1292,25 +1346,30 @@ void UDialogue::PlayPlayerDialogueNode(class UDialogueNode_Player* PlayerReply)
 
 		CurrentLine = PlayerReply->GetRandomLine(OwningComp->GetNetMode() == NM_Standalone);
 		ReplaceStringVariables(PlayerReply, CurrentLine, CurrentLine.Text);
+		if (!IsCurrentLineCompletion(StartedLine)) { return; }
 
 		//Call delegates and BPNativeEvents
 		OwningComp->OnPlayerDialogueLineStarted.Broadcast(this, PlayerReply, CurrentLine);
+		if (!IsCurrentLineCompletion(StartedLine)) { return; }
 
 		OnPlayerDialogueLineStarted(PlayerReply, CurrentLine);
+		if (!IsCurrentLineCompletion(StartedLine)) { return; }
 
 		//Actual playing of the node is inside a BlueprintNativeEvent so designers can override how NPC dialogues are played 
 		PlayPlayerDialogue(PlayerReply, CurrentLine);
+		if (!IsCurrentLineCompletion(StartedLine)) { return; }
 
 		CurrentSpeaker = PlayerSpeakerInfo;
 
 		const float Duration = GetLineDuration(CurrentNode, CurrentLine);
+		if (!IsCurrentLineCompletion(StartedLine)) { return; }
 
 		if (!FMath::IsNearlyEqual(Duration, -1.f))
 		{
 			if (Duration > 0.01f && GetWorld())
 			{
 				//Give the reply time to play, then play the next one! 
-				GetWorld()->GetTimerManager().SetTimer(TimerHandle_PlayerReplyFinished, this, &UDialogue::FinishPlayerDialogue, Duration, false);
+				GetWorld()->GetTimerManager().SetTimer(TimerHandle_PlayerReplyFinished, StartedLine, &UDialogueLineCompletionToken::Complete, Duration, false);
 			}
 			else
 			{
@@ -1441,7 +1500,9 @@ void UDialogue::PlayNextNPCReply()
 
 void UDialogue::FinishNPCDialogue()
 {
-	if (bPlaybackSuspended || bDeinitialized || bLineCompletionInProgress || bCurrentLineFinished) { return; }
+	if (bDeinitialized || bLineCompletionInProgress || bCurrentLineFinished || !IsValid(OwningComp) || OwningComp->GetCurrentDialogue() != this) { return; }
+	if (bPlaybackSuspended || (GetWorld() && GetWorld()->IsPaused()))
+	{ if (IsCurrentLineCompletion(LineCompletionToken)) { DeferredLineCompletion = LineCompletionToken; } return; }
 	TGuardValue<bool> Completing(bLineCompletionInProgress,true);
 	if (UDialogueNode_NPC* NPCNode = Cast<UDialogueNode_NPC>(CurrentNode))
 	{
@@ -1476,7 +1537,9 @@ void UDialogue::FinishNPCDialogue()
 
 void UDialogue::FinishPlayerDialogue()
 {
-	if (bPlaybackSuspended || bDeinitialized || bLineCompletionInProgress || bCurrentLineFinished) { return; }
+	if (bDeinitialized || bLineCompletionInProgress || bCurrentLineFinished || !IsValid(OwningComp) || OwningComp->GetCurrentDialogue() != this) { return; }
+	if (bPlaybackSuspended || (GetWorld() && GetWorld()->IsPaused()))
+	{ if (IsCurrentLineCompletion(LineCompletionToken)) { DeferredLineCompletion = LineCompletionToken; } return; }
 	TGuardValue<bool> Completing(bLineCompletionInProgress,true);
 	//FString RoleString = OwningComp && OwningComp->HasAuthority() ? "Server" : "Client";
 	//UE_LOG(LogNarrative, Warning, TEXT("FinishPlayerDialogue called on %s with node %s"), *RoleString, *GetNameSafe(CurrentNode));
@@ -1801,6 +1864,7 @@ void UDialogue::PlayDialogueSound_Implementation(const FDialogueLine& Line, clas
 	{
 		//Remove any previously added bindings
 		DialogueAudio->OnAudioFinished.RemoveAll(this);
+		if (LineCompletionToken) { DialogueAudio->OnAudioFinished.RemoveAll(LineCompletionToken); }
 		DialogueAudio->Stop();
 		DialogueAudio->DestroyComponent();
 	}
@@ -1821,9 +1885,9 @@ void UDialogue::PlayDialogueSound_Implementation(const FDialogueLine& Line, clas
 			if (DialogueAudio) { DialogueAudio->bIsUISound = false; }
 		}
 
-		if (DialogueAudio && Line.Duration == ELineDuration::LD_WhenAudioEnds)
+		if (DialogueAudio && Line.Duration == ELineDuration::LD_WhenAudioEnds && LineCompletionToken)
 		{
-			DialogueAudio->OnAudioFinished.AddDynamic(this, &UDialogue::EndCurrentLine);
+			DialogueAudio->OnAudioFinished.AddDynamic(LineCompletionToken.Get(), &UDialogueLineCompletionToken::Complete);
 		}
 		if (DialogueAudio && !Speaker) { DialogueAudio->Play(); }
 	}
@@ -1884,6 +1948,7 @@ void UDialogue::FinishDialogueNode_Implementation(class UDialogueNode* Node, con
 	if (DialogueAudio)
 	{
 		DialogueAudio->OnAudioFinished.RemoveAll(this);
+		if (LineCompletionToken) { DialogueAudio->OnAudioFinished.RemoveAll(LineCompletionToken); }
 		DialogueAudio->Stop();
 	}
 
@@ -2045,6 +2110,7 @@ void UDialogue::PlayDialogueSequence(class UNarrativeDialogueSequence* Sequence,
 			if (ULevelSequencePlayer* SP = DialogueSequencePlayer->GetSequencePlayer())
 			{
 				SP->OnFinished.RemoveAll(this);
+				if (LineCompletionToken) { SP->OnFinished.RemoveAll(LineCompletionToken); }
 
 				if (CurrentDialogueSequence)
 				{
@@ -2055,9 +2121,9 @@ void UDialogue::PlayDialogueSequence(class UNarrativeDialogueSequence* Sequence,
 
 				CurrentDialogueSequence = Sequence;
 
-				if (CurrentLine.Duration == ELineDuration::LD_WhenSequenceEnds)
+				if (CurrentLine.Duration == ELineDuration::LD_WhenSequenceEnds && LineCompletionToken)
 				{
-					SP->OnFinished.AddDynamic(this, &UDialogue::EndCurrentLine);
+					SP->OnFinished.AddDynamic(LineCompletionToken.Get(), &UDialogueLineCompletionToken::Complete);
 				}
 			}
 		}

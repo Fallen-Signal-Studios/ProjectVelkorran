@@ -17,6 +17,8 @@
 #include "Engine/LocalPlayer.h"
 #include "Engine/GameViewportClient.h"
 #include "Framework/Application/SlateApplication.h"
+#include "Save/SovSaveSubsystem.h"
+#include "Engine/GameInstance.h"
 
 #define LOCTEXT_NAMESPACE "SovNativeFrontend"
 USovFrontendComponent::USovFrontendComponent()
@@ -48,6 +50,19 @@ void USovFrontendComponent::RefreshFrontend()
     auto* ASC = Cast<UNarrativeAbilitySystemComponent>(PC->GetAbilitySystemComponent());
     if (ASC && ASC->GetAvatarActor() != PC->GetPawn()) { ASC = nullptr; }
     BindProducers(PC->GetTalesComponent(), PC->GetNarrativeCues(), ASC);
+    auto* Save = GetWorld() && GetWorld()->GetGameInstance() ? GetWorld()->GetGameInstance()->GetSubsystem<USovSaveSubsystem>() : nullptr;
+    if (BoundSave.Get() != Save)
+    {
+        if (BoundSave.IsValid()) { BoundSave->OnLoadCompleted.RemoveDynamic(this, &ThisClass::OnLoadCompleted); }
+        BoundSave = Save;
+        if (Save)
+        {
+            Save->OnLoadCompleted.AddUniqueDynamic(this, &ThisClass::OnLoadCompleted);
+            bRecoveryMenuPending = Save->HasTravelRecovery() && !Save->IsLoadPending();
+        }
+    }
+    if (bRecoveryMenuPending && Save && Save->HasTravelRecovery() && !Save->IsLoadPending() && OpenAccessibilitySettings())
+    { bRecoveryMenuPending = false; SetupMenu->PresentTravelRecovery(RecoveryMessage); }
     auto* Settings = USovGameUserSettings::Get();
     UWorld* World = GetWorld();
     if (Settings && World && World->bAllowAudioPlayback)
@@ -169,7 +184,7 @@ void USovFrontendComponent::OnDialogueEnded(UDialogue* Dialogue, bool bStartingN
 {
     if (SpeechDialogue.Get() != Dialogue) { return; }
     ++SpeechEpoch; SpeechDialogue.Reset(); SpeechNode.Reset();
-    if (Presentation) { Presentation->ClearSpeech(); Presentation->ClearSceneHistory(); }
+    if (Presentation) { Presentation->ClearSpeech(); }
 }
 void USovFrontendComponent::OnCueStarted(USovNarrativeCue* Cue, AActor* Speaker, const FText& Caption, float Seconds)
 {
@@ -197,15 +212,28 @@ void USovFrontendComponent::OnDamage(const FSovDamageResult& Result)
     else if (Result.bDeflected) { Caption = LOCTEXT("Deflected", "Attack deflected"); }
     else if (Result.AppliedHealthDamage > 0.f || Result.AppliedShieldDamage > 0.f) { Caption = LOCTEXT("IncomingDamage", "Incoming damage"); }
     if (!Caption.IsEmpty())
-    { Presentation->PresentCaption(Caption, 2.f, IsValid(Result.SourceActor) ? Result.SourceActor->GetActorLocation() : FVector::ZeroVector); }
+    {
+        const ESovCaptionPriority Priority = Result.bGuardBroken || Result.bShieldBroken || Result.bPoiseBroken
+            ? ESovCaptionPriority::Critical : Result.bPerfectDefense || Result.bDeflected
+            ? ESovCaptionPriority::Important : ESovCaptionPriority::Routine;
+        Presentation->PresentCaption(Caption, 3.f, IsValid(Result.SourceActor) ? Result.SourceActor->GetActorLocation() : FVector::ZeroVector, Priority);
+    }
 }
 void USovFrontendComponent::RetirePreviousSpeech(UDialogue* NewDialogue)
 {
     if (!Presentation) { return; }
     if (SpeechDialogue.IsValid() && SpeechDialogue.Get() != NewDialogue)
-    { Presentation->ClearSceneHistory(); }
+    { Presentation->RetireSpeechPresentation(); }
     else if (SpeechNode.IsValid() || SpeechCue.IsValid())
     { Presentation->ClearSpeech(); }
+}
+void USovFrontendComponent::OnLoadCompleted(ESovSaveResult Result, const FSovSaveSlotHeader&, const FString& Message)
+{
+    if (bEnding) { return; }
+    if (Result == ESovSaveResult::RecoveryAvailable)
+    { RecoveryMessage = Message; bRecoveryMenuPending = true; }
+    else if (Result == ESovSaveResult::Success)
+    { RecoveryMessage.Reset(); bRecoveryMenuPending = false; }
 }
 void USovFrontendComponent::Unbind()
 {
@@ -230,6 +258,8 @@ void USovFrontendComponent::Unbind()
 void USovFrontendComponent::EndPlay(const EEndPlayReason::Type Reason)
 {
     bEnding = true; Unbind(); ReleaseSetupPause();
+    if (BoundSave.IsValid()) { BoundSave->OnLoadCompleted.RemoveDynamic(this, &ThisClass::OnLoadCompleted); }
+    BoundSave.Reset(); bRecoveryMenuPending = false; RecoveryMessage.Reset();
     if (SetupMenu) { SetupMenu->DeactivateWidget(); SetupMenu = nullptr; }
     if (Presentation) { Presentation->RemoveFromParent(); Presentation = nullptr; }
     Super::EndPlay(Reason);

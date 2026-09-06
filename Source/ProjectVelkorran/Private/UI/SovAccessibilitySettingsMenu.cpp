@@ -19,6 +19,7 @@
 #include "Widgets/NarrativeGameplayHUD.h"
 #include "Widgets/SWidget.h"
 #include "NarrativeGameplayTags.h"
+#include "Save/SovSaveSubsystem.h"
 
 #define LOCTEXT_NAMESPACE "SovAccessibilitySettings"
 namespace
@@ -155,6 +156,7 @@ TSharedRef<SWidget> USovAccessibilitySettingsMenu::RebuildWidget()
 		RowsBox = WidgetTree->ConstructWidget<UVerticalBox>();
 		Status = WidgetTree->ConstructWidget<UTextBlock>(); Status->SetAutoWrapText(true); Status->SetColorAndOpacity(FSlateColor(FLinearColor::White));
 		RowsBox->AddChild(Status); Scroll->AddChild(RowsBox); Backdrop->AddChild(Scroll); Safe->AddChild(Backdrop); WidgetTree->RootWidget = Safe;
+		AddRow("Recovery.Retry", LOCTEXT("RetryRecovery", "Retry checkpoint recovery"));
 		AddRow("bMenuNarration", LOCTEXT("Narration", "Menu and dialogue narration"));
 		AddRow("UIScale", LOCTEXT("UIScale", "UI text scale"), 1.f, 2.f, .25f);
 		AddRow("SubtitleScale", LOCTEXT("SubtitleScale", "Subtitle text scale"), 1.f, 2.5f, .25f);
@@ -169,7 +171,7 @@ TSharedRef<SWidget> USovAccessibilitySettingsMenu::RebuildWidget()
 		AddRow("Audio.Tinnitus",LOCTEXT("TinnitusAudio","Tinnitus-like tones volume"),0,1,.1f);
 		AddRow("Audio.DynamicRange",LOCTEXT("AudioRange","Audio dynamic range"),0,2,1);
 		AddRow("Review.Evidence", LOCTEXT("ReviewEvidence", "Review acquired evidence summaries"));
-		AddRow("Review.History", LOCTEXT("ReviewHistory", "Review current scene dialogue history"));
+		AddRow("Review.History", LOCTEXT("ReviewHistory", "Review recent dialogue and unheard records"));
 		AddRow("SubtitleBackgroundOpacity", LOCTEXT("SubtitleBackground", "Subtitle background opacity"), 0.f, 1.f, .1f);
 		AddRow("bSubtitleSpeakerNames", LOCTEXT("SpeakerNames", "Subtitle speaker names"));
 		AddRow("bSubtitleDirections", LOCTEXT("Directions", "Subtitle and caption directions"));
@@ -289,6 +291,13 @@ void USovAccessibilitySettingsMenu::CloudChanged(const FSovCloudReview& Review)
 	{ return bHas ? FText::Format(LOCTEXT("CopyMetadata","{0}; {1}; {2} minutes; generation {3}"),Header.MissionLabel,FText::AsDateTime(Header.TimestampUtc),FText::AsNumber(FMath::RoundToInt(Header.PlaySeconds/60.)),FText::AsNumber(Header.Generation)) : Missing; };
 	Status->SetText(FText::Format(LOCTEXT("CloudReview","Cloud review: {0}\nLocal: {1}\nCloud: {2}\nSelect publish local, import cloud, or cancel. Neither copy is changed by review."),FText::FromString(Review.Message),Describe(Review.bHasLocal,Review.Local),Describe(Review.bHasCloud,Review.Cloud)));
 }
+void USovAccessibilitySettingsMenu::PresentTravelRecovery(const FString& Message)
+{
+	RecoveryMessage = FText::FromString(Message);
+	RefreshRows();
+	// CommonUI routes this request only when our layer owns focus; an existing modal retains control.
+	RequestRefreshFocus();
+}
 void USovAccessibilitySettingsMenu::RefreshRows()
 {
 	const auto Value = CurrentSettings(); SetMenuNavigationWrap(Value.bMenuNavigationWrap);
@@ -297,7 +306,17 @@ void USovAccessibilitySettingsMenu::RefreshRows()
 		Status->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", FMath::RoundToInt(22 * Value.UIScale)));
 		Status->SetText(bFirstBoot ? LOCTEXT("FirstBoot", "Accessibility setup — settings save immediately. Activate or use left/right to change a value. Continue when ready.") : LOCTEXT("Instructions", "Accessibility — settings save immediately. Activate or use left/right to change a value."));
 	}
-	for (USovAccessibilitySettingRow* Row : Rows) { if (Row) { Row->Refresh(); } }
+	for (USovAccessibilitySettingRow* Row : Rows)
+	{
+		if (!Row) { continue; }
+		if (Row->SettingKey == "Recovery.Retry")
+		{
+			const auto* Save = GetGameInstance() ? GetGameInstance()->GetSubsystem<USovSaveSubsystem>() : nullptr;
+			Row->SetVisibility(Save && Save->HasTravelRecovery() ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+			if (Status && Save && Save->HasTravelRecovery() && !RecoveryMessage.IsEmpty()) { Status->SetText(RecoveryMessage); }
+		}
+		Row->Refresh();
+	}
 }
 UWidget* USovAccessibilitySettingsMenu::NativeGetDesiredFocusTarget() const
 {
@@ -318,6 +337,7 @@ FText USovAccessibilitySettingsMenu::ValueText(const USovAccessibilitySettingRow
 {
 	if (!Row) { return FText::GetEmpty(); }
 	const FName Key = Row->SettingKey; const FString Name = Key.ToString();
+	if (Key == "Recovery.Retry") { return LOCTEXT("Activate", "activate"); }
 	if (Name.StartsWith(TEXT("HDR.")) && BoundSettings && BoundSettings->IsDisplayOutputSystemManaged())
 	{ return LOCTEXT("HDRSystemManaged", "Managed by console display settings"); }
 	if(Name.StartsWith(TEXT("Audio.")) && BoundSettings)
@@ -353,6 +373,11 @@ FText USovAccessibilitySettingsMenu::ValueText(const USovAccessibilitySettingRow
 bool USovAccessibilitySettingsMenu::IsRowEnabled(const USovAccessibilitySettingRow* Row) const
 {
 	if (!Row) { return false; } const FName Key = Row->SettingKey;
+	if (Key == "Recovery.Retry")
+	{
+		const auto* Save = GetGameInstance() ? GetGameInstance()->GetSubsystem<USovSaveSubsystem>() : nullptr;
+		return Save && Save->HasTravelRecovery() && !Save->IsLoadPending() && Save->IsPlatformStorageOwnerAvailable() && !Save->IsPlatformStorageSuspended();
+	}
 	if (Key.ToString().StartsWith(TEXT("HDR.")))
 	{
 		if (!BoundSettings || BoundSettings->IsDisplayOutputSystemManaged()) { return false; }
@@ -376,7 +401,7 @@ bool USovAccessibilitySettingsMenu::CanAdjustValue(const USovAccessibilitySettin
 {
 	if (!Row || !IsRowEnabled(Row)) { return false; }
 	const FName Key = Row->SettingKey; const FString Name = Key.ToString();
-	return Key != "Continue" && !Name.StartsWith(TEXT("Review.")) &&
+	return Key != "Continue" && Key != "Recovery.Retry" && !Name.StartsWith(TEXT("Review.")) &&
 		Key != "HDR.Preview" && Key != "HDR.Confirm" && Key != "HDR.Revert" &&
 		(!Name.StartsWith(TEXT("Cloud.")) || Key == "Cloud.Enabled" || Key == "Cloud.Slot");
 }
@@ -386,6 +411,17 @@ void USovAccessibilitySettingsMenu::Adjust(USovAccessibilitySettingRow* Row, int
 	const uint64 Expected=MenuGeneration; const bool bWasActive=IsActivated();
 	const auto IsCurrent=[&]() { return Expected==MenuGeneration && (!bWasActive || IsActivated()); };
 	const FName Key = Row->SettingKey; const FString Name = Key.ToString(); FString Error;
+	if (Key == "Recovery.Retry")
+	{
+		if (auto* Save = GetGameInstance() ? GetGameInstance()->GetSubsystem<USovSaveSubsystem>() : nullptr)
+		{
+			const ESovSaveResult Result = Save->RetryTravelRecovery(Error);
+			if (!IsCurrent()) { return; }
+			if (Result == ESovSaveResult::LoadStarted) { DeactivateWidget(); }
+			else { PresentTravelRecovery(Error); }
+		}
+		return;
+	}
 	if (Key == "Continue") { if ((!bFirstBoot || BoundSettings->CompleteAccessibilitySetup()) && IsCurrent()) { DeactivateWidget(); } return; }
 	if(Key=="Difficulty")
 	{

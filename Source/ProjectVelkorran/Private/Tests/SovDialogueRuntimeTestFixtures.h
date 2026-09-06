@@ -14,7 +14,14 @@ public:
 	void Stage(UTalesComponent* Tales);
 	UDialogueNode_Player* Choice(int32 Index) const { return PlayerReplies[Index]; }
 	void RetireRevision() { bRepliesPresented = false; ++ReplyPresentationRevision; }
+	UDialogueLineCompletionToken* CompletionToken() const { return LineCompletionToken; }
+	void RestartPrompt()
+	{ ++ReplyPresentationRevision; bRepliesPresented = false; bCurrentLineFinished = false; BeginLineCompletionOwnership(); }
+	bool HasDeferredCompletion() const { return DeferredLineCompletion != nullptr; }
+	int32 FinishedLines = 0;
 protected:
+	virtual void FinishDialogueNode_Implementation(UDialogueNode* Node, const FDialogueLine& Line, const FSpeakerInfo& Speaker, AActor* SpeakerActor, AActor* ListenerActor) override
+	{ ++FinishedLines; Super::FinishDialogueNode_Implementation(Node, Line, Speaker, SpeakerActor, ListenerActor); }
 	// Media is omitted in this deterministic fixture, but native selection/events/revision invalidation still execute.
 	virtual void PlayPlayerDialogue_Implementation(UDialogueNode_Player* Reply, const FDialogueLine& Line) override {}
 };

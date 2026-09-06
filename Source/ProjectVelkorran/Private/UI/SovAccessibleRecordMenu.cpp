@@ -7,6 +7,7 @@
 #include "Accessibility/SovAccessibleNarrationSubsystem.h"
 #include "Campaign/SovCampaignStateComponent.h"
 #include "Campaign/SovEvidenceDefinition.h"
+#include "Narrative/SovNarrativeCueComponent.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/Border.h"
 #include "Components/SafeZone.h"
@@ -70,6 +71,8 @@ void USovAccessibleRecordMenu::NativeConstruct()
 		BoundCampaign=PC->FindComponentByClass<USovCampaignStateComponent>();
 		if(BoundCampaign) { BoundCampaign->OnEvidenceRecorded.AddUniqueDynamic(this,&ThisClass::EvidenceChanged); BoundCampaign->OnCampaignStateRestored.AddUniqueDynamic(this,&ThisClass::CampaignRestored); BoundCampaign->OnMissionChanged.AddUniqueDynamic(this,&ThisClass::MissionChanged); }
 		if(auto* Frontend=PC->FindComponentByClass<USovFrontendComponent>()) { BoundPresentation=Frontend->GetPresentation(); if(BoundPresentation) { BoundPresentation->OnSceneHistoryChanged.AddUniqueDynamic(this,&ThisClass::HistoryChanged); } }
+		BoundCues=PC->FindComponentByClass<USovNarrativeCueComponent>();
+		if(BoundCues) { BoundCues->OnCueEnded.AddUniqueDynamic(this,&ThisClass::CueEnded); }
 	}
 	Super::NativeConstruct(); if(bRetiring || Expected!=ViewGeneration) { return; }
 	RebuildRecords(); ShowRecord(false);
@@ -79,8 +82,9 @@ void USovAccessibleRecordMenu::NativeDestruct()
 	bRetiring=true; const uint64 Expected=++ViewGeneration;
 	if(BoundSettings) { BoundSettings->OnUserSettingsChanged.RemoveDynamic(this,&ThisClass::SettingsChanged); }
 	if(BoundPresentation) { BoundPresentation->OnSceneHistoryChanged.RemoveDynamic(this,&ThisClass::HistoryChanged); }
+	if(BoundCues) { BoundCues->OnCueEnded.RemoveDynamic(this,&ThisClass::CueEnded); }
 	if(BoundCampaign) { BoundCampaign->OnEvidenceRecorded.RemoveDynamic(this,&ThisClass::EvidenceChanged); BoundCampaign->OnCampaignStateRestored.RemoveDynamic(this,&ThisClass::CampaignRestored); BoundCampaign->OnMissionChanged.RemoveDynamic(this,&ThisClass::MissionChanged); }
-	BoundPresentation=nullptr; BoundCampaign=nullptr;
+	BoundPresentation=nullptr; BoundCampaign=nullptr; BoundCues=nullptr;
 	Records.Reset(); BoundSettings=nullptr; Super::NativeDestruct();
 	if(Expected!=ViewGeneration || !bRetiring) { return; }
 	if(GetOwningLocalPlayer()) { if(auto* Narrator=GetOwningLocalPlayer()->GetSubsystem<USovAccessibleNarrationSubsystem>()) { Narrator->Cancel(this); } }
@@ -124,6 +128,16 @@ void USovAccessibleRecordMenu::RebuildRecords()
 	Records.Reset(); APlayerController* PC=GetOwningPlayer(); if(!PC) { return; }
 	if(bSceneHistory)
 	{
+		// These summaries are the existing save-backed archive, including important interrupted cues.
+		// Reading a summary does not pretend its original audio completed or mutate repetition history.
+		if(auto* Cues=PC->FindComponentByClass<USovNarrativeCueComponent>())
+		{
+			for(const auto* Cue:Cues->GetUnheardRecords())
+			{
+				if(IsValid(Cue) && Cue->bCritical && Cue->bRecordUnheardSummary && !Cue->RecordSummary.IsEmpty())
+				{ Records.Add(FText::Format(LOCTEXT("UnheardEntry","Unheard important record: {0}"),Cue->RecordSummary)); }
+			}
+		}
 		if(auto* Frontend=PC->FindComponentByClass<USovFrontendComponent>())
 		{
 			if(auto* Presentation=Frontend->GetPresentation())
@@ -150,7 +164,7 @@ void USovAccessibleRecordMenu::ShowRecord(bool bAnnounce)
 	if (ScrollHint) { ScrollHint->SetFont(Font); ScrollHint->SetColorAndOpacity(FSlateColor(FLinearColor::White)); }
 	for(auto* Button:{PreviousButton.Get(),NextButton.Get(),ReadButton.Get(),CloseButton.Get()})
 	{ if(auto* Label=Cast<UTextBlock>(Button->GetContent())) { Label->SetFont(Font); Label->SetColorAndOpacity(FSlateColor(FLinearColor::White)); } Button->SetBackgroundColor(FLinearColor::Black); }
-	Heading->SetText(FText::Format(LOCTEXT("Heading","{0} — {1} of {2}"),bSceneHistory ? LOCTEXT("SceneHistory","Current scene history") : LOCTEXT("Evidence","Acquired evidence"),FText::AsNumber(Records.Num() ? Selection+1 : 0),FText::AsNumber(Records.Num())));
+	Heading->SetText(FText::Format(LOCTEXT("Heading","{0} — {1} of {2}"),bSceneHistory ? LOCTEXT("SceneHistory","Recent dialogue and unheard records") : LOCTEXT("Evidence","Acquired evidence"),FText::AsNumber(Records.Num() ? Selection+1 : 0),FText::AsNumber(Records.Num())));
 	const FText NewBody = Records.IsValidIndex(Selection) ? Records[Selection] : LOCTEXT("Empty","No records available to the current protagonist in this view.");
 	const bool bNewRecord = !Body->GetText().EqualTo(NewBody);
 	Body->SetText(NewBody);
@@ -187,6 +201,7 @@ void USovAccessibleRecordMenu::HistoryChanged()
 		RebuildRecords(); ShowRecord(false);
 	}
 }
+void USovAccessibleRecordMenu::CueEnded(USovNarrativeCue*, bool) { HistoryChanged(); }
 void USovAccessibleRecordMenu::EvidenceChanged(const FSovEvidenceAcquisition& Value)
 {
 	if(!bSceneHistory && IsActivated())

@@ -5,6 +5,7 @@
 #include "Tales/Dialogue.h"
 #include "Tales/DialogueSM.h"
 #include "GAS/SovCombatTypes.h"
+#include "Save/SovCampaignSaveGame.h"
 #include "SovFrontendComponent.generated.h"
 class UTalesComponent;
 class USovNarrativeCue;
@@ -12,6 +13,7 @@ class USovNarrativeCueComponent;
 class UNarrativeAbilitySystemComponent;
 class USovAccessibilityPresentation;
 class USovAccessibilitySettingsMenu;
+class USovSaveSubsystem;
 
 /** Binds native frontend consumers to existing Tales, cue and combat producers. */
 UCLASS(ClassGroup=(Sovereign), meta=(BlueprintSpawnableComponent))
@@ -41,6 +43,7 @@ private:
     UFUNCTION() void OnCueStarted(USovNarrativeCue* Cue, AActor* Speaker, const FText& Caption, float Seconds);
     UFUNCTION() void OnCueEnded(USovNarrativeCue* Cue, bool bInterrupted);
     UFUNCTION() void OnDamage(const FSovDamageResult& Result);
+    UFUNCTION() void OnLoadCompleted(ESovSaveResult Result, const FSovSaveSlotHeader& Slot, const FString& Message);
     void Unbind();
     void ReleaseSetupPause();
     bool bEnding = false;
@@ -51,6 +54,9 @@ private:
     TWeakObjectPtr<UTalesComponent> BoundTales;
     TWeakObjectPtr<USovNarrativeCueComponent> BoundCues;
     TWeakObjectPtr<UNarrativeAbilitySystemComponent> BoundASC;
+    TWeakObjectPtr<USovSaveSubsystem> BoundSave;
+    bool bRecoveryMenuPending = false;
+    FString RecoveryMessage;
     TWeakObjectPtr<UDialogue> SpeechDialogue;
     TWeakObjectPtr<UDialogueNode> SpeechNode;
     uint64 SpeechEpoch = 0;

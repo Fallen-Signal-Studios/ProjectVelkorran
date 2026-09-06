@@ -32,4 +32,5 @@ void USovDialogueRuntimeFixture::Stage(UTalesComponent* Tales)
 		AvailableResponses.Add(Reply);
 		RootDialogue->PlayerReplies.Add(Reply);
 	}
+	BeginLineCompletionOwnership();
 }

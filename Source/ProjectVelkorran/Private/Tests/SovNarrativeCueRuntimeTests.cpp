@@ -12,6 +12,7 @@
 #include "Sovereign/SovGameplayTags.h"
 #include "Components/AudioComponent.h"
 #include "Sound/SoundClass.h"
+#include "UI/SovAccessibleRecordMenu.h"
 #include <limits>
 
 #if WITH_AUTOMATION_TESTS
@@ -24,6 +25,8 @@ struct FSovNarrativeCueTestAccess
 	static void DuplicateInFlight(USovNarrativeCueComponent* C) { C->Pending.Add(C->InFlightCriticalSave); }
 	static bool ControllerOutput(UAudioComponent* Audio, USoundClass* Class, float Volume)
 	{ return USovNarrativeCueComponent::ConfigureControllerOutput(Audio, Class, Volume); }
+	static bool ReviewContains(USovAccessibleRecordMenu* Menu, const FString& Text)
+	{ return Menu->Records.ContainsByPredicate([&](const FText& Record) { return Record.ToString().Contains(Text); }); }
 };
 namespace
 {
@@ -71,6 +74,10 @@ bool FSovCuePriorityTest::RunTest(const FString& Parameters)
 	FSovNarrativeCueTestAccess::Interrupt(Cues);
 	TestEqual(TEXT("Interrupted critical cue remains queued"), FSovNarrativeCueTestAccess::Queued(Cues), 1);
 	TestTrue(TEXT("Only the explicitly diegetic summary is retained"), Cues->GetUnheardRecords().Contains(Critical));
+	auto* Review = NewObject<USovAccessibleRecordMenu>(F.PC); Review->SetOwningPlayer(F.PC); Review->SetSceneHistoryMode(true);
+	TestTrue(TEXT("Native records review consumes the existing saved unheard archive"), FSovNarrativeCueTestAccess::ReviewContains(Review, TEXT("An authored record summary.")));
+	TestTrue(TEXT("Unheard information keeps its explicit presentation label"), FSovNarrativeCueTestAccess::ReviewContains(Review, TEXT("Unheard important record")));
+	TestTrue(TEXT("Review does not falsely complete the original audio cue"), Cues->GetUnheardRecords().Contains(Critical));
 	return true;
 }
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovDialogueSuspensionTest, "ProjectVelkorran.Campaign.Narrative.DialogueSuspensionPreservesNode",
