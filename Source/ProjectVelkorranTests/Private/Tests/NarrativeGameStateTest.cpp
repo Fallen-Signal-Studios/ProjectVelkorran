@@ -4,6 +4,9 @@
 #include "NarrativeGameplayTags.h"
 #include "UnrealFramework/NarrativeGameState.h"
 #include "Misc/AutomationTest.h"
+#include "Engine/Engine.h"
+#include "Engine/World.h"
+#include "Misc/ScopeExit.h"
 
 #if WITH_AUTOMATION_TESTS 
 
@@ -12,7 +15,18 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FNarrativeGameStateFactionAttitudeTest, "Narrat
 
 bool FNarrativeGameStateFactionAttitudeTest::RunTest(const FString& Parameters)
 {
-	ANarrativeGameState* GameState = NewObject<ANarrativeGameState>();
+	const UWorld::InitializationValues Values = UWorld::InitializationValues().AllowAudioPlayback(false)
+		.CreatePhysicsScene(false).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false);
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Values);
+	if (!World) { AddError(TEXT("Faction test world could not initialize.")); return false; }
+	if (GEngine) { GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World); }
+	ON_SCOPE_EXIT
+	{
+		World->DestroyWorld(false);
+		if (GEngine) { GEngine->DestroyWorldContext(World); }
+	};
+	ANarrativeGameState* GameState = World->SpawnActor<ANarrativeGameState>();
+	if (!GameState) { AddError(TEXT("Faction test GameState could not spawn.")); return false; }
 	FNarrativeGameplayTags Tags = FNarrativeGameplayTags::Get();
 
 	// Hostile test

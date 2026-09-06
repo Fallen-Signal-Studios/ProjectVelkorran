@@ -56,6 +56,9 @@ request ID, so it cannot abort another controller/task's newer request.
   change, destroyed source or restored life stops further use of the old source;
   the final fatal self-hit cannot kill a revived/rebound owner. Death-explosion
   suppression remains on the existing drone base, with no duplicate blast path.
+  Its suppression flag is claimed only after fatal-spec construction and exact
+  ownership validation, immediately before applying the fatal effect. Rejecting
+  a stale fatal spec cannot silently suppress a later ordinary drone death.
 
 This does not change damage tuning, Heavy guard classification, hostile/LOS
 filtering, cloak tracking policy, default attack inputs or the default requirement
@@ -82,6 +85,13 @@ spec-construction life and actor-info changes, and mutation of the fatal effect
 configuration from actual detonation presentation are covered. Source ownership
 is rechecked after spec construction, and all committed blast/fatal configuration
 is captured before presentation callbacks.
+
+The Editor-only `SovDroneDeathSuppressionRuntimeTests.cpp` adds one further
+registration, `RejectedFatalPreservesOrdinaryDeathExplosion`. It uses the real
+`ASovDroneNPCBase` and Narrative death callback, not the generic character fixture
+alone: a fatal-spec actor-info ABA rejects self death, the committed presentation
+is retired, and a later ordinary fatal effect must still produce native death
+explosion damage. A fresh ordinary-death control validates the same setup.
 
 ## Acceptance gates still outstanding
 

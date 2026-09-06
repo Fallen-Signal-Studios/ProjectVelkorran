@@ -2,7 +2,7 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "UI/Dialogue/SovDialoguePressurePolicy.h"
-struct FSovDialoguePresentationState
+struct PROJECTVELKORRAN_API FSovDialoguePresentationState
 {
 	SovDialoguePressure::State Pressure;
 	TArray<FText> Choices;

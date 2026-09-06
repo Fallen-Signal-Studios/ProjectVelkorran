@@ -3,6 +3,7 @@
 #include <cmath>
 #include <array>
 #include <algorithm>
+// Header-only production policy shared with the isolated native test module.
 namespace SovAimAssistPolicy
 {
 constexpr double MaximumLeadSeconds = .6;
