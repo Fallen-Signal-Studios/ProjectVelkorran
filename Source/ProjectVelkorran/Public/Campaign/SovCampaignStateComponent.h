@@ -12,7 +12,7 @@ UENUM(BlueprintType)
 enum class ESovCampaignResult : uint8
 {
 	Applied, AlreadyApplied, NotAuthority, Busy, Invalid, PrerequisiteMissing,
-	KnowledgeMissing, ProtectedStateConflict, SkipUnavailable
+	KnowledgeMissing, ProtectedStateConflict, SkipUnavailable, ObjectiveClosed
 };
 
 USTRUCT(BlueprintType)
@@ -21,6 +21,9 @@ struct PROJECTVELKORRAN_API FSovCampaignMissionRecord
 	GENERATED_BODY()
 	UPROPERTY(SaveGame, BlueprintReadOnly) TArray<FName> CompletedBeats;
 	UPROPERTY(SaveGame, BlueprintReadOnly) bool bSucceeded = false;
+	/** Only accepted transitions and terminal results are cached; availability is derived from current knowledge. */
+	UPROPERTY(SaveGame, BlueprintReadOnly) TMap<FName, ESovObjectiveState> ObjectiveStates;
+	UPROPERTY(SaveGame, BlueprintReadOnly) TMap<FName, FName> SelectedChoices;
 };
 
 USTRUCT(BlueprintType)
@@ -79,6 +82,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FSovCampaignBeatCommitted, const FSo
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FSovCampaignMissionChanged, FName, MissionId, bool, bSucceeded);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FSovCampaignStateRestored, bool, bValid);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FSovEvidenceRecorded, const FSovEvidenceAcquisition&, Evidence);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FSovObjectiveStateChanged, FName, MissionId, FName, BeatId, ESovObjectiveState, State);
 
 /** Durable, validated campaign boundary. Narrative still owns quests, dialogue and disk storage. */
 UCLASS(ClassGroup=(Sovereign), meta=(BlueprintSpawnableComponent))
@@ -91,6 +95,16 @@ public:
 	ESovCampaignResult BeginMission(USovCampaignDefinition* Definition);
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Campaign")
 	ESovCampaignResult CompleteBeat(FName BeatId, bool bSkipPresentation = false);
+	/** Activate a ready objective, or fail/skip an eligible optional objective. Success uses CompleteBeat. */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Campaign|Objectives")
+	ESovCampaignResult TransitionObjective(FName BeatId, ESovObjectiveState State);
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Campaign|Objectives")
+	ESovCampaignResult ResolveChoice(FName GroupId, FName OutcomeBeatId);
+	UFUNCTION(BlueprintPure, Category="Campaign|Objectives") ESovObjectiveState GetObjectiveState(FName MissionId, FName BeatId) const;
+	UFUNCTION(BlueprintPure, Category="Campaign|Objectives") FName GetSelectedChoice(FName MissionId, FName GroupId) const;
+	/** Actionable authored goals only; excludes future, failed, skipped and unchosen objectives. */
+	UFUNCTION(BlueprintPure, Category="Campaign|Objectives") TArray<FName> GetActionableObjectiveIds() const;
+	UFUNCTION(BlueprintPure, Category="Campaign|Objectives") const TArray<FSovObjectiveJournalEntry>& GetObjectiveJournal() const { return ObjectiveJournal; }
 	/** Call from successful full Sequence playback only. A skipped/aborted play does not grant permission. */
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Campaign|Cinematics")
 	bool RecordCinematicViewed(FName BeatId);
@@ -125,10 +139,12 @@ public:
 	UPROPERTY(BlueprintAssignable, Category="Campaign") FSovCampaignMissionChanged OnMissionChanged;
 	UPROPERTY(BlueprintAssignable, Category="Campaign") FSovCampaignStateRestored OnCampaignStateRestored;
 	UPROPERTY(BlueprintAssignable, Category="Campaign|Evidence") FSovEvidenceRecorded OnEvidenceRecorded;
+	UPROPERTY(BlueprintAssignable, Category="Campaign|Objectives") FSovObjectiveStateChanged OnObjectiveStateChanged;
 private:
 	friend struct FSovCampaignStateTestAccess;
 	friend struct FSovNarrativeStateTestAccess;
 	friend struct FSovCoActionTestAccess;
+	friend struct FSovObjectiveLifecycleTestAccess;
 	friend class ASovCoActionAnchor;
 	friend class ASovPlayerController;
 	friend class USovCampaignCinematicComponent;
@@ -137,6 +153,7 @@ private:
 	ESovCampaignResult CompleteCoAction(class ASovCoActionAnchor* Source);
 	ESovCampaignResult CompleteBeatInternal(FName BeatId, bool bSkipPresentation, class ASovCoActionAnchor* CoActionSource, const FGuid& HandoffRequestId = FGuid(), class USovCampaignCinematicComponent* CinematicSource = nullptr);
 	bool ValidateSavedState() const;
+	bool MigrateLegacyObjectives();
 	bool HasAuthorityOwner() const;
 	bool DoesCurrentPawnMatch(FGameplayTag Protagonist) const;
 	bool StateWritesValid(const TArray<FSovCampaignStateWrite>& Writes) const;
@@ -144,7 +161,7 @@ private:
 	static bool ValidateEvidenceStep(const FSovEvidenceAcquisition& Candidate, const TArray<FSovEvidenceAcquisition>& Prior);
 	static ESovEvidenceStage EvidenceStageIn(const TArray<FSovEvidenceAcquisition>& History, FName EvidenceId, FGameplayTag Hero);
 	static bool EvidenceKnownTo(const TArray<FSovEvidenceAcquisition>& History, FName EvidenceId, FName Observer);
-	UPROPERTY(SaveGame) int32 SavedSchemaVersion = 1;
+	UPROPERTY(SaveGame) int32 SavedSchemaVersion = 2;
 	UPROPERTY(SaveGame) TObjectPtr<USovCampaignDefinition> ActiveMission;
 	UPROPERTY(SaveGame) FGameplayTag ActiveProtagonist;
 	UPROPERTY(SaveGame) TMap<FName, FSovCampaignMissionRecord> Missions;
@@ -154,6 +171,7 @@ private:
 	UPROPERTY(SaveGame) FGameplayTagContainer ProtectedStateKeys;
 	UPROPERTY(SaveGame) TArray<FName> ViewedCinematics;
 	UPROPERTY(SaveGame) TArray<FSovCampaignJournalEntry> Journal;
+	UPROPERTY(SaveGame) TArray<FSovObjectiveJournalEntry> ObjectiveJournal;
 	UPROPERTY(SaveGame) TArray<FSovEvidenceAcquisition> Evidence;
 	bool bStateValid = true;
 	bool bMutating = false;

@@ -7,6 +7,7 @@
 #include "Campaign/SovCampaignProtagonistProfile.h"
 #include "Resonance/SovResonanceTypes.h"
 #include "Campaign/SovNarrativeTypes.h"
+#include "Campaign/SovObjectiveTypes.h"
 #include "SovCampaignDefinition.generated.h"
 
 class ASovPlayerCharacterBase;
@@ -35,6 +36,14 @@ struct PROJECTVELKORRAN_API FSovCampaignBeatDefinition
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) FGameplayTag HandoffToProtagonist;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) FName RequiredHandoffAnchorId;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) FText ObjectiveText;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) ESovObjectiveType ObjectiveType = ESovObjectiveType::General;
+	/** Failure is opt-in, optional-only, and must explain its rule before the objective is active. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) FName FailureReasonId;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) FText FailureRuleText;
+	/** Exactly one optional outcome in a declared group can complete. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) FName ChoiceGroupId;
+	/** Mandatory reconvergence waits for an accepted outcome, never for every optional alternative. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FName> RequiredChoiceGroups;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FName> PrerequisiteBeats;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) FGameplayTagContainer RequiredKnowledge;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FSovCampaignStateWrite> RequiredState;
@@ -58,6 +67,16 @@ struct PROJECTVELKORRAN_API FSovCampaignBeatDefinition
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) TObjectPtr<UNarrativeDataTask> CompletionTask;
 };
 
+USTRUCT(BlueprintType)
+struct PROJECTVELKORRAN_API FSovCampaignChoiceGroup
+{
+	GENERATED_BODY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) FName GroupId;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) FName ReconciliationBeatId;
+	/** Explicit explanation of how every legal local outcome rejoins the fixed campaign spine. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) FText ReconciliationNote;
+};
+
 /** Authored mission content over Narrative's existing quest/save framework. */
 UCLASS(BlueprintType, Blueprintable)
 class PROJECTVELKORRAN_API USovCampaignDefinition : public UPrimaryDataAsset
@@ -78,6 +97,7 @@ public:
 	/** Concrete prior facts consumed by this mission, verified before entry and by the shipping manifest. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Campaign") TArray<FName> RequiredPriorConsequenceIds;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Campaign") TArray<FSovCampaignBeatDefinition> Beats;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Campaign") TArray<FSovCampaignChoiceGroup> ChoiceGroups;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Campaign", meta=(ClampMin="0",ClampMax="100")) float EntryEchoReserve = 25.f;
 	/** Explicit convergence opt-in. Only authored M12/M13 definitions may enable it. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Campaign|Companions") bool bAllowJointResonance = false;
@@ -89,6 +109,8 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="Campaign") bool ValidateDefinition(FString& OutError) const;
 	const FSovCampaignBeatDefinition* FindBeat(FName BeatId) const;
+	const FSovCampaignChoiceGroup* FindChoiceGroup(FName GroupId) const;
+	bool ValidateObjectives(FString& OutError) const;
 	bool SupportsProtagonist(FGameplayTag Lead) const;
 	TSoftClassPtr<ASovPlayerCharacterBase> ResolvePawnClass(FGameplayTag Lead) const;
 	TSoftObjectPtr<UPlayerDefinition> ResolvePlayerDefinition(FGameplayTag Lead) const;

@@ -34,12 +34,90 @@ const FSovCampaignBeatDefinition* USovCampaignDefinition::FindBeat(FName BeatId)
 	return Beats.FindByPredicate([BeatId](const FSovCampaignBeatDefinition& Beat) { return Beat.BeatId == BeatId; });
 }
 
+const FSovCampaignChoiceGroup* USovCampaignDefinition::FindChoiceGroup(FName GroupId) const
+{
+	return ChoiceGroups.FindByPredicate([GroupId](const auto& Group) { return Group.GroupId == GroupId; });
+}
+
+bool USovCampaignDefinition::ValidateObjectives(FString& OutError) const
+{
+	const auto Fail = [&OutError](const TCHAR* Message) { OutError = Message; return false; };
+	if (Beats.Num() > 512 || ChoiceGroups.Num() > 64) { return Fail(TEXT("Mission objective contract exceeds 512 beats or 64 choices.")); }
+	TSet<FName> Groups;
+	for (const auto& Group : ChoiceGroups)
+	{
+		const auto* Rejoin = FindBeat(Group.ReconciliationBeatId);
+		if (Group.GroupId.IsNone() || Groups.Contains(Group.GroupId) || Group.ReconciliationNote.IsEmpty()
+			|| !Rejoin || Rejoin->bOptional || !Rejoin->ChoiceGroupId.IsNone()
+			|| !Rejoin->RequiredChoiceGroups.Contains(Group.GroupId))
+		{ return Fail(TEXT("Choice groups need a unique stable ID, explicit reconciliation note and mandatory reconciliation beat.")); }
+		Groups.Add(Group.GroupId);
+		const FSovCampaignBeatDefinition* First = nullptr;
+		int32 Options = 0;
+		for (const auto& Beat : Beats)
+		{
+			if (Beat.ChoiceGroupId != Group.GroupId) { continue; }
+			++Options;
+			if (!Beat.bOptional || !Beat.bInteractiveChoice || Beat.bCanonGate || !Beat.FailureReasonId.IsNone()
+				|| Beat.HandoffToProtagonist.IsValid() || Beat.bRequiresCoActionProof || !Beat.CinematicId.IsNone()
+				|| !Beat.RequiredState.IsEmpty() || !Beat.RequiredKnowledge.IsEmpty() || !Beat.GrantedKnowledge.IsEmpty()
+				|| !Beat.RequiredChoiceGroups.IsEmpty())
+			{ return Fail(TEXT("Choice outcomes must be optional interactive beats with shared prerequisite gating and no canon, failure, proof or unique knowledge grants.")); }
+			if (First && (Beat.PrerequisiteBeats != First->PrerequisiteBeats || Beat.RequiredProtagonist != First->RequiredProtagonist))
+			{ return Fail(TEXT("All choice outcomes must share the same ordered prerequisites and protagonist.")); }
+			First = &Beat;
+			for (FName Prior : Beat.PrerequisiteBeats)
+			{ if (!Rejoin->PrerequisiteBeats.Contains(Prior)) { return Fail(TEXT("Reconciliation must explicitly require the choice's shared prerequisite beats.")); } }
+			for (const auto& Write : Beat.StateWrites)
+			{
+				if (Write.bCanonProtected) { return Fail(TEXT("Local choice outcomes cannot create protected canon facts.")); }
+				for (const auto& Required : Beats)
+				{
+					if (Required.StateWrites.ContainsByPredicate([&Write](const auto& Fact) { return Fact.Key == Write.Key && Fact.bCanonProtected; }))
+					{ return Fail(TEXT("A local choice cannot write a key reserved for this mission's protected canon facts.")); }
+					if (!Required.bOptional && Required.RequiredState.ContainsByPredicate([&Write](const auto& Fact) { return Fact.Key == Write.Key; }))
+					{ return Fail(TEXT("A mandatory beat cannot depend on one local choice's variable state value.")); }
+				}
+			}
+		}
+		if (Options < 2 || Options > 4) { return Fail(TEXT("A choice group must offer two to four outcomes.")); }
+		if (First && Rejoin->RequiredProtagonist != First->RequiredProtagonist)
+		{ return Fail(TEXT("Choice and reconciliation must use the same authored protagonist.")); }
+	}
+	for (const auto& Beat : Beats)
+	{
+		if (static_cast<uint8>(Beat.ObjectiveType) > static_cast<uint8>(ESovObjectiveType::MasteryRescue))
+		{ return Fail(TEXT("Objective type is unknown.")); }
+		if (!Beat.FailureReasonId.IsNone() && (!Beat.bOptional || Beat.bCanonGate || Beat.FailureRuleText.IsEmpty() || !Beat.ChoiceGroupId.IsNone()))
+		{ return Fail(TEXT("Objective failure requires an optional non-choice beat and a readable authored failure rule.")); }
+		if (Beat.FailureReasonId.IsNone() && !Beat.FailureRuleText.IsEmpty())
+		{ return Fail(TEXT("An objective failure rule needs its stable failure reason ID.")); }
+		if (!Beat.ChoiceGroupId.IsNone() && !Groups.Contains(Beat.ChoiceGroupId))
+		{ return Fail(TEXT("Outcome references an unknown choice group.")); }
+		TSet<FName> Requirements;
+		for (FName Id : Beat.RequiredChoiceGroups)
+		{
+			const auto* Group = FindChoiceGroup(Id);
+			if (!Group || Group->ReconciliationBeatId != Beat.BeatId || Requirements.Contains(Id))
+			{ return Fail(TEXT("Only the declared reconciliation beat can require a choice group, once.")); }
+			Requirements.Add(Id);
+		}
+		for (FName PriorId : Beat.PrerequisiteBeats)
+		{
+			if (const auto* Prior = FindBeat(PriorId); Prior && !Prior->ChoiceGroupId.IsNone())
+			{ return Fail(TEXT("Depend on a choice's mandatory reconciliation beat, not an exclusive optional outcome.")); }
+		}
+	}
+	return true;
+}
+
 bool USovCampaignDefinition::ValidateDefinition(FString& OutError) const
 {
 	OutError.Reset();
 	const auto Fail = [&OutError](const FString& Message) { OutError = Message; return false; };
 	const FSovGameplayTags& Tags = FSovGameplayTags::Get();
 	if (SchemaVersion != 1 || MissionId.IsNone() || Beats.IsEmpty()) { return Fail(TEXT("Mission requires schema 1, stable ID and at least one beat.")); }
+	if (!ValidateObjectives(OutError)) { return false; }
 	if (Protagonist != Tags.Character_Player_Tarrik && Protagonist != Tags.Character_Player_Selene)
 	{ return Fail(TEXT("Campaign mission must select exactly Tarrik or Selene.")); }
 	if (PawnClass.IsNull() || PlayerDefinition.IsNull()) { return Fail(TEXT("Mission requires a pawn class and matching PlayerDefinition.")); }
