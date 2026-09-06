@@ -6,6 +6,8 @@
 #include "AbilitySystemComponent.h"
 #include "Engine/World.h"
 #include "GAS/NarrativeAttributeSetBase.h"
+#include "GAS/NarrativeAbilitySystemComponent.h"
+#include "NarrativeGameplayTags.h"
 #include "GameFramework/Actor.h"
 #include "GameplayEffectTypes.h"
 #include "TimerManager.h"
@@ -33,6 +35,7 @@ void USovPoiseComponent::BeginPlay()
 
 void USovPoiseComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	bEndingPlay = true;
 	if (ANarrativeCharacter* NarrativeOwner = Cast<ANarrativeCharacter>(GetOwner()))
 	{
 		NarrativeOwner->OnASCInitialized.RemoveDynamic(this, &ThisClass::HandleOwnerASCInitialized);
@@ -44,19 +47,25 @@ void USovPoiseComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 bool USovPoiseComponent::InitializeWithAbilitySystem(UAbilitySystemComponent* InAbilitySystemComponent)
 {
-	if (!IsValid(InAbilitySystemComponent))
+	AActor* Owner = GetOwner();
+	if (bEndingPlay || bChangingAbilitySystem || !IsValid(Owner) || Owner->IsActorBeingDestroyed()
+		|| !IsValid(InAbilitySystemComponent) || InAbilitySystemComponent->GetAvatarActor() != Owner
+		|| UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Owner) != InAbilitySystemComponent
+		|| Owner->FindComponentByClass<USovPoiseComponent>() != this)
 	{
 		return false;
 	}
 
 	if (AbilitySystemComponent == InAbilitySystemComponent
+		&& IsInitialized()
 		&& PoiseChangedDelegateHandle.IsValid()
 		&& MaxPoiseChangedDelegateHandle.IsValid())
 	{
 		return true;
 	}
 
-	if (!InAbilitySystemComponent->GetSet<UNarrativeAttributeSetBase>())
+	const UNarrativeAttributeSetBase* Attributes = InAbilitySystemComponent->GetSet<UNarrativeAttributeSetBase>();
+	if (!IsValid(Attributes) || Attributes->GetOwningAbilitySystemComponent() != InAbilitySystemComponent)
 	{
 		if (!bWarnedMissingAttributeSet)
 		{
@@ -70,8 +79,23 @@ bool USovPoiseComponent::InitializeWithAbilitySystem(UAbilitySystemComponent* In
 		return false;
 	}
 
+	const auto* RequestedNarrativeASC = Cast<UNarrativeAbilitySystemComponent>(InAbilitySystemComponent);
+	const uint64 RequestedActorEpoch = RequestedNarrativeASC ? RequestedNarrativeASC->GetCombatActorInfoEpoch() : 0;
+	const uint64 RequestedLifeEpoch = Attributes->GetCombatLifeEpoch();
+	TGuardValue<bool> ChangingGuard(bChangingAbilitySystem, true);
 	UninitializeFromAbilitySystem();
+	if (!IsValid(Owner) || Owner->IsActorBeingDestroyed() || bEndingPlay || !IsValid(InAbilitySystemComponent)
+		|| InAbilitySystemComponent->GetAvatarActor() != Owner
+		|| UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Owner) != InAbilitySystemComponent
+		|| InAbilitySystemComponent->GetSet<UNarrativeAttributeSetBase>() != Attributes
+		|| !IsValid(Attributes) || Attributes->GetCombatLifeEpoch() != RequestedLifeEpoch
+		|| (RequestedNarrativeASC && RequestedNarrativeASC->GetCombatActorInfoEpoch() != RequestedActorEpoch)) { return false; }
 	AbilitySystemComponent = InAbilitySystemComponent;
+	BoundAttributes = Attributes;
+	BoundLifeEpoch = Attributes->GetCombatLifeEpoch();
+	const auto* EpochASC = Cast<UNarrativeAbilitySystemComponent>(InAbilitySystemComponent);
+	BoundActorInfoEpoch = EpochASC ? EpochASC->GetCombatActorInfoEpoch() : 0;
+	const uint64 Generation = ++BindingGeneration;
 	bWarnedMissingAttributeSet = false;
 
 	const FSovGameplayTags& Tags = FSovGameplayTags::Get();
@@ -79,6 +103,13 @@ bool USovPoiseComponent::InitializeWithAbilitySystem(UAbilitySystemComponent* In
 	BrokenTag = Tags.State_Poise_Broken;
 	RecoveringTag = Tags.State_Poise_Recovering;
 	RegenerationBlockedTag = Tags.State_Poise_RegenBlocked;
+	HealthChangedDelegateHandle = AbilitySystemComponent
+		->GetGameplayAttributeValueChangeDelegate(UNarrativeAttributeSetBase::GetHealthAttribute())
+		.AddUObject(this, &ThisClass::HandleHealthAttributeChanged);
+	if (auto* NarrativeASC = Cast<UNarrativeAbilitySystemComponent>(AbilitySystemComponent))
+	{
+		NarrativeASC->OnDeathStateChanged.AddUniqueDynamic(this, &ThisClass::HandleDeathStateChanged);
+	}
 
 	PoiseChangedDelegateHandle = AbilitySystemComponent
 		->GetGameplayAttributeValueChangeDelegate(UNarrativeAttributeSetBase::GetPoiseAttribute())
@@ -121,28 +152,110 @@ bool USovPoiseComponent::InitializeWithAbilitySystem(UAbilitySystemComponent* In
 	LastRegenerationUpdateWorldTime = LastPoiseDamageWorldTime;
 	PoiseState = ESovPoiseState::Stable;
 	RefreshPoiseState(false);
-
+	if (!IsCurrentOperation(Generation)) { return false; }
 	TryStartRegeneration();
 	return true;
 }
 
 void USovPoiseComponent::ResetForCheckpoint()
 {
-	if (!CanWritePoise()) { return; }
+	if (bChangingAbilitySystem || bEndingPlay) { return; }
+	++ReviveRebindGeneration;
+	if (GetWorld()) { GetWorld()->GetTimerManager().ClearTimer(ReviveRebindTimerHandle); }
+	if (!IsInitialized() && !InitializeWithAbilitySystem(
+		UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner()))) { return; }
+	if (!IsInitialized() || !GetOwner()->HasAuthority()) { return; }
+	TGuardValue<bool> ChangingGuard(bChangingAbilitySystem, true);
+	const uint64 Generation = ++BindingGeneration;
 	ClearLifecycleTimers();
 	RemoveOwnedStateTags();
+	if (!IsCurrentOperation(Generation)) { return; }
 	PoiseState = ESovPoiseState::Stable;
 	bHasRecordedPoiseDamage = false;
 	bRegenerationDelayElapsed = true;
 	LastPoiseDamageWorldTime = GetWorldTimeSeconds();
 	LastRegenerationUpdateWorldTime = LastPoiseDamageWorldTime;
 	RefreshPoiseState(false);
-	if (GetPoise() > KINDA_SMALL_NUMBER && GetPoise() + KINDA_SMALL_NUMBER < GetMaxPoise()) { RecordPoiseDamage(); }
+	if (!IsCurrentOperation(Generation)) { return; }
+	if (GetPoise() > KINDA_SMALL_NUMBER && GetPoise() + KINDA_SMALL_NUMBER < GetMaxPoise())
+	{
+		bHasRecordedPoiseDamage = true;
+		bRegenerationDelayElapsed = false;
+		if (!bRestoringCheckpoint) { TryStartRegeneration(); }
+	}
+	bCheckpointStateReconciled = IsCurrentOperation(Generation);
+}
+
+void USovPoiseComponent::SetCheckpointRestoreInProgress(const bool bInProgress, const bool bResumePassiveWork)
+{
+	if (bInProgress) { ++CheckpointRestoreGeneration; }
+	if (!bInProgress && bRestoringCheckpoint == bInProgress)
+	{
+		if (!bInProgress && !bResumePassiveWork) { ++BindingGeneration; bCheckpointStateReconciled = false; ClearLifecycleTimers(); }
+		return;
+	}
+	bRestoringCheckpoint = bInProgress;
+	++BindingGeneration;
+	if (bInProgress)
+	{
+		bCheckpointStateReconciled = false; ClearLifecycleTimers(); ++ReviveRebindGeneration;
+		if (GetWorld()) { GetWorld()->GetTimerManager().ClearTimer(ReviveRebindTimerHandle); }
+	}
+	else if (bResumePassiveWork && bCheckpointStateReconciled && CanWritePoise())
+	{
+		if (PoiseState == ESovPoiseState::Broken) { ScheduleBrokenFallback(); }
+		else if (PoiseState == ESovPoiseState::Recovering) { ScheduleRecoveryEnd(); }
+		else { TryStartRegeneration(); }
+	}
+	else { bCheckpointStateReconciled = false; ClearLifecycleTimers(); }
+}
+
+bool USovPoiseComponent::EndCheckpointRestore(const uint64 Generation, const bool bResumePassiveWork)
+{
+	if (Generation != CheckpointRestoreGeneration || (bResumePassiveWork && !bRestoringCheckpoint)) { return false; }
+	SetCheckpointRestoreInProgress(false, bResumePassiveWork);
+	return Generation == CheckpointRestoreGeneration;
 }
 
 bool USovPoiseComponent::IsInitialized() const
 {
-	return IsValid(AbilitySystemComponent);
+	const AActor* Owner = GetOwner();
+	const auto* ASC = AbilitySystemComponent.Get();
+	const auto* Attributes = BoundAttributes.Get();
+	const auto* NarrativeASC = Cast<UNarrativeAbilitySystemComponent>(ASC);
+	return !bEndingPlay && IsValid(Owner) && !Owner->IsActorBeingDestroyed()
+		&& IsValid(ASC) && IsValid(Attributes) && ASC->GetAvatarActor() == Owner
+		&& UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(const_cast<AActor*>(Owner)) == ASC
+		&& Owner->FindComponentByClass<USovPoiseComponent>() == this
+		&& ASC->GetSet<UNarrativeAttributeSetBase>() == Attributes
+		&& Attributes->GetOwningAbilitySystemComponent() == ASC
+		&& Attributes->GetCombatLifeEpoch() == BoundLifeEpoch
+		&& (!NarrativeASC || NarrativeASC->GetCombatActorInfoEpoch() == BoundActorInfoEpoch);
+}
+
+bool USovPoiseComponent::IsCurrentOperation(const uint64 Generation) const
+{
+	return BindingGeneration == Generation && IsInitialized();
+}
+
+bool USovPoiseComponent::ValidateBindingOrRetire()
+{
+	if (IsInitialized()) { return true; }
+	const auto* NarrativeASC = Cast<UNarrativeAbilitySystemComponent>(AbilitySystemComponent);
+	if (IsValid(GetOwner()) && IsValid(AbilitySystemComponent) && BoundAttributes.IsValid()
+		&& AbilitySystemComponent->GetAvatarActor() == GetOwner()
+		&& UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner()) == AbilitySystemComponent
+		&& AbilitySystemComponent->GetSet<UNarrativeAttributeSetBase>() == BoundAttributes.Get()
+		&& (!NarrativeASC || NarrativeASC->GetCombatActorInfoEpoch() == BoundActorInfoEpoch))
+	{
+		ClearLifecycleTimers(); RemoveOwnedStateTags(); return false;
+	}
+	if (AbilitySystemComponent && !bChangingAbilitySystem)
+	{
+		TGuardValue<bool> ChangingGuard(bChangingAbilitySystem, true);
+		UninitializeFromAbilitySystem();
+	}
+	return false;
 }
 
 float USovPoiseComponent::GetPoise() const
@@ -202,7 +315,7 @@ float USovPoiseComponent::GetSecondsUntilRecoveryComplete() const
 
 bool USovPoiseComponent::RecoverFromPoiseBreak()
 {
-	if (!CanWritePoise() || PoiseState != ESovPoiseState::Broken)
+	if (!ValidateBindingOrRetire() || bRestoringCheckpoint || !CanWritePoise() || PoiseState != ESovPoiseState::Broken)
 	{
 		return false;
 	}
@@ -217,8 +330,26 @@ bool USovPoiseComponent::RecoverFromPoiseBreak()
 	StopRegeneration();
 	bHasRecordedPoiseDamage = false;
 	bRegenerationDelayElapsed = true;
-	SetPoiseInternal(GetMaxPoise());
+	const uint64 Generation = BindingGeneration;
+	const float RecoveryPoise = GetMaxPoise();
+	SetPoiseInternal(RecoveryPoise);
+	if (!IsCurrentOperation(Generation) || !CanWritePoise()) { return false; }
+	if (PoiseState != ESovPoiseState::Broken
+		|| !FMath::IsNearlyEqual(GetPoise(), RecoveryPoise, KINDA_SMALL_NUMBER)
+		|| !FMath::IsNearlyEqual(GetMaxPoise(), RecoveryPoise, KINDA_SMALL_NUMBER))
+	{
+		// One-shot damage during refill invalidates this recovery, not the next
+		// authored fallback. Avoid immediate recursive retries when duration is zero.
+		if (PoiseState == ESovPoiseState::Broken && GetWorld())
+		{
+			const float RetryDelay = FMath::IsFinite(BrokenFallbackDuration) ? FMath::Max(BrokenFallbackDuration, 0.01f) : 0.8f;
+			GetWorld()->GetTimerManager().SetTimer(BrokenFallbackTimerHandle, this,
+				&ThisClass::HandleBrokenFallbackElapsed, RetryDelay, false);
+		}
+		return false;
+	}
 	SetPoiseState(ESovPoiseState::Recovering, true);
+	if (!IsCurrentOperation(Generation) || !CanWritePoise()) { return false; }
 	ScheduleRecoveryEnd();
 	return true;
 }
@@ -232,7 +363,7 @@ void USovPoiseComponent::TryInitializeFromOwner()
 
 	if (UAbilitySystemComponent* OwnerASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner()))
 	{
-		if (OwnerASC != AbilitySystemComponent)
+		if (OwnerASC != AbilitySystemComponent || !IsInitialized())
 		{
 			InitializeWithAbilitySystem(OwnerASC);
 		}
@@ -246,6 +377,9 @@ void USovPoiseComponent::HandleOwnerASCInitialized()
 
 void USovPoiseComponent::UninitializeFromAbilitySystem()
 {
+	++BindingGeneration;
+	++ReviveRebindGeneration;
+	if (GetWorld()) { GetWorld()->GetTimerManager().ClearTimer(ReviveRebindTimerHandle); }
 	StopRegeneration();
 
 	if (UWorld* World = GetWorld())
@@ -260,6 +394,7 @@ void USovPoiseComponent::UninitializeFromAbilitySystem()
 	{
 		AbilitySystemComponent = nullptr;
 		PoiseChangedDelegateHandle.Reset();
+		HealthChangedDelegateHandle.Reset();
 		MaxPoiseChangedDelegateHandle.Reset();
 		RegenerationBlockedTagChangedDelegateHandle.Reset();
 		BrokenTagChangedDelegateHandle.Reset();
@@ -275,6 +410,20 @@ void USovPoiseComponent::UninitializeFromAbilitySystem()
 		bAppliedBrokenTag = false;
 		bAppliedRecoveringTag = false;
 		return;
+	}
+	UAbilitySystemComponent* PreviousASC = AbilitySystemComponent;
+	if (auto* NarrativeASC = Cast<UNarrativeAbilitySystemComponent>(PreviousASC))
+	{
+		NarrativeASC->OnDeathStateChanged.RemoveDynamic(this, &ThisClass::HandleDeathStateChanged);
+	}
+	TArray<FGameplayTag> PreviousOwnedTags;
+	if (bAppliedPressuredTag) { PreviousOwnedTags.Add(PressuredTag); }
+	if (bAppliedBrokenTag) { PreviousOwnedTags.Add(BrokenTag); }
+	if (bAppliedRecoveringTag) { PreviousOwnedTags.Add(RecoveringTag); }
+	if (HealthChangedDelegateHandle.IsValid())
+	{
+		PreviousASC->GetGameplayAttributeValueChangeDelegate(UNarrativeAttributeSetBase::GetHealthAttribute())
+			.Remove(HealthChangedDelegateHandle);
 	}
 
 	if (PoiseChangedDelegateHandle.IsValid())
@@ -318,10 +467,10 @@ void USovPoiseComponent::UninitializeFromAbilitySystem()
 			.Remove(RecoveringTagChangedDelegateHandle);
 	}
 
-	RemoveOwnedStateTags();
-
 	AbilitySystemComponent = nullptr;
+	BoundAttributes.Reset();
 	PoiseChangedDelegateHandle.Reset();
+	HealthChangedDelegateHandle.Reset();
 	MaxPoiseChangedDelegateHandle.Reset();
 	RegenerationBlockedTagChangedDelegateHandle.Reset();
 	BrokenTagChangedDelegateHandle.Reset();
@@ -333,6 +482,16 @@ void USovPoiseComponent::UninitializeFromAbilitySystem()
 	PoiseState = ESovPoiseState::Stable;
 	bHasRecordedPoiseDamage = false;
 	bRegenerationDelayElapsed = false;
+	bAppliedPressuredTag = false;
+	bAppliedBrokenTag = false;
+	bAppliedRecoveringTag = false;
+	for (const FGameplayTag& Tag : PreviousOwnedTags)
+	{
+		if (Tag.IsValid() && IsValid(PreviousASC))
+		{
+			PreviousASC->RemoveLooseGameplayTag(Tag, 1, EGameplayTagReplicationState::TagAndCountToAll);
+		}
+	}
 }
 
 void USovPoiseComponent::ClearLifecycleTimers()
@@ -349,6 +508,9 @@ void USovPoiseComponent::ClearLifecycleTimers()
 
 void USovPoiseComponent::HandlePoiseAttributeChanged(const FOnAttributeChangeData& ChangeData)
 {
+	if (!ValidateBindingOrRetire() || bRestoringCheckpoint
+		|| (GetOwner()->HasAuthority() && !CanWritePoise())) { return; }
+	const uint64 Generation = BindingGeneration;
 	const float OldPoise = FMath::Max(ChangeData.OldValue, 0.0f);
 	const float NewPoise = FMath::Clamp(ChangeData.NewValue, 0.0f, GetMaxPoise());
 
@@ -368,9 +530,10 @@ void USovPoiseComponent::HandlePoiseAttributeChanged(const FOnAttributeChangeDat
 		RefreshPoiseState(!bRestoringCheckpoint);
 	}
 
+	if (!IsCurrentOperation(Generation)) { return; }
 	OnPoiseChanged.Broadcast(OldPoise, NewPoise, GetMaxPoise());
 
-	if (!CanWritePoise())
+	if (!IsCurrentOperation(Generation) || !CanWritePoise())
 	{
 		return;
 	}
@@ -388,6 +551,9 @@ void USovPoiseComponent::HandlePoiseAttributeChanged(const FOnAttributeChangeDat
 
 void USovPoiseComponent::HandleMaxPoiseAttributeChanged(const FOnAttributeChangeData& ChangeData)
 {
+	if (!ValidateBindingOrRetire() || bRestoringCheckpoint
+		|| (GetOwner()->HasAuthority() && !CanWritePoise())) { return; }
+	const uint64 Generation = BindingGeneration;
 	const float CurrentPoise = GetPoise();
 	const float CurrentMaxPoise = FMath::Max(ChangeData.NewValue, 0.0f);
 
@@ -409,7 +575,9 @@ void USovPoiseComponent::HandleMaxPoiseAttributeChanged(const FOnAttributeChange
 		RefreshPoiseState(true);
 	}
 
+	if (!IsCurrentOperation(Generation)) { return; }
 	OnPoiseChanged.Broadcast(CurrentPoise, CurrentPoise, CurrentMaxPoise);
+	if (!IsCurrentOperation(Generation)) { return; }
 
 	if (!CanWritePoise()
 		|| PoiseState == ESovPoiseState::Broken
@@ -422,13 +590,53 @@ void USovPoiseComponent::HandleMaxPoiseAttributeChanged(const FOnAttributeChange
 	TryStartRegeneration();
 }
 
+void USovPoiseComponent::HandleHealthAttributeChanged(const FOnAttributeChangeData& ChangeData)
+{
+	if (bRestoringCheckpoint || CanWritePoise()) { return; }
+	++BindingGeneration;
+	ClearLifecycleTimers();
+	RemoveOwnedStateTags();
+}
+
+void USovPoiseComponent::HandleDeathStateChanged(AActor* Actor, UNarrativeAbilitySystemComponent* ASC, const bool bDead)
+{
+	if (Actor != GetOwner() || ASC != AbilitySystemComponent || bEndingPlay || bRestoringCheckpoint) { return; }
+	const uint64 Request = ++ReviveRebindGeneration;
+	UWorld* World = GetWorld();
+	if (!World) { return; }
+	World->GetTimerManager().ClearTimer(ReviveRebindTimerHandle);
+	if (bDead)
+	{
+		++BindingGeneration; ClearLifecycleTimers(); RemoveOwnedStateTags(); return;
+	}
+	const auto* Attributes = ASC->GetSet<UNarrativeAttributeSetBase>();
+	if (!IsValid(Attributes)) { return; }
+	const uint64 ExpectedLife = Attributes->GetCombatLifeEpoch() + (Attributes->GetHealth() <= 0.f ? 1 : 0);
+	const uint64 ActorEpoch = ASC->GetCombatActorInfoEpoch();
+	ReviveRebindTimerHandle = World->GetTimerManager().SetTimerForNextTick(FTimerDelegate::CreateWeakLambda(this,
+		[this, Request, ExpectedLife, ActorEpoch, WeakASC = TWeakObjectPtr<UNarrativeAbilitySystemComponent>(ASC),
+		 WeakAttributes = TWeakObjectPtr<const UNarrativeAttributeSetBase>(Attributes)]()
+		{
+			auto* CurrentASC = WeakASC.Get(); const auto* CurrentAttributes = WeakAttributes.Get();
+			if (Request != ReviveRebindGeneration || bRestoringCheckpoint || bEndingPlay || !IsValid(CurrentASC)
+				|| !IsValid(CurrentAttributes) || !IsValid(GetOwner()) || GetOwner()->IsActorBeingDestroyed()
+				|| CurrentASC->GetAvatarActor() != GetOwner()
+				|| UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner()) != CurrentASC
+				|| CurrentASC->GetCombatActorInfoEpoch() != ActorEpoch
+				|| CurrentASC->GetSet<UNarrativeAttributeSetBase>() != CurrentAttributes
+				|| CurrentAttributes->GetCombatLifeEpoch() != ExpectedLife || CurrentAttributes->GetHealth() <= 0.f
+				|| CurrentASC->IsDead()) { return; }
+			ResetForCheckpoint();
+		}));
+}
+
 void USovPoiseComponent::HandleRegenerationBlockedTagChanged(
 	const FGameplayTag CallbackTag,
 	const int32 NewCount)
 {
 	static_cast<void>(CallbackTag);
 
-	if (!CanWritePoise())
+	if (!ValidateBindingOrRetire() || bRestoringCheckpoint || !CanWritePoise())
 	{
 		return;
 	}
@@ -450,7 +658,7 @@ void USovPoiseComponent::HandleReplicatedStateTagChanged(
 	static_cast<void>(CallbackTag);
 	static_cast<void>(NewCount);
 
-	if (!CanWritePoise())
+	if (ValidateBindingOrRetire() && !GetOwner()->HasAuthority() && !bRestoringCheckpoint)
 	{
 		RefreshPoiseState(true);
 	}
@@ -458,7 +666,7 @@ void USovPoiseComponent::HandleReplicatedStateTagChanged(
 
 void USovPoiseComponent::RecordPoiseDamage()
 {
-	if (!CanWritePoise())
+	if (bRestoringCheckpoint || !CanWritePoise())
 	{
 		return;
 	}
@@ -472,7 +680,7 @@ void USovPoiseComponent::RecordPoiseDamage()
 
 void USovPoiseComponent::ScheduleRegenerationDelay(const float DelaySeconds)
 {
-	if (!CanWritePoise() || PoiseState == ESovPoiseState::Broken)
+	if (bRestoringCheckpoint || !CanWritePoise() || !FMath::IsFinite(DelaySeconds) || PoiseState == ESovPoiseState::Broken)
 	{
 		return;
 	}
@@ -500,15 +708,20 @@ void USovPoiseComponent::ScheduleRegenerationDelay(const float DelaySeconds)
 
 void USovPoiseComponent::HandleRegenerationDelayElapsed()
 {
+	if (!ValidateBindingOrRetire()) { return; }
+	if (bRestoringCheckpoint || !CanWritePoise()) { return; }
 	bRegenerationDelayElapsed = true;
 	TryStartRegeneration();
 }
 
 void USovPoiseComponent::TryStartRegeneration()
 {
-	if (!CanWritePoise()
+	if (bRestoringCheckpoint || !CanWritePoise()
 		|| PoiseState == ESovPoiseState::Broken
 		|| IsRegenerationBlocked()
+		|| !FMath::IsFinite(RegenerationDelay)
+		|| !FMath::IsFinite(RegenerationPercentPerSecond)
+		|| !FMath::IsFinite(RegenerationTimerInterval)
 		|| RegenerationPercentPerSecond <= 0.0f
 		|| RegenerationTimerInterval <= 0.0f)
 	{
@@ -518,7 +731,8 @@ void USovPoiseComponent::TryStartRegeneration()
 
 	const float CurrentPoise = GetPoise();
 	const float CurrentMaxPoise = GetMaxPoise();
-	if (CurrentMaxPoise <= KINDA_SMALL_NUMBER
+	if (!FMath::IsFinite(CurrentPoise) || !FMath::IsFinite(CurrentMaxPoise)
+		|| CurrentMaxPoise <= KINDA_SMALL_NUMBER
 		|| CurrentPoise + KINDA_SMALL_NUMBER >= CurrentMaxPoise)
 	{
 		StopRegeneration();
@@ -562,7 +776,8 @@ void USovPoiseComponent::TryStartRegeneration()
 
 void USovPoiseComponent::HandleRegenerationTimerElapsed()
 {
-	if (!CanWritePoise()
+	if (!ValidateBindingOrRetire()) { return; }
+	if (bRestoringCheckpoint || !CanWritePoise()
 		|| PoiseState == ESovPoiseState::Broken
 		|| IsRegenerationBlocked())
 	{
@@ -572,7 +787,9 @@ void USovPoiseComponent::HandleRegenerationTimerElapsed()
 
 	const float CurrentPoise = GetPoise();
 	const float CurrentMaxPoise = GetMaxPoise();
-	if (CurrentMaxPoise <= KINDA_SMALL_NUMBER
+	if (!FMath::IsFinite(CurrentPoise) || !FMath::IsFinite(CurrentMaxPoise)
+		|| !FMath::IsFinite(RegenerationPercentPerSecond)
+		|| CurrentMaxPoise <= KINDA_SMALL_NUMBER
 		|| CurrentPoise + KINDA_SMALL_NUMBER >= CurrentMaxPoise)
 	{
 		StopRegeneration();
@@ -594,7 +811,9 @@ void USovPoiseComponent::HandleRegenerationTimerElapsed()
 		* FMath::Max(RegenerationPercentPerSecond, 0.0f)
 		* RegenerationSeconds;
 	const float NewPoise = FMath::Min(CurrentPoise + RegenerationAmount, CurrentMaxPoise);
+	const uint64 Generation = BindingGeneration;
 	SetPoiseInternal(NewPoise);
+	if (!IsCurrentOperation(Generation) || !CanWritePoise()) { return; }
 
 	if (NewPoise + KINDA_SMALL_NUMBER >= CurrentMaxPoise)
 	{
@@ -613,7 +832,8 @@ void USovPoiseComponent::StopRegeneration()
 
 void USovPoiseComponent::EnterBrokenState(const bool bBroadcastChanges)
 {
-	if (PoiseState == ESovPoiseState::Broken)
+	if (!IsInitialized() || (GetOwner()->HasAuthority() && !CanWritePoise())
+		|| PoiseState == ESovPoiseState::Broken)
 	{
 		return;
 	}
@@ -624,8 +844,9 @@ void USovPoiseComponent::EnterBrokenState(const bool bBroadcastChanges)
 		World->GetTimerManager().ClearTimer(RegenerationDelayTimerHandle);
 	}
 
+	const uint64 Generation = BindingGeneration;
 	SetPoiseState(ESovPoiseState::Broken, bBroadcastChanges);
-	if (CanWritePoise())
+	if (IsCurrentOperation(Generation) && CanWritePoise())
 	{
 		ScheduleBrokenFallback();
 	}
@@ -633,7 +854,8 @@ void USovPoiseComponent::EnterBrokenState(const bool bBroadcastChanges)
 
 void USovPoiseComponent::ScheduleBrokenFallback()
 {
-	if (!CanWritePoise() || PoiseState != ESovPoiseState::Broken)
+	if (bRestoringCheckpoint || !CanWritePoise() || !FMath::IsFinite(BrokenFallbackDuration)
+		|| PoiseState != ESovPoiseState::Broken)
 	{
 		return;
 	}
@@ -667,7 +889,8 @@ void USovPoiseComponent::HandleBrokenFallbackElapsed()
 
 void USovPoiseComponent::ScheduleRecoveryEnd()
 {
-	if (!CanWritePoise() || PoiseState != ESovPoiseState::Recovering)
+	if (bRestoringCheckpoint || !CanWritePoise() || !FMath::IsFinite(RecoveryImmunityDuration)
+		|| PoiseState != ESovPoiseState::Recovering)
 	{
 		return;
 	}
@@ -696,12 +919,15 @@ void USovPoiseComponent::ScheduleRecoveryEnd()
 
 void USovPoiseComponent::HandleRecoveryElapsed()
 {
-	if (!CanWritePoise() || PoiseState != ESovPoiseState::Recovering)
+	if (!ValidateBindingOrRetire()) { return; }
+	if (bRestoringCheckpoint || !CanWritePoise() || PoiseState != ESovPoiseState::Recovering)
 	{
 		return;
 	}
 
+	const uint64 Generation = BindingGeneration;
 	SetOwnedLooseTag(RecoveringTag, false, bAppliedRecoveringTag);
+	if (!IsCurrentOperation(Generation) || !CanWritePoise()) { return; }
 
 	const float CurrentPoise = GetPoise();
 	const float CurrentMaxPoise = GetMaxPoise();
@@ -713,6 +939,7 @@ void USovPoiseComponent::HandleRecoveryElapsed()
 		: ESovPoiseState::Stable;
 
 	SetPoiseState(NewState, true);
+	if (!IsCurrentOperation(Generation) || !CanWritePoise()) { return; }
 	TryStartRegeneration();
 }
 
@@ -762,6 +989,8 @@ void USovPoiseComponent::SetPoiseState(
 	const ESovPoiseState NewState,
 	const bool bBroadcastChanges)
 {
+	if (!IsInitialized() || (GetOwner()->HasAuthority() && !CanWritePoise())) { return; }
+	const uint64 Generation = BindingGeneration;
 	if (NewState == PoiseState)
 	{
 		if (CanWritePoise())
@@ -779,12 +1008,14 @@ void USovPoiseComponent::SetPoiseState(
 		UpdateOwnedStateTags(NewState);
 	}
 
-	if (!bBroadcastChanges)
+	if (!IsCurrentOperation(Generation) || PoiseState != NewState || !bBroadcastChanges)
 	{
 		return;
 	}
 
 	OnPoiseStateChanged.Broadcast(PreviousState, NewState);
+	if (!IsCurrentOperation(Generation) || PoiseState != NewState
+		|| (GetOwner()->HasAuthority() && !CanWritePoise())) { return; }
 
 	if (NewState == ESovPoiseState::Broken)
 	{
@@ -798,14 +1029,17 @@ void USovPoiseComponent::SetPoiseState(
 
 void USovPoiseComponent::UpdateOwnedStateTags(const ESovPoiseState NewState)
 {
+	const uint64 Generation = BindingGeneration;
 	SetOwnedLooseTag(
 		PressuredTag,
 		NewState == ESovPoiseState::Pressured,
 		bAppliedPressuredTag);
+	if (!IsCurrentOperation(Generation) || !CanWritePoise() || PoiseState != NewState) { return; }
 	SetOwnedLooseTag(
 		BrokenTag,
 		NewState == ESovPoiseState::Broken,
 		bAppliedBrokenTag);
+	if (!IsCurrentOperation(Generation) || !CanWritePoise() || PoiseState != NewState) { return; }
 	SetOwnedLooseTag(
 		RecoveringTag,
 		NewState == ESovPoiseState::Recovering,
@@ -814,9 +1048,21 @@ void USovPoiseComponent::UpdateOwnedStateTags(const ESovPoiseState NewState)
 
 void USovPoiseComponent::RemoveOwnedStateTags()
 {
-	SetOwnedLooseTag(PressuredTag, false, bAppliedPressuredTag);
-	SetOwnedLooseTag(BrokenTag, false, bAppliedBrokenTag);
-	SetOwnedLooseTag(RecoveringTag, false, bAppliedRecoveringTag);
+	UAbilitySystemComponent* PreviousASC = AbilitySystemComponent;
+	TArray<FGameplayTag> Tags;
+	if (bAppliedPressuredTag) { Tags.Add(PressuredTag); }
+	if (bAppliedBrokenTag) { Tags.Add(BrokenTag); }
+	if (bAppliedRecoveringTag) { Tags.Add(RecoveringTag); }
+	bAppliedPressuredTag = false;
+	bAppliedBrokenTag = false;
+	bAppliedRecoveringTag = false;
+	for (const FGameplayTag& Tag : Tags)
+	{
+		if (IsValid(PreviousASC) && Tag.IsValid())
+		{
+			PreviousASC->RemoveLooseGameplayTag(Tag, 1, EGameplayTagReplicationState::TagAndCountToAll);
+		}
+	}
 }
 
 void USovPoiseComponent::SetOwnedLooseTag(
@@ -833,27 +1079,27 @@ void USovPoiseComponent::SetOwnedLooseTag(
 		return;
 	}
 
-	if (bShouldApply && !bAppliedFlag)
+	if (bShouldApply && !bAppliedFlag && CanWritePoise())
 	{
+		bAppliedFlag = true;
 		AbilitySystemComponent->AddLooseGameplayTag(
 			Tag,
 			1,
 			EGameplayTagReplicationState::TagAndCountToAll);
-		bAppliedFlag = true;
 	}
 	else if (!bShouldApply && bAppliedFlag)
 	{
+		bAppliedFlag = false;
 		AbilitySystemComponent->RemoveLooseGameplayTag(
 			Tag,
 			1,
 			EGameplayTagReplicationState::TagAndCountToAll);
-		bAppliedFlag = false;
 	}
 }
 
 void USovPoiseComponent::SetPoiseInternal(const float NewPoise)
 {
-	if (!CanWritePoise())
+	if (bRestoringCheckpoint || !CanWritePoise() || !FMath::IsFinite(NewPoise))
 	{
 		return;
 	}
@@ -865,7 +1111,12 @@ void USovPoiseComponent::SetPoiseInternal(const float NewPoise)
 
 bool USovPoiseComponent::CanWritePoise() const
 {
-	return IsInitialized() && IsValid(GetOwner()) && GetOwner()->HasAuthority();
+	if (!IsInitialized() || !GetOwner()->HasAuthority()) { return false; }
+	const auto* NarrativeASC = Cast<UNarrativeAbilitySystemComponent>(AbilitySystemComponent);
+	const float Health = BoundAttributes->GetHealth();
+	return FMath::IsFinite(Health) && Health > 0.f && (!NarrativeASC || !NarrativeASC->IsDead())
+		&& !AbilitySystemComponent->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_IsDead)
+		&& !AbilitySystemComponent->HasMatchingGameplayTag(FSovGameplayTags::Get().State_Fatal);
 }
 
 float USovPoiseComponent::GetWorldTimeSeconds() const
