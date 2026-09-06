@@ -83,8 +83,8 @@ TSharedRef<SWidget> USovAccessibilityPresentation::RebuildWidget()
 		SubtitleSlot->SetAnchors(FAnchors(.5f,.88f)); SubtitleSlot->SetAlignment(FVector2D(.5f,1)); SubtitleSlot->SetAutoSize(true);
 		CaptionBackground = WidgetTree->ConstructWidget<UBorder>(); CaptionBackground->SetPadding(FMargin(14,8));
 		CaptionText = WidgetTree->ConstructWidget<UTextBlock>(); CaptionText->SetJustification(ETextJustify::Center); CaptionText->SetAutoWrapText(true);
-		CaptionBackground->AddChild(CaptionText); UCanvasPanelSlot* Slot = SafeTextCanvas->AddChildToCanvas(CaptionBackground);
-		Slot->SetAnchors(FAnchors(.5f,.13f)); Slot->SetAlignment(FVector2D(.5f,0)); Slot->SetAutoSize(true);
+		CaptionBackground->AddChild(CaptionText); UCanvasPanelSlot* CanvasSlot = SafeTextCanvas->AddChildToCanvas(CaptionBackground);
+		CanvasSlot->SetAnchors(FAnchors(.5f,.13f)); CanvasSlot->SetAlignment(FVector2D(.5f,0)); CanvasSlot->SetAutoSize(true);
 		ObjectiveBackground = WidgetTree->ConstructWidget<UBorder>(); ObjectiveBackground->SetPadding(FMargin(12, 8));
 		ObjectiveBackground->SetClipping(EWidgetClipping::ClipToBounds);
 		ObjectiveSize = WidgetTree->ConstructWidget<USizeBox>(); ObjectiveBackground->AddChild(ObjectiveSize);
@@ -151,20 +151,20 @@ void USovAccessibilityPresentation::BeginEntry(const FSovSceneSubtitleEntry& Ent
 	SpeechPages = PaginateText(Entry.Text.ToString(), Characters, Settings.SubtitleMaximumLines); PageIndex = 0;
 	PageRemaining = FMath::Max(2.f, Entry.Duration / FMath::Max(1,SpeechPages.Num())); RefreshText();
 }
-void USovAccessibilityPresentation::PresentCaption(const FText& Text, float Duration, const FVector& Location, ESovCaptionPriority Priority)
+void USovAccessibilityPresentation::PresentCaption(const FText& Text, float Duration, const FVector& Location, ESovCaptionPriority CaptionPriority)
 {
-	if (Text.IsEmpty() || !FMath::IsFinite(Duration) || Location.ContainsNaN() || Priority > ESovCaptionPriority::Critical) { return; }
+	if (Text.IsEmpty() || !FMath::IsFinite(Duration) || Location.ContainsNaN() || CaptionPriority > ESovCaptionPriority::Critical) { return; }
 	// Repeated damage updates direction, never restarts the reading clock or floods history.
 	if (CaptionRemaining > 0.f && ActiveCaption.Text.EqualTo(Text))
-	{ ActiveCaption.Location = Location; ActiveCaption.CaptionPriority = FMath::Max(ActiveCaption.CaptionPriority, Priority); return; }
+	{ ActiveCaption.Location = Location; ActiveCaption.CaptionPriority = FMath::Max(ActiveCaption.CaptionPriority, CaptionPriority); return; }
 	for (auto& Pending : PendingCaptions)
 	{
 		if (Pending.Text.EqualTo(Text))
-		{ Pending.Location = Location; Pending.CaptionPriority = FMath::Max(Pending.CaptionPriority, Priority); return; }
+		{ Pending.Location = Location; Pending.CaptionPriority = FMath::Max(Pending.CaptionPriority, CaptionPriority); return; }
 	}
 	FSovSceneSubtitleEntry Entry; Entry.Text = Text; Entry.Location = Location; Entry.bCaption = true;
-	Entry.Duration = FMath::Clamp(Duration, 3.f, 30.f); Entry.CaptionPriority = Priority;
-	if (SovPlayerInformationPolicy::CanPreempt(int(ActiveCaption.CaptionPriority), int(Priority), CaptionRemaining > 0.f))
+	Entry.Duration = FMath::Clamp(Duration, 3.f, 30.f); Entry.CaptionPriority = CaptionPriority;
+	if (SovPlayerInformationPolicy::CanPreempt(int(ActiveCaption.CaptionPriority), int(CaptionPriority), CaptionRemaining > 0.f))
 	{
 		if (CaptionRemaining > 0.f) { QueueCaption(ActiveCaption); }
 		BeginCaption(Entry);
@@ -311,9 +311,9 @@ void USovAccessibilityPresentation::LayoutObjectives(float SafeWidth, float Safe
 	const bool bFitsContent = Remaining > 0 ? CounterHeight > 0.f && Budget >= CounterHeight : VisibleObjectiveRows > 0;
 	ObjectiveBackground->SetVisibility(Settings.bShowObjectiveText && !Objectives.IsEmpty() && Budget > 0.f && bFitsContent
 		? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
-	if (auto* Slot = Cast<UCanvasPanelSlot>(ObjectiveBackground->Slot))
+	if (auto* CanvasSlot = Cast<UCanvasPanelSlot>(ObjectiveBackground->Slot))
 	{
-		Slot->SetAnchors(FAnchors(.02f, 0.f)); Slot->SetPosition(FVector2D(0.f, Top));
+		CanvasSlot->SetAnchors(FAnchors(.02f, 0.f)); CanvasSlot->SetPosition(FVector2D(0.f, Top));
 	}
 }
 FText USovAccessibilityPresentation::DirectionText(const FVector& Location) const
@@ -396,13 +396,13 @@ void USovAccessibilityPresentation::NativeTick(const FGeometry& Geometry, float 
 	{
 		RefreshWeakPointMarkers(PC);
 	}
-	if (auto* Navigation = PC->FindComponentByClass<UNarrativeNavigationComponent>())
+	if (auto* NarrativeNavigation = PC->FindComponentByClass<UNarrativeNavigationComponent>())
 	{
 		const FGameplayTag Domain = FNavigatorGameplayTags::Get().NavigatorTypes_Screenspace;
-		for (UMapMarker* Marker : Navigation->Markers)
+		for (UMapMarker* Marker : NarrativeNavigation->Markers)
 		{
 			if (Markers.Num() >= 48) { break; } if (!IsValid(Marker) || !Marker->HasDomain(Domain)) { continue; }
-			FText Subtitle; const FText Title = Marker->GetMarkerDisplayText(Navigation,Domain,Subtitle);
+			FText Subtitle; const FText Title = Marker->GetMarkerDisplayText(NarrativeNavigation,Domain,Subtitle);
 			Markers.Add({Marker->GetMarkerTransform().GetLocation(),Title,false,true});
 		}
 	}

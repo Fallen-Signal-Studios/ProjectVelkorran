@@ -48,7 +48,10 @@ namespace
             FURL URL; URL.AddOption(*(TEXT("game=") + ASovLifecycleTestGameMode::StaticClass()->GetPathName()));
             if (World->SetGameMode(URL))
             {
-                Mode = World->GetAuthGameMode<ASovLifecycleTestGameMode>(); Mode->InitGameState();
+                // Normal actor initialization creates GameState before InitGameState.
+                // Calling InitGameState directly dereferences the absent state in UE 5.7.
+                World->InitializeActorsForPlay(URL);
+                Mode = World->GetAuthGameMode<ASovLifecycleTestGameMode>();
                 PC = World->SpawnActor<ASovPlayerController>();
             }
         }
@@ -72,6 +75,8 @@ bool FSovSystemPauseOwnershipTest::RunTest(const FString&)
     TestTrue(TEXT("Save failure can acquire while both reasons exist"), W.PC->AcquireSystemPause(TEXT("SaveFailure")));
     TestTrue(TEXT("Duplicate acquisition is idempotent"), W.PC->AcquireSystemPause(TEXT("SaveFailure")));
     TestEqual(TEXT("Exactly three owners exist"), FSovLifecycleTestAccess::PauseOwners(W.PC), 3);
+    W.Mode->ClearPause();
+    TestTrue(TEXT("GameMode unpause also respects the registered system ownership rules"), W.World->IsPaused());
     W.PC->ReleaseSystemPause(TEXT("AccessibilitySetup"));
     TestFalse(TEXT("A menu cannot unpause an active platform/save hold"), W.PC->SetPause(false));
     W.PC->ReleaseSystemPause(TEXT("PlatformInterruption"));
@@ -85,7 +90,18 @@ bool FSovSystemPauseOwnershipTest::RunTest(const FString&)
     W.PC->AcquireSystemPause(TEXT("PlatformInterruption")); W.PC->SetPause(true);
     W.PC->ReleaseSystemPause(TEXT("PlatformInterruption"));
     TestTrue(TEXT("Platform resume preserves a later menu pause"), W.World->IsPaused());
-    W.PC->SetPause(false); W.Mode->bAcceptPause = false;
+    W.PC->SetPause(false);
+    TestTrue(TEXT("A fresh platform hold is acquired for an overlapping authored rule"), W.PC->AcquireSystemPause(TEXT("PlatformInterruption")));
+    bool bMenuReadyToUnpause = false;
+    TestTrue(TEXT("An already paused world accepts a later menu and its unpause rule"),
+        W.PC->SetPause(true, FCanUnpause::CreateLambda([&bMenuReadyToUnpause]() { return bMenuReadyToUnpause; })));
+    W.PC->ReleaseSystemPause(TEXT("PlatformInterruption"));
+    W.PC->SetPause(false);
+    TestTrue(TEXT("The later menu's unpause delegate remains authoritative after platform release"), W.World->IsPaused());
+    bMenuReadyToUnpause = true;
+    W.PC->SetPause(false);
+    TestFalse(TEXT("The menu can release its own remaining rule when ready"), W.World->IsPaused());
+    W.Mode->bAcceptPause = false;
     TestFalse(TEXT("GameMode can refuse a pause"), W.PC->SetPause(true));
     TestFalse(TEXT("Refused pause cannot leave a phantom menu owner"), FSovLifecycleTestAccess::ExternalPause(W.PC));
     TestFalse(TEXT("Refused system pause cannot claim success"), W.PC->AcquireSystemPause(TEXT("PlatformInterruption")));

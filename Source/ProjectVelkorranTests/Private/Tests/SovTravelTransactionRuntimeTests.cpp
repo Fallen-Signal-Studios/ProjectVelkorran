@@ -193,6 +193,8 @@ bool FSovTravelRestoreGenerationTest::RunTest(const FString& Parameters)
     auto* Owner = F.World->SpawnActor<AActor>();
     if (!Pawn || !Owner) { AddError(TEXT("Restore generation fixture could not spawn")); return false; }
     TStrongObjectPtr<UNarrativeAbilitySystemComponent> ASC(NewObject<UNarrativeAbilitySystemComponent>(Owner));
+    Owner->AddInstanceComponent(ASC.Get()); ASC->RegisterComponent();
+    if (!TestTrue(TEXT("Restore ASC registered its actor-info storage"), ASC->IsRegistered() && ASC->AbilityActorInfo.IsValid())) { return false; }
     ASC->InitAbilityActorInfo(Owner, Pawn);
     FSovTravelTransactionTestAccess::BindGenerations(*F.Saves, *Pawn, *ASC);
     TestTrue(TEXT("Current actor-info generation is accepted"), FSovTravelTransactionTestAccess::GenerationsMatch(*F.Saves));

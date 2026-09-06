@@ -1,5 +1,6 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "UI/SovFrontendComponent.h"
+#include "UI/SovCombatVitalsWidget.h"
 #include "UI/SovAccessibilityPresentation.h"
 #include "UI/SovAccessibilitySettingsMenu.h"
 #include "Framework/SovPlayerController.h"
@@ -25,6 +26,7 @@
 #define LOCTEXT_NAMESPACE "SovNativeFrontend"
 USovFrontendComponent::USovFrontendComponent()
 {
+    bAutoActivate = true;
     PrimaryComponentTick.bCanEverTick = true;
     PrimaryComponentTick.bTickEvenWhenPaused = true;
     PrimaryComponentTick.TickInterval = 0.f;
@@ -43,7 +45,17 @@ void USovFrontendComponent::RefreshFrontend()
     auto* PC = Cast<ASovPlayerController>(GetOwner());
     if (bEnding || !IsActive() || !PC || !PC->IsLocalController() || !PC->GetLocalPlayer()
         || IsRunningCommandlet() || !FSlateApplication::IsInitialized())
-    { UnbindObjectives(); return; }
+    { UnbindObjectives(); RemoveCombatVitals(); return; }
+    if (bShowCombatVitals)
+    {
+        if (!CombatVitals)
+        {
+            CombatVitals = CreateWidget<USovCombatVitalsWidget>(PC, USovCombatVitalsWidget::StaticClass());
+            if (CombatVitals) { CombatVitals->AddToPlayerScreen(-1); }
+        }
+        if (CombatVitals) { CombatVitals->RefreshVitals(); }
+    }
+    else { RemoveCombatVitals(); }
     if (!Presentation)
     {
         Presentation = CreateWidget<USovAccessibilityPresentation>(PC, USovAccessibilityPresentation::StaticClass());
@@ -370,9 +382,18 @@ void USovFrontendComponent::Unbind()
     BoundTales.Reset(); BoundCues.Reset(); BoundASC.Reset();
     if (Presentation) { Presentation->ClearSpeech(); Presentation->ClearSceneHistory(); }
 }
+void USovFrontendComponent::RemoveCombatVitals()
+{
+    if (CombatVitals) { CombatVitals->RemoveFromParent(); CombatVitals = nullptr; }
+}
+void USovFrontendComponent::Deactivate()
+{
+    Super::Deactivate();
+    RemoveCombatVitals();
+}
 void USovFrontendComponent::EndPlay(const EEndPlayReason::Type Reason)
 {
-    bEnding = true; UnbindObjectives(); Unbind(); ReleaseSetupPause();
+    bEnding = true; UnbindObjectives(); Unbind(); ReleaseSetupPause(); RemoveCombatVitals();
     if (BoundSave.IsValid()) { BoundSave->OnLoadCompleted.RemoveDynamic(this, &ThisClass::OnLoadCompleted); }
     BoundSave.Reset(); bRecoveryMenuPending = false; RecoveryMessage.Reset();
     if (SetupMenu) { SetupMenu->DeactivateWidget(); SetupMenu = nullptr; }

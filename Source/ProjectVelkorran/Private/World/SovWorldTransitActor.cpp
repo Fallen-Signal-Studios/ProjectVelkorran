@@ -239,7 +239,7 @@ void ASovWorldTransitActor::SetPower(bool Value)
 }
 void ASovWorldTransitActor::SetLockReason(const FText& Reason)
 { if (HasAuthority()) { ++LockRevision; LockReason = Reason; UpdateLinks(); OnTransitChanged.Broadcast(State, Reason); } }
-float ASovWorldTransitActor::TakeDamage(float Amount, const FDamageEvent& Event, AController* Instigator, AActor* Causer)
+float ASovWorldTransitActor::TakeDamage(float Amount, const FDamageEvent& Event, AController* EventInstigator, AActor* Causer)
 {
     if (!HasAuthority() || !FMath::IsFinite(Amount) || Amount <= 0.f || StructuralHealth <= 0.f) { return 0.f; }
     const float Applied = FMath::Min(StructuralHealth, Amount); StructuralHealth -= Applied;

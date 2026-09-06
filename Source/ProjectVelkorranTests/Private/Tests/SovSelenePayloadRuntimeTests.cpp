@@ -1,6 +1,7 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Tests/SovSelenePayloadTestFixtures.h"
 #include "Tests/SovAxiomRuntimeTestFixtures.h"
+#include "Tests/SovRuntimeActorTestFixtures.h"
 #include "Combat/SovSelenePayload.h"
 #include "Components/BoxComponent.h"
 #include "Components/SovDeflectionComponent.h"
@@ -258,13 +259,22 @@ bool FSovSeleneDispatchQueuedInputTest::RunTest(const FString& Parameters)
 	auto* Source = Fixture.Character(FVector::ZeroVector, 0);
 	if (!Source) { AddError(TEXT("Fixture creation failed")); return false; }
 	auto* ASC = Source->GetNarrativeAbilitySystemComponent();
+	// WaitInputPress replays queued events only for an authority serving a remote
+	// player. An unpossessed authority pawn is locally controlled in GAS.
+	auto* RemotePC = Fixture.World->SpawnActor<ASovRuntimeTestPlayerController>();
+	if (!TestNotNull(TEXT("Remote ownership controller"), RemotePC)) { return false; }
+	RemotePC->Possess(Source);
+	ASC->InitAbilityActorInfo(Source, Source);
+	if (!TestTrue(TEXT("Authority exercises the actual queued remote-input branch"),
+		ASC->AbilityActorInfo->IsNetAuthority() && !ASC->AbilityActorInfo->IsLocallyControlled())) { return false; }
 	FGameplayAbilitySpec Spec(USovDispatchPayloadTestAbility::StaticClass(), 1, INDEX_NONE, Source->SetTestWeapon());
 	Spec.InputPressed = true;
 	const auto Handle = ASC->GiveAbility(Spec);
 	// Remote input can reach GAS before the authority's WaitInputPress task binds.
 	// This follows the same generic replicated-event channel used by Narrative input.
-	ASC->InvokeReplicatedEvent(EAbilityGenericReplicatedEvent::InputPressed, Handle, FPredictionKey());
-	if (!TestTrue(TEXT("Paid activation consumes queued input safely"), ASC->TryActivateAbility(Handle))) { return false; }
+	FPredictionKey RemotePrediction; RemotePrediction.Current = 1; // received client activation key
+	ASC->InvokeReplicatedEvent(EAbilityGenericReplicatedEvent::InputPressed, Handle, RemotePrediction);
+	if (!TestTrue(TEXT("Paid activation consumes queued input safely"), ASC->InternalTryActivateAbility(Handle, RemotePrediction))) { return false; }
 	auto* Projectile = Fixture.Projectile();
 	if (!TestNotNull(TEXT("Exactly one initialized returning actor"), Projectile)) { return false; }
 	TestTrue(TEXT("Early queued recall is applied after actor assignment"), Projectile->GetPayloadPhase() == ESovSeleneProjectilePhase::Recalling);
@@ -304,8 +314,13 @@ bool FSovSeleneFrozenDOTTest::RunTest(const FString& Parameters)
 	{
 		TGuardValue<uint64> FrameGuard(GFrameCounter, GFrameCounter + 1);
 		Fixture.World->Tick(LEVELTICK_All, 0.01f);
-		++GFrameCounter;
-		Fixture.World->Tick(LEVELTICK_All, 1.1f);
+		const double PeriodStarted = Fixture.World->GetTimeSeconds();
+		// WorldSettings clamps a single 1.1-second frame below the DOT period.
+		for (int32 Frame = 0; Frame < 22; ++Frame)
+		{
+			++GFrameCounter; Fixture.World->Tick(LEVELTICK_All, .05f);
+		}
+		TestTrue(TEXT("Actual world time crosses the periodic damage interval"), Fixture.World->GetTimeSeconds() - PeriodStarted > 1.0);
 	}
 	TestTrue(TEXT("Frozen target receives actual periodic damage"), SovSelenePayloadTests::Shield(Frozen) < 100.0f);
 	TestEqual(TEXT("Thawed target receives no frozen-only damage"), SovSelenePayloadTests::Shield(Thawed), 100.0f);

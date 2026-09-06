@@ -11,12 +11,16 @@
 #include "Misc/AutomationTest.h"
 #include "NarrativeGameplayTags.h"
 #include "Sovereign/SovGameplayTags.h"
+#include "UObject/Script.h"
 
 #if WITH_AUTOMATION_TESTS
 namespace
 {
 	struct FGuardRuntimeWorld
 	{
+#if WITH_EDITOR
+		FEditorScriptExecutionGuard AllowProductionReceivers;
+#endif
 		UWorld* World = nullptr;
 		FGuardRuntimeWorld()
 		{
@@ -210,6 +214,7 @@ bool FSovGuardRuntimeLastStaminaTest::RunTest(const FString& Parameters)
 	auto* Character = Fixture.Character();
 	auto* Source = Fixture.Character(FVector(200.f, 0.f, 0.f));
 	if (!TestNotNull(TEXT("Defender"), Character) || !TestNotNull(TEXT("Attacker"), Source)) { return false; }
+	Source->TestTeam = 0; // Damage routing requires a hostile source, including guard/counter packets.
 	auto* ASC = Character->GetNarrativeAbilitySystemComponent();
 	const auto Handle = GrantGuard(Character);
 	TestTrue(TEXT("Guard begins with sufficient start stamina"), ASC->TryActivateAbility(Handle));
@@ -238,6 +243,7 @@ bool FSovGuardRuntimeCounterTransitionTest::RunTest(const FString& Parameters)
 	auto* Character = Fixture.Character();
 	auto* Source = Fixture.Character(FVector(200.f, 0.f, 0.f));
 	if (!TestNotNull(TEXT("Defender"), Character) || !TestNotNull(TEXT("Attacker"), Source)) { return false; }
+	Source->TestTeam = 0; // Damage routing requires a hostile source, including guard/counter packets.
 	auto* ASC = Character->GetNarrativeAbilitySystemComponent();
 	const auto Handle = GrantGuard(Character);
 	TestTrue(TEXT("Guard activation succeeds"), ASC->TryActivateAbility(Handle));

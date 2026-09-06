@@ -271,7 +271,7 @@ void USovCorruptionComponent::TickComponent(float DeltaTime, ELevelTick TickType
 	TSet<USovCorruptionProfile*> ContactProfiles;
 	for (auto It = Sources.CreateIterator(); It; ++It)
 	{
-		ESovCorruptionBand Cap; FName SourceMission; float Falloff = 0.0f;
+		ESovCorruptionBand Cap = ESovCorruptionBand::Clear; FName SourceMission = NAME_None; float Falloff = 0.0f;
 		auto* Profile = It.Value().Profile.Get();
 		auto* Source = It.Value().Source.Get();
 		auto* Producer = It.Value().Producer.Get();

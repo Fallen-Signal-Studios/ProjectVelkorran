@@ -214,7 +214,17 @@ void USovShieldComponent::SetCheckpointRestoreInProgress(const bool bInProgress,
 		bCheckpointStateReconciled = false; ClearLifecycleTimers(); ++ReviveRebindGeneration;
 		if (GetWorld()) { GetWorld()->GetTimerManager().ClearTimer(ReviveRebindTimerHandle); }
 	}
-	else if (bResumePassiveWork && bCheckpointStateReconciled && CanWriteShield()) { TryStartRecharge(); }
+	else if (bResumePassiveWork && bCheckpointStateReconciled && CanWriteShield())
+	{
+		// Time spent behind the restore barrier must not consume the fresh delay.
+		if (GetShield() + KINDA_SMALL_NUMBER < GetMaxShield())
+		{
+			bHasRecordedShieldDamage = true;
+			bRechargeDelayElapsed = false;
+			LastShieldDamageWorldTime = GetWorldTimeSeconds();
+		}
+		TryStartRecharge();
+	}
 	else { bCheckpointStateReconciled = false; ClearLifecycleTimers(); }
 }
 
@@ -720,9 +730,10 @@ void USovShieldComponent::HandleDamageResolved(const FSovDamageResult& Result)
 	// This path covers hits against an already-depleted Shield and explicit
 	// recharge-reset packets, which otherwise have no attribute transition.
 	if (!bRestoringCheckpoint && CanWriteShield()
-		&& Result.TargetActor == GetOwner() && Result.IsCurrentTargetLife()
+		&& Result.TargetActor == GetOwner() && Result.IsCurrentTargetLife(AbilitySystemComponent)
 		&& Result.bShouldRestartShieldRecharge
-		&& Result.AppliedShieldDamage <= KINDA_SMALL_NUMBER)
+		&& Result.AppliedShieldDamage <= KINDA_SMALL_NUMBER
+		&& Result.ConsumeNativeReceipt(this))
 	{
 		RecordShieldDamage();
 	}

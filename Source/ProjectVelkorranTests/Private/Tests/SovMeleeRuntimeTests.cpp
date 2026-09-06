@@ -9,6 +9,8 @@
 #include "Components/BoxComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "Character/PlayerDefinition.h"
+#include "Framework/SovPlayerState.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
 #include "GAS/NarrativeAttributeSetBase.h"
 #include "Misc/AutomationTest.h"
@@ -49,6 +51,17 @@ struct FMeleeWorld
         if (Actor) { Actor->InitializeTestCombat(Team); Actor->GetCapsuleComponent()->SetCollisionResponseToChannel(UArsenalStatics::GetNarrativeProSettings()->WeaponTraceChannel,ECR_Block); }
         return Actor;
     }
+    ASovMeleeRuntimeTestPlayer* ReadyPlayer(FVector Location)
+    {
+        FActorSpawnParameters Spawn; Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+        auto* Player = World->SpawnActor<ASovMeleeRuntimeTestPlayer>(ASovMeleeRuntimeTestPlayer::StaticClass(), Location, FRotator::ZeroRotator, Spawn);
+        auto* Controller = World->SpawnActor<ASovHandoffRuntimeTestController>();
+        auto* State = World->SpawnActor<ASovPlayerState>();
+        if (!Player || !Controller || !State) { return nullptr; }
+        auto* Definition = NewObject<UPlayerDefinition>(Controller); Controller->KeepAlive.Add(Definition);
+        Player->PrepareCampaignInitialization(Definition); Controller->SetTestPlayerState(State); Controller->Possess(Player);
+        return Player->StageTestReadiness(State, true) && Player->CompleteCampaignDataInitialization(false) ? Player : nullptr;
+    }
     void Advance(USovGameplayAbility_Melee* Ability,float Seconds)
     {
         TGuardValue<uint64> Frame(GFrameCounter,GFrameCounter+1); World->Tick(LEVELTICK_TimeOnly,Seconds);
@@ -60,7 +73,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovMeleeSweepAndLedgerRuntimeTest,
     "ProjectVelkorran.Campaign.Melee.SocketSweepLedgerAndFiniteBranch",EAutomationTestFlags::EditorContext|EAutomationTestFlags::ProductFilter)
 bool FSovMeleeSweepAndLedgerRuntimeTest::RunTest(const FString& Parameters)
 {
-    FMeleeWorld F; auto* Source=F.Character(FVector(0,0,100),0); auto* Target=F.Character(FVector(90,0,100),1);
+    FMeleeWorld F; auto* Source=F.ReadyPlayer(FVector(0,0,100)); auto* Target=F.Character(FVector(90,0,100),1);
     if (!Source||!Target) { return false; }
     auto* Mesh=NewObject<USovMeleeRuntimeTestMesh>(Source); Source->AddInstanceComponent(Mesh);
     Mesh->SetupAttachment(Source->GetRootComponent()); Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision); Mesh->RegisterComponent();
@@ -69,6 +82,7 @@ bool FSovMeleeSweepAndLedgerRuntimeTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Native definition admits attack"),ASC->TryActivateAbility(Handle,false));
     auto* Ability=Cast<USovMeleeRuntimeTestAbility>(ASC->FindAbilitySpecFromHandle(Handle)->GetPrimaryInstance());
     if (!TestNotNull(TEXT("Ability instance"),Ability)) { return false; }
+    TestTrue(TEXT("Combo input belongs to a ready possessed campaign player"), Source->IsCharacterReady() && Source->GetController() != nullptr);
     auto* StaleTask=FSovMeleeRuntimeTestAccess::AdditionalTask(Ability,Mesh);
     F.Advance(Ability,.15f); Mesh->SetWorldLocation(FVector(180,0,100)); F.Advance(Ability,.1f);
     TestEqual(TEXT("A fast socket sweep catches crossed target"),Target->ResolvedHitCount,1);

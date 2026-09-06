@@ -1,0 +1,1456 @@
+{
+  "schema": 2,
+  "authored_date": "2026-09-06",
+  "engine": "UE 5.7.4 / CL 51494982",
+  "scope": "Native protagonist kits, coherent project inputs/loadouts, projectile presentation, weapon metadata and combat HUD, and failure-menu footer",
+  "scripts": {
+    "Scripts/Editor/setup_protagonist_native_kits.py": "7038053ceb37b8e2e46c838dc7f299183db999c7d5c8e4cbed7b69605ca96b2a",
+    "Scripts/Editor/setup_protagonist_projectile_presentation.py": "91f5429bfeac9ca1dd27b843c8fe732dc27e10d905db929eee148cd99c5ea9dc",
+    "Scripts/Editor/verify_protagonist_setup_source_templates.py": "04eb2f4b94c1a37d6c207b87c072f1a7ad0aefb605095e16ebf861b28291c439",
+    "Scripts/Editor/protagonist_equipment_order.py": "e464d56d4b37f9efa9774752278ce6b2a3d97413bd4f847b7dc01d1e6fc86a05",
+    "Scripts/Editor/probe_loadout_slot_rules_readonly.py": "78e904e6b78fdde2d49116e1cbc46b4a346a05f1bc6c932a4f17e55d4e87591b",
+    "Scripts/Editor/setup_project_loadout_order.py": "ed7c6450221567eea88db3fdc2514c5d6e75bd10f1420c75a932c5bab0b3171d",
+    "Scripts/Editor/probe_combat_hud_layout_readonly.py": "40abe4a790c9eb5f315ba278282b4de1dae80efb7106ec4c78c18b26df28ae0c",
+    "Scripts/Editor/setup_combat_hud_layout.py": "cb8e65f344e527632144292f3fe9964c045da0edec45c614b33e32895711ce4a",
+    "Scripts/Editor/probe_weapon_display_metadata_readonly.py": "6f0d399744cf05d68a11eec0092514fac8ef8745129e3eeeae5a25531179f21b",
+    "Scripts/Editor/setup_project_weapon_display.py": "d76cece833a16cf769396b08c1215308255b032169f4e2860731fbb58b912f88",
+    "Scripts/Editor/probe_weapon_presentation_health_readonly.py": "a68033cab372eb0bbb751734c0224a5c8eea945e433c6b5f2c576c490f8a7ff8",
+    "Scripts/Editor/setup_project_weapon_presentation_repairs.py": "0eedd513c8246ef109c588bfca3e2e5983a1c3036214184653e42c40c0993b44",
+    "Scripts/Editor/setup_project_failure_menu_footer.py": "3983c8fde1fc07e450810810e12a91174329a0c734d8c19cf1b7a9d65a412a91"
+  },
+  "packages": [
+    {
+      "package": "/Game/Abilities/Common/GA_Cover",
+      "file": "Content/Abilities/Common/GA_Cover.uasset",
+      "bytes": 231979,
+      "sha256": "8288b42f7baa9f3ab28dba96d36e130b18f111749e2211d628a7d575def2907c"
+    },
+    {
+      "package": "/Game/Abilities/Common/GA_Evade",
+      "file": "Content/Abilities/Common/GA_Evade.uasset",
+      "bytes": 15817,
+      "sha256": "5b91216404f76d5c948061294e9e1b9114415c216a11e64103056de7d9e10d34"
+    },
+    {
+      "package": "/Game/Abilities/Common/GA_Sprint",
+      "file": "Content/Abilities/Common/GA_Sprint.uasset",
+      "bytes": 15837,
+      "sha256": "55a3db5d2b59cca167e8116de5cd88670d3a8b7aa594e687a22a00f1e58708b9"
+    },
+    {
+      "package": "/Game/Abilities/Common/GA_WeaponBash",
+      "file": "Content/Abilities/Common/GA_WeaponBash.uasset",
+      "bytes": 57622,
+      "sha256": "55d9c6df13702254216591894ed7600ee00ccc87d21be31bb232497920f64878"
+    },
+    {
+      "package": "/Game/Abilities/Configurations/AC_Selene",
+      "file": "Content/Abilities/Configurations/AC_Selene.uasset",
+      "bytes": 3507,
+      "sha256": "f1f11e50acda18b5085ae65ada20858ea109496453becd7dedf1b6d8f83e8f9f"
+    },
+    {
+      "package": "/Game/Abilities/Configurations/AC_Tarrik",
+      "file": "Content/Abilities/Configurations/AC_Tarrik.uasset",
+      "bytes": 3348,
+      "sha256": "038359a3e95dc006dcc6b23c7c0c3f4637384ccaefc44b62e0ad4eb2331e3440"
+    },
+    {
+      "package": "/Game/Abilities/Effects/GE_Selene_DefaultAttributes",
+      "file": "Content/Abilities/Effects/GE_Selene_DefaultAttributes.uasset",
+      "bytes": 58732,
+      "sha256": "2d0414263d89155dafb7ec0e2f7c9770fda304d737de841614e18b1476545780"
+    },
+    {
+      "package": "/Game/Abilities/Effects/GE_Tarrik_DefaultAttributes",
+      "file": "Content/Abilities/Effects/GE_Tarrik_DefaultAttributes.uasset",
+      "bytes": 58732,
+      "sha256": "fe8318283dce84893c8ddffe3aec0d7c2331608018ddee8698318e8581aaea08"
+    },
+    {
+      "package": "/Game/Abilities/Presentation/BP_CinderGrenadeProjectile",
+      "file": "Content/Abilities/Presentation/BP_CinderGrenadeProjectile.uasset",
+      "bytes": 31854,
+      "sha256": "fb75dcbc2e77d3b3273ea36537afe5ee4f973ae46864f7d48b89d5258068a888"
+    },
+    {
+      "package": "/Game/Abilities/Presentation/BP_DispatchProjectile",
+      "file": "Content/Abilities/Presentation/BP_DispatchProjectile.uasset",
+      "bytes": 32460,
+      "sha256": "684515035bb59990980aa452217f1609327092f5c60a606f96aae4abeef2b91e"
+    },
+    {
+      "package": "/Game/Abilities/Presentation/BP_StillpointProjectile",
+      "file": "Content/Abilities/Presentation/BP_StillpointProjectile.uasset",
+      "bytes": 33464,
+      "sha256": "0f94c25f6680ea170e0f541a30ced74ecf359cd19a348e38aec01aac86d62160"
+    },
+    {
+      "package": "/Game/Abilities/Presentation/BP_VelkorransHungerProjectile",
+      "file": "Content/Abilities/Presentation/BP_VelkorransHungerProjectile.uasset",
+      "bytes": 38077,
+      "sha256": "e9a0d5cb044dc46ba659b2681e2d43cc16aab16292b9b5bdbf256c68ce9241ce"
+    },
+    {
+      "package": "/Game/Abilities/Presentation/BP_VeritysWakeProjectile",
+      "file": "Content/Abilities/Presentation/BP_VeritysWakeProjectile.uasset",
+      "bytes": 33862,
+      "sha256": "0b441ceac57a4f8c90d214da554df60d20967b9bdbee8c7f07dfe0a691506a46"
+    },
+    {
+      "package": "/Game/Abilities/Presentation/M_EchoCryo",
+      "file": "Content/Abilities/Presentation/M_EchoCryo.uasset",
+      "bytes": 8987,
+      "sha256": "b974fa8fe994892ccd0bb1a75cb5f63a1ed886c324c7d42fb856f77acccdd2a6"
+    },
+    {
+      "package": "/Game/Abilities/Selene/GA_Selene_AxiomNullPulse",
+      "file": "Content/Abilities/Selene/GA_Selene_AxiomNullPulse.uasset",
+      "bytes": 16343,
+      "sha256": "88807b50b41616d17872769371c5971d663b6ab150bb358426051f3b7c357614"
+    },
+    {
+      "package": "/Game/Abilities/Selene/GA_Selene_Deflection",
+      "file": "Content/Abilities/Selene/GA_Selene_Deflection.uasset",
+      "bytes": 16053,
+      "sha256": "4c6624b6b34863fe4da0ba88e5467f895727bfd4a888bdca96850fab934c8b36"
+    },
+    {
+      "package": "/Game/Abilities/Selene/GA_Selene_Dispatch",
+      "file": "Content/Abilities/Selene/GA_Selene_Dispatch.uasset",
+      "bytes": 16453,
+      "sha256": "c46eef2565be8e44bacf69a2d4fc721837f363db533d9cc4eeabe89ec0f3b53f"
+    },
+    {
+      "package": "/Game/Abilities/Selene/GA_Selene_StaccatoZero",
+      "file": "Content/Abilities/Selene/GA_Selene_StaccatoZero.uasset",
+      "bytes": 16309,
+      "sha256": "f15d2186f235fffc3206b7952b54354a67bc56f38192c5eafe4bc937b4f00780"
+    },
+    {
+      "package": "/Game/Abilities/Selene/GA_Selene_StillpointGrenade",
+      "file": "Content/Abilities/Selene/GA_Selene_StillpointGrenade.uasset",
+      "bytes": 16916,
+      "sha256": "bafbfd6b06dd8d0ff52e7b043493310e5751a6b7f93bbc7beaef262168132cfe"
+    },
+    {
+      "package": "/Game/Abilities/Selene/GA_Selene_VeritysWake",
+      "file": "Content/Abilities/Selene/GA_Selene_VeritysWake.uasset",
+      "bytes": 16509,
+      "sha256": "934026b25224c152fd8942f44e395b7dfbf259183296a11b9df04c0046e4d62b"
+    },
+    {
+      "package": "/Game/Abilities/Tarrik/GA_Tarrik_CinderJudgement",
+      "file": "Content/Abilities/Tarrik/GA_Tarrik_CinderJudgement.uasset",
+      "bytes": 16373,
+      "sha256": "25d25e9cbfd442d02d3b0069586bffdde2c2e8e42f97640d73f9001ca4ef9850"
+    },
+    {
+      "package": "/Game/Abilities/Tarrik/GA_Tarrik_CinderSlam",
+      "file": "Content/Abilities/Tarrik/GA_Tarrik_CinderSlam.uasset",
+      "bytes": 16271,
+      "sha256": "4b5d085ece4ae076ec07eb476d1c8a37ab06a85e4f6cd930e6d8d3f23cedd01a"
+    },
+    {
+      "package": "/Game/Abilities/Tarrik/GA_Tarrik_CinderStickyGrenade",
+      "file": "Content/Abilities/Tarrik/GA_Tarrik_CinderStickyGrenade.uasset",
+      "bytes": 16464,
+      "sha256": "8e04113e1b05c5a05a690d6e0d110ee626277c557462cb318b1e0dbd4bd06b01"
+    },
+    {
+      "package": "/Game/Abilities/Tarrik/GA_Tarrik_CinderlineRequiem",
+      "file": "Content/Abilities/Tarrik/GA_Tarrik_CinderlineRequiem.uasset",
+      "bytes": 16413,
+      "sha256": "9c71b2407e7775bfe3dd5656ab6491023d7f1c42940c847798738534c6414fb3"
+    },
+    {
+      "package": "/Game/Abilities/Tarrik/GA_Tarrik_Guard",
+      "file": "Content/Abilities/Tarrik/GA_Tarrik_Guard.uasset",
+      "bytes": 15953,
+      "sha256": "caf56c4daea7394a88fef4b26a6909e427d2a7040550590b9924319126e41e57"
+    },
+    {
+      "package": "/Game/Abilities/Tarrik/GA_Tarrik_VelkorransHunger",
+      "file": "Content/Abilities/Tarrik/GA_Tarrik_VelkorransHunger.uasset",
+      "bytes": 16631,
+      "sha256": "e46abb620e27acfa47924af25f6d83b32326a0721307a0bd790d8ef8c3e0cb1f"
+    },
+    {
+      "package": "/Game/Characters/Animation/ABP_SovVerityOverlay",
+      "file": "Content/Characters/Animation/ABP_SovVerityOverlay.uasset",
+      "bytes": 47925,
+      "sha256": "da7cfd919344a3bd2d12a627bd46a131c5aad7a1b67b213f5712382926407bbd"
+    },
+    {
+      "package": "/Game/Characters/Definitions/PD_Selene",
+      "file": "Content/Characters/Definitions/PD_Selene.uasset",
+      "bytes": 4076,
+      "sha256": "a3e510e6c013fef9245669cd3d5d7bb4993ac0b9f756dd28aa14e2c7b89c0711"
+    },
+    {
+      "package": "/Game/Characters/Definitions/PD_Tarrik",
+      "file": "Content/Characters/Definitions/PD_Tarrik.uasset",
+      "bytes": 4108,
+      "sha256": "f08231427336ea1489d2bcc1be1793a23803e699fed544e790cd2427091aa252"
+    },
+    {
+      "package": "/Game/Framework/BP_SovPlayerController",
+      "file": "Content/Framework/BP_SovPlayerController.uasset",
+      "bytes": 2098908,
+      "sha256": "25b3681837cf509277685143577ed8c228f0aeed32558840c942e6e9244f0c95"
+    },
+    {
+      "package": "/Game/Input/DA_CombatInputs",
+      "file": "Content/Input/DA_CombatInputs.uasset",
+      "bytes": 7665,
+      "sha256": "25c67ba2aae76dc73d7225e3782e5b1dc6f6c3a6f6200f4eba0de74c599565e9"
+    },
+    {
+      "package": "/Game/Input/IA_Evade",
+      "file": "Content/Input/IA_Evade.uasset",
+      "bytes": 2159,
+      "sha256": "521f9798f00dedba91c1db29fa8df79594c887560f3abe29fefa3f307a4b3f00"
+    },
+    {
+      "package": "/Game/Input/IA_Grenade",
+      "file": "Content/Input/IA_Grenade.uasset",
+      "bytes": 2168,
+      "sha256": "157d3b69661d07c2177c95e6d1c4d7ff7aa540e15c267cf5d349d0e69d58ede3"
+    },
+    {
+      "package": "/Game/Input/IMC_Combat",
+      "file": "Content/Input/IMC_Combat.uasset",
+      "bytes": 23138,
+      "sha256": "16f3171e86fb4f5664901f16ad902b5f4d3b9906f61abf9c29b82ad6f467005e"
+    },
+    {
+      "package": "/Game/Items/Loadouts/IC_Selene",
+      "file": "Content/Items/Loadouts/IC_Selene.uasset",
+      "bytes": 2249,
+      "sha256": "a402cf9813839dc8268391533f5c04aedc4d0de99050099ffb61271099ff8236"
+    },
+    {
+      "package": "/Game/Items/Loadouts/IC_Tarrik",
+      "file": "Content/Items/Loadouts/IC_Tarrik.uasset",
+      "bytes": 1916,
+      "sha256": "32aa501c1069fc0e369a4ea58c667b945e149a89ad8620219ab2db99b90a5e25"
+    },
+    {
+      "package": "/Game/Items/Weapons/WI_Axiom",
+      "file": "Content/Items/Weapons/WI_Axiom.uasset",
+      "bytes": 37298,
+      "sha256": "807b65c3487b77415d71f819f1f64d3541c1a19a7152b0e39e99186854566359"
+    },
+    {
+      "package": "/Game/Items/Weapons/WI_Cinderline",
+      "file": "Content/Items/Weapons/WI_Cinderline.uasset",
+      "bytes": 10117,
+      "sha256": "201d8a5d75dc6c9a86d755fe3dceebf9a14c7f18652d04fd3ead101da7c93ff3"
+    },
+    {
+      "package": "/Game/Items/Weapons/WI_Staccato",
+      "file": "Content/Items/Weapons/WI_Staccato.uasset",
+      "bytes": 13865,
+      "sha256": "6c9c0a8a2cb45a062f8a73e5f781e7559e5bbdf92b3871015f582157fc5322b9"
+    },
+    {
+      "package": "/Game/Items/Weapons/WI_Velkorran",
+      "file": "Content/Items/Weapons/WI_Velkorran.uasset",
+      "bytes": 9109,
+      "sha256": "88d357803c691008e6555b7a6027819ec7a964c5892f6793815430d700ff8cc9"
+    },
+    {
+      "package": "/Game/Items/Weapons/WI_Verity",
+      "file": "Content/Items/Weapons/WI_Verity.uasset",
+      "bytes": 9269,
+      "sha256": "aae537c88f3c86469cb0560df14553b3d6328c1ff71f1bf5b6934f10bc9f4790"
+    },
+    {
+      "package": "/Game/UI/Narrative/Menus/Fail/W_NarrativeMenu_Failed",
+      "file": "Content/UI/Narrative/Menus/Fail/W_NarrativeMenu_Failed.uasset",
+      "bytes": 239513,
+      "sha256": "ea180935b64e504b91372ff862b3b233f35267abfbb60558d21bf2aa07761008"
+    },
+    {
+      "package": "/Game/UI/Narrative/Menus/GameHUD/WBP_DefaultGameplayHUD",
+      "file": "Content/UI/Narrative/Menus/GameHUD/WBP_DefaultGameplayHUD.uasset",
+      "bytes": 216642,
+      "sha256": "1a3969cf5af3b0cf61875f33e0ab4406d2bf5214b0e405a035c39e0f78dbbe86"
+    },
+    {
+      "package": "/Game/Weapons/Visuals/BP_SovVerityWeaponVisual",
+      "file": "Content/Weapons/Visuals/BP_SovVerityWeaponVisual.uasset",
+      "bytes": 39376,
+      "sha256": "7d4cc28ecdbbda1badbd0c64d3a36f851eeb7b04f2b3fb3a5fe7cce7d1005f65"
+    }
+  ],
+  "execution_order": [
+    "project framework setup",
+    "verify_protagonist_setup_source_templates.py",
+    "project controller UI setup",
+    "probe_weapon_display_metadata_readonly.py",
+    "setup_project_weapon_display.py",
+    "PIE with equipped weapon: probe_combat_hud_layout_readonly.py",
+    "end PIE: setup_combat_hud_layout.py",
+    "probe_weapon_presentation_health_readonly.py",
+    "setup_project_weapon_presentation_repairs.py",
+    "end PIE: setup_project_failure_menu_footer.py",
+    "verify_controller_ui_remap_readonly.py"
+  ],
+  "required_template_roots": [
+    "/NarrativePro/Pro/Core",
+    "/NarrativePro/Pro/Demo",
+    "/Game/WeaponMeshes",
+    "/Game/SCF_Rifle_02",
+    "/Game/Fire_Magic"
+  ],
+  "abilities": {
+    "CinderStickyGrenade": {
+      "asset": "/Game/Abilities/Tarrik/GA_Tarrik_CinderStickyGrenade.GA_Tarrik_CinderStickyGrenade",
+      "native_parent": "/Script/ProjectVelkorran.SovGameplayAbility_TarrikCinderStickyGrenade",
+      "input": "Narrative.Input.Ability1",
+      "echo": 35.0,
+      "allowed_weapons": []
+    },
+    "VelkorransHunger": {
+      "asset": "/Game/Abilities/Tarrik/GA_Tarrik_VelkorransHunger.GA_Tarrik_VelkorransHunger",
+      "native_parent": "/Script/ProjectVelkorran.SovGameplayAbility_TarrikVelkorransHunger",
+      "input": "Narrative.Input.Ability2",
+      "echo": 50.0,
+      "allowed_weapons": [
+        "/Game/Items/Weapons/WI_Velkorran.WI_Velkorran_C"
+      ]
+    },
+    "CinderSlam": {
+      "asset": "/Game/Abilities/Tarrik/GA_Tarrik_CinderSlam.GA_Tarrik_CinderSlam",
+      "native_parent": "/Script/ProjectVelkorran.SovGameplayAbility_TarrikCinderSlam",
+      "input": "Narrative.Input.Ability3",
+      "echo": 90.0,
+      "allowed_weapons": [
+        "/Game/Items/Weapons/WI_Velkorran.WI_Velkorran_C"
+      ]
+    },
+    "CinderJudgement": {
+      "asset": "/Game/Abilities/Tarrik/GA_Tarrik_CinderJudgement.GA_Tarrik_CinderJudgement",
+      "native_parent": "/Script/ProjectVelkorran.SovGameplayAbility_TarrikCinderJudgement",
+      "input": "Narrative.Input.Ability2",
+      "echo": 50.0,
+      "allowed_weapons": [
+        "/Game/Items/Weapons/WI_Cinderline.WI_Cinderline_C"
+      ]
+    },
+    "CinderlineRequiem": {
+      "asset": "/Game/Abilities/Tarrik/GA_Tarrik_CinderlineRequiem.GA_Tarrik_CinderlineRequiem",
+      "native_parent": "/Script/ProjectVelkorran.SovGameplayAbility_TarrikCinderlineRequiem",
+      "input": "Narrative.Input.Ability3",
+      "echo": 90.0,
+      "allowed_weapons": [
+        "/Game/Items/Weapons/WI_Cinderline.WI_Cinderline_C"
+      ]
+    },
+    "StillpointGrenade": {
+      "asset": "/Game/Abilities/Selene/GA_Selene_StillpointGrenade.GA_Selene_StillpointGrenade",
+      "native_parent": "/Script/ProjectVelkorran.SovGameplayAbility_SeleneStillpointGrenade",
+      "input": "Narrative.Input.Ability1",
+      "echo": 35.0,
+      "allowed_weapons": [
+        "/Game/Items/Weapons/WI_Verity.WI_Verity_C",
+        "/Game/Items/Weapons/WI_Staccato.WI_Staccato_C",
+        "/Game/Items/Weapons/WI_Axiom.WI_Axiom_C"
+      ]
+    },
+    "VeritysWake": {
+      "asset": "/Game/Abilities/Selene/GA_Selene_VeritysWake.GA_Selene_VeritysWake",
+      "native_parent": "/Script/ProjectVelkorran.SovGameplayAbility_SeleneVeritysWake",
+      "input": "Narrative.Input.Ability2",
+      "echo": 30.0,
+      "allowed_weapons": [
+        "/Game/Items/Weapons/WI_Verity.WI_Verity_C"
+      ]
+    },
+    "StaccatoZero": {
+      "asset": "/Game/Abilities/Selene/GA_Selene_StaccatoZero.GA_Selene_StaccatoZero",
+      "native_parent": "/Script/ProjectVelkorran.SovGameplayAbility_SeleneStaccatoZero",
+      "input": "Narrative.Input.Ability2",
+      "echo": 30.0,
+      "allowed_weapons": [
+        "/Game/Items/Weapons/WI_Staccato.WI_Staccato_C"
+      ]
+    },
+    "AxiomNullPulse": {
+      "asset": "/Game/Abilities/Selene/GA_Selene_AxiomNullPulse.GA_Selene_AxiomNullPulse",
+      "native_parent": "/Script/ProjectVelkorran.SovGameplayAbility_SeleneAxiomNullPulse",
+      "input": "Narrative.Input.Ability2",
+      "echo": 30.0,
+      "allowed_weapons": [
+        "/Game/Items/Weapons/WI_Axiom.WI_Axiom_C"
+      ]
+    },
+    "Dispatch": {
+      "asset": "/Game/Abilities/Selene/GA_Selene_Dispatch.GA_Selene_Dispatch",
+      "native_parent": "/Script/ProjectVelkorran.SovGameplayAbility_SeleneDispatch",
+      "input": "Narrative.Input.Ability3",
+      "echo": 90.0,
+      "allowed_weapons": []
+    }
+  },
+  "grant_validation": [
+    {
+      "hero": "Tarrik",
+      "context": "Unarmed",
+      "claims": {
+        "Narrative.Input.Attack": [
+          "/NarrativePro/Pro/Core/Abilities/GameplayAbilities/Attacks/Melee/GA_Melee_Punch_Unarmed.GA_Melee_Punch_Unarmed_C"
+        ],
+        "Narrative.Input.Crouch": [
+          "/NarrativePro/Pro/Core/Abilities/GameplayAbilities/Movement/GA_Crouch.GA_Crouch_C"
+        ],
+        "Narrative.Input.Jump": [
+          "/NarrativePro/Pro/Core/Abilities/GameplayAbilities/Movement/GA_Jump.GA_Jump_C"
+        ],
+        "Narrative.Input.Reload": [
+          "/NarrativePro/Pro/Core/Abilities/GameplayAbilities/Weapons/GA_Weapon_Reload.GA_Weapon_Reload_C"
+        ],
+        "Narrative.Input.Sprint": [
+          "/Game/Abilities/Common/GA_Sprint.GA_Sprint_C"
+        ],
+        "Narrative.Input.Evade": [
+          "/Game/Abilities/Common/GA_Evade.GA_Evade_C"
+        ],
+        "Narrative.Input.Cover": [
+          "/Game/Abilities/Common/GA_Cover.GA_Cover_C"
+        ],
+        "Narrative.Input.Ability1": [
+          "/Game/Abilities/Tarrik/GA_Tarrik_CinderStickyGrenade.GA_Tarrik_CinderStickyGrenade_C"
+        ]
+      },
+      "excluded": [],
+      "duplicates": {}
+    },
+    {
+      "hero": "Tarrik",
+      "context": "Velkorran",
+      "claims": {
+        "Narrative.Input.Crouch": [
+          "/NarrativePro/Pro/Core/Abilities/GameplayAbilities/Movement/GA_Crouch.GA_Crouch_C"
+        ],
+        "Narrative.Input.Jump": [
+          "/NarrativePro/Pro/Core/Abilities/GameplayAbilities/Movement/GA_Jump.GA_Jump_C"
+        ],
+        "Narrative.Input.Reload": [
+          "/NarrativePro/Pro/Core/Abilities/GameplayAbilities/Weapons/GA_Weapon_Reload.GA_Weapon_Reload_C"
+        ],
+        "Narrative.Input.Sprint": [
+          "/Game/Abilities/Common/GA_Sprint.GA_Sprint_C"
+        ],
+        "Narrative.Input.Evade": [
+          "/Game/Abilities/Common/GA_Evade.GA_Evade_C"
+        ],
+        "Narrative.Input.Cover": [
+          "/Game/Abilities/Common/GA_Cover.GA_Cover_C"
+        ],
+        "Narrative.Input.Ability1": [
+          "/Game/Abilities/Tarrik/GA_Tarrik_CinderStickyGrenade.GA_Tarrik_CinderStickyGrenade_C"
+        ],
+        "Narrative.Input.Attack": [
+          "/NarrativePro/Pro/Demo/Items/Examples/Items/Weapons/Melee/Abilities/GA_Attack_Melee_Sword_1H_Tarrik.GA_Attack_Melee_Sword_1H_Tarrik_C"
+        ],
+        "Narrative.Input.AltAttack": [
+          "/Game/Abilities/Tarrik/GA_Tarrik_Guard.GA_Tarrik_Guard_C"
+        ],
+        "Narrative.Input.Ability2": [
+          "/Game/Abilities/Tarrik/GA_Tarrik_VelkorransHunger.GA_Tarrik_VelkorransHunger_C"
+        ],
+        "Narrative.Input.Ability3": [
+          "/Game/Abilities/Tarrik/GA_Tarrik_CinderSlam.GA_Tarrik_CinderSlam_C"
+        ]
+      },
+      "excluded": [
+        {
+          "class": "/NarrativePro/Pro/Core/Abilities/GameplayAbilities/Attacks/Melee/GA_Melee_Punch_Unarmed.GA_Melee_Punch_Unarmed_C",
+          "reason": "authored Equipped blocker excludes the unarmed attack"
+        }
+      ],
+      "duplicates": {}
+    },
+    {
+      "hero": "Tarrik",
+      "context": "Cinderline",
+      "claims": {
+        "Narrative.Input.Crouch": [
+          "/NarrativePro/Pro/Core/Abilities/GameplayAbilities/Movement/GA_Crouch.GA_Crouch_C"
+        ],
+        "Narrative.Input.Jump": [
+          "/NarrativePro/Pro/Core/Abilities/GameplayAbilities/Movement/GA_Jump.GA_Jump_C"
+        ],
+        "Narrative.Input.Reload": [
+          "/NarrativePro/Pro/Core/Abilities/GameplayAbilities/Weapons/GA_Weapon_Reload.GA_Weapon_Reload_C"
+        ],
+        "Narrative.Input.Sprint": [
+          "/Game/Abilities/Common/GA_Sprint.GA_Sprint_C"
+        ],
+        "Narrative.Input.Evade": [
+          "/Game/Abilities/Common/GA_Evade.GA_Evade_C"
+        ],
+        "Narrative.Input.Cover": [
+          "/Game/Abilities/Common/GA_Cover.GA_Cover_C"
+        ],
+        "Narrative.Input.Ability1": [
+          "/Game/Abilities/Tarrik/GA_Tarrik_CinderStickyGrenade.GA_Tarrik_CinderStickyGrenade_C"
+        ],
+        "Narrative.Input.Attack": [
+          "/NarrativePro/Pro/Core/Abilities/GameplayAbilities/Attacks/Firearms/GA_Firearm_Cinderline.GA_Firearm_Cinderline_C"
+        ],
+        "Narrative.Input.AltAttack": [
+          "/NarrativePro/Pro/Core/Abilities/GameplayAbilities/Weapons/GA_Weapon_Aim.GA_Weapon_Aim_C"
+        ],
+        "Narrative.Input.Attack.Heavy": [
+          "/Game/Abilities/Common/GA_WeaponBash.GA_WeaponBash_C"
+        ],
+        "Narrative.Input.Ability2": [
+          "/Game/Abilities/Tarrik/GA_Tarrik_CinderJudgement.GA_Tarrik_CinderJudgement_C"
+        ],
+        "Narrative.Input.Ability3": [
+          "/Game/Abilities/Tarrik/GA_Tarrik_CinderlineRequiem.GA_Tarrik_CinderlineRequiem_C"
+        ]
+      },
+      "excluded": [
+        {
+          "class": "/NarrativePro/Pro/Core/Abilities/GameplayAbilities/Attacks/Melee/GA_Melee_Punch_Unarmed.GA_Melee_Punch_Unarmed_C",
+          "reason": "authored Equipped blocker excludes the unarmed attack"
+        }
+      ],
+      "duplicates": {}
+    },
+    {
+      "hero": "Selene",
+      "context": "Unarmed",
+      "claims": {
+        "Narrative.Input.Attack": [
+          "/NarrativePro/Pro/Core/Abilities/GameplayAbilities/Attacks/Melee/GA_Melee_Punch_Unarmed.GA_Melee_Punch_Unarmed_C"
+        ],
+        "Narrative.Input.Crouch": [
+          "/NarrativePro/Pro/Core/Abilities/GameplayAbilities/Movement/GA_Crouch.GA_Crouch_C"
+        ],
+        "Narrative.Input.Jump": [
+          "/NarrativePro/Pro/Core/Abilities/GameplayAbilities/Movement/GA_Jump.GA_Jump_C"
+        ],
+        "Narrative.Input.Reload": [
+          "/NarrativePro/Pro/Core/Abilities/GameplayAbilities/Weapons/GA_Weapon_Reload.GA_Weapon_Reload_C"
+        ],
+        "Narrative.Input.Sprint": [
+          "/Game/Abilities/Common/GA_Sprint.GA_Sprint_C"
+        ],
+        "Narrative.Input.Evade": [
+          "/Game/Abilities/Common/GA_Evade.GA_Evade_C"
+        ],
+        "Narrative.Input.Cover": [
+          "/Game/Abilities/Common/GA_Cover.GA_Cover_C"
+        ],
+        "Narrative.Input.Ability1": [
+          "/Game/Abilities/Selene/GA_Selene_StillpointGrenade.GA_Selene_StillpointGrenade_C"
+        ],
+        "Narrative.Input.Ability3": [
+          "/Game/Abilities/Selene/GA_Selene_Dispatch.GA_Selene_Dispatch_C"
+        ]
+      },
+      "excluded": [],
+      "duplicates": {}
+    },
+    {
+      "hero": "Selene",
+      "context": "Verity",
+      "claims": {
+        "Narrative.Input.Crouch": [
+          "/NarrativePro/Pro/Core/Abilities/GameplayAbilities/Movement/GA_Crouch.GA_Crouch_C"
+        ],
+        "Narrative.Input.Jump": [
+          "/NarrativePro/Pro/Core/Abilities/GameplayAbilities/Movement/GA_Jump.GA_Jump_C"
+        ],
+        "Narrative.Input.Reload": [
+          "/NarrativePro/Pro/Core/Abilities/GameplayAbilities/Weapons/GA_Weapon_Reload.GA_Weapon_Reload_C"
+        ],
+        "Narrative.Input.Sprint": [
+          "/Game/Abilities/Common/GA_Sprint.GA_Sprint_C"
+        ],
+        "Narrative.Input.Evade": [
+          "/Game/Abilities/Common/GA_Evade.GA_Evade_C"
+        ],
+        "Narrative.Input.Cover": [
+          "/Game/Abilities/Common/GA_Cover.GA_Cover_C"
+        ],
+        "Narrative.Input.Ability1": [
+          "/Game/Abilities/Selene/GA_Selene_StillpointGrenade.GA_Selene_StillpointGrenade_C"
+        ],
+        "Narrative.Input.Ability3": [
+          "/Game/Abilities/Selene/GA_Selene_Dispatch.GA_Selene_Dispatch_C"
+        ],
+        "Narrative.Input.Attack": [
+          "/NarrativePro/Pro/Demo/Items/Examples/Items/Weapons/Melee/Abilities/GA_Attack_Melee_Verity.GA_Attack_Melee_Verity_C"
+        ],
+        "Narrative.Input.AltAttack": [
+          "/Game/Abilities/Selene/GA_Selene_Deflection.GA_Selene_Deflection_C"
+        ],
+        "Narrative.Input.Ability2": [
+          "/Game/Abilities/Selene/GA_Selene_VeritysWake.GA_Selene_VeritysWake_C"
+        ]
+      },
+      "excluded": [
+        {
+          "class": "/NarrativePro/Pro/Core/Abilities/GameplayAbilities/Attacks/Melee/GA_Melee_Punch_Unarmed.GA_Melee_Punch_Unarmed_C",
+          "reason": "authored Equipped blocker excludes the unarmed attack"
+        }
+      ],
+      "duplicates": {}
+    },
+    {
+      "hero": "Selene",
+      "context": "Staccato",
+      "claims": {
+        "Narrative.Input.Crouch": [
+          "/NarrativePro/Pro/Core/Abilities/GameplayAbilities/Movement/GA_Crouch.GA_Crouch_C"
+        ],
+        "Narrative.Input.Jump": [
+          "/NarrativePro/Pro/Core/Abilities/GameplayAbilities/Movement/GA_Jump.GA_Jump_C"
+        ],
+        "Narrative.Input.Reload": [
+          "/NarrativePro/Pro/Core/Abilities/GameplayAbilities/Weapons/GA_Weapon_Reload.GA_Weapon_Reload_C"
+        ],
+        "Narrative.Input.Sprint": [
+          "/Game/Abilities/Common/GA_Sprint.GA_Sprint_C"
+        ],
+        "Narrative.Input.Evade": [
+          "/Game/Abilities/Common/GA_Evade.GA_Evade_C"
+        ],
+        "Narrative.Input.Cover": [
+          "/Game/Abilities/Common/GA_Cover.GA_Cover_C"
+        ],
+        "Narrative.Input.Ability1": [
+          "/Game/Abilities/Selene/GA_Selene_StillpointGrenade.GA_Selene_StillpointGrenade_C"
+        ],
+        "Narrative.Input.Ability3": [
+          "/Game/Abilities/Selene/GA_Selene_Dispatch.GA_Selene_Dispatch_C"
+        ],
+        "Narrative.Input.Attack": [
+          "/NarrativePro/Pro/Core/Abilities/GameplayAbilities/Attacks/Firearms/GA_Staccato.GA_Staccato_C"
+        ],
+        "Narrative.Input.AltAttack": [
+          "/NarrativePro/Pro/Core/Abilities/GameplayAbilities/Weapons/GA_Weapon_Aim.GA_Weapon_Aim_C"
+        ],
+        "Narrative.Input.Attack.Heavy": [
+          "/Game/Abilities/Common/GA_WeaponBash.GA_WeaponBash_C"
+        ],
+        "Narrative.Input.Ability2": [
+          "/Game/Abilities/Selene/GA_Selene_StaccatoZero.GA_Selene_StaccatoZero_C"
+        ]
+      },
+      "excluded": [
+        {
+          "class": "/NarrativePro/Pro/Core/Abilities/GameplayAbilities/Attacks/Melee/GA_Melee_Punch_Unarmed.GA_Melee_Punch_Unarmed_C",
+          "reason": "authored Equipped blocker excludes the unarmed attack"
+        }
+      ],
+      "duplicates": {}
+    },
+    {
+      "hero": "Selene",
+      "context": "Axiom",
+      "claims": {
+        "Narrative.Input.Crouch": [
+          "/NarrativePro/Pro/Core/Abilities/GameplayAbilities/Movement/GA_Crouch.GA_Crouch_C"
+        ],
+        "Narrative.Input.Jump": [
+          "/NarrativePro/Pro/Core/Abilities/GameplayAbilities/Movement/GA_Jump.GA_Jump_C"
+        ],
+        "Narrative.Input.Reload": [
+          "/NarrativePro/Pro/Core/Abilities/GameplayAbilities/Weapons/GA_Weapon_Reload.GA_Weapon_Reload_C"
+        ],
+        "Narrative.Input.Sprint": [
+          "/Game/Abilities/Common/GA_Sprint.GA_Sprint_C"
+        ],
+        "Narrative.Input.Evade": [
+          "/Game/Abilities/Common/GA_Evade.GA_Evade_C"
+        ],
+        "Narrative.Input.Cover": [
+          "/Game/Abilities/Common/GA_Cover.GA_Cover_C"
+        ],
+        "Narrative.Input.Ability1": [
+          "/Game/Abilities/Selene/GA_Selene_StillpointGrenade.GA_Selene_StillpointGrenade_C"
+        ],
+        "Narrative.Input.Ability3": [
+          "/Game/Abilities/Selene/GA_Selene_Dispatch.GA_Selene_Dispatch_C"
+        ],
+        "Narrative.Input.Attack": [
+          "/NarrativePro/Pro/Core/Abilities/GameplayAbilities/Attacks/Firearms/GA_Firearm_Pistol.GA_Firearm_Pistol_C"
+        ],
+        "Narrative.Input.AltAttack": [
+          "/NarrativePro/Pro/Core/Abilities/GameplayAbilities/Weapons/GA_Weapon_Aim.GA_Weapon_Aim_C"
+        ],
+        "Narrative.Input.Ability2": [
+          "/Game/Abilities/Selene/GA_Selene_AxiomNullPulse.GA_Selene_AxiomNullPulse_C"
+        ]
+      },
+      "excluded": [
+        {
+          "class": "/NarrativePro/Pro/Core/Abilities/GameplayAbilities/Attacks/Melee/GA_Melee_Punch_Unarmed.GA_Melee_Punch_Unarmed_C",
+          "reason": "authored Equipped blocker excludes the unarmed attack"
+        }
+      ],
+      "duplicates": {}
+    },
+    {
+      "hero": "Selene",
+      "context": "DualAxiom",
+      "claims": {
+        "Narrative.Input.Crouch": [
+          "/NarrativePro/Pro/Core/Abilities/GameplayAbilities/Movement/GA_Crouch.GA_Crouch_C"
+        ],
+        "Narrative.Input.Jump": [
+          "/NarrativePro/Pro/Core/Abilities/GameplayAbilities/Movement/GA_Jump.GA_Jump_C"
+        ],
+        "Narrative.Input.Reload": [
+          "/NarrativePro/Pro/Core/Abilities/GameplayAbilities/Weapons/GA_Weapon_Reload.GA_Weapon_Reload_C"
+        ],
+        "Narrative.Input.Sprint": [
+          "/Game/Abilities/Common/GA_Sprint.GA_Sprint_C"
+        ],
+        "Narrative.Input.Evade": [
+          "/Game/Abilities/Common/GA_Evade.GA_Evade_C"
+        ],
+        "Narrative.Input.Cover": [
+          "/Game/Abilities/Common/GA_Cover.GA_Cover_C"
+        ],
+        "Narrative.Input.Ability1": [
+          "/Game/Abilities/Selene/GA_Selene_StillpointGrenade.GA_Selene_StillpointGrenade_C"
+        ],
+        "Narrative.Input.Ability3": [
+          "/Game/Abilities/Selene/GA_Selene_Dispatch.GA_Selene_Dispatch_C"
+        ],
+        "Narrative.Input.AltAttack": [
+          "/NarrativePro/Pro/Core/Abilities/GameplayAbilities/Attacks/Firearms/GA_Firearm_Pistol_R.GA_Firearm_Pistol_R_C"
+        ],
+        "Narrative.Input.Ability2": [
+          "/Game/Abilities/Selene/GA_Selene_AxiomNullPulse.GA_Selene_AxiomNullPulse_C"
+        ],
+        "Narrative.Input.Attack": [
+          "/NarrativePro/Pro/Core/Abilities/GameplayAbilities/Attacks/Firearms/GA_Firearm_Pistol.GA_Firearm_Pistol_C"
+        ]
+      },
+      "excluded": [
+        {
+          "class": "/NarrativePro/Pro/Core/Abilities/GameplayAbilities/Attacks/Melee/GA_Melee_Punch_Unarmed.GA_Melee_Punch_Unarmed_C",
+          "reason": "authored Equipped blocker excludes the unarmed attack"
+        }
+      ],
+      "duplicates": {}
+    }
+  ],
+  "input_mappings": [
+    {
+      "key": "SpaceBar",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_Jump.IA_Jump",
+      "ability_tag": "Narrative.Input.Jump"
+    },
+    {
+      "key": "Gamepad_FaceButton_Bottom",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_Jump.IA_Jump",
+      "ability_tag": "Narrative.Input.Jump"
+    },
+    {
+      "key": "W",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_Move.IA_Move",
+      "ability_tag": null
+    },
+    {
+      "key": "S",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_Move.IA_Move",
+      "ability_tag": null
+    },
+    {
+      "key": "A",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_Move.IA_Move",
+      "ability_tag": null
+    },
+    {
+      "key": "D",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_Move.IA_Move",
+      "ability_tag": null
+    },
+    {
+      "key": "Up",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_Move.IA_Move",
+      "ability_tag": null
+    },
+    {
+      "key": "Down",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_Move.IA_Move",
+      "ability_tag": null
+    },
+    {
+      "key": "Right",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_Move.IA_Move",
+      "ability_tag": null
+    },
+    {
+      "key": "Left",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_Move.IA_Move",
+      "ability_tag": null
+    },
+    {
+      "key": "Gamepad_Left2D",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_Move.IA_Move",
+      "ability_tag": null
+    },
+    {
+      "key": "Mouse2D",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_Look.IA_Look",
+      "ability_tag": null
+    },
+    {
+      "key": "Gamepad_Right2D",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_Look.IA_Look",
+      "ability_tag": null
+    },
+    {
+      "key": "Touch1",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_Jump.IA_Jump",
+      "ability_tag": "Narrative.Input.Jump"
+    },
+    {
+      "key": "LeftMouseButton",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_Attack.IA_Attack",
+      "ability_tag": "Narrative.Input.Attack"
+    },
+    {
+      "key": "RightMouseButton",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_AltAttack.IA_AltAttack",
+      "ability_tag": "Narrative.Input.AltAttack"
+    },
+    {
+      "key": "C",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_Crouch.IA_Crouch",
+      "ability_tag": "Narrative.Input.Crouch"
+    },
+    {
+      "key": "Q",
+      "action": "/Game/Input/IA_Evade.IA_Evade",
+      "ability_tag": "Narrative.Input.Evade"
+    },
+    {
+      "key": "X",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_Ability2.IA_Ability2",
+      "ability_tag": "Narrative.Input.Ability2"
+    },
+    {
+      "key": "F",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_Ability3.IA_Ability3",
+      "ability_tag": "Narrative.Input.Ability3"
+    },
+    {
+      "key": "Gamepad_RightTrigger",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_Attack.IA_Attack",
+      "ability_tag": "Narrative.Input.Attack"
+    },
+    {
+      "key": "Gamepad_LeftTrigger",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_AltAttack.IA_AltAttack",
+      "ability_tag": "Narrative.Input.AltAttack"
+    },
+    {
+      "key": "Gamepad_FaceButton_Right",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_Crouch.IA_Crouch",
+      "ability_tag": "Narrative.Input.Crouch"
+    },
+    {
+      "key": "Gamepad_RightThumbstick",
+      "action": "/Game/Input/IA_Evade.IA_Evade",
+      "ability_tag": "Narrative.Input.Evade"
+    },
+    {
+      "key": "Gamepad_FaceButton_Top",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_Ability3.IA_Ability3",
+      "ability_tag": "Narrative.Input.Ability3"
+    },
+    {
+      "key": "R",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_Reload.IA_Reload",
+      "ability_tag": "Narrative.Input.Reload"
+    },
+    {
+      "key": "Tab",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_OpenInventory.IA_OpenInventory",
+      "ability_tag": null
+    },
+    {
+      "key": "Gamepad_DPad_Left",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_OpenInventory.IA_OpenInventory",
+      "ability_tag": null
+    },
+    {
+      "key": "M",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_OpenMap.IA_OpenMap",
+      "ability_tag": null
+    },
+    {
+      "key": "Escape",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_PauseGame.IA_PauseGame",
+      "ability_tag": null
+    },
+    {
+      "key": "Gamepad_Special_Right",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_PauseGame.IA_PauseGame",
+      "ability_tag": null
+    },
+    {
+      "key": "E",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_Interact.IA_Interact",
+      "ability_tag": null
+    },
+    {
+      "key": "Gamepad_FaceButton_Left",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_Interact.IA_Interact",
+      "ability_tag": null
+    },
+    {
+      "key": "Gamepad_FaceButton_Left",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_Reload.IA_Reload",
+      "ability_tag": "Narrative.Input.Reload"
+    },
+    {
+      "key": "LeftShift",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_Sprint.IA_Sprint",
+      "ability_tag": "Narrative.Input.Sprint"
+    },
+    {
+      "key": "Gamepad_LeftThumbstick",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_Sprint.IA_Sprint",
+      "ability_tag": "Narrative.Input.Sprint"
+    },
+    {
+      "key": "T",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_WeaponWheel.IA_WeaponWheel",
+      "ability_tag": null
+    },
+    {
+      "key": "LeftControl",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_QuickUseItems.IA_QuickUseItems",
+      "ability_tag": null
+    },
+    {
+      "key": "Gamepad_LeftShoulder",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_WeaponWheel.IA_WeaponWheel",
+      "ability_tag": null
+    },
+    {
+      "key": "Gamepad_DPad_Right",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_QuickUseItems.IA_QuickUseItems",
+      "ability_tag": null
+    },
+    {
+      "key": "V",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_Wait.IA_Wait",
+      "ability_tag": null
+    },
+    {
+      "key": "Gamepad_Special_Left",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_Wait.IA_Wait",
+      "ability_tag": null
+    },
+    {
+      "key": "G",
+      "action": "/Game/Input/IA_Grenade.IA_Grenade",
+      "ability_tag": "Narrative.Input.Ability1"
+    },
+    {
+      "key": "Gamepad_RightShoulder",
+      "action": "/Game/Input/IA_Grenade.IA_Grenade",
+      "ability_tag": "Narrative.Input.Ability1"
+    },
+    {
+      "key": "MouseScrollUp",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_CameraModeUp.IA_CameraModeUp",
+      "ability_tag": null
+    },
+    {
+      "key": "Gamepad_DPad_Up",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_Ability2.IA_Ability2",
+      "ability_tag": "Narrative.Input.Ability2"
+    },
+    {
+      "key": "MouseScrollDown",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_CameraModeDown.IA_CameraModeDown",
+      "ability_tag": null
+    },
+    {
+      "key": "Gamepad_DPad_Down",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_HeavyAttack.IA_HeavyAttack",
+      "ability_tag": "Narrative.Input.Attack.Heavy"
+    },
+    {
+      "key": "F5",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_Quicksave.IA_Quicksave",
+      "ability_tag": null
+    },
+    {
+      "key": "One",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_Cover.IA_Cover",
+      "ability_tag": "Narrative.Input.Cover"
+    },
+    {
+      "key": "MiddleMouseButton",
+      "action": "/NarrativePro/Pro/Core/Data/Input/IA_HeavyAttack.IA_HeavyAttack",
+      "ability_tag": "Narrative.Input.Attack.Heavy"
+    }
+  ],
+  "projectile_bindings": [
+    {
+      "ability": "/Game/Abilities/Tarrik/GA_Tarrik_CinderStickyGrenade.GA_Tarrik_CinderStickyGrenade",
+      "property": "grenade_class",
+      "projectile": "/Game/Abilities/Presentation/BP_CinderGrenadeProjectile.BP_CinderGrenadeProjectile_C"
+    },
+    {
+      "ability": "/Game/Abilities/Tarrik/GA_Tarrik_VelkorransHunger.GA_Tarrik_VelkorransHunger",
+      "property": "projectile_class",
+      "projectile": "/Game/Abilities/Presentation/BP_VelkorransHungerProjectile.BP_VelkorransHungerProjectile_C"
+    },
+    {
+      "ability": "/Game/Abilities/Selene/GA_Selene_StillpointGrenade.GA_Selene_StillpointGrenade",
+      "property": "grenade_class",
+      "projectile": "/Game/Abilities/Presentation/BP_StillpointProjectile.BP_StillpointProjectile_C"
+    },
+    {
+      "ability": "/Game/Abilities/Selene/GA_Selene_VeritysWake.GA_Selene_VeritysWake",
+      "property": "wave_class",
+      "projectile": "/Game/Abilities/Presentation/BP_VeritysWakeProjectile.BP_VeritysWakeProjectile_C"
+    },
+    {
+      "ability": "/Game/Abilities/Selene/GA_Selene_Dispatch.GA_Selene_Dispatch",
+      "property": "returning_verity_class",
+      "projectile": "/Game/Abilities/Presentation/BP_DispatchProjectile.BP_DispatchProjectile_C"
+    }
+  ],
+  "native_exertion_profiles": {
+    "Tarrik": {
+      "component": "/Game/PlayerCharacters/BP_SovTarrik.Default__BP_SovTarrik_C:SovExertionComponent",
+      "apply_prototype_defaults": true,
+      "maximum_stamina": 120.0,
+      "idle_regen_rate": 32.0
+    },
+    "Selene": {
+      "component": "/Game/PlayerCharacters/BP_SovSelene.Default__BP_SovSelene_C:SovExertionComponent",
+      "apply_prototype_defaults": true,
+      "maximum_stamina": 100.0,
+      "idle_regen_rate": 38.0
+    }
+  },
+  "native_regen": [
+    {
+      "hero": "Tarrik",
+      "removed": "/NarrativePro/Pro/Core/Abilities/GameplayEffects/GE_PassiveAttributeRegen.GE_PassiveAttributeRegen_C",
+      "reason": "Stamina-only periodic GE suppressed native exertion regeneration"
+    },
+    {
+      "hero": "Tarrik",
+      "attribute_effect": "/Game/Abilities/Effects/GE_Tarrik_DefaultAttributes.GE_Tarrik_DefaultAttributes",
+      "removed_overrides": [],
+      "native_attributes_absent": [
+        "MaxStamina",
+        "StaminaRegenRate"
+      ],
+      "reason": "Native Exertion initializes these bases before the startup attribute effect; later overrides would replace the native profile"
+    },
+    {
+      "hero": "Selene",
+      "removed": "/NarrativePro/Pro/Core/Abilities/GameplayEffects/GE_PassiveAttributeRegen.GE_PassiveAttributeRegen_C",
+      "reason": "Stamina-only periodic GE suppressed native exertion regeneration"
+    },
+    {
+      "hero": "Selene",
+      "attribute_effect": "/Game/Abilities/Effects/GE_Selene_DefaultAttributes.GE_Selene_DefaultAttributes",
+      "removed_overrides": [],
+      "native_attributes_absent": [
+        "MaxStamina",
+        "StaminaRegenRate"
+      ],
+      "reason": "Native Exertion initializes these bases before the startup attribute effect; later overrides would replace the native profile"
+    }
+  ],
+  "dual_wield_policy": {
+    "native_default": false,
+    "opted_in": [
+      "/Game/Items/Weapons/WI_Axiom.WI_Axiom"
+    ],
+    "restriction": "If either participant opts in, exact item classes must match; existing native hand/equipment/visual rules still apply.",
+    "blocked_contexts": [
+      "Verity+Axiom",
+      "Axiom+Verity"
+    ],
+    "validated_grant_context": "DualAxiom"
+  },
+  "combat_vitals": {
+    "controller": "/Game/Framework/BP_SovPlayerController.BP_SovPlayerController",
+    "enabled": true,
+    "resources": [
+      "Health",
+      "Shield",
+      "Stamina",
+      "Poise",
+      "Echo"
+    ],
+    "native_default_enabled": false
+  },
+  "equipment_order": {
+    "Tarrik": {
+      "hero": "Tarrik",
+      "rules": {
+        "Cinderline": {
+          "class": "/Game/Items/Weapons/WI_Cinderline.WI_Cinderline_C",
+          "allowed_slots": [
+            "Narrative.Equipment.Slot.Weapon.BackA"
+          ],
+          "holster_slots": [
+            "Narrative.Equipment.Slot.Weapon.BackA"
+          ]
+        },
+        "Velkorran": {
+          "class": "/Game/Items/Weapons/WI_Velkorran.WI_Velkorran_C",
+          "allowed_slots": [
+            "Narrative.Equipment.Slot.Weapon.HipLeft"
+          ],
+          "holster_slots": [
+            "Narrative.Equipment.Slot.Weapon.HipLeft"
+          ]
+        }
+      },
+      "before": [
+        {
+          "weapon": "Cinderline",
+          "class": "/Game/Items/Weapons/WI_Cinderline.WI_Cinderline_C",
+          "slot": "Narrative.Equipment.Slot.Weapon.BackA",
+          "blocked_by": {}
+        },
+        {
+          "weapon": "Velkorran",
+          "class": "/Game/Items/Weapons/WI_Velkorran.WI_Velkorran_C",
+          "slot": "Narrative.Equipment.Slot.Weapon.HipLeft",
+          "blocked_by": {}
+        }
+      ],
+      "after": [
+        {
+          "weapon": "Cinderline",
+          "class": "/Game/Items/Weapons/WI_Cinderline.WI_Cinderline_C",
+          "slot": "Narrative.Equipment.Slot.Weapon.BackA",
+          "blocked_by": {}
+        },
+        {
+          "weapon": "Velkorran",
+          "class": "/Game/Items/Weapons/WI_Velkorran.WI_Velkorran_C",
+          "slot": "Narrative.Equipment.Slot.Weapon.HipLeft",
+          "blocked_by": {}
+        }
+      ],
+      "changed": false,
+      "entry_multiset_preserved": true
+    },
+    "Selene": {
+      "hero": "Selene",
+      "rules": {
+        "Verity": {
+          "class": "/Game/Items/Weapons/WI_Verity.WI_Verity_C",
+          "allowed_slots": [
+            "Narrative.Equipment.Slot.Weapon.BackA"
+          ],
+          "holster_slots": [
+            "Narrative.Equipment.Slot.Weapon.BackA"
+          ]
+        },
+        "Staccato": {
+          "class": "/Game/Items/Weapons/WI_Staccato.WI_Staccato_C",
+          "allowed_slots": [
+            "Narrative.Equipment.Slot.Weapon.BackA",
+            "Narrative.Equipment.Slot.Weapon.BackB"
+          ],
+          "holster_slots": [
+            "Narrative.Equipment.Slot.Weapon.BackA",
+            "Narrative.Equipment.Slot.Weapon.BackB"
+          ]
+        },
+        "Axiom": {
+          "class": "/Game/Items/Weapons/WI_Axiom.WI_Axiom_C",
+          "allowed_slots": [
+            "Narrative.Equipment.Slot.Weapon.HipLeft",
+            "Narrative.Equipment.Slot.Weapon.HipRight"
+          ],
+          "holster_slots": [
+            "Narrative.Equipment.Slot.Weapon.HipRight",
+            "Narrative.Equipment.Slot.Weapon.HipLeft"
+          ]
+        }
+      },
+      "before": [
+        {
+          "weapon": "Staccato",
+          "class": "/Game/Items/Weapons/WI_Staccato.WI_Staccato_C",
+          "slot": "Narrative.Equipment.Slot.Weapon.BackA",
+          "blocked_by": {}
+        },
+        {
+          "weapon": "Axiom",
+          "class": "/Game/Items/Weapons/WI_Axiom.WI_Axiom_C",
+          "slot": "Narrative.Equipment.Slot.Weapon.HipLeft",
+          "blocked_by": {}
+        },
+        {
+          "weapon": "Verity",
+          "class": "/Game/Items/Weapons/WI_Verity.WI_Verity_C",
+          "slot": null,
+          "blocked_by": {
+            "Narrative.Equipment.Slot.Weapon.BackA": "Staccato",
+            "Narrative.Equipment.Slot.Weapon.HipLeft": "Axiom"
+          }
+        }
+      ],
+      "after": [
+        {
+          "weapon": "Verity",
+          "class": "/Game/Items/Weapons/WI_Verity.WI_Verity_C",
+          "slot": "Narrative.Equipment.Slot.Weapon.BackA",
+          "blocked_by": {}
+        },
+        {
+          "weapon": "Staccato",
+          "class": "/Game/Items/Weapons/WI_Staccato.WI_Staccato_C",
+          "slot": "Narrative.Equipment.Slot.Weapon.BackB",
+          "blocked_by": {}
+        },
+        {
+          "weapon": "Axiom",
+          "class": "/Game/Items/Weapons/WI_Axiom.WI_Axiom_C",
+          "slot": "Narrative.Equipment.Slot.Weapon.HipLeft",
+          "blocked_by": {}
+        }
+      ],
+      "changed": true,
+      "entry_multiset_preserved": true
+    }
+  },
+  "weapon_metadata": {
+    "Velkorran": {
+      "asset": "/Game/Items/Weapons/WI_Velkorran.WI_Velkorran",
+      "before": {
+        "display_name": " Weapon Item",
+        "thumbnail": null,
+        "derived_weapon_name": " Weapon Item"
+      },
+      "generic_icon_assigned": "/NarrativePro/Pro/Demo/Items/Examples/Items/Thumbnails/T_Thumb_Greatsword.T_Thumb_Greatsword",
+      "after": {
+        "display_name": "Velkorran",
+        "thumbnail": "/NarrativePro/Pro/Demo/Items/Examples/Items/Thumbnails/T_Thumb_Greatsword.T_Thumb_Greatsword",
+        "derived_weapon_name": "Velkorran"
+      }
+    },
+    "Cinderline": {
+      "asset": "/Game/Items/Weapons/WI_Cinderline.WI_Cinderline",
+      "before": {
+        "display_name": "Cinderline",
+        "thumbnail": null,
+        "derived_weapon_name": "Cinderline"
+      },
+      "generic_icon_assigned": "/NarrativePro/Pro/Demo/Items/Examples/Items/Thumbnails/T_ExampleRifle.T_ExampleRifle",
+      "after": {
+        "display_name": "Cinderline",
+        "thumbnail": "/NarrativePro/Pro/Demo/Items/Examples/Items/Thumbnails/T_ExampleRifle.T_ExampleRifle",
+        "derived_weapon_name": "Cinderline"
+      }
+    },
+    "Verity": {
+      "asset": "/Game/Items/Weapons/WI_Verity.WI_Verity",
+      "before": {
+        "display_name": "Verity",
+        "thumbnail": null,
+        "derived_weapon_name": "Verity"
+      },
+      "generic_icon_assigned": "/NarrativePro/Pro/Demo/Items/Examples/Items/Thumbnails/T_Thumb_Sword.T_Thumb_Sword",
+      "after": {
+        "display_name": "Verity",
+        "thumbnail": "/NarrativePro/Pro/Demo/Items/Examples/Items/Thumbnails/T_Thumb_Sword.T_Thumb_Sword",
+        "derived_weapon_name": "Verity"
+      }
+    },
+    "Staccato": {
+      "asset": "/Game/Items/Weapons/WI_Staccato.WI_Staccato",
+      "before": {
+        "display_name": "Narrative Demo Rifle",
+        "thumbnail": "/NarrativePro/Pro/Demo/Items/Examples/Items/Thumbnails/T_ExampleRifle.T_ExampleRifle",
+        "derived_weapon_name": "Narrative Demo Rifle"
+      },
+      "existing_icon_preserved": "/NarrativePro/Pro/Demo/Items/Examples/Items/Thumbnails/T_ExampleRifle.T_ExampleRifle",
+      "after": {
+        "display_name": "Staccato",
+        "thumbnail": "/NarrativePro/Pro/Demo/Items/Examples/Items/Thumbnails/T_ExampleRifle.T_ExampleRifle",
+        "derived_weapon_name": "Staccato"
+      }
+    },
+    "Axiom": {
+      "asset": "/Game/Items/Weapons/WI_Axiom.WI_Axiom",
+      "before": {
+        "display_name": "Axiom",
+        "thumbnail": "/NarrativePro/Pro/Demo/Items/Examples/Items/Thumbnails/T_ExamplePistol.T_ExamplePistol",
+        "derived_weapon_name": "Axiom"
+      },
+      "existing_icon_preserved": "/NarrativePro/Pro/Demo/Items/Examples/Items/Thumbnails/T_ExamplePistol.T_ExamplePistol",
+      "after": {
+        "display_name": "Axiom",
+        "thumbnail": "/NarrativePro/Pro/Demo/Items/Examples/Items/Thumbnails/T_ExamplePistol.T_ExamplePistol",
+        "derived_weapon_name": "Axiom"
+      }
+    }
+  },
+  "weapon_presentation_repairs": {
+    "status": "saved; repeat Staccato hand/holster cycle and Verity wield in fresh PIE",
+    "staccato": {
+      "before": {
+        "Narrative.Equipment.Slot.Weapon.BackA": "(SocketName=\"Socket_BackA\",Offset=(Rotation=(X=-0.000126,Y=-1.000000,Z=0.000357,W=0.000000),Translation=(X=-0.821199,Y=-9.974508,Z=28.732658),Scale3D=(X=0.000000,Y=0.000000,Z=0.000000)))",
+        "Narrative.Equipment.Slot.Weapon.BackB": "(SocketName=\"Socket_BackB\",Offset=(Rotation=(X=-0.000240,Y=-0.999968,Z=0.000543,W=0.007945),Translation=(X=-2.845216,Y=0.026159,Z=22.690775),Scale3D=(X=0.000000,Y=0.000000,Z=0.000000)))"
+      },
+      "source": {
+        "Narrative.Equipment.Slot.Weapon.BackA": "(SocketName=\"Socket_BackA\",Offset=(Rotation=(X=-0.000126,Y=-1.000000,Z=0.000357,W=0.000000),Translation=(X=-0.821199,Y=-9.974508,Z=28.732658),Scale3D=(X=0.000000,Y=0.000000,Z=0.000000)))",
+        "Narrative.Equipment.Slot.Weapon.BackB": "(SocketName=\"Socket_BackB\",Offset=(Rotation=(X=-0.000240,Y=-0.999968,Z=0.000543,W=0.007945),Translation=(X=-2.845216,Y=0.026159,Z=22.690775),Scale3D=(X=0.000000,Y=0.000000,Z=0.000000)))"
+      },
+      "expected_after": {
+        "Narrative.Equipment.Slot.Weapon.BackA": "(SocketName=\"Socket_BackA\",Offset=(Rotation=(X=-0.000126,Y=-1.000000,Z=0.000357,W=0.000000),Translation=(X=-0.821199,Y=-9.974508,Z=28.732658),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000)))",
+        "Narrative.Equipment.Slot.Weapon.BackB": "(SocketName=\"Socket_BackB\",Offset=(Rotation=(X=-0.000240,Y=-0.999968,Z=0.000543,W=0.007945),Translation=(X=-2.845216,Y=0.026159,Z=22.690775),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000)))"
+      },
+      "clip_size_preserved": 4
+    },
+    "verity": {
+      "before": "(PropertyMappings=((TagToMap=(TagName=\"Narrative.State.Weapon.Equipped.Shield\"),PropertyName=\"IsUsingShield\",PropertyGuid=2DBD409747D8E322B642459BF1FDAC38),(TagToMap=(TagName=\"Sov.State.Guard\"),PropertyName=\"IsBlocking\",PropertyGuid=1A3A9E7C4E7859C8EC3489BBD3EB1F16),(TagToMap=(TagName=\"Narrative.State.Movement.Falling\"),PropertyName=\"IsFalling\",PropertyGuid=643833684309780218C128BCAAD6290E),(TagToMap=(TagName=\"Sov.State.PerfectGuard\"),PropertyName=\"IsBlocking\",PropertyGuid=1A3A9E7C4E7859C8EC3489BBD3EB1F16),(TagToMap=(TagName=\"Sov.State.Guard.Broken\")),(TagToMap=(TagName=\"Narrative.State.Weapon.Blocking\"),PropertyName=\"IsBlocking\",PropertyGuid=1A3A9E7C4E7859C8EC3489BBD3EB1F16)))",
+      "after": "(PropertyMappings=((TagToMap=(TagName=\"Narrative.State.Weapon.Equipped.Shield\"),PropertyName=\"IsUsingShield\",PropertyGuid=2DBD409747D8E322B642459BF1FDAC38),(TagToMap=(TagName=\"Sov.State.Guard\"),PropertyName=\"IsBlocking\",PropertyGuid=1A3A9E7C4E7859C8EC3489BBD3EB1F16),(TagToMap=(TagName=\"Narrative.State.Movement.Falling\"),PropertyName=\"IsFalling\",PropertyGuid=643833684309780218C128BCAAD6290E),(TagToMap=(TagName=\"Sov.State.PerfectGuard\"),PropertyName=\"IsBlocking\",PropertyGuid=1A3A9E7C4E7859C8EC3489BBD3EB1F16),(TagToMap=(TagName=\"Narrative.State.Weapon.Blocking\"),PropertyName=\"IsBlocking\",PropertyGuid=1A3A9E7C4E7859C8EC3489BBD3EB1F16)))",
+      "overlay": "/Game/Characters/Animation/ABP_SovVerityOverlay",
+      "visual": "/Game/Weapons/Visuals/BP_SovVerityWeaponVisual",
+      "layer_fields": {
+        "default_weapon_anim_layer": "/Game/Characters/Animation/ABP_SovVerityOverlay.ABP_SovVerityOverlay_C",
+        "weapon1p_anim_layer": null,
+        "dual_wield_weapon_anim_layer": null,
+        "dual_wield_weapon1p_anim_layer": null
+      }
+    },
+    "source_templates_unchanged": true
+  },
+  "hud": {
+    "package": "/Game/UI/Narrative/Menus/GameHUD/WBP_DefaultGameplayHUD",
+    "source": "/NarrativePro/Pro/Core/UI/Menus/GameHUD/WBP_DefaultGameplayHUD",
+    "legacy_resources": "collapsed",
+    "weapon_panel": "lower right",
+    "crosshair": "unchanged"
+  },
+  "source_preservation": {
+    "status": "passed: 14 loaded source templates unchanged by complete setup rerun",
+    "source_templates": [
+      "/NarrativePro/Pro/Core/Data/Input/IMC_Default",
+      "/NarrativePro/Pro/Core/Data/Input/DA_DefaultAbilityInputs",
+      "/NarrativePro/Pro/Demo/Character/Definitions/Player/CD_DefaultPlayer",
+      "/NarrativePro/Pro/Demo/Character/Definitions/Player/CD_Selene",
+      "/NarrativePro/Pro/Demo/Character/Definitions/Player/IC_DefaultTarrikItems",
+      "/NarrativePro/Pro/Demo/Character/Definitions/Player/IC_DefaultSeleneItems",
+      "/NarrativePro/Pro/Core/Abilities/Configurations/AC_Player_Shooter",
+      "/NarrativePro/Pro/Core/Abilities/Configurations/AC_Player_Selene",
+      "/NarrativePro/Pro/Core/Abilities/GameplayEffects/Attributes/GE_DefaultPlayerAttributes",
+      "/Game/WeaponMeshes/Velkorran/NWI_Velkorran",
+      "/Game/SCF_Rifle_02/NWI_Cinderline",
+      "/Game/WeaponMeshes/NWI_Verity",
+      "/Game/WeaponMeshes/Weapon_Staccato",
+      "/Game/WeaponMeshes/Weapon_Axiom"
+    ],
+    "dirty_before": [],
+    "dirty_after": [],
+    "changed_sources": {}
+  },
+  "evidence": {
+    "protagonist-kit-setup.json": {
+      "sha256": "5b8ef308f69ededd1ff4616f07a80afcc2379914846d3b224a087b6c0fe7f667"
+    },
+    "projectile-presentation-setup.json": {
+      "sha256": "4e6551922453e2ccc05a79adf2271664c32421e7625a23af9473f29bb9abe37a"
+    },
+    "protagonist-source-preservation-check.json": {
+      "sha256": "a23f7365f14ddabd527f4053233e6e6d310d9d6b4f597dbb3ee11ad4ce51f9bb"
+    },
+    "combat-hud-layout-setup.json": {
+      "sha256": "f4d151e79d121c9066e17f14c17737a1380071a43d5c421e4a8a3c7cdb5f4e2d"
+    },
+    "project-weapon-display-setup.json": {
+      "sha256": "1123418ad69032eba91a49dc73fc348f6a52f2de29b528be1e7d5be1c6a988bc"
+    },
+    "project-loadout-order-setup.json": {
+      "sha256": "6a2b63803e7af859ccf9808c52f9aac5b61da62bd93a3761dbe313f15d8513eb"
+    },
+    "weapon-presentation-repairs.json": {
+      "sha256": "0df2ce59080ff0aaea4da798039dda218b9a00a94b13ead843a93f3ce62de06f"
+    },
+    "live-combat-acceptance-Tarrik.json": {
+      "sha256": "036da7c2f5e15bb1191872d630c281e9fb3659cbeb480be5cf920d05f96dae44"
+    },
+    "live-combat-acceptance-Selene.json": {
+      "sha256": "969cffb19337b0f9f2be1b9fcb7bcd05d7de41728b19f82e36ebada813963ca0"
+    },
+    "live-primary-acceptance-Selene.json": {
+      "sha256": "1da39e76c5d11887822d3fd262c72d83c681609681fb6b99e3bf1b9bfdd65c60"
+    },
+    "weapon-presentation-health.json": {
+      "sha256": "67b4301a9e787a83859e77f19ea06e16d0b407c25024236f8066379b2d562a54"
+    },
+    "project-failure-menu-footer-setup.json": {
+      "sha256": "d0bc618ac7abd94a8f2ad43bfd15382f3dc6b1cf79ab47e42e110362dfd7dba9"
+    },
+    "controller-ui-remap-verification.json": {
+      "sha256": "380658edb890f17c7990d853f9a181180d4590c4a0d5bf5e7394ea97d7408c6a"
+    }
+  },
+  "validation_limits": [
+    "All ten Echo abilities across both protagonists passed live mapped-input cost/activity checks; spawned presentation was observed for applicable projectiles. These checks do not prove damage to every enemy type.",
+    "Selene primary checks observed both Verity attack montages and ammo consumption for Axiom and Staccato after reload. Tarrik Cinderline ammo changed 32 to 28 to 25 under mapped primary input.",
+    "GUI 09 visually verified five native resources at lower left, weapon information at lower right, and canonical names. Native tests and final packaged-run validation are recorded separately by the root task.",
+    "Copied Staccato zero-scale holster offsets and one invalid Verity animation mapping are repaired. Fresh GUI 10 primary checks pass, both Staccato mesh transform chains are finite, and the root's fresh-session log review found zero invalid-bounds or empty-property tag-map errors.",
+    "Existing primary animation graphs are retained; new native Echo choreography and prototype Selene projectile art remain incomplete."
+  ],
+  "supplemental_scripts": {
+    "Scripts/Editor/setup_combat_map_entry.py": "03aa3da82f4792b5b6cc714a3007ddc7de3c0d8afb09023d7bd1d58859205f50",
+    "Scripts/Editor/verify_controller_ui_remap_readonly.py": "357911003615ebbc7067b3f514b4e9e3ea1cb85ea0c5a9e11f0b6df9ea24714a"
+  },
+  "supplemental_scope": "Hashes cover root-owned map-entry and copied-controller UI validation support; root's full bundle manifest supplies their additional map/UI package set.",
+  "final_presentation_validation": {
+    "session": "GUI 10 after presentation repairs",
+    "live_probe": "weapon-presentation-health.json",
+    "staccato_mesh_count": 2,
+    "finite_transform_fields": [
+      "relative_transform",
+      "world_transform",
+      "frame_world",
+      "parent_world",
+      "parent_socket_world"
+    ],
+    "attachment_sockets": [
+      "Socket_BackB"
+    ],
+    "live_probe_errors": 0,
+    "selene_primary": "Fresh mapped-input ammo checks passed; Verity attack montages observed",
+    "editor_log_review": "Root reviewed the entire fresh PIE session: zero invalid-bounds and empty-property tag-map errors"
+  },
+  "failure_menu": {
+    "package": "/Game/UI/Narrative/Menus/Fail/W_NarrativeMenu_Failed",
+    "controller": "/Game/Framework/BP_SovPlayerController",
+    "controller_property": "DeathMenuClass",
+    "only_widget_change": "CommonTextBlock_CornerText visibility Collapsed",
+    "source_templates_unchanged": true,
+    "compile_errors": 0,
+    "compile_warnings": 0,
+    "parent_and_graphs_verified": true,
+    "blueprints_verified": 25,
+    "graphs_verified": 362,
+    "nodes_verified": 3967,
+    "reproduction": "setup_project_failure_menu_footer.py after framework/controller UI setup, then verify_controller_ui_remap_readonly.py",
+    "full_overlay_package_count": 74
+  }
+}

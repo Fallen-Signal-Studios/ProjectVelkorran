@@ -10,6 +10,9 @@
 #include "NarrativeGameplayTags.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "Engine/LocalPlayer.h"
+#include "ICommonInputModule.h"
+#include "UObject/StrongObjectPtr.h"
 #include "GameFramework/Pawn.h"
 #include "Misc/AutomationTest.h"
 #include "Tales/TalesComponent.h"
@@ -23,13 +26,15 @@ struct FSovFrontendTestAccess
 		Presentation->Settings = FSovUserSettingsSnapshot();
 		C->Presentation = Presentation; C->BindProducers(Tales, Cues, ASC);
 	}
-	static void End(USovFrontendComponent* C) { C->EndPlay(EEndPlayReason::RemovedFromWorld); }
+	static void Begin(USovFrontendComponent* C) { C->RegisterAllComponentTickFunctions(true); C->BeginPlay(); }
+	static void End(USovFrontendComponent* C) { if (C->HasBegunPlay()) { C->EndPlay(EEndPlayReason::RemovedFromWorld); } }
 };
 
 namespace
 {
 	struct FFrontendWorld
 	{
+		TStrongObjectPtr<ULocalPlayer> LocalPlayer{NewObject<ULocalPlayer>(GEngine)};
 		UWorld* World;
 		ASovFrontendRuntimeController* PC;
 		APawn* Pawn;
@@ -40,6 +45,7 @@ namespace
 		USovFrontendRuntimePresentation* Presentation;
 		FFrontendWorld()
 		{
+			ICommonInputModule::GetSettings().LoadData();
 			const UWorld::InitializationValues IVS = UWorld::InitializationValues().AllowAudioPlayback(false).CreatePhysicsScene(false)
 				.RequiresHitProxies(false).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
 			World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &IVS);
@@ -47,8 +53,12 @@ namespace
 			PC = World->SpawnActor<ASovFrontendRuntimeController>();
 			Pawn = World->SpawnActor<APawn>(); PC->StagePawn(Pawn);
 			Tales = PC->GetTalesComponent(); Cues = PC->GetNarrativeCues();
-			ASC = NewObject<UNarrativeAbilitySystemComponent>(PC); ASC->InitAbilityActorInfo(PC, Pawn);
+			ASC = NewObject<UNarrativeAbilitySystemComponent>(PC); PC->AddInstanceComponent(ASC); ASC->RegisterComponent(); ASC->InitAbilityActorInfo(PC, Pawn);
 			Frontend = NewObject<USovFrontendComponent>(PC);
+			PC->AddInstanceComponent(Frontend); Frontend->RegisterComponent();
+			// Begin without a local viewport, then bind the same producers explicitly.
+			FSovFrontendTestAccess::Begin(Frontend);
+			PC->Player = LocalPlayer.Get(); LocalPlayer->PlayerController = PC; PC->SetAsLocalPlayerController(); World->AddController(PC);
 			Presentation = NewObject<USovFrontendRuntimePresentation>(PC);
 			Presentation->SetOwningPlayer(PC); Presentation->Initialize(); Presentation->TakeWidget();
 			// Only viewport admission is bypassed. The exact production binding helper subscribes to actual component delegates.
@@ -124,7 +134,7 @@ bool FSovFrontendCueDamageIntegrationTest::RunTest(const FString&)
 	TestEqual(TEXT("Another avatar's damage cannot overwrite local feedback"), W.Presentation->GetCurrentCaptionText().ToString(), FString(TEXT("Shield broken")));
 	auto* NewTales = NewObject<UTalesComponent>(W.PC);
 	auto* NewCues = NewObject<USovNarrativeCueComponent>(W.PC);
-	auto* NewASC = NewObject<UNarrativeAbilitySystemComponent>(W.PC); NewASC->InitAbilityActorInfo(W.PC, W.Pawn);
+	auto* NewASC = NewObject<UNarrativeAbilitySystemComponent>(W.PC); W.PC->AddInstanceComponent(NewASC); NewASC->RegisterComponent(); NewASC->InitAbilityActorInfo(W.PC, W.Pawn);
 	FSovFrontendTestAccess::Bind(W.Frontend, W.Presentation, NewTales, NewCues, NewASC);
 	W.Cues->OnCueStarted.Broadcast(Cue, W.Pawn, FText::FromString(TEXT("Retired producer.")), 3.f);
 	Damage.TargetActor = W.Pawn; W.ASC->OnDamageResolvedAsTarget.Broadcast(Damage);
@@ -146,6 +156,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovNativeHUDIntegrationTest, "ProjectVelkorran
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovNativeHUDIntegrationTest::RunTest(const FString&)
 {
+	ICommonInputModule::GetSettings().LoadData();
 	USovNativeGameplayHUD* HUD = NewObject<USovNativeGameplayHUD>(); HUD->Initialize(); HUD->TakeWidget(); HUD->NativeConstruct();
 	const auto& Tags = FNarrativeGameplayTags::Get();
 	TestNotNull(TEXT("Native host registers existing game layer"), HUD->GetLayerContainer(Tags.UI_Layer_Game));

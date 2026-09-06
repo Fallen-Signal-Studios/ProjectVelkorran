@@ -485,6 +485,11 @@ private:
 	bool ResolveJudgementAuthorityAimPoint(FVector& OutEye, FVector& OutAimPoint, FVector& OutForward);
 	struct FJudgementShotContext;
 	bool IsJudgementShotCurrent(const FJudgementShotContext& Shot) const;
+	void CaptureJudgementExplosionTargets(
+		FJudgementShotContext& Shot,
+		const FVector& Origin,
+		AActor* DirectHitActor,
+		AActor* ExplosionDamageCauser) const;
 	bool ApplyJudgementDamage(
 		const FJudgementShotContext& Shot,
 		class UAbilitySystemComponent* TargetAbilitySystem,

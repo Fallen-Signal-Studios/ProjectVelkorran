@@ -30,10 +30,10 @@ ASovProtagonistCompanionCharacter::ASovProtagonistCompanionCharacter(const FObje
 bool ASovProtagonistCompanionCharacter::PrepareProxy(FGameplayTag Identity, FName CompanionId,
 	const UNarrativeAbilitySystemComponent* OutgoingASC, const TArray<TSubclassOf<UGameplayAbility>>& CuratedClasses, FString& Reason)
 {
-	Reason.Reset(); const auto& Tags = FSovGameplayTags::Get();
+	Reason.Reset(); const auto& GameplayTags = FSovGameplayTags::Get();
 	if (!HasAuthority() || HasActorBegunPlay() || bPrepared || CompanionId.IsNone() || !IsValid(OutgoingASC)
 		|| !OutgoingASC->GetAvatarActor() || !OutgoingASC->GetSet<UNarrativeAttributeSetBase>()
-		|| (Identity != Tags.Character_Player_Tarrik && Identity != Tags.Character_Player_Selene)
+		|| (Identity != GameplayTags.Character_Player_Tarrik && Identity != GameplayTags.Character_Player_Selene)
 		|| !OutgoingASC->HasMatchingGameplayTag(Identity))
 	{ Reason = TEXT("A proxy must copy a real, matching outgoing protagonist before spawning."); return false; }
 	CopiedGrants.Reset(); TSet<UClass*> Seen;
@@ -126,10 +126,10 @@ bool ASovProtagonistCompanionCharacter::CaptureProxySnapshot(FName MissionId, FS
 bool ASovProtagonistCompanionCharacter::PrepareProxyFromSnapshot(const FSovCompanionProxySnapshot& Snapshot,
 	const TArray<TSubclassOf<UGameplayAbility>>& Curated, FString& Reason)
 {
-	Reason.Reset(); const auto& Tags = FSovGameplayTags::Get();
+	Reason.Reset(); const auto& GameplayTags = FSovGameplayTags::Get();
 	if (!HasAuthority() || HasActorBegunPlay() || bPrepared || !Snapshot.Resources.IsValid() || Snapshot.Resources.Health <= 0.f
 		|| !Snapshot.ActorRecord.IsValid() || Snapshot.CompanionId.IsNone()
-		|| (Snapshot.Identity != Tags.Character_Player_Tarrik && Snapshot.Identity != Tags.Character_Player_Selene))
+		|| (Snapshot.Identity != GameplayTags.Character_Player_Tarrik && Snapshot.Identity != GameplayTags.Character_Player_Selene))
 	{ Reason = TEXT("The saved protagonist companion is invalid."); return false; }
 	TSet<UClass*> Seen;
 	for (const auto& Grant : Snapshot.Grants)

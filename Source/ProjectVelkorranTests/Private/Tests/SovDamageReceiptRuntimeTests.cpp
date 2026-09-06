@@ -3,6 +3,7 @@
 #include "Tests/SovCombatRoutingTestFixtures.h"
 #include "Components/SovSeleneEchoGenerationComponent.h"
 #include "Engine/Engine.h"
+#include "Tests/SovRuntimeObjectTestFixtures.h"
 #include "Engine/World.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
 #include "GAS/NarrativeAttributeSetBase.h"
@@ -78,7 +79,7 @@ bool FSovNativeDamageReceiptCopiesTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Receipt owns current target life"), Result.IsCurrentTargetLife());
 	FSovDamageResult Copy;
 	FSovDamageResult::StaticStruct()->CopyScriptStruct(&Copy, &Result);
-	TStrongObjectPtr<UObject> Consumer(NewObject<UObject>());
+	TStrongObjectPtr<UObject> Consumer(NewObject<USovRuntimeTestIdentity>());
 	TestTrue(TEXT("Reflected copy retains receipt"), Copy.HasNativeReceipt());
 	TestTrue(TEXT("First consumer channel is accepted"), Copy.ConsumeNativeReceipt(Consumer.Get()));
 	TestFalse(TEXT("Original shares consumed state with reflected copy"), Result.ConsumeNativeReceipt(Consumer.Get()));
@@ -112,7 +113,7 @@ bool FSovNativeDamageReceiptBoundTest::RunTest(const FString& Parameters)
 	TArray<TStrongObjectPtr<UObject>> Consumers;
 	for (int32 Index = 0; Index < 33; ++Index)
 	{
-		Consumers.Emplace(NewObject<UObject>());
+		Consumers.Emplace(NewObject<USovRuntimeTestIdentity>());
 		const bool bConsumed = Unobserved.ConsumeNativeReceipt(Consumers.Last().Get());
 		TestEqual(FString::Printf(TEXT("Consumer %d respects the per-packet cap"), Index), bConsumed, Index < 32);
 	}
@@ -133,7 +134,7 @@ bool FSovNativeDamageReceiptRestoredLifeTest::RunTest(const FString& Parameters)
 	auto* ASC = Target->GetNarrativeAbilitySystemComponent();
 	ASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetHealthAttribute(), 0.f);
 	ASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetHealthAttribute(), 100.f);
-	TStrongObjectPtr<UObject> Consumer(NewObject<UObject>());
+	TStrongObjectPtr<UObject> Consumer(NewObject<USovRuntimeTestIdentity>());
 	TestTrue(TEXT("Old receipt remains historical native proof"), OldResult.HasNativeReceipt());
 	TestFalse(TEXT("Same-avatar Health restoration retires old life"), OldResult.IsCurrentTargetLife());
 	TestFalse(TEXT("Previously unconsumed old receipt cannot affect restored life"), OldResult.ConsumeNativeReceipt(Consumer.Get()));

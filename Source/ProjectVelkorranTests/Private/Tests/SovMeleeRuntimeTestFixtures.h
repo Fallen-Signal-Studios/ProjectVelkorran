@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Melee/SovGameplayAbility_Melee.h"
+#include "Tests/SovHandoffRuntimeTestFixtures.h"
 #include "SovMeleeRuntimeTestFixtures.generated.h"
 /** Content-free socket transform provider; all physics sweeps, ASC damage and ledger code remain production. */
 UCLASS(Transient,NotBlueprintable)
@@ -20,4 +21,14 @@ class USovMeleeRuntimeTestAbility : public USovGameplayAbility_Melee
 public:
     USovMeleeRuntimeTestAbility();
     virtual USkeletalMeshComponent* ResolveMeleeTraceMesh_Implementation() const override;
+};
+
+/** A fully ready campaign player for the production player-only combo input gate. */
+UCLASS(Transient, NotBlueprintable)
+class ASovMeleeRuntimeTestPlayer : public ASovHandoffRuntimeTestPawn
+{
+    GENERATED_BODY()
+public:
+    ASovMeleeRuntimeTestPlayer(const FObjectInitializer& Initializer) : Super(Initializer) {}
+    virtual ETeamAttitude::Type GetTeamAttitudeTowards(const AActor& Other) const override;
 };

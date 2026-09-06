@@ -3,12 +3,14 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Abilities/GameplayAbilityTypes.h"
 #include "Engine/TimerHandle.h"
 #include "GameplayEffectTypes.h"
 #include "Weapons/WeaponVisual.h"
 #include "SovTransformingWeaponVisual.generated.h"
 
 class FLifetimeProperty;
+struct FAnimMontageInstance;
 class UAnimMontage;
 class UAnimInstance;
 class UAnimSequenceBase;
@@ -147,6 +149,16 @@ public:
 	/** Stops only the montage started by PlayDeflectionWeaponMontage. */
 	UFUNCTION(BlueprintCallable, Category = "Sovereign|Weapon Transition|Deflection")
 	void StopDeflectionWeaponMontage();
+
+	/** Starts Narrative's authoritative, notify-driven melee collision window. */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Weapon Transition|Melee")
+	bool BeginMeleeDamageWindow(
+		const FGameplayEventData& GameplayEvent,
+		bool bCanHitMultipleTargets = true);
+
+	/** Flushes the final notify samples, then stops and clears the melee window. */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Weapon Transition|Melee")
+	void EndMeleeDamageWindow();
 
 protected:
 	friend class USovCampaignCinematicComponent;
@@ -303,6 +315,9 @@ private:
 	void ApplyMaterialProgress(float NormalizedProgress);
 	void SetTransitionGateActive(bool bActive);
 	void RefreshReadyCollisionData();
+	FAnimMontageInstance* GetMeleeDamageMontageInstance() const;
+	void CheckMeleeDamageCollision();
+	void ResetMeleeDamageWindow();
 	void ProcessQueuedAttachmentRequest();
 	float GetSynchronizedServerTime() const;
 	float GetCurrentPhaseAge() const;
@@ -327,6 +342,14 @@ private:
 
 	FTimerHandle PhaseTimerHandle;
 	FTimerHandle CollisionRefreshTimerHandle;
+	FTimerHandle MeleeDamageTimerHandle;
+	TWeakObjectPtr<ANarrativeCharacter> MeleeDamageOwner;
+	TWeakObjectPtr<UAnimMontage> MeleeDamageMontage;
+	TSet<TWeakObjectPtr<AActor>> MeleeDispatchedHitActors;
+	int32 MeleeDamageMontageInstanceId = INDEX_NONE;
+	uint32 MeleeDamageWindowGeneration = 0;
+	bool bMeleeDamageWindowActive = false;
+	bool bMeleeCanHitMultipleTargets = true;
 	FActiveGameplayEffectHandle TransitionGateEffectHandle;
 	TWeakObjectPtr<UAbilitySystemComponent> TransitionGateAbilitySystem;
 	TWeakObjectPtr<UAnimInstance> ActiveMainCharacterAnimInstance;

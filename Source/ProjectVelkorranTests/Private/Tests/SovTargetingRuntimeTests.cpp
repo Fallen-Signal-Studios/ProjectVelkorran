@@ -1,6 +1,10 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
+#include "Tests/SovMeleeRuntimeTestFixtures.h"
+#include "Character/PlayerDefinition.h"
+#include "Framework/SovPlayerState.h"
 #include "Targeting/SovTargetingComponent.h"
 #include "Targeting/SovAimAssist.h"
+#include "Camera/PlayerCameraManager.h"
 #include "Tests/SovAxiomRuntimeTestFixtures.h"
 #include "Tests/SovSettingsTestFixtures.h"
 #include "UnrealFramework/NarrativePlayerController.h"
@@ -22,16 +26,31 @@ bool FSovTargetingWorldTest::RunTest(const FString& Parameters)
 	if (!TestNotNull(TEXT("World"), World)) { return false; }
 	if (GEngine) { GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World); }
 	FActorSpawnParameters Spawn; Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	auto* Player = World->SpawnActor<ASovAxiomRuntimeTestCharacter>(ASovAxiomRuntimeTestCharacter::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, Spawn);
+	auto* Player = World->SpawnActor<ASovMeleeRuntimeTestPlayer>(ASovMeleeRuntimeTestPlayer::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, Spawn);
 	auto* Enemy = World->SpawnActor<ASovAxiomRuntimeTestCharacter>(ASovAxiomRuntimeTestCharacter::StaticClass(), FVector(600.f, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
-	auto* Controller = World->SpawnActor<ANarrativePlayerController>();
-	if (!Player || !Enemy || !Controller)
+	auto* Controller = World->SpawnActor<ASovHandoffRuntimeTestController>();
+	auto* PlayerState = World->SpawnActor<ASovPlayerState>();
+	if (!Player || !Enemy || !Controller || !PlayerState)
 	{
 		AddError(TEXT("Required actors failed to spawn")); World->DestroyWorld(false); if (GEngine) { GEngine->DestroyWorldContext(World); } return false;
 	}
-	Player->InitializeTestCombat(0); Enemy->InitializeTestCombat(1);
-	Controller->Possess(Player); Controller->SetViewTarget(Player); Controller->ResetIgnoreLookInput(); Controller->ResetIgnoreMoveInput();
-	Player->GetNarrativeAbilitySystemComponent()->SetCharacterReadyEpoch(1);
+	Enemy->InitializeTestCombat(1);
+	auto* Definition = NewObject<UPlayerDefinition>(Controller); Controller->KeepAlive.Add(Definition);
+	Player->PrepareCampaignInitialization(Definition); Controller->SetTestPlayerState(PlayerState);
+	World->AddController(Controller); Controller->SetAsLocalPlayerController(); Controller->Possess(Player);
+	if (!TestTrue(TEXT("Targeting uses a fully initialized native campaign player"),
+		Player->StageTestReadiness(PlayerState, true) && Player->CompleteCampaignDataInitialization(false)))
+	{ World->DestroyWorld(false); if (GEngine) { GEngine->DestroyWorldContext(World); } return false; }
+	TestTrue(TEXT("Narrative controller associates its actual player for input-tag queries"), Controller->GetOwnedCharacter() == Player);
+	Controller->SetViewTarget(Player); Controller->ResetIgnoreLookInput(); Controller->ResetIgnoreMoveInput();
+	TestTrue(TEXT("Fixture has actual local controller ownership"), Controller->IsLocalController() && Controller->GetPawn() == Player);
+	if (!Controller->PlayerCameraManager) { Controller->PlayerCameraManager = World->SpawnActor<APlayerCameraManager>(); }
+	if (!TestNotNull(TEXT("Real camera manager owns the view target"), Controller->PlayerCameraManager.Get()))
+	{ World->DestroyWorld(false); if (GEngine) { GEngine->DestroyWorldContext(World); } return false; }
+	Controller->PlayerCameraManager->InitializeFor(Controller);
+	Controller->SetViewTarget(Player); Controller->PlayerCameraManager->UpdateCamera(0.f);
+	TestTrue(TEXT("Camera assistance fixture is viewing the possessed pawn"), Controller->GetViewTarget() == Player);
+	TestTrue(TEXT("Production readiness publishes the camera-control epoch"), Player->IsCharacterReady() && Player->GetNarrativeAbilitySystemComponent()->GetCharacterReadyEpoch() > 0);
 	Enemy->GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
 	USovTargetingComponent* Targeting = NewObject<USovTargetingComponent>(Player);
 	Player->AddInstanceComponent(Targeting); Targeting->RegisterComponent(); Targeting->Controller = Controller;
@@ -63,10 +82,20 @@ bool FSovTargetingWorldTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Opaque cover rejects actual ray"), Targeting->HasLineOfSight(Enemy));
 	TestFalse(TEXT("Aim assistance cannot acquire a target through opaque cover"), SovAimAssist::FindVisibleTarget(Player,
 		FVector::ZeroVector, FVector::ForwardVector, 1000.f, 8.f, AimTarget, AimPoint));
+	TestTrue(TEXT("Actual owner satisfies every camera-control prerequisite"), Targeting->CanControlCamera());
+	TestTrue(TEXT("Current enemy remains eligible before occlusion timing"), Targeting->IsValidTarget(Enemy, false, false, Reason));
+	auto* OcclusionProbe = NewObject<USovTargetingLossProbe>(Targeting);
+	Targeting->OnLockTargetChanged.AddDynamic(OcclusionProbe, &USovTargetingLossProbe::OnTargetChanged);
 	Targeting->SetTarget(Enemy, ESovLockLossReason::None);
 	const FVector OriginalLocation = Player->GetActorLocation();
 	Targeting->TickComponent(.2f, LEVELTICK_All, nullptr);
 	TestTrue(TEXT("Brief occlusion keeps lock"), Targeting->GetLockedTarget() == Enemy);
+	if (Targeting->GetLockedTarget() != Enemy)
+	{
+		AddInfo(FString::Printf(TEXT("Early lock loss reason=%d, ready=%d lookIgnored=%d moveIgnored=%d paused=%d viewCurrent=%d"),
+			static_cast<int32>(OcclusionProbe->LastLoss), Player->GetNarrativeAbilitySystemComponent()->GetCharacterReadyEpoch(),
+			Controller->IsLookInputIgnored(), Controller->IsMoveInputIgnored(), World->IsPaused(), Controller->GetViewTarget() == Player));
+	}
 	Targeting->TickComponent(.3f, LEVELTICK_All, nullptr);
 	TestNull(TEXT("Occlusion timeout releases lock"), Targeting->GetLockedTarget());
 	TestTrue(TEXT("Camera assistance never translates player"), Player->GetActorLocation().Equals(OriginalLocation));

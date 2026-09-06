@@ -346,9 +346,9 @@ bool USovGameUserSettings::CapturePortableSettings(TArray<uint8>& OutData) const
 	if (!ValidateSnapshot(Settings, bCampaignCompleted, Error)) { return false; }
 	TArray<uint8> Data;
 	FMemoryWriter Writer(Data, true);
-	uint8 Version = SovSettingsPolicy::Schema, Preset = static_cast<uint8>(Settings.Preset), Rescue = Settings.bAllowCompanionRescue ? 1 : 0;
+	uint8 SchemaVersion = SovSettingsPolicy::Schema, Preset = static_cast<uint8>(Settings.Preset), Rescue = Settings.bAllowCompanionRescue ? 1 : 0;
 	float Damage = Settings.IncomingDamageScale, Recovery = Settings.EnemyRecoveryScale;
-	Writer << Version << Preset << Damage << Recovery << Rescue;
+	Writer << SchemaVersion << Preset << Damage << Recovery << Rescue;
 	if (Writer.IsError()) { return false; }
 	OutData = MoveTemp(Data); return true;
 }

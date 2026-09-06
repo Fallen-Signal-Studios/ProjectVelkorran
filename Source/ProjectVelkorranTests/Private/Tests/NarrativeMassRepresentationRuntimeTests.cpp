@@ -8,6 +8,7 @@
 #include "MassCommandBuffer.h"
 #include "MassEntityManager.h"
 #include "MassEntitySubsystem.h"
+#include "MassRepresentationTypes.h"
 #include "Misc/AutomationTest.h"
 
 #if WITH_AUTOMATION_TESTS

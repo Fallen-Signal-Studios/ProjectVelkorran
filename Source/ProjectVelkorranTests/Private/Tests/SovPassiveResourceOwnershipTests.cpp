@@ -1,5 +1,5 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
-#include "Tests/SovAxiomRuntimeTestFixtures.h"
+#include "Tests/SovPassiveResourceOwnershipTestFixtures.h"
 #include "Tests/SovCombatRoutingTestFixtures.h"
 #include "Components/SovPoiseComponent.h"
 #include "Components/SovShieldComponent.h"
@@ -42,12 +42,12 @@ namespace SovPassiveResourceTests
 				if (GEngine) { GEngine->DestroyWorldContext(World); }
 			}
 		}
-		ASovAxiomRuntimeTestCharacter* Character()
+		ASovPassiveResourceOwnershipTestCharacter* Character()
 		{
 			FActorSpawnParameters Spawn;
 			Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-			auto* Result = World ? World->SpawnActor<ASovAxiomRuntimeTestCharacter>(
-				ASovAxiomRuntimeTestCharacter::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, Spawn) : nullptr;
+			auto* Result = World ? World->SpawnActor<ASovPassiveResourceOwnershipTestCharacter>(
+				ASovPassiveResourceOwnershipTestCharacter::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, Spawn) : nullptr;
 			if (Result) { Result->InitializeTestCombat(0); }
 			return Result;
 		}
@@ -56,7 +56,9 @@ namespace SovPassiveResourceTests
 			for (float Elapsed = 0.f; Elapsed + KINDA_SMALL_NUMBER < Seconds; Elapsed += 0.1f)
 			{
 				TGuardValue<uint64> Frame(GFrameCounter, ++FixtureFrame);
-				World->Tick(LEVELTICK_TimeOnly, FMath::Min(0.1f, Seconds - Elapsed));
+				const float Delta = FMath::Min(0.1f, Seconds - Elapsed);
+				World->Tick(LEVELTICK_TimeOnly, Delta);
+				World->GetTimerManager().Tick(Delta);
 			}
 		}
 	};
@@ -75,14 +77,17 @@ namespace SovPassiveResourceTests
 		auto* ASC = NewObject<UNarrativeAbilitySystemComponent>(Owner);
 		Owner->AddInstanceComponent(ASC);
 		ASC->RegisterComponent();
-		ASC->AddAttributeSetSubobject(NewObject<UNarrativeAttributeSetBase>(ASC));
+		// Attribute sets require an actor outer. Initialize this second set directly:
+		// the actor's ability-system interface intentionally still identifies the original ASC.
+		auto* Attributes = NewObject<UNarrativeAttributeSetBase>(Owner);
+		Attributes->InitMaxHealth(100.f);
+		Attributes->InitHealth(100.f);
+		Attributes->InitMaxShield(100.f);
+		Attributes->InitShield(Shield);
+		Attributes->InitMaxPoise(100.f);
+		Attributes->InitPoise(Poise);
+		ASC->AddAttributeSetSubobject(Attributes);
 		ASC->InitAbilityActorInfo(Owner, Owner);
-		ASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetMaxHealthAttribute(), 100.f);
-		ASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetHealthAttribute(), 100.f);
-		ASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetMaxShieldAttribute(), 100.f);
-		ASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetShieldAttribute(), Shield);
-		ASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetMaxPoiseAttribute(), 100.f);
-		ASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetPoiseAttribute(), Poise);
 		return ASC;
 	}
 }
@@ -138,7 +143,8 @@ bool FSovPassiveResourceDeathTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Zero health rejects authored break completion"), Poise->RecoverFromPoiseBreak());
 	ASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetHealthAttribute(), 100.f);
 	Fixture.Advance(4.f);
-	TestEqual(TEXT("Health revival cannot resume old shield timer"), Shield->GetShield(), 30.f);
+	TestEqual(TEXT("Health revival cannot resume old shield timer"), ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetShieldAttribute()), 30.f);
+	TestFalse(TEXT("Old shield binding remains retired until explicit reset"), Shield->IsInitialized());
 	TestEqual(TEXT("Health revival cannot resume old break fallback"), Poise->GetPoise(), 0.f);
 	Shield->ResetForCheckpoint();
 	Poise->ResetForCheckpoint();
@@ -239,7 +245,6 @@ bool FSovPassiveResourceReentrantTagTest::RunTest(const FString& Parameters)
 	Replacement->AddLooseGameplayTag(Tags.State_Shield_RechargeBlocked);
 	Replacement->AddLooseGameplayTag(Tags.State_Poise_RegenBlocked);
 	auto* Shield = Attach<USovShieldComponent>(Owner, ASC);
-	auto* Poise = Attach<USovPoiseComponent>(Owner, ASC);
 	ASC->AddLooseGameplayTag(Tags.State_Shield_Broken); // unrelated contributor survives rebind
 	bool bShieldRebound = false;
 	const auto ShieldListener = ASC->RegisterGameplayTagEvent(Tags.State_Shield_Broken, EGameplayTagEventType::AnyCountChange)
@@ -248,6 +253,7 @@ bool FSovPassiveResourceReentrantTagTest::RunTest(const FString& Parameters)
 			if (Count == 2 && !bShieldRebound)
 			{
 				bShieldRebound = true;
+				Owner->AdoptAbilitySystemForTest(Replacement);
 				Shield->InitializeWithAbilitySystem(Replacement);
 			}
 		});
@@ -257,25 +263,32 @@ bool FSovPassiveResourceReentrantTagTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("New shield binding is not broken"), Shield->IsShieldBroken());
 	TestEqual(TEXT("Only original owned shield tag is released"), ASC->GetTagCount(Tags.State_Shield_Broken), 1);
 	ASC->RegisterGameplayTagEvent(Tags.State_Shield_Broken, EGameplayTagEventType::AnyCountChange).Remove(ShieldListener);
+	auto* PoiseOwner = Fixture.Character();
+	if (!TestNotNull(TEXT("Independent poise handoff owner"), PoiseOwner)) { return false; }
+	auto* PoiseASC = PoiseOwner->GetNarrativeAbilitySystemComponent();
+	auto* PoiseReplacement = ReplacementASC(PoiseOwner, 75.f, 40.f);
+	PoiseReplacement->AddLooseGameplayTag(Tags.State_Poise_RegenBlocked);
+	auto* Poise = Attach<USovPoiseComponent>(PoiseOwner, PoiseASC);
 	bool bPoiseRebound = false;
-	const auto PoiseListener = ASC->RegisterGameplayTagEvent(Tags.State_Poise_Recovering, EGameplayTagEventType::NewOrRemoved)
+	const auto PoiseListener = PoiseASC->RegisterGameplayTagEvent(Tags.State_Poise_Recovering, EGameplayTagEventType::NewOrRemoved)
 		.AddLambda([&](FGameplayTag, int32 Count)
 		{
 			if (Count > 0 && !bPoiseRebound)
 			{
 				bPoiseRebound = true;
-				Poise->InitializeWithAbilitySystem(Replacement);
+				PoiseOwner->AdoptAbilitySystemForTest(PoiseReplacement);
+				Poise->InitializeWithAbilitySystem(PoiseReplacement);
 			}
 		});
-	ASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetPoiseAttribute(), 0.f);
+	PoiseASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetPoiseAttribute(), 0.f);
 	TestFalse(TEXT("Old recovery reports interruption after callback rebind"), Poise->RecoverFromPoiseBreak());
 	TestTrue(TEXT("Poise listener rebound during recovery transition"), bPoiseRebound);
 	Fixture.Advance(3.f);
 	TestEqual(TEXT("Retired fallback/recovery cannot refill replacement poise"), Poise->GetPoise(), 40.f);
 	TestEqual(TEXT("Replacement owns its actual state"), Poise->GetPoiseState(), ESovPoiseState::Pressured);
-	TestEqual(TEXT("Old recovering contribution released"), ASC->GetTagCount(Tags.State_Poise_Recovering), 0);
-	TestEqual(TEXT("Old recovery cannot add replacement immunity"), Replacement->GetTagCount(Tags.State_Poise_Recovering), 0);
-	ASC->RegisterGameplayTagEvent(Tags.State_Poise_Recovering, EGameplayTagEventType::NewOrRemoved).Remove(PoiseListener);
+	TestEqual(TEXT("Old recovering contribution released"), PoiseASC->GetTagCount(Tags.State_Poise_Recovering), 0);
+	TestEqual(TEXT("Old recovery cannot add replacement immunity"), PoiseReplacement->GetTagCount(Tags.State_Poise_Recovering), 0);
+	PoiseASC->RegisterGameplayTagEvent(Tags.State_Poise_Recovering, EGameplayTagEventType::NewOrRemoved).Remove(PoiseListener);
 	return true;
 }
 
@@ -314,14 +327,18 @@ bool FSovPassiveResourceDamageReceiptTest::RunTest(const FString& Parameters)
 	ASC->OnDamageResolvedAsTarget.Broadcast(Receipt);
 	TestEqual(TEXT("Rebinding cannot make an old-life receipt reusable"), Shield->GetSecondsUntilRecharge(), RemainingAfterRebind);
 	// A copied native multicast models a broadcaster already traversing its listener list.
-	// This consumer did not observe the original hit, so receipt replay protection alone
-	// cannot hide a wrong-ASC delivery after its same-avatar rebind.
+	// A new canonical consumer did not observe the original hit. Its captured old-ASC
+	// callback must remain harmless after the avatar adopts its replacement ASC.
+	Shield->DestroyComponent();
 	auto* UnconsumedShield = Attach<USovShieldComponent>(Owner, ASC);
+	TestTrue(TEXT("New canonical consumer observes the original ASC"), UnconsumedShield->IsInitialized());
 	const auto RetiredCallbacks = ASC->OnDamageResolvedAsTarget;
 	auto* Replacement = ReplacementASC(Owner, 75.f, 40.f);
 	TestTrue(TEXT("Original receipt still identifies its real ASC"), Receipt.IsCurrentTargetLife(ASC));
 	TestFalse(TEXT("Same avatar does not make the receipt belong to replacement ASC"), Receipt.IsCurrentTargetLife(Replacement));
-	UnconsumedShield->InitializeWithAbilitySystem(Replacement);
+	Owner->AdoptAbilitySystemForTest(Replacement);
+	TestFalse(TEXT("Canonical handoff retires the old receipt"), Receipt.IsCurrentTargetLife(ASC));
+	TestTrue(TEXT("New canonical consumer adopts replacement ASC"), UnconsumedShield->InitializeWithAbilitySystem(Replacement));
 	UnconsumedShield->ResetForCheckpoint();
 	Fixture.Advance(1.f);
 	const float ReplacementRemaining = UnconsumedShield->GetSecondsUntilRecharge();

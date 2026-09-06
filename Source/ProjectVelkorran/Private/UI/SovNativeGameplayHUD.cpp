@@ -19,8 +19,8 @@ TSharedRef<SWidget> USovNativeGameplayHUD::RebuildWidget()
         for (UCommonActivatableWidgetStack* Layer : {GameLayer.Get(), MenuLayer.Get(), ModalLayer.Get()})
         {
             Layer->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
-            UOverlaySlot* Slot = Root->AddChildToOverlay(Layer);
-            Slot->SetHorizontalAlignment(HAlign_Fill); Slot->SetVerticalAlignment(VAlign_Fill);
+            UOverlaySlot* OverlaySlot = Root->AddChildToOverlay(Layer);
+            OverlaySlot->SetHorizontalAlignment(HAlign_Fill); OverlaySlot->SetVerticalAlignment(VAlign_Fill);
         }
     }
     return Super::RebuildWidget();

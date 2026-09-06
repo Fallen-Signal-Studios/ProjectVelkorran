@@ -218,13 +218,19 @@ bool FSovStatusCheckpointClearModifierBoundaryTest::RunTest(const FString& Param
 		AddError(TEXT("Real component/resource capture failed"));
 		return false;
 	}
+	TestEqual(TEXT("Resources use the explicit base/current schema"), Resources.SchemaVersion, 2);
+	TestEqual(TEXT("Capture retains underlying Stamina separately"), Resources.BaseStamina, 50.f);
+	TestEqual(TEXT("Capture records the debuffed presentation current"), Resources.Stamina, 40.f);
 	TestEqual(TEXT("Clear-default effect is not persisted"), Fixture.Status->CaptureCheckpointState().Statuses.Num(), 0);
 	TestTrue(TEXT("Native status record stages its empty state"), USovEncounterSnapshotLibrary::RestoreComponent(Fixture.Status, Record)
 		&& Fixture.Status->WasSaveRecordLoadAccepted());
 	TestFalse(TEXT("Old continuous GE leaves before saved resource setters"), Fixture.Status->HasActiveStatus(Tag));
 	TestEqual(TEXT("Staging removes the old modifier, exposing unmodified base"), Fixture.ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetStaminaAttribute()), 50.f);
 	TestTrue(TEXT("Production resource equality check succeeds without stale modifier"), USovEncounterSnapshotLibrary::RestoreResources(Fixture.ASC, Resources));
-	TestEqual(TEXT("Saved resolved current becomes the exact post-checkpoint current"), Fixture.ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetStaminaAttribute()), 40.f);
+	// V2 restores the saved underlying resource. A clear-default penalty must
+	// not be baked permanently into its base after the GE is removed.
+	TestEqual(TEXT("Cleared transient penalty leaves the saved base current"), Fixture.ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetStaminaAttribute()), 50.f);
+	TestEqual(TEXT("Resource base remains stable after status cleanup"), Fixture.ASC->GetNumericAttributeBase(UNarrativeAttributeSetBase::GetStaminaAttribute()), 50.f);
 	TestFalse(TEXT("Clear-default debuff cannot return at completion"), Fixture.Status->HasActiveStatus(Tag));
 	return true;
 }

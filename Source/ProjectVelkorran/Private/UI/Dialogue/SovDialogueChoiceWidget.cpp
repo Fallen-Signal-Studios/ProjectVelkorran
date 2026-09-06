@@ -58,10 +58,10 @@ TSharedRef<SWidget> USovDialogueChoiceWidget::RebuildWidget()
 		SafeZone->SetContent(Overlay);
 		Panel = WidgetTree->ConstructWidget<UBorder>();
 		Panel->SetPadding(FMargin(24.f));
-		UOverlaySlot* Slot = Overlay->AddChildToOverlay(Panel);
-		Slot->SetHorizontalAlignment(HAlign_Center);
-		Slot->SetVerticalAlignment(VAlign_Bottom);
-		Slot->SetPadding(FMargin(24.f));
+		UOverlaySlot* OverlaySlot = Overlay->AddChildToOverlay(Panel);
+		OverlaySlot->SetHorizontalAlignment(HAlign_Center);
+		OverlaySlot->SetVerticalAlignment(VAlign_Bottom);
+		OverlaySlot->SetPadding(FMargin(24.f));
 		USizeBox* Size = WidgetTree->ConstructWidget<USizeBox>();
 		Size->SetMaxDesiredWidth(1100.f);
 		Size->SetMaxDesiredHeight(600.f);

@@ -7,7 +7,11 @@
 #include "Components/SizeBox.h"
 #include "Components/TextBlock.h"
 #include "Engine/Engine.h"
+#include "Engine/EngineBaseTypes.h"
 #include "Engine/GameInstance.h"
+#include "Engine/LocalPlayer.h"
+#include "ICommonInputModule.h"
+#include "UObject/StrongObjectPtr.h"
 #include "Engine/World.h"
 #include "Misc/AutomationTest.h"
 #include "Serialization/MemoryReader.h"
@@ -39,16 +43,18 @@ struct FSovObjectivePresentationTestAccess
 	static void Bind(USovFrontendComponent& Frontend, USovAccessibilityPresentation* Presentation,
 		ASovPlayerController* Controller, USovCampaignStateComponent* Campaign)
 	{
-		Frontend.Presentation = Presentation; Frontend.Activate(true);
+		Frontend.Presentation = Presentation;
 		Frontend.BindObjectives(Controller, Campaign); Frontend.RefreshObjectives();
 	}
 	static void Refresh(USovFrontendComponent& Frontend) { Frontend.RefreshObjectives(false); }
-	static void End(USovFrontendComponent& Frontend) { Frontend.EndPlay(EEndPlayReason::RemovedFromWorld); }
+	static void Begin(USovFrontendComponent& Frontend) { Frontend.RegisterAllComponentTickFunctions(true); Frontend.BeginPlay(); }
+	static void End(USovFrontendComponent& Frontend) { if (Frontend.HasBegunPlay()) { Frontend.EndPlay(EEndPlayReason::RemovedFromWorld); } }
 	static void Settings(USovAccessibilityPresentation& Presentation, const FSovUserSettingsSnapshot& Value)
 	{ Presentation.SettingsChanged(Value); }
 	static bool Visible(const USovAccessibilityPresentation& Presentation)
 	{ return Presentation.ObjectiveBackground && Presentation.ObjectiveBackground->GetVisibility() != ESlateVisibility::Collapsed; }
 	static int32 FontSize(const USovAccessibilityPresentation& Presentation) { return Presentation.ObjectiveText->GetFont().Size; }
+	static float OverflowHeight(const USovAccessibilityPresentation& Presentation) { return float(Presentation.ObjectiveOverflow->GetDesiredSize().Y); }
 	static FText Text(const USovAccessibilityPresentation& Presentation) { return Presentation.ObjectiveText->GetText(); }
 	static void InitializeNativeAccount(USovSaveSubsystem& Saves, const FSovObservedPlatformAccount& Account)
 	{ Saves.Storage = MakeUnique<FObjectiveHUDTestStorage>(); Saves.ObserveNativePlatformAccount(Account); }
@@ -74,12 +80,14 @@ namespace
 {
 	struct FObjectivePresentationWorld
 	{
+		TStrongObjectPtr<ULocalPlayer> LocalPlayer{NewObject<ULocalPlayer>(GEngine)};
 		UWorld* World = nullptr;
 		ASovFrontendRuntimeController* PC = nullptr;
 		ASovCampaignRuntimeTestPawn* Pawn = nullptr;
 		USovCampaignStateComponent* State = nullptr;
 		USovFrontendComponent* Frontend = nullptr;
 		USovAccessibilityPresentation* Presentation = nullptr;
+		TSharedPtr<SWidget> PresentationSlate;
 		FObjectivePresentationWorld()
 		{
 			const auto IVS = UWorld::InitializationValues().AllowAudioPlayback(false).RequiresHitProxies(false)
@@ -87,17 +95,24 @@ namespace
 			World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &IVS);
 			if (!World) { return; }
 			if (GEngine) { GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World); }
+			World->InitializeActorsForPlay(FURL());
 			PC = World->SpawnActor<ASovFrontendRuntimeController>(); Pawn = World->SpawnActor<ASovCampaignRuntimeTestPawn>();
 			if (!PC || !Pawn) { return; }
+			ICommonInputModule::GetSettings().LoadData();
+			FSovObjectivePresentationTestAccess::Begin(*PC->GetFrontend());
+			PC->Player = LocalPlayer.Get(); LocalPlayer->PlayerController = PC; PC->SetAsLocalPlayerController();
 			PC->StagePawn(Pawn); State = PC->GetCampaignState(); Frontend = PC->GetFrontend();
 			Presentation = NewObject<USovAccessibilityPresentation>(PC);
-			Presentation->SetOwningPlayer(PC); Presentation->Initialize(); Presentation->TakeWidget();
+			Presentation->SetOwningPlayer(PC); Presentation->Initialize();
+			// A real viewport retains Slate; releasing it here would make text measurement return zero.
+			PresentationSlate = Presentation->TakeWidget();
 			FSovObjectivePresentationTestAccess::Settings(*Presentation, FSovUserSettingsSnapshot());
 			FSovObjectivePresentationTestAccess::Bind(*Frontend, Presentation, PC, State);
 		}
 		~FObjectivePresentationWorld()
 		{
 			if (Frontend) { FSovObjectivePresentationTestAccess::End(*Frontend); }
+			PresentationSlate.Reset();
 			if (PC) { PC->StagePawn(nullptr); }
 			if (World) { World->DestroyWorld(false); if (GEngine) { GEngine->DestroyWorldContext(World); } }
 		}
@@ -134,6 +149,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovObjectivePresentationLifecycleTest, "Projec
 bool FSovObjectivePresentationLifecycleTest::RunTest(const FString&)
 {
 	FObjectivePresentationWorld F; if (!F.Frontend || !F.Presentation) { AddError(TEXT("Fixture failed")); return false; }
+	if (!TestTrue(TEXT("Controller frontend activates through normal world initialization"), F.Frontend->IsActive())) { return false; }
 	auto* Mission = F.Mission();
 	TestEqual(TEXT("Mission begins"), F.State->BeginMission(Mission), ESovCampaignResult::Applied);
 	if (!TestEqual(TEXT("Only immediate goal shown"), F.Presentation->GetPresentedObjectives().Num(), 1)) { return false; }
@@ -215,6 +231,8 @@ bool FSovObjectivePresentationSettingsTest::RunTest(const FString&)
 	TestEqual(TEXT("Full authorized cache preserves every goal for review"), F.Presentation->GetObjectiveReviewEntries().Num(), 8);
 	FSovUserSettingsSnapshot Settings; Settings.UIScale = 1.5f; Settings.SubtitleScale = 2.f;
 	FSovObjectivePresentationTestAccess::Settings(*F.Presentation, Settings);
+	TestTrue(TEXT("Objective measurement retains the real Slate tree"), F.Presentation->GetCachedWidget().IsValid());
+	TestTrue(TEXT("Overflow text has an actual measured height"), FSovObjectivePresentationTestAccess::OverflowHeight(*F.Presentation) > 0.f);
 	TestEqual(TEXT("Objective font follows UI scale independently of subtitle scale"), FSovObjectivePresentationTestAccess::FontSize(*F.Presentation), 30);
 	Settings.bShowObjectiveText = false; FSovObjectivePresentationTestAccess::Settings(*F.Presentation, Settings);
 	TestFalse(TEXT("Player can hide objective text"), FSovObjectivePresentationTestAccess::Visible(*F.Presentation));

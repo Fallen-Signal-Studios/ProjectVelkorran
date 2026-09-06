@@ -8,6 +8,7 @@
 #include "Campaign/SovCampaignDefinition.h"
 #include "Campaign/SovCampaignStateComponent.h"
 #include "Character/PlayerDefinition.h"
+#include "Camera/PlayerCameraManager.h"
 #include "Framework/SovPlayerState.h"
 #include "Framework/SovApplicationLifecycleComponent.h"
 #include "Tracks/MovieSceneEventTrack.h"
@@ -18,9 +19,11 @@
 #include "GAS/NarrativeAbilitySystemComponent.h"
 #include "LevelSequence.h"
 #include "MovieScene.h"
+#include "EntitySystem/MovieSceneEntitySystemRunner.h"
 #include "Misc/AutomationTest.h"
 #include "NarrativeGameplayTags.h"
 #include "TimerManager.h"
+#include "UObject/Script.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 struct FSovCinematicInterruptionTestAccess
@@ -110,6 +113,8 @@ namespace
 {
 	struct FSequenceWorld
 	{
+		// Transient fixture worlds still need actor delegates dispatched through ProcessEvent.
+		FEditorScriptExecutionGuard ScriptGuard;
 		UWorld* World = nullptr;
 		ASovSequenceLifecycleTestActor* Actor = nullptr;
 		ASovAxiomRuntimeTestCharacter* Participant = nullptr;
@@ -157,7 +162,12 @@ namespace
 			Pawn->PrepareCampaignInitialization(Definition); PC->SetTestPlayerState(PS); PC->Possess(Pawn);
 			if (!Pawn->StageTestReadiness(PS, true) || !Pawn->CompleteCampaignDataInitialization(false)) { return; }
 			ASC = Cast<UNarrativeAbilitySystemComponent>(PS->GetAbilitySystemComponent());
+			// Transient worlds do not run the controller initialization that owns the camera.
+			if (!PC->PlayerCameraManager) { PC->PlayerCameraManager = Base.World->SpawnActor<APlayerCameraManager>(); }
+			if (!PC->PlayerCameraManager) { return; }
+			PC->PlayerCameraManager->InitializeFor(PC);
 			PC->SetViewTarget(Pawn);
+			PC->PlayerCameraManager->UpdateCamera(0.f);
 			auto* Mission = NewObject<USovCampaignDefinition>(PC); PC->KeepAlive.Add(Mission);
 			Mission->MissionId = TEXT("CinematicRuntime"); Mission->Protagonist = Pawn->GetProtagonistIdentityTag();
 			Mission->PawnClass = Pawn->GetClass(); Mission->PlayerDefinition = Definition;
@@ -167,6 +177,8 @@ namespace
 			{ FSovCampaignBeatDefinition Replay = Beat; Replay.BeatId = TEXT("Replay"); Replay.PrerequisiteBeats = {Beat.BeatId}; Mission->Beats.Add(Replay); }
 			if (PC->GetCampaignState()->BeginMission(Mission) != ESovCampaignResult::Applied) { return; }
 			Component = NewObject<USovCampaignCinematicComponent>(Base.Actor); Base.Actor->AddInstanceComponent(Component); Component->RegisterComponent();
+			// Match the tick prerequisite normally established when the world begins play.
+			Component->RegisterAllComponentTickFunctions(true); Component->SetComponentTickEnabled(true);
 			Component->MissionId = Mission->MissionId; Component->BeatId = Beat.BeatId; Component->Sequence = Base.Sequence;
 			FSovCinematicParticipant Participant; Participant.BindingTag = TEXT("Player"); Participant.bControlledProtagonist = true;
 			Component->Participants.Add(Participant);
@@ -330,7 +342,12 @@ bool FSovCampaignCinematicPauseReentryTest::RunTest(const FString& Parameters)
 	FSovCinematicTestAccess::StagePlaying(F.Component, F.Base.Actor->GetPlaybackGeneration());
 	F.Base.Probe->Managed = F.Component;
 	F.Base.Actor->GetSequencePlayer()->OnPause.AddDynamic(F.Base.Probe, &USovSequenceLifecycleProbe::AbortManaged);
-	TestFalse(TEXT("Pause cannot succeed after its callback aborts the request"), F.Component->SetCinematicPaused(true));
+	// UE 5.7 delivers OnPause after queued evaluation completes, as the game tick would do.
+	TestTrue(TEXT("Pause request is accepted before its deferred callback runs"), F.Component->SetCinematicPaused(true));
+	TestTrue(TEXT("Accepted request pauses the real engine player"), F.Base.Actor->GetSequencePlayer()->IsPaused());
+	auto Runner = F.Base.Actor->GetSequencePlayer()->GetEvaluationTemplate().GetRunner();
+	if (!TestTrue(TEXT("Real evaluation runner owns the deferred pause callback"), Runner.IsValid())) { return false; }
+	Runner->Flush();
 	TestEqual(TEXT("Outer pause cannot resurrect a retired phase"), F.Component->GetPhase(), ESovCinematicPhase::Failed);
 	TestFalse(TEXT("Reentrant pause interruption releases component ownership"), FSovCinematicTestAccess::OwnsAnything(F.Component));
 	TestFalse(TEXT("Matching interrupted sequence is stopped"), F.Base.Actor->GetSequencePlayer()->IsPlaying());

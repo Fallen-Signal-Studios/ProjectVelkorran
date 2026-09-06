@@ -57,22 +57,38 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovSuspensionCallbackRuntimeTest, "ProjectVelk
 bool FSovSuspensionCallbackRuntimeTest::RunTest(const FString& Parameters)
 {
     FRestoreWorld F; auto* Director = F.World->SpawnActor<ASovEncounterDirector>();
-    auto* Actor = F.World->SpawnActor<ASovAxiomRuntimeTestCharacter>(); if (!Director || !Actor) { return false; }
-    Actor->InitializeTestCombat(0); auto* ASC = Actor->GetNarrativeAbilitySystemComponent(); const auto& N = FNarrativeGameplayTags::Get();
-    ASC->AddLooseGameplayTag(N.State_Busy); ASC->AddLooseGameplayTag(N.State_Invulnerable);
+    auto* Actor = F.World->SpawnActor<ASovAxiomRuntimeTestCharacter>();
+    auto* ForeignActor = F.World->SpawnActor<ASovAxiomRuntimeTestCharacter>();
+    if (!Director || !Actor || !ForeignActor) { return false; }
+    Actor->InitializeTestCombat(0); ForeignActor->InitializeTestCombat(0);
+    auto* ASC = Actor->GetNarrativeAbilitySystemComponent();
+    auto* ForeignASC = ForeignActor->GetNarrativeAbilitySystemComponent();
+    const auto& N = FNarrativeGameplayTags::Get();
+    // UE 5.7 defers removal delegates but only dispatches them at a zero boundary.
+    // Exercise the real callback on this actor and foreign Busy ownership on the
+    // next actor, which an interrupted release must not reach.
+    ASC->AddLooseGameplayTag(N.State_Invulnerable);
+    ForeignASC->AddLooseGameplayTag(N.State_Busy); ForeignASC->AddLooseGameplayTag(N.State_Invulnerable);
     FSovEncounterCallbackTestAccess::Suspend(Director, Actor);
+    FSovEncounterCallbackTestAccess::Suspend(Director, ForeignActor);
+    bool bCallbackRan = false;
     const auto Callback = ASC->RegisterGameplayTagEvent(N.State_Busy, EGameplayTagEventType::AnyCountChange).AddLambda(
-        [Director](FGameplayTag Tag, int32 Count) { if (Count == 1) { FSovEncounterCallbackTestAccess::Invalidate(Director); } });
+        [Director, &bCallbackRan](FGameplayTag Tag, int32 Count)
+        { if (Count == 0) { bCallbackRan = true; FSovEncounterCallbackTestAccess::Invalidate(Director); } });
     TestFalse(TEXT("A synchronous GAS callback stops the old release"), FSovEncounterCallbackTestAccess::Release(Director));
-    TestEqual(TEXT("Only its Busy count was removed before interruption"), ASC->GetTagCount(N.State_Busy), 1);
+    TestTrue(TEXT("The actual GAS removal callback retired the operation"), bCallbackRan);
+    TestEqual(TEXT("Only its Busy count was removed before interruption"), ASC->GetTagCount(N.State_Busy), 0);
     TestEqual(TEXT("Protection is retained until the rightful operation resumes"), ASC->GetTagCount(N.State_Invulnerable), 2);
+    TestEqual(TEXT("Interruption cannot touch the next actor's Busy owners"), ForeignASC->GetTagCount(N.State_Busy), 2);
     ASC->RegisterGameplayTagEvent(N.State_Busy, EGameplayTagEventType::AnyCountChange).Remove(Callback);
     FSovEncounterCallbackTestAccess::Suspend(Director, Actor);
-    TestEqual(TEXT("Retry reacquires exactly one missing Busy count"), ASC->GetTagCount(N.State_Busy), 2);
+    TestEqual(TEXT("Retry reacquires exactly one missing Busy count"), ASC->GetTagCount(N.State_Busy), 1);
     TestEqual(TEXT("Retry cannot stack another protection owner"), ASC->GetTagCount(N.State_Invulnerable), 2);
     TestTrue(TEXT("Current restore completes its owned cleanup"), FSovEncounterCallbackTestAccess::Release(Director));
-    TestEqual(TEXT("Foreign Busy survives interrupted release and retry"), ASC->GetTagCount(N.State_Busy), 1);
+    TestEqual(TEXT("Retried actor releases its last owned Busy"), ASC->GetTagCount(N.State_Busy), 0);
+    TestEqual(TEXT("Foreign Busy survives interrupted release and retry"), ForeignASC->GetTagCount(N.State_Busy), 1);
     TestEqual(TEXT("Foreign protection survives interrupted release and retry"), ASC->GetTagCount(N.State_Invulnerable), 1);
+    TestEqual(TEXT("The second actor also retains foreign protection"), ForeignASC->GetTagCount(N.State_Invulnerable), 1);
     return true;
 }
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovFinishRestoreCallbackRuntimeTest, "ProjectVelkorran.Campaign.Encounter.FinishRejectsChangedPlayerOwnership",

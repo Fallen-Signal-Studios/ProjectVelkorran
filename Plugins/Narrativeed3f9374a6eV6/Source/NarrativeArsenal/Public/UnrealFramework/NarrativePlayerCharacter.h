@@ -137,6 +137,7 @@ protected:
 	bool bInitialPlayerDataApplied = false;
 	bool bVisualReadyForGameplay = false;
 	bool bCharacterReady = false;
+	bool bFinalizingCharacterReadiness = false;
 	int32 CharacterInitializationGeneration = 0;
 
 protected:

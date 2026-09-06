@@ -42,7 +42,7 @@ class PROJECTVELKORRAN_API USovAccessibilityPresentation : public UUserWidget
 public:
 	USovAccessibilityPresentation(const FObjectInitializer& Initializer);
 	UFUNCTION(BlueprintCallable, Category="Sovereign|Accessibility") void PresentSpeech(const FText& Speaker, const FText& Text, float Duration, const FVector& SpeakerLocation, bool bCinematic);
-	UFUNCTION(BlueprintCallable, Category="Sovereign|Accessibility") void PresentCaption(const FText& Text, float Duration, const FVector& SourceLocation, ESovCaptionPriority Priority = ESovCaptionPriority::Important);
+	UFUNCTION(BlueprintCallable, Category="Sovereign|Accessibility") void PresentCaption(const FText& Text, float Duration, const FVector& SourceLocation, ESovCaptionPriority CaptionPriority = ESovCaptionPriority::Important);
 	/** Line-end and normal dialogue completion preserve the remaining readable pages. */
 	UFUNCTION(BlueprintCallable, Category="Sovereign|Accessibility") void ClearSpeech();
 	/** A replacement scene may take the speech surface immediately; its predecessor stays in recent history. */

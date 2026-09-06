@@ -13,7 +13,14 @@ void USovNarrativeCueRuntimeDialogue::Stage(UTalesComponent* Component)
 	RootDialogue->Line.Text = FText::FromString(TEXT("A recoverable line."));
 	RootDialogue->OwningComponent = Component; RootDialogue->OwningDialogue = this;
 	NPCReplies.Add(RootDialogue); CurrentNode = RootDialogue; CurrentLine = RootDialogue->Line;
-	TestChoice = NewObject<UDialogueNode_Player>(this); TestChoice->SetID(TEXT("TestChoice")); PlayerReplies.Add(TestChoice); AvailableResponses.Add(TestChoice);
+	// Two authored, nonempty replies keep the graph at player choice. A single
+	// empty default reply is a routing node and legitimately auto-completes next.
+	TestChoice = NewObject<UDialogueNode_Player>(this); TestChoice->SetID(TEXT("TestChoice"));
+	TestChoice->Line.Text = FText::FromString(TEXT("Ask about the route."));
+	PlayerReplies.Add(TestChoice); AvailableResponses.Add(TestChoice);
+	auto* OtherChoice = NewObject<UDialogueNode_Player>(this); OtherChoice->SetID(TEXT("OtherChoice"));
+	OtherChoice->Line.Text = FText::FromString(TEXT("Ask about the supplies."));
+	PlayerReplies.Add(OtherChoice); AvailableResponses.Add(OtherChoice);
 	GetWorld()->GetTimerManager().SetTimer(TimerHandle_NPCReplyFinished,
 		FTimerDelegate::CreateWeakLambda(this, [this]() { FinishNPCDialogue(); }), 10.f, false);
 }

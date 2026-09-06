@@ -6,6 +6,8 @@
 #include "Tests/SovSettingsTestFixtures.h"
 #include "Tests/SovPlatformOutputTestFixtures.h"
 #include "Misc/AutomationTest.h"
+#include "ICommonInputModule.h"
+#include "UObject/UnrealType.h"
 #include "Blueprint/WidgetTree.h"
 #include "Blueprint/WidgetNavigation.h"
 #include "Components/SafeZone.h"
@@ -42,6 +44,7 @@ bool FSovConsoleMenuBackTest::RunTest(const FString& Parameters)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovConsoleNativeLayoutTest,"ProjectVelkorran.UI.Console.NavigationAndSafeArea",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
 bool FSovConsoleNativeLayoutTest::RunTest(const FString& Parameters)
 {
+	ICommonInputModule::GetSettings().LoadData();
 	auto* Presentation=NewObject<USovAccessibilityPresentation>(); Presentation->Initialize(); Presentation->TakeWidget();
 	TestTrue(TEXT("Actual subtitle/caption tree uses engine SafeZone"),FSovAccessibilityFrontendTestAccess::HasSafeTextRoot(Presentation));
 	auto* Review=NewObject<USovAccessibleRecordMenu>(); Review->Initialize(); Review->TakeWidget();
@@ -92,6 +95,12 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAccessibilityTransaction,"ProjectVelkorran.
 bool FSovAccessibilityTransaction::RunTest(const FString& Parameters)
 {
 	auto* Settings = NewObject<USovSettingsTestSettings>(); FString Error; TArray<uint8> Bytes;
+	// Config-backed instances inherit the user's first-boot completion on this PC.
+	// Stage an uncompleted test instance without touching the real settings owner.
+	auto* Completed = FindFProperty<FBoolProperty>(Settings->GetClass(), TEXT("bAccessibilitySetupCompleted"));
+	if (!TestNotNull(TEXT("Reflected first-boot fixture field"), Completed)) { return false; }
+	Completed->SetPropertyValue_InContainer(Settings, false);
+	TestFalse(TEXT("Fixture begins before explicit setup completion"), Settings->HasCompletedAccessibilitySetup());
 	TestTrue(TEXT("Capture legacy eleven-byte gameplay payload"),Settings->CapturePortableSettings(Bytes)); TestEqual(TEXT("Schema unchanged"),Bytes.Num(),11);
 	auto Value = Settings->GetSettingsSnapshot(); Value.UIScale=2; Value.SubtitleScale=2.5f; Value.bHighContrastHUD=true; Value.bMenuNarration=true;
 	Value.DialoguePressureMode=ESovDialoguePressureMode::Disabled; Value.bOverrideTeamColor=true; Value.TeamColor=FLinearColor::Green;

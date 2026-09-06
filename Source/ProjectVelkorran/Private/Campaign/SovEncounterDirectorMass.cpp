@@ -32,6 +32,7 @@
 #include "MassCommonFragments.h"
 #include "MassActorSubsystem.h"
 #include "MassRepresentationFragments.h"
+#include "MassRepresentationActorManagement.h"
 #include "AI/Mass/Peds/MassPedRepresentationSubsystem.h"
 #include "MassCommands.h"
 #include "NarrativeGameplayTags.h"
@@ -238,10 +239,10 @@ bool ASovEncounterDirector::SetParticipantRepresentation(FName Id, ESovCampaignR
 		for (AActor* Actor : AttemptActors)
 		{
 			TSet<const AActor*> Visited;
-			for (const AActor* Owner = IsValid(Actor) ? Actor->GetOwner() : nullptr; Owner && !Visited.Contains(Owner); Owner = Owner->GetOwner())
+			for (const AActor* OwnerActor = IsValid(Actor) ? Actor->GetOwner() : nullptr; OwnerActor && !Visited.Contains(OwnerActor); OwnerActor = OwnerActor->GetOwner())
 			{
-				if (Owner == NPC) { Error = TEXT("A live attempt actor still depends on this participant's combat ownership."); return false; }
-				Visited.Add(Owner);
+				if (OwnerActor == NPC) { Error = TEXT("A live attempt actor still depends on this participant's combat ownership."); return false; }
+				Visited.Add(OwnerActor);
 			}
 		}
 		// The owner record must exist before creation observers can request a representation.
@@ -378,23 +379,24 @@ void ASovEncounterDirector::DestroyMassEntity(FName Id)
 		{
 			auto& Identity = Manager.GetFragmentDataChecked<FNarrativeMassParticipantFragment>(Entity);
 			Identity.Owner.Reset(); Identity.Generation = 0;
-			// The representation fragment is authoritative even when owner acceptance rejected the new actor.
+			// A bound receipt may belong to an externally created actor, which has no
+			// spawn-reference count in the representation subsystem.
+			bool bProxyOwnedByMass = false;
 			if (auto* ActorFragment = Manager.GetFragmentDataPtr<FMassActorFragment>(Entity))
-			{ if (ActorFragment->GetMutable()) { Proxy = ActorFragment->GetMutable(); } }
+			{
+				if (ActorFragment->GetMutable()) { Proxy = ActorFragment->GetMutable(); }
+				bProxyOwnedByMass = ActorFragment->GetOwnedByMassMutable() != nullptr;
+				if (!bProxyOwnedByMass)
+				{ ActorFragment->ResetAndUpdateHandleMap(GetWorld()->GetSubsystem<UMassActorSubsystem>()); }
+			}
 			if (Proxy.IsValid())
 			{ if (auto* Receipt = Proxy->FindComponentByClass<UNarrativeMassParticipantReceiptComponent>()) { Receipt->Reset(); } }
-			if (auto* Representation = GetWorld()->GetSubsystem<UMassPedRepresentationSubsystem>())
+			if (Manager.IsEntityValid(Entity))
 			{
-				FMassRepresentationFragment Visual = Manager.GetFragmentDataChecked<FMassRepresentationFragment>(Entity);
-				bool bReleased = Representation->ReleaseTemplateActorOrCancelSpawning(Entity, Visual.HighResTemplateActorIndex, Proxy.Get(), Visual.ActorSpawnRequestHandle, true);
-				if (!bReleased && Visual.LowResTemplateActorIndex != Visual.HighResTemplateActorIndex)
-				{ bReleased = Representation->ReleaseTemplateActorOrCancelSpawning(Entity, Visual.LowResTemplateActorIndex, Proxy.Get(), Visual.ActorSpawnRequestHandle, true); }
-				if (Manager.IsEntityValid(Entity))
-				{
-					if (auto* ActorFragment = Manager.GetFragmentDataPtr<FMassActorFragment>(Entity))
-					{ ActorFragment->ResetAndUpdateHandleMap(GetWorld()->GetSubsystem<UMassActorSubsystem>()); }
-				}
-				if (bReleased) { Proxy.Reset(); }
+				// The engine helper releases only Mass-owned actors, cancels both LOD
+				// requests, and clears the handle map before callbacks can move archetypes.
+				UMassRepresentationActorManagement::ReleaseAnyActorOrCancelAnySpawning(Manager, Entity, true);
+				if (bProxyOwnedByMass) { Proxy.Reset(); }
 			}
 			if (Manager.IsEntityValid(Entity)) { Manager.Defer().DestroyEntity(Entity); }
 		}

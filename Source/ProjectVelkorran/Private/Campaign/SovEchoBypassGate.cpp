@@ -92,11 +92,11 @@ bool ASovEchoBypassGate::ValidateCandidate(bool& bOutNewlyDisabled) const
 		|| GetWorld()->GetTimeSeconds() - EnteredAt > FMath::Max(MaximumTraversalSeconds, 0.1f)
 		|| CandidateThreats.Num() != ThreatParticipantIds.Num() || CandidateThreats.IsEmpty()) return false;
 	UAbilitySystemComponent* PlayerASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Candidate.Get());
-	const FSovGameplayTags& Tags = FSovGameplayTags::Get();
-	if (!PlayerASC || !PlayerASC->HasMatchingGameplayTag(Tags.Character_Player_Selene)
-		|| PlayerASC->HasMatchingGameplayTag(Tags.Character_Player_Tarrik)
+	const FSovGameplayTags& GameplayTags = FSovGameplayTags::Get();
+	if (!PlayerASC || !PlayerASC->HasMatchingGameplayTag(GameplayTags.Character_Player_Selene)
+		|| PlayerASC->HasMatchingGameplayTag(GameplayTags.Character_Player_Tarrik)
 		|| PlayerASC->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_IsDead)
-		|| PlayerASC->HasMatchingGameplayTag(Tags.State_Fatal)) return false;
+		|| PlayerASC->HasMatchingGameplayTag(GameplayTags.State_Fatal)) return false;
 	for (int32 Index = 0; Index < CandidateThreats.Num(); ++Index)
 	{
 		ASovNPCCharacterBase* Threat = CandidateThreats[Index].Get();
@@ -109,12 +109,12 @@ bool ASovEchoBypassGate::ValidateCandidate(bool& bOutNewlyDisabled) const
 			|| !ASC->GetSet<UNarrativeAttributeSetBase>()
 			|| ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()) <= 0.f
 			|| ASC->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_IsDead)
-			|| ASC->HasMatchingGameplayTag(Tags.State_Fatal)
+			|| ASC->HasMatchingGameplayTag(GameplayTags.State_Fatal)
 			|| UArsenalStatics::GetAttitude(Candidate.Get(), Threat) != ETeamAttitude::Hostile) return false;
 		TArray<AActor*> KnownActors;
 		Perception->GetKnownPerceivedActors(nullptr, KnownActors);
 		if (KnownActors.Contains(Candidate.Get())) return false;
-		bOutNewlyDisabled |= ASC->HasMatchingGameplayTag(Tags.State_Status_DeviceDisabled);
+		bOutNewlyDisabled |= ASC->HasMatchingGameplayTag(GameplayTags.State_Status_DeviceDisabled);
 	}
 	return true;
 }

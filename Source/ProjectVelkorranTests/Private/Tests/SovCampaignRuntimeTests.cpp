@@ -6,6 +6,7 @@
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "Misc/AutomationTest.h"
+#include "UObject/Script.h"
 #include "Sovereign/SovGameplayTags.h"
 
 #if WITH_AUTOMATION_TESTS
@@ -19,6 +20,7 @@ namespace
 {
 	struct FCampaignWorld
 	{
+		FEditorScriptExecutionGuard ScriptGuard;
 		UWorld* World = nullptr;
 		ASovCampaignRuntimeTestController* PC = nullptr;
 		ASovCampaignRuntimeTestPawn* Pawn = nullptr;

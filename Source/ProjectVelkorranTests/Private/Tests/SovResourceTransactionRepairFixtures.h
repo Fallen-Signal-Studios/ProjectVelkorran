@@ -48,6 +48,7 @@ class USovResourceRepairWeapon : public UWeaponItem
 public:
 	USovResourceRepairWeapon()
 	{ RequiredAmmo = USovResourceRepairAmmo::StaticClass(); ClipSize = 1; bBotsConsumeAmmo = true; Weight = 0.f; }
+	using UWeaponItem::ConsumeAmmo;
 	void SetLoaded(int32 Value) { WeaponClipState.AmmoInClip = Value; MarkDirtyForReplication(); }
 	int32 RawLoaded() const { return WeaponClipState.AmmoInClip; }
 	void SetAmmoSourceForTest(UNarrativeItem* Item)
@@ -73,7 +74,7 @@ public:
 	ASovResourceRepairPlayer(const FObjectInitializer& Initializer) : Super(Initializer)
 	{ InventoryComponent = CreateDefaultSubobject<UNarrativeInventoryComponent>(TEXT("ResourceRepairInventory")); }
 	// No authored player definition is needed for the production pickup admission path.
-	virtual void PossessedBy(AController* Controller) override { APawn::PossessedBy(Controller); }
+	virtual void PossessedBy(AController* NewController) override { APawn::PossessedBy(NewController); }
 };
 
 UCLASS(Transient, NotBlueprintable)

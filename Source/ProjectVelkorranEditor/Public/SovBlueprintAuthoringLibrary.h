@@ -1,0 +1,37 @@
+// Copyright Fallen Signal Studios. All Rights Reserved.
+#pragma once
+#include "CoreMinimal.h"
+#include "Kismet/BlueprintFunctionLibrary.h"
+#include "SovBlueprintAuthoringLibrary.generated.h"
+
+/** Python keeps this result intact on failure, including the compilation report. */
+USTRUCT(BlueprintType)
+struct PROJECTVELKORRANEDITOR_API FSovBlueprintAuthoringResult
+{
+    GENERATED_BODY()
+    UPROPERTY(BlueprintReadOnly, Category="Velkorran|Editor")
+    bool bSucceeded = false;
+    UPROPERTY(BlueprintReadOnly, Category="Velkorran|Editor")
+    FString Report;
+};
+
+/** Scoped asset authoring operations. This module is never included in a game build. */
+UCLASS()
+class PROJECTVELKORRANEDITOR_API USovBlueprintAuthoringLibrary : public UBlueprintFunctionLibrary
+{
+    GENERATED_BODY()
+public:
+    /** Read-only digests of persistent UObject properties, including graph objects and CDOs. */
+    UFUNCTION(BlueprintCallable, Category="Velkorran|Editor")
+    static FString FingerprintBlueprint(UObject* Asset);
+
+    /** Remap hard Blueprint/class/default-object references only in explicitly supplied /Game copies.
+     * Does not save assets; the caller must inspect the compilation report before saving.
+     */
+    UFUNCTION(BlueprintCallable, Category="Velkorran|Editor")
+    static FSovBlueprintAuthoringResult RemapProjectBlueprintReferences(const TArray<UObject*>& ProjectAssets,
+        const TArray<UObject*>& SourceAssets, const TArray<UObject*>& ReplacementAssets);
+private:
+    static bool RemapProjectBlueprintReferencesInternal(const TArray<UObject*>& ProjectAssets,
+        const TArray<UObject*>& SourceAssets, const TArray<UObject*>& ReplacementAssets, FString& Report);
+};

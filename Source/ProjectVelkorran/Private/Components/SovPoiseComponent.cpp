@@ -209,7 +209,17 @@ void USovPoiseComponent::SetCheckpointRestoreInProgress(const bool bInProgress, 
 	{
 		if (PoiseState == ESovPoiseState::Broken) { ScheduleBrokenFallback(); }
 		else if (PoiseState == ESovPoiseState::Recovering) { ScheduleRecoveryEnd(); }
-		else { TryStartRegeneration(); }
+		else
+		{
+			// Start the new delay at accepted completion, after the restore barrier.
+			if (GetPoise() + KINDA_SMALL_NUMBER < GetMaxPoise())
+			{
+				bHasRecordedPoiseDamage = true;
+				bRegenerationDelayElapsed = false;
+				LastPoiseDamageWorldTime = GetWorldTimeSeconds();
+			}
+			TryStartRegeneration();
+		}
 	}
 	else { bCheckpointStateReconciled = false; ClearLifecycleTimers(); }
 }

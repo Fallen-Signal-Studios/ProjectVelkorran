@@ -919,8 +919,8 @@ bool ANarrativePlayerController::WantsToggleForInput(FGameplayTag InputTag) cons
 	if (InputTag == FNarrativeGameplayTags::Get().Narrative_Input_Sprint) { return Settings->ShouldSprintToggle(); }
 	if (InputTag == FNarrativeGameplayTags::Get().Narrative_Input_AltAttack)
 	{
-		const ANarrativeCharacter* Character = GetNarrativeCharacter();
-		return Character && Cast<URangedWeaponItem>(Character->GetWeapon()) ? Settings->ShouldAimToggle() : Settings->ShouldGuardToggle();
+		const ANarrativeCharacter* InputCharacter = GetNarrativeCharacter();
+		return InputCharacter && Cast<URangedWeaponItem>(InputCharacter->GetWeapon()) ? Settings->ShouldAimToggle() : Settings->ShouldGuardToggle();
 	}
 	return false;
 }
@@ -1030,14 +1030,14 @@ void ANarrativePlayerController::ReleaseHeldAbilityInputs()
 void ANarrativePlayerController::UpdateAutomaticSprintInput(float MovementMagnitude)
 {
 	const auto* Settings = UNarrativeGameUserSettings::GetSovSettings();
-	const ANarrativePlayerCharacter* Character = Cast<ANarrativePlayerCharacter>(GetPawn());
-	const UCharacterMovementComponent* Movement = Character ? Character->GetCharacterMovement() : nullptr;
+	const ANarrativePlayerCharacter* SprintCharacter = Cast<ANarrativePlayerCharacter>(GetPawn());
+	const UCharacterMovementComponent* Movement = SprintCharacter ? SprintCharacter->GetCharacterMovement() : nullptr;
 	const UNarrativeAbilitySystemComponent* ASC = Cast<UNarrativeAbilitySystemComponent>(GetAbilitySystemComponent());
-	const auto& Tags = FNarrativeGameplayTags::Get();
-	const bool bReady = Character && Character->IsCharacterReady() && ASC && ASC->GetAvatarActor() == Character && !ASC->IsDead();
+	const auto& NarrativeTags = FNarrativeGameplayTags::Get();
+	const bool bReady = SprintCharacter && SprintCharacter->IsCharacterReady() && ASC && ASC->GetAvatarActor() == SprintCharacter && !ASC->IsDead();
 	const bool bBlocked = !bReady || !IsLocalController() || IsMoveInputIgnored() || IsLookInputIgnored()
-		|| !GetWorld() || GetWorld()->IsPaused() || bCinematicMode || (ASC && (ASC->HasMatchingGameplayTag(Tags.State_Busy)
-		|| ASC->HasMatchingGameplayTag(Tags.State_Weapon_IsAiming) || ASC->HasMatchingGameplayTag(Tags.State_SequencerControlled)));
+		|| !GetWorld() || GetWorld()->IsPaused() || bCinematicMode || (ASC && (ASC->HasMatchingGameplayTag(NarrativeTags.State_Busy)
+		|| ASC->HasMatchingGameplayTag(NarrativeTags.State_Weapon_IsAiming) || ASC->HasMatchingGameplayTag(NarrativeTags.State_SequencerControlled)));
 	SetAutomaticSprintHeld(SovMovementAssistPolicy::WantsAutomaticSprint(Settings && Settings->UseAutomaticSprint(),
 		MovementMagnitude, Movement && Movement->IsMovingOnGround(), !bBlocked));
 }

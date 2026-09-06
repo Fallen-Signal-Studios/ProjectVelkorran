@@ -6,6 +6,9 @@
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/AutomationTest.h"
+#include "Misc/Crc.h"
+#include "Serialization/MemoryWriter.h"
+#include "Serialization/ObjectAndNameAsStringProxyArchive.h"
 #include "Settings/SovGameUserSettings.h"
 #include "Sovereign/SovGameplayTags.h"
 #include "Subsystems/NarrativeSaveSubsystem.h"
@@ -121,7 +124,14 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovSaveBankFailureTest, "ProjectVelkorran.Camp
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovSaveBankFailureTest::RunTest(const FString& Parameters)
 {
-    TStrongObjectPtr<USovSaveSubsystem> S(NewObject<USovSaveSubsystem>());
+    // The deliberately truncated bank is decoded during fallback, repair preflight,
+    // and recovery preservation. Keep these expected field-specific diagnostics counted.
+    AddExpectedMessage(TEXT("Failed loading tagged StructProperty /Script/ProjectVelkorran.SovCampaignSaveGame:Header. Read [0-9]+B, expected [0-9]+B. Package: FMemoryReader"),
+        ELogVerbosity::Error, EAutomationExpectedMessageFlags::Contains, 3);
+    AddExpectedMessage(TEXT("Failed loading tagged TextProperty /Script/ProjectVelkorran.SovSaveSlotHeader:MissionLabel. Read 0B, expected [0-9]+B. Package: FMemoryReader"),
+        ELogVerbosity::Error, EAutomationExpectedMessageFlags::Contains, 3);
+    TStrongObjectPtr<UGameInstance> Instance(NewObject<UGameInstance>());
+    TStrongObjectPtr<USovSaveSubsystem> S(NewObject<USovSaveSubsystem>(Instance.Get()));
     auto* Storage = FSovSaveTestAccess::Initialize(*S); FString Error;
     TStrongObjectPtr<USovCampaignSaveGame> First(FSovSaveTestAccess::Envelope(*S));
     TestEqual(TEXT("First platform write/readback succeeds"), FSovSaveTestAccess::Write(*S, First.Get(), Error), ESovSaveResult::Success);
@@ -148,7 +158,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovSaveSchemaTest, "ProjectVelkorran.Campaign.
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovSaveSchemaTest::RunTest(const FString& Parameters)
 {
-    TStrongObjectPtr<USovSaveSubsystem> S(NewObject<USovSaveSubsystem>()); FSovSaveTestAccess::Initialize(*S);
+    TStrongObjectPtr<UGameInstance> Instance(NewObject<UGameInstance>());
+    TStrongObjectPtr<USovSaveSubsystem> S(NewObject<USovSaveSubsystem>(Instance.Get())); FSovSaveTestAccess::Initialize(*S);
     TStrongObjectPtr<USovCampaignSaveGame> Save(FSovSaveTestAccess::Envelope(*S)); FString Error;
     Save->Header.Generation = 1; Save->IntegrityChecksum = Save->CalculateChecksum();
     TestTrue(TEXT("Schema 1.0 fixture accepted"), FSovSaveTestAccess::Validate(*S, Save.Get(), Error));
@@ -170,12 +181,19 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovSaveRepeatedFaultRecoveryTest, "ProjectVelk
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovSaveRepeatedFaultRecoveryTest::RunTest(const FString& Parameters)
 {
+    // Fifty torn-write cycles each decode the invalid bank three times. Only the
+    // known truncated header/text diagnostics are expected; every recovery assertion remains active.
+    AddExpectedMessage(TEXT("Failed loading tagged StructProperty /Script/ProjectVelkorran.SovCampaignSaveGame:Header. Read [0-9]+B, expected [0-9]+B. Package: FMemoryReader"),
+        ELogVerbosity::Error, EAutomationExpectedMessageFlags::Contains, 150);
+    AddExpectedMessagePlain(TEXT("Type mismatch in MissionLabel of SovSaveSlotHeader - Previous (None) Current(TextProperty) in package: FMemoryReader"),
+        ELogVerbosity::Warning, EAutomationExpectedMessageFlags::Contains, 150);
     TMap<FString, TArray<uint8>> Disk;
     int64 LastGoodGeneration = 0;
     for (int32 Cycle = 0; Cycle < 100; ++Cycle)
     {
         // Recreate the subsystem over retained physical bytes, not a retained live save UObject.
-        TStrongObjectPtr<USovSaveSubsystem> S(NewObject<USovSaveSubsystem>());
+        TStrongObjectPtr<UGameInstance> Instance(NewObject<UGameInstance>());
+        TStrongObjectPtr<USovSaveSubsystem> S(NewObject<USovSaveSubsystem>(Instance.Get()));
         auto* Storage = FSovSaveTestAccess::Initialize(*S); Storage->Slots = Disk;
         TStrongObjectPtr<USovCampaignSaveGame> Save(FSovSaveTestAccess::Envelope(*S));
         Save->Header.PlaySeconds = Cycle;
@@ -256,6 +274,80 @@ bool FSovNarrativeRestorePhaseTest::RunTest(const FString& Parameters)
     Record.SavedComponents.Pop(); Record.SavedComponents[0].RestorePhase = static_cast<ENarrativeRestorePhase>(255);
     TestFalse(TEXT("Unknown restore phase fails closed"), Narrative->LoadActorFromRecord(Actor, Record));
     World->DestroyWorld(false); if (GEngine) { GEngine->DestroyWorldContext(World); }
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovSavePersistentChecksumTest,
+    "ProjectVelkorran.Campaign.Save.PersistentEnvelopeChecksumSurvivesTextRoundTrip",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovSavePersistentChecksumTest::RunTest(const FString& Parameters)
+{
+    TStrongObjectPtr<UGameInstance> Instance(NewObject<UGameInstance>());
+    TStrongObjectPtr<USovSaveSubsystem> S(NewObject<USovSaveSubsystem>(Instance.Get()));
+    FSovSaveTestAccess::Initialize(*S);
+    const FText Labels[] = {
+        FText::FromString(TEXT("Runtime mission label")),
+        FText::AsCultureInvariant(TEXT("Invariant mission label")),
+        NSLOCTEXT("SovSaveTests", "AuthoredMission", "Authored mission label"),
+        FText::Format(NSLOCTEXT("SovSaveTests", "FormattedMission", "Mission {0}"), FText::AsNumber(2))
+    };
+    for (const FText& Label : Labels)
+    {
+        TStrongObjectPtr<USovCampaignSaveGame> Original(FSovSaveTestAccess::Envelope(*S));
+        Original->Header.MissionLabel = Label;
+        Original->Header.Generation = 1;
+        Original->IntegrityChecksum = Original->CalculateChecksum();
+        TestEqual(TEXT("Repeated checksum calculation is stable before serialization"), Original->CalculateChecksum(), Original->IntegrityChecksum);
+        TArray<uint8> Bytes;
+        if (!TestTrue(TEXT("Actual native envelope serialization succeeds"), UGameplayStatics::SaveGameToMemory(Original.Get(), Bytes))) { return false; }
+        TStrongObjectPtr<USovCampaignSaveGame> Restored(Cast<USovCampaignSaveGame>(UGameplayStatics::LoadGameFromMemory(Bytes)));
+        if (!TestNotNull(TEXT("Native envelope deserializes"), Restored.Get())) { return false; }
+        TestEqual(TEXT("Persistent serialization preserves the displayed mission label"), Restored->Header.MissionLabel.ToString(), Label.ToString());
+        TestTrue(TEXT("Construction flags cannot invalidate intact persisted data"), Restored->HasValidIntegrity());
+        TestEqual(TEXT("Serialization leaves original checksum valid"), Original->CalculateChecksum(), Original->IntegrityChecksum);
+        FString Error;
+        TestTrue(TEXT("The real save validator accepts the intact roundtrip"), FSovSaveTestAccess::Validate(*S, Restored.Get(), Error));
+        Restored->Header.MissionLabel = FText::AsCultureInvariant(TEXT("Tampered label"));
+        TestFalse(TEXT("Mission label changes remain protected by integrity"), Restored->HasValidIntegrity());
+    }
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovSaveLegacyChecksumCompatibilityTest,
+    "ProjectVelkorran.Campaign.Save.ExistingStableLabelBankRemainsReadable",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovSaveLegacyChecksumCompatibilityTest::RunTest(const FString& Parameters)
+{
+    TStrongObjectPtr<UGameInstance> Instance(NewObject<UGameInstance>());
+    TStrongObjectPtr<USovSaveSubsystem> S(NewObject<USovSaveSubsystem>(Instance.Get()));
+    auto* Storage = FSovSaveTestAccess::Initialize(*S);
+    TStrongObjectPtr<USovCampaignSaveGame> Existing(FSovSaveTestAccess::Envelope(*S));
+    Existing->Header.Generation = 7;
+    Existing->Header.MissionLabel = NSLOCTEXT("SovSaveTests", "LegacyMission", "Existing mission label");
+    // Encode the original schema-1 checksum exactly as released before the fix.
+    TArray<uint8> HeaderBytes;
+    FMemoryWriter Writer(HeaderBytes);
+    FObjectAndNameAsStringProxyArchive Ar(Writer, false);
+    FSovSaveSlotHeader LegacyHeader = Existing->Header;
+    FSovSaveSlotHeader::StaticStruct()->SerializeItem(Ar, &LegacyHeader, nullptr);
+    for (const FSoftObjectPath& Asset : Existing->RequiredAssets)
+    { FString Path = Asset.ToString(); Ar << Path; }
+    uint32 LegacyCRC = FCrc::MemCrc32(HeaderBytes.GetData(), HeaderBytes.Num());
+    LegacyCRC = FCrc::MemCrc32(Existing->NarrativePayload.GetData(), Existing->NarrativePayload.Num(), LegacyCRC);
+    Existing->IntegrityChecksum = FCrc::MemCrc32(Existing->PortableSettings.GetData(), Existing->PortableSettings.Num(), LegacyCRC);
+    TestTrue(TEXT("Fixture exercises legacy rather than canonical checksum"), Existing->IntegrityChecksum != Existing->CalculateChecksum());
+    TArray<uint8> BankBytes;
+    TestTrue(TEXT("Actual old-format bank serializes"), UGameplayStatics::SaveGameToMemory(Existing.Get(), BankBytes));
+    Storage->Write(FSovSaveTestAccess::Name(*S, ESovSaveSlotKind::Manual, 0, 0), 0, BankBytes);
+    bool bDamaged = false;
+    TStrongObjectPtr<USovCampaignSaveGame> Restored(FSovSaveTestAccess::Read(*S, ESovSaveSlotKind::Manual, 0, bDamaged));
+    if (!TestNotNull(TEXT("Existing valid bank remains readable after checksum repair"), Restored.Get())) { return false; }
+    TestFalse(TEXT("Stable old-format bank is not marked corrupt"), bDamaged);
+    TestEqual(TEXT("Previously verified generation is retained"), Restored->Header.Generation, static_cast<int64>(7));
+    FString Error;
+    TestEqual(TEXT("Next write upgrades checksum through normal alternating-bank transaction"), FSovSaveTestAccess::Write(*S, Restored.Get(), Error), ESovSaveResult::Success);
+    TestEqual(TEXT("New write advances exactly one generation"), Restored->Header.Generation, static_cast<int64>(8));
+    TestEqual(TEXT("New bank receives canonical checksum"), Restored->IntegrityChecksum, Restored->CalculateChecksum());
+    Restored->Header.MissionLabel = FText::AsCultureInvariant(TEXT("Tampered historical label"));
+    TestFalse(TEXT("Compatibility cannot accept changed label contents"), Restored->HasValidIntegrity());
     return true;
 }
 #endif

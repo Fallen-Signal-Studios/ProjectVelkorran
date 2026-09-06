@@ -15,6 +15,7 @@
 #include "NarrativeGameplayTags.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "Engine/EngineBaseTypes.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
 #include "Misc/AutomationTest.h"
 #include "Sovereign/SovGameplayTags.h"
@@ -22,7 +23,12 @@
 #if WITH_AUTOMATION_TESTS
 struct FSovCorruptionTestAccess
 {
-	static void Refresh(ASovCorruptionSourceVolume& Source) { Source.ExposureSphere->UpdateOverlaps(); Source.RefreshContacts(); }
+	static void Refresh(ASovCorruptionSourceVolume& Source)
+	{
+		// UE overlap tracking starts only after the source actor begins play.
+		if (!Source.HasActorBegunPlay()) { Source.DispatchBeginPlay(); }
+		Source.ExposureSphere->UpdateOverlaps(); Source.RefreshContacts();
+	}
 	static float SavedExposure(const USovCorruptionComponent& Component)
 	{
 		float Total = 0.0f; for (const auto& Record : Component.SavedRecords) { Total += Record.Exposure; } return Total;
@@ -56,6 +62,8 @@ namespace
 			World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &IVS);
 			if (!World) { return; }
 			if (GEngine) { GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World); }
+			// Register controllers and initialize collision actors before exercising native contacts.
+			World->InitializeActorsForPlay(FURL());
 			PC = World->SpawnActor<ASovCampaignRuntimeTestController>();
 			Pawn = World->SpawnActor<ASovCorruptionRuntimeTestPawn>();
 			if (PC && Pawn) { PC->Possess(Pawn); Pawn->InitializeCombat(); }
@@ -400,7 +408,11 @@ bool FSovCorruptionGlobalImmunityTest::RunTest(const FString& Parameters)
 		ASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetStaminaRegenRateAttribute(), 20.0f);
 		ASC->AddLooseGameplayTag(Immunity);
 		auto* Profile = F.Profile(TEXT("ImmunityField"), 60.0f);
+		// A countermeasure owns the cleanse; immunity must only suspend combat pressure.
+		Profile->Escape = ESovCorruptionEscape::AuthoredCountermeasure;
 		Profile->EscapeRecoveryPerSecond = 0.0f;
+		FString ProfileError;
+		if (!TestTrue(TEXT("Immunity fixture has a valid remedy contract"), Profile->ValidateProfile(ProfileError))) { return false; }
 		auto* Source = F.Source(Profile);
 		TestEqual(*FString::Printf(TEXT("%s blocks real field contact"), *Immunity.ToString()), Component->GetCorruptionState().Exposure, 0.0f);
 		TestFalse(TEXT("An immune player acquires no source handle"), Component->AcquireSource(Source).IsValid());

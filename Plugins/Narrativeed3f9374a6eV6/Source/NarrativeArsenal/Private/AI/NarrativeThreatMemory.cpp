@@ -78,9 +78,13 @@ bool ANarrativeNPCController::IsThreatTargetCloaked(AActor* Target) const
 bool ANarrativeNPCController::IsThreatPerceptionReady() const
 {
 	const UAIPerceptionComponent* Component = GetAIPerceptionComponent();
-	// AI Perception normally uses event-driven sensing. Tick-disabled only implies suspension
-	// for a subclass that actually declares a component tick; campaign holds an explicit lease.
-	return Component && Component->IsRegistered() && Component->IsActive()
+	// Stock perception registers event-driven senses without activating an ActorComponent tick.
+	// Activation-driven subclasses still require activation, and an observed explicit deactivation
+	// remains suspended until its matching activation. Deactivate() on an initially inactive stock
+	// sensor is an engine no-op: use SetSenseEnabled(false) or a threat suspension lease to stop it.
+	return Component && Component == ThreatPerception.Get() && Component->IsRegistered()
+		&& !bThreatPerceptionExplicitlyDeactivated
+		&& (Component->IsActive() || (!Component->bAutoActivate && !Component->PrimaryComponentTick.bCanEverTick))
 		&& (!Component->PrimaryComponentTick.bCanEverTick || Component->IsComponentTickEnabled())
 		&& Component->IsSenseEnabled(UAISense_Sight::StaticClass());
 }
@@ -95,7 +99,15 @@ void ANarrativeNPCController::BindThreatPerception()
 		ThreatPerception->OnComponentActivated.RemoveDynamic(this, &ThisClass::HandleThreatPerceptionActivated);
 		ThreatPerception->OnComponentDeactivated.RemoveDynamic(this, &ThisClass::HandleThreatPerceptionDeactivated);
 	}
+	// A different listener cannot inherit direct sight authorization from the old listener.
+	// Retire it before publishing the new identity; refresh can then ingest that listener's sight.
+	for (FNarrativeThreatMemory& Memory : ThreatMemory)
+	{
+		if (Memory.Source == ENarrativeThreatSource::Sight) { Memory.bDirectObservation = false; }
+	}
+	++ThreatMemoryGeneration;
 	ThreatPerception = Current;
+	bThreatPerceptionExplicitlyDeactivated = false;
 	bThreatPerceptionWasReady = IsThreatPerceptionReady();
 	if (Current && HasAuthority())
 	{
@@ -108,12 +120,20 @@ void ANarrativeNPCController::BindThreatPerception()
 
 void ANarrativeNPCController::HandleThreatPerceptionActivated(UActorComponent* Component, const bool bReset)
 {
-	if (Component == ThreatPerception.Get()) { InvalidateCachedThreatPerception(); }
+	if (Component == ThreatPerception.Get())
+	{
+		bThreatPerceptionExplicitlyDeactivated = false;
+		InvalidateCachedThreatPerception();
+	}
 }
 
 void ANarrativeNPCController::HandleThreatPerceptionDeactivated(UActorComponent* Component)
 {
-	if (Component == ThreatPerception.Get()) { InvalidateCachedThreatPerception(); }
+	if (Component == ThreatPerception.Get())
+	{
+		bThreatPerceptionExplicitlyDeactivated = true;
+		InvalidateCachedThreatPerception();
+	}
 }
 
 void ANarrativeNPCController::InvalidateCachedThreatPerception()
@@ -417,17 +437,17 @@ void ANarrativeNPCController::ClearInvalidThreatTarget()
 			|| ASC->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_SequencerControlled)) { return; }
 	}
 	const UArsenalSettings* Settings = GetDefault<UArsenalSettings>();
-	UBlackboardComponent* Blackboard = GetBlackboardComponent();
+	UBlackboardComponent* ThreatBlackboard = GetBlackboardComponent();
 	const TWeakObjectPtr<ANarrativeNPCController> Self = this;
 	const TWeakObjectPtr<APawn> OriginalPawn = GetPawn();
 	const uint64 Generation = ThreatMemoryGeneration;
-	const auto StillOwns = [Self, OriginalPawn, Blackboard, Generation]()
+	const auto StillOwns = [Self, OriginalPawn, ThreatBlackboard, Generation]()
 	{
 		return Self.IsValid() && !Self->IsActorBeingDestroyed() && !OriginalPawn.IsStale()
-			&& Self->GetPawn() == OriginalPawn.Get() && Self->GetBlackboardComponent() == Blackboard
+			&& Self->GetPawn() == OriginalPawn.Get() && Self->GetBlackboardComponent() == ThreatBlackboard
 			&& Self->ThreatMemoryGeneration == Generation && !Self->IsThreatMemorySuspended();
 	};
-	AActor* AttackTarget = Blackboard ? Cast<AActor>(Blackboard->GetValueAsObject(Settings->BBKey_AttackTarget)) : nullptr;
+	AActor* AttackTarget = ThreatBlackboard ? Cast<AActor>(ThreatBlackboard->GetValueAsObject(Settings->BBKey_AttackTarget)) : nullptr;
 	AActor* FocusTarget = GetFocusActor();
 	const bool bFocusIsThreat = FocusTarget && (FocusTarget == AttackTarget
 		|| FocusTarget == InvestigationTarget.Get()
@@ -438,14 +458,14 @@ void ANarrativeNPCController::ClearInvalidThreatTarget()
 	{
 		FNarrativeThreatMemory LastKnown;
 		const bool bRemember = GetBestThreatMemory(Invalid, LastKnown);
-		if (AttackTarget == Invalid && Blackboard) { Blackboard->ClearValue(Settings->BBKey_AttackTarget); }
+		if (AttackTarget == Invalid && ThreatBlackboard) { ThreatBlackboard->ClearValue(Settings->BBKey_AttackTarget); }
 		if (!StillOwns()) { return; }
 		if (GetFocusActor() == Invalid) { ClearFocus(EAIFocusPriority::Gameplay); }
 		if (!StillOwns()) { return; }
-		const auto HasIndependentTarget = [this, Blackboard, Settings, Invalid]()
+		const auto HasIndependentTarget = [this, ThreatBlackboard, Settings, Invalid]()
 		{
 			AActor* OtherFocus = GetFocusActor();
-			AActor* OtherAttack = Blackboard ? Cast<AActor>(Blackboard->GetValueAsObject(Settings->BBKey_AttackTarget)) : nullptr;
+			AActor* OtherAttack = ThreatBlackboard ? Cast<AActor>(ThreatBlackboard->GetValueAsObject(Settings->BBKey_AttackTarget)) : nullptr;
 			return (OtherFocus && OtherFocus != Invalid) || (OtherAttack && OtherAttack != Invalid && CanDirectlyTargetThreat(OtherAttack));
 		};
 		if (HasIndependentTarget()) { return; }
@@ -456,7 +476,7 @@ void ANarrativeNPCController::ClearInvalidThreatTarget()
 			InvestigationTarget = Invalid;
 			InvestigationPosition = LastKnown.LastKnownPosition;
 			bOwnsInvestigationLocation = true;
-			if (Blackboard) { Blackboard->SetValueAsVector(Settings->BBKey_TargetLocation, InvestigationPosition); }
+			if (ThreatBlackboard) { ThreatBlackboard->SetValueAsVector(Settings->BBKey_TargetLocation, InvestigationPosition); }
 			if (!StillOwns() || HasIndependentTarget()) { return; }
 			SetFocalPoint(InvestigationPosition, EAIFocusPriority::Gameplay);
 		}
@@ -468,8 +488,8 @@ void ANarrativeNPCController::ClearInvalidThreatTarget()
 		const bool bReacquired = InvestigationTarget.IsValid() && CanDirectlyTargetThreat(InvestigationTarget.Get());
 		if (!bRemember || bReacquired)
 		{
-			if (Blackboard && Blackboard->GetValueAsVector(Settings->BBKey_TargetLocation).Equals(InvestigationPosition))
-			{ Blackboard->ClearValue(Settings->BBKey_TargetLocation); }
+			if (ThreatBlackboard && ThreatBlackboard->GetValueAsVector(Settings->BBKey_TargetLocation).Equals(InvestigationPosition))
+			{ ThreatBlackboard->ClearValue(Settings->BBKey_TargetLocation); }
 			if (!StillOwns()) { return; }
 			if (!GetFocusActor() && GetFocalPoint().Equals(InvestigationPosition)) { ClearFocus(EAIFocusPriority::Gameplay); }
 			bOwnsInvestigationLocation = false;
@@ -502,13 +522,13 @@ void ANarrativeNPCController::ClearThreatMemory()
 
 bool ANarrativeNPCController::IsThreatMemorySuspended() const
 {
-	return ThreatSuspensionOwners.ContainsByPredicate([](const TWeakObjectPtr<UObject>& Owner) { return Owner.IsValid(); });
+	return ThreatSuspensionOwners.ContainsByPredicate([](const TWeakObjectPtr<UObject>& ActiveSuspensionOwner) { return ActiveSuspensionOwner.IsValid(); });
 }
 
 void ANarrativeNPCController::SetThreatMemorySuspended(UObject* SuspensionOwner, const bool bSuspend)
 {
 	if (!HasAuthority() || !IsValid(SuspensionOwner)) { return; }
-	ThreatSuspensionOwners.RemoveAll([](const TWeakObjectPtr<UObject>& Owner) { return !Owner.IsValid(); });
+	ThreatSuspensionOwners.RemoveAll([](const TWeakObjectPtr<UObject>& ActiveSuspensionOwner) { return !ActiveSuspensionOwner.IsValid(); });
 	if (bSuspend)
 	{
 		if (ThreatSuspensionOwners.Contains(SuspensionOwner)) { return; }

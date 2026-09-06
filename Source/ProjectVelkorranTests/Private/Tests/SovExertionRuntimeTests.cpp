@@ -13,6 +13,7 @@
 #include "Misc/AutomationTest.h"
 #include "NarrativeGameplayTags.h"
 #include "Sovereign/SovGameplayTags.h"
+#include "UObject/Script.h"
 
 #if WITH_AUTOMATION_TESTS
 struct FSovExertionTestAccess
@@ -23,6 +24,9 @@ namespace
 {
 	struct FExertionWorld
 	{
+#if WITH_EDITOR
+		FEditorScriptExecutionGuard AllowProductionReceivers;
+#endif
 		UWorld* World;
 		FExertionWorld()
 		{

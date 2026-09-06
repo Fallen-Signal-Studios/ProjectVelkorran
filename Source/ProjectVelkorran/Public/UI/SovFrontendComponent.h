@@ -17,6 +17,7 @@ class USovAccessibilityPresentation;
 class USovAccessibilitySettingsMenu;
 class USovSaveSubsystem;
 class USovPlatformServicesSubsystem;
+class USovCombatVitalsWidget;
 
 /** Binds native frontend consumers to existing Tales, cue and combat producers. */
 UCLASS(ClassGroup=(Sovereign), meta=(BlueprintSpawnableComponent))
@@ -28,6 +29,9 @@ public:
     /** Real local viewport only: headless automation/server worlds never acquire a first-boot UI prerequisite. */
     static bool IsInitialAccessibilitySetupPending(const class APlayerController* Player);
     void RefreshFrontend();
+    /** Opt-in native resource readout; authored HUD content remains in place. */
+    UPROPERTY(EditDefaultsOnly, Category="Sovereign|Combat HUD") bool bShowCombatVitals = false;
+    virtual void Deactivate() override;
     UFUNCTION(BlueprintCallable, Category="Accessibility") bool OpenAccessibilitySettings();
     USovAccessibilityPresentation* GetPresentation() const { return Presentation; }
     virtual void TickComponent(float Delta, ELevelTick TickType, FActorComponentTickFunction* Tick) override;
@@ -60,6 +64,7 @@ private:
     UFUNCTION() void OnLoadCompleted(ESovSaveResult Result, const FSovSaveSlotHeader& Slot, const FString& Message);
     void Unbind();
     void ReleaseSetupPause();
+    void RemoveCombatVitals();
     bool bEnding = false;
     bool bOwnSetupPause = false;
     TWeakObjectPtr<UWorld> AudioAppliedWorld;
@@ -84,6 +89,7 @@ private:
     TWeakObjectPtr<UDialogueNode> SpeechNode;
     uint64 SpeechEpoch = 0;
     TWeakObjectPtr<USovNarrativeCue> SpeechCue;
+    UPROPERTY(Transient) TObjectPtr<USovCombatVitalsWidget> CombatVitals;
     UPROPERTY(Transient) TObjectPtr<USovAccessibilityPresentation> Presentation;
     UPROPERTY(Transient) TObjectPtr<USovAccessibilitySettingsMenu> SetupMenu;
 };
