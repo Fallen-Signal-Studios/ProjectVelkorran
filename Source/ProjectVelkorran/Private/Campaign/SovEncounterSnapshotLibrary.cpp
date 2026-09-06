@@ -8,6 +8,7 @@
 #include "Components/SovHealthRechargeComponent.h"
 #include "Components/SovShieldComponent.h"
 #include "Components/SovPoiseComponent.h"
+#include "Components/SovStatusComponent.h"
 #include "GAS/NarrativeAttributeSetBase.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
 #include "NarrativeSavableComponent.h"
@@ -16,6 +17,21 @@
 #include "Serialization/ObjectAndNameAsStringProxyArchive.h"
 #include "Sovereign/SovGameplayTags.h"
 #include "Misc/ScopeExit.h"
+#include "UObject/StrongObjectPtr.h"
+
+namespace
+{
+	bool IsCurrentSnapshotComponent(const UActorComponent* Component, const AActor* Owner, const FName Name)
+	{
+		if (!IsValid(Component) || !IsValid(Owner) || Owner->IsActorBeingDestroyed()
+			|| Component->GetOwner() != Owner || Component->GetFName() != Name)
+		{
+			return false;
+		}
+		TInlineComponentArray<UActorComponent*> Components(Owner);
+		return Components.Contains(Component);
+	}
+}
 
 bool FSovCombatResourceSnapshot::IsValid() const
 {
@@ -59,6 +75,8 @@ bool USovEncounterSnapshotLibrary::RestoreResources(UAbilitySystemComponent* ASC
 	AActor* Avatar = ASC->GetAvatarActor();
 	USovShieldComponent* ShieldComponent = Avatar ? Avatar->FindComponentByClass<USovShieldComponent>() : nullptr;
 	USovPoiseComponent* PoiseComponent = Avatar ? Avatar->FindComponentByClass<USovPoiseComponent>() : nullptr;
+	TWeakObjectPtr<USovStatusComponent> StatusComponent = Avatar ? Avatar->FindComponentByClass<USovStatusComponent>() : nullptr;
+	const bool bHadStatusComponent = StatusComponent.IsValid();
 	if (ShieldComponent) { ShieldComponent->SetCheckpointRestoreInProgress(true); }
 	if (PoiseComponent) { PoiseComponent->SetCheckpointRestoreInProgress(true); }
 	ON_SCOPE_EXIT
@@ -95,6 +113,16 @@ bool USovEncounterSnapshotLibrary::RestoreResources(UAbilitySystemComponent* ASC
 		{
 			Echo->RestoreEchoFromCheckpoint(Snapshot.Echo);
 		}
+		if (!StillOwnsAvatar()) { return false; }
+		if (bHadStatusComponent)
+		{
+			// Component records queue status effects before resource loading. Commit
+			// their saved state now, before encounter actors are unsuspended.
+			if (!StatusComponent.IsValid()
+				|| Avatar->FindComponentByClass<USovStatusComponent>() != StatusComponent.Get()
+				|| !StatusComponent->CompletePendingCheckpointRestore()
+				|| !StillOwnsAvatar()) { return false; }
+		}
 	}
 	return StillOwnsAvatar();
 }
@@ -102,28 +130,75 @@ bool USovEncounterSnapshotLibrary::RestoreResources(UAbilitySystemComponent* ASC
 bool USovEncounterSnapshotLibrary::CaptureComponent(UActorComponent* Component, FNarrativeSaveComponent& OutRecord)
 {
 	if (!IsValid(Component) || !Component->Implements<UNarrativeSavableComponent>()) { return false; }
+	TStrongObjectPtr<UActorComponent> KeepComponent(Component);
+	TStrongObjectPtr<AActor> KeepOwner(Component->GetOwner());
 	FNarrativeSaveComponent Result;
 	Result.ComponentName = Component->GetFName();
+	const auto StillOwnsComponent = [&]()
+	{
+		return IsCurrentSnapshotComponent(Component, KeepOwner.Get(), Result.ComponentName);
+	};
+	if (!StillOwnsComponent()) { return false; }
+	Result.ComponentClass = Component->GetClass();
+	Result.bOptional = INarrativeSavableComponent::Execute_IsOptionalSaveRecord(Component);
+	if (!StillOwnsComponent()) { return false; }
+	const INarrativeSavableComponent* Policy = Cast<INarrativeSavableComponent>(Component);
+	if (Policy)
+	{
+		Result.RestorePhase = Policy->GetSaveRestorePhase();
+		if (!StillOwnsComponent()
+			|| static_cast<uint8>(Result.RestorePhase) > static_cast<uint8>(ENarrativeRestorePhase::MissionResume)) { return false; }
+	}
 	INarrativeSavableComponent::Execute_PrepareForSave(Component);
-	if (!IsValid(Component) || Component->GetFName() != Result.ComponentName) { return false; }
+	if (!StillOwnsComponent()) { return false; }
 	FMemoryWriter Writer(Result.ByteData);
 	FObjectAndNameAsStringProxyArchive Archive(Writer, true);
 	Archive.ArIsSaveGame = true;
+	Archive.ArNoDelta = true;
 	Component->Serialize(Archive);
-	if (Archive.IsError()) { return false; }
+	if (Archive.IsError() || !StillOwnsComponent()) { return false; }
+	if (Policy)
+	{
+		const bool bAccepted = Policy->ValidateSaveRecord(Result.ByteData);
+		if (!bAccepted || !StillOwnsComponent()) { return false; }
+	}
 	OutRecord = MoveTemp(Result);
 	return true;
 }
 
 bool USovEncounterSnapshotLibrary::RestoreComponent(UActorComponent* Component, const FNarrativeSaveComponent& Record)
 {
-	if (!IsValid(Component) || !Component->GetOwner() || !Component->GetOwner()->HasAuthority()
-		|| Component->GetFName() != Record.ComponentName || !Component->Implements<UNarrativeSavableComponent>()) { return false; }
-	FMemoryReader Reader(Record.ByteData);
+	if (!IsValid(Component) || !Component->Implements<UNarrativeSavableComponent>()) { return false; }
+	TStrongObjectPtr<UActorComponent> KeepComponent(Component);
+	TStrongObjectPtr<AActor> KeepOwner(Component->GetOwner());
+	// A callback may invalidate the caller's live snapshot collection.
+	const FNarrativeSaveComponent StableRecord = Record;
+	const auto StillOwnsComponent = [&]()
+	{
+		return IsCurrentSnapshotComponent(Component, KeepOwner.Get(), StableRecord.ComponentName)
+			&& KeepOwner->HasAuthority();
+	};
+	if (!StillOwnsComponent() || StableRecord.ByteData.IsEmpty()
+		|| static_cast<uint8>(StableRecord.RestorePhase) > static_cast<uint8>(ENarrativeRestorePhase::MissionResume)) { return false; }
+	if (!StableRecord.ComponentClass.IsNull())
+	{
+		UClass* SavedClass = StableRecord.ComponentClass.LoadSynchronous();
+		if (!StillOwnsComponent() || !SavedClass || !Component->IsA(SavedClass)) { return false; }
+	}
+	const INarrativeSavableComponent* Policy = Cast<INarrativeSavableComponent>(Component);
+	if (Policy)
+	{
+		const bool bAccepted = Policy->ValidateSaveRecord(StableRecord.ByteData);
+		if (!bAccepted || !StillOwnsComponent()) { return false; }
+	}
+	FMemoryReader Reader(StableRecord.ByteData);
 	FObjectAndNameAsStringProxyArchive Archive(Reader, true);
 	Archive.ArIsSaveGame = true;
+	Archive.ArNoDelta = true;
 	Component->Serialize(Archive);
-	if (Archive.IsError()) { return false; }
+	if (Archive.IsError() || !StillOwnsComponent()) { return false; }
 	INarrativeSavableComponent::Execute_Load(Component);
-	return true;
+	if (!StillOwnsComponent()) { return false; }
+	const bool bAccepted = !Policy || Policy->WasSaveRecordLoadAccepted();
+	return bAccepted && StillOwnsComponent();
 }

@@ -6,11 +6,13 @@
 #include "Components/ActorComponent.h"
 #include "GAS/SovCombatTypes.h"
 #include "GameplayEffectTypes.h"
+#include "NarrativeSavableComponent.h"
 #include "Status/SovStatusDefinition.h"
 #include "TimerManager.h"
 #include "SovStatusComponent.generated.h"
 
 class UNarrativeAbilitySystemComponent;
+class ANarrativePlayerCharacter;
 class FLifetimeProperty;
 
 /** Why an authoritative status record changed. */
@@ -35,6 +37,9 @@ struct PROJECTVELKORRAN_API FSovStatusCheckpointRecord
 	FPrimaryAssetId DefinitionId;
 
 	UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Sovereign|Status|Checkpoint")
+	int32 DefinitionSchemaVersion = 1;
+
+	UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Sovereign|Status|Checkpoint")
 	FGameplayTag RequestTag;
 
 	UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Sovereign|Status|Checkpoint")
@@ -42,6 +47,10 @@ struct PROJECTVELKORRAN_API FSovStatusCheckpointRecord
 
 	UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Sovereign|Status|Checkpoint")
 	float Magnitude = 1.0f;
+
+	/** Effective GE level, not a transient source actor or captured attribute. */
+	UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Sovereign|Status|Checkpoint")
+	float EffectLevel = 1.0f;
 
 	/** Stable Sov.Ability.* provenance retained by periodic restored effects. */
 	UPROPERTY(BlueprintReadOnly, SaveGame, Category = "Sovereign|Status|Checkpoint")
@@ -55,7 +64,7 @@ struct PROJECTVELKORRAN_API FSovStatusCheckpointRecord
 	bool bInfinite = false;
 };
 
-/** Versioned status state suitable for a later checkpoint-system adapter. */
+/** Versioned semantic state serialized by Narrative's existing component record. */
 USTRUCT(BlueprintType)
 struct PROJECTVELKORRAN_API FSovStatusCheckpointState
 {
@@ -122,12 +131,19 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_FiveParams(
  * semantics; it never removes unrelated effects by a broad tag query.
  */
 UCLASS(ClassGroup = (Sovereign), BlueprintType, meta = (BlueprintSpawnableComponent))
-class PROJECTVELKORRAN_API USovStatusComponent : public UActorComponent
+class PROJECTVELKORRAN_API USovStatusComponent : public UActorComponent, public INarrativeSavableComponent
 {
 	GENERATED_BODY()
 
 public:
 	USovStatusComponent();
+
+	virtual ENarrativeRestorePhase GetSaveRestorePhase() const override { return ENarrativeRestorePhase::Player; }
+	virtual void PrepareForSave_Implementation() override;
+	virtual void Load_Implementation() override;
+	virtual bool ValidateSaveRecord(const TArray<uint8>& RecordBytes) const override;
+	virtual bool WasSaveRecordLoadAccepted() const override { return bLastSaveRecordLoadAccepted; }
+	virtual bool LoadMissingSaveRecord() override;
 
 	UFUNCTION(BlueprintCallable, Category = "Sovereign|Status")
 	bool InitializeWithAbilitySystem(
@@ -197,6 +213,9 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Status|Checkpoint")
 	bool RestoreCheckpointState(const FSovStatusCheckpointState& State);
 
+	/** Native resource/readiness boundary. True also covers an accepted queue awaiting player readiness. */
+	bool CompletePendingCheckpointRestore();
+
 	UPROPERTY(BlueprintAssignable, Category = "Sovereign|Status|Events")
 	FSovStatusApplicationResolvedSignature OnStatusApplicationResolved;
 
@@ -242,6 +261,7 @@ private:
 		FGameplayTagContainer SourceAbilityTags;
 		FActiveGameplayEffectHandle EffectHandle;
 		float Magnitude = 1.0f;
+		float EffectLevel = 1.0f;
 		float AppliedDuration = 0.0f;
 		float EndWorldTime = 0.0f;
 		int32 StackCount = 1;
@@ -291,6 +311,16 @@ private:
 	void ApplyRecoveryImmunity(const USovStatusDefinition& Definition);
 	void ApplyPendingCheckpointRestore();
 	bool ApplyCheckpointStateNow(const FSovStatusCheckpointState& State);
+	bool ValidateCheckpointState(const FSovStatusCheckpointState& State) const;
+	bool IsCheckpointTargetReady() const;
+	bool StageNativeCheckpointState(const FSovStatusCheckpointState& State);
+	void BindCheckpointLifecycle();
+	void CleanupCheckpointLifecycle();
+	void HandleDeferredCheckpointRestore(uint64 ExpectedGeneration);
+
+	UFUNCTION()
+	void HandleCheckpointCharacterReady(ANarrativePlayerCharacter* Character);
+
 	void UpsertReplicatedPresentation(
 		const USovStatusDefinition& Definition,
 		const FRuntimeStatusRecord& RuntimeRecord);
@@ -351,9 +381,23 @@ private:
 	TArray<FReplayKey> ReplayLedgerOrder;
 	TMap<FGameplayTag, FSovStatusPresentationEntry> LastObservedPresentation;
 	FTimerHandle DeferredDeathCleanupTimer;
+	FTimerHandle DeferredCheckpointRestoreTimer;
+	uint64 CheckpointLifecycleGeneration = 0;
+	bool bAwaitingRestoreBoundary = false;
+	bool bCompletingRestoreBoundary = false;
+	bool bCheckpointLifecycleEnding = false;
+	TArray<FSovStatusPresentationEntry> PendingCheckpointPresentation;
+
+	/** Only stable definitions and resolved semantic values enter Narrative's save archive. */
+	UPROPERTY(SaveGame)
+	FSovStatusCheckpointState SavedCheckpointState;
 
 	FSovStatusCheckpointState PendingCheckpointState;
+	FSovStatusCheckpointState RestoringCheckpointState;
 	bool bHasPendingCheckpointState = false;
 	bool bRestoringCheckpoint = false;
+	bool bClearingOwnedEffects = false;
+	bool bChangingAbilitySystem = false;
+	bool bLastSaveRecordLoadAccepted = true;
 	bool bDeferredDeathCleanupPending = false;
 };

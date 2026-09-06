@@ -109,11 +109,11 @@ The presentation snapshot includes normalized exposure, exact band, most relevan
 
 `On Corruption Remedied` is an authority-side gameplay hook in this prototype. Client presentation should react to replicated `On Corruption Changed` and presentation snapshots; a falling value is the network-safe remedy cue.
 
-## Checkpoint adapter boundary
+## Checkpoint persistence and legacy adapter boundary
 
-This slice exposes `Capture Checkpoint State` / `Restore Checkpoint State` for statuses and `Capture Corruption Checkpoint` / `Restore Corruption Checkpoint` for corruption. It does not automatically write these structs into Narrative save data yet.
+Generic statuses now participate in Narrative's existing component save pipeline. See [Checkpoint-safe status restoration](CheckpointSafeStatusRestoration-2026-09-06.md) for native lifecycle integration, effective-value persistence, definition validation, old-save compatibility, resource/readiness ordering and engine validation requirements. No Blueprint status save adapter is required.
 
-The future encounter/checkpoint coordinator must:
+The following manual adapter boundary applies only to the opt-in **legacy corruption prototype**, not generic statuses or the campaign's canonical corruption owner. It exposes `Capture Corruption Checkpoint` / `Restore Corruption Checkpoint`. A standalone prototype coordinator must:
 
 1. capture semantic state before destroying or resetting the avatar;
 2. restore only after the PlayerState ASC is bound to the new avatar (early calls queue safely);
