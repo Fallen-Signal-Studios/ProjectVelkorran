@@ -79,7 +79,7 @@ bool ASovCampaignInteractionTerminal::CanUseInternal(const APawn* Pawn, FText& E
     { return Fail(LOCTEXT("Unavailable", "Terminal unavailable")); }
     if ((!bExecutingRequest && (bPending || bExecuting)) || PC->GetCampaignTransitionState() != ESovCampaignTransitionState::Idle)
     { return Fail(LOCTEXT("Pending", "Please wait for the current operation")); }
-    if (Beat->bCanonGate || Beat->bRequiresCinematicProof || !Beat->CinematicId.IsNone() || Beat->bRequiresCoActionProof
+    if (!Beat->RequiredEncounterId.IsNone() || Beat->bCanonGate || Beat->bRequiresCinematicProof || !Beat->CinematicId.IsNone() || Beat->bRequiresCoActionProof
         || Beat->HandoffToProtagonist.IsValid() || Beat->bInteractiveChoice || !Beat->ChoiceGroupId.IsNone())
     { return Fail(LOCTEXT("SpecialProof", "This objective needs its authored event")); }
     if (Beat->RequiredProtagonist.IsValid() && Beat->RequiredProtagonist != Player->GetProtagonistIdentityTag())

@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "sources": {
+    "map": "/Game/Maps/Development/L_TarrikCombat",
+    "game_mode": "/Game/Framework/BP_SovGameMode_Tarrik",
+    "pawn": "/Game/PlayerCharacters/BP_SovTarrik",
+    "player_definition": "/Game/Characters/Definitions/PD_Tarrik"
+  },
+  "player_start_actor": null,
+  "participants": [
+    {"participant_id": "FormationEnemy01", "actor_name": null, "npc_definition": null, "role": "enemy", "background": "hostile"},
+    {"participant_id": "DominionSurvivor01", "actor_name": null, "npc_definition": null, "role": "protected_survivor", "background": "dominion"},
+    {"participant_id": "ReformationSurvivor01", "actor_name": null, "npc_definition": null, "role": "protected_survivor", "background": "reformation"}
+  ],
+  "placement": {
+    "arrival_terminal": {"location": null, "rotation": [0, 0, 0]},
+    "start_volume": {"location": null, "rotation": [0, 0, 0], "extent": null},
+    "secure_terminal": {"location": null, "rotation": [0, 0, 0]}
+  }
+}

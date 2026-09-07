@@ -2,6 +2,7 @@
 
 
 #include "UnrealFramework/NarrativeGameState.h"
+#include "AI/NarrativeAIStartupDiagnostics.h"
 #include "ArsenalStatics.h"
 #include "Net/UnrealNetwork.h"
 #include "SaveSystemStatics.h"
@@ -307,6 +308,8 @@ void ANarrativeGameState::SetFactionAttitude(FGameplayTag SourceFaction,FGamepla
 	auto& Attitude = AllianceData.AttitudeMap.FindOrAdd(TargetFaction, NewAttitude);
 	Attitude = NewAttitude;
 
+	FNarrativeAIStartupDiagnostics::Record(this, TEXT("game_state_attitude_publication"),
+		FString::Printf(TEXT("%s -> %s = %d"), *SourceFaction.ToString(), *TargetFaction.ToString(), static_cast<int32>(NewAttitude)));
 	OnFactionAttitudeChanged.Broadcast(SourceFaction, TargetFaction, NewAttitude);
 }
 

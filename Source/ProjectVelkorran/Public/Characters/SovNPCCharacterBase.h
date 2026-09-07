@@ -19,6 +19,13 @@ public:
 	virtual void SetActorGUID_Implementation(const FGuid& SavedGUID) override;
 	virtual bool ShouldRespawn_Implementation() const override;
 
+	/** Optional definition for a directly placed encounter NPC. Spawner/restore definitions take priority.
+	 * Use the definition's existing matching role class; this does not replace its AI, abilities or factions. */
+	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="Sovereign|Placed NPC")
+	TObjectPtr<class UNPCDefinition> AuthoredPlacedDefinition;
+	UFUNCTION(BlueprintPure, Category="Sovereign|Placed NPC")
+	class UNPCDefinition* GetAuthoredPlacedDefinition() const { return AuthoredPlacedDefinition; }
+
 	/** Called on a deferred replacement before setting its NPC definition. */
 	void PrepareForEncounterRestore(const FNPCSpawnInfo& SavedSpawnInfo, const FGuid& SavedGUID);
 	const FNPCSpawnInfo& GetEncounterSpawnInfo() const { return SpawnInfo; }
@@ -42,6 +49,7 @@ public:
 	class USovStatusComponent* GetStatusComponent() const { return StatusComponent; }
 
 protected:
+	bool InitializeAuthoredPlacedDefinition(FString& Error);
 	virtual void OnCharacterVisualInitialized() override;
 	UPROPERTY(SaveGame)
 	FGuid NativeSaveGuid;

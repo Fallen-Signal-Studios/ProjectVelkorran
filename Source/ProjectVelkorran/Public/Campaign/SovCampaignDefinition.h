@@ -63,6 +63,10 @@ struct PROJECTVELKORRAN_API FSovCampaignBeatDefinition
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bRequiresCoActionProof = false;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) FName RequiredCompanionId;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) FName RequiredCoActionAnchorId;
+	/** Native encounter victory receipt. Empty for ordinary beats; generic completion cannot satisfy this ID. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) FName RequiredEncounterId;
+	/** Minimum distinct protected participants in the encounter receipt; faction backgrounds remain authored content. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) int32 MinimumProtectedParticipants = 0;
 	/** Optional bridge into existing Narrative quest graphs after native state commits. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) TObjectPtr<UNarrativeDataTask> CompletionTask;
 };
@@ -107,7 +111,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Campaign|Companions") TArray<FSovCampaignCompanionProfile> ProtagonistCompanions;
 	const FSovCampaignCompanionProfile* FindCompanionProfile(FGameplayTag Identity) const;
 
-	UFUNCTION(BlueprintPure, Category="Campaign") bool ValidateDefinition(FString& OutError) const;
+	UFUNCTION(BlueprintPure, Category="Campaign") virtual bool ValidateDefinition(FString& OutError) const;
 	const FSovCampaignBeatDefinition* FindBeat(FName BeatId) const;
 	const FSovCampaignChoiceGroup* FindChoiceGroup(FName GroupId) const;
 	bool ValidateObjectives(FString& OutError) const;

@@ -74,3 +74,46 @@ Unreal/UHT/UBT execution is not available in this workspace. These tests are aut
 4. Remove a required definition/zone or introduce a duplicate participant ID. Verify a clear failure with no false `Active` transition.
 5. Test M01 Tarrik to M02 Selene to Tarrik with distinct ammo, Echo, perks, and factions. Ensure target input is unavailable until its own record is applied.
 6. Test a listen server/client retry: owned status counts release once, replacement participant references replicate, and late appearance initialization cannot overwrite the restored loadout.
+
+## Aurelion encounter objectives (7 September 2026)
+
+`ASovCampaignEncounterObjective` binds a director to a campaign beat with
+`RequiredEncounterId`. Generic campaign completion and interaction terminals cannot
+complete these beats. The objective observes the native Active attempt and defers
+victory publication until the director's callbacks have returned. Publication checks
+the exact mission, protagonist, possession, ASC/avatar, readiness and actor-info
+epochs, campaign transition epoch, director lifecycle generation, and attempt ID.
+The campaign journal stores the encounter ID and attempt receipt. Save validation
+replays those fields and rejects missing, mismatched or reused receipts.
+
+Author the objective's `EncounterDirector`, `MissionId`, `CompletionBeat` and optional
+`StartVolume`/`bStartOnPlayerOverlap`. `StartEncounter` captures the existing director
+entry before calling its native begin path, which writes and verifies the ArenaEntry
+boundary before releasing combat in a campaign GameInstance. Keep placed NPCs ready
+and quiescent behind an occluded approach until entry capture. A failed disk boundary
+leaves the captured encounter inactive and frozen so entry can be requested again.
+
+Register protected NPCs in the same director's `Participants`, with
+`bRequiredForVictory=false` and `bAllowMassRepresentation=false`, and include their
+stable IDs in `ProtectedParticipantIds`. Enemy formation members are ordinary
+required-for-victory participants. Protected death or destruction fails the attempt;
+confirmed hostile deaths cannot reverse that failure. The frozen entry preserves
+survivor membership and restores their existing NPC/resource records on retry.
+Protection monitoring stays active during actor/Mass promotion completion. There is
+no second NPC save or consequence ledger.
+
+A normal failure uses `RetryEncounter` through the objective's entry function or
+volume re-entry. A success whose authority context was retired before publication
+requires loading the verified entry checkpoint. It is intentionally not awarded to
+a replacement pawn, mission or loaded state. Both the live objective and a retained
+director flag hold save admission until the campaign receipt commits, so destroying
+the objective actor cannot overwrite the recoverable entry with an orphan victory.
+A restored active encounter follows the existing Failed -> Retry policy; a loaded
+Succeeded state never manufactures a new receipt.
+
+Native coverage: `ProjectVelkorran.Campaign.EncounterObjective.*` exercises production
+entry capture/begin, real delegate consumption of externally supplied combat deaths,
+exactly-once publication, survivor death/destruction, callback readiness/possession/
+load/destruction retirement, native entry retry and receipt serialization validation.
+These tests are authored for Unreal automation and require execution on the full
+UE 5.7 checkout. This source-only preparation does not qualify their runtime result.

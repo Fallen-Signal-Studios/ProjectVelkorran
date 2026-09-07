@@ -2,6 +2,7 @@
 
 
 #include "UnrealFramework/NarrativePlayerState.h"
+#include "AI/NarrativeAIStartupDiagnostics.h"
 #include "UnrealFramework/NarrativePlayerCharacter.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
 #include "GAS/NarrativeAttributeSetBase.h"
@@ -108,6 +109,7 @@ void ANarrativePlayerState::SetFactions(const FGameplayTagContainer& NewFactions
 
 void ANarrativePlayerState::OnRep_Faction()
 {
+	FNarrativeAIStartupDiagnostics::Record(this, TEXT("player_factions_assigned"), Factions.ToString());
 	if (ANarrativePlayerCharacter* PlayerCharacter = Cast<ANarrativePlayerCharacter>(GetPawn()))
 	{
 		if (UCharacterMapMarker* Marker = PlayerCharacter->GetMarkerComponent())
@@ -115,6 +117,7 @@ void ANarrativePlayerState::OnRep_Faction()
 			Marker->RefreshMarker();
 		}
 
+		FNarrativeAIStartupDiagnostics::Record(PlayerCharacter, TEXT("player_faction_publication"), Factions.ToString());
 		PlayerCharacter->OnFactionUpdated.Broadcast();
 	}
 }

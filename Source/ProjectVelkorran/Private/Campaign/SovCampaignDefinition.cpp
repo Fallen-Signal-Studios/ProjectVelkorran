@@ -144,7 +144,7 @@ bool USovCampaignDefinition::ValidateDefinition(FString& OutError) const
 		InheritedConsequences.Add(Id);
 	}
 	TSet<FName> Ids;
-	TSet<FName> ConsequenceIds, MemoryIds;
+	TSet<FName> ConsequenceIds, MemoryIds, EncounterIds;
 	bool bHasMandatoryBeat = false;
 	for (const FSovCampaignBeatDefinition& Beat : Beats)
 	{
@@ -173,6 +173,18 @@ bool USovCampaignDefinition::ValidateDefinition(FString& OutError) const
 		}
 		else if (!Beat.RequiredCompanionId.IsNone() || !Beat.RequiredCoActionAnchorId.IsNone())
 		{ return Fail(TEXT("Companion/anchor proof IDs require a co-action beat.")); }
+		if (Beat.MinimumProtectedParticipants < 0 || (Beat.MinimumProtectedParticipants > 0 && Beat.RequiredEncounterId.IsNone()))
+		{ return Fail(TEXT("Minimum protected participants must be nonnegative and require a native encounter objective.")); }
+		if (!Beat.RequiredEncounterId.IsNone())
+		{
+			if (EncounterIds.Contains(Beat.RequiredEncounterId) || !Beat.RequiredProtagonist.IsValid()
+				|| Beat.bCanonGate || Beat.bRequiresCinematicProof || !Beat.CinematicId.IsNone()
+				|| Beat.bRequiresCoActionProof || Beat.HandoffToProtagonist.IsValid() || Beat.bInteractiveChoice
+				|| !Beat.ChoiceGroupId.IsNone() || !Beat.CriticalEvidence.IsEmpty()
+				|| Beat.StateWrites.ContainsByPredicate([](const auto& Write) { return Write.bCanonProtected; }))
+			{ return Fail(TEXT("Encounter objectives need a unique encounter ID and explicit lead, with no canon, evidence, cinematic, co-action, handoff or choice proof.")); }
+			EncounterIds.Add(Beat.RequiredEncounterId);
+		}
 		if (Beat.Consequences.Num() > 16 || Beat.RelationshipMemories.Num() > 32 || Beat.CriticalEvidence.Num() > 16) { return Fail(TEXT("Beat narrative records exceed their bounded contract.")); }
 		TSet<FName> CriticalIds;
 		for (const auto& Evidence : Beat.CriticalEvidence)

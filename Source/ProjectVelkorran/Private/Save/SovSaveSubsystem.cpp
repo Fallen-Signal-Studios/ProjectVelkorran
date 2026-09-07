@@ -6,6 +6,7 @@
 #include "AbilitySystemComponent.h"
 #include "AIController.h"
 #include "Campaign/SovCampaignDefinition.h"
+#include "Campaign/SovCampaignEncounterObjective.h"
 #include "Campaign/SovCampaignStateComponent.h"
 #include "Campaign/SovEncounterDirector.h"
 #include "Characters/SovPlayerCharacterBase.h"
@@ -405,6 +406,11 @@ bool USovSaveSubsystem::CanCaptureInternal(FString& Error, bool bAllowEntrySuspe
     const UNarrativeSaveSubsystem* Narrative = World ? World->GetSubsystem<UNarrativeSaveSubsystem>() : nullptr;
     if (!PC || !Pawn || !PS || !State || !ASC || !World || !Narrative || !Techniques)
     { Error = TEXT("A fully initialized campaign player is required to save."); return false; }
+    for (TActorIterator<ASovCampaignEncounterObjective> It(const_cast<UWorld*>(World)); It; ++It)
+    {
+        if (!It->IsActorBeingDestroyed() && It->IsResultPending())
+        { Error = TEXT("Encounter victory is awaiting its campaign receipt. A retired result requires the verified entry checkpoint."); return false; }
+    }
     SovSavePolicy::Admission Admission;
     Admission.Authority = PC->HasAuthority(); Admission.Standalone = World->GetNetMode() == NM_Standalone;
     Admission.Ready = Pawn->IsCharacterReady(); Admission.Alive = ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()) > 0.f;
@@ -437,6 +443,8 @@ bool USovSaveSubsystem::CanCaptureInternal(FString& Error, bool bAllowEntrySuspe
     Admission.InTraversal = ASC->HasAnyMatchingGameplayTags(Blocked);
     for (TActorIterator<ASovEncounterDirector> It(const_cast<UWorld*>(World)); It; ++It)
     {
+        if (It->IsCampaignReceiptPending())
+        { Error = TEXT("Encounter victory has no committed campaign receipt. Reload the verified entry checkpoint."); return false; }
         const auto Encounter = It->GetEncounterState();
         if (Encounter == ESovEncounterState::Active || Encounter == ESovEncounterState::Restoring)
         { Admission.InCombat = true; break; }

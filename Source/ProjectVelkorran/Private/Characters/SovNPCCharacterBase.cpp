@@ -9,6 +9,7 @@
 #include "Misc/SecureHash.h"
 #include "AI/NPCDefinition.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 
 ASovNPCCharacterBase::ASovNPCCharacterBase(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -31,6 +32,43 @@ void ASovNPCCharacterBase::BeginPlay()
 		StatusComponent->InitializeWithAbilitySystem(
 			GetNarrativeAbilitySystemComponent());
 	}
+	if (HasAuthority() && IsValid(AuthoredPlacedDefinition) && !GetNPCDefinition())
+	{
+		FString Error;
+		if (InitializeAuthoredPlacedDefinition(Error)) { EnsureEncounterController(); }
+		else { UE_LOG(LogTemp, Warning, TEXT("Placed encounter NPC %s: %s"), *GetPathName(), *Error); }
+	}
+}
+
+bool ASovNPCCharacterBase::InitializeAuthoredPlacedDefinition(FString& Error)
+{
+	Error.Reset();
+	// Deferred spawns and encounter restoration already supply their actual definition.
+	// Never reapply it: that would duplicate definition-owned grants and appearance work.
+	if (GetNPCDefinition()) { return true; }
+	if (!HasAuthority() || !GetWorld() || !GetWorld()->IsGameWorld() || IsActorBeingDestroyed()
+		|| bEncounterRestoreInitialization || !IsValid(AuthoredPlacedDefinition))
+	{ Error = TEXT("A living authority-world placed NPC needs an authored definition; restore must supply its own definition."); return false; }
+	UNPCDefinition* const Definition = AuthoredPlacedDefinition;
+	UClass* const ExpectedClass = Definition->NPCClassPath.LoadSynchronous();
+	if (!IsValid(this) || IsActorBeingDestroyed() || GetNPCDefinition() || AuthoredPlacedDefinition != Definition)
+	{ Error = TEXT("Placed NPC ownership changed while loading its role class."); return false; }
+	if (!ExpectedClass || !IsA(ExpectedClass))
+	{ Error = TEXT("Placed NPC class must match or derive from its authored definition's NPCClassPath."); return false; }
+	if (!Definition->bAllowMultipleInstances)
+	{
+		for (TActorIterator<ASovNPCCharacterBase> It(GetWorld()); It; ++It)
+		{
+			if (*It == this || It->IsActorBeingDestroyed()) { continue; }
+			const UNPCDefinition* Other = It->GetNPCDefinition() ? It->GetNPCDefinition() : It->AuthoredPlacedDefinition.Get();
+			if (Other == Definition || (Other && Other->NPCID == Definition->NPCID))
+			{ Error = TEXT("A unique NPC definition is assigned to more than one live/placed character."); return false; }
+		}
+	}
+	SetNPCDefinition(Definition);
+	if (!IsValid(this) || IsActorBeingDestroyed() || GetNPCDefinition() != Definition)
+	{ Error = TEXT("Placed NPC definition callback changed or retired the character."); return false; }
+	return true;
 }
 
 FGuid ASovNPCCharacterBase::GetActorGUID_Implementation() const

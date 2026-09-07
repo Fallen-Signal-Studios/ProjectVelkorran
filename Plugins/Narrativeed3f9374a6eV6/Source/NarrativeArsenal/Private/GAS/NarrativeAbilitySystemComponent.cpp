@@ -2,6 +2,7 @@
 
 
 #include "GAS/NarrativeAbilitySystemComponent.h"
+#include "AI/NarrativeAIStartupDiagnostics.h"
 #include "GAS/NarrativeAttributeSetBase.h"
 #include "UnrealFramework/NarrativeAnimInstance.h"
 #include "UnrealFramework/NarrativeCharacter.h"
@@ -276,6 +277,7 @@ void UNarrativeAbilitySystemComponent::SetCharacterReadyEpoch(const int32 NewRea
 			ASCOwnerActor->ForceNetUpdate();
 		}
 		// RepNotifies run on receivers; authority also owns local lifecycle listeners.
+		FNarrativeAIStartupDiagnostics::Record(this, TEXT("asc_ready_publication"), FString::FromInt(NewReadyEpoch));
 		OnCharacterReadyEpochChanged.Broadcast(NewReadyEpoch);
 	}
 }
@@ -339,6 +341,7 @@ void UNarrativeAbilitySystemComponent::TrackStartupEffect(
 
 void UNarrativeAbilitySystemComponent::OnRep_CharacterReadyEpoch()
 {
+	FNarrativeAIStartupDiagnostics::Record(this, TEXT("asc_ready_replication"), FString::FromInt(CharacterReadyEpoch));
 	OnCharacterReadyEpochChanged.Broadcast(CharacterReadyEpoch);
 }
 

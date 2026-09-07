@@ -2,7 +2,9 @@
 
 
 #include "AI/Activities/NPCGoalGenerator.h"
+#include "AI/NarrativeAIStartupDiagnostics.h"
 #include "AI/Activities/NPCActivityComponent.h"
+#include "AI/NarrativeNPCController.h"
 
 UNPCGoalGenerator::UNPCGoalGenerator(const FObjectInitializer& ObjectInitializer)
 {
@@ -15,7 +17,11 @@ void UNPCGoalGenerator::Initialize(class ANarrativeNPCController* InOwnerControl
 	OwnerController = InOwnerController;
 	OwnerActivityComponent = InOwnerComp;
 
+	FNarrativeAIStartupDiagnostics::Record(this, TEXT("generator_initialize_enter"), GetPathNameSafe(InOwnerController));
+	FNarrativeAIStartupDiagnostics::Snapshot(InOwnerController, true);
 	InitializeGoalGenerator();
+	FNarrativeAIStartupDiagnostics::Record(this, TEXT("generator_initialize_return"), GetPathNameSafe(InOwnerController));
+	FNarrativeAIStartupDiagnostics::Snapshot(InOwnerController, true);
 }
 
 void UNPCGoalGenerator::InitializeGoalGenerator_Implementation()

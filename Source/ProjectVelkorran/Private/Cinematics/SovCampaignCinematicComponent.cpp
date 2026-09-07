@@ -3,6 +3,7 @@
 #include "Cinematics/SovCinematicPolicy.h"
 #include "Cinematics/NarrativeLevelSequenceActor.h"
 #include "Campaign/SovCampaignStateComponent.h"
+#include "Campaign/SovAurelionMissionDefinition.h"
 #include "Characters/SovPlayerCharacterBase.h"
 #include "Characters/SovNPCCharacterBase.h"
 #include "Framework/SovPlayerController.h"
@@ -309,10 +310,12 @@ bool USovCampaignCinematicComponent::IsContextCurrent() const
 {
     auto* PC = Controller.Get(); auto* Pawn = Cast<ASovPlayerCharacterBase>(PlayerPawn.Get()); auto* ASC = PlayerASC.Get();
     const auto* State = PC ? PC->FindComponentByClass<USovCampaignStateComponent>() : nullptr;
+    const auto* Aurelion = State ? Cast<USovAurelionMissionDefinition>(State->GetActiveMission()) : nullptr;
     return !bEndingPlay && IsRegistered() && IsComponentTickEnabled() && IsValid(GetOwner()) && !GetOwner()->IsActorBeingDestroyed() && GetOwner()->HasAuthority()
         && PC && PC->GetPawn() == Pawn && Pawn && Pawn->IsCharacterReady() && Pawn->IsAlive()
         && ASC && ASC->GetAvatarActor() == Pawn && UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(Pawn) == ASC
         && State && State->IsStateValid() && State->GetActiveMission() && State->GetActiveMission()->MissionId == MissionId
+        && (!Aurelion || Aurelion->MatchesStorySequence(BeatId, Sequence))
         && State->GetActiveProtagonist() == Pawn->GetProtagonistIdentityTag()
         && PC->GetCampaignTransitionState() == ESovCampaignTransitionState::Idle;
 }
@@ -468,6 +471,10 @@ bool USovCampaignCinematicComponent::RequestPlay(ASovPlayerController* Player, F
     AccessibilityWaitStartedSeconds = 0.0;
     Controller = Player; PlayerPawn = Cast<ANarrativeCharacter>(Player->GetPawn());
     PlayerASC = PlayerPawn.IsValid() ? UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(PlayerPawn.Get()) : nullptr;
+    const auto* AdmissionState = Player->FindComponentByClass<USovCampaignStateComponent>();
+    if (const auto* Aurelion = AdmissionState ? Cast<USovAurelionMissionDefinition>(AdmissionState->GetActiveMission()) : nullptr;
+        Aurelion && !Aurelion->MatchesStorySequence(BeatId, Sequence))
+    { OutError = TEXT("Aurelion cinematic sequence must match this beat's declared story dependency."); return false; }
     if (!IsContextCurrent() || FVector::DistSquared(PlayerPawn->GetActorLocation(), GetOwner()->GetActorLocation()) > FMath::Square(RequestRange))
     { OutError = TEXT("Cinematic requires the ready current protagonist at its physical entry."); return false; }
     auto* State = Player->FindComponentByClass<USovCampaignStateComponent>(); const auto* Beat = State->GetActiveMission()->FindBeat(BeatId);

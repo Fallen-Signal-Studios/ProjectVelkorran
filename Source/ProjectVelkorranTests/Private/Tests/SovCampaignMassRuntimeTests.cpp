@@ -484,6 +484,7 @@ bool FSovCampaignMassDeferredVictoryTest::RunTest(const FString& Parameters)
 		FSovCampaignMassTestAccess::BindDeaths(*Director);
 		auto* RequiredASC = Required->GetNarrativeAbilitySystemComponent();
 		// Deliver the native GAS death notification while the asynchronous replacement is held.
+		RequiredASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetHealthAttribute(), 0.f);
 		RequiredASC->OnDeathStateChanged.Broadcast(Required, RequiredASC, true);
 		TestEqual(TEXT("Victory waits for promotion stability"), Director->GetEncounterState(), ESovEncounterState::Active);
 		if (bFailPromotion)

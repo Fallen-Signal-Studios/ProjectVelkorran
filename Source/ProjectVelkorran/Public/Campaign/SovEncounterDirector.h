@@ -90,6 +90,13 @@ public:
 	/** Stable and globally unique (e.g. M01.Courtyard); never rename after shipping saves. */
 	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Encounter") FName EncounterId;
 	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Replicated, Category = "Encounter") TArray<FSovEncounterParticipant> Participants;
+	/** Registered non-victory NPCs whose death fails this attempt. Kept as actors throughout combat. */
+	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="Encounter|Protection") TSet<FName> ProtectedParticipantIds;
+	/** Current native confirmed-defeat and survivor result; scripted empty completion is not campaign proof. */
+	UFUNCTION(BlueprintPure, Category="Encounter") bool HasConfirmedVictory() const;
+	uint64 GetLifecycleGeneration() const { return RestoreGeneration; }
+	/** Retained by the director even if its objective actor streams out during publication. */
+	bool IsCampaignReceiptPending() const { return State == ESovEncounterState::Succeeded && bAwaitingCampaignReceipt; }
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Encounter", meta = (ClampMin = "0")) float CompletionEchoReserve = 25.f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Encounter", meta = (ClampMin = "1")) float RestoreTimeoutSeconds = 30.f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Encounter") bool bCompleteWhenRequiredParticipantsDefeated = true;
@@ -149,6 +156,8 @@ protected:
 	UPROPERTY(SaveGame) FSovProtagonistSnapshot EntryPlayer;
 	UPROPERTY(SaveGame) FNarrativeActorRecord EntryController;
 	UPROPERTY(SaveGame) TArray<FSovEncounterNPCRecord> EntryParticipants;
+	UPROPERTY(SaveGame) TSet<FName> EntryProtectedParticipantIds;
+	UPROPERTY(SaveGame) bool bAwaitingCampaignReceipt = false;
 	UPROPERTY(SaveGame) TSet<FName> ClaimedCompletionRewards;
 	UPROPERTY(SaveGame) TSet<FName> DefeatedParticipants;
 	UPROPERTY(SaveGame) TSet<FName> ClaimedAttemptRewards;
@@ -158,6 +167,7 @@ private:
 	friend struct FSovCampaignMassTestAccess;
 	friend struct FSovEncounterCallbackTestAccess;
 	friend struct FSovCoordinationTestAccess;
+	friend class ASovCampaignEncounterObjective;
 	UPROPERTY(VisibleAnywhere, Category="Encounter") TObjectPtr<class USovEncounterCoordinationComponent> Coordination;
 	bool bPlayerAndControllerRestored = false;
 	void SetState(ESovEncounterState NewState);
@@ -177,6 +187,9 @@ private:
 	bool RemoveTimedEffects(UAbilitySystemComponent* ASC, TFunctionRef<bool()> CanContinue);
 	UFUNCTION() void HandleDeath(AActor* KilledActor, UNarrativeAbilitySystemComponent* ASC, bool bIsDead);
 	void EvaluateCompletionConditions();
+	bool AreProtectedParticipantsAlive() const;
+	bool HasConfirmedRequiredDefeats() const;
+	bool ValidateProtectionConfiguration(FString& Error) const;
 	void BindDeaths();
 	void UnbindDeaths();
 	UPROPERTY(Transient) TObjectPtr<ASovPlayerCharacterBase> EncounterPlayer;
