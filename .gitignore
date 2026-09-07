@@ -1,6 +1,5 @@
-# Project source and configuration are intentionally tracked.
-# Large Unreal content remains local until Git LFS or another binary
-# versioning solution is available.
+# Project source, configuration, and selected Unreal content are tracked.
+# Generated content and raw source art remain ignored.
 
 # Unreal-generated directories (matched at any depth, including plugins)
 Binaries/
@@ -48,11 +47,6 @@ StagedBuilds/
 *.sig
 *.ucas
 *.utoc
-
-# Unreal project and plugin content is binary and intentionally not tracked yet
-Content/
-*.uasset
-*.umap
 
 # Raw source assets that normally belong in LFS
 SourceArt/
