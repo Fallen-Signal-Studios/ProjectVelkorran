@@ -1,5 +1,6 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Campaign/SovCampaignStateComponent.h"
+#include "Campaign/SovCampaignEncounterObjective.h"
 #include "Save/SovSaveSubsystem.h"
 #include "Settings/SovGameUserSettings.h"
 #include "Engine/GameInstance.h"
@@ -234,7 +235,12 @@ ESovCampaignResult USovCampaignStateComponent::CompleteCoAction(ASovCoActionAnch
 	return IsValid(Source) ? CompleteBeatInternal(Source->CompletionBeat, false, Source) : ESovCampaignResult::Invalid;
 }
 
-ESovCampaignResult USovCampaignStateComponent::CompleteBeatInternal(FName BeatId, bool bSkipPresentation, ASovCoActionAnchor* CoActionSource, const FGuid& HandoffRequestId, USovCampaignCinematicComponent* CinematicSource)
+ESovCampaignResult USovCampaignStateComponent::CompleteEncounterObjective(ASovCampaignEncounterObjective* Source)
+{
+	return IsValid(Source) ? CompleteBeatInternal(Source->CompletionBeat, false, nullptr, FGuid(), nullptr, Source) : ESovCampaignResult::Invalid;
+}
+
+ESovCampaignResult USovCampaignStateComponent::CompleteBeatInternal(FName BeatId, bool bSkipPresentation, ASovCoActionAnchor* CoActionSource, const FGuid& HandoffRequestId, USovCampaignCinematicComponent* CinematicSource, ASovCampaignEncounterObjective* EncounterSource)
 {
 	if (!HasAuthorityOwner()) { return ESovCampaignResult::NotAuthority; }
 	if (bMutating) { return ESovCampaignResult::Busy; }
@@ -243,6 +249,11 @@ ESovCampaignResult USovCampaignStateComponent::CompleteBeatInternal(FName BeatId
 		|| (!HandoffRequestId.IsValid() && !DoesCurrentPawnMatch(GetActiveProtagonist()))) { return ESovCampaignResult::Invalid; }
 	const FSovCampaignBeatDefinition* Beat = ActiveMission->FindBeat(BeatId);
 	if (!Beat || (Beat->RequiredProtagonist.IsValid() && Beat->RequiredProtagonist != GetActiveProtagonist())) { return ESovCampaignResult::Invalid; }
+	if (!Beat->RequiredEncounterId.IsNone())
+	{
+		if (!IsValid(EncounterSource) || bSkipPresentation || !EncounterSource->HasCommitReceipt(this, BeatId)) { return ESovCampaignResult::Invalid; }
+	}
+	else if (EncounterSource) { return ESovCampaignResult::Invalid; }
 	const auto ObjectiveState = GetObjectiveState(ActiveMission->MissionId, BeatId);
 	if (SovObjectivePolicy::IsTerminal(static_cast<EObjectivePolicyState>(ObjectiveState)) && ObjectiveState != ESovObjectiveState::Succeeded)
 	{ return ESovCampaignResult::ObjectiveClosed; }
@@ -287,6 +298,14 @@ ESovCampaignResult USovCampaignStateComponent::CompleteBeatInternal(FName BeatId
 	}
 	else if (CoActionSource) { return ESovCampaignResult::Invalid; }
 	FSovCampaignJournalEntry Entry;
+	if (EncounterSource)
+	{
+		Entry.EncounterId = Beat->RequiredEncounterId;
+		Entry.EncounterProof = Beat->RequiredEncounterProof;
+		Entry.EncounterAttemptId = EncounterSource->GetReceiptAttemptId();
+		Entry.DisabledReceiverIds = EncounterSource->GetDisabledReceiverReceiptIds();
+		if (Journal.ContainsByPredicate([&Entry](const auto& Prior) { return Prior.EncounterAttemptId == Entry.EncounterAttemptId; })) { return ESovCampaignResult::Invalid; }
+	}
 	if (CoActionSource)
 	{
 		Entry.CoActionRequestId = CoActionSource->ReceiptRequestId;
@@ -335,11 +354,15 @@ ESovCampaignResult USovCampaignStateComponent::CompleteBeatInternal(FName BeatId
 	TArray<FSovEvidenceAcquisition> CriticalAcquisitions;
 	for (const auto& Definition : Beat->CriticalEvidence)
 	{
-		if (KnowsEvidence(Definition->EvidenceId, Entry.Protagonist)) { continue; }
+		const bool bObserversKnow = !Beat->CriticalEvidenceObserverIds.ContainsByPredicate([this, &Definition](FName Observer)
+			{ return !ObserverKnowsEvidence(Definition->EvidenceId, Observer); });
+		if (KnowsEvidence(Definition->EvidenceId, Entry.Protagonist) && bObserversKnow) { continue; }
 		FSovEvidenceAcquisition Record; Record.Definition = Definition; Record.EvidenceId = Definition->EvidenceId;
 		Record.SourceId = FGuid::NewGuid(); Record.CriticalBeatEventId = Entry.EventId; Record.Protagonist = Entry.Protagonist;
 		Record.MissionId = Entry.MissionId; Record.AcquisitionBeat = Entry.BeatId; Record.AfterJournalSequence = Entry.Sequence;
 		Record.SourceLocationId = Entry.BeatId; Record.CustodianId = Definition->OriginalCustodian;
+		Record.WitnessIds = Beat->CriticalEvidenceObserverIds;
+		Record.Publicity = Record.WitnessIds.IsEmpty() ? ESovRecordPublicity::Private : ESovRecordPublicity::Shared;
 		if (!ValidateEvidenceStep(Record, Evidence)) { return ESovCampaignResult::Invalid; }
 		CriticalAcquisitions.Add(Record);
 	}
@@ -366,6 +389,7 @@ ESovCampaignResult USovCampaignStateComponent::CompleteBeatInternal(FName BeatId
 		bMissionJustSucceeded = bAllMandatoryComplete && !Record.bSucceeded;
 		Record.bSucceeded = bAllMandatoryComplete;
 		Journal.Add(Entry);
+		if (EncounterSource) { EncounterSource->AcknowledgeCommitReceipt(this); }
 		Evidence.Append(CriticalAcquisitions);
 		if (Entry.HandoffToProtagonist.IsValid()) { ActiveProtagonist = Entry.HandoffToProtagonist; }
 	}
@@ -566,6 +590,7 @@ bool USovCampaignStateComponent::ValidateSavedState() const
 	TSet<FGuid> CoActionRequests;
 	TSet<FGuid> HandoffRequests;
 	TSet<FGuid> CinematicSessions;
+	TSet<FGuid> EncounterAttempts;
 	TMap<FName, FGameplayTag> ReplayedLeads;
 	const auto LeadFor = [&ReplayedLeads](const USovCampaignDefinition* Definition)
 	{
@@ -652,7 +677,10 @@ bool USovCampaignStateComponent::ValidateSavedState() const
 				if (!CriticalBeat || CriticalEntry.EventId != Item.CriticalBeatEventId || CriticalEntry.MissionId != Item.MissionId
 					|| CriticalEntry.Protagonist != Item.Protagonist || Item.AcquisitionBeat != CriticalEntry.BeatId
 					|| !CriticalBeat->CriticalEvidence.Contains(Item.Definition) || !Item.GrantedKnowledge.IsEmpty()
-					|| Item.SourceLocationId != CriticalEntry.BeatId || Item.CustodianId != Item.Definition->OriginalCustodian) { return false; }
+					|| Item.SourceLocationId != CriticalEntry.BeatId || Item.CustodianId != Item.Definition->OriginalCustodian
+					|| Item.WitnessIds != CriticalBeat->CriticalEvidenceObserverIds
+					|| Item.Publicity != (Item.WitnessIds.IsEmpty() ? ESovRecordPublicity::Private : ESovRecordPublicity::Shared)
+					|| (!Item.WitnessIds.IsEmpty() && (!CriticalBeat->bRequiresCinematicProof || !CriticalEntry.CinematicSessionId.IsValid()))) { return false; }
 			}
 			else if (Item.Definition && Item.Definition->bCriticalPath && Item.Stage == ESovEvidenceStage::Observed) { return false; }
 			ReplayedEvidence.Add(Item);
@@ -692,6 +720,15 @@ bool USovCampaignStateComponent::ValidateSavedState() const
 					&& !Fact->Definition.WitnessIds.Contains(Memory.HolderId))) { return false; }
 			SeenMemories.Add(Memory.MemoryId);
 		}
+		if (!Beat->RequiredEncounterId.IsNone())
+		{
+			if (Entry.EncounterId != Beat->RequiredEncounterId || Entry.EncounterProof != Beat->RequiredEncounterProof || !Entry.EncounterAttemptId.IsValid()
+				|| EncounterAttempts.Contains(Entry.EncounterAttemptId) || Entry.bPresentationSkipped) { return false; }
+			if (Entry.DisabledReceiverIds.Num() != Beat->RequiredReceiverIds.Num()
+				|| !Entry.DisabledReceiverIds.Difference(Beat->RequiredReceiverIds).IsEmpty()) { return false; }
+			EncounterAttempts.Add(Entry.EncounterAttemptId);
+		}
+		else if (!Entry.EncounterId.IsNone() || Entry.EncounterAttemptId.IsValid() || !Entry.DisabledReceiverIds.IsEmpty() || Entry.EncounterProof != ESovEncounterProofType::RequiredDefeats) { return false; }
 		if (Beat->bRequiresCinematicProof)
 		{
 			if (!Entry.CinematicSessionId.IsValid() || CinematicSessions.Contains(Entry.CinematicSessionId) || !Viewed.Contains(Beat->CinematicId)) { return false; }
@@ -755,10 +792,15 @@ bool USovCampaignStateComponent::ValidateSavedState() const
 		const auto* Beat = MissionDefinitions.FindChecked(Entry.MissionId)->FindBeat(Entry.BeatId);
 		for (const auto& Critical : Beat->CriticalEvidence)
 		{
-			if (!Evidence.ContainsByPredicate([&Entry, Critical](const auto& Item)
-				{ return Item.EvidenceId == Critical->EvidenceId && Item.AfterJournalSequence <= Entry.Sequence
-					&& (Item.Protagonist == Entry.Protagonist || Item.WitnessIds.Contains(NarrativeIdentity(Entry.Protagonist))
-						|| Item.CopyDestination == NarrativeIdentity(Entry.Protagonist)); })) { return false; }
+			TArray<FName> RequiredObservers = Beat->CriticalEvidenceObserverIds;
+			RequiredObservers.AddUnique(NarrativeIdentity(Entry.Protagonist));
+			for (FName Observer : RequiredObservers)
+			{
+				if (!Evidence.ContainsByPredicate([&Entry, Critical, Observer](const auto& Item)
+					{ return Item.EvidenceId == Critical->EvidenceId && Item.AfterJournalSequence <= Entry.Sequence
+						&& (NarrativeIdentity(Item.Protagonist) == Observer || Item.WitnessIds.Contains(Observer)
+							|| Item.CopyDestination == Observer); })) { return false; }
+			}
 		}
 	}
 	if (!LastMission.IsNone() && LastMission != ActiveMission->MissionId)

@@ -43,6 +43,8 @@ class NARRATIVEARSENAL_API UNPCActivityComponent : public UActorComponent, publi
 public:	
 
 	friend class ANarrativeNPCController;
+	// Private, read-only non-Shipping diagnostics; no public mutable AI access.
+	friend struct FNarrativeAIStartupDiagnostics;
 
 	// Sets default values for this component's properties
 	UNPCActivityComponent();

@@ -16,8 +16,8 @@ class PROJECTVELKORRAN_API USovConvergenceCompanionState : public UActorComponen
 	GENERATED_BODY()
 public:
 	virtual ENarrativeRestorePhase GetSaveRestorePhase() const override { return ENarrativeRestorePhase::Companions; }
-	bool StageHandoff(USovCampaignDefinition* Mission, FGameplayTag Incoming, ASovPlayerCharacterBase* Outgoing, FString& Reason);
-	bool StageSavedRecord(const TArray<uint8>& Bytes, USovCampaignDefinition* Mission, FGameplayTag Lead, FString& Reason);
+	bool StageHandoff(USovCampaignDefinition* Mission, FGameplayTag Incoming, ASovPlayerCharacterBase* Outgoing, FString& Reason, FName HandoffBeat = NAME_None);
+	bool StageSavedRecord(const TArray<uint8>& Bytes, USovCampaignDefinition* Mission, FGameplayTag Lead, FString& Reason, const TArray<uint8>* CampaignBytes = nullptr);
 	bool StageInitialCompanion(USovCampaignDefinition* Mission, FGameplayTag Lead, FString& Reason);
 	bool PollStaged(FString& Reason);
 	bool CommitStaged(ASovPlayerCharacterBase* Leader, FString& Reason);
@@ -25,6 +25,7 @@ public:
 	bool IsEncounterRestorePending() const { return bEncounterRestorePending; }
 	void RollbackStaged();
 	bool HasStagedProxy() const { return IsValid(Staged); }
+	ASovProtagonistCompanionCharacter* GetActiveCompanion() const { return Active; }
 	virtual void PrepareForSave_Implementation() override;
 	virtual void Serialize(FArchive& Ar) override;
 	virtual void Load_Implementation() override;
@@ -32,6 +33,9 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 private:
 	friend struct FSovConvergenceTestAccess;
+	friend struct FSovCompanionApproachTestAccess;
+	bool RequiresCompanion(const USovCampaignDefinition* Mission) const;
+	bool SavedMissionRequiresCompanion(const USovCampaignDefinition* Mission, const TArray<uint8>* CampaignBytes, bool& bRequired, FString& Reason) const;
 	bool StageSnapshot(const FSovCompanionProxySnapshot& Snapshot, USovCampaignDefinition* Mission, FString& Reason, bool bRestoreRecord = true);
 	void DestroyOwnedProxy(ASovProtagonistCompanionCharacter* Proxy);
 	UPROPERTY(SaveGame) bool bHasSavedCompanion = false;

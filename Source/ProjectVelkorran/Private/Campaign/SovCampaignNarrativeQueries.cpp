@@ -81,6 +81,13 @@ bool USovCampaignStateComponent::ValidateEvidenceStep(const FSovEvidenceAcquisit
 	{ return Existing.EvidenceId == Item.EvidenceId && !Item.CopyDestination.IsNone() && Existing.CopyDestination == Item.CopyDestination; });
 	if (Item.Stage != ESovEvidenceStage::Distributed && !Item.CopyDestination.IsNone()) { return false; }
 	if (Item.Stage != ESovEvidenceStage::Corroborated && !Item.SupportingEvidenceId.IsNone()) { return false; }
+	// A later accepted critical scene may expose an already-known record to a new
+	// protagonist. Its journal event and exact observers are verified during replay;
+	// ordinary world sources cannot issue a critical-beat receipt.
+	if (Item.CriticalBeatEventId.IsValid() && Item.Definition->bCriticalPath
+		&& Item.Stage == ESovEvidenceStage::Observed && Current >= ESovEvidenceStage::Observed
+		&& Item.WitnessIds.ContainsByPredicate([&](FName Observer) { return !EvidenceKnownTo(Prior, Item.EvidenceId, Observer); }))
+	{ return true; }
 	return SovEvidencePolicy::CanAdvance(static_cast<unsigned>(Current), static_cast<unsigned>(Item.Stage), Independent, Authentic, Destination, Copied);
 }
 bool USovCampaignStateComponent::FindConsequence(FName Id, FName Observer, FSovConsequenceRecord& OutRecord) const

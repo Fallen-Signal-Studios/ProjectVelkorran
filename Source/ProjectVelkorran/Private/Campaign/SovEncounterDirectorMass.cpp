@@ -651,5 +651,6 @@ void ASovEncounterDirector::TickMassPromotions()
 		// Fail closed. Keep the saved C/D state and checkpoint for retry; never release a partially restored combatant.
 		SetState(ESovEncounterState::Failed); OnEncounterRestoreFailed.Broadcast(Error); return;
 	}
-	if (MassPromotions.IsEmpty() && State != ESovEncounterState::Restoring) { SetActorTickEnabled(false); }
+	if (MassPromotions.IsEmpty() && State != ESovEncounterState::Restoring)
+	{ SetActorTickEnabled(State == ESovEncounterState::Active && !ProtectedParticipantIds.IsEmpty()); }
 }

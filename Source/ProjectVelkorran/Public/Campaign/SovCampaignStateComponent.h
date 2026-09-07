@@ -53,6 +53,11 @@ struct PROJECTVELKORRAN_API FSovCampaignJournalEntry
 	UPROPERTY(SaveGame, BlueprintReadOnly) FGuid CoActionRequestId;
 	UPROPERTY(SaveGame, BlueprintReadOnly) FName CoActionCompanionId;
 	UPROPERTY(SaveGame, BlueprintReadOnly) FName CoActionAnchorId;
+	UPROPERTY(SaveGame, BlueprintReadOnly) FName EncounterId;
+	UPROPERTY(SaveGame, BlueprintReadOnly) FGuid EncounterAttemptId;
+	/** Physical receiver receipts from this native encounter attempt; exact authored IDs required on replay. */
+	UPROPERTY(SaveGame, BlueprintReadOnly) TSet<FName> DisabledReceiverIds;
+	UPROPERTY(SaveGame, BlueprintReadOnly) ESovEncounterProofType EncounterProof = ESovEncounterProofType::RequiredDefeats;
 };
 
 USTRUCT(BlueprintType)
@@ -142,16 +147,19 @@ public:
 	UPROPERTY(BlueprintAssignable, Category="Campaign|Objectives") FSovObjectiveStateChanged OnObjectiveStateChanged;
 private:
 	friend struct FSovCampaignStateTestAccess;
+	friend struct FSovCompanionApproachTestAccess;
 	friend struct FSovNarrativeStateTestAccess;
 	friend struct FSovCoActionTestAccess;
 	friend struct FSovObjectiveLifecycleTestAccess;
 	friend class ASovCoActionAnchor;
+	friend class ASovCampaignEncounterObjective;
+	ESovCampaignResult CompleteEncounterObjective(class ASovCampaignEncounterObjective* Source);
 	friend class ASovPlayerController;
 	friend class USovCampaignCinematicComponent;
 	ESovCampaignResult CompleteCinematic(class USovCampaignCinematicComponent* Source, bool bSkipped);
 	ESovCampaignResult CompleteAuthoredHandoff(FName BeatId, const FGuid& RequestId);
 	ESovCampaignResult CompleteCoAction(class ASovCoActionAnchor* Source);
-	ESovCampaignResult CompleteBeatInternal(FName BeatId, bool bSkipPresentation, class ASovCoActionAnchor* CoActionSource, const FGuid& HandoffRequestId = FGuid(), class USovCampaignCinematicComponent* CinematicSource = nullptr);
+	ESovCampaignResult CompleteBeatInternal(FName BeatId, bool bSkipPresentation, class ASovCoActionAnchor* CoActionSource, const FGuid& HandoffRequestId = FGuid(), class USovCampaignCinematicComponent* CinematicSource = nullptr, class ASovCampaignEncounterObjective* EncounterSource = nullptr);
 	bool ValidateSavedState() const;
 	bool MigrateLegacyObjectives();
 	bool HasAuthorityOwner() const;

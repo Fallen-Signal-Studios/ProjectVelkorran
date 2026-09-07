@@ -30,6 +30,33 @@ AActor* ResolveRecoveryAnchor(UWorld* World, FName Tag)
 }
 }
 
+bool USovConvergenceCompanionState::RequiresCompanion(const USovCampaignDefinition* Mission) const
+{
+	if (!Mission || Mission->ProtagonistCompanions.IsEmpty()) { return false; }
+	if (Mission->CompanionActivationBeat.IsNone()) { return true; }
+	const auto* State = GetOwner() ? GetOwner()->FindComponentByClass<USovCampaignStateComponent>() : nullptr;
+	return State && State->IsStateValid() && State->GetActiveMission() == Mission
+		&& State->IsBeatComplete(Mission->MissionId, Mission->CompanionActivationBeat);
+}
+
+bool USovConvergenceCompanionState::SavedMissionRequiresCompanion(const USovCampaignDefinition* Mission,
+	const TArray<uint8>* CampaignBytes, bool& bRequired, FString& Reason) const
+{
+	bRequired = Mission && !Mission->ProtagonistCompanions.IsEmpty();
+	if (!bRequired || Mission->CompanionActivationBeat.IsNone()) { return true; }
+	// Full loads stage companions before the controller record is applied. Read the validated
+	// saved campaign journal, never the previous live world's convergence state.
+	if (!CampaignBytes || !USovCampaignStateComponent::ValidateSerializedSave(*CampaignBytes, Reason))
+	{ if (Reason.IsEmpty()) { Reason = TEXT("A gated companion restore requires its matching campaign journal."); } return false; }
+	auto* Candidate = NewObject<USovCampaignStateComponent>();
+	FMemoryReader Reader(*CampaignBytes); FObjectAndNameAsStringProxyArchive Archive(Reader, true); Archive.ArIsSaveGame = true;
+	Candidate->Serialize(Archive);
+	if (Archive.IsError() || Candidate->GetActiveMission() != Mission)
+	{ Reason = TEXT("The companion restore journal names another mission."); return false; }
+	bRequired = Candidate->IsBeatComplete(Mission->MissionId, Mission->CompanionActivationBeat);
+	return true;
+}
+
 void USovConvergenceCompanionState::DestroyOwnedProxy(ASovProtagonistCompanionCharacter* Proxy)
 {
 	if (!IsValid(Proxy)) { return; }
@@ -48,7 +75,7 @@ void USovConvergenceCompanionState::RollbackStaged()
 	DestroyOwnedProxy(Previous);
 }
 bool USovConvergenceCompanionState::StageHandoff(USovCampaignDefinition* Mission, FGameplayTag Incoming,
-	ASovPlayerCharacterBase* Outgoing, FString& Reason)
+	ASovPlayerCharacterBase* Outgoing, FString& Reason, FName HandoffBeat)
 {
 	Reason.Reset();
 	if (!GetOwner() || !GetOwner()->HasAuthority() || !Mission || !Outgoing || HasStagedProxy())
@@ -56,18 +83,45 @@ bool USovConvergenceCompanionState::StageHandoff(USovCampaignDefinition* Mission
 	const auto* OutProfile = Mission->FindCompanionProfile(Outgoing->GetProtagonistIdentityTag());
 	const auto* InProfile = Mission->FindCompanionProfile(Incoming);
 	if (!OutProfile || !InProfile) { Reason = TEXT("Both protagonist companion profiles must be authored."); return false; }
-	for (TActorIterator<ASovProtagonistCompanionCharacter> It(GetWorld()); It; ++It)
+	const auto* State = GetOwner()->FindComponentByClass<USovCampaignStateComponent>();
+	const auto* Beat = Mission->FindBeat(HandoffBeat);
+	if (!State || !State->IsStateValid() || State->GetActiveMission() != Mission || !Beat
+		|| Beat->HandoffToProtagonist != Incoming || Beat->RequiredProtagonist != Outgoing->GetProtagonistIdentityTag())
+	{ Reason = TEXT("Companion staging requires the current authored protagonist handoff."); return false; }
+	const ESovObjectiveState ObjectiveState = State->GetObjectiveState(Mission->MissionId, HandoffBeat);
+	if (ObjectiveState != ESovObjectiveState::Available && ObjectiveState != ESovObjectiveState::Active)
+	{ Reason = TEXT("The authored protagonist handoff is not actionable."); return false; }
+	const bool bAlreadyTogether = RequiresCompanion(Mission);
+	const bool bActivatingCompanion = !bAlreadyTogether && !Mission->CompanionActivationBeat.IsNone()
+		&& HandoffBeat == Mission->CompanionActivationBeat && !Beat->bIsolatedPerspectiveCut;
+	if (!bAlreadyTogether)
 	{
-		if (It->GetCompanionIdentity() == Incoming && It->GetCompanionComponent()->CompanionId == InProfile->CompanionId && It->IsAlive())
+		if (IsValid(Active)) { Reason = TEXT("A protagonist companion is present before the authored meeting."); return false; }
+		if (Beat->bIsolatedPerspectiveCut && !Mission->CompanionActivationBeat.IsNone())
 		{
-			if (*It != Active || It->GetOwner() != GetOwner()) { Reason = TEXT("The incoming protagonist proxy is not owned by this campaign controller."); return false; }
-			if (IncomingProxy) { IncomingProxy = nullptr; Reason = TEXT("More than one incoming protagonist proxy is alive."); return false; }
-			IncomingProxy = *It;
+			// The incoming player uses their own saved kit (or the normal first-entry kit).
+			// No partner resources, companion actor or resonance membership cross a solo cut.
+			return true;
 		}
+		if (!bActivatingCompanion) { Reason = TEXT("The protagonist partnership has not been established."); return false; }
 	}
-	if (!IncomingProxy) { Reason = TEXT("The incoming protagonist's actual living companion must be present."); return false; }
+	else if (Beat->bIsolatedPerspectiveCut)
+	{ Reason = TEXT("An isolated perspective cut cannot dissolve an established partnership."); return false; }
 	FSovCompanionProxySnapshot IncomingSnapshot;
-	if (!IncomingProxy->CaptureProxySnapshot(Mission->MissionId, IncomingSnapshot, Reason)) { IncomingProxy = nullptr; return false; }
+	if (!bActivatingCompanion)
+	{
+		for (TActorIterator<ASovProtagonistCompanionCharacter> It(GetWorld()); It; ++It)
+		{
+			if (It->GetCompanionIdentity() == Incoming && It->GetCompanionComponent()->CompanionId == InProfile->CompanionId && It->IsAlive())
+			{
+				if (*It != Active || It->GetOwner() != GetOwner()) { Reason = TEXT("The incoming protagonist proxy is not owned by this campaign controller."); return false; }
+				if (IncomingProxy) { IncomingProxy = nullptr; Reason = TEXT("More than one incoming protagonist proxy is alive."); return false; }
+				IncomingProxy = *It;
+			}
+		}
+		if (!IncomingProxy) { Reason = TEXT("The incoming protagonist's actual living companion must be present."); return false; }
+		if (!IncomingProxy->CaptureProxySnapshot(Mission->MissionId, IncomingSnapshot, Reason)) { IncomingProxy = nullptr; return false; }
+	}
 	UClass* Class = OutProfile->CompanionClass.LoadSynchronous(); UNPCDefinition* Definition = OutProfile->CompanionDefinition.LoadSynchronous();
 	if (!Class || Class->HasAnyClassFlags(CLASS_Abstract) || !Definition)
 	{ IncomingProxy = nullptr; Reason = TEXT("The outgoing companion class or NPC definition is missing."); return false; }
@@ -90,6 +144,9 @@ bool USovConvergenceCompanionState::StageHandoff(USovCampaignDefinition* Mission
 	FSovProtagonistSnapshot PlayerSnapshot;
 	if (!PS || !PS->FindProtagonistSnapshot(Incoming, PlayerSnapshot))
 	{ Reason = TEXT("Convergence requires the previously learned incoming player kit snapshot."); RollbackStaged(); return false; }
+	// At the first shared handoff the incoming hero is restored from the kit retained
+	// during their solo approach; only subsequent swaps carry a live proxy's resources.
+	if (bActivatingCompanion) { return true; }
 	PreviousIncomingSnapshot = PlayerSnapshot; bHasPreviousIncomingSnapshot = true;
 	PlayerSnapshot.Resources = IncomingSnapshot.Resources;
 	if (!PS->StoreProtagonistSnapshot(PlayerSnapshot)) { Reason = TEXT("Incoming protagonist resources could not be retained."); RollbackStaged(); return false; }
@@ -121,19 +178,22 @@ bool USovConvergenceCompanionState::StageSnapshot(const FSovCompanionProxySnapsh
 	if (!IsValid(ExpectedStage) || Staged != ExpectedStage) { Reason = TEXT("Saved companion ownership changed while staging its activity."); return false; }
 	return true;
 }
-bool USovConvergenceCompanionState::StageSavedRecord(const TArray<uint8>& Bytes, USovCampaignDefinition* Mission, FGameplayTag Lead, FString& Reason)
+bool USovConvergenceCompanionState::StageSavedRecord(const TArray<uint8>& Bytes, USovCampaignDefinition* Mission, FGameplayTag Lead, FString& Reason,
+	const TArray<uint8>* CampaignBytes)
 {
 	Reason.Reset();
 	if (Bytes.IsEmpty() || Bytes.Num() > 16 * 1024 * 1024) { Reason = TEXT("Companion save record is missing or too large."); return false; }
 	auto* Candidate = NewObject<USovConvergenceCompanionState>();
 	FMemoryReader Reader(Bytes); FObjectAndNameAsStringProxyArchive Archive(Reader, true); Archive.ArIsSaveGame = true; Candidate->Serialize(Archive);
 	if (Archive.IsError()) { Reason = TEXT("Companion save data could not be deserialized."); return false; }
+	bool bRequired = false;
+	if (!SavedMissionRequiresCompanion(Mission, CampaignBytes, bRequired, Reason)) { return false; }
 	if (!Candidate->bHasSavedCompanion)
 	{
-		if (Mission && Mission->bAllowJointResonance) { Reason = TEXT("A convergence save is missing its required protagonist companion record."); return false; }
-		return StageInitialCompanion(Mission, Lead, Reason);
+		if (bRequired) { Reason = TEXT("A convergence save is missing its required protagonist companion record."); return false; }
+		return true;
 	}
-	if (!Mission || !Mission->bAllowJointResonance) { Reason = TEXT("A saved convergence companion is not permitted in this mission."); return false; }
+	if (!bRequired) { Reason = TEXT("A saved convergence companion is not permitted before this mission's shared entry."); return false; }
 	if (Candidate->SavedCompanion.Identity == Lead) { Reason = TEXT("A saved companion duplicates the controlled protagonist."); return false; }
 	return StageSnapshot(Candidate->SavedCompanion, Mission, Reason);
 }
@@ -159,20 +219,26 @@ bool USovConvergenceCompanionState::CommitStaged(ASovPlayerCharacterBase* Leader
 	Reason.Reset();
 	if (!Staged)
 	{
-		if (!IsValid(Active)) { return true; }
 		auto* State = GetOwner()->FindComponentByClass<USovCampaignStateComponent>();
 		auto* Mission = State ? State->GetActiveMission() : nullptr;
-		if (!Mission || !Mission->bAllowJointResonance || !Leader || Active->GetCompanionIdentity() == Leader->GetProtagonistIdentityTag())
+		if (!IsValid(Active))
+		{ if (RequiresCompanion(Mission)) { Reason = TEXT("The committed shared route is missing its protagonist companion."); return false; } return true; }
+		if (!RequiresCompanion(Mission))
 		{ auto* Previous = Active.Get(); Active = nullptr; DestroyOwnedProxy(Previous); bHasSavedCompanion = false; return true; }
+		if (!Leader || Active->GetCompanionIdentity() == Leader->GetProtagonistIdentityTag())
+		{ Reason = TEXT("The established companion duplicates or has lost its controlled protagonist."); return false; }
 		auto* Resonance = Leader->FindComponentByClass<USovResonanceComponent>();
-		return Active->GetCompanionComponent()->SetLeader(Leader, Reason) && Resonance && Resonance->RegisterPartner(Active->GetCompanionComponent(), Reason);
+		return Active->GetCompanionComponent()->SetLeader(Leader, Reason)
+			&& (!Mission->bAllowJointResonance || (Resonance && Resonance->RegisterPartner(Active->GetCompanionComponent(), Reason)));
 	}
 	if (!IsValid(Leader) || !Leader->IsCharacterReady() || !StagedMission || !PollStaged(Reason)) { return false; }
 	auto* State = GetOwner()->FindComponentByClass<USovCampaignStateComponent>();
-	if (!State || State->GetActiveMission() != StagedMission) { Reason = TEXT("The staged companion lost its campaign context."); return false; }
+	if (!State || State->GetActiveMission() != StagedMission || !RequiresCompanion(StagedMission))
+	{ Reason = TEXT("The staged companion lost its established campaign partnership."); return false; }
 	auto* ExpectedStage = Staged.Get();
 	const auto StillOwnsStage = [this, ExpectedStage, State, Leader]()
-	{ return IsValid(ExpectedStage) && Staged == ExpectedStage && IsValid(Leader) && IsValid(State) && State->GetActiveMission() == StagedMission; };
+	{ return IsValid(ExpectedStage) && Staged == ExpectedStage && IsValid(Leader) && IsValid(State)
+		&& State->GetActiveMission() == StagedMission && RequiresCompanion(StagedMission); };
 	auto* Controller = Cast<ANarrativeNPCController>(Staged->GetController());
 	if (!Controller || !Controller->GetActivityComponent()) { Reason = TEXT("The companion has no Narrative activity owner."); return false; }
 	Controller->GetActivityComponent()->Activate();
@@ -180,7 +246,7 @@ bool USovConvergenceCompanionState::CommitStaged(ASovPlayerCharacterBase* Leader
 	if (!ExpectedStage->GetCompanionComponent()->SetLeader(Leader, Reason)) { return false; }
 	if (!StillOwnsStage()) { Reason = TEXT("Companion ownership changed while assigning its leader."); return false; }
 	auto* Resonance = Leader->FindComponentByClass<USovResonanceComponent>();
-	if (!Resonance || !Resonance->RegisterPartner(ExpectedStage->GetCompanionComponent(), Reason))
+	if (StagedMission->bAllowJointResonance && (!Resonance || !Resonance->RegisterPartner(ExpectedStage->GetCompanionComponent(), Reason)))
 	{ if (StillOwnsStage()) { ExpectedStage->GetCompanionComponent()->CancelContextCommand(); } return false; }
 	if (!StillOwnsStage()) { Reason = TEXT("Companion ownership changed while registering the paired action."); return false; }
 	ASovProtagonistCompanionCharacter* Retiring = IncomingProxy;
@@ -199,11 +265,12 @@ void USovConvergenceCompanionState::PrepareForSave_Implementation()
 	auto* State = GetOwner() ? GetOwner()->FindComponentByClass<USovCampaignStateComponent>() : nullptr;
 	if (!IsValid(Active))
 	{
-		if (State && State->GetActiveMission() && State->GetActiveMission()->bAllowJointResonance) { bSaveCaptureValid = false; return; }
+		if (State && RequiresCompanion(State->GetActiveMission())) { bSaveCaptureValid = false; return; }
 		bHasSavedCompanion = false; SavedCompanion = FSovCompanionProxySnapshot(); return;
 	}
 	FString Reason;
-	bSaveCaptureValid = State && State->GetActiveMission() && Active->CaptureProxySnapshot(State->GetActiveMission()->MissionId, SavedCompanion, Reason);
+	bSaveCaptureValid = State && RequiresCompanion(State->GetActiveMission())
+		&& Active->CaptureProxySnapshot(State->GetActiveMission()->MissionId, SavedCompanion, Reason);
 	bHasSavedCompanion = bSaveCaptureValid;
 }
 void USovConvergenceCompanionState::Serialize(FArchive& Ar)
@@ -217,6 +284,9 @@ void USovConvergenceCompanionState::Load_Implementation()
 	auto* PC = Cast<ASovPlayerController>(GetOwner());
 	if (!PC || PC->GetCampaignTransitionState() != ESovCampaignTransitionState::Idle || HasStagedProxy()) { return; }
 	bEncounterRestorePending = true; EncounterRestoreError.Reset();
+	const bool bRequired = RequiresCompanion(PC->GetCampaignState()->GetActiveMission());
+	if (bRequired != bHasSavedCompanion)
+	{ EncounterRestoreError = TEXT("Encounter restore companion membership disagrees with the restored campaign partnership."); return; }
 	if (!bHasSavedCompanion)
 	{
 		auto* Previous = Active.Get(); Active = nullptr; DestroyOwnedProxy(Previous);
@@ -244,7 +314,7 @@ void USovConvergenceCompanionState::EndPlay(const EEndPlayReason::Type Reason)
 bool USovConvergenceCompanionState::StageInitialCompanion(USovCampaignDefinition* Mission, FGameplayTag Lead, FString& Reason)
 {
 	Reason.Reset();
-	if (!Mission || !Mission->bAllowJointResonance || HasStagedProxy()) { return true; }
+	if (!RequiresCompanion(Mission) || HasStagedProxy()) { return true; }
 	const FSovCampaignCompanionProfile* Profile = Mission->ProtagonistCompanions.FindByPredicate(
 		[Lead](const FSovCampaignCompanionProfile& Item) { return Item.Protagonist != Lead; });
 	auto* PC = Cast<APlayerController>(GetOwner()); auto* PS = PC ? PC->GetPlayerState<ASovPlayerState>() : nullptr;

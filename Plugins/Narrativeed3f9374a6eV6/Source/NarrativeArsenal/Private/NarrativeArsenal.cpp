@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "NarrativeArsenal.h"
+#include "AI/NarrativeAIStartupDiagnostics.h"
 #include "NarrativeGameplayTags.h"
 #include "Navigation/NavigatorGameplayTags.h"
 #include "Sovereign/SovGameplayTags.h"
@@ -21,6 +22,7 @@ DEFINE_LOG_CATEGORY(LogMassVehicle);
 
 void FNarrativeArsenalModule::StartupModule()
 {
+	FNarrativeAIStartupDiagnostics::Startup();
 	// This code will execute after your module is loaded into memory; the exact timing is specified in the .uplugin file per-module
 
 #if WITH_GAMEPLAY_DEBUGGER
@@ -40,6 +42,7 @@ void FNarrativeArsenalModule::StartupModule()
 
 void FNarrativeArsenalModule::ShutdownModule()
 {
+	FNarrativeAIStartupDiagnostics::Shutdown();
 #if WITH_GAMEPLAY_DEBUGGER
 	if (IGameplayDebugger::IsAvailable())
 	{

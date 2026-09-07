@@ -286,7 +286,7 @@ bool ASovPlayerController::StartPawnHandoff(USovCampaignDefinition* Destination,
 		OutError = TEXT("Destination could not spawn or source changed; no combat state was replaced.");
 		return false;
 	}
-	if (HandoffRequest.IsValid() && (!ConvergenceCompanionState->StageHandoff(Destination, Lead, Source, OutError) || !StillOwnSource()))
+	if (HandoffRequest.IsValid() && (!ConvergenceCompanionState->StageHandoff(Destination, Lead, Source, OutError, HandoffBeat) || !StillOwnSource()))
 	{
 		ConvergenceCompanionState->RollbackStaged(); Spawned->Destroy();
 		if (TransitionEpoch == ExpectedEpoch) { TransitionState = ESovCampaignTransitionState::Idle; }
@@ -369,8 +369,13 @@ bool ASovPlayerController::StageCampaignLoad(USovCampaignDefinition* Mission, co
 		{ return Item.ComponentName == ConvergenceCompanionState->GetFName(); });
 		if (CompanionRecord)
 		{
-			if (!ConvergenceCompanionState->StageSavedRecord(CompanionRecord->ByteData, Mission, PendingProtagonist, OutError)) { return false; }
+			const auto* CampaignRecord = Records->ControllerData.SavedComponents.FindByPredicate([this](const FNarrativeSaveComponent& Item)
+			{ return Item.ComponentName == CampaignState->GetFName(); });
+			if (!ConvergenceCompanionState->StageSavedRecord(CompanionRecord->ByteData, Mission, PendingProtagonist, OutError,
+				CampaignRecord ? &CampaignRecord->ByteData : nullptr)) { return false; }
 		}
+		else if (!Mission->ProtagonistCompanions.IsEmpty())
+		{ OutError = TEXT("A convergence mission save requires its companion membership record, including during solo approaches."); return false; }
 		else if (!ConvergenceCompanionState->StageInitialCompanion(Mission, PendingProtagonist, OutError)) { return false; }
 	}
 	else if (!ConvergenceCompanionState->StageInitialCompanion(Mission, PendingProtagonist, OutError)) { return false; }
@@ -609,10 +614,14 @@ void ASovPlayerController::FailCampaignInitialization(const FString& Message)
 			TransitionState = ESovCampaignTransitionState::Recovering;
 			const auto* CompanionRecord = RecoveryController.SavedComponents.FindByPredicate([this](const FNarrativeSaveComponent& Item)
 			{ return Item.ComponentName == ConvergenceCompanionState->GetFName(); });
+			const auto* CampaignRecord = RecoveryController.SavedComponents.FindByPredicate([this](const FNarrativeSaveComponent& Item)
+			{ return Item.ComponentName == CampaignState->GetFName(); });
 			FString CompanionError;
 			const bool bStagedCompanion = CompanionRecord
-				? ConvergenceCompanionState->StageSavedRecord(CompanionRecord->ByteData, RecoveryMission, PendingProtagonist, CompanionError)
-				: ConvergenceCompanionState->StageInitialCompanion(RecoveryMission, PendingProtagonist, CompanionError);
+				? ConvergenceCompanionState->StageSavedRecord(CompanionRecord->ByteData, RecoveryMission, PendingProtagonist, CompanionError,
+					CampaignRecord ? &CampaignRecord->ByteData : nullptr)
+				: RecoveryMission->ProtagonistCompanions.IsEmpty() && ConvergenceCompanionState->StageInitialCompanion(RecoveryMission, PendingProtagonist, CompanionError);
+			if (!bStagedCompanion && CompanionError.IsEmpty()) { CompanionError = TEXT("Recovery is missing its required companion membership record."); }
 			if (!OwnsFailure()) { return; }
 			if (!bStagedCompanion)
 			{

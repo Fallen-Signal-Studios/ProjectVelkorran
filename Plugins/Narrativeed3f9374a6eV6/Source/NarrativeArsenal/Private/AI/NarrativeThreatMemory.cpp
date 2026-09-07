@@ -1,5 +1,6 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "AI/NarrativeThreatMemory.h"
+#include "AI/NarrativeAIStartupDiagnostics.h"
 #include "AI/NarrativeNPCController.h"
 #include "AI/NarrativeThreatPolicy.h"
 #include "AbilitySystemBlueprintLibrary.h"
@@ -95,6 +96,7 @@ void ANarrativeNPCController::BindThreatPerception()
 	if (ThreatPerception.Get() == Current) { return; }
 	if (ThreatPerception.IsValid())
 	{
+		FNarrativeAIStartupDiagnostics::Record(this, TEXT("perception_detached"), ThreatPerception->GetPathName());
 		ThreatPerception->OnTargetPerceptionUpdated.RemoveDynamic(this, &ThisClass::HandleThreatPerception);
 		ThreatPerception->OnComponentActivated.RemoveDynamic(this, &ThisClass::HandleThreatPerceptionActivated);
 		ThreatPerception->OnComponentDeactivated.RemoveDynamic(this, &ThisClass::HandleThreatPerceptionDeactivated);
@@ -113,6 +115,7 @@ void ANarrativeNPCController::BindThreatPerception()
 	{
 		bThreatMemoryManaged = true;
 		Current->OnTargetPerceptionUpdated.AddUniqueDynamic(this, &ThisClass::HandleThreatPerception);
+		FNarrativeAIStartupDiagnostics::Record(this, TEXT("perception_attached"), Current->GetPathName());
 		Current->OnComponentActivated.AddUniqueDynamic(this, &ThisClass::HandleThreatPerceptionActivated);
 		Current->OnComponentDeactivated.AddUniqueDynamic(this, &ThisClass::HandleThreatPerceptionDeactivated);
 	}
@@ -159,6 +162,7 @@ void ANarrativeNPCController::InvalidateCachedThreatPerception()
 void ANarrativeNPCController::Tick(const float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	FNarrativeAIStartupDiagnostics::Snapshot(this);
 	if (!HasAuthority()) { return; }
 	ThreatUpdateAccumulator += DeltaSeconds;
 	// Supporting tiers can throttle their existing perception component. Do not poll faster.
@@ -209,6 +213,7 @@ bool ANarrativeNPCController::ReportThreatObservation(AActor* Target, const ENar
 
 void ANarrativeNPCController::HandleThreatPerception(AActor* Actor, FAIStimulus Stimulus)
 {
+	FNarrativeAIStartupDiagnostics::Perception(this, Actor, Stimulus);
 	if (!HasAuthority()) { return; }
 	ENarrativeThreatSource Source;
 	float Lifetime = 8.f;

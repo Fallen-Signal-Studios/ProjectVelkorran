@@ -3,10 +3,16 @@
 #include "Tests/SovAxiomRuntimeTestFixtures.h"
 #include "Tests/SovHandoffRuntimeTestFixtures.h"
 #include "Tests/SovCinematicInventoryRuntimeTestFixtures.h"
+#include "Tests/SovCompanionApproachTestFixtures.h"
 #include "Components/EquipmentComponent.h"
 #include "Cinematics/SovCampaignCinematicComponent.h"
 #include "Campaign/SovCampaignDefinition.h"
 #include "Campaign/SovCampaignStateComponent.h"
+#include "Campaign/SovEvidenceDefinition.h"
+#include "Companions/SovConvergenceCompanionState.h"
+#include "Companions/SovCompanionComponent.h"
+#include "AI/NPCDefinition.h"
+#include "AI/NarrativeNPCController.h"
 #include "Character/PlayerDefinition.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Framework/SovPlayerState.h"
@@ -24,6 +30,10 @@
 #include "NarrativeGameplayTags.h"
 #include "TimerManager.h"
 #include "UObject/Script.h"
+#include "Serialization/MemoryWriter.h"
+#include "Serialization/ObjectAndNameAsStringProxyArchive.h"
+#include "Sovereign/SovGameplayTags.h"
+#include "EngineUtils.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 struct FSovCinematicInterruptionTestAccess
@@ -46,6 +56,7 @@ struct FNarrativeSequenceLifecycleTestAccess
 };
 struct FSovCinematicTestAccess
 {
+	static bool ResolveParticipantSnapshot(USovCampaignCinematicComponent* C, FString& Error) { return C->ResolveParticipants(Error); }
 	static bool ValidateSequence(USovCampaignCinematicComponent* C, ULevelSequence* Sequence, FString& Error)
 	{ return C->ValidatePresentationSequence(Sequence, Error); }
 	static bool AcquirePartition(USovCampaignCinematicComponent* C, FString& Error) { return C->AcquirePartitionSources(Error); }
@@ -151,7 +162,7 @@ namespace
 		ASovHandoffRuntimeTestPawn* Pawn = nullptr;
 		UNarrativeAbilitySystemComponent* ASC = nullptr;
 		USovCampaignCinematicComponent* Component = nullptr;
-		FManagedSequenceWorld(bool bIncludeReplayBeat = false)
+		FManagedSequenceWorld(bool bIncludeReplayBeat = false, bool bSharedObserverMission = false)
 		{
 			if (!Base.World || !Base.Actor) { return; }
 			PC = Base.World->SpawnActor<ASovHandoffRuntimeTestController>();
@@ -169,7 +180,8 @@ namespace
 			PC->SetViewTarget(Pawn);
 			PC->PlayerCameraManager->UpdateCamera(0.f);
 			auto* Mission = NewObject<USovCampaignDefinition>(PC); PC->KeepAlive.Add(Mission);
-			Mission->MissionId = TEXT("CinematicRuntime"); Mission->Protagonist = Pawn->GetProtagonistIdentityTag();
+			Mission->MissionId = bSharedObserverMission ? FName(TEXT("M13_SharedWitnessTest")) : FName(TEXT("CinematicRuntime"));
+			Mission->Protagonist = Pawn->GetProtagonistIdentityTag();
 			Mission->PawnClass = Pawn->GetClass(); Mission->PlayerDefinition = Definition;
 			FSovCampaignBeatDefinition Beat; Beat.BeatId = TEXT("Scene"); Beat.CinematicId = TEXT("FirstView"); Beat.bRequiresCinematicProof = true;
 			Mission->Beats.Add(Beat);
@@ -633,6 +645,112 @@ bool FSovCinematicInventoryReceiptTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Exactly two campaign journal receipts"), F.PC->GetCampaignState()->GetJournal().Num(), 2);
     return true;
 }
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCinematicSharedWitnessTest, "ProjectVelkorran.Campaign.Cinematic.SharedCriticalWitnessRequiresActualCompanion",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCinematicSharedWitnessTest::RunTest(const FString& Parameters)
+{
+    FManagedSequenceWorld F(false, true); if (!TestNotNull(TEXT("Managed shared-witness cinematic"), F.Component)) { return false; }
+    auto* Campaign = F.PC->GetCampaignState(); auto* Mission = Campaign->GetActiveMission();
+    auto* PS = F.PC->GetPlayerState<ASovPlayerState>(); auto* Companions = F.PC->GetConvergenceCompanionState();
+    const auto& Tags = FSovGameplayTags::Get(); FString Error;
+    auto* SeleneDefinition = NewObject<UPlayerDefinition>(F.PC); F.PC->KeepAlive.Add(SeleneDefinition);
+    FSovCampaignProtagonistProfile Alternate; Alternate.Protagonist = Tags.Character_Player_Selene;
+    Alternate.PawnClass = ASovCompanionApproachTestSelene::StaticClass(); Alternate.PlayerDefinition = SeleneDefinition;
+    Mission->AlternateProtagonists.Add(Alternate);
+    for (bool bSelene : {false, true})
+    {
+        auto& Profile = Mission->ProtagonistCompanions.AddDefaulted_GetRef();
+        Profile.Protagonist = bSelene ? Tags.Character_Player_Selene : Tags.Character_Player_Tarrik;
+        Profile.CompanionId = bSelene ? FName(TEXT("Selene")) : FName(TEXT("Tarrik"));
+        Profile.EntryAnchorTag = bSelene ? FName(TEXT("WitnessSeleneEntry")) : FName(TEXT("WitnessTarrikEntry"));
+        Profile.CompanionClass = ASovCompanionApproachTestProxy::StaticClass();
+        auto* NPC = NewObject<UNPCDefinition>(F.PC); F.PC->KeepAlive.Add(NPC);
+        NPC->NPCClassPath = ASovCompanionApproachTestProxy::StaticClass(); Profile.CompanionDefinition = NPC;
+        Mission->AllowedCompanionIds.Add(Profile.CompanionId);
+    }
+    auto* Evidence = NewObject<USovEvidenceDefinition>(F.PC); F.PC->KeepAlive.Add(Evidence);
+    Evidence->EvidenceId = TEXT("FifthWitness"); Evidence->CanonicalContentId = TEXT("HistoricFifthWitness");
+    Evidence->Summary = FText::FromString(TEXT("Both bearers observe the historical witness."));
+    Evidence->OriginalCustodian = TEXT("AurelionMemory"); Evidence->SourceCustodians = {Evidence->OriginalCustodian};
+    Evidence->RelevantMissions = {Mission->MissionId}; Evidence->bCriticalPath = true;
+    auto& Witness = Mission->Beats[0]; Witness.BeatId = TEXT("FifthWitness"); Witness.RequiredProtagonist = Tags.Character_Player_Tarrik;
+    Witness.CriticalEvidence = {Evidence}; Witness.CriticalEvidenceObserverIds = {TEXT("Tarrik"), TEXT("Selene")};
+    F.Component->BeatId = Witness.BeatId;
+    FSovCampaignBeatDefinition Stay; Stay.BeatId = TEXT("VoluntaryStay"); Stay.RequiredProtagonist = Tags.Character_Player_Tarrik;
+    Stay.PrerequisiteBeats = {Witness.BeatId}; Mission->Beats.Add(Stay);
+    if (!TestTrue(TEXT("Shared historical observation is a valid cinematic evidence contract"), Mission->ValidateDefinition(Error)))
+    { AddError(Error); return false; }
+    FSovCinematicParticipant Partner; Partner.BindingTag = TEXT("Selene"); Partner.ActorTag = TEXT("WitnessSelene");
+    F.Component->Participants.Add(Partner);
+    FSovCinematicTestAccess::StageOwnedSession(F.Component, F.PC, F.Pawn, F.ASC);
+    TestFalse(TEXT("Missing physical Selene cannot be registered as a witness"), FSovCinematicTestAccess::ResolveParticipantSnapshot(F.Component, Error));
+    FSovCinematicTestAccess::RetireInventorySession(F.Component);
+
+    // Supply a previously played incoming kit using a real ready Selene pawn and the
+    // production snapshot capture, rather than granting the observer a synthetic kit.
+    auto* PriorPC = F.Base.World->SpawnActor<ASovHandoffRuntimeTestController>();
+    auto* PriorPS = F.Base.World->SpawnActor<ASovPlayerState>();
+    auto* PriorSelene = F.Base.World->SpawnActor<ASovCompanionApproachTestSelene>();
+    if (!PriorPC || !PriorPS || !PriorSelene || !PS) { return false; }
+    PriorSelene->PrepareCampaignInitialization(SeleneDefinition); PriorPC->SetTestPlayerState(PriorPS); PriorPC->Possess(PriorSelene);
+    if (!TestTrue(TEXT("Prior Selene kit has actual native readiness"), PriorSelene->StageTestReadiness(PriorPS, true)
+        && PriorSelene->CompleteCampaignDataInitialization(false))) { return false; }
+    FSovProtagonistSnapshot SeleneKit;
+    if (!TestTrue(TEXT("Previously played Selene kit is captured and retained"), PriorPS->CaptureProtagonistSnapshot(PriorSelene, SeleneKit, Error)
+        && PS->StoreProtagonistSnapshot(SeleneKit))) { AddError(Error); return false; }
+    PriorPC->UnPossess(); PriorSelene->Destroy(); PriorPC->Destroy(); PriorPS->Destroy();
+    auto* EntryAnchor = F.Base.World->SpawnActor<AActor>(); if (!EntryAnchor) { return false; }
+    EntryAnchor->Tags.Add(TEXT("WitnessSeleneEntry"));
+    if (!TestTrue(TEXT("Native companion entry stages the actual inactive protagonist"), Companions->StageInitialCompanion(Mission, Tags.Character_Player_Tarrik, Error)))
+    { AddError(Error); return false; }
+    ASovCompanionApproachTestProxy* Selene = nullptr;
+    for (TActorIterator<ASovCompanionApproachTestProxy> It(F.Base.World); It; ++It)
+    { if (It->GetOwner() == F.PC) { if (Selene) { AddError(TEXT("Companion entry created duplicate proxies")); return false; } Selene = *It; } }
+    if (!TestNotNull(TEXT("Actual staged Selene actor exists"), Selene)) { return false; }
+    Selene->Tags.Add(Partner.ActorTag);
+    auto* AI = Cast<ANarrativeNPCController>(Selene->GetController()); if (!TestNotNull(TEXT("Actual Narrative companion controller"), AI)) { return false; }
+    if (!AI->HasActorBegunPlay()) { AI->DispatchBeginPlay(); }
+    if (!TestTrue(TEXT("Actual native companion kit finishes initialization"), Companions->PollStaged(Error))) { AddError(Error); return false; }
+    FSovCinematicTestAccess::StageOwnedSession(F.Component, F.PC, F.Pawn, F.ASC);
+    TestFalse(TEXT("A staged but unregistered protagonist cannot be credited as an observer"), FSovCinematicTestAccess::ResolveParticipantSnapshot(F.Component, Error));
+    FSovCinematicTestAccess::RetireInventorySession(F.Component);
+    if (!TestTrue(TEXT("Native companion ownership commits to the current Tarrik"), Companions->CommitStaged(F.Pawn, Error))) { AddError(Error); return false; }
+    TestTrue(TEXT("Committed observer is the controller-owned companion"), Companions->GetActiveCompanion() == Selene
+        && Selene->GetCompanionComponent()->GetCurrentLeader() == F.Pawn);
+    F.Component->Participants.Pop();
+    FSovCinematicTestAccess::StageOwnedSession(F.Component, F.PC, F.Pawn, F.ASC);
+    TestFalse(TEXT("A living companion outside the cinematic participant bindings gains no witness credit"), FSovCinematicTestAccess::ResolveParticipantSnapshot(F.Component, Error));
+    F.Component->Participants.Add(Partner);
+    if (!TestTrue(TEXT("Both actual bound protagonists satisfy the shared observer contract"), FSovCinematicTestAccess::ResolveParticipantSnapshot(F.Component, Error)))
+    { AddError(Error); return false; }
+    if (!TestTrue(TEXT("Native empty inventory postconditions resolve and apply"), FSovCinematicTestAccess::ResolveInventory(F.Component, Error)
+        && FSovCinematicTestAccess::ApplyInventory(F.Component, Error))) { AddError(Error); return false; }
+    // Reuse the existing suite's accepted playback boundary; evidence, observer
+    // admission, native postconditions and campaign receipt all execute in production.
+    if (!TestTrue(TEXT("Accepted native cinematic receipt commits the historical witness"), FSovCinematicTestAccess::CommitInventoryReceipt(F.Component, false, Error)))
+    { AddError(Error); return false; }
+    TestTrue(TEXT("Controlled Tarrik knows the Fifth Witness"), Campaign->KnowsEvidence(Evidence->EvidenceId, Tags.Character_Player_Tarrik));
+    TestTrue(TEXT("Actual bound companion Selene knows the same Fifth Witness"), Campaign->KnowsEvidence(Evidence->EvidenceId, Tags.Character_Player_Selene));
+    TestFalse(TEXT("Shared observation does not silently choose VoluntaryStay"), Campaign->IsBeatComplete(Mission->MissionId, TEXT("VoluntaryStay")));
+    TestEqual(TEXT("The shared observation is one provenance record"), Campaign->GetEvidence().Num(), 1);
+    FSovCinematicTestAccess::RestoreInventory(F.Component); FSovCinematicTestAccess::RetireInventorySession(F.Component);
+    const auto SerializeCampaign = [Campaign]()
+    {
+        TArray<uint8> Bytes; FMemoryWriter Writer(Bytes); FObjectAndNameAsStringProxyArchive Archive(Writer, false);
+        Archive.ArIsSaveGame = true; Campaign->Serialize(Archive); return Bytes;
+    };
+    TestTrue(TEXT("Accepted shared observation survives native journal replay validation"), USovCampaignStateComponent::ValidateSerializedSave(SerializeCampaign(), Error));
+    if (Campaign->GetEvidence().IsEmpty()) { return false; }
+    auto& SavedEvidence = const_cast<FSovEvidenceAcquisition&>(Campaign->GetEvidence()[0]);
+    const auto AcceptedObservers = SavedEvidence.WitnessIds;
+    SavedEvidence.WitnessIds.Remove(TEXT("Selene"));
+    TestFalse(TEXT("Dropping a required historical observer corrupts the restore contract"), USovCampaignStateComponent::ValidateSerializedSave(SerializeCampaign(), Error));
+    SavedEvidence.WitnessIds = AcceptedObservers; SavedEvidence.WitnessIds.Add(TEXT("UnboundObserver"));
+    TestFalse(TEXT("Restore rejects invented observer credit"), USovCampaignStateComponent::ValidateSerializedSave(SerializeCampaign(), Error));
+    SavedEvidence.WitnessIds = AcceptedObservers;
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCinematicInventoryUnregisterTest, "ProjectVelkorran.Campaign.Cinematic.Inventory.UnregisterDuringGrantRestoresOwnedDelta",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovCinematicInventoryUnregisterTest::RunTest(const FString& Parameters)

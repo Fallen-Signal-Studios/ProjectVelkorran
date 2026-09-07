@@ -61,6 +61,7 @@ public class NarrativeArsenal : ModuleRules
 			new string[]
 			{
 				"CoreUObject",
+                "Json",
 				"Engine",
 				"Slate",
 				"SlateCore",

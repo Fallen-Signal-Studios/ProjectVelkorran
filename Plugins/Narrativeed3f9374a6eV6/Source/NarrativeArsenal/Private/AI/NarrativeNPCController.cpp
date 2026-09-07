@@ -2,6 +2,7 @@
 
 
 #include "AI/NarrativeNPCController.h"
+#include "AI/NarrativeAIStartupDiagnostics.h"
 #include "AI/NPCDefinition.h"
 #include "AI/Activities/NPCActivityComponent.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
@@ -26,6 +27,8 @@ ANarrativeNPCController::ANarrativeNPCController(const FObjectInitializer& Objec
 
 void ANarrativeNPCController::BeginPlay()
 {
+	FNarrativeAIStartupDiagnostics::Record(this, TEXT("controller_begin_play_enter"));
+	FNarrativeAIStartupDiagnostics::Snapshot(this, true);
 	Super::BeginPlay();
 	RefreshThreatMemory();
 
@@ -37,9 +40,11 @@ void ANarrativeNPCController::BeginPlay()
 
 void ANarrativeNPCController::EndPlay(EEndPlayReason::Type EndPlayReason)
 {
+	FNarrativeAIStartupDiagnostics::Record(this, TEXT("controller_end_play"));
 	ClearThreatMemory();
 	if (ThreatPerception.IsValid())
 	{
+		FNarrativeAIStartupDiagnostics::Record(this, TEXT("perception_detached"), ThreatPerception->GetPathName());
 		ThreatPerception->OnTargetPerceptionUpdated.RemoveDynamic(this, &ThisClass::HandleThreatPerception);
 		ThreatPerception->OnComponentActivated.RemoveDynamic(this, &ThisClass::HandleThreatPerceptionActivated);
 		ThreatPerception->OnComponentDeactivated.RemoveDynamic(this, &ThisClass::HandleThreatPerceptionDeactivated);

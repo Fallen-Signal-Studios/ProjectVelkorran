@@ -144,7 +144,7 @@ bool USovCampaignDefinition::ValidateDefinition(FString& OutError) const
 		InheritedConsequences.Add(Id);
 	}
 	TSet<FName> Ids;
-	TSet<FName> ConsequenceIds, MemoryIds;
+	TSet<FName> ConsequenceIds, MemoryIds, EncounterIds;
 	bool bHasMandatoryBeat = false;
 	for (const FSovCampaignBeatDefinition& Beat : Beats)
 	{
@@ -173,7 +173,35 @@ bool USovCampaignDefinition::ValidateDefinition(FString& OutError) const
 		}
 		else if (!Beat.RequiredCompanionId.IsNone() || !Beat.RequiredCoActionAnchorId.IsNone())
 		{ return Fail(TEXT("Companion/anchor proof IDs require a co-action beat.")); }
+		if (Beat.MinimumProtectedParticipants < 0 || (Beat.MinimumProtectedParticipants > 0 && Beat.RequiredEncounterId.IsNone()))
+		{ return Fail(TEXT("Minimum protected participants must be nonnegative and require a native encounter objective.")); }
+		if (static_cast<uint8>(Beat.RequiredEncounterProof) > static_cast<uint8>(ESovEncounterProofType::AurelionThermalFracture)
+			|| (Beat.RequiredEncounterId.IsNone() && (Beat.RequiredEncounterProof != ESovEncounterProofType::RequiredDefeats || !Beat.RequiredReceiverIds.IsEmpty()))
+			|| Beat.RequiredReceiverIds.Num() > 8 || Beat.RequiredReceiverIds.Contains(NAME_None))
+		{ return Fail(TEXT("Encounter proof types and receiver IDs require a valid typed encounter contract; at most eight named receivers are supported.")); }
+		if (!Beat.RequiredEncounterId.IsNone())
+		{
+			if (EncounterIds.Contains(Beat.RequiredEncounterId) || !Beat.RequiredProtagonist.IsValid()
+				|| Beat.bCanonGate || Beat.bRequiresCinematicProof || !Beat.CinematicId.IsNone()
+				|| Beat.bRequiresCoActionProof || Beat.HandoffToProtagonist.IsValid() || Beat.bInteractiveChoice
+				|| !Beat.ChoiceGroupId.IsNone() || !Beat.CriticalEvidence.IsEmpty()
+				|| Beat.StateWrites.ContainsByPredicate([](const auto& Write) { return Write.bCanonProtected; }))
+			{ return Fail(TEXT("Encounter objectives need a unique encounter ID and explicit lead, with no canon, evidence, cinematic, co-action, handoff or choice proof.")); }
+			EncounterIds.Add(Beat.RequiredEncounterId);
+		}
 		if (Beat.Consequences.Num() > 16 || Beat.RelationshipMemories.Num() > 32 || Beat.CriticalEvidence.Num() > 16) { return Fail(TEXT("Beat narrative records exceed their bounded contract.")); }
+		if (Beat.CriticalEvidenceObserverIds.Num() > 2 || (!Beat.CriticalEvidenceObserverIds.IsEmpty()
+			&& (!Beat.bRequiresCinematicProof || Beat.CriticalEvidence.IsEmpty())))
+		{ return Fail(TEXT("Shared critical evidence requires a native cinematic and at most two canonical protagonist observers.")); }
+		TSet<FName> EvidenceObservers;
+		for (FName Observer : Beat.CriticalEvidenceObserverIds)
+		{
+			const FGameplayTag Identity = Observer == TEXT("Tarrik") ? Tags.Character_Player_Tarrik
+				: Observer == TEXT("Selene") ? Tags.Character_Player_Selene : FGameplayTag();
+			if (!SupportsProtagonist(Identity) || EvidenceObservers.Contains(Observer))
+			{ return Fail(TEXT("Critical evidence observers must name distinct canonical protagonists supported by this mission.")); }
+			EvidenceObservers.Add(Observer);
+		}
 		TSet<FName> CriticalIds;
 		for (const auto& Evidence : Beat.CriticalEvidence)
 		{
@@ -299,6 +327,30 @@ bool USovCampaignDefinition::ValidateDefinition(FString& OutError) const
 	}
 	Handoffs.Sort([&BeatAncestors](const auto& A, const auto& B)
 	{ return BeatAncestors.FindChecked(B.BeatId).Contains(A.BeatId); });
+	const auto* CompanionActivation = FindBeat(CompanionActivationBeat);
+	if (!CompanionActivationBeat.IsNone())
+	{
+		if (ProtagonistCompanions.IsEmpty() || !CompanionActivation || CompanionActivation->bOptional
+			|| !CompanionActivation->HandoffToProtagonist.IsValid() || CompanionActivation->bIsolatedPerspectiveCut)
+		{ return Fail(TEXT("Companion activation requires a mandatory shared-entry protagonist handoff in a convergence mission.")); }
+		bool bResonanceWaitsForMeeting = false;
+		for (FName Required : ResonancePrerequisiteBeats)
+		{ bResonanceWaitsForMeeting |= Required == CompanionActivationBeat || BeatAncestors.FindChecked(Required).Contains(CompanionActivationBeat); }
+		if (bAllowJointResonance && !bResonanceWaitsForMeeting)
+		{ return Fail(TEXT("Joint Resonance prerequisites must wait for the established protagonist partnership.")); }
+	}
+	for (const auto& Beat : Beats)
+	{
+		const bool bPrecedesActivation = CompanionActivation && BeatAncestors.FindChecked(CompanionActivationBeat).Contains(Beat.BeatId);
+		if (Beat.bIsolatedPerspectiveCut && (!Beat.HandoffToProtagonist.IsValid() || !bPrecedesActivation))
+		{ return Fail(TEXT("Isolated perspective cuts are mandatory handoffs before the first shared protagonist entry.")); }
+		if (Beat.HandoffToProtagonist.IsValid() && bPrecedesActivation && !Beat.bIsolatedPerspectiveCut)
+		{ return Fail(TEXT("A handoff before the protagonist meeting must preserve the separate approaches.")); }
+		if (CompanionActivation && Beat.bRequiresCoActionProof
+			&& ProtagonistCompanions.ContainsByPredicate([&Beat](const auto& Profile) { return Profile.CompanionId == Beat.RequiredCompanionId; })
+			&& !BeatAncestors.FindChecked(Beat.BeatId).Contains(CompanionActivationBeat))
+		{ return Fail(TEXT("Protagonist co-action requires the established shared-entry handoff as an ancestor.")); }
+	}
 	for (const auto& Beat : Beats)
 	{
 		if (!Beat.RequiredProtagonist.IsValid()) { continue; }
