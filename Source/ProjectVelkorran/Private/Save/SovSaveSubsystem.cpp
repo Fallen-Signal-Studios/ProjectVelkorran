@@ -423,11 +423,11 @@ bool USovSaveSubsystem::CanCaptureInternal(FString& Error, bool bAllowEntrySuspe
     Admission.SavingDisabled = Narrative->IsSavingDisabled();
     const auto& N = FNarrativeGameplayTags::Get(); const auto& S = FSovGameplayTags::Get();
     const ASovEncounterDirector* QuiescentEntry = nullptr;
-    if (bAllowEntrySuspension)
     {
         for (TActorIterator<ASovEncounterDirector> It(const_cast<UWorld*>(World)); It; ++It)
         {
-            if (It->IsEntryCheckpointQuiescentForSave(Pawn))
+            if ((bAllowEntrySuspension && It->IsEntryCheckpointQuiescentForSave(Pawn))
+                || It->IsCompletedPhaseBoundaryQuiescentForSave(Pawn))
             { if (QuiescentEntry) { Error = TEXT("Multiple entry checkpoints claim this player."); return false; } QuiescentEntry = *It; }
         }
     }
@@ -443,6 +443,8 @@ bool USovSaveSubsystem::CanCaptureInternal(FString& Error, bool bAllowEntrySuspe
     Admission.InTraversal = ASC->HasAnyMatchingGameplayTags(Blocked);
     for (TActorIterator<ASovEncounterDirector> It(const_cast<UWorld*>(World)); It; ++It)
     {
+        if (It->IsPhaseEntryCapturePending())
+        { Error = TEXT("The carried encounter roster is awaiting its phase entry capture; retain the verified prior boundary."); return false; }
         if (It->IsCampaignReceiptPending())
         { Error = TEXT("Encounter victory has no committed campaign receipt. Reload the verified entry checkpoint."); return false; }
         const auto Encounter = It->GetEncounterState();

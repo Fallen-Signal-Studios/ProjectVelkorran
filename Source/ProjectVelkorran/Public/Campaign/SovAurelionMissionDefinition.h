@@ -27,7 +27,8 @@ public:
 	virtual bool ValidateDefinition(FString& OutError) const override;
 };
 
-/** Development-only corridor preparation. Grants no canon, evidence, assent or convergence progress. */
+/** Development-only corridor preparation, not the approved Z00-Z12 level layout.
+ * Grants no canon, evidence, assent or convergence progress. Existing technical assets keep this bounded contract. */
 UCLASS(BlueprintType, Blueprintable)
 class PROJECTVELKORRAN_API USovAurelionTarrikPreparationMissionDefinition : public USovAurelionMissionDefinition
 {
@@ -36,7 +37,8 @@ public:
 	USovAurelionTarrikPreparationMissionDefinition();
 };
 
-/** August TDD M12, manuscript chapter 24. Map, player/companion definitions and scenes are deliberately unassigned. */
+/** Approved Aurelion layout Z00-Z09, August TDD M12, manuscript chapter 24.
+ * All four encounters precede recognition; map, player/companion definitions and scenes are deliberately unassigned. */
 UCLASS(BlueprintType, Blueprintable)
 class PROJECTVELKORRAN_API USovAurelionFireAndFrostMissionDefinition : public USovAurelionMissionDefinition
 {
@@ -45,7 +47,8 @@ public:
 	USovAurelionFireAndFrostMissionDefinition();
 };
 
-/** August TDD M13, manuscript chapters 25-26. Terminal authority never implies permission to release. */
+/** Approved Aurelion layout Z10-Z12, August TDD M13, manuscript chapters 25-26.
+ * No new combat or rescue choice. Terminal authority never implies permission to release. */
 UCLASS(BlueprintType, Blueprintable)
 class PROJECTVELKORRAN_API USovAurelionContraryWitnessMissionDefinition : public USovAurelionMissionDefinition
 {

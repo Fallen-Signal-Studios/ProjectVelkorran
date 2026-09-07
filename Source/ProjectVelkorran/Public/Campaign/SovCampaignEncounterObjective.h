@@ -6,6 +6,7 @@
 #include "SovCampaignEncounterObjective.generated.h"
 
 class ASovEncounterDirector;
+class ASovCampaignRelayReceiver;
 class ASovPlayerCharacterBase;
 class ASovPlayerController;
 class UNarrativeAbilitySystemComponent;
@@ -25,6 +26,8 @@ public:
     UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="Campaign") TObjectPtr<ASovEncounterDirector> EncounterDirector;
     UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="Campaign") FName MissionId;
     UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="Campaign") FName CompletionBeat;
+    /** Exact physical actors matching the beat's RequiredReceiverIds. Both E2 receivers must be reachable on foot. */
+    UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="Campaign|Receivers") TArray<TObjectPtr<ASovCampaignRelayReceiver>> RequiredReceivers;
     /** Re-entering the volume after a failed attempt requests the existing director's entry retry. */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Campaign") bool bStartOnPlayerOverlap = false;
     UPROPERTY(BlueprintReadOnly, Transient, Category="Campaign") FString LastError;
@@ -36,6 +39,7 @@ protected:
     virtual void EndPlay(EEndPlayReason::Type Reason) override;
 private:
     friend class USovCampaignStateComponent;
+    friend class ASovCampaignRelayReceiver;
     struct FAttemptContext
     {
         TWeakObjectPtr<ASovPlayerCharacterBase> Player;
@@ -47,6 +51,8 @@ private:
         FGuid AttemptId;
         FName MissionId, BeatId, EncounterId;
         TSet<FName> ProtectedIds;
+        TMap<FName, TWeakObjectPtr<ASovCampaignRelayReceiver>> Receivers;
+        TSet<FName> DisabledReceiverIds;
         int32 ReadyEpoch = 0;
         uint64 ActorInfoEpoch = 0, TransitionEpoch = 0, DirectorGeneration = 0;
     };
@@ -55,6 +61,14 @@ private:
     bool HasCommitReceipt(const USovCampaignStateComponent* State, FName BeatId) const;
     void AcknowledgeCommitReceipt(const USovCampaignStateComponent* State);
     FGuid GetReceiptAttemptId() const { return Attempt.AttemptId; }
+    TSet<FName> GetDisabledReceiverReceiptIds() const { return Attempt.DisabledReceiverIds; }
+    FGuid GetReceiverAttemptId() const { return Attempt.AttemptId; }
+    bool ValidateReceiverConfiguration(const TSet<FName>& RequiredIds, FString& Error, bool bCheckFrozen) const;
+    bool HasRequiredReceiverProof() const;
+    bool HasReceiverDisabled(const ASovCampaignRelayReceiver* Receiver) const;
+    bool CanDisableReceiver(const ASovCampaignRelayReceiver* Receiver, const ASovPlayerCharacterBase* Player, FString& Error) const;
+    bool AcceptReceiverDisable(ASovCampaignRelayReceiver* Receiver, const FGuid& AttemptId);
+    void QueueVictoryIfReady();
     void BindDirector();
     void RetireAttempt();
     void CommitVictory(FAttemptContext Context);

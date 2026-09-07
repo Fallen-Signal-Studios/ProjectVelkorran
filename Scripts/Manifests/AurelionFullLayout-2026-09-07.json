@@ -1,0 +1,1441 @@
+{
+  "schema_version": 1,
+  "layout_id": "Aurelion.FullLayout.2026-09-07",
+  "authority": {
+    "source": "Aurelion_Level_Layout_Plan.pdf",
+    "source_pages": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      19
+    ],
+    "design_adoption": "Creator authorized implementation of the layout alignment on 7 September 2026.",
+    "precedence": "August 14 TDD plus approved creator decisions; this layout explicitly relocates Eclipse combat before quarantine and concurrence.",
+    "geometry_status": "blockout_targets_unmeasured"
+  },
+  "qualification": {
+    "unreal_authored": false,
+    "native_automation_run": false,
+    "gameplay_measured": false,
+    "packaged_route_verified": false
+  },
+  "units": {
+    "distance": "meters",
+    "unreal_units_per_meter": 100
+  },
+  "zones": [
+    {
+      "id": "Z00",
+      "name": "Broken landing",
+      "geometry": {
+        "shape": "rectangle",
+        "width_m": 28,
+        "depth_m": 22
+      },
+      "elevation": {
+        "datum": "Tarrik entry",
+        "min_m": 0,
+        "max_m": 0,
+        "description": "Sheltered landing"
+      },
+      "streaming_chunk": "A"
+    },
+    {
+      "id": "Z01",
+      "name": "Pressure hall",
+      "geometry": {
+        "shape": "rectangle",
+        "width_m": 56,
+        "depth_m": 26
+      },
+      "elevation": {
+        "datum": "Tarrik entry",
+        "min_m": 0,
+        "max_m": 2,
+        "description": "Three cover bands"
+      },
+      "streaming_chunk": "A"
+    },
+    {
+      "id": "Z02",
+      "name": "Survivor bend",
+      "geometry": {
+        "shape": "rectangle",
+        "width_m": 30,
+        "depth_m": 18
+      },
+      "elevation": {
+        "datum": "Tarrik entry",
+        "min_m": 0,
+        "max_m": 0,
+        "description": "Returns to entry datum"
+      },
+      "streaming_chunk": "A"
+    },
+    {
+      "id": "Z03",
+      "name": "Frozen sensor access",
+      "geometry": {
+        "shape": "rectangle",
+        "width_m": 48,
+        "depth_m": 22
+      },
+      "elevation": {
+        "datum": "Selene entry",
+        "min_m": 0,
+        "max_m": 3,
+        "description": "Frozen ribs and service path"
+      },
+      "streaming_chunk": "B"
+    },
+    {
+      "id": "Z04",
+      "name": "Relay overlook",
+      "geometry": {
+        "shape": "rectangle",
+        "width_m": 62,
+        "depth_m": 38
+      },
+      "elevation": {
+        "datum": "Selene entry",
+        "min_m": 0,
+        "max_m": 0,
+        "description": "Flank balcony 3 m above main floor"
+      },
+      "streaming_chunk": "B"
+    },
+    {
+      "id": "Z05",
+      "name": "Meeting atrium",
+      "geometry": {
+        "shape": "circle",
+        "diameter_m": 72,
+        "bridge_width_m": 6,
+        "shaft_opening_m": 18,
+        "scenic_diameter_m": 300
+      },
+      "elevation": {
+        "datum": "Atrium",
+        "min_m": null,
+        "max_m": null,
+        "description": "Absolute floor elevation unspecified"
+      },
+      "streaming_chunk": "C"
+    },
+    {
+      "id": "Z06",
+      "name": "Breach rescue",
+      "geometry": {
+        "shape": "rectangle",
+        "width_m": 56,
+        "depth_m": 34
+      },
+      "elevation": {
+        "datum": "Shared route",
+        "min_m": 0,
+        "max_m": 0,
+        "description": "Side refuge 1 m above main floor"
+      },
+      "streaming_chunk": "D"
+    },
+    {
+      "id": "Z07",
+      "name": "Capture gallery",
+      "geometry": {
+        "shape": "rectangle",
+        "width_m": 34,
+        "depth_m": 22
+      },
+      "elevation": {
+        "datum": "Shared route",
+        "min_m": -3,
+        "max_m": -3,
+        "description": "Auxiliary control desk"
+      },
+      "streaming_chunk": "D"
+    },
+    {
+      "id": "Z08",
+      "name": "Quarantine crucible",
+      "geometry": {
+        "shape": "rectangle",
+        "width_m": 70,
+        "depth_m": 48,
+        "central_court_m": [
+          18,
+          14
+        ]
+      },
+      "elevation": {
+        "datum": "Shared route",
+        "min_m": -6,
+        "max_m": -6,
+        "description": "East balcony 3 m above local floor"
+      },
+      "streaming_chunk": "D"
+    },
+    {
+      "id": "Z09",
+      "name": "Wound gallery",
+      "geometry": {
+        "shape": "rectangle",
+        "width_m": 55,
+        "depth_m": 16
+      },
+      "elevation": {
+        "datum": "Core descent",
+        "min_m": null,
+        "max_m": null,
+        "description": "Shallow descent; no gravity reversal"
+      },
+      "streaming_chunk": "E"
+    },
+    {
+      "id": "Z10",
+      "name": "Fifth chamber",
+      "geometry": {
+        "shape": "circle",
+        "diameter_m": 54,
+        "interaction_dais_diameter_m": 10
+      },
+      "elevation": {
+        "datum": "Core",
+        "min_m": null,
+        "max_m": null,
+        "description": "Lower core; absolute elevation unspecified"
+      },
+      "streaming_chunk": "E"
+    },
+    {
+      "id": "Z11",
+      "name": "Observation gallery",
+      "geometry": {
+        "shape": "rectangle",
+        "width_m": 24,
+        "depth_m": 16
+      },
+      "elevation": {
+        "datum": "Observation",
+        "min_m": null,
+        "max_m": null,
+        "description": "Several levels above core via authored lift"
+      },
+      "streaming_chunk": "F"
+    },
+    {
+      "id": "Z12",
+      "name": "Departure concourse",
+      "geometry": {
+        "shape": "rectangle",
+        "width_m": 42,
+        "depth_m": 24
+      },
+      "elevation": {
+        "datum": "Outer ring",
+        "min_m": null,
+        "max_m": null,
+        "description": "Scenic opposite docks; absolute elevation unspecified"
+      },
+      "streaming_chunk": "F"
+    }
+  ],
+  "physical_edges": [
+    [
+      "Z00",
+      "Z01"
+    ],
+    [
+      "Z01",
+      "Z02"
+    ],
+    [
+      "Z02",
+      "Z05"
+    ],
+    [
+      "Z03",
+      "Z04"
+    ],
+    [
+      "Z04",
+      "Z05"
+    ],
+    [
+      "Z05",
+      "Z06"
+    ],
+    [
+      "Z06",
+      "Z07"
+    ],
+    [
+      "Z07",
+      "Z08"
+    ],
+    [
+      "Z08",
+      "Z09"
+    ],
+    [
+      "Z09",
+      "Z10"
+    ],
+    [
+      "Z10",
+      "Z11"
+    ],
+    [
+      "Z11",
+      "Z12"
+    ]
+  ],
+  "physical_entries": [
+    "Z00",
+    "Z03"
+  ],
+  "physical_exit": "Z12",
+  "play_order": [
+    "Z00",
+    "Z01",
+    "Z02",
+    "Z03",
+    "Z04",
+    "Z05",
+    "Z06",
+    "Z07",
+    "Z08",
+    "Z09",
+    "Z10",
+    "Z11",
+    "Z12"
+  ],
+  "perspective_cuts": [
+    {
+      "from_zone": "Z02",
+      "to_zone": "Z03",
+      "beat": "HandoffToSelene",
+      "physical_connection": false
+    }
+  ],
+  "streaming": {
+    "chunks": [
+      {
+        "id": "A",
+        "zones": [
+          "Z00",
+          "Z01",
+          "Z02"
+        ]
+      },
+      {
+        "id": "B",
+        "zones": [
+          "Z03",
+          "Z04"
+        ]
+      },
+      {
+        "id": "C",
+        "zones": [
+          "Z05"
+        ]
+      },
+      {
+        "id": "D",
+        "zones": [
+          "Z06",
+          "Z07",
+          "Z08"
+        ]
+      },
+      {
+        "id": "E",
+        "zones": [
+          "Z09",
+          "Z10"
+        ]
+      },
+      {
+        "id": "F",
+        "zones": [
+          "Z11",
+          "Z12"
+        ]
+      }
+    ],
+    "prestream_destination_before_transition": true,
+    "retain_previous_until_checkpoint_committed": true,
+    "state_survives_unload": true
+  },
+  "build_passes": [
+    {
+      "id": "shared_skeleton",
+      "zones": [
+        "Z05",
+        "Z06",
+        "Z07",
+        "Z08",
+        "Z09",
+        "Z10",
+        "Z11",
+        "Z12"
+      ],
+      "purpose": "Collision, gates, placeholder scenes, companion anchors and connected recovery"
+    },
+    {
+      "id": "separate_entrances",
+      "zones": [
+        "Z00",
+        "Z01",
+        "Z02",
+        "Z03",
+        "Z04"
+      ],
+      "purpose": "Add both entry branches after shared flow is stable"
+    },
+    {
+      "id": "identity_encounters",
+      "encounters": [
+        "E1",
+        "E2"
+      ],
+      "purpose": "Production movement/camera, zero Echo and low ammunition"
+    },
+    {
+      "id": "shared_escalation",
+      "encounters": [
+        "E3",
+        "E4"
+      ],
+      "zones": [
+        "Z07"
+      ],
+      "purpose": "Rescue, both priority outcomes, handoffs and Resonance recovery"
+    },
+    {
+      "id": "story_and_art",
+      "zones": [
+        "Z00",
+        "Z01",
+        "Z02",
+        "Z03",
+        "Z04",
+        "Z05",
+        "Z06",
+        "Z07",
+        "Z08",
+        "Z09",
+        "Z10",
+        "Z11",
+        "Z12"
+      ],
+      "purpose": "Lock core storyboard before dressing and fleet spectacle"
+    }
+  ],
+  "clock": {
+    "basis": "Standard difficulty; first successful play with mandatory scenes watched; excludes deaths/loading/pauses/menu dwell. No mission countdown.",
+    "mandatory_minutes": 50,
+    "optional_minutes": 8,
+    "all_content_minutes": 58,
+    "segments": [
+      {
+        "zones": [
+          "Z00",
+          "Z01",
+          "Z02"
+        ],
+        "minutes": 10,
+        "lead": "Tarrik",
+        "allocation": [
+          {
+            "activity": "context",
+            "minutes": 1
+          },
+          {
+            "activity": "approach",
+            "minutes": 2
+          },
+          {
+            "activity": "formation_encounter",
+            "minutes": 4
+          },
+          {
+            "activity": "recovery_and_rescue_traversal",
+            "minutes": 3
+          }
+        ]
+      },
+      {
+        "zones": [
+          "Z03",
+          "Z04"
+        ],
+        "minutes": 10,
+        "lead": "Selene",
+        "allocation": [
+          {
+            "activity": "sensor_route",
+            "minutes": 3
+          },
+          {
+            "activity": "terminal_read",
+            "minutes": 2
+          },
+          {
+            "activity": "precision_encounter",
+            "minutes": 4
+          },
+          {
+            "activity": "exit",
+            "minutes": 1
+          }
+        ]
+      },
+      {
+        "zones": [
+          "Z05"
+        ],
+        "minutes": 5,
+        "lead": "authored_handoff",
+        "allocation": [
+          {
+            "activity": "restrained_duel",
+            "minutes": 2
+          },
+          {
+            "activity": "carrier_rescue",
+            "minutes": 1.5
+          },
+          {
+            "activity": "response_and_descent",
+            "minutes": 1.5
+          }
+        ]
+      },
+      {
+        "zones": [
+          "Z06"
+        ],
+        "minutes": 5,
+        "lead": "Tarrik_with_Selene_companion",
+        "allocation": [
+          {
+            "activity": "joint_breach",
+            "minutes": 3
+          },
+          {
+            "activity": "rescue_and_lyric_grounding",
+            "minutes": 2
+          }
+        ]
+      },
+      {
+        "zones": [
+          "Z07"
+        ],
+        "minutes": 5,
+        "lead": "Tarrik_to_Selene",
+        "allocation": [
+          {
+            "activity": "paired_cages_and_threat_bridge",
+            "minutes": 2
+          },
+          {
+            "activity": "priority_decision_and_recovery",
+            "minutes": 3
+          }
+        ]
+      },
+      {
+        "zones": [
+          "Z08"
+        ],
+        "minutes": 5,
+        "lead": "Selene_to_Tarrik",
+        "allocation": [
+          {
+            "activity": "elite_encounter",
+            "minutes": 4
+          },
+          {
+            "activity": "survivor_exit_and_quarantine",
+            "minutes": 1
+          }
+        ]
+      },
+      {
+        "zones": [
+          "Z09",
+          "Z10"
+        ],
+        "minutes": 5,
+        "lead": "authored_pair",
+        "allocation": [
+          {
+            "activity": "recognition_and_descent",
+            "minutes": 1
+          },
+          {
+            "activity": "diagnostics_and_assent",
+            "minutes": 1.5
+          },
+          {
+            "activity": "fifth_witness",
+            "minutes": 1.5
+          },
+          {
+            "activity": "consequence",
+            "minutes": 1
+          }
+        ]
+      },
+      {
+        "zones": [
+          "Z11",
+          "Z12"
+        ],
+        "minutes": 5,
+        "lead": "dialogue_framing",
+        "allocation": [
+          {
+            "activity": "reunion",
+            "minutes": 0.5
+          },
+          {
+            "activity": "voluntary_conversation",
+            "minutes": 3.5
+          },
+          {
+            "activity": "separate_departures",
+            "minutes": 1
+          }
+        ]
+      }
+    ],
+    "optional_pockets": [
+      {
+        "id": "O1",
+        "zone": "Z02",
+        "return_zone": "Z02",
+        "minutes": 2,
+        "content": "Casualty-log conversation",
+        "required_for_progression": false
+      },
+      {
+        "id": "O2",
+        "zone": "Z04",
+        "return_zone": "Z04",
+        "minutes": 2,
+        "content": "Elevated sensor reconstruction and flank",
+        "required_for_progression": false
+      },
+      {
+        "id": "O3",
+        "zone": "Z07",
+        "return_zone": "Z07",
+        "minutes": 1,
+        "content": "Contamination record inspection",
+        "required_for_progression": false
+      },
+      {
+        "id": "O4",
+        "zone": "Z11",
+        "return_zone": "Z11",
+        "minutes": 3,
+        "content": "Extended Darek, Lyessa and falsified-history conversation",
+        "required_for_progression": false
+      }
+    ]
+  },
+  "missions": [
+    {
+      "mission_id": "M12_FireAndFrost",
+      "beats": [
+        {
+          "beat_id": "TarrikArrival",
+          "zone": "Z00"
+        },
+        {
+          "beat_id": "PressureHall",
+          "zone": "Z01"
+        },
+        {
+          "beat_id": "SecureTarrikRoute",
+          "zone": "Z02"
+        },
+        {
+          "beat_id": "HandoffToSelene",
+          "zone": "Z02"
+        },
+        {
+          "beat_id": "SeleneArrival",
+          "zone": "Z03"
+        },
+        {
+          "beat_id": "RelayOverlook",
+          "zone": "Z04"
+        },
+        {
+          "beat_id": "MeetingAndCarrierRescue",
+          "zone": "Z05"
+        },
+        {
+          "beat_id": "HandoffToTarrikRescue",
+          "zone": "Z05"
+        },
+        {
+          "beat_id": "BreachSharedJunction",
+          "zone": "Z06"
+        },
+        {
+          "beat_id": "FreeTrappedMarine",
+          "zone": "Z06"
+        },
+        {
+          "beat_id": "GroundLyric",
+          "zone": "Z06"
+        },
+        {
+          "beat_id": "DestroyDominionResonator",
+          "zone": "Z07"
+        },
+        {
+          "beat_id": "HandoffToSeleneCage",
+          "zone": "Z07"
+        },
+        {
+          "beat_id": "DestroyReformationCage",
+          "zone": "Z07"
+        },
+        {
+          "beat_id": "ShareIsolatedThreatData",
+          "zone": "Z07"
+        },
+        {
+          "beat_id": "PriorityWestStretchers",
+          "zone": "Z07"
+        },
+        {
+          "beat_id": "PriorityEastWalkers",
+          "zone": "Z07"
+        },
+        {
+          "beat_id": "LocalPriorityCommitted",
+          "zone": "Z07"
+        },
+        {
+          "beat_id": "SeverCrucibleLinks",
+          "zone": "Z08"
+        },
+        {
+          "beat_id": "HandoffToTarrikCrucible",
+          "zone": "Z08"
+        },
+        {
+          "beat_id": "ThermalFracture",
+          "zone": "Z08"
+        },
+        {
+          "beat_id": "SurvivorsClearAndQuarantine",
+          "zone": "Z08"
+        },
+        {
+          "beat_id": "ContraryWitnessRecognized",
+          "zone": "Z09"
+        }
+      ]
+    },
+    {
+      "mission_id": "M13_ContraryWitness",
+      "beats": [
+        {
+          "beat_id": "ContraryPosition",
+          "zone": "Z10"
+        },
+        {
+          "beat_id": "TarrikIndependentAssent",
+          "zone": "Z10"
+        },
+        {
+          "beat_id": "HandoffToSeleneAssent",
+          "zone": "Z10"
+        },
+        {
+          "beat_id": "SeleneIndependentAssent",
+          "zone": "Z10"
+        },
+        {
+          "beat_id": "MeridianContainment",
+          "zone": "Z10"
+        },
+        {
+          "beat_id": "FifthWitness",
+          "zone": "Z10"
+        },
+        {
+          "beat_id": "GrammarPropagation",
+          "zone": "Z10"
+        },
+        {
+          "beat_id": "VoluntaryStay",
+          "zone": "Z11"
+        },
+        {
+          "beat_id": "CauldronRecorderReceived",
+          "zone": "Z11"
+        },
+        {
+          "beat_id": "HandoffToTarrikAftermath",
+          "zone": "Z11"
+        },
+        {
+          "beat_id": "Record7283Received",
+          "zone": "Z11"
+        },
+        {
+          "beat_id": "ContainmentPact",
+          "zone": "Z11"
+        },
+        {
+          "beat_id": "SeparateDepartures",
+          "zone": "Z12"
+        }
+      ]
+    }
+  ],
+  "encounters": [
+    {
+      "id": "E1",
+      "zone": "Z01",
+      "mission_id": "M12_FireAndFrost",
+      "completion_beats": [
+        "PressureHall"
+      ],
+      "maximum_active": 4,
+      "committed_total": 6,
+      "roster": {
+        "ReformationSecurityDrone": 6
+      },
+      "waves": [
+        {
+          "id": "initial",
+          "roster": {
+            "ReformationSecurityDrone": 4
+          },
+          "gate": {
+            "all_events": [
+              "entry_checkpoint_committed"
+            ],
+            "maximum_alive_before_spawn": 0,
+            "operator": "all"
+          }
+        },
+        {
+          "id": "reinforcement",
+          "roster": {
+            "ReformationSecurityDrone": 2
+          },
+          "gate": {
+            "all_events": [
+              "first_formation_broken"
+            ],
+            "maximum_alive_before_spawn": 2,
+            "operator": "all"
+          }
+        }
+      ],
+      "completion_conditions": [
+        "all_committed_hostiles_cleared"
+      ],
+      "runtime_qualified": false,
+      "native_bindings": [
+        {
+          "encounter_id": "M12_E1_PressureHall",
+          "beat_id": "PressureHall",
+          "proof": "RequiredDefeats"
+        }
+      ]
+    },
+    {
+      "id": "E2",
+      "zone": "Z04",
+      "mission_id": "M12_FireAndFrost",
+      "completion_beats": [
+        "RelayOverlook"
+      ],
+      "maximum_active": 6,
+      "committed_total": 6,
+      "roster": {
+        "DominionEnforcer": 4,
+        "ContaminatedReformationDrone": 2
+      },
+      "waves": [
+        {
+          "id": "initial",
+          "roster": {
+            "DominionEnforcer": 4,
+            "ContaminatedReformationDrone": 2
+          },
+          "gate": {
+            "all_events": [
+              "entry_checkpoint_committed"
+            ],
+            "maximum_alive_before_spawn": 0,
+            "operator": "all"
+          }
+        }
+      ],
+      "completion_conditions": [
+        "both_relay_receivers_disabled",
+        "local_hostiles_cleared_or_routed"
+      ],
+      "runtime_qualified": false,
+      "relay_receivers": [
+        {
+          "id": "M12_E2_ReceiverWest",
+          "actor_class": "ASovCampaignRelayReceiver",
+          "bridge_property": "RequiredReceivers",
+          "close_interaction_disable": true,
+          "physical_placement": "Near physical relay; reachable from low cover",
+          "world_location_m": null
+        },
+        {
+          "id": "M12_E2_ReceiverEast",
+          "actor_class": "ASovCampaignRelayReceiver",
+          "bridge_property": "RequiredReceivers",
+          "close_interaction_disable": true,
+          "physical_placement": "Second receiver visible from +3m balcony; also reachable by close route",
+          "world_location_m": null
+        }
+      ],
+      "sensor_failure": {
+        "alerts_existing_drones": 2,
+        "extra_spawns": 0,
+        "mission_failure": false
+      },
+      "native_bindings": [
+        {
+          "encounter_id": "M12_E2_RelayOverlook",
+          "beat_id": "RelayOverlook",
+          "proof": "RequiredDefeats"
+        }
+      ]
+    },
+    {
+      "id": "E3",
+      "zone": "Z06",
+      "mission_id": "M12_FireAndFrost",
+      "completion_beats": [
+        "BreachSharedJunction",
+        "FreeTrappedMarine"
+      ],
+      "maximum_active": 6,
+      "committed_total": 7,
+      "roster": {
+        "Linkbound": 5,
+        "WallRunner": 1,
+        "Weaver": 1
+      },
+      "waves": [
+        {
+          "id": "initial",
+          "roster": {
+            "Linkbound": 3,
+            "WallRunner": 1
+          },
+          "gate": {
+            "all_events": [
+              "entry_checkpoint_committed"
+            ],
+            "maximum_alive_before_spawn": 0,
+            "operator": "all"
+          }
+        },
+        {
+          "id": "reinforcement",
+          "roster": {
+            "Linkbound": 2,
+            "Weaver": 1
+          },
+          "gate": {
+            "all_events": [
+              "rescue_approach_open"
+            ],
+            "maximum_alive_before_spawn": 3,
+            "operator": "all"
+          }
+        }
+      ],
+      "completion_conditions": [
+        "all_committed_hostiles_cleared",
+        "trapped_marine_rescue_confirmed",
+        "required_survivors_safe"
+      ],
+      "runtime_qualified": false,
+      "melee_slots": {
+        "initial": 2,
+        "after_link_lesson": 3
+      },
+      "rescue": {
+        "deadline_seconds": null,
+        "marine_outside_spawn_volumes": true,
+        "camera_or_navigation_fault_cannot_kill_marine": true
+      },
+      "contextual_assist_is_full_resonance": false,
+      "native_bindings": [
+        {
+          "encounter_id": "M12_E3_SharedBreach",
+          "beat_id": "BreachSharedJunction",
+          "proof": "RequiredDefeats"
+        }
+      ]
+    },
+    {
+      "id": "E4",
+      "zone": "Z08",
+      "mission_id": "M12_FireAndFrost",
+      "completion_beats": [
+        "SeverCrucibleLinks",
+        "HandoffToTarrikCrucible",
+        "ThermalFracture"
+      ],
+      "maximum_active": 5,
+      "committed_total": 5,
+      "roster": {
+        "Linkbound": 2,
+        "Weaver": 1,
+        "WallRunner": 1,
+        "Elite": 1
+      },
+      "waves": [
+        {
+          "id": "initial",
+          "roster": {
+            "Linkbound": 2,
+            "Weaver": 1,
+            "Elite": 1
+          },
+          "gate": {
+            "all_events": [
+              "entry_checkpoint_committed",
+              "local_priority_acknowledged"
+            ],
+            "maximum_alive_before_spawn": 0,
+            "operator": "all"
+          }
+        },
+        {
+          "id": "wall_runner",
+          "roster": {
+            "WallRunner": 1
+          },
+          "gate": {
+            "all_events": [
+              "first_link_anchor_falls"
+            ],
+            "maximum_alive_before_spawn": 4,
+            "operator": "all"
+          }
+        }
+      ],
+      "completion_conditions": [
+        "phase_a_links_severed",
+        "phase_b_handoff_committed",
+        "thermal_fracture_shown",
+        "hostiles_cleared",
+        "survivors_clear_before_quarantine"
+      ],
+      "runtime_qualified": false,
+      "phases": [
+        {
+          "id": "A",
+          "lead": "Selene",
+          "partner": "Tarrik",
+          "completion_beat": "SeverCrucibleLinks",
+          "handoff_beat": "HandoffToTarrikCrucible",
+          "checkpoint": "CP5"
+        },
+        {
+          "id": "B",
+          "lead": "Tarrik",
+          "partner": "Selene",
+          "completion_beat": "ThermalFracture",
+          "checkpoint": "CP5b"
+        }
+      ],
+      "resonance": {
+        "id": "ThermalFracture",
+        "required_demonstrations": 1,
+        "scarce_resource_required": false,
+        "miss_spends_scarce_resource": false,
+        "interruption": "Cancel window, restore valid partner positions, low-pressure reset.",
+        "assistance": [
+          "wider_window",
+          "automatic_confirm"
+        ],
+        "conventional_finish_after_demonstration": true,
+        "native_component": "USovAurelionThermalFractureComponent"
+      },
+      "native_bindings": [
+        {
+          "encounter_id": "M12_E4_QuarantineCrucibleA",
+          "beat_id": "SeverCrucibleLinks",
+          "proof": "AurelionLinks",
+          "class": "ASovAurelionLinkPhaseDirector"
+        },
+        {
+          "encounter_id": "M12_E4_QuarantineCrucibleB",
+          "beat_id": "ThermalFracture",
+          "proof": "AurelionThermalFracture",
+          "class": "ASovAurelionThermalPhaseDirector"
+        }
+      ],
+      "same_elite_preserved_across_handoff": true,
+      "native_binding_requirements": {
+        "phase_a_required_link_count": 2,
+        "phase_b_initial_roster_empty": true,
+        "same_elite_participant_id_both_phases": true,
+        "elite_components": [
+          "USovAurelionThermalFractureComponent",
+          "USovWeakPointComponent"
+        ],
+        "wall_runner_arrival_requires_authored_staging": true
+      }
+    }
+  ],
+  "checkpoints": [
+    {
+      "id": "CP0",
+      "zone": "Z00",
+      "mission_id": "M12_FireAndFrost",
+      "after_beat": null,
+      "before_beat": "TarrikArrival",
+      "lead": "Tarrik",
+      "essential_state": "Before opening context; kit, crash and chapter context",
+      "content_binding": "requires_work_pc_authoring",
+      "native_owner": {
+        "class": "ASovAurelionCheckpoint",
+        "boundary": "ExplicitCheckpoint",
+        "save_key": "Aurelion.CP0"
+      }
+    },
+    {
+      "id": "CP1",
+      "zone": "Z01",
+      "mission_id": "M12_FireAndFrost",
+      "after_beat": "TarrikArrival",
+      "before_beat": "PressureHall",
+      "lead": "Tarrik",
+      "essential_state": "E1 threshold; formation phase and companion/casualty anchors",
+      "content_binding": "requires_work_pc_authoring",
+      "native_owner": {
+        "class": "ASovCampaignEncounterObjective",
+        "boundary": "ArenaEntry",
+        "save_key": "M12_E1_PressureHall",
+        "note": "Use the verified director entry transaction; do not place a second checkpoint writer."
+      }
+    },
+    {
+      "id": "CP2",
+      "zone": "Z03",
+      "mission_id": "M12_FireAndFrost",
+      "after_beat": "HandoffToSelene",
+      "before_beat": "SeleneArrival",
+      "lead": "Selene",
+      "essential_state": "Completed Tarrik branch, Selene kit and scanner reset",
+      "content_binding": "requires_work_pc_authoring",
+      "native_owner": {
+        "class": "ASovAurelionCheckpoint",
+        "boundary": "ExplicitCheckpoint",
+        "save_key": "Aurelion.CP2"
+      }
+    },
+    {
+      "id": "CP2b",
+      "zone": "Z04",
+      "mission_id": "M12_FireAndFrost",
+      "after_beat": "SeleneArrival",
+      "before_beat": "RelayOverlook",
+      "lead": "Selene",
+      "essential_state": "Sensor traversal and terminal read complete; relays and hostile state",
+      "content_binding": "requires_work_pc_authoring",
+      "native_owner": {
+        "class": "ASovCampaignEncounterObjective",
+        "boundary": "ArenaEntry",
+        "save_key": "M12_E2_RelayOverlook",
+        "note": "Use the verified director entry transaction; do not place a second checkpoint writer."
+      }
+    },
+    {
+      "id": "CP3",
+      "zone": "Z05",
+      "mission_id": "M12_FireAndFrost",
+      "after_beat": "RelayOverlook",
+      "before_beat": "MeetingAndCarrierRescue",
+      "lead": "Selene",
+      "essential_state": "Both approaches complete; squads hold fire",
+      "content_binding": "requires_work_pc_authoring",
+      "native_owner": {
+        "class": "ASovAurelionCheckpoint",
+        "boundary": "ExplicitCheckpoint",
+        "save_key": "Aurelion.CP3"
+      }
+    },
+    {
+      "id": "CP4",
+      "zone": "Z06",
+      "mission_id": "M12_FireAndFrost",
+      "after_beat": "HandoffToTarrikRescue",
+      "before_beat": "BreachSharedJunction",
+      "lead": "Tarrik",
+      "essential_state": "Carrier survived; Selene companion; E3 entry",
+      "content_binding": "requires_work_pc_authoring",
+      "native_owner": {
+        "class": "ASovCampaignEncounterObjective",
+        "boundary": "ArenaEntry",
+        "save_key": "M12_E3_SharedBreach",
+        "note": "Use the verified director entry transaction; do not place a second checkpoint writer."
+      }
+    },
+    {
+      "id": "CP4b",
+      "zone": "Z07",
+      "mission_id": "M12_FireAndFrost",
+      "after_beat": "ShareIsolatedThreatData",
+      "before_beat": "LocalPriorityCommitted",
+      "lead": "Selene",
+      "essential_state": "Cages destroyed; isolated threat bridge; priority pending",
+      "content_binding": "requires_work_pc_authoring",
+      "native_owner": {
+        "class": "ASovAurelionPriorityTerminal",
+        "boundary": "ExplicitCheckpoint",
+        "save_key": "Aurelion.CP4b"
+      }
+    },
+    {
+      "id": "CP5",
+      "zone": "Z08",
+      "mission_id": "M12_FireAndFrost",
+      "after_beat": "LocalPriorityCommitted",
+      "before_beat": "SeverCrucibleLinks",
+      "lead": "Selene",
+      "essential_state": "Priority acknowledged once; exclusive support arrangement",
+      "content_binding": "requires_work_pc_authoring",
+      "native_owner": {
+        "class": "ASovAurelionPriorityTerminal",
+        "boundary": "ExplicitCheckpoint",
+        "save_key": "Aurelion.CP5"
+      }
+    },
+    {
+      "id": "CP5b",
+      "zone": "Z08",
+      "mission_id": "M12_FireAndFrost",
+      "after_beat": "HandoffToTarrikCrucible",
+      "before_beat": "ThermalFracture",
+      "lead": "Tarrik",
+      "essential_state": "Links severed; elite phase retained; valid Selene frost anchor",
+      "content_binding": "requires_work_pc_authoring",
+      "native_owner": {
+        "class": "ASovAurelionLinkPhaseDirector",
+        "boundary": "ArenaEntry",
+        "save_key": "M12_E4_QuarantineCrucibleB",
+        "note": "Use the verified director entry transaction; do not place a second checkpoint writer."
+      }
+    },
+    {
+      "id": "CP6",
+      "zone": "Z09",
+      "mission_id": "M12_FireAndFrost",
+      "after_beat": "SurvivorsClearAndQuarantine",
+      "before_beat": "ContraryWitnessRecognized",
+      "lead": "Tarrik",
+      "essential_state": "Cast separated; no unresolved hostiles; two bearers only",
+      "content_binding": "requires_work_pc_authoring",
+      "native_owner": {
+        "class": "ASovAurelionCheckpoint",
+        "boundary": "ExplicitCheckpoint",
+        "save_key": "Aurelion.CP6"
+      }
+    },
+    {
+      "id": "CP7",
+      "zone": "Z10",
+      "mission_id": "M13_ContraryWitness",
+      "after_beat": "GrammarPropagation",
+      "before_beat": "VoluntaryStay",
+      "lead": "Selene",
+      "essential_state": "Assents, Witness and grammar synchronization complete; boundary closed",
+      "content_binding": "requires_work_pc_authoring",
+      "native_owner": {
+        "class": "ASovAurelionCheckpoint",
+        "boundary": "ExplicitCheckpoint",
+        "save_key": "Aurelion.CP7"
+      }
+    },
+    {
+      "id": "CP8",
+      "zone": "Z11",
+      "mission_id": "M13_ContraryWitness",
+      "after_beat": "VoluntaryStay",
+      "before_beat": "CauldronRecorderReceived",
+      "lead": "Selene",
+      "essential_state": "Reunion; choice callback; evidence and pact pending",
+      "content_binding": "requires_work_pc_authoring",
+      "native_owner": {
+        "class": "ASovAurelionCheckpoint",
+        "boundary": "ExplicitCheckpoint",
+        "save_key": "Aurelion.CP8"
+      }
+    },
+    {
+      "id": "CP9",
+      "zone": "Z12",
+      "mission_id": "M13_ContraryWitness",
+      "after_beat": "SeparateDepartures",
+      "before_beat": null,
+      "lead": "Tarrik",
+      "essential_state": "Evidence, pact and separate destinations complete",
+      "content_binding": "requires_work_pc_authoring",
+      "native_owner": {
+        "class": "ASovAurelionCheckpoint",
+        "boundary": "ExplicitCheckpoint",
+        "save_key": "Aurelion.CP9"
+      }
+    }
+  ],
+  "choice": {
+    "key": "Aurelion.RescuePriority",
+    "zone": "Z07",
+    "group_id": "ImmediateProtection",
+    "acknowledgment_beat": "LocalPriorityCommitted",
+    "before_encounter": "E4",
+    "pending_checkpoint": "CP4b",
+    "committed_checkpoint": "CP5",
+    "commit_requires_acknowledgment": true,
+    "commit_once": true,
+    "both_groups_safe": true,
+    "rewards_mutually_exclusive": true,
+    "groups_mixed_faction": true,
+    "named_cast_not_choice_casualties": [
+      "Malik",
+      "Lyric",
+      "Tharne",
+      "Lyessa"
+    ],
+    "outcomes": [
+      {
+        "id": "WestStretchers",
+        "beat_id": "PriorityWestStretchers",
+        "immediate_support": "west_field_cache",
+        "excluded_support": "early_east_shutter",
+        "survivor_order": "stretchers_first",
+        "aftermath": "Medic acknowledges protected carry; gallery recalls making room for those who could not run."
+      },
+      {
+        "id": "EastWalkers",
+        "beat_id": "PriorityEastWalkers",
+        "immediate_support": "early_east_shutter",
+        "excluded_support": "west_field_cache",
+        "survivor_order": "walking_wounded_first",
+        "aftermath": "Survivor helps last stretcher; gallery recalls trusting others with the route."
+      }
+    ],
+    "east_flank_opens_for_both_after_beat": "HandoffToTarrikCrucible",
+    "native_owners": {
+      "support_actor": "ASovAurelionPrioritySupport",
+      "priority_terminal": "ASovAurelionPriorityTerminal",
+      "consumable_owner": "existing_one_time_pickups"
+    }
+  },
+  "shared_metrics": {
+    "combat_circulation_m": [
+      4,
+      6
+    ],
+    "minimum_flank_width_m": 3,
+    "ordinary_door_m": [
+      3,
+      3.5
+    ],
+    "elite_door_m": [
+      5,
+      4.5
+    ],
+    "low_cover_m": 1.2,
+    "high_cover_m": 2.2,
+    "camera_clearance_m": 2.5,
+    "ramp_rise_m": 3,
+    "ramp_run_m": [
+      10,
+      12
+    ],
+    "engagement_bands_m": {
+      "near": [
+        8,
+        15
+      ],
+      "mid": [
+        15,
+        30
+      ],
+      "far": [
+        30,
+        45
+      ]
+    }
+  },
+  "canonical_guards": {
+    "all_present_day_combat_before_quarantine": true,
+    "no_combat_in_core_or_aftermath": true,
+    "carrier_rescue_fixed_success": true,
+    "carrier_people": 7184,
+    "carrier_event_readout": "01:31",
+    "diagnostic_forecast_if_shown": "02:11:43",
+    "independent_assents": 2,
+    "meridian_continuity": [
+      4,
+      5
+    ],
+    "boundary_closed": true,
+    "release_withheld": true,
+    "grammar_propagation_unavoidable": true,
+    "crownmark_five_stays_integrated": true,
+    "lyric_alive_not_cured": true,
+    "separate_departures": {
+      "Tarrik": "Crownwatch",
+      "Selene": "Mestria"
+    }
+  },
+  "acceptance_targets": {
+    "main_route_minutes": [
+      50,
+      60
+    ],
+    "protagonist_identification_percent": 80,
+    "echo_understanding_percent": 70,
+    "corruption_remedy_understanding_percent": 80,
+    "checkpoint_reload_success_percent_strictly_greater_than": 99.5,
+    "surviving_canon_contradictions": 0,
+    "gameplay_fps": 60
+  },
+  "runtime_scope": "This file is a host-validated authoring contract. It does not create actors, maps, waves, relays, checkpoints, scenery, UI, dialogue, or content receipts. Bind each listed native contract to actual work-PC content and retain runtime qualification evidence.",
+  "role_variants": {
+    "ContaminatedReformationDrone": {
+      "base_role": "ReformationSecurityDrone",
+      "state": "contaminated"
+    }
+  }
+}

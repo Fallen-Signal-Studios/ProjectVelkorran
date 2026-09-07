@@ -1,6 +1,7 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Campaign/SovCampaignEncounterObjective.h"
 #include "Campaign/SovCampaignDefinition.h"
+#include "Campaign/SovCampaignRelayReceiver.h"
 #include "Campaign/SovCampaignStateComponent.h"
 #include "Campaign/SovEncounterDirector.h"
 #include "Characters/SovPlayerCharacterBase.h"
@@ -59,7 +60,8 @@ bool ASovCampaignEncounterObjective::ValidateContext(ASovPlayerCharacterBase* Pl
     if (!Mission->ValidateDefinition(DefinitionError)) { Error = DefinitionError; return false; }
     if (!IsValid(EncounterDirector) || EncounterDirector->IsActorBeingDestroyed() || EncounterDirector->GetWorld() != GetWorld()
         || EncounterDirector->EncounterId.IsNone() || Beat->RequiredEncounterId != EncounterDirector->EncounterId
-        || !EncounterDirector->bCompleteWhenRequiredParticipantsDefeated)
+        || EncounterDirector->GetCampaignProofType() != Beat->RequiredEncounterProof
+        || (Beat->RequiredEncounterProof == ESovEncounterProofType::RequiredDefeats && !EncounterDirector->bCompleteWhenRequiredParticipantsDefeated))
     { return Reject(TEXT("Encounter objective requires its authored director and confirmed-defeat victory policy.")); }
     if (EncounterDirector->ProtectedParticipantIds.Num() < Beat->MinimumProtectedParticipants)
     { return Reject(TEXT("Encounter objective is missing its required protected survivor participants.")); }
@@ -74,6 +76,7 @@ bool ASovCampaignEncounterObjective::ValidateContext(ASovPlayerCharacterBase* Pl
         if (*It != EncounterDirector && !It->IsActorBeingDestroyed() && It->EncounterId == EncounterDirector->EncounterId)
         { return Reject(TEXT("Encounter director identity is ambiguous.")); }
     }
+    if (!ValidateReceiverConfiguration(Beat->RequiredReceiverIds, Error, false)) { return false; }
     const auto Objective = State->GetObjectiveState(MissionId, CompletionBeat);
     if (Objective != ESovObjectiveState::Available && Objective != ESovObjectiveState::Active)
     { return Reject(TEXT("Complete the preceding objective before starting this encounter.")); }
@@ -93,6 +96,8 @@ bool ASovCampaignEncounterObjective::StartEncounter(ASovPlayerCharacterBase* Pla
     {
         const bool bStarted = EncounterDirector->RetryEncounter(Error); LastError = Error; return bStarted;
     }
+    if (Current == ESovEncounterState::Succeeded && OwnsAttempt(Attempt, Current) && !HasRequiredReceiverProof())
+    { Error = TEXT("Defeat confirmed. Disable the remaining relay receivers to secure the overlook."); LastError = Error; return false; }
     if (Current != ESovEncounterState::Inactive)
     { Error = TEXT("Encounter already started. A retired victory requires reloading its entry checkpoint."); LastError = Error; return false; }
     // CaptureEntryCheckpoint is intentionally not repeatable. A pre-captured entry is owned by this player.
@@ -133,6 +138,7 @@ void ASovCampaignEncounterObjective::HandleEncounterState(ESovEncounterState Pre
         Attempt.TransitionEpoch = PC->GetCampaignTransitionEpoch(); Attempt.MissionId = MissionId;
         Attempt.BeatId = CompletionBeat; Attempt.EncounterId = EncounterDirector->EncounterId;
         Attempt.ProtectedIds = EncounterDirector->ProtectedParticipantIds;
+        for (ASovCampaignRelayReceiver* Receiver : RequiredReceivers) { Attempt.Receivers.Add(Receiver->ReceiverId, Receiver); }
         BoundCampaign = Attempt.State;
         BoundCampaign->OnCampaignStateRestored.AddUniqueDynamic(this, &ThisClass::HandleCampaignRestored);
         BoundCampaign->OnMissionChanged.AddUniqueDynamic(this, &ThisClass::HandleMissionChanged);
@@ -140,6 +146,14 @@ void ASovCampaignEncounterObjective::HandleEncounterState(ESovEncounterState Pre
     }
     if (Current != ESovEncounterState::Succeeded) { RetireAttempt(); return; }
     if (Previous != ESovEncounterState::Active || bPending || bExecuting || !EncounterDirector->bAwaitingCampaignReceipt || !OwnsAttempt(Attempt, Current)) { return; }
+    QueueVictoryIfReady();
+}
+void ASovCampaignEncounterObjective::QueueVictoryIfReady()
+{
+    if (bPending || bExecuting || !IsValid(EncounterDirector) || !EncounterDirector->bAwaitingCampaignReceipt
+        || !OwnsAttempt(Attempt, ESovEncounterState::Succeeded)) { return; }
+    if (!HasRequiredReceiverProof())
+    { LastError = TEXT("Defeat confirmed. Disable the remaining relay receivers to secure the overlook."); return; }
     bPending = true;
     const FAttemptContext Captured = Attempt;
     ResultTimer = GetWorldTimerManager().SetTimerForNextTick(FTimerDelegate::CreateWeakLambda(this,
@@ -147,7 +161,10 @@ void ASovCampaignEncounterObjective::HandleEncounterState(ESovEncounterState Pre
 }
 bool ASovCampaignEncounterObjective::OwnsAttempt(const FAttemptContext& Context, ESovEncounterState ExpectedState) const
 {
-    return !bEnding && !IsActorBeingDestroyed() && Context.AttemptId.IsValid() && Context.AttemptId == Attempt.AttemptId
+    FString ReceiverError;
+    const auto* Beat = Context.Mission.IsValid() ? Context.Mission->FindBeat(Context.BeatId) : nullptr;
+    return Beat && ValidateReceiverConfiguration(Beat->RequiredReceiverIds, ReceiverError, true)
+        && !bEnding && !IsActorBeingDestroyed() && Context.AttemptId.IsValid() && Context.AttemptId == Attempt.AttemptId
         && Context.Director.IsValid() && Context.Director.Get() == EncounterDirector && BoundDirector == Context.Director
         && !EncounterDirector->IsActorBeingDestroyed() && EncounterDirector->GetEncounterState() == ExpectedState
         && EncounterDirector->GetAttemptId() == Context.AttemptId && EncounterDirector->GetLifecycleGeneration() == Context.DirectorGeneration
@@ -169,14 +186,86 @@ bool ASovCampaignEncounterObjective::HasCommitReceipt(const USovCampaignStateCom
     FString Error;
     return bExecuting && !bPending && State == Attempt.State.Get() && BeatId == Attempt.BeatId
         && OwnsAttempt(Attempt, ESovEncounterState::Succeeded) && ValidateContext(Attempt.Player.Get(), Error)
-        && EncounterDirector->HasConfirmedVictory();
+        && EncounterDirector->HasConfirmedVictory() && HasRequiredReceiverProof();
+}
+bool ASovCampaignEncounterObjective::ValidateReceiverConfiguration(const TSet<FName>& RequiredIds, FString& Error, bool bCheckFrozen) const
+{
+    if (RequiredIds.Num() > 8 || RequiredIds.Contains(NAME_None) || RequiredReceivers.Num() != RequiredIds.Num())
+    { Error = TEXT("Encounter requires its exact authored relay receiver set."); return false; }
+    TSet<FName> Seen;
+    for (const ASovCampaignRelayReceiver* Receiver : RequiredReceivers)
+    {
+        if (!IsValid(Receiver) || Receiver->IsActorBeingDestroyed() || !Receiver->IsActorInitialized() || Receiver->GetWorld() != GetWorld()
+            || Receiver->EncounterObjective != this || !RequiredIds.Contains(Receiver->ReceiverId) || Seen.Contains(Receiver->ReceiverId))
+        { Error = TEXT("Relay receivers must be distinct, living same-world actors bound to this objective and its named IDs."); return false; }
+        Seen.Add(Receiver->ReceiverId);
+        if (bCheckFrozen)
+        {
+            const auto* Frozen = Attempt.Receivers.Find(Receiver->ReceiverId);
+            if (!Frozen || Frozen->Get() != Receiver)
+            { Error = TEXT("Relay receiver identity changed during the encounter; reload its entry checkpoint."); return false; }
+        }
+        for (TActorIterator<ASovCampaignRelayReceiver> It(GetWorld()); It; ++It)
+        {
+            if (*It != Receiver && !It->IsActorBeingDestroyed() && It->ReceiverId == Receiver->ReceiverId)
+            { Error = TEXT("Relay receiver identity is duplicated in this world."); return false; }
+        }
+    }
+    if (bCheckFrozen && Attempt.Receivers.Num() != RequiredIds.Num())
+    { Error = TEXT("Relay receiver contract changed after the attempt started."); return false; }
+    return true;
+}
+bool ASovCampaignEncounterObjective::HasRequiredReceiverProof() const
+{
+    const auto* Beat = Attempt.Mission.IsValid() ? Attempt.Mission->FindBeat(Attempt.BeatId) : nullptr;
+    FString Error;
+    return Beat && ValidateReceiverConfiguration(Beat->RequiredReceiverIds, Error, true)
+        && Attempt.DisabledReceiverIds.Num() == Beat->RequiredReceiverIds.Num()
+        && Attempt.DisabledReceiverIds.Difference(Beat->RequiredReceiverIds).IsEmpty();
+}
+bool ASovCampaignEncounterObjective::HasReceiverDisabled(const ASovCampaignRelayReceiver* Receiver) const
+{
+    if (!IsValid(Receiver) || !IsValid(EncounterDirector) || Receiver->EncounterObjective != this
+        || !Attempt.AttemptId.IsValid() || EncounterDirector->GetAttemptId() != Attempt.AttemptId
+        || !Attempt.State.IsValid() || !Attempt.State->IsStateValid()) { return false; }
+    const auto State = EncounterDirector->GetEncounterState();
+    const auto* Frozen = Attempt.Receivers.Find(Receiver->ReceiverId);
+    return (State == ESovEncounterState::Active || State == ESovEncounterState::Succeeded)
+        && Frozen && Frozen->Get() == Receiver && Attempt.DisabledReceiverIds.Contains(Receiver->ReceiverId);
+}
+bool ASovCampaignEncounterObjective::CanDisableReceiver(const ASovCampaignRelayReceiver* Receiver,
+    const ASovPlayerCharacterBase* Player, FString& Error) const
+{
+    Error.Reset();
+    if (!IsValid(Receiver) || !IsValid(EncounterDirector) || Player != Attempt.Player.Get() || bEnding || bExecuting
+        || HasReceiverDisabled(Receiver))
+    { Error = TEXT("Receiver has no current encounter operation."); return false; }
+    const auto State = EncounterDirector->GetEncounterState();
+    const auto* Frozen = Attempt.Receivers.Find(Receiver->ReceiverId);
+    if ((State != ESovEncounterState::Active && State != ESovEncounterState::Succeeded)
+        || !OwnsAttempt(Attempt, State) || !Frozen || Frozen->Get() != Receiver
+        || !ValidateContext(Attempt.Player.Get(), Error))
+    { if (Error.IsEmpty()) { Error = TEXT("Receiver operation lost its live encounter context; reload its entry checkpoint."); } return false; }
+    return true;
+}
+bool ASovCampaignEncounterObjective::AcceptReceiverDisable(ASovCampaignRelayReceiver* Receiver, const FGuid& AttemptId)
+{
+    FString Error;
+    if (!IsValid(Receiver) || AttemptId != Attempt.AttemptId || !CanDisableReceiver(Receiver, Attempt.Player.Get(), Error)
+        || !Receiver->HasPhysicalDisableReceipt(this, AttemptId)) { return false; }
+    Attempt.DisabledReceiverIds.Add(Receiver->ReceiverId);
+    // Both deaths-before-receivers and receivers-before-deaths use the same deferred commit path.
+    QueueVictoryIfReady();
+    return true;
 }
 void ASovCampaignEncounterObjective::AcknowledgeCommitReceipt(const USovCampaignStateComponent* State)
 {
     if (!State || !Attempt.Director.IsValid() || Attempt.Director->GetAttemptId() != Attempt.AttemptId) { return; }
     if (State->GetJournal().ContainsByPredicate([this](const auto& Entry)
         { return Entry.MissionId == Attempt.MissionId && Entry.BeatId == Attempt.BeatId
-            && Entry.EncounterId == Attempt.EncounterId && Entry.EncounterAttemptId == Attempt.AttemptId; }))
+            && Entry.EncounterId == Attempt.EncounterId && Entry.EncounterAttemptId == Attempt.AttemptId
+            && Entry.DisabledReceiverIds.Num() == Attempt.DisabledReceiverIds.Num()
+            && Entry.DisabledReceiverIds.Difference(Attempt.DisabledReceiverIds).IsEmpty(); }))
     { Attempt.Director->bAwaitingCampaignReceipt = false; }
 }
 void ASovCampaignEncounterObjective::CommitVictory(FAttemptContext Context)

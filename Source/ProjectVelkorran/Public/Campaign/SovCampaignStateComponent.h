@@ -55,6 +55,9 @@ struct PROJECTVELKORRAN_API FSovCampaignJournalEntry
 	UPROPERTY(SaveGame, BlueprintReadOnly) FName CoActionAnchorId;
 	UPROPERTY(SaveGame, BlueprintReadOnly) FName EncounterId;
 	UPROPERTY(SaveGame, BlueprintReadOnly) FGuid EncounterAttemptId;
+	/** Physical receiver receipts from this native encounter attempt; exact authored IDs required on replay. */
+	UPROPERTY(SaveGame, BlueprintReadOnly) TSet<FName> DisabledReceiverIds;
+	UPROPERTY(SaveGame, BlueprintReadOnly) ESovEncounterProofType EncounterProof = ESovEncounterProofType::RequiredDefeats;
 };
 
 USTRUCT(BlueprintType)
@@ -144,6 +147,7 @@ public:
 	UPROPERTY(BlueprintAssignable, Category="Campaign|Objectives") FSovObjectiveStateChanged OnObjectiveStateChanged;
 private:
 	friend struct FSovCampaignStateTestAccess;
+	friend struct FSovCompanionApproachTestAccess;
 	friend struct FSovNarrativeStateTestAccess;
 	friend struct FSovCoActionTestAccess;
 	friend struct FSovObjectiveLifecycleTestAccess;

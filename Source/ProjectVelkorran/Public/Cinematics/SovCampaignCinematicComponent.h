@@ -216,6 +216,7 @@ private:
     UWeaponItem* GetExitWeapon(int32 ParticipantIndex) const;
     void AdvanceOwnedItemState(UNarrativeItem* Item);
     bool ValidateParticipants(bool bCheckExit, FString& OutError) const;
+    bool ValidateCriticalEvidenceObservers(FString& OutError) const;
     bool ValidatePresentationSequence(ULevelSequence* Asset, FString& OutError) const;
     void StartPreparedPlayback();
     bool ObservePlaybackProgress(bool bTerminal);

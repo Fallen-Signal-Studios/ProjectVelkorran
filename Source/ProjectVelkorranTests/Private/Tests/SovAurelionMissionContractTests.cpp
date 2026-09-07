@@ -64,6 +64,21 @@ bool FSovAurelionNativeStructure::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Preparation has no successor into canon"), Preparation->AllowedSuccessorMissions.IsEmpty());
 	TestFalse(TEXT("Preparation cannot enable companion Resonance"), Preparation->bAllowJointResonance);
 	TestFalse(TEXT("M13 never authorizes the terminal release Resonance action"), M13->AllowedResonanceTypes.Contains(ESovResonanceType::TerminalRelease));
+	TestTrue(TEXT("M13 contains no new local decision"), M13->ChoiceGroups.IsEmpty());
+	TestFalse(TEXT("M13 contains no post-recognition combat"), M13->Beats.ContainsByPredicate([](const auto& Beat) { return !Beat.RequiredEncounterId.IsNone(); }));
+	TestNull(TEXT("Technical mixed-survivor preparation is not silently substituted for the separate E1 approach"), M12->FindBeat(TEXT("HoldMixedSurvivorCorridor")));
+	TestEqual(TEXT("Companion activation waits for first shared entry"), M12->CompanionActivationBeat, FName(TEXT("HandoffToTarrikRescue")));
+	const auto* OpeningCut = M12->FindBeat(TEXT("HandoffToSelene"));
+	TestTrue(TEXT("The separate Selene approach uses an isolated perspective cut"), OpeningCut && OpeningCut->bIsolatedPerspectiveCut);
+	const auto* Rescue = M12->FindBeat(TEXT("FreeTrappedMarine"));
+	TestTrue(TEXT("Physical trapped-marine rescue follows E3 combat and requires presentation proof"), Rescue
+		&& Rescue->PrerequisiteBeats.Contains(TEXT("BreachSharedJunction")) && Rescue->bRequiresCinematicProof && !Rescue->bRequiresCoActionProof);
+	const auto* Recognition = M12->FindBeat(TEXT("ContraryWitnessRecognized"));
+	TestTrue(TEXT("Recognition waits for survivor clearance and quarantine after E4"), Recognition
+		&& Recognition->PrerequisiteBeats.Contains(TEXT("SurvivorsClearAndQuarantine")));
+	const auto* Propagation = M13->FindBeat(TEXT("GrammarPropagation"));
+	TestTrue(TEXT("Grammar propagation is a fixed presentation after Fifth Witness"), Propagation
+		&& Propagation->PrerequisiteBeats.Contains(TEXT("FifthWitness")) && Propagation->bCanonGate && Propagation->bRequiresCinematicProof && !Propagation->bOptional);
 	return true;
 }
 
@@ -92,11 +107,25 @@ bool FSovAurelionCanonMutation::RunTest(const FString& Parameters)
 		TestFalse(TEXT("Release, boundary, Lyric and terminal state values cannot be substituted"), Mission->ValidateAurelionContract(Error));
 		Fact = Saved;
 	}
-	auto* Choice = MutableBeat(*Mission, TEXT("ProtectMedicalGroup"));
+	TStrongObjectPtr<USovAurelionFireAndFrostMissionDefinition> M12(NewObject<USovAurelionFireAndFrostMissionDefinition>());
+	auto* Choice = MutableBeat(*M12, TEXT("PriorityWestStretchers"));
 	if (!TestNotNull(TEXT("Local protection choice exists"), Choice)) { return false; }
+	TestEqual(TEXT("Selene owns evacuation priority before the final encounter"), Choice->RequiredProtagonist, FSovGameplayTags::Get().Character_Player_Selene);
 	Choice->StateWrites.Add(Containment->StateWrites[0]);
-	TestFalse(TEXT("Optional survivor outcome cannot produce a protected containment fact"), Mission->ValidateAurelionContract(Error));
+	TestFalse(TEXT("Optional survivor outcome cannot produce a protected containment fact"), M12->ValidateAurelionContract(Error));
 	Choice->StateWrites.Reset();
+	auto* Relay = MutableBeat(*M12, TEXT("RelayOverlook"));
+	if (!TestNotNull(TEXT("Receiver encounter contract exists"), Relay)) { return false; }
+	Relay->RequiredReceiverIds.Remove(TEXT("M12_E2_ReceiverWest"));
+	TestFalse(TEXT("E2 cannot become complete with only one of its two receiver proofs"), M12->ValidateAurelionContract(Error));
+	Relay->RequiredReceiverIds.Add(TEXT("M12_E2_ReceiverWest"));
+	auto* Thermal = MutableBeat(*M12, TEXT("ThermalFracture"));
+	if (!TestNotNull(TEXT("Typed E4 payoff contract exists"), Thermal)) { return false; }
+	Thermal->RequiredEncounterProof = ESovEncounterProofType::RequiredDefeats;
+	TestFalse(TEXT("Conventional kills cannot replace the required Thermal Fracture proof"), M12->ValidateAurelionContract(Error));
+	Thermal->RequiredEncounterProof = ESovEncounterProofType::AurelionThermalFracture;
+	M12->CompanionActivationBeat = NAME_None;
+	TestFalse(TEXT("The two solo entries cannot silently gain the other protagonist as a companion"), M12->ValidateAurelionContract(Error));
 	Mission->AllowedResonanceTypes.Add(ESovResonanceType::TerminalRelease);
 	TestFalse(TEXT("Terminal authority cannot be expanded into a prison-release action"), Mission->ValidateAurelionContract(Error));
 	return true;
@@ -118,15 +147,25 @@ bool FSovAurelionAssentBoundaries::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Tarrik cannot speak Selene's assent"), Mission->ValidateAurelionContract(Error));
 	*Selene = OriginalSelene;
 	Selene->bRequiresCinematicProof = false; Selene->bRequiresCoActionProof = true;
-	Selene->RequiredCompanionId = TEXT("Tarrik"); Selene->RequiredCoActionAnchorId = TEXT("M13_TarrikContraryPosition");
+	Selene->RequiredCompanionId = TEXT("Selene"); Selene->RequiredCoActionAnchorId = TEXT("M13_SeleneContraryPosition");
 	TestFalse(TEXT("Companion arrival cannot substitute for independent assent"), Mission->ValidateAurelionContract(Error));
 	*Selene = OriginalSelene;
-	Containment->PrerequisiteBeats.Remove(TEXT("SeleneIndependentAssent"));
+	const auto OriginalPrerequisites = Containment->PrerequisiteBeats;
+	Containment->PrerequisiteBeats.Remove(TEXT("TarrikIndependentAssent"));
 	TestFalse(TEXT("Meridian completion explicitly retains both independent assents"), Mission->ValidateAurelionContract(Error));
-	Containment->PrerequisiteBeats.Add(TEXT("SeleneIndependentAssent"));
+	Containment->PrerequisiteBeats = OriginalPrerequisites;
+	auto* Fifth = MutableBeat(*Mission, TEXT("FifthWitness"));
+	if (!Fifth) { AddError(TEXT("Fifth Witness observation contract missing.")); return false; }
+	TestTrue(TEXT("Both protagonists observe Fifth Witness before VoluntaryStay"),
+		Fifth->CriticalEvidenceObserverIds == TArray<FName>({TEXT("Tarrik"), TEXT("Selene")}));
+	const auto Observers = Fifth->CriticalEvidenceObserverIds;
+	Fifth->CriticalEvidenceObserverIds.Remove(TEXT("Tarrik"));
+	TestFalse(TEXT("Tarrik's shared warning cannot be delayed until the later evidence exchange"), Mission->ValidateAurelionContract(Error));
+	Fifth->CriticalEvidenceObserverIds = Observers;
 	auto* Record = MutableBeat(*Mission, TEXT("Record7283Received"));
 	auto* Recorder = MutableBeat(*Mission, TEXT("CauldronRecorderReceived"));
 	if (!Record || !Recorder) { AddError(TEXT("Evidence exchange contracts missing.")); return false; }
+	TestEqual(TEXT("Record 7283 exchange has no delayed duplicate Fifth Witness grant"), Record->CriticalEvidence.Num(), 1);
 	TestEqual(TEXT("Record 7283 is acquired while controlling Tarrik"), Record->RequiredProtagonist, Tags.Character_Player_Tarrik);
 	TestEqual(TEXT("The Cauldron recorder is acquired while controlling Selene"), Recorder->RequiredProtagonist, Tags.Character_Player_Selene);
 	Recorder->RequiredProtagonist = Tags.Character_Player_Tarrik;
@@ -196,7 +235,7 @@ bool FSovAurelionSceneBinding::RunTest(const FString& Parameters)
 	Mission->StorySequences.Add(TEXT("M13_SeleneIndependentAssent"), Assent);
 	TestTrue(TEXT("The declared scene admits only its own beat"), Mission->MatchesStorySequence(TEXT("FifthWitness"), Fifth));
 	TestFalse(TEXT("A valid different scene cannot manufacture Fifth Witness proof"), Mission->MatchesStorySequence(TEXT("FifthWitness"), Assent));
-	TestFalse(TEXT("A scene cannot complete an encounter objective"), Mission->MatchesStorySequence(TEXT("EclipseEscalation"), Fifth));
+	TestFalse(TEXT("A scene cannot replace the companion-position receipt"), Mission->MatchesStorySequence(TEXT("ContraryPosition"), Fifth));
 	TestFalse(TEXT("Unknown beat is rejected"), Mission->MatchesStorySequence(TEXT("InventedBeat"), Fifth));
 	Mission->StorySequences[TEXT("M13_FifthWitness")] = Assent;
 	TestFalse(TEXT("Changing the declared asset invalidates the previously admitted scene before commit"), Mission->MatchesStorySequence(TEXT("FifthWitness"), Fifth));

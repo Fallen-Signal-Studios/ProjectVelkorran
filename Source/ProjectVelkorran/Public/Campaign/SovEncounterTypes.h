@@ -68,6 +68,13 @@ struct PROJECTVELKORRAN_API FSovProtagonistSnapshot
 	bool IsValid() const;
 };
 
+/** The native source of an encounter objective, persisted with its campaign receipt. */
+UENUM(BlueprintType)
+enum class ESovEncounterProofType : uint8
+{
+	RequiredDefeats, AurelionLinks, AurelionThermalFracture
+};
+
 UENUM(BlueprintType)
 enum class ESovEncounterState : uint8
 {

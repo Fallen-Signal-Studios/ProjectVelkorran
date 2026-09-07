@@ -47,6 +47,7 @@ public:
 	/** Authored split phases retain separation instead of pulling a protagonist through a locked route. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Companion|Recovery") bool bInAuthoredSplitPhase = false;
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Companion") bool SetLeader(ASovPlayerCharacterBase* Player, FString& Reason);
+	ASovPlayerCharacterBase* GetCurrentLeader() const { return Leader; }
 	UFUNCTION(BlueprintPure, Category="Companion") bool CanRequestCommand(ASovPlayerCharacterBase* Player, ESovCompanionCommand Command, AActor* Target, FString& Reason) const;
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Companion") bool RequestCommand(ASovPlayerCharacterBase* Player, ESovCompanionCommand Command, AActor* Target, FString& Reason);
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Companion") void CancelContextCommand();

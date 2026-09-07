@@ -1,59 +1,61 @@
 # Aurelion morning handoff
 
-This branch prepares the first Aurelion encounter and the canonical M12/M13 contracts for work-PC authoring. It is based on main `8b1551e862018ec3fc8e4ed6ff90e2ad51de6c04`, the merged PR #42 review route. The reference is the August 14 TDD v2 and manuscript chapters 23–26. Chapter 23 supplies approach context; chapters 24–26 supply the M12/M13 events. See [the adaptation contract](AurelionAdaptationContract-2026-09-06.md) for the exact chapter mapping and fixed outcomes.
+This branch now aligns the canonical Aurelion source contracts with the **7 September level layout plan**, extending the earlier PR #43 preparation package. The authority remains the August 14 TDD, Origins chapters 23–26 and the creator's approved layout adaptation. The work-PC target is the shared **Z05–Z12 skeleton first**, followed by entrances Z00–Z04. The earlier three-beat Tarrik preparation map remains a separate technical harness.
 
-## What is ready in source
+Start with [the full layout contract](AurelionLayoutContract-2026-09-07.md) and [machine-readable manifest](../Scripts/Manifests/AurelionFullLayout-2026-09-07.json). They record 13 zones, four physical encounters, all 13 checkpoint boundaries, the 50-minute main route and eight optional minutes. The geometry and timing values are adopted authoring targets, not measured results.
 
-| Change | Result | Remaining work-PC gate |
+## What the source now supports
+
+| Change | Source behavior | Work-PC content and execution gate |
 |---|---|---|
-| Native preparation and M12/M13 mission definitions | Ordered objectives, independent assent, declared scene/evidence dependencies, controlled handoffs and protected historical facts. Ordinary encounter victory cannot award canon scenes or evidence. | Compile; bind real profiles, maps, scenes and evidence. Canonical scaffolds intentionally fail validation until these exist. |
-| Encounter-to-objective bridge | Entry capture and durable checkpoint precede combat. Current registered victory completes its objective once; generic terminals cannot bypass it. Late or invalidated results require entry recovery. | Exercise actual combat, save/load, reentrant callbacks and retry in Unreal. |
-| Protected survivors | Survivors share the director's entry snapshot and retry ownership. Death or destruction fails an active attempt. | Stage safe entry, actual factions, navigation, a coordinated hostile roster and both survivor roles. |
-| Placed NPC definition fallback | Existing project role classes can initialize an explicitly assigned Narrative definition. Existing spawn/restore definitions retain ownership. | Assign the correct definition to each placed role and confirm assets, abilities and AI initialize. |
-| Editor setup and manifest | Read-only inventory first, explicit roster and placement, source preservation, repeat-run protection, separate preparation output and incomplete canonical scaffolds. | Supply real content and coordinates, author the output and reload it. |
-| AI startup observation | Bounded opt-in timeline of native perception callbacks, player faction publication, ASC readiness and goals. | Record stalled and successful cold starts; this is instrumentation, not a causal fix. |
+| Revised M12/M13 contracts | Separate approaches, delayed shared protagonist companion activation, cage destruction, local priority before E4, combat before quarantine, independent assent, unavoidable grammar propagation and separate departures. | Compile; bind actual profiles, maps, scenes, evidence and handoff anchors. Inspect old canonical scaffold assets for serialized-contract drift. |
+| Two E2 relay receivers | Normal nearby held interactions provide two distinct native disable receipts. Hostile clearance alone cannot stand in for receiver proof. | Place both `ASovCampaignRelayReceiver` actors and bind `RequiredReceivers`; prove close interaction remains reachable without ammunition. |
+| E4 native phases | Exact link-sever proof leads to a frozen handoff boundary; the same living elite transfers to Tarrik's phase. Thermal Fracture needs actual frost/heat/payoff evidence before conventional victory. | Bind the elite, source links, both phase objectives, partner anchors and presentation. Test interruptions, retry, handoff, and the verified phase-B checkpoint. |
+| Local priority and support | One acknowledged WestStretchers/EastWalkers choice; CP4b before choice and CP5 after acknowledgment. West cache and early east shutter derive from the same saved outcome. | Place the two priority terminals and support barriers. Author cache pickups, survivor staging and matching aftermath lines. No duplicate consumable grant comes from support code. |
+| Remaining checkpoint thresholds | `ASovAurelionCheckpoint` captures CP0, CP2, CP3, CP6–CP9 only when native mission progress matches. It cannot complete an objective. | Place thresholds after streaming and safe staging. Arena entry and priority checkpoints keep their existing transaction owners; do not duplicate them. |
+| Layout validation | Connected topology, wave/cap arithmetic, clock accounting, checkpoint and native-name references, exclusive support and shared-first build order. | This is a host authoring-contract check. Actual waves, room geometry, actors, AI and gameplay still need content and engine qualification. |
+| Existing preparation and AI diagnostics | Source-preserving technical setup, placed NPC definition fallback, protected-participant recovery and bounded startup trace remain available. | Use the prep map only as a separate harness. Record both successful and stalled cold AI starts; instrumentation does not establish a causal fix. |
 
-The first authored target is a three-beat Tarrik corridor: arrival, protect two survivors while defeating the required enemies, then secure the route. It is a technical foothold for the 50–60-minute slice. Selene's sensor route, final formation mechanics, full companion/Resonance integration, cinematics, local-choice consequences and aftermath remain to be authored.
+**Chronology is deliberate:** meeting and carrier rescue → shared breach/rescue → both cage destructions and isolated threat exchange → local priority → two-phase E4 → survivor exit/quarantine → recognition → independent assent/Witness/consequence → voluntary conversation, evidence, pact and separate departures. No combat moves into the Fifth chamber or aftermath.
 
 ## Start here on the work PC
 
-Close Unreal. Preserve any local source edits before switching branches, and retain the existing content overlay. From the repository root:
+Close Unreal. Preserve local source edits before switching branches and keep the existing content overlay. From the repository root:
 
 ```powershell
 git status --short
 git fetch origin codex/aurelion-slice-preparation-20260907
-git switch --track origin/codex/aurelion-slice-preparation-20260907
+git switch codex/aurelion-slice-preparation-20260907
+python Scripts/Validate-AurelionLayout.py --check-native-bindings
 .\Scripts\Validate-Unreal.ps1 -EngineRoot 'C:\Program Files\Epic Games\UE_5.7' -BuildGame -NonUnity
 ```
 
-Use the actual engine installation path. If the local branch already exists, switch to it and update normally without discarding local changes. Capture the exact checked-out revision and validation artifacts. Do not reuse the earlier 424-pass report to qualify this branch. Native registrations are discovered from the current source by the validation scripts.
+Use the actual engine installation path. For a checkout without that local branch, create a tracking branch from the fetched remote. Update an existing branch normally without discarding local work. Retain the exact revision and fresh reports. The earlier 424-pass or PR #43 host results do not qualify this revision.
 
-After a successful build and native run, follow [AurelionAuthoringSetup.md](AurelionAuthoringSetup.md). Start in `inventory` mode; the checked-in example deliberately cannot pass apply validation. Create a dedicated source template, assign actual NPC definitions, place at least one required hostile and two protected survivors, then supply every participant and position explicitly. Use `apply` only when that template is ready. The preparation-only generated manifest excludes incomplete M12/M13 assets.
+After native compilation, inspect canonical M12/M13 assets created from the earlier preparation constructors. Their old serialized beat order may correctly fail validation now. Back up and explicitly reconcile or recreate only those owned canonical scaffolds. Preserve real scene/evidence assignments and keep the unchanged technical preparation assets. Running the old setup's stamp check is not an asset migration.
 
-Before expanding the map, qualify these boundaries:
+## Author and qualify in this order
 
-1. Fresh load, player readiness, arrival interaction and entry checkpoint before hostilities.
-2. Protected-survivor loss fails; surviving-player retry and player-death recovery restore the correct entry.
-3. Required enemy deaths with survivors alive complete the hold exactly once; the secure terminal cannot skip it.
-4. Secure-route checkpoint saves and reloads correctly; a stale victory never becomes a new player's success.
-5. Packaged keyboard/controller play and a selected-route cook/preflight with retained reports.
+1. Block **Z05–Z12 first**: collision, gates, phase/scene entry and exit locations, companion anchors, streaming and every checkpoint. Use temporary content to prove each boundary reaches the next.
+2. Add the two independent entrances Z00–Z04. Keep them physically separate until Z05 and preserve the isolated Tarrik-to-Selene perspective cut.
+3. Tune E1/E2 using production movement and camera. E1 commits six drones with four active at most. E2 has six total and two close-disable receivers. Start with zero Echo and low ammunition; do not manufacture extra enemies on sensor failure.
+4. Author E3's seven committed enemies with six active at most, the trapped-marine rescue and Lyric grounding. Then both Z07 cage destructions, the isolated threat bridge and the acknowledged local priority.
+5. Exercise both E4 phases in the same five-hostile arena. Preserve the live elite, phase state and partner anchors through the handoff. Test staggered partners and missed Thermal Fracture windows, then conventional exposed-core completion.
+6. Finish the core and aftermath: independent assent, historical Witness, unavoidable synchronization, boundary closed, release withheld, Crownmark Five integrated, Lyric alive/not cured, reciprocal evidence and separate destinations.
+7. Cook and play the route with keyboard and controller. Test every checkpoint, both support outcomes, scene skips, evidence custody and departure. Retain timing, performance, recovery and player-research results.
 
-Use [the AI startup procedure](AurelionAIStartupTrace-2026-09-06.md) for the existing intermittent stall. Arm `sov.AIStartupTrace 1` before creating a fresh PIE world. Keep the first stalled run untouched and extract its complete log for comparison with a successful cold run.
+For a separate native recovery/input harness, follow [AurelionAuthoringSetup.md](AurelionAuthoringSetup.md). Its `inventory`/`apply` workflow remains unchanged; it does not build canonical E1–E4 or the full map. Existing Hound/Handler assets may be useful proxies but do not qualify the prescribed Aurelion roles merely by renaming them.
 
-`Content/` and Unreal binaries are excluded from this source repository. Back up the authored output and reports through the existing work-PC content process. Pulling the branch alone cannot recreate or qualify binary assets.
+Use [the AI startup procedure](AurelionAIStartupTrace-2026-09-06.md) for the unresolved intermittent stall. Arm `sov.AIStartupTrace 1` before a fresh PIE world. Preserve the first stalled run and compare its complete timeline with a successful cold start.
 
-## Validation performed here
+`Content/` and Unreal binaries remain outside this source repository. Preserve authored assets and reports through the existing work-PC content process. A source pull cannot supply those binaries.
 
-- Python host suite: **98/98 passed**, including 12 authoring-configuration and 8 trace-extractor tests.
-- Portable C++ policy suite: **42/42 passed**, compiled with warnings as errors and undefined-behavior sanitization by the repository harness.
-- Reflected test-module isolation source check: passed. The `ProjectVelkorran` native selection contains **437** tests, including **13 new** tests. This is an inventory, not an Unreal pass count.
-- Whitespace/error checks: `git diff --check` passed.
-- UE 5.7 UHT/UBT, native automation, Editor execution, cooking and gameplay: **not run in this environment**. New native tests and asset-authoring calls require the work PC.
+## Validation status
 
-The branch should remain a draft until engine validation and the first encounter acceptance checks are recorded. Main remains the prior validated baseline.
+The full host suite passes **119 tests**, including **21 layout boundary tests** covering topology, budgets, conjunctive wave gates, optional-time accounting, native-name drift, checkpoint ordering and mutually exclusive support. All **42 portable C++ policy suites** pass. These checks do not execute Unreal.
 
-## Alignment and next development priorities
+This layout amendment adds **18 Unreal test registrations** covering receivers, priority/checkpoint boundaries, companion staging, E4 and shared Witness observation. The complete source-discovered `ProjectVelkorran` selection now contains **455 tests** (31 additions across PR #43). Test-module isolation and whitespace checks pass. These native registrations are authored test coverage, not a passing Unreal report.
 
-Retain the latest reviewed estimate of **about 35% alignment with the full TDD (30–40% planning range)** and **70–80% for engineering foundations**, as explained in [TDDAlignment-2026-09-06.md](TDDAlignment-2026-09-06.md). These are judgmental scope estimates. This source increment improves preparation but does not establish a measurable whole-game percentage increase. Previous figures near 84% covered a different engineering scope.
+UE 5.7 UHT/UBT, native automation, Editor asset authoring, cooking, actual playthroughs and platform performance are **not run in this environment**. Keep the branch reviewable until the work-PC evidence qualifies it. Previous engineering/full-TDD estimates are not revised upward solely because this source preparation exists.
 
-After qualifying the first encounter, prioritize Selene's sensor/command-network segment and controlled protagonist handoff; then companion positioning and Eclipse escalation; then real independent-assent/Fifth-Witness scenes, evidence custody and the quiet consequence scene. Keep containment closed and release withheld throughout this material. Final slice acceptance still needs the TDD's player research, representative performance, production-cost and checkpoint-soak evidence.
+Final slice acceptance still requires the TDD's player-understanding thresholds, checkpoint/reload success **above 99.5%** in soak, representative performance, measured production cost and zero surviving canon contradictions. See [the adaptation contract](AurelionAdaptationContract-2026-09-06.md) for fixed story outcomes.

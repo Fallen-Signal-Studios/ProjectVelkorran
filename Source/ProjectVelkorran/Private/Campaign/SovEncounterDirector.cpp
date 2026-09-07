@@ -203,7 +203,7 @@ bool ASovEncounterDirector::CaptureNPC(const FSovEncounterParticipant& Participa
 	ASovNPCCharacterBase* NPC = Participant.Character;
 	UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(NPC);
 	UNarrativeSaveSubsystem* Save = GetWorld()->GetSubsystem<UNarrativeSaveSubsystem>();
-	if (!IsValid(NPC) || !NPC->IsEncounterSnapshotReady() || !NPC->IsAlive() || !IsQuiescent(ASC)
+	if (!IsValid(NPC) || !NPC->IsEncounterSnapshotReady() || !NPC->IsAlive() || !IsQuiescent(ASC, SuspendedASCs.Contains(ASC) && OwnedBusySuspensions.Contains(ASC))
 		|| !NPC->GetNPCDefinition() || NPC->GetEncounterSpawnInfo().OwningSpawnerGUID.IsValid())
 	{
 		Error = FString::Printf(TEXT("Participant %s must be initialized, alive, idle, and owned by this encounter (not a settlement spawner)."), *Participant.ParticipantId.ToString());
@@ -246,11 +246,23 @@ bool ASovEncounterDirector::CaptureNPC(const FSovEncounterParticipant& Participa
 		LinkRecord.ComponentName = Link->GetFName();
 		LinkRecord.State = Link->CaptureCommandLinkState();
 		LinkRecord.SourceParticipantId = FindParticipantId(Link->GetCommandSource() ? Link->GetCommandSource() : NPC);
+		if (LinkRecord.SourceParticipantId.IsNone() && LinkRecord.State.State != ESovCommandLinkState::Active)
+		{
+			const auto* Source = Cast<ANarrativeCharacter>(Link->GetCommandSource());
+			// A severed link may outlive a defeated source between staged phases. Persist its
+			// living owner as the inert restore anchor; never revive or register the corpse.
+			if (!IsValid(Source) || !Source->IsAlive()) { LinkRecord.SourceParticipantId = Participant.ParticipantId; }
+		}
 		if (LinkRecord.SourceParticipantId.IsNone()) { Error = TEXT("Command source must be a registered participant."); return false; }
 		for (const AActor* Linked : Link->GetLinkedActors())
 		{
 			const FName LinkedId = FindParticipantId(Linked);
-			if (LinkedId.IsNone()) { Error = TEXT("Every linked actor must be registered with this encounter."); return false; }
+			if (LinkedId.IsNone())
+			{
+				const auto* DeadRecipient = Cast<ANarrativeCharacter>(Linked);
+				if (LinkRecord.State.State != ESovCommandLinkState::Active && DeadRecipient && !DeadRecipient->IsAlive()) { continue; }
+				Error = TEXT("Every living linked actor must be registered with this encounter."); return false;
+			}
 			LinkRecord.LinkedParticipantIds.AddUnique(LinkedId);
 		}
 	}
@@ -539,6 +551,24 @@ bool ASovEncounterDirector::AreProtectedParticipantsAlive() const
 	}
 	return true;
 }
+bool ASovEncounterDirector::AreOwnedParticipantsQuiescent(bool bAllowConfirmedDeaths) const
+{
+	if (Participants.IsEmpty() || !MassPromotions.IsEmpty() || !MassParticipants.IsEmpty()) { return false; }
+	for (const auto& Participant : Participants)
+	{
+		if (bAllowConfirmedDeaths && DefeatedParticipants.Contains(Participant.ParticipantId)) { continue; }
+		const auto* NPC = Participant.Character.Get();
+		auto* ASC = IsValid(NPC) ? NPC->GetNarrativeAbilitySystemComponent() : nullptr;
+		if (!IsValid(NPC) || NPC->IsActorBeingDestroyed() || !NPC->IsAlive() || !NPC->IsEncounterSnapshotReady()
+			|| !ASC || ASC->GetAvatarActor() != NPC || !SuspendedASCs.Contains(ASC)
+			|| !OwnedBusySuspensions.Contains(ASC) || !OwnedProtectionSuspensions.Contains(ASC)
+			|| !IsQuiescent(ASC, true) || !ASC->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_Invulnerable)) { return false; }
+		const auto* AI = Cast<AAIController>(NPC->GetController());
+		if (AI && AI->GetBrainComponent() && AI->GetBrainComponent()->IsRunning() && !AI->GetBrainComponent()->IsPaused()) { return false; }
+	}
+	return true;
+}
+
 bool ASovEncounterDirector::HasConfirmedRequiredDefeats() const
 {
 	bool bHasRequired = false;
@@ -1154,6 +1184,8 @@ void ASovEncounterDirector::Load_Implementation()
 	SetState(static_cast<ESovEncounterState>(SovEncounterPolicy::StateAfterLoad(static_cast<unsigned>(State), bHasEntryCheckpoint)));
 	for (const FSovEncounterNPCRecord& Record : EntryParticipants)
 	{
+		if (TransferredParticipantIds.Contains(Record.ParticipantId))
+		{ Participants.RemoveAll([&Record](const auto& P) { return P.ParticipantId == Record.ParticipantId; }); continue; }
 		if (IsParticipantMassRepresented(Record.ParticipantId)) { continue; }
 		if (UNarrativeSaveSubsystem* Save = GetWorld()->GetSubsystem<UNarrativeSaveSubsystem>())
 		{

@@ -4,6 +4,9 @@
 #include "Cinematics/NarrativeLevelSequenceActor.h"
 #include "Campaign/SovCampaignStateComponent.h"
 #include "Campaign/SovAurelionMissionDefinition.h"
+#include "Companions/SovConvergenceCompanionState.h"
+#include "Companions/SovProtagonistCompanionCharacter.h"
+#include "Sovereign/SovGameplayTags.h"
 #include "Characters/SovPlayerCharacterBase.h"
 #include "Characters/SovNPCCharacterBase.h"
 #include "Framework/SovPlayerController.h"
@@ -348,6 +351,49 @@ bool USovCampaignCinematicComponent::ResolveParticipants(FString& OutError)
     return ValidateParticipants(true, OutError);
 }
 
+bool USovCampaignCinematicComponent::ValidateCriticalEvidenceObservers(FString& OutError) const
+{
+    const auto* PC = Controller.Get();
+    const auto* State = PC ? PC->FindComponentByClass<USovCampaignStateComponent>() : nullptr;
+    const auto* Mission = State ? State->GetActiveMission() : nullptr;
+    const auto* Beat = Mission ? Mission->FindBeat(BeatId) : nullptr;
+    if (!Beat) { OutError = TEXT("Cinematic evidence requires its active mission beat."); return false; }
+    if (Beat->CriticalEvidenceObserverIds.IsEmpty()) { return true; }
+    if (Snapshot.Num() != Participants.Num() || !Beat->bRequiresCinematicProof || Beat->CriticalEvidence.IsEmpty())
+    { OutError = TEXT("Shared critical observation requires a complete native cinematic participant contract."); return false; }
+    const auto* Companions = PC->GetConvergenceCompanionState();
+    const auto& Tags = FSovGameplayTags::Get();
+    for (FName Observer : Beat->CriticalEvidenceObserverIds)
+    {
+        const FGameplayTag Identity = Observer == TEXT("Tarrik") ? Tags.Character_Player_Tarrik
+            : Observer == TEXT("Selene") ? Tags.Character_Player_Selene : FGameplayTag();
+        int32 Matches = 0;
+        for (int32 Index = 0; Index < Participants.Num(); ++Index)
+        {
+            const auto& Contract = Participants[Index]; const auto& Entry = Snapshot[Index];
+            const auto* Character = Entry.Character.Get(); const auto* ASC = Entry.ASC.Get();
+            if (!Identity.IsValid() || !Contract.bRequireLiving || !Character || Character->IsActorBeingDestroyed()
+                || Character->GetWorld() != GetWorld() || !Character->IsAlive() || !ASC || ASC->GetAvatarActor() != Character
+                || UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(Character) != ASC) { continue; }
+            if (Contract.bControlledProtagonist)
+            {
+                const auto* Player = Cast<ASovPlayerCharacterBase>(Character);
+                if (Player && Character == PlayerPawn.Get() && PC->GetPawn() == Player && Player->IsCharacterReady()
+                    && Player->GetProtagonistIdentityTag() == Identity) { ++Matches; }
+            }
+            else
+            {
+                const auto* Proxy = Cast<ASovProtagonistCompanionCharacter>(Character);
+                if (Proxy && Companions && Companions->GetActiveCompanion() == Proxy && Proxy->IsEncounterSnapshotReady()
+                    && Proxy->GetCompanionIdentity() == Identity) { ++Matches; }
+            }
+        }
+        if (Matches != 1)
+        { OutError = TEXT("Critical evidence needs each living observer bound as the controlled protagonist or its registered protagonist companion."); return false; }
+    }
+    return true;
+}
+
 bool USovCampaignCinematicComponent::ValidateParticipants(bool bCheckExit, FString& OutError) const
 {
     if (Snapshot.Num() != Participants.Num()) { OutError = TEXT("Cinematic participant snapshot is incomplete."); return false; }
@@ -416,7 +462,7 @@ bool USovCampaignCinematicComponent::ValidateParticipants(bool bCheckExit, FStri
             }
         }
     }
-    return true;
+    return ValidateCriticalEvidenceObservers(OutError);
 }
 
 bool USovCampaignCinematicComponent::ValidatePresentationSequence(ULevelSequence* Asset, FString& OutError) const
@@ -704,7 +750,8 @@ bool USovCampaignCinematicComponent::HasCommitReceipt(const USovCampaignStateCom
         && CastChecked<ANarrativeLevelSequenceActor>(GetOwner())->GetPlaybackGeneration() == ExpectedPlaybackGeneration
         && bReceiptAvailable && bFinishing && Phase == ESovCinematicPhase::Committing && SessionId.IsValid()
         && bReceiptSkipped == bSkipped && RequestedBeat == BeatId && IsContextCurrent() && Controller.Get() == State->GetOwner()
-        && bInventoryPostconditionsApplied && !bInventoryTransactionCommitted && ValidateExitPostconditions(Error);
+        && bInventoryPostconditionsApplied && !bInventoryTransactionCommitted
+        && ValidateCriticalEvidenceObservers(Error) && ValidateExitPostconditions(Error);
 }
 bool USovCampaignCinematicComponent::ConsumeCommitReceipt(const USovCampaignStateComponent* State, FName RequestedBeat, bool bSkipped)
 { if (!HasCommitReceipt(State, RequestedBeat, bSkipped)) { return false; } bReceiptAvailable = false; return true; }

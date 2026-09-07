@@ -2,6 +2,8 @@
 
 This setup prepares a **development Tarrik corridor encounter**, backed by the native Aurelion mission and encounter contracts. The full canonical M12/M13 assets are created separately as incomplete scaffolds. The script never assigns those scaffolds to the playable GameMode or manufactures story completion.
 
+For the full adopted layout, start with [AurelionLayoutContract-2026-09-07.md](AurelionLayoutContract-2026-09-07.md) and its machine-readable manifest. **Build shared zones Z05–Z12 before entrances Z00–Z04.** This script remains an optional technical harness and does not construct the thirteen-zone layout, canonical E1/E2/E3/E4 rosters, wave producers, receivers, choice support or story actors.
+
 The source/configuration changes can be reviewed and tested without Unreal. Creating the assets, compiling the Editor target, validating actual NPC readiness, and playing the route require the full work-PC checkout. No Unreal execution is claimed by the host configuration tests.
 
 ## Morning preparation
@@ -41,7 +43,7 @@ Replace the example drive/path with the real checkout path. Use `apply` only aft
 | Incomplete canonical M12 scaffold | `/Game/Campaign/Development/Aurelion/Scaffolds/DA_M12_FireAndFrost` |
 | Incomplete canonical M13 scaffold | `/Game/Campaign/Development/Aurelion/Scaffolds/DA_M13_ContraryWitness` |
 
-The technical mission is `M12_AurelionTarrikPreparation`. Its exact progression is:
+The technical mission is `M12_AurelionTarrikPreparation`. Its arbitrary protected-survivor roster is neither the six-drone E1 nor the authored E3 rescue. Its exact progression is:
 
 1. `TarrikArrival`: operate the first terminal. This does **not** write a checkpoint before the encounter owns and freezes its participants.
 2. `HoldMixedSurvivorCorridor`: cross the encounter-entry volume. The native bridge captures entry, then `BeginEncounter` writes its verified ArenaEntry checkpoint before starting combat. Its director is `M12_MixedSurvivorCorridor`. Enemies are required for victory; protected survivors are registered non-victory participants. A protected death fails the attempt. Success comes from the registered encounter, never a generic terminal.
@@ -56,6 +58,8 @@ No companion rescue, Mass conversion, local-choice consequence, Selene handoff, 
 Setup refuses dirty packages, source/output aliases, unknown participant identities, empty victory rosters, unsupported external-actor/sublevel maps, and pre-existing encounter producers in the source template. It loads source assets read-only, fingerprints the source Blueprints, hashes explicit source packages before and after authoring, and only saves the five fixed output packages.
 
 A rerun with the same config and all output ownership stamps **preserves existing output without modifying it**. Matching stamps are not gameplay or asset-validation receipts. If the config changed or only partial outputs exist, setup stops and reports the packages. Inspect and back up any useful work; move or delete only the listed generated outputs through Unreal before rerunning. The tool does not delete assets or silently rebuild over hand-authored changes.
+
+The updated full M12/M13 constructor order may intentionally reject canonical assets serialized against the earlier preparation contract. Inspect and back up only those owned `Scaffolds` assets; explicitly reconcile their properties or recreate them from the revised native classes. Preserve content-bound scene/evidence work. Do not delete the unchanged technical map or use this script's all-output stamp check as a canonical asset migration.
 
 A failure can leave partial generated assets, including a map created by Unreal's template-copy operation. Inspect the saved report before restarting. Original combat/framework assets are inputs and must remain unchanged.
 

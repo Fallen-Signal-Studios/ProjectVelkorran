@@ -5,6 +5,8 @@
 #include "Campaign/SovCampaignEncounterObjective.h"
 #include "Campaign/SovCampaignInteractionTerminal.h"
 #include "Campaign/SovEncounterDirector.h"
+#include "Campaign/SovAurelionCrucibleDirector.h"
+#include "Sovereign/SovGameplayTags.h"
 #include "Campaign/SovEncounterSnapshotLibrary.h"
 #include "Character/PlayerDefinition.h"
 #include "AI/NPCDefinition.h"
@@ -18,7 +20,21 @@
 #include "TimerManager.h"
 #include "UObject/Script.h"
 
+FGameplayTag ASovCrucibleTestSelenePawn::GetProtagonistIdentityTag() const
+{ return FSovGameplayTags::Get().Character_Player_Selene; }
+ETeamAttitude::Type ASovCrucibleTestSelenePawn::GetTeamAttitudeTowards(const AActor& Other) const
+{ return Other.IsA<ASovNPCCharacterBase>() ? ETeamAttitude::Hostile : ETeamAttitude::Friendly; }
+
 #if WITH_AUTOMATION_TESTS
+/** Tests the native roster-transfer primitive after real phase completion. The public API's
+ * actual controller handoff prerequisite is exercised separately by refusal assertions. */
+struct FSovCrucibleRuntimeTestAccess
+{
+    static void Step(ASovEncounterDirector* Director, float DeltaSeconds)
+    { Director->Tick(DeltaSeconds); }
+    static bool Transfer(ASovAurelionLinkPhaseDirector* Source, ASovAurelionThermalPhaseDirector* Destination, FString& Error)
+    { return Source->TransferFrozenParticipants(Destination, Error); }
+};
 namespace
 {
     struct FEncounterObjectiveWorld
@@ -33,7 +49,7 @@ namespace
         ASovCampaignEncounterObjective* Objective = nullptr;
         FString SetupError;
         uint64 Frame = GFrameCounter;
-        FEncounterObjectiveWorld()
+        FEncounterObjectiveWorld(bool bCrucible = false)
         {
             const auto Init = UWorld::InitializationValues().AllowAudioPlayback(false).RequiresHitProxies(false)
                 .CreatePhysicsScene(true).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
@@ -42,7 +58,7 @@ namespace
             if (GEngine) { GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World); }
             World->InitializeActorsForPlay(FURL()); World->GetTimerManager().Tick(0.f);
             PC = World->SpawnActor<ASovHandoffRuntimeTestController>();
-            Player = World->SpawnActor<ASovHandoffRuntimeTestPawn>();
+            Player = bCrucible ? World->SpawnActor<ASovCrucibleTestSelenePawn>() : World->SpawnActor<ASovHandoffRuntimeTestPawn>();
             auto* PS = World->SpawnActor<ASovPlayerState>();
             if (!PC || !Player || !PS) { return; }
             World->AddController(PC);
@@ -52,17 +68,21 @@ namespace
             ASC = Player->GetNarrativeAbilitySystemComponent();
             Mission = NewObject<USovCampaignDefinition>(PC); PC->KeepAlive.Add(Mission);
             Mission->MissionId = TEXT("M12_EncounterObjectiveTest"); Mission->Protagonist = Player->GetProtagonistIdentityTag();
-            Mission->PawnClass = ASovHandoffRuntimeTestPawn::StaticClass(); Mission->PlayerDefinition = Definition;
+            Mission->PawnClass = Player->GetClass(); Mission->PlayerDefinition = Definition;
             FSovCampaignBeatDefinition Hold; Hold.BeatId = TEXT("HoldMixedSurvivorCorridor");
             Hold.RequiredProtagonist = Mission->Protagonist; Hold.RequiredEncounterId = TEXT("Test.MixedSurvivorCorridor");
             Hold.MinimumProtectedParticipants = 2;
+            Hold.RequiredEncounterProof = bCrucible ? ESovEncounterProofType::AurelionLinks : ESovEncounterProofType::RequiredDefeats;
             Hold.ObjectiveText = FText::FromString(TEXT("Protect both survivors and defeat the formation"));
             FSovCampaignBeatDefinition Exit; Exit.BeatId = TEXT("SecureTarrikRoute"); Exit.PrerequisiteBeats = { Hold.BeatId };
             Exit.ObjectiveText = FText::FromString(TEXT("Secure the exit")); Mission->Beats = { Hold, Exit };
             if (PC->GetCampaignState()->BeginMission(Mission) != ESovCampaignResult::Applied) { ASC = nullptr; return; }
-            Director = World->SpawnActor<ASovEncounterDirector>(); Director->EncounterId = Hold.RequiredEncounterId;
+            Director = bCrucible ? World->SpawnActor<ASovAurelionLinkPhaseDirector>() : World->SpawnActor<ASovEncounterDirector>();
+            Director->EncounterId = Hold.RequiredEncounterId;
             auto* NPCDefinition = NewObject<UNPCDefinition>(PC); PC->KeepAlive.Add(NPCDefinition);
-            for (const FName Id : { FName(TEXT("Formation.Guard")), FName(TEXT("Survivor.Dominion")), FName(TEXT("Survivor.Reformation")) })
+            TArray<FName> ParticipantIds = { TEXT("Formation.Guard"), TEXT("Survivor.Dominion"), TEXT("Survivor.Reformation") };
+            if (bCrucible) { ParticipantIds.Append({ TEXT("Crucible.NodeWest"), TEXT("Crucible.NodeEast") }); }
+            for (const FName Id : ParticipantIds)
             {
                 FActorSpawnParameters Spawn; Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
                 auto* NPC = World->SpawnActor<ASovCampaignMassRoundTripNPC>(ASovCampaignMassRoundTripNPC::StaticClass(),
@@ -73,9 +93,24 @@ namespace
 #define SOV_RESOURCE(Name) NPCASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetMax##Name##Attribute(), 100.f); NPCASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::Get##Name##Attribute(), 100.f);
                 SOV_RESOURCE(Health) SOV_RESOURCE(Shield) SOV_RESOURCE(Stamina) SOV_RESOURCE(Poise) SOV_RESOURCE(Echo)
 #undef SOV_RESOURCE
-                const bool bRequired = Id == TEXT("Formation.Guard");
+                const bool bRequired = Id != TEXT("Survivor.Dominion") && Id != TEXT("Survivor.Reformation");
                 if (!Director->RegisterParticipant(Id, NPC, bRequired)) { ASC = nullptr; return; }
                 if (!bRequired) { Director->ProtectedParticipantIds.Add(Id); }
+            }
+            if (auto* Crucible = Cast<ASovAurelionLinkPhaseDirector>(Director))
+            {
+                Crucible->MissionId = Mission->MissionId; Crucible->CompletionBeat = Hold.BeatId;
+                Crucible->EliteParticipantId = TEXT("Formation.Guard");
+                for (const FName NodeId : { FName(TEXT("Crucible.NodeWest")), FName(TEXT("Crucible.NodeEast")) })
+                {
+                    auto* Node = Director->GetParticipant(NodeId);
+                    auto* Link = NewObject<USovCommandLinkComponent>(Node, TEXT("CrucibleLink"));
+                    Node->AddInstanceComponent(Link); Link->RegisterComponent();
+                    Link->ConfigureLinkId(NodeId); Link->RegisterLinkedActor(Director->GetParticipant(TEXT("Formation.Guard")));
+                    if (!Link->ActivateCommandLink(Node)) { ASC = nullptr; return; }
+                    FSovAurelionCrucibleLink Binding; Binding.ParticipantId = NodeId; Binding.ComponentName = Link->GetFName(); Binding.LinkId = NodeId;
+                    Crucible->RequiredLinks.Add(Binding);
+                }
             }
             Objective = World->SpawnActor<ASovCampaignEncounterObjective>();
             Objective->EncounterDirector = Director; Objective->MissionId = Mission->MissionId; Objective->CompletionBeat = Hold.BeatId;
@@ -149,9 +184,9 @@ bool FSovEncounterObjectiveProtectionTest::RunTest(const FString& Parameters)
     for (const bool bDestroy : { false, true })
     {
         FEncounterObjectiveWorld F; if (!TestNotNull(TEXT("Ready campaign"), F.ASC) || !F.Start()) { AddError(F.SetupError); return false; }
-        F.Director->Tick(.016f);
+        FSovCrucibleRuntimeTestAccess::Step(F.Director, .016f);
         TestTrue(TEXT("Protection monitoring remains scheduled after an ordinary tick"), F.Director->IsActorTickEnabled());
-        if (bDestroy) { F.Director->GetParticipant(TEXT("Survivor.Reformation"))->Destroy(); F.Director->Tick(.016f); }
+        if (bDestroy) { F.Director->GetParticipant(TEXT("Survivor.Reformation"))->Destroy(); FSovCrucibleRuntimeTestAccess::Step(F.Director, .016f); }
         else { F.Kill(TEXT("Survivor.Reformation")); }
         TestEqual(TEXT("Protected loss fails the attempt"), F.Director->GetEncounterState(), ESovEncounterState::Failed);
         F.Kill(TEXT("Formation.Guard")); F.NextFrame();
@@ -200,7 +235,7 @@ bool FSovEncounterObjectiveRetryTest::RunTest(const FString& Parameters)
     if (!TestTrue(TEXT("Objective requests the production director checkpoint retry"), F.Objective->StartEncounter(F.Player, Error)))
     { AddError(Error); return false; }
     for (int32 Step = 0; Step < 8 && F.Director->GetEncounterState() == ESovEncounterState::Restoring; ++Step)
-    { F.NextFrame(); F.Director->Tick(.016f); }
+    { F.NextFrame(); FSovCrucibleRuntimeTestAccess::Step(F.Director, .016f); }
     if (!TestEqual(TEXT("All replacement participants restore before play"), F.Director->GetEncounterState(), ESovEncounterState::Active)) { return false; }
     TestTrue(TEXT("Entry retry creates a new attempt identity"), F.Director->GetAttemptId() != FailedAttempt);
     TestTrue(TEXT("Protected survivor is restored from its entry record"), F.Director->GetParticipant(TEXT("Survivor.Dominion"))->IsAlive());
@@ -233,4 +268,66 @@ bool FSovEncounterObjectiveReceiptSaveTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("An encounter fact without its native attempt is rejected on replay"), USovCampaignStateComponent::ValidateSerializedSave(Record.ByteData, Error));
     return true;
 }
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCrucibleNativeLinkBoundaryTest,
+    "ProjectVelkorran.Campaign.Aurelion.CrucibleNativeLinksFreezeWithoutKillingElite",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCrucibleNativeLinkBoundaryTest::RunTest(const FString& Parameters)
+{
+    FEncounterObjectiveWorld F(true); if (!TestNotNull(TEXT("Ready Selene campaign"), F.ASC) || !F.Start()) { AddError(F.SetupError); return false; }
+    auto* Crucible = CastChecked<ASovAurelionLinkPhaseDirector>(F.Director);
+    auto* Elite = F.Director->GetParticipant(TEXT("Formation.Guard")); auto* EliteASC = Elite->GetNarrativeAbilitySystemComponent();
+    EliteASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetHealthAttribute(), 73.f);
+    EliteASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetShieldAttribute(), 41.f);
+    TestFalse(TEXT("A scripted phase completion cannot substitute for either live link sever"), Crucible->CompleteEncounter());
+    for (int32 Index = 0; Index < Crucible->RequiredLinks.Num(); ++Index)
+    {
+        auto* Node = Crucible->GetParticipant(Crucible->RequiredLinks[Index].ParticipantId);
+        auto* Link = Node->FindComponentByClass<USovCommandLinkComponent>(); FSovCommandLinkSeverResult Result;
+        TestEqual(TEXT("Selene performs a real authoritative native link sever"), Link->TrySeverCommandLink(F.Player, Result), ESovCommandLinkSeverResolution::NewlySevered);
+        TestEqual(TEXT("Link callbacks never directly publish phase completion"), Crucible->GetEncounterState(), ESovEncounterState::Active);
+        if (Index == 0) { FSovCrucibleRuntimeTestAccess::Step(Crucible, .016f); TestEqual(TEXT("One sever cannot finish the phase"), Crucible->GetEncounterState(), ESovEncounterState::Active); }
+    }
+    FSovCrucibleRuntimeTestAccess::Step(Crucible, .016f);
+    TestEqual(TEXT("Both sever receipts settle into a completed phase boundary"), Crucible->GetEncounterState(), ESovEncounterState::Succeeded);
+    TestTrue(TEXT("Elite remains living for phase B"), Elite->IsAlive());
+    TestEqual(TEXT("Freeze preserves elite health"), EliteASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()), 73.f);
+    TestEqual(TEXT("Freeze preserves elite shield"), EliteASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetShieldAttribute()), 41.f);
+    F.NextFrame();
+    const auto& Journal = F.PC->GetCampaignState()->GetJournal();
+    if (!TestEqual(TEXT("Exactly one typed link-phase fact commits"), Journal.Num(), 1)) { AddError(F.Objective->LastError); return false; }
+    TestEqual(TEXT("Journal preserves link proof rather than claiming kill-all"), Journal[0].EncounterProof, ESovEncounterProofType::AurelionLinks);
+    TestTrue(TEXT("Only the exact frozen completed phase permits safe transition capture"), Crucible->IsCompletedPhaseBoundaryQuiescentForSave(F.Player));
+    FString Error;
+    TestFalse(TEXT("Selene cannot call phase B transfer without the actual Tarrik handoff"), Crucible->CompletePhaseHandoff(F.Player, Error));
+    TestTrue(TEXT("Rejected transfer leaves the same elite under its source owner"), Crucible->GetParticipant(TEXT("Formation.Guard")) == Elite);
+    // Isolate the transfer primitive from navigation and external companion assets: no journal or
+    // handshake success is fabricated. This checks the exact ownership/save logic used after handoff.
+    auto* PhaseB = F.World->SpawnActor<ASovAurelionThermalPhaseDirector>(); PhaseB->EncounterId = TEXT("Test.CrucibleB");
+    PhaseB->EliteParticipantId = TEXT("Formation.Guard");
+    TestTrue(TEXT("The completed native phase transfers its existing frozen roster"), FSovCrucibleRuntimeTestAccess::Transfer(Crucible, PhaseB, Error));
+    TestTrue(TEXT("The destination receives the same elite actor"), PhaseB->GetParticipant(TEXT("Formation.Guard")) == Elite);
+    TestEqual(TEXT("No source ownership remains"), Crucible->Participants.Num(), 0);
+    TestEqual(TEXT("Transfer preserves elite health exactly"), EliteASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()), 73.f);
+    TestEqual(TEXT("Transfer preserves elite shield exactly"), EliteASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetShieldAttribute()), 41.f);
+    TestTrue(TEXT("Destination blocks saves until its entry snapshot is captured"), PhaseB->IsPhaseEntryCapturePending());
+    auto* Save = F.World->GetSubsystem<UNarrativeSaveSubsystem>(); FNarrativeActorRecord SourceRecord;
+    TestTrue(TEXT("Narrative stores source transfer ownership markers"), Save->CreateActorRecord(Crucible, SourceRecord));
+    TestTrue(TEXT("Native source restore consumes its own saved record"), Save->LoadActorFromRecord(Crucible, SourceRecord));
+    TestEqual(TEXT("Restoring phase A never reclaims transferred NPCs from phase B"), Crucible->Participants.Num(), 0);
+    TestTrue(TEXT("Destination still owns the same elite after source restore"), PhaseB->GetParticipant(TEXT("Formation.Guard")) == Elite);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCruciblePrematureEliteDeathTest,
+    "ProjectVelkorran.Campaign.Aurelion.CrucibleEliteDeathBeforePhaseBoundaryRequiresRetry",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCruciblePrematureEliteDeathTest::RunTest(const FString& Parameters)
+{
+    FEncounterObjectiveWorld F(true); if (!TestNotNull(TEXT("Ready Selene campaign"), F.ASC) || !F.Start()) { AddError(F.SetupError); return false; }
+    F.Kill(TEXT("Formation.Guard")); FSovCrucibleRuntimeTestAccess::Step(F.Director, .016f); F.NextFrame();
+    TestEqual(TEXT("Early elite kill has an explicit recoverable failure"), F.Director->GetEncounterState(), ESovEncounterState::Failed);
+    TestEqual(TEXT("An impossible phase B is never recorded as success"), F.PC->GetCampaignState()->GetJournal().Num(), 0);
+    return true;
+}
+
 #endif

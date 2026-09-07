@@ -8,6 +8,7 @@
 #include "Resonance/SovResonanceTypes.h"
 #include "Campaign/SovNarrativeTypes.h"
 #include "Campaign/SovObjectiveTypes.h"
+#include "Campaign/SovEncounterTypes.h"
 #include "SovCampaignDefinition.generated.h"
 
 class ASovPlayerCharacterBase;
@@ -35,6 +36,8 @@ struct PROJECTVELKORRAN_API FSovCampaignBeatDefinition
 	/** Native handoff-only beat. Generic CompleteBeat cannot produce a protagonist transition. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) FGameplayTag HandoffToProtagonist;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) FName RequiredHandoffAnchorId;
+	/** An authored cut between separate approaches; it never creates a protagonist companion. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bIsolatedPerspectiveCut = false;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) FText ObjectiveText;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) ESovObjectiveType ObjectiveType = ESovObjectiveType::General;
 	/** Failure is opt-in, optional-only, and must explain its rule before the objective is active. */
@@ -53,6 +56,8 @@ struct PROJECTVELKORRAN_API FSovCampaignBeatDefinition
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FSovRelationshipMemoryDefinition> RelationshipMemories;
 	/** Guaranteed observation at this mandatory critical-path beat; never dependent on finding an optional world source. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<TObjectPtr<USovEvidenceDefinition>> CriticalEvidence;
+	/** Same-scene canonical observers, proven by the controlled pawn and registered protagonist companion. Empty preserves lead-only observation. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FName> CriticalEvidenceObserverIds;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bOptional = false;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bCanonGate = false;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) FName CinematicId;
@@ -65,6 +70,9 @@ struct PROJECTVELKORRAN_API FSovCampaignBeatDefinition
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) FName RequiredCoActionAnchorId;
 	/** Native encounter victory receipt. Empty for ordinary beats; generic completion cannot satisfy this ID. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) FName RequiredEncounterId;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) ESovEncounterProofType RequiredEncounterProof = ESovEncounterProofType::RequiredDefeats;
+	/** Exact authored receiver IDs, proven by native receiver components during this encounter. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) TSet<FName> RequiredReceiverIds;
 	/** Minimum distinct protected participants in the encounter receipt; faction backgrounds remain authored content. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0")) int32 MinimumProtectedParticipants = 0;
 	/** Optional bridge into existing Narrative quest graphs after native state commits. */
@@ -105,6 +113,8 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Campaign", meta=(ClampMin="0",ClampMax="100")) float EntryEchoReserve = 25.f;
 	/** Explicit convergence opt-in. Only authored M12/M13 definitions may enable it. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Campaign|Companions") bool bAllowJointResonance = false;
+	/** Optional mandatory handoff that first establishes the protagonist partnership. Empty starts together. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Campaign|Companions") FName CompanionActivationBeat;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Campaign|Companions") TArray<ESovResonanceType> AllowedResonanceTypes;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Campaign|Companions") TArray<FName> ResonancePrerequisiteBeats;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Campaign|Companions") TArray<FName> AllowedCompanionIds;
