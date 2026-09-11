@@ -161,10 +161,89 @@ already verified green beforehand.
 
 ---
 
-## Priorities 3–8
+## Priority 3 — GameplayCue discovery
 
-Not yet started. Order of attack follows the brief; each will be verified against current
-main before any change, per working rule 1.
+**Status: implemented, after correcting a regression I introduced mid-task.**
+
+### Trace
+
+Enumerated cue notifies through the **asset registry by native parent class**, not by asset
+name — a cue notify Blueprint can be called anything, and a name search could not rule out a
+differently-named one inside 22 GB of marketplace content.
+
+| Root | Cue notifies |
+|---|---|
+| `/Game/Cues` | 22 registry entries (11 assets) |
+| `/NarrativePro/Pro/Core/Abilities/Cues` | 22 registry entries (11 assets) |
+| **Anywhere else** | **0** |
+
+No source in the project or the fork references `UGameplayCueManager`,
+`AddGameplayCueNotifyPath`, `RemoveGameplayCueNotifyPath` or any cue notify base class, so
+the set is entirely static and the brief's "do not force it if discovery is dynamic"
+condition does not apply. Reproducible via `Scripts/Report-GameplayCueLocations.py`.
+
+Config location verified in engine source rather than trusted from the warning text:
+`UGameplayAbilitiesDeveloperSettings` overrides its section back to
+`[/Script/GameplayAbilities.AbilitySystemGlobals]` in `DefaultGame.ini`.
+
+### The regression, and the correction
+
+Finding cues in two roots is **not** a reason to scan both. Configuring both produced nine
+`AddGameplayCueData_Internal ... Skipping` collisions, resolving **inconsistently**:
+
+```
+Character.Invulnerable : fork skipped, /Game wins
+Character.Poisoned     : /Game skipped, FORK wins
+Character.Invisible    : fork skipped, /Game wins
+TakeDamage             : /Game skipped, FORK wins
+TakeDamage.Blocked     : /Game skipped, FORK wins
+```
+
+The project's `/Game/Cues` assets are forked copies carrying the same tags as the fork's
+originals. The engine's previous fallback scanned `/Game/` alone, so the fork's copies were
+never registered and the project's overrides always won. Adding the fork root registered
+both and let load order decide — silently discarding some project overrides.
+
+**Final configuration is `/Game/Cues` only.** It removes the fallback warning, bounds the
+scan, and preserves the established resolution exactly.
+
+### Measurement — no startup win claimed
+
+Map load **3.071 s**, against 2.969 s and 2.472 s on identical content beforehand. That is
+inside the run-to-run spread, so there is **no measurable improvement**. The benefit is that
+the scan no longer grows with project content, and the warning is gone. Recorded here so no
+one later cites this change as a performance gain.
+
+This also sets a floor for Priority 4: with ~0.5 s of variance between identical runs,
+single-sample comparisons cannot detect anything smaller. The harness must do repeated runs
+and report spread.
+
+### Guard
+
+`SovGameplayCuePathTests.cpp` asserts the **resolved runtime value**, not the ini text, so a
+config that parses but never reaches `AbilitySystemGlobals` still fails. It rejects a bare
+`/Game` entry, asserts the fork root is *not* scanned, and counts tags into a `TSet` to
+assert **zero duplicate tags** — so re-adding a colliding root fails the suite instead of
+hiding in a startup warning. That last assertion exists only because the packaged
+before/after comparison exposed the problem.
+
+---
+
+## Priorities 4–8
+
+Not yet started. Order per the revised brief: AI startup stall, performance harness,
+progression, pause/menu, fresh-clone audit. Each verified against the current tree before
+any change, per working rule 1.
+
+---
+
+## Method note
+
+Two of the three completed priorities had a defect caught by verification rather than by
+reasoning: the Priority 1 negative control, and the Priority 3 packaged comparison. Worth
+retaining both habits — a regression suite should be shown to fail against the defect, and
+any change touching startup or content resolution should be compared in a packaged build,
+not only under the test suite.
 
 ---
 
