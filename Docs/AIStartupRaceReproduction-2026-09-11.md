@@ -74,6 +74,66 @@ The `sov.DebugApproachHostile` placement probe turned out to be **unnecessary** 
 reproduction: the Hounds already see Selene at spawn. It is retained because it is useful for
 driving other encounters, but the stall needs no player movement at all.
 
+## Option C survey — framework-native mechanisms
+
+Surveyed the local fork for an existing invalidation/reconsideration entry point. Five
+relevant mechanisms exist. **None closes this gap unmodified**, but one is the obvious
+foundation for the repair.
+
+| # | Mechanism | Exposure | Verdict |
+|---|---|---|---|
+| 1 | `UNPCActivityComponent::RescoreGoals()` → `PerformActivitySelection(true)` | `UFUNCTION()`, on a **repeating timer** (`RescoreInterval`) | **Wrong layer.** Scores activities against goals that already exist (`GetGoals(...)`). With zero attack goals there is nothing to select, which is exactly why the stall survives a periodic rescore. |
+| 2 | `ANarrativeGameState::OnFactionAttitudeChanged` | `BlueprintAssignable` | **Right semantics, never raised.** Its own comment: *"bots bind this to recheck if they are perceiving someone who has become a hostile."* Broadcast **only** from `SetFactionAttitude`, i.e. a change to the faction-pair attitude table. Faction *membership* changes never reach it. |
+| 3 | `ANarrativeCharacter::OnFactionUpdated` | **Not** `UPROPERTY`/BlueprintAssignable | **Exists but unreachable** from the stock Blueprint generator. Adjacent framework comment: *"Factions are getting a little messy - possibly fold this into a FactionComponent?"* |
+| 4 | `ANarrativeNPCController::RefreshThreatMemory()` | `BlueprintCallable`, called at `BeginPlay` and periodically | **Refreshes threat, not goals.** Notable as precedent: the framework already re-examines currently perceived actors on a timer *without manufacturing perception events*. Consistent with the 6 Sept note that threat memory allowed direct targeting while the NPC still stalled. |
+| 5 | `UNPCGoalGenerator::AddGoalItem(Goal, bTriggerReselect)` / `InitializeGoalGenerator()` | `BlueprintCallable` / `BlueprintNativeEvent` | **The correct write path.** `InitializeGoalGenerator` is where the once-only "refresh currently perceived Sight actors" pass lives; `AddGoalItem` is how a goal is added, with reselect built in. |
+
+### Where the gap actually is
+
+The generator is **already subscribed to the right kind of signal** (#2). The defect is not a
+missing subscription — it is that **a faction *membership* change does not raise the faction
+*attitude* signal.** Both change the effective attitude toward an actor; only one is
+announced.
+
+### Recommendation: C1, raise the existing signal on membership change
+
+Have player faction publication (`ANarrativePlayerState::SetFactions` / `OnRep_Faction`)
+raise `OnFactionAttitudeChanged` for the affected faction pairs.
+
+Why this over Options A and B:
+
+- **No Blueprint edits.** The stock `GoalGenerator_Attack` already binds this delegate, so
+  the repair is native-only and every existing subscriber benefits.
+- **Framework-consistent.** It uses the mechanism the framework documents for precisely this
+  case rather than inventing a parallel path.
+- **Bounded fan-out.** One publication at character initialization, not an ongoing signal.
+- **Touches no perception.** No refresh, no UE semantics change.
+
+### Risks to resolve before implementing
+
+| Risk | Assessment needed |
+|---|---|
+| Semantic honesty | The delegate's parameters describe a faction-pair attitude change. Raising it for a membership change is arguably a misstatement unless the broadcast reports the genuinely current pair attitude. |
+| Fan-out | Broadcasts to every bound bot. One-shot at init is acceptable; a per-pair loop over all factions would not be. |
+| Duplicate goals | The 2/20 runs that already recover must not gain a second goal. `AddGoalItem` must remain idempotent for an existing target. |
+| Repeated restart | Re-selection must not restart a running attack tree. |
+| Checkpoint/restore | Restoring a save republishes factions; that must not re-trigger goal churn on NPCs already mid-activity. |
+| Late spawn | NPCs spawned after publication must still work — they run `InitializeGoalGenerator` against already-valid factions, so they should be unaffected, but this needs confirming. |
+| Multiplayer | `OnRep_Faction` is a replication callback. On a listen server the broadcast would fire on both server and client paths; goal generation is server-authoritative, so the client path must be a no-op rather than a second generation. |
+
+### Alternatives if C1 is rejected
+
+**Option A (subscribe generator to faction publication)** is effectively mechanism #3 plus
+Blueprint work: expose `OnFactionUpdated` as `BlueprintAssignable` and bind it in the stock
+generator. More precise per-actor, but requires editing fork *content*, couples the generator
+to player-state internals, and sits on the area the framework author flagged as unstable.
+
+**Option B (targeted native reevaluation)** adds a new native call that re-runs generator
+predicates against already-perceived actors. Most surgical, but introduces a parallel
+reconsideration path alongside the existing one, which is the outcome to avoid.
+
+---
+
 ## Repair options — none implemented
 
 Per instruction, no fork modification. The requirement is that **hostile goal evaluation
