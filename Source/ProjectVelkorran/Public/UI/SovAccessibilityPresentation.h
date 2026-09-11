@@ -4,6 +4,7 @@
 #include "Blueprint/UserWidget.h"
 #include "Settings/SovGameUserSettings.h"
 #include "UI/SovObjectivePresentationTypes.h"
+#include "UI/SovObjectiveWaypoint.h"
 #include "SovAccessibilityPresentation.generated.h"
 
 class UBorder;
@@ -41,6 +42,10 @@ class PROJECTVELKORRAN_API USovAccessibilityPresentation : public UUserWidget
 	GENERATED_BODY()
 public:
 	USovAccessibilityPresentation(const FObjectInitializer& Initializer);
+    /** Geometry readers for other native HUD layers; no objective or caption state changes. */
+    const UBorder* GetObjectivePanel() const { return ObjectiveBackground; }
+    const UBorder* GetSubtitlePanel() const { return SubtitleBackground; }
+    const UBorder* GetCaptionPanel() const { return CaptionBackground; }
 	UFUNCTION(BlueprintCallable, Category="Sovereign|Accessibility") void PresentSpeech(const FText& Speaker, const FText& Text, float Duration, const FVector& SpeakerLocation, bool bCinematic);
 	UFUNCTION(BlueprintCallable, Category="Sovereign|Accessibility") void PresentCaption(const FText& Text, float Duration, const FVector& SourceLocation, ESovCaptionPriority CaptionPriority = ESovCaptionPriority::Important);
 	/** Line-end and normal dialogue completion preserve the remaining readable pages. */
@@ -79,6 +84,9 @@ private:
 	void BeginCaption(const FSovSceneSubtitleEntry& Entry);
 	void QueueCaption(const FSovSceneSubtitleEntry& Entry);
 	void RefreshWeakPointMarkers(APlayerController* Player);
+    void RefreshObjectiveWaypoint();
+    void RegisterWaypointSource(AActor* Actor);
+    void ResetWaypointRegistry();
 	void RegisterMarkerCharacter(AActor* Actor);
 	void ResetMarkerRegistry();
 	void RefreshText();
@@ -126,6 +134,10 @@ private:
 	float LastLayoutHeight = 0.f;
 	struct FMarker { FVector Location; FText Text; bool bThreat = false; bool bNavigation = false; };
 	TArray<FMarker> Markers;
+    FSovObjectiveWaypoint ObjectiveWaypoint;
+    TArray<TWeakObjectPtr<AActor>> WaypointSources;
+    TWeakObjectPtr<UWorld> WaypointWorld;
+    FDelegateHandle WaypointSpawnedHandle;
 	TWeakObjectPtr<UWorld> MarkerWorld;
 	FDelegateHandle ActorSpawnedHandle;
 	TArray<TWeakObjectPtr<ANarrativeCharacter>> MarkerCharacters;

@@ -17,6 +17,16 @@
 #include "Perception/AISenseConfig_Sight.h"
 #include "Perception/AISense_Sight.h"
 #include "Tests/SovBotAttackTestFixtures.h"
+#include "AI/Activities/NPCActivityComponent.h"
+#include "Tests/SovNPCGoalKeyLifetimeTestFixtures.h"
+#include "Abilities/SovGameplayAbility_ReformationDrone.h"
+#include "BehaviorTree/BehaviorTree.h"
+#include "BehaviorTree/BehaviorTreeComponent.h"
+#include "BehaviorTree/BTCompositeNode.h"
+#include "BehaviorTree/Decorators/BTDecorator_Blackboard.h"
+#include "Components/CapsuleComponent.h"
+#include "TimerManager.h"
+#include "UObject/UnrealType.h"
 
 #if WITH_AUTOMATION_TESTS
 namespace
@@ -467,6 +477,321 @@ bool FSovThreatPawnAssignmentRuntimeTest::RunTest(const FString& Parameters)
 	TestNull(TEXT("Unpossess clears OwnedCharacter"), Controller->GetOwnedNPC());
 	TestNull(TEXT("Unpossess does not expose the outgoing ASC"), Controller->GetAbilitySystemComponent());
 	TestNull(TEXT("Unpossess clears actor focus"), Controller->GetFocusActor());
+	return true;
+}
+
+namespace
+{
+	// Uses the shipped goal, activity, blackboard and tree. Only the world,
+	// native character health/factions and physical sight stimulus are fixtures.
+	struct FStockThreatActivityWorld : FThreatWorld
+	{
+		ASovBotTestCharacter* Source = nullptr;
+		ASovBotTestCharacter* Target = nullptr;
+		ANarrativeNPCController* AI = nullptr;
+		UAIPerceptionComponent* Perception = nullptr;
+		UNPCActivity* Activity = nullptr;
+		UNPCGoalItem* Goal = nullptr;
+		FGameplayAbilitySpecHandle Gun;
+		uint64 FrameNumber = GFrameCounter;
+
+		bool Initialize(FAutomationTestBase& Test)
+		{
+			if (!World) { return false; }
+			// Normal actor initialization performs autoactivation for registered components.
+			// DispatchBeginPlay alone cannot activate an uninitialized game-world owner.
+			World->InitializeActorsForPlay(FURL());
+			Source = Character(FVector::ZeroVector, 0);
+			Target = Character(FVector(500, 0, 0), 1);
+			AI = Controller(Source);
+			if (!Test.TestNotNull(TEXT("Native source"), Source) || !Test.TestNotNull(TEXT("Native target"), Target)
+				|| !Test.TestNotNull(TEXT("Native controller"), AI)) { return false; }
+			Target->GetCapsuleComponent()->SetCollisionResponseToChannel(GetDefault<UArsenalSettings>()->WeaponTraceChannel, ECR_Block);
+			Target->GetNarrativeAbilitySystemComponent()->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetMaxHealthAttribute(), 1000.f);
+			Target->GetNarrativeAbilitySystemComponent()->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetHealthAttribute(), 1000.f);
+			// This world does not run asynchronous NPC appearance initialization.
+			// Actual controller BeginPlay establishes its component's owner cache.
+			AI->DispatchBeginPlay();
+			if (!Test.TestTrue(TEXT("Real actor startup autoactivated the stock activity component"),
+				AI->IsActorInitialized() && AI->GetActivityComponent()->IsActive())) { return false; }
+			Perception = NewObject<UAIPerceptionComponent>(AI);
+			AI->AddInstanceComponent(Perception);
+			auto* Sight = NewObject<UAISenseConfig_Sight>(Perception);
+			Sight->DetectionByAffiliation.bDetectEnemies = true;
+			Perception->ConfigureSense(*Sight);
+			AI->SetPerceptionComponent(*Perception);
+			Perception->RegisterComponent();
+			AI->RefreshThreatMemory();
+			Gun = Source->AddAbility(USovGameplayAbility_ReformationDroneGunfire::StaticClass());
+			TArray<FGameplayAbilitySpecHandle> TaggedAttacks;
+			Source->GetNarrativeAbilitySystemComponent()->FindAbilitiesWithTag(
+				FNarrativeGameplayTags::Get().Narrative_Input_Attack, TaggedAttacks);
+			if (!Test.TestTrue(TEXT("Canonical character grant publishes the stock service input tag"), Gun.IsValid() && TaggedAttacks.Contains(Gun))) { return false; }
+			UClass* GoalClass = LoadClass<UNPCGoalItem>(nullptr,
+				TEXT("/NarrativePro/Pro/Core/AI/Activities/Attacks/Goals/Goal_Attack.Goal_Attack_C"));
+			UClass* ActivityClass = LoadClass<UNPCActivity>(nullptr,
+				TEXT("/NarrativePro/Pro/Core/AI/Activities/Attacks/ShootAndStrafe/BPA_Attack_Ranged_Strafe.BPA_Attack_Ranged_Strafe_C"));
+			if (!Test.TestNotNull(TEXT("Shipped attack goal"), GoalClass)
+				|| !Test.TestNotNull(TEXT("Shipped ranged strafe activity"), ActivityClass)) { return false; }
+			Activity = AI->GetActivityComponent()->AddActivity(ActivityClass, false);
+			Goal = NewObject<UNPCGoalItem>(AI->GetActivityComponent(), GoalClass);
+			const FObjectPropertyBase* TargetField = FindFProperty<FObjectPropertyBase>(GoalClass, TEXT("TargetToAttack"));
+			if (!Activity || !Goal || !Test.TestNotNull(TEXT("Stock goal's target field"), TargetField)) { return false; }
+			TargetField->SetObjectPropertyValue_InContainer(Goal, Target);
+			Seen(true);
+			if (!Test.TestEqual(TEXT("Stock goal initializes and registers"), AI->GetActivityComponent()->AddGoal(Goal, false), Goal)) { return false; }
+			// Stock BPA_Attack requires both its sight-driven alert and strictly positive
+			// time since that alert. Let its real timers and normal selection settle;
+			// a guessed 0.15s can end before the first alert timer or on its exact frame.
+			const double SelectionDeadline = World->GetTimeSeconds() + 5.;
+			while (AI->GetActivityComponent()->GetCurrentActivity() != Activity
+				&& World->GetTimeSeconds() < SelectionDeadline)
+			{
+				AdvanceStockTree(.05f);
+				AI->GetActivityComponent()->PerformActivitySelection(true);
+			}
+			if (AI->GetActivityComponent()->GetCurrentActivity() != Activity)
+			{
+				FString FailReason;
+				const bool bCanRun = AI->GetActivityComponent()->CanRunActivity(Activity, Goal, FailReason);
+				Test.AddError(FString::Printf(TEXT("Stock selection readiness timed out: active=%d score=%.3f goal=%.3f canRun=%d reason=%s goalState=%s"),
+					AI->GetActivityComponent()->IsActive(), Activity->LastScore, Goal->GetGoalScore(), bCanRun, *FailReason, *Goal->GetDebugString()));
+			}
+			return Test.TestEqual(TEXT("Normal activity selection chose the stock strafe activity"), AI->GetActivityComponent()->GetCurrentActivity(), Activity)
+				&& Test.TestEqual(TEXT("Normal activity selection chose the stock goal"), AI->GetActivityComponent()->GetCurrentActivityGoal(), Goal)
+				&& Test.TestTrue(TEXT("Stock live goal remains positively scored"), Goal->GetGoalScore() > 0.f)
+				&& Test.TestEqual(TEXT("Inherited stock SetupBlackboard authored the exact target"), Blackboard()->GetValueAsObject(Key()), static_cast<UObject*>(Target));
+		}
+		~FStockThreatActivityWorld()
+		{
+			if (IsValid(AI)) { AI->GetActivityComponent()->StopCurrentActivity(); AI->GetActivityComponent()->RemoveAllGoals(); }
+			if (IsValid(Source)) { Source->GetNarrativeAbilitySystemComponent()->CancelAllAbilities(); }
+		}
+		FName Key() const { return GetDefault<UArsenalSettings>()->BBKey_AttackTarget; }
+		UBlackboardComponent* Blackboard() const { return AI->GetBlackboardComponent(); }
+		void Seen(bool bSeen)
+		{
+			FAIStimulus Stimulus(*GetDefault<UAISense_Sight>(), 1.f, Target->GetActorLocation(), Source->GetActorLocation());
+			if (!bSeen) { Stimulus.MarkNoLongerSensed(); }
+			Perception->RegisterStimulus(Target, Stimulus);
+			Perception->ProcessStimuli();
+		}
+		void AdvanceStockTree(float Seconds)
+		{
+			// The isolated world has no gameplay actor ticks. Advance its real clock
+			// then its real timers and BT scheduler (never an ability/payload call).
+			const double Until = World->GetTimeSeconds() + Seconds;
+			while (World->GetTimeSeconds() + UE_DOUBLE_SMALL_NUMBER < Until)
+			{
+				TGuardValue<uint64> Frame(GFrameCounter, ++FrameNumber);
+				const float Delta = FMath::Min(.05, Until - World->GetTimeSeconds());
+				World->Tick(LEVELTICK_TimeOnly, Delta);
+				World->GetTimerManager().Tick(Delta); // TimeOnly deliberately omits timer dispatch.
+				if (auto* Tree = Cast<UBehaviorTreeComponent>(AI->GetBrainComponent()))
+				{ Tree->TickComponent(Delta, LEVELTICK_All, nullptr); }
+			}
+		}
+	};
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovStockThreatAttackReacquisitionTest,
+	"ProjectVelkorran.Campaign.Threat.StockRangedActivityReacquiresClearedTarget",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovStockThreatAttackReacquisitionTest::RunTest(const FString& Parameters)
+{
+	FStockThreatActivityWorld F;
+	if (!F.Initialize(*this)) { return false; }
+	auto* Tree = F.AI->GetCurrentTree();
+	if (!TestNotNull(TEXT("Actual stock tree running"), Tree)) { return false; }
+	TestEqual(TEXT("Actual stock ranged tree"), Tree->GetPathName(),
+		FString(TEXT("/NarrativePro/Pro/Core/AI/Activities/Attacks/ShootAndStrafe/BT_Attack_Ranged.BT_Attack_Ranged")));
+	if (!TestNotNull(TEXT("Stock root"), Tree->RootNode.Get()) || !TestEqual(TEXT("Stock tree has one root branch"), Tree->RootNode->Children.Num(), 1)) { return false; }
+	const auto& Branch = Tree->RootNode->Children[0];
+	if (!TestEqual(TEXT("The stock attack branch has its target-set decorator"), Branch.Decorators.Num(), 1)
+		|| !TestNotNull(TEXT("Actual Blackboard decorator"), Cast<UBTDecorator_Blackboard>(Branch.Decorators[0]))) { return false; }
+
+	UObject* HoldOwner = NewObject<USovRuntimeTestIdentity>(F.AI);
+	F.AI->SetThreatMemorySuspended(HoldOwner, true);
+	F.AI->GetBrainComponent()->PauseLogic(TEXT("Actual encounter hold ordering"));
+	F.AI->SetThreatMemorySuspended(HoldOwner, false);
+	F.AI->GetBrainComponent()->ResumeLogic(TEXT("Actual encounter release ordering"));
+	TestNull(TEXT("Release before new perception clears the unauthorized actor key"), F.Blackboard()->GetValueAsObject(F.Key()));
+	TestEqual(TEXT("Release retains the exact current activity"), F.AI->GetActivityComponent()->GetCurrentActivity(), F.Activity);
+	TestEqual(TEXT("Release retains the exact registered goal"), F.AI->GetActivityComponent()->GetCurrentActivityGoal(), F.Goal);
+	TestTrue(TEXT("That existing stock goal still scores positively"), F.Goal->GetGoalScore() > 0.f);
+	TestFalse(TEXT("No direct authorization is invented by release"), F.AI->CanDirectlyTargetThreat(F.Target));
+	F.Seen(true);
+	if (!TestEqual(TEXT("Fresh actual perception reopens the same stock target gate"),
+		F.Blackboard()->GetValueAsObject(F.Key()), static_cast<UObject*>(F.Target))) { return false; }
+	TestEqual(TEXT("Recovery does not replace/restart the activity"), F.AI->GetActivityComponent()->GetCurrentActivity(), F.Activity);
+	const float Before = F.Target->GetNarrativeAbilitySystemComponent()->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute());
+	F.AdvanceStockTree(3.f);
+	TestTrue(TEXT("Real stock services and native drone payload cause ordinary damage without a test activation call"),
+		F.Target->GetNarrativeAbilitySystemComponent()->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()) < Before);
+	F.Source->GetNarrativeAbilitySystemComponent()->CancelAllAbilities();
+	F.Seen(false);
+	TestNull(TEXT("Actual lost sight removes the live target again"), F.Blackboard()->GetValueAsObject(F.Key()));
+	F.Target->GetNarrativeAbilitySystemComponent()->AddLooseGameplayTag(FNarrativeGameplayTags::Get().State_InvisibleToEnemies);
+	F.Seen(true);
+	TestNull(TEXT("Successful sensor data cannot restore a cloaked actor"), F.Blackboard()->GetValueAsObject(F.Key()));
+	// Sight only notifies on success changes. End the cloaked stimulus first,
+	// so the uncloaked observation below is a real failed-to-successful event.
+	F.Seen(false);
+	F.Target->GetNarrativeAbilitySystemComponent()->RemoveLooseGameplayTag(FNarrativeGameplayTags::Get().State_InvisibleToEnemies);
+	F.Seen(true);
+	TestEqual(TEXT("New uncloaked sight can restore the same still-owned attack"), F.Blackboard()->GetValueAsObject(F.Key()), static_cast<UObject*>(F.Target));
+	F.AI->ForgetThreat(F.Target);
+	TestNull(TEXT("Explicit forgetting removes the actor key"), F.Blackboard()->GetValueAsObject(F.Key()));
+	F.AI->RefreshThreatMemory();
+	TestFalse(TEXT("Forget does not authorize retained successful sensor data"), F.AI->CanDirectlyTargetThreat(F.Target));
+	TestNull(TEXT("No new observation means no restored key after Forget"), F.Blackboard()->GetValueAsObject(F.Key()));
+	F.Seen(true);
+	TestEqual(TEXT("Only fresh post-Forget observation resumes the still-current goal"), F.Blackboard()->GetValueAsObject(F.Key()), static_cast<UObject*>(F.Target));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovStockThreatExistingDestinationTest,
+	"ProjectVelkorran.Campaign.Threat.StockRangedReacquisitionPreservesExistingDestination",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovStockThreatExistingDestinationTest::RunTest(const FString& Parameters)
+{
+	for (int32 Case = 0; Case < 3; ++Case)
+	{
+		FStockThreatActivityWorld F;
+		if (!F.Initialize(*this)) { return false; }
+		const FName LocationKey = GetDefault<UArsenalSettings>()->BBKey_TargetLocation;
+		const FVector ExistingDestination(120., 75., 0.);
+		const FVector ForeignDestination(180., 90., 0.);
+		// The isolated stock fixture has no generated EQS navigation. Supply only
+		// its pre-existing blackboard destination, then use real hold/release,
+		// perception, tree services and native damage. Do not claim an EQS result.
+		if (Case != 2) { F.Blackboard()->SetValueAsVector(LocationKey, ExistingDestination); }
+		else { F.Blackboard()->ClearValue(LocationKey); }
+		UObject* HoldOwner = NewObject<USovRuntimeTestIdentity>(F.AI);
+		F.AI->SetThreatMemorySuspended(HoldOwner, true);
+		F.AI->GetBrainComponent()->PauseLogic(TEXT("Encounter hold with an existing destination"));
+		F.AI->SetThreatMemorySuspended(HoldOwner, false);
+		F.AI->GetBrainComponent()->ResumeLogic(TEXT("Encounter release with an existing destination"));
+		TestNull(TEXT("Real release retired the unauthorized attack key"), F.Blackboard()->GetValueAsObject(F.Key()));
+		TestFalse(TEXT("Release does not invent direct sight"), F.AI->CanDirectlyTargetThreat(F.Target));
+		if (Case != 2) { TestTrue(TEXT("Release preserves the pre-existing destination"), F.Blackboard()->GetValueAsVector(LocationKey) == ExistingDestination); }
+		if (Case != 0) { F.Blackboard()->SetValueAsVector(LocationKey, ForeignDestination); }
+		F.Seen(true);
+		TestTrue(TEXT("Fresh actual sight authorizes the exact current target"), F.AI->CanDirectlyTargetThreat(F.Target));
+		TestEqual(TEXT("No activity replacement or restart"), F.AI->GetActivityComponent()->GetCurrentActivity(), F.Activity);
+		TestEqual(TEXT("No current goal replacement"), F.AI->GetActivityComponent()->GetCurrentActivityGoal(), F.Goal);
+		if (Case == 0)
+		{
+			if (!TestEqual(TEXT("Unchanged pre-cleanup destination permits the exact stock attack target"),
+				F.Blackboard()->GetValueAsObject(F.Key()), static_cast<UObject*>(F.Target))) { return false; }
+			TestTrue(TEXT("Restoring only the target leaves the existing destination unchanged"), F.Blackboard()->GetValueAsVector(LocationKey) == ExistingDestination);
+			const float Before = F.Target->GetNarrativeAbilitySystemComponent()->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute());
+			F.AdvanceStockTree(3.f);
+			TestTrue(TEXT("Stock services cause real legal-range damage without a test activation call"),
+				F.Target->GetNarrativeAbilitySystemComponent()->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()) < Before);
+		}
+		else
+		{
+			TestNull(TEXT("Changed or newly supplied destinations refuse the retired target"), F.Blackboard()->GetValueAsObject(F.Key()));
+			TestTrue(TEXT("Foreign destination is not changed"), F.Blackboard()->GetValueAsVector(LocationKey) == ForeignDestination);
+			F.Blackboard()->ClearValue(LocationKey);
+			F.AI->RefreshThreatMemory();
+			TestNull(TEXT("The foreign write permanently retired this claim even after location clears"), F.Blackboard()->GetValueAsObject(F.Key()));
+		}
+	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovStockThreatAttackOwnershipTest,
+	"ProjectVelkorran.Campaign.Threat.ReacquisitionPreservesForeignActivityGoalAndBlackboard",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovStockThreatAttackOwnershipTest::RunTest(const FString& Parameters)
+{
+	for (int32 Case = 0; Case < 6; ++Case)
+	{
+		FStockThreatActivityWorld F;
+		if (!F.Initialize(*this)) { return false; }
+		F.Seen(false);
+		TestNull(TEXT("Real cleanup removed the owned actor key"), F.Blackboard()->GetValueAsObject(F.Key()));
+		auto* Other = F.Character(FVector(600, 200, 0), 1);
+		if (!Other) { return false; }
+		const FVector OtherLocation(800, 100, 10);
+		if (Case == 0) { F.AI->GetActivityComponent()->StopCurrentActivity(); }
+		if (Case == 1) { F.AI->GetActivityComponent()->RemoveGoal(F.Goal); }
+		if (Case == 2)
+		{
+			F.AI->ReportThreatObservation(Other, ENarrativeThreatSource::Damage, Other->GetActorLocation());
+			F.Blackboard()->SetValueAsObject(F.Key(), Other);
+		}
+		if (Case == 3)
+		{
+			F.AI->ReportThreatObservation(Other, ENarrativeThreatSource::Damage, Other->GetActorLocation());
+			F.AI->SetFocus(Other);
+		}
+		if (Case == 4) { F.Blackboard()->SetValueAsVector(GetDefault<UArsenalSettings>()->BBKey_TargetLocation, OtherLocation); }
+		if (Case == 5) { F.AI->SetFocalPoint(OtherLocation); }
+		F.Seen(true);
+		TestEqual(FString::Printf(TEXT("Case %d never resurrects the retired goal's actor key"), Case),
+			F.Blackboard()->GetValueAsObject(F.Key()), Case == 2 ? static_cast<UObject*>(Other) : nullptr);
+		if (Case == 3) { TestEqual(TEXT("Foreign focus preserved"), F.AI->GetFocusActor(), static_cast<AActor*>(Other)); }
+		if (Case == 5) { TestTrue(TEXT("Foreign focal point preserved"), F.AI->GetFocalPoint().Equals(OtherLocation)); }
+		if (Case == 4) { TestTrue(TEXT("Foreign movement location preserved"), F.Blackboard()->GetValueAsVector(GetDefault<UArsenalSettings>()->BBKey_TargetLocation).Equals(OtherLocation)); }
+	}
+	// The authored key getter is a callback boundary. Reuse the existing
+	// callback fixture solely for reentry; the ordinary attack test above uses
+	// the unchanged shipped Blueprint and full native payload.
+	for (int32 Case = 0; Case < 4; ++Case)
+	{
+		FThreatWorld F;
+		if (!TestNotNull(TEXT("Reentry world"), F.World)) { return false; }
+		F.World->InitializeActorsForPlay(FURL());
+		auto* Source = F.Character(FVector::ZeroVector, 0);
+		auto* Target = F.Character(FVector(500, 0, 0), 1);
+		auto* Other = F.Character(FVector(500, 200, 0), 1);
+		auto* AI = F.Controller(Source);
+		if (!Source || !Target || !Other || !AI) { return false; }
+		AI->DispatchBeginPlay();
+		auto* Activities = AI->GetActivityComponent();
+		auto* Activity = Cast<USovNPCGoalKeyLifetimeTestActivity>(Activities->AddActivity(USovNPCGoalKeyLifetimeTestActivity::StaticClass(), false));
+		if (!Activity) { return false; }
+		Activity->Support(USovNPCGoalKeyLifetimeTestGoal::StaticClass());
+		auto* Goal = NewObject<USovNPCGoalKeyLifetimeTestGoal>(Activities);
+		Goal->GoalKey = Target; Goal->DefaultScore = 1.f;
+		if (!TestEqual(TEXT("Reentry fixture has a real registered current goal"), Activities->AddGoal(Goal, true), static_cast<UNPCGoalItem*>(Goal))) { return false; }
+		if (!TestTrue(TEXT("Reentry controller startup autoactivated its component"), AI->IsActorInitialized() && Activities->IsActive())
+			|| !TestEqual(TEXT("Normal selection owns the reentry activity before cleanup"), Activities->GetCurrentActivity(), static_cast<UNPCActivity*>(Activity))
+			|| !TestEqual(TEXT("Normal selection owns the reentry goal before cleanup"), Activities->GetCurrentActivityGoal(), static_cast<UNPCGoalItem*>(Goal))) { return false; }
+		auto* BB = BlackboardFor(AI);
+		if (!BB) { return false; }
+		const FName Key = GetDefault<UArsenalSettings>()->BBKey_AttackTarget;
+		AI->ReportThreatObservation(Target, ENarrativeThreatSource::Sight, Target->GetActorLocation());
+		BB->SetValueAsObject(Key, Target);
+		const FName LocationKey = GetDefault<UArsenalSettings>()->BBKey_TargetLocation;
+		const FVector PreCleanupLocation(100., 75., 0.);
+		const FVector CallbackLocation(150., 90., 0.);
+		if (Case == 3) { BB->SetValueAsVector(LocationKey, PreCleanupLocation); }
+		AI->ForgetThreat(Target);
+		TestNull(TEXT("Actual native cleanup creates the pending same-goal restoration"), BB->GetValueAsObject(Key));
+		AI->ReportThreatObservation(Other, ENarrativeThreatSource::Damage, Other->GetActorLocation());
+		bool bCalled = false;
+		Goal->DuringKeyRead = [&]()
+		{
+			bCalled = true;
+			if (Case == 0) { BB->SetValueAsObject(Key, Other); }
+			if (Case == 1) { Goal->GoalKey = Other; }
+			if (Case == 2) { Activities->StopCurrentActivity(); }
+			if (Case == 3) { BB->SetValueAsVector(LocationKey, CallbackLocation); }
+		};
+		AI->ReportThreatObservation(Target, ENarrativeThreatSource::Sight, Target->GetActorLocation());
+		AI->RefreshThreatMemory();
+		TestTrue(TEXT("Actual live key callback was reached"), bCalled);
+		TestEqual(FString::Printf(TEXT("Callback case %d cannot publish a stale owner or target"), Case),
+			BB->GetValueAsObject(Key), Case == 0 ? static_cast<UObject*>(Other) : nullptr);
+		if (Case == 3) { TestTrue(TEXT("A destination changed by the authored key callback is preserved and refuses restoration"), BB->GetValueAsVector(LocationKey) == CallbackLocation); }
+		Goal->DuringKeyRead = nullptr;
+		Activities->StopCurrentActivity();
+		Activities->RemoveAllGoals();
+	}
 	return true;
 }
 #endif

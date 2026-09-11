@@ -183,6 +183,11 @@ bool FSovCompanionFirstSharedEntryTest::RunTest(const FString& Parameters)
 	if (!TestNotNull(TEXT("Native deferred spawn produced the companion"), Proxy)) { return false; }
 	auto* AI = Cast<ANarrativeNPCController>(Proxy->GetController());
 	if (!TestNotNull(TEXT("Actual Narrative controller owns the staged proxy"), AI)) { return false; }
+	TestTrue(TEXT("AI possession retains the staged campaign owner"), Proxy->GetOwner() == PC && Proxy->GetController() == AI);
+	AI->UnPossess();
+	TestTrue(TEXT("AI unpossession retains campaign ownership without retaining the AI"), Proxy->GetOwner() == PC && Proxy->GetController() == nullptr);
+	AI->Possess(Proxy);
+	TestTrue(TEXT("Actual AI reacquisition preserves the same campaign owner"), Proxy->GetOwner() == PC && Proxy->GetController() == AI);
 	// This minimal world has no global BeginPlay. Start the real controller's activity
 	// component lifecycle so native Regroup registration runs with its normal owner.
 	if (!AI->HasActorBegunPlay()) { AI->DispatchBeginPlay(); }

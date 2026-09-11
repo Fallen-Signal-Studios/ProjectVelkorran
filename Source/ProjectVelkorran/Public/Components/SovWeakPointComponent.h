@@ -446,5 +446,12 @@ private:
 	FTimerHandle WeakPointRevealVisualRefreshTimerHandle;
 	bool bAppliedStartingState = false;
 	bool bLocalWeakPointRevealActive = false;
+	/** What the last OnWeakPointRevealStateChanged broadcast advertised. RevealWeakPoints
+	 * extends an existing window by taking the max end time, so a second reveal changes the
+	 * window without changing the active/inactive boolean. Consumers that derive gameplay
+	 * state from this delegate - USovResonanceTargetComponent writes ExposureUntil solely
+	 * from it - need the extension too, not just the edge. */
+	float LastBroadcastRevealEndServerWorldTime = 0.0f;
+	TWeakObjectPtr<AActor> LastBroadcastRevealInstigator;
 	bool bWeakPointRevealVisualRefreshPending = false;
 };

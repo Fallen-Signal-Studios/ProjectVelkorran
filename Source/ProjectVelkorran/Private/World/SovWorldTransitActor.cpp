@@ -3,8 +3,12 @@
 #include "World/SovWorldMotionPolicy.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
+#include "AI/NavigationSystemHelpers.h"
 #include "Campaign/SovCampaignStateComponent.h"
 #include "Campaign/SovCampaignDefinition.h"
+#include "Companions/SovCompanionComponent.h"
+#include "Companions/SovConvergenceCompanionState.h"
+#include "Companions/SovProtagonistCompanionCharacter.h"
 #include "Characters/SovPlayerCharacterBase.h"
 #include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -27,6 +31,43 @@
 #include "Net/UnrealNetwork.h"
 #include "Save/SovSaveSubsystem.h"
 #include "Sovereign/SovGameplayTags.h"
+
+USovLiftNavigationSurfaceComponent::USovLiftNavigationSurfaceComponent()
+{
+    SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    SetGenerateOverlapEvents(false);
+    SetCanEverAffectNavigation(false);
+    bHasCustomNavigableGeometry = EHasCustomNavigableGeometry::EvenIfNotCollidable;
+}
+void USovLiftNavigationSurfaceComponent::ConfigureSurface(const FVector& Extent, bool bEnabled)
+{
+    const bool bValidExtent = !Extent.ContainsNaN() && Extent.GetMin() > 0.f;
+    const bool bChanged = bSurfaceEnabled != (bEnabled && bValidExtent)
+        || (bValidExtent && !GetUnscaledBoxExtent().Equals(Extent));
+    if (bChanged)
+    {
+        // Retire the old element before changing its bounds. The normal relevance setter also
+        // updates UActorComponent's cached bNavigationRelevant on first publication after registration.
+        SetCanEverAffectNavigation(false);
+        bSurfaceEnabled = bEnabled && bValidExtent;
+        if (bValidExtent) { SetBoxExtent(Extent, false); }
+        SetCanEverAffectNavigation(bSurfaceEnabled);
+    }
+}
+bool USovLiftNavigationSurfaceComponent::IsNavigationRelevant() const
+{ return bSurfaceEnabled && Super::IsNavigationRelevant(); }
+bool USovLiftNavigationSurfaceComponent::DoCustomNavigableGeometryExport(FNavigableGeometryExport& Export) const
+{
+    if (bSurfaceEnabled)
+    {
+        const FVector E = GetUnscaledBoxExtent();
+        const FVector Vertices[] = { {-E.X,-E.Y,E.Z}, {E.X,-E.Y,E.Z}, {-E.X,E.Y,E.Z}, {E.X,E.Y,E.Z} };
+        // Same top-face winding as UE's box collision exporter.
+        const int32 Indices[] = { 1,0,2, 1,2,3 };
+        Export.ExportCustomMesh(Vertices, UE_ARRAY_COUNT(Vertices), Indices, UE_ARRAY_COUNT(Indices), GetComponentTransform());
+    }
+    return false; // Never export a second collision body.
+}
 
 bool USovWorldTransitInteractable::CanInteract_Implementation(APawn* Pawn, UNarrativeInteractionComponent* Interaction, FText& Error)
 {
@@ -56,14 +97,14 @@ ASovWorldTransitActor::ASovWorldTransitActor()
     Interactable->InteractionDistance = 350.f; Interactable->InteractionTime = .25f; Interactable->InteractableActionText = FText::FromString(TEXT("Use"));
     OriginLink = CreateDefaultSubobject<UNavLinkCustomComponent>(TEXT("OriginLink"));
     DestinationLink = CreateDefaultSubobject<UNavLinkCustomComponent>(TEXT("DestinationLink"));
+    LiftNavigationSurface = CreateDefaultSubobject<USovLiftNavigationSurfaceComponent>(TEXT("LiftNavigationSurface"));
+    LiftNavigationSurface->SetupAttachment(MovingBody);
     OriginLink->SetDisabledArea(UNavArea_Null::StaticClass()); DestinationLink->SetDisabledArea(UNavArea_Null::StaticClass());
 }
 void ASovWorldTransitActor::BeginPlay()
 {
     Super::BeginPlay();
-    OriginLink->SetLinkData(FVector(-160,0,0), FVector(160,0,0), ENavLinkDirection::BothWays);
-    const FVector Offset = Kind == ESovWorldTransitKind::Lift ? DestinationOffset : FVector::ZeroVector;
-    DestinationLink->SetLinkData(Offset + FVector(-160,0,0), Offset + FVector(160,0,0), ENavLinkDirection::BothWays);
+    RefreshNavigationGeometry();
     ReconcileEndpoint();
 }
 FGuid ASovWorldTransitActor::GetActorGUID_Implementation() const
@@ -71,6 +112,24 @@ FGuid ASovWorldTransitActor::GetActorGUID_Implementation() const
     if (!SaveGuid.IsValid())
     { FGuid Stable; FGuid::ParseExact(FMD5::HashAnsiString(*GetPathName()), EGuidFormats::Digits, Stable); const_cast<ASovWorldTransitActor*>(this)->SaveGuid = Stable; }
     return SaveGuid;
+}
+bool ASovWorldTransitActor::HasRequiredMissionCompanionAboard(const ASovPlayerController* PC, const ASovPlayerCharacterBase* Player) const
+{
+    if (Kind != ESovWorldTransitKind::Lift || !bRequireMissionCompanionAboard) { return true; }
+    const auto* Companions = IsValid(PC) ? PC->GetConvergenceCompanionState() : nullptr;
+    const auto* Companion = IsValid(Companions) ? Companions->GetActiveCompanion() : nullptr;
+    const auto* Commands = IsValid(Companion) ? Companion->GetCompanionComponent() : nullptr;
+    const auto* CompanionASC = IsValid(Companion)
+        ? UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(const_cast<ASovProtagonistCompanionCharacter*>(Companion)) : nullptr;
+    return IsValid(Player) && IsValid(Companions) && Companions->GetOwner() == PC && Companions->IsRegistered()
+        && !Companions->HasStagedProxy() && !Companions->IsEncounterRestorePending()
+        && IsValid(Companion) && !Companion->IsActorBeingDestroyed() && Companion->GetOwner() == PC
+        && Companion->GetWorld() == GetWorld() && Companion->IsEncounterSnapshotReady() && !Companion->IsHidden()
+        && Companion->IsAlive() && IsValid(CompanionASC) && CompanionASC->GetAvatarActor() == Companion
+        && CompanionASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()) > 0.f
+        && IsValid(Commands) && Commands->GetOwner() == Companion && Commands->IsRegistered() && Commands->GetCurrentLeader() == Player
+        && Companion->GetCharacterMovement() && Companion->GetCharacterMovement()->IsMovingOnGround()
+        && Companion->GetMovementBase() == MovingBody;
 }
 bool ASovWorldTransitActor::CanUse(const APawn* Pawn, FText& Error) const
 {
@@ -107,6 +166,7 @@ bool ASovWorldTransitActor::CanUse(const APawn* Pawn, FText& Error) const
     { return Reject(TEXT("Interaction is obstructed")); }
     if (Kind == ESovWorldTransitKind::Lift && Player->GetMovementBase() != MovingBody)
     { return Reject(TEXT("Step onto the lift first")); }
+    if (!HasRequiredMissionCompanionAboard(PC, Player)) { return Reject(TEXT("Wait for your companion to board")); }
     for (TActorIterator<ASovWorldTransitActor> It(GetWorld()); It; ++It)
     { if (*It != this && It->TransitId == TransitId) { return Reject(TEXT("Transit identity is ambiguous")); } }
     if (DestinationOffset.ContainsNaN() || !FMath::IsFinite(TravelSeconds) || TravelSeconds < .1f || TravelSeconds > 30.f
@@ -135,6 +195,8 @@ bool ASovWorldTransitActor::RequestUse(APawn* Pawn, FText& Error)
     }
     if (!IsValid(this) || !IsValid(Player) || PC->GetPawn() != Player || (bRequiresPower && !bPowered)
         || StructuralHealth <= 0.f || !LockReason.IsEmpty()) { return false; }
+    if (!HasRequiredMissionCompanionAboard(PC, Player))
+    { Error = FText::FromString(TEXT("Wait for your companion to board")); return false; }
     TransitPlayer = Player; PlayerASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Player);
     MoveStart = MovingBody->GetRelativeLocation(); MoveTarget = bAtDestination ? FVector::ZeroVector : DestinationOffset;
     MoveElapsed = 0; StartedAt = GetWorld()->GetTimeSeconds();
@@ -147,7 +209,7 @@ bool ASovWorldTransitActor::RequestUse(APawn* Pawn, FText& Error)
     Spec.Data->SetDuration(StreamingTimeoutSeconds + TravelSeconds + 1.f, true);
     UAbilitySystemComponent* StartingASC = PlayerASC.Get();
     const FActiveGameplayEffectHandle AppliedWindow = StartingASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
-    if (!IsValid(this) || !AppliedWindow.IsValid() || !OwnsPlayer())
+    if (!IsValid(this) || !AppliedWindow.IsValid() || !OwnsPlayer() || !HasRequiredMissionCompanionAboard(PC, Player))
     {
         if (IsValid(StartingASC) && AppliedWindow.IsValid()) { StartingASC->RemoveActiveGameplayEffect(AppliedWindow); }
         Finish(false, FText::FromString(TEXT("Transit ownership changed"))); return false;
@@ -246,19 +308,77 @@ float ASovWorldTransitActor::TakeDamage(float Amount, const FDamageEvent& Event,
     if (StructuralHealth <= 0.f) { Finish(false, FText::FromString(TEXT("Mechanism damaged"))); }
     return Applied;
 }
+bool ASovWorldTransitActor::IsOpenTraversableDoor() const
+{
+    return HasAuthority() && !IsActorBeingDestroyed() && !bEnding && !bMutating
+        && Kind == ESovWorldTransitKind::Door && State == ESovWorldTransitState::AtDestination && bAtDestination
+        && !TransitId.IsNone() && FMath::IsFinite(StructuralHealth) && StructuralHealth > 0.f
+        && (!bRequiresPower || bPowered) && LockReason.IsEmpty() && !DestinationOffset.ContainsNaN()
+        && !DestinationOffset.IsNearlyZero() && IsValid(MovingBody) && MovingBody->GetOwner() == this && MovingBody->IsRegistered()
+        && MovingBody->GetRelativeLocation().Equals(DestinationOffset, .5f)
+        && IsValid(DestinationLink) && DestinationLink->GetOwner() == this && DestinationLink->IsRegistered() && DestinationLink->IsEnabled();
+}
+
 void ASovWorldTransitActor::UpdateLinks()
 {
     const bool Stable = SovWorldMotionPolicy::CanEnableLink(State == ESovWorldTransitState::AtOrigin || State == ESovWorldTransitState::AtDestination,
         StructuralHealth > 0.f, !bRequiresPower || bPowered, LockReason.IsEmpty());
+    if (Kind == ESovWorldTransitKind::Lift)
+    {
+        // Remove both connections synchronously before removing/rebuilding asynchronous Recast geometry.
+        // The inset surface is an island, so stale tiles cannot leave a walking route over an empty dock.
+        OriginLink->SetEnabled(false); DestinationLink->SetEnabled(false);
+        const FVector E = MovingBody->GetUnscaledBoxExtent();
+        const FVector Scale = MovingBody->GetComponentScale();
+        const bool bShapeValid = MovingBody->GetComponentTransform().IsValid()
+            && !E.ContainsNaN() && !Scale.ContainsNaN() && Scale.GetMin() > UE_SMALL_NUMBER
+            && E.X * Scale.X >= 100.f && E.Y * Scale.Y > 200.f && E.Z > 0.f;
+        const FVector SurfaceExtent = bShapeValid ? FVector(E.X, E.Y - 100.f / Scale.Y, E.Z) : FVector::ZeroVector;
+        const bool bDocked = Stable && FMath::IsFinite(StructuralHealth) && !IsActorBeingDestroyed()
+            && bShapeValid && !DestinationOffset.ContainsNaN()
+            && MovingBody->GetRelativeLocation().Equals(bAtDestination ? DestinationOffset : FVector::ZeroVector, .5f);
+        LiftNavigationSurface->ConfigureSurface(SurfaceExtent, bDocked);
+        OriginLink->SetEnabled(bDocked && !bAtDestination);
+        DestinationLink->SetEnabled(bDocked && bAtDestination);
+        return;
+    }
     OriginLink->SetEnabled(Stable && Kind == ESovWorldTransitKind::Lift && !bAtDestination);
     DestinationLink->SetEnabled(Stable && bAtDestination);
+}
+void ASovWorldTransitActor::RefreshNavigationGeometry()
+{
+    if (Kind != ESovWorldTransitKind::Lift)
+    {
+        LiftNavigationSurface->ConfigureSurface(FVector::ZeroVector, false);
+        OriginLink->SetLinkData(FVector(-160,0,0), FVector(160,0,0), ENavLinkDirection::BothWays);
+        DestinationLink->SetLinkData(FVector(-160,0,0), FVector(160,0,0), ENavLinkDirection::BothWays);
+        UpdateLinks(); return;
+    }
+    OriginLink->SetEnabled(false); DestinationLink->SetEnabled(false);
+    // One physical surface, one explicitly exported navigation surface. The inset separates
+    // its polygons from both landing edges even while an old tile awaits asynchronous removal.
+    MovingBody->SetCanEverAffectNavigation(false);
+    const FVector E = MovingBody->GetUnscaledBoxExtent();
+    const FVector Scale = MovingBody->GetComponentScale();
+    if (!E.ContainsNaN() && !Scale.ContainsNaN() && Scale.GetMin() > UE_SMALL_NUMBER)
+    {
+        FTransform AtOrigin = MovingBody->GetRelativeTransform(); AtOrigin.SetLocation(FVector::ZeroVector);
+        FTransform AtDestination = AtOrigin; AtDestination.SetLocation(DestinationOffset);
+        const double OuterY = E.Y + 120.f / Scale.Y;
+        const double InnerY = E.Y - 180.f / Scale.Y;
+        OriginLink->SetLinkData(AtOrigin.TransformPosition(FVector(0,-OuterY,E.Z)),
+            AtOrigin.TransformPosition(FVector(0,-InnerY,E.Z)), ENavLinkDirection::BothWays);
+        DestinationLink->SetLinkData(AtDestination.TransformPosition(FVector(0,InnerY,E.Z)),
+            AtDestination.TransformPosition(FVector(0,OuterY,E.Z)), ENavLinkDirection::BothWays);
+    }
+    UpdateLinks();
 }
 void ASovWorldTransitActor::ReconcileEndpoint()
 {
     MovingBody->SetRelativeLocation(bAtDestination ? DestinationOffset : FVector::ZeroVector);
     if (Kind == ESovWorldTransitKind::Lift) { EntryBounds->SetRelativeLocation(bAtDestination ? DestinationOffset : FVector::ZeroVector); }
     State = StructuralHealth <= 0.f ? ESovWorldTransitState::Broken : bAtDestination ? ESovWorldTransitState::AtDestination : ESovWorldTransitState::AtOrigin;
-    UpdateLinks();
+    RefreshNavigationGeometry();
 }
 void ASovWorldTransitActor::Load_Implementation()
 { if (HasAuthority()) { ++PowerRevision; ++LockRevision; Finish(false, FText()); ReconcileEndpoint(); } }
@@ -272,7 +392,12 @@ void ASovWorldTransitActor::Serialize(FArchive& Ar)
     if (Ar.ArIsSaveGame && Ar.IsLoading() && (!FMath::IsFinite(StructuralHealth) || StructuralHealth < 0.f)) { Ar.SetError(); }
 }
 void ASovWorldTransitActor::EndPlay(EEndPlayReason::Type Reason)
-{ Finish(false, FText()); Super::EndPlay(Reason); }
+{
+    Finish(false, FText());
+    if (Kind == ESovWorldTransitKind::Lift)
+    { OriginLink->SetEnabled(false); DestinationLink->SetEnabled(false); LiftNavigationSurface->ConfigureSurface(FVector::ZeroVector, false); }
+    Super::EndPlay(Reason);
+}
 void ASovWorldTransitActor::OnRep_State() { UpdateLinks(); OnTransitChanged.Broadcast(State, FText()); }
 void ASovWorldTransitActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {

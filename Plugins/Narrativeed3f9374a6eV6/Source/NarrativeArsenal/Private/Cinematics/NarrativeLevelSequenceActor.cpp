@@ -390,7 +390,13 @@ bool ANarrativeLevelSequenceActor::ParticipantsReady() const
 				{
 					const auto* ASC = Cast<UNarrativeAbilitySystemComponent>(UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(Character));
 					const auto* Visual = Character->GetCharacterVisual();
-					if (!ASC || ASC->GetAvatarActor() != Character || !ASC->bInitializedFromConfig || !Visual || !Visual->bBaseAppearanceLoaded) { return false; }
+					const auto* Definition = Character->GetCharacterDefinition();
+					// Native character startup maintains bStartupEffectsApplied; the legacy
+					// bInitializedFromConfig field has no producer. Clients instead retain
+					// their replicated player-ready contract and local asset/actor-info gates.
+					if (!ASC || ASC->GetAvatarActor() != Character || !Definition || !Definition->AbilityConfiguration
+						|| (Character->HasAuthority() && !ASC->bStartupEffectsApplied)
+						|| !Visual || !Visual->bBaseAppearanceLoaded || Character->IsCharacterPendingLoad()) { return false; }
 				}
 				bFound = true;
 			}

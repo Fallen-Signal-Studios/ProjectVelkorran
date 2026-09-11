@@ -438,15 +438,72 @@ ESovCommandLinkSeverResolution USovGameplayAbility_SeleneAxiomNullPulse::TrySeve
 	if (!CurrentActorInfo || !CurrentActorInfo->IsNetAuthority() || !bPulseReleased
 		|| !CanReleaseAxiomPulse() || !IsValid(CommandNode) || AuthorizedCommandNode.Get() != CommandNode) { return ESovCommandLinkSeverResolution::Invalid; }
 	AuthorizedCommandNode.Reset(); // consume before callbacks can re-enter
-	USovCommandLinkComponent* Link = CommandNode->FindComponentByClass<USovCommandLinkComponent>();
 	UAbilitySystemComponent* NodeASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(CommandNode);
-	if (!Link || !IsAxiomTargetEligible(CommandNode, NodeASC) || !IsAxiomTargetInPulse(CommandNode)) { return ESovCommandLinkSeverResolution::Invalid; }
-	UAbilitySystemComponent* CommandASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Link->GetCommandSource());
-	if (!IsAxiomAlive(CommandASC) || IsAxiomImmune(CommandASC)) { return ESovCommandLinkSeverResolution::Immune; }
+	if (!IsAxiomTargetEligible(CommandNode, NodeASC) || !IsAxiomTargetInPulse(CommandNode)) { return ESovCommandLinkSeverResolution::Invalid; }
+	// A command actor can own independent links. Keep a fixed, deterministic
+	// candidate list; a severed first component must not hide another active link.
+	struct FCandidate
+	{
+		TWeakObjectPtr<USovCommandLinkComponent> Link;
+		TWeakObjectPtr<AActor> Source;
+		FGuid InstanceId;
+		FName LinkId;
+		FName ComponentName;
+	};
+	TArray<USovCommandLinkComponent*> Components;
+	CommandNode->GetComponents(Components);
+	TArray<FCandidate> Candidates;
+	for (USovCommandLinkComponent* Link : Components)
+	{
+		if (IsValid(Link) && Link->IsRegistered() && Link->GetOwner() == CommandNode
+			&& Link->GetWorld() == GetWorld() && Link->IsCommandLinkActive()
+			&& Link->GetLinkInstanceId().IsValid() && !Link->GetLinkId().IsNone())
+		{
+			Candidates.Add({Link, Link->GetCommandSource(), Link->GetLinkInstanceId(), Link->GetLinkId(), Link->GetFName()});
+		}
+	}
+	Candidates.Sort([](const FCandidate& Left, const FCandidate& Right)
+	{
+		return Left.LinkId == Right.LinkId ? Left.ComponentName.LexicalLess(Right.ComponentName) : Left.LinkId.LexicalLess(Right.LinkId);
+	});
+	const uint32 Epoch = ActivationEpoch;
+	const TWeakObjectPtr<AActor> OriginalNode = CommandNode;
 	AActor* Avatar = GetAvatarActorFromActorInfo();
 	const TWeakObjectPtr<AActor> OriginalAvatar = Avatar;
 	const TWeakObjectPtr<UAbilitySystemComponent> OriginalASC = CurrentActorInfo->AbilitySystemComponent;
-	const ESovCommandLinkSeverResolution Result = Link->TrySeverCommandLink(Avatar, OutResult);
+	ESovCommandLinkSeverResolution Result = ESovCommandLinkSeverResolution::Inactive;
+	for (const FCandidate& Candidate : Candidates)
+	{
+		if (!ContinueAxiomRelease(Epoch) || !OriginalNode.IsValid()
+			|| OriginalNode->IsActorBeingDestroyed() || OriginalNode->GetWorld() != GetWorld()) { return ESovCommandLinkSeverResolution::Invalid; }
+		USovCommandLinkComponent* Link = Candidate.Link.Get();
+		const auto IsCurrentCandidate = [&]()
+		{
+			return OriginalNode.IsValid() && !OriginalNode->IsActorBeingDestroyed()
+				&& Candidate.Source.IsValid() && !Candidate.Source->IsActorBeingDestroyed()
+				&& Candidate.Source->GetWorld() == GetWorld()
+				&& IsValid(Link) && Link->IsRegistered() && Link->GetOwner() == OriginalNode.Get()
+				&& OriginalNode->GetComponents().Contains(Link) && Link->GetWorld() == GetWorld()
+				&& Link->IsCommandLinkActive() && Link->GetLinkInstanceId() == Candidate.InstanceId
+				&& Link->GetLinkId() == Candidate.LinkId && Link->GetCommandSource() == Candidate.Source.Get();
+		};
+		if (!IsCurrentCandidate()) { continue; }
+		NodeASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(OriginalNode.Get());
+		if (!IsAxiomTargetEligible(OriginalNode.Get(), NodeASC) || !IsAxiomTargetInPulse(OriginalNode.Get())
+			|| !ContinueAxiomRelease(Epoch) || !IsCurrentCandidate()) { return ESovCommandLinkSeverResolution::Invalid; }
+		UAbilitySystemComponent* CommandASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Candidate.Source.Get());
+		if (!ContinueAxiomRelease(Epoch) || !IsCurrentCandidate()) { return ESovCommandLinkSeverResolution::Invalid; }
+		if (!IsAxiomAlive(CommandASC) || IsAxiomImmune(CommandASC)) { Result = ESovCommandLinkSeverResolution::Immune; continue; }
+		// The native link remains the sole owner of immunity/hostility admission,
+		// mutation, transaction identity and notifications. Rejections mint no proof.
+		FSovCommandLinkSeverResult CandidateResult;
+		Result = Link->TrySeverCommandLink(OriginalAvatar.Get(), CandidateResult);
+		if (Result == ESovCommandLinkSeverResolution::NewlySevered)
+		{
+			OutResult = MoveTemp(CandidateResult);
+			break; // At most one successful link, including callback cancellation.
+		}
+	}
 	// Sever is already committed. A cosmetic/link listener cancelling this ability
 	// must not erase its earned reward, but possession/death must never transfer it.
 	if (Result == ESovCommandLinkSeverResolution::NewlySevered
@@ -483,20 +540,35 @@ bool USovGameplayAbility_SeleneAxiomNullPulse::ReleaseAxiomNullPulseFromAim()
 	}
 	bPulseReleased = true; // ownership precedes every target/effect/Blueprint callback
 	ClearAxiomTasksAndTimers();
+	// Broadphase for the release cone. IsAxiomTargetEligible admits exactly two kinds of
+	// target: an actor with a live hostile ASC, or an actor carrying a USovCommandLinkComponent
+	// ("an unowned world prop is not a device"). Neither can be reached only through
+	// ECC_WorldStatic or ECC_PhysicsBody: static level geometry is never a live NPC or an
+	// authored command source, and a physics body is either a ragdoll - already rejected by
+	// IsAxiomAlive - or an inert prop. Querying them cost a full-radius sweep of every wall,
+	// floor and piece of debris within MaximumPulseRange, plus ResolveAxiomActor's owner walk
+	// per result, which is a visible hitch on a dressed level and would corrupt any FPS
+	// measurement of the slice's signature ability.
 	FCollisionObjectQueryParams Objects;
 	Objects.AddObjectTypesToQuery(ECC_Pawn);
 	Objects.AddObjectTypesToQuery(ECC_WorldDynamic);
-	Objects.AddObjectTypesToQuery(ECC_WorldStatic);
-	Objects.AddObjectTypesToQuery(ECC_PhysicsBody);
 	FCollisionQueryParams Query(SCENE_QUERY_STAT(SovAxiomPulseOverlap), false);
 	IgnoreAxiomSource(Query, Avatar);
 	TArray<FOverlapResult> Overlaps;
 	GetWorld()->OverlapMultiByObjectType(Overlaps, ReleaseOrigin, FQuat::Identity,
 		Objects, FCollisionShape::MakeSphere(ReleasedRange), Query);
 	TSet<TWeakObjectPtr<AActor>> Targets;
+	// One overlap actor can contribute many primitives. Resolve each distinct actor once so the
+	// owner walk, component search and ASC lookup do not repeat per capsule, mesh and prop.
+	TSet<AActor*> ResolvedOverlapActors;
 	for (const FOverlapResult& Overlap : Overlaps)
 	{
-		if (AActor* Target = ResolveAxiomActor(Overlap.GetActor())) { Targets.Add(Target); }
+		AActor* OverlapActor = Overlap.GetActor();
+		if (!IsValid(OverlapActor)) { continue; }
+		bool bAlreadyResolved = false;
+		ResolvedOverlapActors.Add(OverlapActor, &bAlreadyResolved);
+		if (bAlreadyResolved) { continue; }
+		if (AActor* Target = ResolveAxiomActor(OverlapActor)) { Targets.Add(Target); }
 	}
 	const float Suppression = SovAxiomPulse::Lerp(MinimumShieldSuppressionDuration, MaximumShieldSuppressionDuration, ReleasedChargeAlpha);
 	const FSovGameplayTags& Tags = FSovGameplayTags::Get();

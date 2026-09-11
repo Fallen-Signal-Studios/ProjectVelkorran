@@ -49,6 +49,8 @@ public:
     UPROPERTY(BlueprintReadOnly, Transient, Category="Aurelion|Crucible") FString LastPhaseError;
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Aurelion|Crucible") bool CompletePhaseHandoff(ASovPlayerCharacterBase* Tarrik, FString& Error);
     virtual ESovEncounterProofType GetCampaignProofType() const override { return ESovEncounterProofType::AurelionLinks; }
+    /** Uses the existing accepted receipt and live proof-owner epochs; no injected event path. */
+    bool HasAcceptedCurrentLinkReceipt() const;
     virtual bool HasConfirmedVictory() const override;
     virtual bool CompleteEncounter() override;
     virtual bool IsCompletedPhaseBoundaryQuiescentForSave(const ASovPlayerCharacterBase* Player) const override;
@@ -68,6 +70,7 @@ private:
     UFUNCTION() void HandleLinkSever(const FSovCommandLinkSeverResult& Result);
     UPROPERTY(SaveGame) FGuid ProofAttemptId;
     UPROPERTY(SaveGame) TArray<FSovAurelionCrucibleLinkReceipt> LinkReceipts;
+    UPROPERTY(SaveGame) int32 CompletedReleaseWave = 0;
     UPROPERTY(SaveGame) bool bBoundaryFrozen = false;
     UPROPERTY(SaveGame) bool bTransferred = false;
     UPROPERTY(Transient) TArray<TObjectPtr<USovCommandLinkComponent>> BoundLinks;
@@ -91,6 +94,7 @@ public:
     virtual ESovEncounterProofType GetCampaignProofType() const override { return ESovEncounterProofType::AurelionThermalFracture; }
     virtual bool HasConfirmedVictory() const override;
     virtual bool CompleteEncounter() override;
+    virtual void Load_Implementation() override;
 protected:
     virtual void Tick(float DeltaSeconds) override;
 private:

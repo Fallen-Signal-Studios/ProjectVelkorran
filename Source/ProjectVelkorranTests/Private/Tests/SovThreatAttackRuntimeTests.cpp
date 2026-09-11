@@ -5,6 +5,7 @@
 #include "ArsenalSettings.h"
 #include "ArsenalStatics.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/BoxComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "GAS/NarrativeAttributeSetBase.h"
@@ -166,6 +167,86 @@ bool FSovThreatRocketTrackingTest::RunTest(const FString& Parameters)
 	F.Target->GetNarrativeAbilitySystemComponent()->AddLooseGameplayTag(FNarrativeGameplayTags::Get().State_InvisibleToEnemies);
 	FSovThreatAttackTestAccess::ImpactNearby(*Rocket);
 	TestTrue(TEXT("Nearby rocket splash still damages a concealed actor"), F.Health() < 100.f);
+	return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovThreatRocketTickOrderTest, "ProjectVelkorran.Campaign.Threat.RocketRegisteredTickOrderAndPhysicalSweep",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FSovThreatRocketTickOrderTest::RunTest(const FString& Parameters)
+{
+	FThreatAttackWorld F;
+	if (!TestTrue(TEXT("Existing native perception/GAS/physics fixture"), F.Valid())) { return false; }
+	F.Target->SetActorLocation(FVector(2000., 500., 90.));
+	const auto* SightConfig = F.Perception->GetSenseConfig<UAISenseConfig_Sight>();
+	if (!TestNotNull(TEXT("Real configured sight"), SightConfig)) { return false; }
+	const FVector ToTarget = F.Target->GetActorLocation() - F.Source->GetActorLocation();
+	if (!TestTrue(TEXT("Fixture target is inside actual sight range and cone during scheduler ticks"),
+		ToTarget.Size() < FMath::Min(SightConfig->SightRadius, SightConfig->LoseSightRadius)
+		&& FVector::DotProduct(ToTarget.GetSafeNormal(), F.Source->GetActorForwardVector())
+			> FMath::Cos(FMath::DegreesToRadians(SightConfig->PeripheralVisionAngleDegrees)))) { return false; }
+	F.Sight(true);
+	const FTransform Transform(FRotator::ZeroRotator, FVector(200., 0., 90.));
+	auto* Rocket = F.World->SpawnActorDeferred<ASovReformationDroneRocketProjectile>(ASovReformationDroneRocketProjectile::StaticClass(),
+		Transform, F.Source, F.Source, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+	if (!TestNotNull(TEXT("Deferred native homing rocket"), Rocket)) { return false; }
+	auto* Movement = Rocket->FindComponentByClass<UProjectileMovementComponent>();
+	if (!TestNotNull(TEXT("Native projectile movement"), Movement)) { return false; }
+	TestFalse(TEXT("New native movement does not request the reverse owner order"), Movement->bTickBeforeOwner);
+	// Exercise the legacy Blueprint/default value through real engine registration.
+	Movement->bTickBeforeOwner = true;
+	Rocket->RegisterAllActorTickFunctions(true, false);
+	Movement->RegisterAllComponentTickFunctions(true);
+	const auto DependsOn = [](const FTickFunction& Tick, const FTickFunction& Prerequisite)
+	{
+		return Tick.GetPrerequisites().ContainsByPredicate([&](const FTickPrerequisite& Row) { return Row.Get() == &Prerequisite; });
+	};
+	if (!TestTrue(TEXT("Engine registration actually installed the old reverse dependency"),
+		DependsOn(Rocket->PrimaryActorTick, Movement->PrimaryComponentTick))) { return false; }
+	const auto& Tags = FSovGameplayTags::Get();
+	Rocket->InitializeRocket(F.Source->GetNarrativeAbilitySystemComponent(), F.Source, F.Source,
+		USovGameplayEffect_ReformationDroneDamage::StaticClass(), Tags.Ability_NPC_ReformationDrone_RocketLauncher,
+		FGameplayTagContainer(Tags.Damage_Channel_Kinetic), FGameplayTagContainer(Tags.Damage_GuardClass_Heavy), 1.f,
+		FVector(500., 0., 0.), 0.f, 10.f, 3.f, 350.f, 30.f, 10.f, .5f, true, F.Target, 2000.f);
+	Rocket->FinishSpawning(Transform);
+	Rocket->DispatchBeginPlay(); // Real actor/component registration and native flight startup.
+	TestTrue(TEXT("Both real tick functions registered"), Rocket->PrimaryActorTick.IsTickFunctionRegistered()
+		&& Movement->PrimaryComponentTick.IsTickFunctionRegistered());
+	TestTrue(TEXT("Movement waits for the authoritative tracking check"), DependsOn(Movement->PrimaryComponentTick, Rocket->PrimaryActorTick));
+	TestFalse(TEXT("Only the contradictory movement-before-owner edge is retired"), DependsOn(Rocket->PrimaryActorTick, Movement->PrimaryComponentTick));
+	TestFalse(TEXT("Later component registration cannot reinstall the reverse edge"), Movement->bTickBeforeOwner);
+	const auto Advance = [&](int32 Frames)
+	{
+		for (int32 Index = 0; Index < Frames; ++Index)
+		{
+			TGuardValue<uint64> Frame(GFrameCounter, ++F.TimerFrame);
+			F.World->Tick(LEVELTICK_All, .016f);
+		}
+	};
+	Advance(3);
+	if (!TestTrue(TEXT("Real scheduler advances and curves the unoccluded homing rocket"),
+		!Rocket->HasResolved() && Movement->bIsHomingProjectile && Rocket->GetActorLocation().X > 200.
+		&& Movement->Velocity.Y > 0.f)) { return false; }
+	const FVector BeforeCloak = Movement->Velocity;
+	F.Target->GetNarrativeAbilitySystemComponent()->AddLooseGameplayTag(FNarrativeGameplayTags::Get().State_InvisibleToEnemies);
+	F.Target->SetActorLocation(FVector(2000., -500., 90.));
+	Advance(1); // No manual Rocket::Tick or movement call: order must be provided by the scheduler.
+	TestFalse(TEXT("Cloak retires tracking before this frame computes acceleration"), Movement->bIsHomingProjectile);
+	TestTrue(TEXT("The retirement frame preserves the previously committed ballistic velocity"), Movement->Velocity.Equals(BeforeCloak, .01f));
+	TestTrue(TEXT("Physical movement and swept root remain active after tracking retirement"),
+		Movement->IsComponentTickEnabled() && Movement->bSweepCollision && Movement->UpdatedComponent == Rocket->GetRootComponent()
+		&& Rocket->GetActorEnableCollision());
+	// A physical blocker still resolves the moving projectile through its native swept collision.
+	auto* WallActor = F.World->SpawnActor<AActor>();
+	if (!TestNotNull(TEXT("Physical blocker owner"), WallActor)) { return false; }
+	auto* Wall = NewObject<UBoxComponent>(WallActor);
+	WallActor->SetRootComponent(Wall); WallActor->AddInstanceComponent(Wall);
+	Wall->SetBoxExtent(FVector(5., 500., 500.));
+	Wall->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics); Wall->SetCollisionObjectType(ECC_WorldStatic);
+	Wall->SetCollisionResponseToAllChannels(ECR_Block); Wall->RegisterComponent();
+	WallActor->SetActorLocation(Rocket->GetActorLocation() + Movement->Velocity * .08f);
+	Advance(10);
+	TestTrue(TEXT("Native physical sweep resolves the rocket against the real blocker"), Rocket->HasResolved()
+		&& !Rocket->ExpiredInFlight() && Rocket->GetResolution().HitActor == WallActor);
+	TestFalse(TEXT("Resolved projectile movement is disabled"), Movement->IsComponentTickEnabled());
 	return true;
 }
 #endif

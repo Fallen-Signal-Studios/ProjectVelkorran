@@ -2,6 +2,7 @@
 
 
 #include "Character/NarrativeCharacterVisual.h"
+#include "UObject/StrongObjectPtr.h"
 #include "NarrativeGameplayTags.h"
 #include "NarrativeLogChannels.h"
 #include "UnrealFramework/NarrativeCharacter.h"
@@ -1359,38 +1360,41 @@ void ANarrativeCharacterVisual::ResetMeshToBaseAppearance(FGameplayTag Slot)
 
 void ANarrativeCharacterVisual::OnBaseMeshesReady()
 {
+	const TWeakObjectPtr<ANarrativeCharacter> InitialCharacter(OwnerCharacter);
+	if (!InitialCharacter.IsValid()) { return; }
+	ANarrativeCharacterVisual* ExpectedVisual = InitialCharacter->GetCharacterVisual();
+	if (ExpectedVisual && ExpectedVisual != this) { return; }
+	const auto IsCurrentOwner = [this, InitialCharacter, &ExpectedVisual]()
+	{
+		return IsValid(this) && !IsActorBeingDestroyed() && InitialCharacter.IsValid()
+			&& !InitialCharacter->IsActorBeingDestroyed() && OwnerCharacter == InitialCharacter.Get()
+			&& InitialCharacter->GetCharacterVisual() == ExpectedVisual;
+	};
+	if (!IsCurrentOwner()) { return; }
+	TStrongObjectPtr<ANarrativeCharacterVisual> KeepVisual(this);
+	TStrongObjectPtr<ANarrativeCharacter> KeepCharacter(InitialCharacter.Get());
+	const auto CompletedLoadHandle = BaseAppearanceLoadHandle;
 	bBaseAppearanceLoaded = true;
-
 	UE_LOG(LogNarrativeCharacterVisual, Verbose, TEXT("%s: Applying base meshes"), *OwnerCharacter->GetHumanReadableName());
-
-	for (auto& BodyPart : AppearanceAttributeSet.Meshes)
+	const auto Meshes = AppearanceAttributeSet.Meshes;
+	for (auto& BodyPart : Meshes)
 	{
 		OnMeshAppearanceReady(BodyPart.Key, BodyPart.Value);
+		if (!IsCurrentOwner()) { return; }
 	}
-
 	OnBaseAppearanceApplied.Broadcast();
-	
-	if (OwnerCharacter)
-	{
-		//Seemed that rarely this would init before pointer repped back? Either way just set it here beforehand to make sure. 
-		if (!OwnerCharacter->CharVisual)
-		{
-			OwnerCharacter->CharVisual = this;
-		}
-		
-		OwnerCharacter->OnCharacterVisualInitialized();
-	}
-	else
-	{
-		UE_LOG(LogNarrativeNet, Warning, TEXT("BADTHING OwnerCharacter was null. GetOwner is %s, CharacterOwner ptr is %s"), *GetNameSafe(GetOwner()), *GetNameSafe(OwnerCharacter));
-	}
-	
-	BaseAppearanceApplied();
+	if (!IsCurrentOwner()) { return; }
 
-	if (BaseAppearanceLoadHandle)
-	{
-		BaseAppearanceLoadHandle.Reset();
-	}
+	// The visual may finish loading before its replicated character pointer.
+	if (!OwnerCharacter->CharVisual) { OwnerCharacter->CharVisual = this; }
+	ExpectedVisual = this;
+	OwnerCharacter->OnCharacterVisualInitialized();
+	// A saved-dead NPC is destroyed inside that callback. Do not then invoke
+	// the visual's Blueprint event, or clear a newer appearance's load handle.
+	if (!IsCurrentOwner() || InitialCharacter->GetCharacterVisual() != this) { return; }
+	BaseAppearanceApplied();
+	if (!IsCurrentOwner() || InitialCharacter->GetCharacterVisual() != this) { return; }
+	if (BaseAppearanceLoadHandle == CompletedLoadHandle) { BaseAppearanceLoadHandle.Reset(); }
 }
 
 void ANarrativeCharacterVisual::OnMeshAppearanceReady(FGameplayTag Slot, FCharacterCreatorAttribute_Mesh MeshData)

@@ -54,7 +54,8 @@ float UNPCActivity::ScoreActivity_Implementation(const FNPCGoalContainer& GoalCo
 
 	for (auto& Goal : GoalContainer.Goals)
 	{
-		const float GoalScore = ScoreGoalItem(Goal);
+		const float GoalScore = IsValid(OwnerActivityComponent) && OwnerActivityComponent->HasStaleRegisteredGoalKey(Goal)
+			? -1.f : ScoreGoalItem(Goal);
 
 		//Negative scored goals should be removed, and zero scored goals should be ignored. 
 		if (GoalScore < 0.f)
@@ -74,8 +75,10 @@ float UNPCActivity::ScoreActivity_Implementation(const FNPCGoalContainer& GoalCo
 
 float UNPCActivity::ScoreGoalItem_Implementation(const UNPCGoalItem* Goal) 
 {
-	if (Goal)
+	if (IsValid(Goal))
 	{
+		if (IsValid(OwnerActivityComponent) && OwnerActivityComponent->HasStaleRegisteredGoalKey(Goal))
+		{ return -1.f; }
 		//Check if goals lifetime is up 
 		if (Goal->GoalLifetime > 0.f)
 		{

@@ -159,7 +159,7 @@ TSharedRef<SWidget> USovAccessibilitySettingsMenu::RebuildWidget()
 		AddRow("Recovery.Retry", LOCTEXT("RetryRecovery", "Retry checkpoint recovery"));
 		AddRow("bMenuNarration", LOCTEXT("Narration", "Menu and dialogue narration"));
 		AddRow("UIScale", LOCTEXT("UIScale", "UI text scale"), 1.f, 2.f, .25f);
-		AddRow("bShowObjectiveText", LOCTEXT("ShowObjectiveText", "Show objective text"));
+		AddRow("bShowObjectiveText", LOCTEXT("ShowObjectivesAndWaypoints", "Show objectives and waypoints"));
 		AddRow("SubtitleScale", LOCTEXT("SubtitleScale", "Subtitle text scale"), 1.f, 2.5f, .25f);
 		AddRow("bSubtitles", LOCTEXT("Subtitles", "Speech subtitles"));
 		AddRow("bClosedCaptions", LOCTEXT("Captions", "Important sound captions"));
@@ -214,6 +214,7 @@ TSharedRef<SWidget> USovAccessibilitySettingsMenu::RebuildWidget()
 		AddRow("MeleeAimAssistStrength", LOCTEXT("MeleeAssist", "Melee aim assistance"), 0, 1, .1f);
 		AddRow("RangedAimAssistStrength", LOCTEXT("RangedAssist", "Ranged aim friction"), 0, 1, .1f);
 		AddRow("bDisableCameraShake", LOCTEXT("Shake", "Disable camera shake")); AddRow("bReduceLensEffects", LOCTEXT("Lens", "Reduce lens effects")); AddRow("bReduceCorruptionEffects", LOCTEXT("Corruption", "Reduce corruption distortion"));
+		AddRow("bReduceCombatEffects", LOCTEXT("CombatEffects", "Reduce combat particles"));
 		AddRow("Haptic.Master", LOCTEXT("HapticMaster", "Vibration master"), 0, 1, .1f);
 		AddRow("Haptic.Combat", LOCTEXT("HapticCombat", "Combat vibration"), 0, 1, .1f);
 		AddRow("Haptic.Interaction", LOCTEXT("HapticInteraction", "Interaction vibration"), 0, 1, .1f);

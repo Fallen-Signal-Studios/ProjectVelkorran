@@ -113,6 +113,34 @@ namespace
 		if (!Test.TestTrue(TEXT("Native charge remains active with held input"), Ability->IsActive())) { return nullptr; }
 		return Ability;
 	}
+
+	USovAxiomRuntimeTestCommandLink* AddPulseLink(FAutomationTestBase& Test,
+		ASovAxiomRuntimeTestCharacter* Node, ASovAxiomRuntimeTestCharacter* Source, FName Id)
+	{
+		const FName ComponentName(*Id.ToString().Replace(TEXT("."), TEXT("_")));
+		auto* Link = NewObject<USovAxiomRuntimeTestCommandLink>(Node, ComponentName);
+		Node->AddInstanceComponent(Link);
+		Link->RegisterComponent();
+		Test.TestTrue(TEXT("Authored link identity is accepted before activation"), Link->ConfigureLinkId(Id));
+		Link->OnCommandLinkSevered.AddDynamic(Source, &ASovAxiomRuntimeTestCharacter::RecordSever);
+		return Link;
+	}
+
+	bool ReleasePulseInput(FAutomationTestBase& Test, ASovAxiomRuntimeTestCharacter* Source,
+		USovAxiomRuntimeTestAbility* Pulse)
+	{
+		// Drive the same GAS event as Narrative's input processing. The real
+		// WaitInputRelease task invokes the ability's normal release callback.
+		FGameplayAbilitySpec* Spec = Pulse ? Pulse->GetCurrentAbilitySpec() : nullptr;
+		if (!Test.TestNotNull(TEXT("Held native ability has an active input spec"), Spec)) { return false; }
+		const FGameplayAbilitySpecHandle Handle = Pulse->GetCurrentAbilitySpecHandle();
+		const FPredictionKey PredictionKey = Pulse->GetCurrentActivationInfoRef().GetActivationPredictionKey();
+		auto* ASC = Source->GetNarrativeAbilitySystemComponent();
+		Spec->InputPressed = false;
+		ASC->AbilitySpecInputReleased(*Spec);
+		return Test.TestTrue(TEXT("Real input-release task receives the ordinary GAS event"),
+			ASC->InvokeReplicatedEvent(EAbilityGenericReplicatedEvent::InputReleased, Handle, PredictionKey));
+	}
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAxiomRuntimeReleaseTest,
@@ -390,6 +418,229 @@ bool FSovAxiomRuntimeActivationGateTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Insufficient Echo fails before activation"), ASC->TryActivateAbility(Handle));
 	TestEqual(TEXT("Failed payment leaves Echo intact"), Source->TestEcho->GetEcho(), 20.f);
 	TestFalse(TEXT("Rejected activation grants no busy state"), ASC->HasMatchingGameplayTag(Tags.State_EchoAbility_Active));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAxiomRuntimeMultipleLinkTest,
+	"ProjectVelkorran.Campaign.AxiomNullPulse.SuccessiveInputsSeverIndependentLinks",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+
+bool FSovAxiomRuntimeMultipleLinkTest::RunTest(const FString& Parameters)
+{
+	FAxiomRuntimeWorld Fixture;
+	if (!Fixture.World) { AddError(TEXT("World creation failed")); return false; }
+	auto* Source = Fixture.Character(FVector::ZeroVector, 0);
+	auto* Node = Fixture.Character(FVector(1000.f, 0.f, 0.f));
+	if (!Source || !Node) { AddError(TEXT("Command fixtures failed to spawn")); return false; }
+	// Deliberately create B first: selection uses authored identity, not component order.
+	auto* LinkB = AddPulseLink(*this, Node, Source, TEXT("Aurelion.Weaver.AnchorB"));
+	auto* LinkA = AddPulseLink(*this, Node, Source, TEXT("Aurelion.Weaver.AnchorA"));
+	if (!TestTrue(TEXT("A activates through native link owner"), LinkA->ActivateCommandLink(Node))
+		|| !TestTrue(TEXT("B activates through native link owner"), LinkB->ActivateCommandLink(Node))) { return false; }
+	const FGuid InstanceA = LinkA->GetLinkInstanceId(), InstanceB = LinkB->GetLinkInstanceId();
+	TestTrue(TEXT("Independent active links have distinct instance identities"), InstanceA.IsValid() && InstanceB.IsValid() && InstanceA != InstanceB);
+	auto* Pulse = ActivatePulse(*this, Source);
+	if (!Pulse || !ReleasePulseInput(*this, Source, Pulse)) { return false; }
+	TestEqual(TEXT("First input severs authored A"), LinkA->GetCommandLinkState(), ESovCommandLinkState::Severed);
+	TestTrue(TEXT("B remains active after the first input"), LinkB->IsCommandLinkActive());
+	TestEqual(TEXT("First input emits one actual native receipt"), Source->RecordedSevers.Num(), 1);
+	TestEqual(TEXT("First native sever returns exactly 12 Echo after the 30 cost"), Source->TestEcho->GetEcho(), 82.f);
+	Pulse->FinishEchoAbility();
+	Pulse = ActivatePulse(*this, Source);
+	if (!Pulse || !ReleasePulseInput(*this, Source, Pulse)) { return false; }
+	TestEqual(TEXT("Second ordinary input reaches B on the same actor"), LinkB->GetCommandLinkState(), ESovCommandLinkState::Severed);
+	TestEqual(TEXT("Two ordinary inputs emit two actual receipts"), Source->RecordedSevers.Num(), 2);
+	TestEqual(TEXT("Each independent native sever earns its own 12 Echo"), Source->TestEcho->GetEcho(), 64.f);
+	if (Source->RecordedSevers.Num() == 2)
+	{
+		const auto& A = Source->RecordedSevers[0];
+		const auto& B = Source->RecordedSevers[1];
+		TestTrue(TEXT("Transactions are valid and distinct"), A.TransactionId.IsValid() && B.TransactionId.IsValid() && A.TransactionId != B.TransactionId);
+		TestEqual(TEXT("A receipt retains exact activation identity"), A.LinkInstanceId, InstanceA);
+		TestEqual(TEXT("B receipt retains exact activation identity"), B.LinkInstanceId, InstanceB);
+		TestTrue(TEXT("Both receipts retain actual source, node, severer and reward admission"),
+			A.LinkOwner == Node && B.LinkOwner == Node && A.CommandSource == Node && B.CommandSource == Node
+			&& A.SeveredBy == Source && B.SeveredBy == Source && A.bEligibleForEchoReward && B.bEligibleForEchoReward);
+	}
+	const FGuid TransactionA = LinkA->CaptureCommandLinkState().LastSeverTransactionId;
+	const FGuid TransactionB = LinkB->CaptureCommandLinkState().LastSeverTransactionId;
+	Pulse->FinishEchoAbility();
+	Pulse = ActivatePulse(*this, Source);
+	if (!Pulse || !ReleasePulseInput(*this, Source, Pulse)) { return false; }
+	TestEqual(TEXT("Third ordinary input cannot replay either receipt"), Source->RecordedSevers.Num(), 2);
+	TestEqual(TEXT("A transaction remains unchanged on replay"), LinkA->CaptureCommandLinkState().LastSeverTransactionId, TransactionA);
+	TestEqual(TEXT("B transaction remains unchanged on replay"), LinkB->CaptureCommandLinkState().LastSeverTransactionId, TransactionB);
+	TestEqual(TEXT("No reward without a new sever"), Source->TestEcho->GetEcho(), 34.f);
+	TestEqual(TEXT("Command pulses keep the actual node alive"), Value(Node->GetNarrativeAbilitySystemComponent(), UNarrativeAttributeSetBase::GetHealthAttribute()), 100.f);
+	Pulse->FinishEchoAbility();
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAxiomRuntimeBroadphaseTest,
+	"ProjectVelkorran.Campaign.AxiomNullPulse.BroadphaseResolvesEachActorOnce",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+
+bool FSovAxiomRuntimeBroadphaseTest::RunTest(const FString& Parameters)
+{
+	FAxiomRuntimeWorld Fixture;
+	if (!Fixture.World) { AddError(TEXT("World creation failed")); return false; }
+	auto* Source = Fixture.Character(FVector::ZeroVector, 0);
+	auto* Node = Fixture.Character(FVector(1000.f, 0.f, 0.f));
+	if (!Source || !Node) { AddError(TEXT("Command fixtures failed to spawn")); return false; }
+
+	// One target actor commonly overlaps the release sphere through several primitives.
+	// Give the node extra query-only geometry so the broadphase returns it repeatedly.
+	for (int32 Index = 0; Index < 4; ++Index)
+	{
+		auto* Extra = NewObject<UBoxComponent>(Node);
+		Node->AddInstanceComponent(Extra);
+		Extra->SetupAttachment(Node->GetRootComponent());
+		Extra->SetBoxExtent(FVector(40.f, 40.f, 40.f));
+		Extra->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+		Extra->SetCollisionObjectType(ECC_Pawn);
+		Extra->SetCollisionResponseToAllChannels(ECR_Overlap);
+		Extra->RegisterComponent();
+		Extra->SetRelativeLocation(FVector(0.f, 0.f, 20.f * Index));
+	}
+	// Static level geometry is off the firing line. It is not an Axiom target and, since the
+	// broadphase no longer queries ECC_WorldStatic, it must not change targeting either way.
+	Fixture.Wall(FVector(500.f, 900.f, 0.f));
+
+	auto* Link = AddPulseLink(*this, Node, Source, TEXT("Aurelion.Weaver.AnchorA"));
+	if (!TestTrue(TEXT("Link activates through native link owner"), Link->ActivateCommandLink(Node))) { return false; }
+	auto* Pulse = ActivatePulse(*this, Source);
+	if (!Pulse || !ReleasePulseInput(*this, Source, Pulse)) { return false; }
+
+	TestEqual(TEXT("A multi-primitive target is still acquired and severed"),
+		Link->GetCommandLinkState(), ESovCommandLinkState::Severed);
+	TestEqual(TEXT("Repeated overlap primitives produce exactly one native receipt"),
+		Source->RecordedSevers.Num(), 1);
+	TestEqual(TEXT("Repeated overlap primitives award the sever exactly once"),
+		Source->TestEcho->GetEcho(), 82.f);
+	TestEqual(TEXT("Command pulses keep the actual node alive"),
+		Value(Node->GetNarrativeAbilitySystemComponent(), UNarrativeAttributeSetBase::GetHealthAttribute()), 100.f);
+	Pulse->FinishEchoAbility();
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAxiomRuntimeCandidateAdmissionTest,
+	"ProjectVelkorran.Campaign.AxiomNullPulse.RejectedAndRetiredLinksCannotBlockEligibleLink",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+
+bool FSovAxiomRuntimeCandidateAdmissionTest::RunTest(const FString& Parameters)
+{
+	FAxiomRuntimeWorld Fixture;
+	if (!Fixture.World) { AddError(TEXT("World creation failed")); return false; }
+	auto* Source = Fixture.Character(FVector::ZeroVector, 0);
+	auto* Node = Fixture.Character(FVector(1000.f, 0.f, 0.f));
+	auto* Friendly = Fixture.Character(FVector(0.f, 1000.f, 0.f), 0);
+	if (!Source || !Node || !Friendly) { AddError(TEXT("Admission fixtures failed to spawn")); return false; }
+	auto* Inactive = AddPulseLink(*this, Node, Source, TEXT("00.Inactive"));
+	auto* Retired = AddPulseLink(*this, Node, Source, TEXT("01.Unregistered"));
+	auto* Immune = AddPulseLink(*this, Node, Source, TEXT("02.NonSeverable"));
+	auto* NonHostile = AddPulseLink(*this, Node, Source, TEXT("03.NonHostile"));
+	auto* Accepted = AddPulseLink(*this, Node, Source, TEXT("04.Accepted"));
+	auto* Deferred = AddPulseLink(*this, Node, Source, TEXT("05.NextPulse"));
+	Immune->SetTestSeverable(false);
+	NonHostile->SetTestIncludeOwner(false);
+	TestTrue(TEXT("Nonhostile candidate has an actual friendly participant"), NonHostile->RegisterLinkedActor(Friendly));
+	for (auto* Link : {Retired, Immune, NonHostile, Accepted, Deferred})
+	{
+		if (!TestTrue(TEXT("Candidate activates normally"), Link->ActivateCommandLink(Node))) { return false; }
+	}
+	Retired->UnregisterComponent();
+	TestFalse(TEXT("Retired candidate is no longer registered"), Retired->IsRegistered());
+	TestTrue(TEXT("Retired candidate still carries a logical instance requiring rejection"), Retired->IsCommandLinkActive());
+	auto* Pulse = ActivatePulse(*this, Source);
+	if (!Pulse || !ReleasePulseInput(*this, Source, Pulse)) { return false; }
+	TestEqual(TEXT("Native rejection of earlier candidates does not hide eligible link"), Accepted->GetCommandLinkState(), ESovCommandLinkState::Severed);
+	TestTrue(TEXT("Next eligible link is reserved for another pulse"), Deferred->IsCommandLinkActive());
+	TestEqual(TEXT("Only actual accepted link emits a receipt"), Source->RecordedSevers.Num(), 1);
+	TestEqual(TEXT("Rejected candidates create no additional reward"), Source->TestEcho->GetEcho(), 82.f);
+	TestEqual(TEXT("Inactive candidate remains inactive"), Inactive->GetCommandLinkState(), ESovCommandLinkState::Inactive);
+	for (auto* Link : {Inactive, Retired, Immune, NonHostile, Deferred})
+	{
+		TestFalse(TEXT("Unselected or rejected candidate has no sever transaction"), Link->CaptureCommandLinkState().LastSeverTransactionId.IsValid());
+	}
+	TestTrue(TEXT("Nonseverable candidate retains native active state"), Immune->IsCommandLinkActive());
+	TestTrue(TEXT("Nonhostile candidate retains native active state"), NonHostile->IsCommandLinkActive());
+	if (Source->RecordedSevers.Num() == 1)
+	{
+		TestEqual(TEXT("Receipt names only the accepted native link"), Source->RecordedSevers[0].LinkId, Accepted->GetLinkId());
+	}
+	Pulse->FinishEchoAbility();
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAxiomRuntimeOneLinkPerNodeTest,
+	"ProjectVelkorran.Campaign.AxiomNullPulse.PreservesOneSeverPerHitCommandNode",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+
+bool FSovAxiomRuntimeOneLinkPerNodeTest::RunTest(const FString& Parameters)
+{
+	FAxiomRuntimeWorld Fixture;
+	if (!Fixture.World) { AddError(TEXT("World creation failed")); return false; }
+	auto* Source = Fixture.Character(FVector::ZeroVector, 0);
+	auto* Left = Fixture.Character(FVector(1000.f, -100.f, 0.f));
+	auto* Right = Fixture.Character(FVector(1000.f, 100.f, 0.f));
+	if (!Source || !Left || !Right) { AddError(TEXT("Multiple-node fixtures failed to spawn")); return false; }
+	auto* LinkA = AddPulseLink(*this, Left, Source, TEXT("NodeA"));
+	auto* LinkB = AddPulseLink(*this, Right, Source, TEXT("NodeB"));
+	auto* NextA = AddPulseLink(*this, Left, Source, TEXT("NodeA2"));
+	auto* NextB = AddPulseLink(*this, Right, Source, TEXT("NodeB2"));
+	if (!TestTrue(TEXT("Left link activates"), LinkA->ActivateCommandLink(Left))
+		|| !TestTrue(TEXT("Right link activates"), LinkB->ActivateCommandLink(Right))
+		|| !TestTrue(TEXT("Second left link activates"), NextA->ActivateCommandLink(Left))
+		|| !TestTrue(TEXT("Second right link activates"), NextB->ActivateCommandLink(Right))) { return false; }
+	auto* Pulse = ActivatePulse(*this, Source);
+	if (!Pulse || !ReleasePulseInput(*this, Source, Pulse)) { return false; }
+	TestEqual(TEXT("Both visible command nodes receive the pulse's normal Shield payload"), Left->ResolvedHitCount + Right->ResolvedHitCount, 2);
+	TestTrue(TEXT("Pulse preserves one successful sever on each hit node"),
+		LinkA->GetCommandLinkState() == ESovCommandLinkState::Severed && LinkB->GetCommandLinkState() == ESovCommandLinkState::Severed);
+	TestTrue(TEXT("Second independent link on each node waits for a later pulse"), NextA->IsCommandLinkActive() && NextB->IsCommandLinkActive());
+	TestEqual(TEXT("Whole pulse preserves two native receipts across two hit nodes"), Source->RecordedSevers.Num(), 2);
+	TestEqual(TEXT("Each successful node retains its existing sever reward"), Source->TestEcho->GetEcho(), 94.f);
+	Pulse->FinishEchoAbility();
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAxiomRuntimeLinkCallbackRetirementTest,
+	"ProjectVelkorran.Campaign.AxiomNullPulse.LinkCallbacksRetireRemainingCandidates",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+
+bool FSovAxiomRuntimeLinkCallbackRetirementTest::RunTest(const FString& Parameters)
+{
+	FAxiomRuntimeWorld Fixture;
+	if (!Fixture.World) { AddError(TEXT("World creation failed")); return false; }
+	auto* Source = Fixture.Character(FVector::ZeroVector, 0);
+	auto* Node = Fixture.Character(FVector(1000.f, 0.f, 0.f));
+	if (!Source || !Node) { AddError(TEXT("Callback fixtures failed to spawn")); return false; }
+	auto* LinkA = AddPulseLink(*this, Node, Source, TEXT("A"));
+	auto* LinkB = AddPulseLink(*this, Node, Source, TEXT("B"));
+	if (!LinkA->ActivateCommandLink(Node) || !LinkB->ActivateCommandLink(Node)) { AddError(TEXT("Link activation failed")); return false; }
+	auto* Pulse = ActivatePulse(*this, Source);
+	if (!Pulse) { return false; }
+	// A real routed Shield callback can retire the pulse before link admission.
+	Node->ReentrantPulse = Pulse;
+	Node->bCancelPulseOnDamage = true;
+	if (!ReleasePulseInput(*this, Source, Pulse)) { return false; }
+	TestFalse(TEXT("Damage callback ends the actual activation"), Pulse->IsActive());
+	TestTrue(TEXT("Cancelled input leaves both links active"), LinkA->IsCommandLinkActive() && LinkB->IsCommandLinkActive());
+	TestEqual(TEXT("Cancellation before admission emits no receipt"), Source->RecordedSevers.Num(), 0);
+	TestEqual(TEXT("Cancellation before a sever earns no reward"), Source->TestEcho->GetEcho(), 70.f);
+	Node->ReentrantPulse.Reset();
+	Node->bCancelPulseOnDamage = false;
+	Pulse = ActivatePulse(*this, Source);
+	if (!Pulse) { return false; }
+	Source->ReentrantPulse = Pulse;
+	Source->bCancelPulseOnSever = true;
+	if (!ReleasePulseInput(*this, Source, Pulse)) { return false; }
+	TestFalse(TEXT("Actual native receipt listener ends the second activation"), Pulse->IsActive());
+	TestEqual(TEXT("Already committed A remains severed"), LinkA->GetCommandLinkState(), ESovCommandLinkState::Severed);
+	TestTrue(TEXT("Callback cancellation cannot continue into B"), LinkB->IsCommandLinkActive());
+	TestEqual(TEXT("Committed receipt remains singular despite cancellation"), Source->RecordedSevers.Num(), 1);
+	TestEqual(TEXT("Original living source retains only the earned sever refund"), Source->TestEcho->GetEcho(), 52.f);
+	TestFalse(TEXT("Retired ability cannot release again"), Pulse->ReleaseAxiomNullPulseFromAim());
 	return true;
 }
 

@@ -7,6 +7,8 @@
 #include "Characters/SovNPCCharacterBase.h"
 #include "Characters/SovPlayerCharacterBase.h"
 #include "Character/PlayerDefinition.h"
+#include "Character/NarrativeCharacterVisual.h"
+#include "Weapons/WeaponVisual.h"
 #include "Components/SovDismembermentComponent.h"
 #include "Components/SovEchoComponent.h"
 #include "Framework/SovPlayerState.h"
@@ -24,6 +26,7 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
+#include "GAS/NarrativeAttributeSetBase.h"
 #include "GameFramework/PlayerController.h"
 #include "GameplayEffect.h"
 #include "Misc/SecureHash.h"
@@ -44,6 +47,12 @@ static_assert(static_cast<unsigned>(ESovEncounterState::Restoring) == 4u);
 
 namespace
 {
+	bool IsPersistentCharacterPresentation(const AActor* Actor)
+	{
+		// These actors share combatant ownership with projectiles, but belong to
+		// Narrative's character/equipment lifecycle, not an encounter attempt.
+		return Actor && (Actor->IsA<ANarrativeCharacterVisual>() || Actor->IsA<AWeaponVisual>());
+	}
 	bool IsQuiescent(UAbilitySystemComponent* ASC, bool bOwnEntrySuspension = false)
 	{
 		if (!ASC) { return false; }
@@ -120,6 +129,10 @@ void ASovEncounterDirector::BeginPlay()
 	{
 		if (IsValid(Participant.Character)) { Participant.Character->SetEncounterOwned(); }
 	}
+	if (bHoldParticipantsBeforeEntry && State == ESovEncounterState::Inactive && !bHasEntryCheckpoint)
+	{ SetActorTickEnabled(true); RefreshPreEntryHold(); }
+	if (bMaintainLoadedParticipantHold && State == ESovEncounterState::Failed)
+	{ SetActorTickEnabled(true); RefreshLoadedParticipantHold(); }
 }
 
 void ASovEncounterDirector::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -195,6 +208,7 @@ bool ASovEncounterDirector::RegisterParticipant(FName ParticipantId, ASovNPCChar
 	Participant.Character = Character;
 	Participant.bRequiredForVictory = bRequiredForVictory;
 	Character->SetEncounterOwned();
+	if (bHoldParticipantsBeforeEntry) { SetActorTickEnabled(true); RefreshPreEntryHold(); }
 	return true;
 }
 
@@ -223,12 +237,48 @@ bool ASovEncounterDirector::CaptureNPC(const FSovEncounterParticipant& Participa
 	FNPCSpawnInfo::StaticStruct()->SerializeItem(Archive, &Record.SpawnInfo, nullptr);
 	Record.WieldEquipSlots = NPC->GetWeaponWieldState().EquipSlots;
 	Record.WieldSlots = NPC->GetWeaponWieldState().WieldSlots;
-	if (Archive.IsError() || !Save || !Save->CreateActorRecord(NPC, Record.ActorRecord)
-		|| !USovEncounterSnapshotLibrary::CaptureResources(ASC, Record.Resources) || Record.Resources.Health <= 0.f)
+	if (Archive.IsError())
+	{ Error = FString::Printf(TEXT("Participant %s could not serialize its Narrative spawn metadata."), *Participant.ParticipantId.ToString()); return false; }
+	if (!Save)
+	{ Error = FString::Printf(TEXT("Participant %s has no current Narrative save subsystem."), *Participant.ParticipantId.ToString()); return false; }
+	if (!Save->CreateActorRecord(NPC, Record.ActorRecord))
+	{ Error = FString::Printf(TEXT("Participant %s failed Narrative actor/component record capture."), *Participant.ParticipantId.ToString()); return false; }
+	Record.ActorTags = NPC->Tags;
+	if (!USovEncounterSnapshotLibrary::CaptureResources(ASC, Record.Resources))
 	{
-		Error = FString::Printf(TEXT("Participant %s could not create a valid Narrative resource/actor record."), *Participant.ParticipantId.ToString());
+		Error = FString::Printf(TEXT("Participant %s failed canonical combat-resource capture."), *Participant.ParticipantId.ToString());
+		if (IsValid(ASC))
+		{
+			const auto AppendResource = [&](const TCHAR* Name, FGameplayAttribute Current, FGameplayAttribute Maximum)
+			{
+				Error += FString::Printf(TEXT(" %s=%.3f(base %.3f)/%.3f(base %.3f);"), Name,
+					ASC->GetNumericAttribute(Current), ASC->GetNumericAttributeBase(Current),
+					ASC->GetNumericAttribute(Maximum), ASC->GetNumericAttributeBase(Maximum));
+			};
+#define SOV_DESCRIBE_RESOURCE(Name) AppendResource(TEXT(#Name), UNarrativeAttributeSetBase::Get##Name##Attribute(), UNarrativeAttributeSetBase::GetMax##Name##Attribute());
+			SOV_DESCRIBE_RESOURCE(Health)
+			SOV_DESCRIBE_RESOURCE(Shield)
+			SOV_DESCRIBE_RESOURCE(Stamina)
+			SOV_DESCRIBE_RESOURCE(Poise)
+			SOV_DESCRIBE_RESOURCE(Echo)
+#undef SOV_DESCRIBE_RESOURCE
+			for (const FActiveGameplayEffectHandle Handle : ASC->GetActiveEffects(FGameplayEffectQuery()))
+			{
+				const FActiveGameplayEffect* Active = ASC->GetActiveGameplayEffect(Handle);
+				if (!Active || !Active->Spec.Def) { continue; }
+				Error += FString::Printf(TEXT(" Effect=%s period=%.3f inhibited=%d;"),
+					*Active->Spec.Def->GetPathName(), Active->Spec.GetPeriod(), Active->bIsInhibited ? 1 : 0);
+				for (const FGameplayModifierInfo& Modifier : Active->Spec.Def->Modifiers)
+				{
+					Error += FString::Printf(TEXT(" %s op=%d magnitudeType=%d;"), *Modifier.Attribute.GetName(),
+					static_cast<int32>(Modifier.ModifierOp), static_cast<int32>(Modifier.ModifierMagnitude.GetMagnitudeCalculationType()));
+				}
+			}
+		}
 		return false;
 	}
+	if (Record.Resources.Health <= 0.f)
+	{ Error = FString::Printf(TEXT("Participant %s has no living health in its captured resources."), *Participant.ParticipantId.ToString()); return false; }
 	if (const USovDismembermentComponent* Sever = NPC->FindComponentByClass<USovDismembermentComponent>())
 	{
 		Record.SeveredRegionMask = Sever->GetSeveredRegionMask();
@@ -273,6 +323,7 @@ bool ASovEncounterDirector::CaptureNPC(const FSovEncounterParticipant& Participa
 bool ASovEncounterDirector::CaptureEntryCheckpoint(ASovPlayerCharacterBase* Player, FString& Error)
 {
 	Error.Reset();
+	if (bHoldParticipantsBeforeEntry) { RefreshPreEntryHold(); }
 	if (!HasAuthority() || State != ESovEncounterState::Inactive || bHasEntryCheckpoint || bMutationInProgress || bInvalidEncounterIdentity
 		|| EncounterId.IsNone() || Participants.IsEmpty() || !IsValid(Player) || !Player->IsCharacterReady() || !Player->IsAlive())
 	{
@@ -569,6 +620,15 @@ bool ASovEncounterDirector::AreOwnedParticipantsQuiescent(bool bAllowConfirmedDe
 	return true;
 }
 
+bool ASovEncounterDirector::HasConfirmedParticipantDefeat(FName ParticipantId) const
+{
+	if (!HasAuthority() || IsActorBeingDestroyed() || State != ESovEncounterState::Active
+		|| !AttemptId.IsValid() || !DefeatedParticipants.Contains(ParticipantId)) { return false; }
+	return bHasEntryCheckpoint
+		? EntryParticipants.ContainsByPredicate([ParticipantId](const auto& Entry) { return Entry.ParticipantId == ParticipantId; })
+		: Participants.ContainsByPredicate([ParticipantId](const auto& Entry) { return Entry.ParticipantId == ParticipantId; });
+}
+
 bool ASovEncounterDirector::HasConfirmedRequiredDefeats() const
 {
 	bool bHasRequired = false;
@@ -618,7 +678,7 @@ void ASovEncounterDirector::EvaluateCompletionConditions()
 	if (bHasRequired) { CompleteEncounter(); }
 }
 
-void ASovEncounterDirector::SuspendActor(AActor* Actor)
+void ASovEncounterDirector::SuspendActor(AActor* Actor, bool bSuspendAbilitySystem)
 {
 	if (!IsValid(Actor)) { return; }
 	if (APawn* Pawn = Cast<APawn>(Actor))
@@ -631,7 +691,7 @@ void ASovEncounterDirector::SuspendActor(AActor* Actor)
 				|| SuspendedThreatControllers.FindRef(ThreatController).Get() != Pawn) { return; }
 		}
 	}
-	if (UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Actor))
+	if (UAbilitySystemComponent* ASC = bSuspendAbilitySystem ? UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Actor) : nullptr)
 	{
 		if (!SuspendedASCs.Contains(ASC) || !OwnedBusySuspensions.Contains(ASC) || !OwnedProtectionSuspensions.Contains(ASC))
 		{
@@ -762,6 +822,7 @@ bool ASovEncounterDirector::RegisterAttemptActor(AActor* SpawnedActor)
 {
 	if (!HasAuthority() || (State != ESovEncounterState::Active && State != ESovEncounterState::Failed) || !IsValid(SpawnedActor) || SpawnedActor->GetWorld() != GetWorld()
 		|| SpawnedActor == this || SpawnedActor == ResolvePlayer() || !FindParticipantId(SpawnedActor).IsNone()
+		|| IsPersistentCharacterPresentation(SpawnedActor)
 		|| !IsAttributedTo(SpawnedActor, this, ResolvePlayer())) { return false; }
 	AttemptActors.AddUnique(SpawnedActor);
 	return true;
@@ -786,7 +847,8 @@ bool ASovEncounterDirector::CleanupAttemptActors(TFunctionRef<bool()> CanContinu
 	for (AActor* Actor : ToDestroy)
 	{
 		if (!CanContinue()) { return false; }
-		if (!IsValid(Actor)) { continue; }
+		// Also reject presentation already captured by an older attempt/save.
+		if (!IsValid(Actor) || IsPersistentCharacterPresentation(Actor)) { continue; }
 		if (Save && Actor->Implements<UNarrativeSavableActor>()) { Save->RemoveSingleActor(Actor); }
 		if (!CanContinue()) { return false; }
 		if (IsValid(Actor)) { Actor->Destroy(); }
@@ -918,6 +980,8 @@ bool ASovEncounterDirector::RetryEncounter(FString& Error)
 		FSovEncounterParticipant Participant; Participant.ParticipantId = Record.ParticipantId; Participant.Character = NPC; Participant.bRequiredForVictory = Record.bRequiredForVictory;
 		Participant.bAllowMassRepresentation = Record.bAllowMassRepresentation;
 		Participants.Add(Participant);
+		// Merge before initialization callbacks; preserve new class/constructor tags as well.
+		for (const FName Tag : Record.ActorTags) { NPC->Tags.AddUnique(Tag); }
 		NPC->PrepareForEncounterRestore(SpawnInfo, Record.ActorRecord.ActorGUID); NPC->SetNPCDefinition(Record.Definition.Get());
 		NPC->FinishSpawning(Record.ActorRecord.Transform);
 		if (!OwnsPreparation()) { StopStalePreparation(); return false; }
@@ -940,6 +1004,16 @@ bool ASovEncounterDirector::RetryEncounter(FString& Error)
 void ASovEncounterDirector::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	if (bMaintainLoadedParticipantHold)
+	{
+		if (State != ESovEncounterState::Failed || RestoreGeneration != LoadedParticipantHoldGeneration)
+		{ bMaintainLoadedParticipantHold = false; }
+		else if (GetWorld() && GetWorld()->GetTimeSeconds() >= NextLoadedParticipantHoldAt)
+		{ NextLoadedParticipantHoldAt = GetWorld()->GetTimeSeconds() + .1; RefreshLoadedParticipantHold(); }
+	}
+	if (bHoldParticipantsBeforeEntry && State == ESovEncounterState::Inactive && !bHasEntryCheckpoint
+		&& GetWorld() && GetWorld()->GetTimeSeconds() >= NextPreEntryHoldAt)
+	{ NextPreEntryHoldAt = GetWorld()->GetTimeSeconds() + .1; RefreshPreEntryHold(); }
 	TickMassPromotions();
 	// The final required death may arrive while an unrelated promotion holds
 	// completion. Revisit its confirmed receipt after the promotion guard releases.
@@ -1177,11 +1251,13 @@ void ASovEncounterDirector::PrepareForSave_Implementation()
 void ASovEncounterDirector::Load_Implementation()
 {
 	if (!HasAuthority()) { return; }
-	++RestoreGeneration;
+	const uint64 LoadGeneration = ++RestoreGeneration;
+	bMaintainLoadedParticipantHold = false;
 	ClearMassRepresentations(false);
 	UnbindDeaths();
 	SetActorTickEnabled(false);
 	SetState(static_cast<ESovEncounterState>(SovEncounterPolicy::StateAfterLoad(static_cast<unsigned>(State), bHasEntryCheckpoint)));
+	if (IsActorBeingDestroyed() || RestoreGeneration != LoadGeneration) { return; }
 	for (const FSovEncounterNPCRecord& Record : EntryParticipants)
 	{
 		if (TransferredParticipantIds.Contains(Record.ParticipantId))
@@ -1189,13 +1265,58 @@ void ASovEncounterDirector::Load_Implementation()
 		if (IsParticipantMassRepresented(Record.ParticipantId)) { continue; }
 		if (UNarrativeSaveSubsystem* Save = GetWorld()->GetSubsystem<UNarrativeSaveSubsystem>())
 		{
-			if (ASovNPCCharacterBase* NPC = Cast<ASovNPCCharacterBase>(Save->LookupActorByGUID(Record.ActorRecord.ActorGUID)))
+			AActor* const SavedActor = Save->LookupActorByGUID(Record.ActorRecord.ActorGUID);
+			// A transferred roster starts empty in the map. Confirmed deaths still own their
+			// saved membership after Narrative applies a tombstone and removes the actor.
+			// Reconstruct only metadata; an unexplained missing living actor is not a defeat.
+			if (!SavedActor && bHasEntryCheckpoint && SnapshotSchemaVersion == 1 && AttemptId.IsValid()
+				&& (State == ESovEncounterState::Succeeded || State == ESovEncounterState::Failed)
+				&& !Record.ParticipantId.IsNone() && Record.ActorRecord.ActorGUID.IsValid()
+				&& Record.bRequiredForVictory && DefeatedParticipants.Contains(Record.ParticipantId)
+				&& !Participants.ContainsByPredicate([&Record](const auto& P) { return P.ParticipantId == Record.ParticipantId; }))
+			{
+				int32 IdMatches = 0, GuidMatches = 0;
+				for (const auto& Candidate : EntryParticipants)
+				{
+					IdMatches += Candidate.ParticipantId == Record.ParticipantId ? 1 : 0;
+					GuidMatches += Candidate.ActorRecord.ActorGUID == Record.ActorRecord.ActorGUID ? 1 : 0;
+				}
+				if (IdMatches == 1 && GuidMatches == 1)
+				{
+					auto& Added = Participants.AddDefaulted_GetRef();
+					Added.ParticipantId = Record.ParticipantId;
+					Added.bRequiredForVictory = Record.bRequiredForVictory;
+					Added.bAllowMassRepresentation = Record.bAllowMassRepresentation;
+				}
+			}
+			if (ASovNPCCharacterBase* NPC = Cast<ASovNPCCharacterBase>(SavedActor))
 			{
 				if (FSovEncounterParticipant* Participant = Participants.FindByPredicate([&](const FSovEncounterParticipant& Candidate) { return Candidate.ParticipantId == Record.ParticipantId; })) { Participant->Character = NPC; }
 				else { FSovEncounterParticipant& Added = Participants.AddDefaulted_GetRef(); Added.ParticipantId = Record.ParticipantId; Added.Character = NPC; Added.bRequiredForVictory = Record.bRequiredForVictory; }
+				// Generic world reload can reconstruct a previously retried dynamic NPC too.
+				// Only the saved GUID's exact current participant may receive its metadata.
+				if (!Record.ActorTags.IsEmpty() && IsValid(NPC) && !NPC->IsActorBeingDestroyed() && NPC->GetWorld() == GetWorld())
+				{
+					const FGuid CurrentGUID = INarrativeSavableActor::Execute_GetActorGUID(NPC);
+					if (IsActorBeingDestroyed() || RestoreGeneration != LoadGeneration) { return; }
+					if (CurrentGUID.IsValid() && CurrentGUID == Record.ActorRecord.ActorGUID && IsValid(NPC) && !NPC->IsActorBeingDestroyed()
+						&& NPC->GetWorld() == GetWorld() && GetParticipant(Record.ParticipantId) == NPC)
+					{
+						bool bForeignOwner = false;
+						for (TActorIterator<ASovEncounterDirector> It(GetWorld()); It; ++It)
+						{
+							const FName OtherId = It->FindParticipantId(NPC);
+							if (*It != this && !It->IsActorBeingDestroyed() && !OtherId.IsNone()
+								&& !It->TransferredParticipantIds.Contains(OtherId)) { bForeignOwner = true; break; }
+						}
+						if (!bForeignOwner) { for (const FName Tag : Record.ActorTags) { NPC->Tags.AddUnique(Tag); } }
+					}
+				}
 			}
 		}
 	}
+	if (bHoldParticipantsBeforeEntry && State == ESovEncounterState::Inactive && !bHasEntryCheckpoint)
+	{ NextPreEntryHoldAt = 0.; SetActorTickEnabled(true); RefreshPreEntryHold(); }
 	// Active saves/streamed records remain Failed until explicit RetryEncounter, including C/D participants.
 	// Recreate only the director-owned proxy, never resurrect a stale saved combat actor alongside it.
 	for (auto& Record : MassParticipants)
@@ -1212,8 +1333,146 @@ void ASovEncounterDirector::Load_Implementation()
 		FString Error;
 		if (!CreateMassEntity(Record, Error)) { SetState(ESovEncounterState::Failed); OnEncounterRestoreFailed.Broadcast(Error); }
 	}
-	if (State == ESovEncounterState::Failed)
+	if (IsActorBeingDestroyed() || RestoreGeneration != LoadGeneration) { return; }
+	if (State == ESovEncounterState::Failed && bHasEntryCheckpoint)
+	{
+		// Arena-entry records serialize Inactive before the attempt exists. The existing load
+		// policy correctly converts them to Failed; do not release their late-created owners.
+		LoadedParticipantHoldGeneration = LoadGeneration;
+		bMaintainLoadedParticipantHold = true;
+		NextLoadedParticipantHoldAt = 0.;
+		SetActorTickEnabled(true);
+		RefreshLoadedParticipantHold();
+	}
+	else if (State == ESovEncounterState::Failed)
 	{
 		for (const FSovEncounterParticipant& Participant : Participants) { SuspendActor(Participant.Character); }
 	}
+}
+
+void ASovEncounterDirector::RefreshLoadedParticipantHold()
+{
+	if (!HasAuthority() || IsActorBeingDestroyed() || !bMaintainLoadedParticipantHold || !bHasEntryCheckpoint
+		|| State != ESovEncounterState::Failed || RestoreGeneration != LoadedParticipantHoldGeneration || bMutationInProgress) { return; }
+	TGuardValue<bool> Mutation(bMutationInProgress, true);
+	const uint64 Generation = RestoreGeneration;
+	const auto Expected = Participants;
+	const auto OwnsHold = [this, Generation, &Expected]()
+	{
+		if (!IsValid(this) || IsActorBeingDestroyed() || !bMaintainLoadedParticipantHold || !bHasEntryCheckpoint
+			|| State != ESovEncounterState::Failed || RestoreGeneration != Generation || LoadedParticipantHoldGeneration != Generation
+			|| Participants.Num() != Expected.Num()) { return false; }
+		for (const auto& P : Expected) { if (GetParticipant(P.ParticipantId) != P.Character) { return false; } }
+		return true;
+	};
+	for (const auto& P : Expected)
+	{
+		if (!OwnsHold()) { return; }
+		auto* NPC = P.Character.Get();
+		if (!IsValid(NPC) || NPC->IsActorBeingDestroyed() || NPC->GetWorld() != GetWorld()
+			|| TransferredParticipantIds.Contains(P.ParticipantId) || IsParticipantMassRepresented(P.ParticipantId)) { continue; }
+		bool bOtherDirectorOwnsActor = false;
+		for (TActorIterator<ASovEncounterDirector> It(GetWorld()); It; ++It)
+		{ if (*It != this && !It->FindParticipantId(NPC).IsNone()) { bOtherDirectorOwnsActor = true; break; } }
+		if (bOtherDirectorOwnsActor) { continue; }
+		auto* ASC = NPC->GetNarrativeAbilitySystemComponent();
+		if (!NPC->IsEncounterSnapshotReady() || !IsValid(ASC) || ASC->GetAvatarActor() != NPC)
+		{
+			// Freeze an already-created controller, but leave GAS/visual initialization untouched.
+			// A subsequent refresh adds the owned tags after this exact actor publishes readiness.
+			SuspendActor(NPC, false);
+			if (!OwnsHold()) { return; }
+			continue;
+		}
+		if (!NPC->IsAlive() || ASC->IsDead() || ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()) <= 0.f) { continue; }
+		// A native ASC reload may clear loose tags on the same object. Only a zero total
+		// proves that our old contribution is absent; never remove somebody else's count.
+		if (SuspendedAvatars.FindRef(ASC).Get() == NPC)
+		{
+			if (ASC->GetTagCount(FNarrativeGameplayTags::Get().State_Busy) == 0) { OwnedBusySuspensions.Remove(ASC); }
+			if (ASC->GetTagCount(FNarrativeGameplayTags::Get().State_Invulnerable) == 0) { OwnedProtectionSuspensions.Remove(ASC); }
+		}
+		SuspendActor(NPC);
+		if (!OwnsHold()) { return; }
+	}
+}
+
+void ASovEncounterDirector::RefreshPreEntryHold()
+{
+	if (!HasAuthority() || IsActorBeingDestroyed() || !bHoldParticipantsBeforeEntry || bHasEntryCheckpoint
+		|| State != ESovEncounterState::Inactive || bMutationInProgress || bRefreshingPreEntryHold) { return; }
+	TGuardValue<bool> Refreshing(bRefreshingPreEntryHold, true);
+	TGuardValue<bool> Mutation(bMutationInProgress, true);
+	const uint64 Generation = RestoreGeneration;
+	const auto Expected = Participants;
+	const auto OwnsHold = [this, Generation, &Expected]()
+	{
+		if (!IsValid(this) || IsActorBeingDestroyed() || RestoreGeneration != Generation || State != ESovEncounterState::Inactive
+			|| !bHoldParticipantsBeforeEntry || bHasEntryCheckpoint || Participants.Num() != Expected.Num()) { return false; }
+		for (const auto& P : Expected) { if (GetParticipant(P.ParticipantId) != P.Character) { return false; } }
+		return true;
+	};
+	PreEntryHoldError.Reset();
+	if (bInvalidEncounterIdentity || EncounterId.IsNone() || Expected.IsEmpty())
+	{ PreEntryHoldError = TEXT("Pre-entry hold requires a unique encounter identity and registered participants."); return; }
+	TSet<FName> Ids; TSet<const ASovNPCCharacterBase*> Actors;
+	for (const auto& P : Expected)
+	{
+		const auto* NPC = P.Character.Get();
+		if (P.ParticipantId.IsNone() || Ids.Contains(P.ParticipantId) || !IsValid(NPC) || NPC->IsActorBeingDestroyed()
+			|| NPC->GetWorld() != GetWorld() || Actors.Contains(NPC) || IsParticipantMassRepresented(P.ParticipantId))
+		{ PreEntryHoldError = TEXT("Pre-entry hold requires exact, living authored actors; missing identities cannot be skipped."); return; }
+		for (TActorIterator<ASovEncounterDirector> It(GetWorld()); It; ++It)
+		{
+			if (*It != this && !It->FindParticipantId(NPC).IsNone())
+			{ PreEntryHoldError = TEXT("A pre-entry participant is registered with another encounter director."); return; }
+		}
+		Ids.Add(P.ParticipantId); Actors.Add(NPC);
+	}
+	for (const auto& P : Expected)
+	{
+		if (!OwnsHold()) { return; }
+		// Story participants remain available before entry; CaptureEntryCheckpoint still admits every actor.
+		if (!P.bRequiredForVictory && !bHoldNonVictoryParticipantsBeforeEntry) { continue; }
+		auto* NPC = P.Character.Get();
+		auto* ASC = IsValid(NPC) ? NPC->GetNarrativeAbilitySystemComponent() : nullptr;
+		// Do not cancel initialization or install a Busy tag before its native readiness is published.
+		if (!IsValid(NPC) || !NPC->IsEncounterSnapshotReady() || !IsValid(ASC) || ASC->GetAvatarActor() != NPC)
+		{ PreEntryHoldError = FString::Printf(TEXT("Waiting for participant readiness: %s"), *P.ParticipantId.ToString()); continue; }
+		if (!NPC->IsAlive() || ASC->IsDead() || !(ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()) > 0.f))
+		{ PreEntryHoldError = FString::Printf(TEXT("Participant was defeated before entry: %s"), *P.ParticipantId.ToString()); continue; }
+		SuspendActor(NPC);
+		if (!OwnsHold()) { return; }
+		if (!IsValid(NPC) || !IsValid(ASC) || NPC->GetNarrativeAbilitySystemComponent() != ASC || ASC->GetAvatarActor() != NPC
+			|| !SuspendedASCs.Contains(ASC) || !OwnedBusySuspensions.Contains(ASC) || !OwnedProtectionSuspensions.Contains(ASC)
+			|| !IsQuiescent(ASC, true))
+		{ PreEntryHoldError = FString::Printf(TEXT("Participant has not settled under its entry hold: %s"), *P.ParticipantId.ToString()); }
+	}
+}
+
+bool ASovEncounterDirector::IsOwnedPreEntryHold(const ASovNPCCharacterBase* NPC) const
+{
+	if (!HasAuthority() || IsActorBeingDestroyed() || !bHoldParticipantsBeforeEntry
+		|| State != ESovEncounterState::Inactive || bHasEntryCheckpoint || bMutationInProgress || bRefreshingPreEntryHold
+		|| !IsValid(NPC) || NPC->IsActorBeingDestroyed() || NPC->GetWorld() != GetWorld()
+		|| !NPC->IsEncounterSnapshotReady() || !NPC->IsAlive()) { return false; }
+	const FName Id = FindParticipantId(NPC);
+	if (Id.IsNone() || GetParticipant(Id) != NPC || IsParticipantMassRepresented(Id)) { return false; }
+	if (!bHoldNonVictoryParticipantsBeforeEntry && !Participants.ContainsByPredicate(
+		[Id](const FSovEncounterParticipant& P) { return P.ParticipantId == Id && P.bRequiredForVictory; })) { return false; }
+	auto* ASC = NPC->GetNarrativeAbilitySystemComponent();
+	if (!IsValid(ASC) || ASC->GetAvatarActor() != NPC || !SuspendedASCs.Contains(ASC)
+		|| SuspendedAvatars.FindRef(ASC).Get() != NPC || !OwnedBusySuspensions.Contains(ASC)
+		|| !OwnedProtectionSuspensions.Contains(ASC) || !IsQuiescent(ASC, true)
+		|| ASC->GetTagCount(FNarrativeGameplayTags::Get().State_Invulnerable) != 1) { return false; }
+	for (TActorIterator<ASovEncounterDirector> It(GetWorld()); It; ++It)
+	{ if (*It != this && !It->FindParticipantId(NPC).IsNone()) { return false; } }
+	if (NPC->GetController())
+	{
+		auto* Controller = Cast<ANarrativeNPCController>(NPC->GetController());
+		if (!IsValid(Controller) || Controller->GetPawn() != NPC
+			|| SuspendedThreatControllers.FindRef(Controller).Get() != NPC
+			|| !Controller->IsThreatMemorySuspendedOnlyBy(this)) { return false; }
+	}
+	return true;
 }

@@ -1,6 +1,7 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 
 #include "Characters/SovPlayerCharacterBase.h"
+#include "Presentation/SovCombatFeedbackComponent.h"
 
 #include "Character/CharacterDefinition.h"
 #include "Character/PlayerDefinition.h"
@@ -21,6 +22,7 @@
 ASovPlayerCharacterBase::ASovPlayerCharacterBase(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
+	CreateDefaultSubobject<USovCombatFeedbackComponent>(TEXT("SovCombatFeedback"));
 	EchoComponent = CreateDefaultSubobject<USovEchoComponent>(TEXT("SovEchoComponent"));
 	ExertionComponent = CreateDefaultSubobject<USovExertionComponent>(TEXT("SovExertionComponent"));
 	FieldRecoveryComponent = CreateDefaultSubobject<USovFieldRecoveryComponent>(TEXT("SovFieldRecoveryComponent"));

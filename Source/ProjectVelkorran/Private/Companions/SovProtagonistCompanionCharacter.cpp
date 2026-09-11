@@ -1,7 +1,9 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Companions/SovProtagonistCompanionCharacter.h"
+#include "Presentation/SovCombatFeedbackComponent.h"
 #include "Subsystems/NarrativeSaveSubsystem.h"
 #include "Engine/World.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "Character/NarrativeCharacterVisual.h"
 #include "Companions/SovCompanionComponent.h"
 #include "Components/SovGuardComponent.h"
@@ -15,9 +17,11 @@
 #include "GAS/NarrativeAbilitySystemComponent.h"
 #include "GAS/NarrativeAttributeSetBase.h"
 #include "Sovereign/SovGameplayTags.h"
+#include "Framework/SovPlayerController.h"
 
 ASovProtagonistCompanionCharacter::ASovProtagonistCompanionCharacter(const FObjectInitializer& Initializer) : Super(Initializer)
 {
+	CreateDefaultSubobject<USovCombatFeedbackComponent>(TEXT("SovCombatFeedback"));
 	Companion = CreateDefaultSubobject<USovCompanionComponent>(TEXT("SovCompanion"));
 	Guard = CreateDefaultSubobject<USovGuardComponent>(TEXT("SovGuard"));
 	Deflection = CreateDefaultSubobject<USovDeflectionComponent>(TEXT("SovDeflection"));
@@ -26,6 +30,39 @@ ASovProtagonistCompanionCharacter::ASovProtagonistCompanionCharacter(const FObje
 	Poise = CreateDefaultSubobject<USovPoiseComponent>(TEXT("SovPoise"));
 	AIControllerClass = ANarrativeNPCController::StaticClass();
 	AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
+}
+void ASovProtagonistCompanionCharacter::PossessedBy(AController* NewController)
+{
+	// APawn normally assigns Owner = AI controller. This mission-owned proxy deliberately
+	// keeps its campaign controller as Owner; GetController() still carries the real AI.
+	// Preserve it before engine possession notifications, so observers never see a false owner.
+	auto* CampaignOwner = Cast<ASovPlayerController>(GetOwner());
+	TGuardValue<TWeakObjectPtr<AActor>> OwnerGuard(PossessionCampaignOwner, CampaignOwner);
+	TGuardValue<TWeakObjectPtr<AActor>> EngineGuard(PossessionEngineOwner, NewController);
+	TGuardValue<bool> WriteGuard(bPreserveNextPawnOwnerWrite,
+		bPrepared && IsValid(CampaignOwner) && IsValid(NewController) && !NewController->IsPlayerController());
+	Super::PossessedBy(NewController);
+}
+void ASovProtagonistCompanionCharacter::UnPossessed()
+{
+	auto* CampaignOwner = Cast<ASovPlayerController>(GetOwner());
+	TGuardValue<TWeakObjectPtr<AActor>> OwnerGuard(PossessionCampaignOwner, CampaignOwner);
+	TGuardValue<TWeakObjectPtr<AActor>> EngineGuard(PossessionEngineOwner, nullptr);
+	TGuardValue<bool> WriteGuard(bPreserveNextPawnOwnerWrite, bPrepared && IsValid(CampaignOwner));
+	Super::UnPossessed();
+}
+void ASovProtagonistCompanionCharacter::SetOwner(AActor* NewOwner)
+{
+	if (bPreserveNextPawnOwnerWrite)
+	{
+		// Consume the interception before Super or any outward callbacks. Later explicit
+		// owner changes remain meaningful retirement and are never restored over.
+		bPreserveNextPawnOwnerWrite = false;
+		if (PossessionCampaignOwner.IsValid() && !PossessionCampaignOwner->IsActorBeingDestroyed()
+			&& GetOwner() == PossessionCampaignOwner.Get() && NewOwner == PossessionEngineOwner.Get())
+		{ NewOwner = PossessionCampaignOwner.Get(); }
+	}
+	Super::SetOwner(NewOwner);
 }
 bool ASovProtagonistCompanionCharacter::PrepareProxy(FGameplayTag Identity, FName CompanionId,
 	const UNarrativeAbilitySystemComponent* OutgoingASC, const TArray<TSubclassOf<UGameplayAbility>>& CuratedClasses, FString& Reason)
@@ -72,6 +109,14 @@ void ASovProtagonistCompanionCharacter::BeginPlay()
 		AbilitySystemComponent->AddLooseGameplayTag(CompanionIdentity, 1, EGameplayTagReplicationState::TagAndCountToAll);
 		Guard->InitializeWithAbilitySystem(AbilitySystemComponent); Deflection->InitializeWithAbilitySystem(AbilitySystemComponent);
 		Echo->InitializeWithAbilitySystem(AbilitySystemComponent); Shield->InitializeWithAbilitySystem(AbilitySystemComponent); Poise->InitializeWithAbilitySystem(AbilitySystemComponent);
+	}
+	// Engine InitializeComponents may Activate(true) after pre-BeginPlay staging.
+	// Keep that normal activation, then suspend only the current lease before a world tick.
+	if (IsValid(this) && !IsActorBeingDestroyed() && bStagedForTransition)
+	{
+		auto* Movement = StagedMovement.Get();
+		if (IsValid(Movement) && Movement == GetCharacterMovement() && Movement->GetOwner() == this)
+		{ Movement->SetComponentTickEnabled(false); }
 	}
 }
 bool ASovProtagonistCompanionCharacter::CompleteProxyInitialization()
@@ -151,9 +196,53 @@ bool ASovProtagonistCompanionCharacter::PrepareProxyFromSnapshot(const FSovCompa
 
 void ASovProtagonistCompanionCharacter::SetProxyStaged(bool bStaged)
 {
+	if (!IsValid(this) || IsActorBeingDestroyed()) { return; }
+	const uint64 Epoch = ++ProxyStagingEpoch;
 	bStagedForTransition = bStaged;
-	SetActorHiddenInGame(bStaged); SetActorEnableCollision(!bStaged);
+	const auto IsCurrent = [this, Epoch]()
+	{ return IsValid(this) && !IsActorBeingDestroyed() && ProxyStagingEpoch == Epoch; };
+	if (bStaged)
+	{
+		auto* Movement = GetCharacterMovement();
+		if (IsValid(Movement) && Movement->GetOwner() == this && StagedMovement.Get() != Movement)
+		{
+			StagedMovement = Movement;
+			bMovementTickWasEnabled = Movement->IsComponentTickEnabled();
+			bMovementTickStartedEnabled = Movement->PrimaryComponentTick.bStartWithTickEnabled;
+			bMovementAutoUpdatedTick = Movement->bAutoUpdateTickRegistration;
+			// StageSnapshot calls us before FinishSpawning. Registration otherwise re-enables
+			// ticks from bStartWithTickEnabled while the capsule cannot meet its floor.
+			Movement->PrimaryComponentTick.bStartWithTickEnabled = false;
+			// Movement also re-enables its tick when the updated component registers.
+			Movement->bAutoUpdateTickRegistration = false;
+			Movement->SetComponentTickEnabled(false);
+		}
+	}
+	SetActorHiddenInGame(bStaged);
+	if (!IsCurrent()) { return; }
+	SetActorEnableCollision(!bStaged);
+	if (!IsCurrent()) { return; }
 	if (auto* Visual = GetCharacterVisual()) { Visual->SetActorHiddenInGame(bStaged); }
+	if (!IsCurrent() || bStaged) { return; }
+
+	// Retire the lease before restoring its still-owned fields. A newer staging call,
+	// replacement component, or explicit external enable must remain authoritative.
+	auto* Movement = StagedMovement.Get();
+	const bool bRestoreTick = bMovementTickWasEnabled;
+	const bool bRestoreStart = bMovementTickStartedEnabled;
+	const bool bRestoreAutoUpdate = bMovementAutoUpdatedTick;
+	StagedMovement.Reset();
+	bMovementTickWasEnabled = false;
+	bMovementTickStartedEnabled = false;
+	bMovementAutoUpdatedTick = false;
+	if (IsValid(Movement) && Movement == GetCharacterMovement() && Movement->GetOwner() == this)
+	{
+		if (!Movement->PrimaryComponentTick.bStartWithTickEnabled)
+		{ Movement->PrimaryComponentTick.bStartWithTickEnabled = bRestoreStart; }
+		if (!Movement->bAutoUpdateTickRegistration) { Movement->bAutoUpdateTickRegistration = bRestoreAutoUpdate; }
+		if (!Movement->IsComponentTickEnabled()) { Movement->SetComponentTickEnabled(bRestoreTick); }
+	}
+	// Movement mode, velocity, activity ownership and gameplay tags were never changed.
 }
 void ASovProtagonistCompanionCharacter::OnCharacterVisualInitialized()
 {

@@ -3,7 +3,9 @@
 #include "AI/NarrativeAIStartupDiagnostics.h"
 #include "AI/NarrativeNPCController.h"
 #include "AI/NarrativeThreatPolicy.h"
+#include "AI/Activities/NPCActivityComponent.h"
 #include "AbilitySystemBlueprintLibrary.h"
+#include "AISystem.h"
 #include "AbilitySystemComponent.h"
 #include "ArsenalSettings.h"
 #include "ArsenalStatics.h"
@@ -463,7 +465,25 @@ void ANarrativeNPCController::ClearInvalidThreatTarget()
 	{
 		FNarrativeThreatMemory LastKnown;
 		const bool bRemember = GetBestThreatMemory(Invalid, LastKnown);
-		if (AttackTarget == Invalid && ThreatBlackboard) { ThreatBlackboard->ClearValue(Settings->BBKey_AttackTarget); }
+		if (AttackTarget == Invalid && ThreatBlackboard)
+		{
+			RetiredThreatAttackTarget = {};
+			UNPCActivityComponent* Activities = GetActivityComponent();
+			UNPCGoalItem* Goal = Activities ? Activities->GetCurrentActivityGoal() : nullptr;
+			UNPCActivity* Activity = Activities ? Activities->GetCurrentActivity() : nullptr;
+			if (IsValid(Activity) && IsValid(Goal) && !Activities->HasStaleRegisteredGoalKey(Goal))
+			{
+				const FNPCGoalContainer Registered = Activities->GetGoals(Goal->GetClass());
+				if (Registered.GoalUniqueObjectMap.FindRef(Invalid) == Goal)
+				{
+					RetiredThreatAttackTarget = {Invalid, GetPawn(), ThreatBlackboard, Activity, Goal, PawnAssignmentGeneration};
+					RetiredThreatAttackTarget.bHadPreCleanupTargetLocation = ThreatBlackboard->IsVectorValueSet(
+						ThreatBlackboard->GetKeyID(Settings->BBKey_TargetLocation));
+					RetiredThreatAttackTarget.PreCleanupTargetLocation = ThreatBlackboard->GetValueAsVector(Settings->BBKey_TargetLocation);
+				}
+			}
+			ThreatBlackboard->ClearValue(Settings->BBKey_AttackTarget);
+		}
 		if (!StillOwns()) { return; }
 		if (GetFocusActor() == Invalid) { ClearFocus(EAIFocusPriority::Gameplay); }
 		if (!StillOwns()) { return; }
@@ -501,6 +521,63 @@ void ANarrativeNPCController::ClearInvalidThreatTarget()
 			InvestigationTarget.Reset();
 		}
 	}
+	if (StillOwns()) { RestoreRetiredThreatAttackTarget(); }
+}
+
+void ANarrativeNPCController::RestoreRetiredThreatAttackTarget()
+{
+	const FRetiredThreatAttackTarget Retired = RetiredThreatAttackTarget;
+	if (!Retired.Target.IsValid()) { RetiredThreatAttackTarget = {}; return; }
+	const TWeakObjectPtr<ANarrativeNPCController> Self = this;
+	const uint64 Generation = ThreatMemoryGeneration;
+	const UArsenalSettings* Settings = GetDefault<UArsenalSettings>();
+	const auto StillOwns = [Self, Retired, Generation, Settings]()
+	{
+		if (!Self.IsValid() || Self->IsActorBeingDestroyed() || !Retired.Pawn.IsValid()
+			|| !Retired.Blackboard.IsValid() || !Retired.Activity.IsValid() || !Retired.Goal.IsValid()
+			|| Self->GetPawn() != Retired.Pawn.Get() || Self->PawnAssignmentGeneration != Retired.PawnAssignment
+			|| Self->GetBlackboardComponent() != Retired.Blackboard.Get()
+			|| Self->ThreatMemoryGeneration != Generation || Self->IsThreatMemorySuspended()) { return false; }
+		if (const UAbilitySystemComponent* ASC = Self->GetAbilitySystemComponent())
+		{
+			if (ASC->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_Interacting)
+				|| ASC->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_SequencerControlled)) { return false; }
+		}
+		UNPCActivityComponent* Activities = Self->GetActivityComponent();
+		if (!IsValid(Activities) || Activities->GetCurrentActivity() != Retired.Activity.Get()
+			|| Activities->GetCurrentActivityGoal() != Retired.Goal.Get()
+			|| Activities->HasStaleRegisteredGoalKey(Retired.Goal.Get())) { return false; }
+		const FNPCGoalContainer Registered = Activities->GetGoals(Retired.Goal->GetClass());
+		return Registered.GoalUniqueObjectMap.FindRef(Retired.Target.Get()) == Retired.Goal.Get()
+			&& !Retired.Blackboard->GetValueAsObject(Settings->BBKey_AttackTarget)
+			&& !Self->GetFocusActor();
+	};
+	const auto HasForeignDestination = [Retired, Settings]()
+	{
+		if (!Retired.Blackboard->IsVectorValueSet(Retired.Blackboard->GetKeyID(Settings->BBKey_TargetLocation))) { return false; }
+		// Hold/release can leave a stock movement destination while retiring only
+		// AttackTarget. Permit that exact value; never authorize a new destination.
+		return !Retired.bHadPreCleanupTargetLocation
+			|| Retired.Blackboard->GetValueAsVector(Settings->BBKey_TargetLocation) != Retired.PreCleanupTargetLocation;
+	};
+	// A different activity/goal or writer permanently ends this cleanup's claim.
+	// Our own finite investigation location is handled before this function.
+	if (!StillOwns()) { RetiredThreatAttackTarget = {}; return; }
+	if (!CanDirectlyTargetThreat(Retired.Target.Get())) { return; }
+	if (FAISystem::IsValidLocation(GetFocalPoint())
+		|| HasForeignDestination())
+	{ RetiredThreatAttackTarget = {}; return; }
+	// GetGoalKey is an authored callback. The registered key alone is insufficient
+	// if that goal's live target changed since registration.
+	UObject* CurrentKey = Retired.Goal->GetGoalKey();
+	if (!StillOwns() || CurrentKey != Retired.Target.Get() || !CanDirectlyTargetThreat(Retired.Target.Get())
+		|| FAISystem::IsValidLocation(GetFocalPoint())
+		|| HasForeignDestination())
+	{ RetiredThreatAttackTarget = {}; return; }
+	RetiredThreatAttackTarget = {};
+	// Set only the key removed by this controller. Normal BT observers, focus,
+	// token acquisition, range/visibility gates and ability selection resume it.
+	Retired.Blackboard->SetValueAsObject(Settings->BBKey_AttackTarget, Retired.Target.Get());
 }
 
 void ANarrativeNPCController::ForgetThreat(AActor* Target)
@@ -528,6 +605,19 @@ void ANarrativeNPCController::ClearThreatMemory()
 bool ANarrativeNPCController::IsThreatMemorySuspended() const
 {
 	return ThreatSuspensionOwners.ContainsByPredicate([](const TWeakObjectPtr<UObject>& ActiveSuspensionOwner) { return ActiveSuspensionOwner.IsValid(); });
+}
+
+bool ANarrativeNPCController::IsThreatMemorySuspendedOnlyBy(const UObject* SuspensionOwner) const
+{
+	if (!IsValid(SuspensionOwner)) { return false; }
+	int32 MatchingOwners = 0;
+	for (const TWeakObjectPtr<UObject>& ActiveSuspensionOwner : ThreatSuspensionOwners)
+	{
+		if (!ActiveSuspensionOwner.IsValid()) { continue; }
+		if (ActiveSuspensionOwner.Get() != SuspensionOwner) { return false; }
+		++MatchingOwners;
+	}
+	return MatchingOwners == 1;
 }
 
 void ANarrativeNPCController::SetThreatMemorySuspended(UObject* SuspensionOwner, const bool bSuspend)

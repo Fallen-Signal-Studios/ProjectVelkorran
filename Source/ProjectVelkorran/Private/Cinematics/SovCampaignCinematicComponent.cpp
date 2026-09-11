@@ -20,6 +20,7 @@
 #include "Components/CapsuleComponent.h"
 #include "Components/EquipmentComponent.h"
 #include "Components/SceneComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Components/WorldPartitionStreamingSourceComponent.h"
 #include "Containers/Ticker.h"
 #include "Items/WeaponItem.h"
@@ -41,6 +42,19 @@
 #include "NavigationSystem.h"
 #include "TimerManager.h"
 #include "WorldPartition/WorldPartitionStreamingSource.h"
+
+namespace
+{
+    bool CanApplyCharacterExitTransform(const ANarrativeCharacter* Character, const UAbilitySystemComponent* ASC)
+    {
+        // Actor-root placement cannot own a detached ragdoll pelvis. Do not stand
+        // a character up or silently move a separately simulated body for a receipt.
+        const auto* Mesh = IsValid(Character) ? Character->GetMesh() : nullptr;
+        return IsValid(Character) && IsValid(ASC) && !Character->IsRagdoll(true)
+            && !ASC->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_Movement_Ragdoll)
+            && IsValid(Mesh) && Mesh->IsAttachedTo(Character->GetRootComponent()) && !Mesh->IsAnySimulatingPhysics();
+    }
+}
 
 USovCampaignCinematicComponent::USovCampaignCinematicComponent()
 { PrimaryComponentTick.bCanEverTick = true; PrimaryComponentTick.bTickEvenWhenPaused = true; }
@@ -415,6 +429,8 @@ bool USovCampaignCinematicComponent::ValidateParticipants(bool bCheckExit, FStri
             || (Contract.bRequireLiving && !Character->IsAlive()) || !ASC->HasAllMatchingGameplayTags(Contract.RequiredState)
             || ASC->HasAnyMatchingGameplayTags(Contract.BlockedState))
         { OutError = TEXT("A cinematic participant is missing, dead, replaced or in an incompatible damage state."); return false; }
+        if (Contract.bApplyExitTransform && !CanApplyCharacterExitTransform(Character, ASC))
+        { OutError = TEXT("Cinematic exit requires an attached, non-ragdolled character body."); return false; }
         if (const auto* Player = Cast<ASovPlayerCharacterBase>(Character); Player && !Player->IsCharacterReady())
         { OutError = TEXT("The cinematic protagonist is not ready."); return false; }
         if (const auto* NPC = Cast<ASovNPCCharacterBase>(Character); NPC && !NPC->IsEncounterSnapshotReady())
@@ -771,6 +787,8 @@ bool USovCampaignCinematicComponent::Commit(bool bSkipped, FString& OutError)
     for (int32 Index = 0; Index < Participants.Num(); ++Index)
     {
         const auto& Contract = Participants[Index]; auto* Character = Snapshot[Index].Character.Get();
+        if (Contract.bApplyExitTransform && !CanApplyCharacterExitTransform(Character, Snapshot[Index].ASC.Get()))
+        { OutError = TEXT("Cinematic exit body ownership changed before placement."); RestoreParticipants(); ReleaseOwnership(); ChangePhase(ESovCinematicPhase::Failed, OutError); return false; }
         Snapshot[Index].bTransformApplied = Contract.bApplyExitTransform;
         if (Contract.bApplyExitTransform && !Character->SetActorTransform(Contract.ExitTransform, false, nullptr, ETeleportType::TeleportPhysics))
         { OutError = TEXT("Cinematic exit transform could not be applied."); RestoreParticipants(); ReleaseOwnership(); ChangePhase(ESovCinematicPhase::Failed, OutError); return false; }
@@ -837,6 +855,8 @@ bool USovCampaignCinematicComponent::ValidateExitPostconditions(FString& OutErro
     {
         const auto& Contract = Participants[Index]; const auto* Character = Snapshot[Index].Character.Get();
         if (!Character || Character->IsActorBeingDestroyed()) { return false; }
+        if (Contract.bApplyExitTransform && !CanApplyCharacterExitTransform(Character, Snapshot[Index].ASC.Get()))
+        { OutError = TEXT("Cinematic exit body ownership changed before receipt commit."); return false; }
         const auto Wield = Character->GetWeaponWieldState();
         const bool bWieldMatches = Contract.ExitWield == ESovCinematicExitWield::Keep
             || (Contract.ExitWield == ESovCinematicExitWield::Holster && Wield.EquipSlots.IsEmpty() && Wield.WieldSlots.IsEmpty())

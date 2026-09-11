@@ -1,6 +1,14 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Tests/SovHandoffRuntimeTestFixtures.h"
 #include "Tests/SovSaveRuntimeTestFixtures.h"
+#include "Tests/SovCompanionApproachTestFixtures.h"
+#include "Tests/SovAxiomRuntimeTestFixtures.h"
+#include "Companions/SovCompanionComponent.h"
+#include "Companions/SovConvergenceCompanionState.h"
+#include "AI/NarrativeNPCController.h"
+#include "AI/NPCDefinition.h"
+#include "UObject/Script.h"
+#include "UObject/UnrealType.h"
 #include "Campaign/SovCampaignDefinition.h"
 #include "Campaign/SovCampaignStateComponent.h"
 #include "Character/PlayerDefinition.h"
@@ -153,6 +161,92 @@ bool FSovTransitSaveTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("Broken midpoint cannot masquerade as a committed endpoint"),FSovWorldTransitTestAccess::Save(Transit));
     Transit->MovingBody->SetRelativeLocation(FVector::ZeroVector);
     TestTrue(TEXT("Broken stable endpoint is checkpointable"),FSovWorldTransitTestAccess::Save(Transit));
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovTransitCompanionBoardingTest,"ProjectVelkorran.World.Transit.RequiredMissionCompanionBoardsBeforeDeparture",
+    EAutomationTestFlags::EditorContext|EAutomationTestFlags::ProductFilter)
+bool FSovTransitCompanionBoardingTest::RunTest(const FString& Parameters)
+{
+#if WITH_EDITOR
+    FEditorScriptExecutionGuard ScriptGuard;
+#endif
+    FWorldFixture F; if (!TestNotNull(TEXT("Native player initialized"), F.ASC)) { return false; }
+    auto* Transit = F.World->SpawnActor<ASovWorldTransitActor>(); if (!Transit) { return false; }
+    Transit->TransitId = TEXT("CompanionBoardingTest"); Transit->Kind = ESovWorldTransitKind::Lift;
+    Transit->MovingBody->SetBoxExtent(FVector(300,300,30)); Transit->SetActorLocation(FVector(0,0,500));
+    F.Player->SetActorLocation(FVector(-100,0,530+F.Player->GetCapsuleComponent()->GetScaledCapsuleHalfHeight()+2.f));
+    F.Player->GetCharacterMovement()->SetMovementMode(MOVE_Walking); F.Player->SetBase(Transit->MovingBody);
+    FText Error;
+    TestTrue(TEXT("Default lift keeps the existing solo boarding contract"), Transit->CanUse(F.Player, Error));
+    Transit->bRequireMissionCompanionAboard = true;
+    TestFalse(TEXT("Opt-in lift rejects absent active companion"), Transit->RequestUse(F.Player, Error));
+    TestEqual(TEXT("Player-facing rejection explains actual boarding"), Error.ToString(), FString(TEXT("Wait for your companion to board")));
+    TestFalse(TEXT("Rejected boarding leaves input unlocked"), F.PC->IsMoveInputIgnored());
+    TestFalse(TEXT("Rejected boarding applies no traversal window"), F.ASC->HasMatchingGameplayTag(FSovGameplayTags::Get().State_Traversal));
+
+    auto* Mission = NewObject<USovCampaignDefinition>(F.PC); F.PC->KeepAlive.Add(Mission);
+    Mission->MissionId = TEXT("TransitCompanionFixture"); Mission->Protagonist = F.Player->GetProtagonistIdentityTag();
+    Mission->PawnClass = ASovHandoffRuntimeTestPawn::StaticClass(); Mission->PlayerDefinition = F.Player->GetPlayerDefinition();
+    Mission->AllowedCompanionIds = {TEXT("Selene")};
+    FSovCampaignBeatDefinition Beat; Beat.BeatId = TEXT("Exit"); Mission->Beats.Add(Beat);
+    if (!TestEqual(TEXT("Ordinary fixture mission starts without seeded progression"),
+        F.PC->GetCampaignState()->BeginMission(Mission), ESovCampaignResult::Applied)) { return false; }
+    auto* Source = F.World->SpawnActor<ASovAxiomRuntimeTestCharacter>(); if (!Source) { return false; }
+    Source->InitializeTestCombat(0); Source->GetNarrativeAbilitySystemComponent()->AddLooseGameplayTag(FSovGameplayTags::Get().Character_Player_Selene);
+    const FTransform SpawnTransform(FVector(150,0,530+F.Player->GetCapsuleComponent()->GetScaledCapsuleHalfHeight()+2.f));
+    auto* Companion = F.World->SpawnActorDeferred<ASovCompanionApproachTestProxy>(ASovCompanionApproachTestProxy::StaticClass(),
+        SpawnTransform, F.PC, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+    FString Reason;
+    if (!Companion || !TestTrue(TEXT("Real native proxy reads an actual matching source ASC"),
+        Companion->PrepareProxy(FSovGameplayTags::Get().Character_Player_Selene, TEXT("Selene"), Source->GetNarrativeAbilitySystemComponent(), {}, Reason))) { return false; }
+    auto* Definition = NewObject<UNPCDefinition>(F.PC); F.PC->KeepAlive.Add(Definition);
+    Definition->NPCClassPath = ASovCompanionApproachTestProxy::StaticClass();
+    Companion->SetNPCDefinition(Definition); Companion->FinishSpawning(SpawnTransform); Companion->EnsureEncounterController();
+    auto* AI = Cast<ANarrativeNPCController>(Companion->GetController());
+    if (!TestNotNull(TEXT("Actual Narrative AI possesses the proxy"), AI)) { return false; }
+    if (!AI->HasActorBegunPlay()) { AI->DispatchBeginPlay(); }
+    if (!TestTrue(TEXT("Native proxy applies its copied resources"), Companion->CompleteProxyInitialization())) { return false; }
+    Companion->SetProxyStaged(false); Source->Destroy();
+    auto* Commands = Companion->GetCompanionComponent();
+    if (!TestTrue(TEXT("Real command owner accepts the actual player leader"), Commands->SetLeader(F.Player, Reason))) { AddError(Reason); return false; }
+    auto* State = F.PC->GetConvergenceCompanionState();
+    auto* Active = FindFProperty<FObjectPropertyBase>(USovConvergenceCompanionState::StaticClass(), TEXT("Active"));
+    if (!TestNotNull(TEXT("Existing companion publication property"), Active)) { return false; }
+    auto* Leader = FindFProperty<FObjectPropertyBase>(USovCompanionComponent::StaticClass(), TEXT("Leader"));
+    if (!TestNotNull(TEXT("Existing command leader property"), Leader)) { return false; }
+    // Supply external completed companion publication, not any mission beat or transit outcome.
+    Active->SetObjectPropertyValue_InContainer(State, Companion);
+    Companion->GetCharacterMovement()->SetMovementMode(MOVE_Walking); Companion->SetBase(nullptr);
+    TestFalse(TEXT("Ready owned companion off the platform cannot authorize departure"), Transit->CanUse(F.Player, Error));
+    Companion->SetBase(Transit->MovingBody);
+    TestTrue(TEXT("Current ready living companion on this exact platform admits departure"), Transit->CanUse(F.Player, Error));
+    Companion->SetProxyStaged(true);
+    TestFalse(TEXT("Staged proxy is not an available passenger"), Transit->CanUse(F.Player, Error)); Companion->SetProxyStaged(false);
+    Companion->SetOwner(F.Player);
+    TestFalse(TEXT("A foreign-owned proxy cannot stand in for campaign ownership"), Transit->CanUse(F.Player, Error)); Companion->SetOwner(F.PC);
+    Leader->SetObjectPropertyValue_InContainer(Commands, nullptr);
+    TestFalse(TEXT("A retired command leader is not the current player companion"), Transit->CanUse(F.Player, Error));
+    Leader->SetObjectPropertyValue_InContainer(Commands, F.Player);
+    auto* ProxyASC = Companion->GetNarrativeAbilitySystemComponent();
+    ProxyASC->InitAbilityActorInfo(Companion, F.Player);
+    TestFalse(TEXT("A retired avatar binding is not a ready passenger"), Transit->CanUse(F.Player, Error)); ProxyASC->InitAbilityActorInfo(Companion, Companion);
+    ProxyASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetHealthAttribute(), 0.f);
+    TestFalse(TEXT("Zero-health companion cannot admit departure before its death latch publishes"), Transit->CanUse(F.Player, Error));
+    ProxyASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetHealthAttribute(), 100.f);
+    TestTrue(TEXT("Restored actual passenger can be checked again"), Transit->CanUse(F.Player, Error));
+    Active->SetObjectPropertyValue_InContainer(State, nullptr);
+    TestFalse(TEXT("Old living actor on the lift is rejected after membership retires"), Transit->CanUse(F.Player, Error));
+    Transit->Kind = ESovWorldTransitKind::Door;
+    TestTrue(TEXT("Door behavior is unchanged even when opt-in property is set"), Transit->CanUse(F.Player, Error)); Transit->Kind = ESovWorldTransitKind::Lift;
+    Active->SetObjectPropertyValue_InContainer(State, Companion);
+    const auto Busy = FNarrativeGameplayTags::Get().State_Busy;
+    const FDelegateHandle Listener = F.ASC->RegisterGameplayTagEvent(Busy, EGameplayTagEventType::NewOrRemoved).AddLambda(
+        [Active, State](FGameplayTag, int32 Count) { if (Count > 0) { Active->SetObjectPropertyValue_InContainer(State, nullptr); } });
+    TestFalse(TEXT("Synchronous retirement while applying transit window rejects departure"), Transit->RequestUse(F.Player, Error));
+    TestEqual(TEXT("Reentrant rejection leaves the real mechanism at origin"), Transit->GetTransitState(), ESovWorldTransitState::AtOrigin);
+    TestFalse(TEXT("Reentrant rejection removes only the new transit window"), F.ASC->HasMatchingGameplayTag(FSovGameplayTags::Get().State_Traversal));
+    TestFalse(TEXT("Reentrant rejection never acquires an input lock"), F.PC->IsMoveInputIgnored());
+    F.ASC->RegisterGameplayTagEvent(Busy, EGameplayTagEventType::NewOrRemoved).Remove(Listener);
     return true;
 }
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCarryOwnershipTest,"ProjectVelkorran.World.Carry.OwnershipReleaseAndSave",

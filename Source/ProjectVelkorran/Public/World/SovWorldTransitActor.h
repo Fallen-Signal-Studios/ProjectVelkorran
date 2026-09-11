@@ -4,6 +4,7 @@
 #include "GameplayEffectTypes.h"
 #include "GameplayTagContainer.h"
 #include "GameFramework/Actor.h"
+#include "Components/BoxComponent.h"
 #include "Interaction/InteractableComponent.h"
 #include "NarrativeSavableActor.h"
 #include "SovWorldTransitActor.generated.h"
@@ -14,6 +15,21 @@ class ULevelStreaming;
 class ASovPlayerCharacterBase;
 class UAbilitySystemComponent;
 class UCharacterMovementComponent;
+class ASovPlayerController;
+
+/** Navigation geometry only. MovingBody remains the sole physical floor and movement base. */
+UCLASS(NotBlueprintable)
+class PROJECTVELKORRAN_API USovLiftNavigationSurfaceComponent : public UBoxComponent
+{
+    GENERATED_BODY()
+public:
+    USovLiftNavigationSurfaceComponent();
+    void ConfigureSurface(const FVector& Extent, bool bEnabled);
+    virtual bool IsNavigationRelevant() const override;
+    virtual bool DoCustomNavigableGeometryExport(FNavigableGeometryExport& Export) const override;
+private:
+    bool bSurfaceEnabled = false;
+};
 
 UENUM(BlueprintType) enum class ESovWorldTransitKind : uint8 { Door, Lift };
 UENUM(BlueprintType) enum class ESovWorldTransitState : uint8 { AtOrigin, AtDestination, WaitingForDestination, Moving, Blocked, Broken };
@@ -45,6 +61,7 @@ public:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<USovWorldTransitInteractable> Interactable;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UNavLinkCustomComponent> OriginLink;
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<UNavLinkCustomComponent> DestinationLink;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<USovLiftNavigationSurfaceComponent> LiftNavigationSurface;
     UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="Transit") FName TransitId;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Transit") ESovWorldTransitKind Kind = ESovWorldTransitKind::Door;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Transit") FVector DestinationOffset = FVector(0,0,260);
@@ -55,6 +72,9 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Transit") FName RequiredMission;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Transit") FName RequiredBeat;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Transit") FGameplayTag RequiredProtagonist;
+    /** Opt-in shared-route lift: the current mission companion must physically board before departure. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Transit", meta=(EditCondition="Kind == ESovWorldTransitKind::Lift"))
+    bool bRequireMissionCompanionAboard = false;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Transit") bool bIrreversibleTransition = false;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Transit") bool bRequiresPower = true;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame, ReplicatedUsing=OnRep_State, Category="Transit") bool bPowered = true;
@@ -68,6 +88,11 @@ public:
     uint64 GetPowerRevision() const { return PowerRevision; }
     uint64 GetLockRevision() const { return LockRevision; }
     UFUNCTION(BlueprintPure, Category="Transit") ESovWorldTransitState GetTransitState() const { return State; }
+    /** Rebuild the navigation-only surface and dock links after authoring the physical box.
+     * Lift docks are on local -Y at origin and +Y at destination; doors retain their existing links. */
+    UFUNCTION(BlueprintCallable, CallInEditor, Category="Transit") void RefreshNavigationGeometry();
+    /** Actual settled physical door endpoint, including structure, power, lock and nav-link state. */
+    bool IsOpenTraversableDoor() const;
     bool CanUse(const APawn* Player, FText& Error) const;
     virtual float TakeDamage(float DamageAmount, const FDamageEvent& DamageEvent, AController* EventInstigator, AActor* Causer) override;
     virtual FGuid GetActorGUID_Implementation() const override;
@@ -83,10 +108,12 @@ protected:
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out) const override;
 private:
     friend struct FSovWorldTransitTestAccess;
+    friend struct FSovLiftNavigationTestAccess;
     void ReconcileEndpoint();
     void UpdateLinks();
     void Finish(bool bSuccess, const FText& Message);
     bool OwnsPlayer() const;
+    bool HasRequiredMissionCompanionAboard(const ASovPlayerController* PC, const ASovPlayerCharacterBase* Player) const;
     UFUNCTION() void OnRep_State();
     UPROPERTY(SaveGame) FGuid SaveGuid;
     UPROPERTY(SaveGame, ReplicatedUsing=OnRep_State) bool bAtDestination = false;

@@ -8,7 +8,7 @@ class ASovPlayerController;
 class USovCampaignStateComponent;
 
 /** Combat entry and priority checkpoints have their own native transaction owners. */
-UENUM(BlueprintType)
+UENUM(BlueprintType, meta=(ScriptName="SovAurelionCheckpointBoundary"))
 enum class ESovAurelionCheckpoint : uint8 { ContextCP0, SeleneEntryCP2, MeetingCP3, QuarantineCP6, CoreCP7, ConversationCP8, DepartureCP9 };
 
 /** Place on a stable route threshold. Captures existing state only; never completes a mission beat. */

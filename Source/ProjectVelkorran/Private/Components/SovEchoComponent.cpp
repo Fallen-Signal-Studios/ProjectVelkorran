@@ -208,6 +208,12 @@ bool USovEchoComponent::IsSignatureReady() const
 	return IsInitialized() && SovEchoAwardPolicy::IsMeterReady(GetEcho(), Requirement);
 }
 
+float USovEchoComponent::GetSecondsSinceCombatActivity() const
+{
+	return IsInitialized() && AbilitySystemComponent->GetAvatarActor() == GetOwner()
+		? FMath::Max(0.f, GetWorldTimeSeconds() - LastActivityWorldTime) : 0.f;
+}
+
 float USovEchoComponent::GetSecondsUntilDecay() const
 {
 	if (!bEncounterActive)

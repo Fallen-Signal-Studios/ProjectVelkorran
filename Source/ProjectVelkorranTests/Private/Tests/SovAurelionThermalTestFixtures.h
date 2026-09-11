@@ -12,8 +12,11 @@ class ASovAurelionThermalTestDirector : public ASovEncounterDirector
     GENERATED_BODY()
 public:
     virtual ESovEncounterProofType GetCampaignProofType() const override { return ESovEncounterProofType::AurelionThermalFracture; }
-    void StartTestAttempt()
+    void StartTestAttempt(ASovPlayerCharacterBase* Player)
     {
+        // The fixture supplies an already captured encounter, including the exact
+        // player identity normally committed by CaptureEntryCheckpoint.
+        EncounterPlayer = Player;
         const auto Previous = State;
         State = ESovEncounterState::Active; AttemptId = FGuid::NewGuid(); bHasEntryCheckpoint = true;
         OnEncounterStateChanged.Broadcast(Previous, State);

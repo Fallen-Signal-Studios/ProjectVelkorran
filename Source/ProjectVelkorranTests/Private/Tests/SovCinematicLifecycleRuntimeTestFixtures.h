@@ -46,3 +46,12 @@ public:
 	UFUNCTION() void Failed() { ++FailedCount; }
 	UFUNCTION() void Blended() { ++BlendCount; }
 };
+
+/** Uses the real tagged binding resolver, unlike the external-ownership test spy. */
+UCLASS()
+class ASovRequiredCharacterSequenceTestActor : public ANarrativeLevelSequenceActor
+{
+	GENERATED_BODY()
+public:
+	void InitializeTestSequence(ULevelSequence* Sequence) { SetSequence(Sequence); InitializePlayer(); }
+};

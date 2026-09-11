@@ -111,24 +111,32 @@ bool USovGameplayAbility_EchoBase::CheckCost(
 	const FGameplayAbilityActorInfo* ActorInfo,
 	FGameplayTagContainer* OptionalRelevantTags) const
 {
-	LastActivationFailureReason.Reset();
+	return CheckEchoPresentationCost(Handle, ActorInfo, LastActivationFailureReason, OptionalRelevantTags);
+}
+
+bool USovGameplayAbility_EchoBase::CheckEchoPresentationCost(
+	const FGameplayAbilitySpecHandle Handle,
+	const FGameplayAbilityActorInfo* ActorInfo,
+	FString& OutReason, FGameplayTagContainer* OptionalRelevantTags) const
+{
+	OutReason.Reset();
 	if (!Super::CheckCost(Handle, ActorInfo, OptionalRelevantTags))
 	{
-		LastActivationFailureReason = TEXT("the inherited GAS cost check failed");
+		OutReason = TEXT("the inherited GAS cost check failed");
 		return false;
 	}
 	const auto* ASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
 	const float Health = ASC ? ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()) : 0.f;
 	if (!FMath::IsFinite(Health) || Health <= 0.f)
 	{
-		LastActivationFailureReason = TEXT("the avatar has no living Health even if its death tag is not published yet");
+		OutReason = TEXT("the avatar has no living Health even if its death tag is not published yet");
 		if (OptionalRelevantTags) { OptionalRelevantTags->AddTag(FNarrativeGameplayTags::Get().Ability_ActivateFail_TagsBlocked); }
 		return false;
 	}
 
 	if (!HasRequiredPayloadConfiguration())
 	{
-		LastActivationFailureReason = TEXT("required payload configuration is incomplete");
+		OutReason = TEXT("required payload configuration is incomplete");
 		if (OptionalRelevantTags)
 		{
 			OptionalRelevantTags->AddTag(
@@ -138,7 +146,7 @@ bool USovGameplayAbility_EchoBase::CheckCost(
 	}
 	if (!MeetsCharacterRequirement(ActorInfo))
 	{
-		LastActivationFailureReason = TEXT("the avatar does not satisfy the character identity requirement");
+		OutReason = TEXT("the avatar does not satisfy the character identity requirement");
 		if (OptionalRelevantTags)
 		{
 			OptionalRelevantTags->AddTag(
@@ -148,7 +156,7 @@ bool USovGameplayAbility_EchoBase::CheckCost(
 	}
 	if (!MeetsWeaponRequirement(Handle, ActorInfo))
 	{
-		LastActivationFailureReason = TEXT("the currently wielded or granting weapon is not allowed");
+		OutReason = TEXT("the currently wielded or granting weapon is not allowed");
 		if (OptionalRelevantTags)
 		{
 			OptionalRelevantTags->AddTag(
@@ -162,13 +170,13 @@ bool USovGameplayAbility_EchoBase::CheckCost(
 	const float Cost = GetEchoCost();
 	if (!IsValid(EchoComponent))
 	{
-		LastActivationFailureReason = TEXT("the avatar has no Sovereign Echo component");
+		OutReason = TEXT("the avatar has no Sovereign Echo component");
 		AddEchoFailureTags(OptionalRelevantTags);
 		return false;
 	}
 	if (!EchoComponent->IsInitialized())
 	{
-		LastActivationFailureReason = TEXT("the Sovereign Echo component could not bind to the current ASC");
+		OutReason = TEXT("the Sovereign Echo component could not bind to the current ASC");
 		AddEchoFailureTags(OptionalRelevantTags);
 		return false;
 	}
@@ -176,7 +184,7 @@ bool USovGameplayAbility_EchoBase::CheckCost(
 	const float CurrentEcho = EchoComponent->GetEcho();
 	if (CurrentEcho + KINDA_SMALL_NUMBER < RequiredEcho)
 	{
-		LastActivationFailureReason = FString::Printf(
+		OutReason = FString::Printf(
 			TEXT("current Echo %.2f is below the %.2f activation threshold"),
 			CurrentEcho,
 			RequiredEcho);
@@ -185,7 +193,7 @@ bool USovGameplayAbility_EchoBase::CheckCost(
 	}
 	if (!EchoComponent->CanAffordEcho(Cost))
 	{
-		LastActivationFailureReason = FString::Printf(
+		OutReason = FString::Printf(
 			TEXT("current Echo %.2f cannot pay the %.2f activation cost"),
 			CurrentEcho,
 			Cost);

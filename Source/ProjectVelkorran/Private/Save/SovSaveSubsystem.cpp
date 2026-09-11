@@ -48,6 +48,19 @@ namespace
         bool Exists(const FString& Slot, int32 User) override
         { return UGameplayStatics::DoesSaveGameExist(Slot, User); }
     };
+    USovCampaignSaveGame* LoadCampaignEnvelope(const TArray<uint8>& Bytes)
+    {
+        // Campaign envelopes use the UE5 GVAS header (engine save format 3).
+        // The engine treats a missing tag as a pre-GVAS class-name string;
+        // damaged leading bytes can then trigger a fatal FName length check.
+        // Reject that unsupported legacy path before invoking UObject decoding.
+        if (Bytes.Num() < 2 * static_cast<int32>(sizeof(int32))) { return nullptr; }
+        FMemoryReader Reader(Bytes, true);
+        int32 Magic = 0, Version = 0;
+        Reader << Magic << Version;
+        if (Reader.IsError() || Magic != 0x53415647 || Version != 3) { return nullptr; }
+        return Cast<USovCampaignSaveGame>(UGameplayStatics::LoadGameFromMemory(Bytes));
+    }
     constexpr double LoadTimeoutSeconds = 120.0;
     SovSavePolicy::Kind PolicyKind(ESovSaveSlotKind Kind) { return static_cast<SovSavePolicy::Kind>(Kind); }
     constexpr uint32 ProfileHintMagic = 0x534F5641;
@@ -326,7 +339,7 @@ bool USovSaveSubsystem::ValidatePlatformSnapshot(const TArray<uint8>& Bytes, ESo
     { Error = TEXT("Cloud save is empty or exceeds the supported 64 MiB envelope limit."); return false; }
     const FOperationOwner Owner = CaptureOperationOwner();
     if (!IsOperationOwnerCurrent(Owner, Error)) { return false; }
-    TStrongObjectPtr<USovCampaignSaveGame> Save(Cast<USovCampaignSaveGame>(UGameplayStatics::LoadGameFromMemory(Bytes)));
+    TStrongObjectPtr<USovCampaignSaveGame> Save(LoadCampaignEnvelope(Bytes));
     if (!IsOperationOwnerCurrent(Owner, Error)) { return false; }
     if (!ValidateEnvelope(Save.Get(), false, Error)) { return false; }
     if (Save->Header.Kind != Kind || Save->Header.SlotIndex != Index || Save->Header.Generation <= 0)
@@ -343,7 +356,7 @@ ESovSaveResult USovSaveSubsystem::ImportPlatformSnapshot(const TArray<uint8>& By
     FSovSaveSlotHeader Header;
     if (!ValidatePlatformSnapshot(Bytes, Kind, Index, Header, Error)) { return ESovSaveResult::IncompatibleSave; }
     if (!IsOperationOwnerCurrent(Owner, Error)) { return OwnershipFailureResult(); }
-    TStrongObjectPtr<USovCampaignSaveGame> Candidate(Cast<USovCampaignSaveGame>(UGameplayStatics::LoadGameFromMemory(Bytes)));
+    TStrongObjectPtr<USovCampaignSaveGame> Candidate(LoadCampaignEnvelope(Bytes));
     if (!IsOperationOwnerCurrent(Owner, Error)) { return OwnershipFailureResult(); }
     if (!ValidateEnvelope(Candidate.Get(), true, Error, &Owner) || !DecodeNarrative(Candidate.Get(), Error, &Owner))
     { return ESovSaveResult::IncompatibleSave; }
@@ -374,7 +387,7 @@ ESovSaveResult USovSaveSubsystem::CommitPlatformSnapshot(const TArray<uint8>& By
     };
     if (!Preserve(TEXT("_Local"), Current) || !Preserve(TEXT("_Remote"), Bytes))
     { Error = TEXT("Could not durably preserve both reviewed copies. Local save banks were not changed."); return ESovSaveResult::WriteFailed; }
-    TStrongObjectPtr<USovCampaignSaveGame> Save(Cast<USovCampaignSaveGame>(UGameplayStatics::LoadGameFromMemory(Bytes)));
+    TStrongObjectPtr<USovCampaignSaveGame> Save(LoadCampaignEnvelope(Bytes));
     if (!IsOperationOwnerCurrent(Owner, Error)) { return OwnershipFailureResult(); }
     // The native writer assigns the next LOCAL generation and preserves the previous good bank.
     // Cloud revision clocks/generations are never used to select or rename local bank authority.
@@ -516,7 +529,7 @@ USovCampaignSaveGame* USovSaveSubsystem::ReadBest(ESovSaveSlotKind Kind, int32 I
         if (!ExistsOwned(Owner, Name, bExists, Error)) { return nullptr; }
         if (!bExists) { continue; }
         if (ReadOwned(Owner, Name, Owner.LocalUser, Bytes, Error))
-        { Banks[Bank].Reset(Cast<USovCampaignSaveGame>(UGameplayStatics::LoadGameFromMemory(Bytes))); }
+        { Banks[Bank].Reset(LoadCampaignEnvelope(Bytes)); }
         if (!IsOperationOwnerCurrent(Owner, Error)) { return nullptr; }
         FString ValidationError;
         if (ValidateEnvelope(Banks[Bank].Get(), false, ValidationError)
@@ -573,7 +586,7 @@ ESovSaveResult USovSaveSubsystem::WriteEnvelope(USovCampaignSaveGame* Save, FStr
             if (!IsOperationOwnerCurrent(Owner, Error)) { return OwnershipFailureResult(); }
             Error = TEXT("Existing save bank cannot be read safely; it was not overwritten."); return ESovSaveResult::WriteFailed;
         }
-        TStrongObjectPtr<USovCampaignSaveGame> Existing(Cast<USovCampaignSaveGame>(UGameplayStatics::LoadGameFromMemory(ExistingBytes)));
+        TStrongObjectPtr<USovCampaignSaveGame> Existing(LoadCampaignEnvelope(ExistingBytes));
         if (!IsOperationOwnerCurrent(Owner, Error)) { return OwnershipFailureResult(); }
         FString ExistingError;
         if (!ValidateEnvelope(Existing.Get(), false, ExistingError)
@@ -601,7 +614,7 @@ ESovSaveResult USovSaveSubsystem::WriteEnvelope(USovCampaignSaveGame* Save, FStr
         if (!IsOperationOwnerCurrent(Owner, Error)) { return OwnershipFailureResult(); }
         Error = TEXT("Save readback failed. Previous good bank retained; the new save is not confirmed."); return ESovSaveResult::ReadbackFailed;
     }
-    TStrongObjectPtr<USovCampaignSaveGame> Verified(Cast<USovCampaignSaveGame>(UGameplayStatics::LoadGameFromMemory(Readback)));
+    TStrongObjectPtr<USovCampaignSaveGame> Verified(LoadCampaignEnvelope(Readback));
     if (!IsOperationOwnerCurrent(Owner, Error)) { return OwnershipFailureResult(); }
     if (!ValidateEnvelope(Verified.Get(), false, Error)) { return ESovSaveResult::ReadbackFailed; }
     Error.Reset(); return ESovSaveResult::Success;

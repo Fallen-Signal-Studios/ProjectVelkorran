@@ -245,6 +245,7 @@ protected:
 	virtual TArray<TSoftObjectPtr<class UTriggerSet>> GetDefaultTriggerSets() const override;
 	virtual void OnCharacterVisualInitialized() override;
 
+	virtual bool IsSaveRecordDestroyed() const override;
 	virtual void PrepareForSave_Implementation() override;
 	virtual void Load_Implementation() override;
 

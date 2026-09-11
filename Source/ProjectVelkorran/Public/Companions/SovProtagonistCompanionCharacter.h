@@ -13,6 +13,7 @@ class USovShieldComponent;
 class USovPoiseComponent;
 class UNarrativeAbilitySystemComponent;
 class UGameplayAbility;
+class UCharacterMovementComponent;
 
 USTRUCT()
 struct FSovCompanionKitGrant
@@ -53,6 +54,9 @@ public:
 	UFUNCTION(BlueprintPure, Category="Companion") FGameplayTag GetCompanionIdentity() const { return CompanionIdentity; }
 	UFUNCTION(BlueprintPure, Category="Companion") USovCompanionComponent* GetCompanionComponent() const { return Companion; }
 	virtual bool ShouldRespawn_Implementation() const override { return false; }
+	virtual void PossessedBy(AController* NewController) override;
+	virtual void UnPossessed() override;
+	virtual void SetOwner(AActor* NewOwner) override;
 protected:
 	virtual void BeginPlay() override;
 	virtual void OnCharacterVisualInitialized() override;
@@ -64,6 +68,10 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly) TObjectPtr<USovPoiseComponent> Poise;
 private:
 	friend struct FSovConvergenceTestAccess;
+	/** Intercepts only APawn's first engine owner assignment during a normal AI possession change. */
+	TWeakObjectPtr<AActor> PossessionCampaignOwner;
+	TWeakObjectPtr<AActor> PossessionEngineOwner;
+	bool bPreserveNextPawnOwnerWrite = false;
 	UPROPERTY() FGameplayTag CompanionIdentity;
 	UPROPERTY(Transient) TArray<FSovCompanionKitGrant> CopiedGrants;
 	TArray<FGameplayAbilitySpecHandle> OwnedKitHandles;
@@ -76,4 +84,10 @@ private:
 	bool bProxyInitialized = false;
 	bool bApplyingKit = false;
 	bool bStagedForTransition = true;
+	/** The collision-free startup interval owns only this component's tick suspension. */
+	TWeakObjectPtr<UCharacterMovementComponent> StagedMovement;
+	bool bMovementTickWasEnabled = false;
+	bool bMovementTickStartedEnabled = false;
+	bool bMovementAutoUpdatedTick = false;
+	uint64 ProxyStagingEpoch = 0;
 };

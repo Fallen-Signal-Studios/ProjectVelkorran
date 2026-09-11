@@ -713,27 +713,40 @@ void UNarrativeSaveSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 
 bool UNarrativeSaveSubsystem::CreateActorRecord(AActor* Actor, FNarrativeActorRecord& ActorRecord) const
 {
-	if (!IsCurrentSaveActor(Actor)) { return false; }
+	const FString CaptureActorPath = IsValid(Actor) ? GetPathNameSafe(Actor) : TEXT("<invalid>");
+	const auto RejectRecord = [&CaptureActorPath](const TCHAR* CaptureStage,
+		const UActorComponent* CapturedComponent = nullptr, int64 ByteCount = 0, bool bArchiveError = false)
+	{
+		UE_LOG(LogSaveSystem, Warning,
+			TEXT("CreateActorRecord rejected actor=%s stage=%s component=%s class=%s bytes=%lld archive_error=%d"),
+			*CaptureActorPath, CaptureStage,
+			IsValid(CapturedComponent) ? *GetPathNameSafe(CapturedComponent) : TEXT("<none or invalid>"),
+			IsValid(CapturedComponent) ? *GetPathNameSafe(CapturedComponent->GetClass()) : TEXT("<none or invalid>"),
+			ByteCount, bArchiveError ? 1 : 0);
+		return false;
+	};
+	if (!IsCurrentSaveActor(Actor)) { return RejectRecord(TEXT("actor unavailable at entry")); }
 	TStrongObjectPtr<AActor> KeepActor(Actor);
 	FNarrativeActorRecord Candidate;
 	if (Actor->Implements<UNarrativeStableActor>())
 	{
 		Candidate.ActorGUID = INarrativeStableActor::Execute_GetActorGUID(Actor);
-		if (!IsCurrentSaveActor(Actor) || !Candidate.ActorGUID.IsValid()) { return false; }
+		if (!IsCurrentSaveActor(Actor)) { return RejectRecord(TEXT("actor retired during stable GUID callback")); }
+		if (!Candidate.ActorGUID.IsValid()) { return RejectRecord(TEXT("stable GUID callback returned an invalid GUID")); }
 	}
 	if (Actor->Implements<UNarrativeSavableActor>())
 	{
 		Candidate.bNeedsDynamicSpawn = INarrativeSavableActor::Execute_ShouldRespawn(Actor);
-		if (!IsCurrentSaveActor(Actor)) { return false; }
+		if (!IsCurrentSaveActor(Actor)) { return RejectRecord(TEXT("actor retired during ShouldRespawn")); }
 		Candidate.bOptional = INarrativeSavableActor::Execute_IsOptionalSaveRecord(Actor);
-		if (!IsCurrentSaveActor(Actor)) { return false; }
+		if (!IsCurrentSaveActor(Actor)) { return RejectRecord(TEXT("actor retired during IsOptionalSaveRecord")); }
 		INarrativeSavableActor::Execute_PrepareForSave(Actor);
-		if (!IsCurrentSaveActor(Actor)) { return false; }
+		if (!IsCurrentSaveActor(Actor)) { return RejectRecord(TEXT("actor retired during PrepareForSave")); }
 	}
 	Candidate.ActorName = Actor->GetFName();
 	Candidate.ActorSoftClass = Actor->GetClass();
     if (const auto* Policy = Cast<INarrativeSavableActor>(Actor)) { Candidate.RestorePhase = Policy->GetSaveRestorePhase(); }
-	if (!IsCurrentSaveActor(Actor)) { return false; }
+	if (!IsCurrentSaveActor(Actor)) { return RejectRecord(TEXT("actor retired during restore-phase query")); }
 	Candidate.bNetStartup = Actor->IsNetStartupActor();
 	Candidate.Transform = FTransform::Identity;
 	if (Actor->GetRootComponent() && Actor->GetRootComponent()->Mobility == EComponentMobility::Movable)
@@ -744,7 +757,8 @@ bool UNarrativeSaveSubsystem::CreateActorRecord(AActor* Actor, FNarrativeActorRe
 	// Full snapshots must overwrite existing state even when the captured value equals its archetype default.
 	Ar.ArNoDelta = true;
 	Actor->Serialize(Ar);
-	if (Ar.IsError() || !IsCurrentSaveActor(Actor)) { return false; }
+	if (Ar.IsError()) { return RejectRecord(TEXT("actor serialization archive error"), nullptr, Candidate.ByteData.Num(), true); }
+	if (!IsCurrentSaveActor(Actor)) { return RejectRecord(TEXT("actor retired during serialization"), nullptr, Candidate.ByteData.Num()); }
 	TInlineComponentArray<UActorComponent*> Components(Actor);
 	TArray<TStrongObjectPtr<UActorComponent>> ComponentPins;
 	TSet<FName> CurrentNames;
@@ -755,7 +769,8 @@ bool UNarrativeSaveSubsystem::CreateActorRecord(AActor* Actor, FNarrativeActorRe
 		if (Component->Implements<UNarrativeSavableComponent>())
 		{
 			const FName Name = Component->GetFName();
-			if (Name.IsNone() || CurrentNames.Contains(Name)) { return false; }
+			if (Name.IsNone()) { return RejectRecord(TEXT("savable component has no name"), Component); }
+			if (CurrentNames.Contains(Name)) { return RejectRecord(TEXT("duplicate savable component name"), Component); }
 			CurrentNames.Add(Name);
 		}
 	}
@@ -764,30 +779,36 @@ bool UNarrativeSaveSubsystem::CreateActorRecord(AActor* Actor, FNarrativeActorRe
 		UActorComponent* Component = ComponentPin.Get();
 		if (!IsValid(Component) || !Component->Implements<UNarrativeSavableComponent>()) { continue; }
 		const FName ComponentName = Component->GetFName();
-		if (!IsCurrentSaveComponent(Actor, Component, ComponentName)) { return false; }
+		if (!IsCurrentSaveComponent(Actor, Component, ComponentName)) { return RejectRecord(TEXT("component ownership invalid before PrepareForSave"), Component); }
 		INarrativeSavableComponent::Execute_PrepareForSave(Component);
-		if (!IsCurrentSaveComponent(Actor, Component, ComponentName)) { return false; }
+		if (!IsCurrentSaveComponent(Actor, Component, ComponentName)) { return RejectRecord(TEXT("component ownership changed during PrepareForSave"), Component); }
 		FNarrativeSaveComponent Record;
 		Record.ComponentName = ComponentName;
 		Record.ComponentClass = Component->GetClass();
         if (const auto* Policy = Cast<INarrativeSavableComponent>(Component)) { Record.RestorePhase = Policy->GetSaveRestorePhase(); }
-		if (!IsCurrentSaveComponent(Actor, Component, ComponentName)) { return false; }
+		if (!IsCurrentSaveComponent(Actor, Component, ComponentName)) { return RejectRecord(TEXT("component ownership changed during restore-phase query"), Component); }
 		Record.bOptional = INarrativeSavableComponent::Execute_IsOptionalSaveRecord(Component);
-		if (!IsCurrentSaveComponent(Actor, Component, ComponentName)) { return false; }
+		if (!IsCurrentSaveComponent(Actor, Component, ComponentName)) { return RejectRecord(TEXT("component ownership changed during IsOptionalSaveRecord"), Component); }
 		FMemoryWriter Writer(Record.ByteData);
 		FObjectAndNameAsStringProxyArchive ComponentAr(Writer, true);
 		ComponentAr.ArIsSaveGame = true;
 		ComponentAr.ArNoDelta = true;
 		Component->Serialize(ComponentAr);
-		if (ComponentAr.IsError() || !IsCurrentSaveComponent(Actor, Component, ComponentName)) { return false; }
+		if (ComponentAr.IsError()) { return RejectRecord(TEXT("component serialization archive error"), Component, Record.ByteData.Num(), true); }
+		if (!IsCurrentSaveComponent(Actor, Component, ComponentName)) { return RejectRecord(TEXT("component ownership changed during serialization"), Component, Record.ByteData.Num()); }
 		if (const auto* Policy = Cast<INarrativeSavableComponent>(Component))
 		{
-			if (!Policy->ValidateSaveRecord(Record.ByteData)
-				|| !IsCurrentSaveComponent(Actor, Component, ComponentName)) { return false; }
+			if (!Policy->ValidateSaveRecord(Record.ByteData))
+			{ return RejectRecord(TEXT("component ValidateSaveRecord rejected serialized bytes"), Component, Record.ByteData.Num()); }
+			if (!IsCurrentSaveComponent(Actor, Component, ComponentName))
+			{ return RejectRecord(TEXT("component ownership changed during ValidateSaveRecord"), Component, Record.ByteData.Num()); }
 		}
 		Candidate.SavedComponents.Add(MoveTemp(Record));
 	}
-	if (!IsCurrentSaveActor(Actor)) { return false; }
+	if (!IsCurrentSaveActor(Actor)) { return RejectRecord(TEXT("actor retired before record publication"), nullptr, Candidate.ByteData.Num()); }
+	if (const auto* Policy = Cast<INarrativeSavableActor>(Actor))
+	{ Candidate.bDestroyed = Policy->IsSaveRecordDestroyed(); }
+	if (!IsCurrentSaveActor(Actor)) { return RejectRecord(TEXT("actor retired during terminal-state query")); }
 	ActorRecord = MoveTemp(Candidate); // Never replace a caller's last good record on capture failure.
 	return true;
 }
@@ -858,7 +879,7 @@ bool UNarrativeSaveSubsystem::LoadActorFromRecord(AActor* Actor, const FNarrativ
 	for (UActorComponent* Component : InitialComponents)
 	{ if (IsValid(Component)) { ComponentPins.Emplace(Component); } }
 	if (!ValidateRecordForActor(Actor, StableRecord)) { return false; }
-	if (StableRecord.bNetStartup && StableRecord.bDestroyed) { return Actor->Destroy(); }
+	if (StableRecord.bDestroyed) { return Actor->Destroy(); }
 
 	struct FComponentRestoreJob
 	{

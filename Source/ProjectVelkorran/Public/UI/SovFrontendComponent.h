@@ -34,6 +34,7 @@ public:
     virtual void Deactivate() override;
     UFUNCTION(BlueprintCallable, Category="Accessibility") bool OpenAccessibilitySettings();
     USovAccessibilityPresentation* GetPresentation() const { return Presentation; }
+    const USovCombatVitalsWidget* GetCombatVitals() const { return CombatVitals; }
     virtual void TickComponent(float Delta, ELevelTick TickType, FActorComponentTickFunction* Tick) override;
 protected:
     virtual void BeginPlay() override;

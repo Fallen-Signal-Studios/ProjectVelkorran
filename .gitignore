@@ -48,6 +48,16 @@ StagedBuilds/
 *.ucas
 *.utoc
 
+# Historical project/plugin binaries remain local; Aurelion owns its tracked assets.
+Content/
+*.uasset
+*.umap
+!/Content/
+/Content/*
+!/Content/Aurelion/
+!/Content/Aurelion/**/*.uasset
+!/Content/Aurelion/**/*.umap
+
 # Raw source assets that normally belong in LFS
 SourceArt/
 *.blend

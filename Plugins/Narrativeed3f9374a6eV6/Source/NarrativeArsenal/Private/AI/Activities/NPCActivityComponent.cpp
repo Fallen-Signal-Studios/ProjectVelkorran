@@ -15,6 +15,7 @@
 #include <TimerManager.h>
 
 #include "BehaviorTree/BehaviorTreeComponent.h"
+#include "UObject/StrongObjectPtr.h"
 
 // Sets default values for this component's properties
 UNPCActivityComponent::UNPCActivityComponent()
@@ -31,6 +32,13 @@ void UNPCActivityComponent::BeginPlay()
 	Super::BeginPlay();
 
 	OwnerController = CastChecked<ANarrativeNPCController>(GetOwner());
+	if (bSavedActivityRestorePending)
+	{
+		// Actor::BeginPlay is still dispatching component callbacks here. A next
+		// tick lets the real controller finish its own BeginPlay first.
+		QueueSavedActivityRestore();
+		return;
+	}
 
 	if (UWorld* World = GetWorld())
 	{
@@ -38,6 +46,24 @@ void UNPCActivityComponent::BeginPlay()
 	}
 
 	RescoreGoals();
+}
+
+void UNPCActivityComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	bActivityComponentEndingPlay = true;
+	RefreshGoalKeyActorBindings();
+	bSavedActivityLoadAccepted = false;
+	++SavedActivityLoadGeneration;
+	bSavedActivityRestorePending = false;
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(TimerHandle_SavedActivityRestore);
+		World->GetTimerManager().ClearTimer(TimerHandle_RescoreGoals);
+	}
+	OwnerController = nullptr;
+	SavedActivityLoadController.Reset();
+	SavedActivityLoadPawn.Reset();
+	Super::EndPlay(EndPlayReason);
 }
 
 void UNPCActivityComponent::RescoreGoals()
@@ -189,6 +215,11 @@ void UNPCActivityComponent::DescribeSelfToGameplayDebugger(FGameplayDebuggerCate
 				{
 					if (Goal)
 					{
+						if (HasStaleRegisteredGoalKey(Goal))
+						{
+							DebuggerCategory->AddTextLine(TEXT("   Expired object-key goal; awaiting ordinary selection cleanup."));
+							continue;
+						}
 						if (CurrentActivity && Goal == CurrentActivity->ActivityGoal)
 						{
 							DebuggerCategory->AddTextLine(FString::Printf(TEXT("{yellow}   %s | Score %f"), *Goal->GetDebugString(), Goal->GetGoalScore()));
@@ -214,7 +245,7 @@ void UNPCActivityComponent::DescribeSelfToGameplayDebugger(FGameplayDebuggerCate
 
 bool UNPCActivityComponent::PerformActivitySelection(bool bCheckNew)
 {
-	if (!IsActive())
+	if (!IsActive() || bSavedActivityRestorePending || bApplyingSavedActivities || bActivityComponentEndingPlay)
 	{
 		return false;
 	}
@@ -343,6 +374,11 @@ bool UNPCActivityComponent::PerformActivitySelection(bool bCheckNew)
 
 bool UNPCActivityComponent::CanRunActivity(UNPCActivity* ActivityTemplate, UNPCGoalItem* ActivityGoal, FString& FailReason) const
 {
+	if (bSavedActivityRestorePending || bApplyingSavedActivities || bActivityComponentEndingPlay)
+	{
+		FailReason = TEXT("Saved activity state is not initialized.");
+		return false;
+	}
 	if(!OwnerController || !OwnerController->HasAuthority())
 	{
 		FailReason = "Not Authority";
@@ -632,6 +668,10 @@ UNPCGoalItem* UNPCActivityComponent::AddGoal(UNPCGoalItem* NewGoal, const bool b
 {
 	if (NewGoal)
 	{
+		// The same published instance is not a new candidate. Reinitializing it
+		// would replace its timer handles before uniqueness admission rejects it.
+		if (const FNPCGoalContainer* Existing = Goals.Find(NewGoal->GetClass());
+			Existing && Existing->Goals.Contains(NewGoal)) { return nullptr; }
 		//This check basically just stops saved goals from having their creation time overriden 
 		NewGoal->CreationTime = GetWorld()->GetTimeSeconds();
 
@@ -646,8 +686,26 @@ UNPCGoalItem* UNPCActivityComponent::AddGoal(UNPCGoalItem* NewGoal, const bool b
 		NewGoal->TODCreationTime = TOD;
 		NewGoal->OwnerController = OwnerController;
 
-		//We call this immediately, as GetGoalKey() may require Initialize to set up the key. 
+		// A restoring generator can create ordinary goals from its initialization
+		// callback. Do not publish one after that callback retires the snapshot.
+		const bool bFromRestore = bApplyingSavedActivities;
+		const uint64 Generation = SavedActivityLoadGeneration;
 		NewGoal->Initialize();
+		if (bFromRestore && !OwnsSavedActivityRestore(Generation)) { return nullptr; }
+		UObject* GoalKey = NewGoal->GetGoalKey();
+		if (bFromRestore && !OwnsSavedActivityRestore(Generation)) { return nullptr; }
+		// Either outward callback may have published this exact instance in a
+		// nested admission. Its accepted work belongs to that registration.
+		if (const FNPCGoalContainer* Existing = Goals.Find(NewGoal->GetClass());
+			Existing && Existing->Goals.Contains(NewGoal)) { return nullptr; }
+		const AActor* ActorKey = Cast<AActor>(GoalKey);
+		if (GoalKey && (!IsValid(GoalKey) || (ActorKey && ActorKey->IsActorBeingDestroyed())))
+		{
+			// Initialize may have started timers. Retire them through the normal
+			// callback rather than publish a new goal for an already dying key.
+			NewGoal->OnRemoved();
+			return nullptr;
+		}
 
 		//Add the goal to the set.
 		if (!Goals.Contains(NewGoal->GetClass()))
@@ -655,7 +713,7 @@ UNPCGoalItem* UNPCActivityComponent::AddGoal(UNPCGoalItem* NewGoal, const bool b
 			FNPCGoalContainer NewGoalSet;
 			NewGoalSet.Goals.Add(NewGoal);
 
-			if (UObject* Key = NewGoal->GetGoalKey())
+			if (UObject* Key = GoalKey)
 			{
 				NewGoalSet.GoalUniqueObjectMap.Add(Key, NewGoal);
 			}
@@ -665,10 +723,13 @@ UNPCGoalItem* UNPCActivityComponent::AddGoal(UNPCGoalItem* NewGoal, const bool b
 		else
 		{	
 			//Enforce uniqueness - dont allow multiple goals with same key
-			if (UObject* Key = NewGoal->GetGoalKey())
+			if (UObject* Key = GoalKey)
 			{
 				if (Goals[NewGoal->GetClass()].GoalUniqueObjectMap.Contains(Key))
 				{
+					// Initialize already acquired timers/delegates. This distinct
+					// rejected candidate will never receive registered-key cleanup.
+					NewGoal->OnRemoved();
 					return nullptr;
 				}
 
@@ -679,11 +740,20 @@ UNPCGoalItem* UNPCActivityComponent::AddGoal(UNPCGoalItem* NewGoal, const bool b
 
 		}
 
+		RefreshGoalKeyActorBindings();
+
 		//let the goal set itself if needed - moved to start to key can be initialized 
 		//NewGoal->Initialize();
 
-		//By default if new goal scores higher than existing one lets perform a reselect 
-		if ((!CurrentActivity || !CurrentActivity->ActivityGoal) || (CurrentActivity && CurrentActivity->ActivityGoal && NewGoal->GetGoalScore() > CurrentActivity->ActivityGoal->GetGoalScore()))
+		// The completed restore will score once after every saved row is applied.
+		if (bFromRestore) { return NewGoal; }
+
+		// A living target can be destroyed during a handoff without a death event.
+		// Check its registered identity before either outward score callback.
+		const auto ScoreRegisteredGoal = [this](const UNPCGoalItem* Goal)
+		{ return HasStaleRegisteredGoalKey(Goal) ? -1.f : Goal->GetGoalScore(); };
+		//By default if new goal scores higher than existing one lets perform a reselect
+		if ((!CurrentActivity || !CurrentActivity->ActivityGoal) || (CurrentActivity && CurrentActivity->ActivityGoal && ScoreRegisteredGoal(NewGoal) > ScoreRegisteredGoal(CurrentActivity->ActivityGoal)))
 		{
 			PerformActivitySelection(true);
 		}
@@ -698,6 +768,85 @@ UNPCGoalItem* UNPCActivityComponent::AddGoal(UNPCGoalItem* NewGoal, const bool b
 	return nullptr;
 }
 
+void UNPCActivityComponent::RefreshGoalKeyActorBindings()
+{
+	TSet<TWeakObjectPtr<AActor>> RequiredActors;
+	if (!bActivityComponentEndingPlay)
+	{
+		for (const auto& Pair : Goals)
+		{
+			for (const auto& Entry : Pair.Value.GoalUniqueObjectMap)
+			{
+				if (AActor* Actor = Cast<AActor>(Entry.Key); IsValid(Actor)
+					&& Pair.Value.Goals.Contains(Entry.Value))
+				{ RequiredActors.Add(Actor); }
+			}
+		}
+	}
+	for (const auto& WeakActor : BoundGoalKeyActors)
+	{
+		if (!RequiredActors.Contains(WeakActor))
+		{
+			if (AActor* Actor = WeakActor.Get())
+			{ Actor->OnDestroyed.RemoveDynamic(this, &UNPCActivityComponent::OnGoalKeyActorDestroyed); }
+		}
+	}
+	for (const auto& WeakActor : RequiredActors)
+	{
+		if (!BoundGoalKeyActors.Contains(WeakActor))
+		{
+			if (AActor* Actor = WeakActor.Get())
+			{ Actor->OnDestroyed.AddUniqueDynamic(this, &UNPCActivityComponent::OnGoalKeyActorDestroyed); }
+		}
+	}
+	BoundGoalKeyActors = MoveTemp(RequiredActors);
+}
+
+void UNPCActivityComponent::OnGoalKeyActorDestroyed(AActor* DestroyedActor)
+{
+	if (!DestroyedActor || bActivityComponentEndingPlay) { return; }
+	// Cleanup callbacks may replace goals or load a newer snapshot. Keep no map
+	// iterators across them, and remove only each captured exact registration.
+	TArray<TWeakObjectPtr<UNPCGoalItem>> RetiringGoals;
+	for (const auto& Pair : Goals)
+	{
+		for (const auto& Entry : Pair.Value.GoalUniqueObjectMap)
+		{
+			if (Entry.Key == DestroyedActor && Pair.Value.Goals.Contains(Entry.Value))
+			{ RetiringGoals.AddUnique(Entry.Value); }
+		}
+	}
+	const uint64 Generation = SavedActivityLoadGeneration;
+	for (const auto& WeakGoal : RetiringGoals)
+	{
+		if (bActivityComponentEndingPlay || SavedActivityLoadGeneration != Generation) { return; }
+		UNPCGoalItem* Goal = WeakGoal.Get();
+		const FNPCGoalContainer* Container = Goal ? Goals.Find(Goal->GetClass()) : nullptr;
+		const auto* Registered = Container ? Container->GoalUniqueObjectMap.Find(DestroyedActor) : nullptr;
+		if (Registered && *Registered == Goal && Container->Goals.Contains(Goal))
+		{ RemoveGoal(Goal); }
+	}
+}
+
+bool UNPCActivityComponent::HasStaleRegisteredGoalKey(const UNPCGoalItem* Goal) const
+{
+	if (!IsValid(Goal)) { return true; }
+	const FNPCGoalContainer* Container = Goals.Find(Goal->GetClass());
+	// Removed goals may still be referenced by a current activity or a copied
+	// scoring container while OnRemoved reenters. They are no longer admitted.
+	if (!Container || !Container->Goals.Contains(Goal)) { return true; }
+	for (const auto& Entry : Container->GoalUniqueObjectMap)
+	{
+		if (Entry.Value == Goal)
+		{
+			if (!IsValid(Entry.Key)) { return true; }
+			const AActor* ActorKey = Cast<AActor>(Entry.Key);
+			return ActorKey && ActorKey->IsActorBeingDestroyed();
+		}
+	}
+	return false;
+}
+
 void UNPCActivityComponent::RemoveGoal(UNPCGoalItem* GoalToRemove)
 {
 	if (GoalToRemove)
@@ -706,12 +855,13 @@ void UNPCActivityComponent::RemoveGoal(UNPCGoalItem* GoalToRemove)
 		{
 			if (Goals[GoalToRemove->GetClass()].Goals.Remove(GoalToRemove) > 0)
 			{
+				// Remove this registration before the outward cleanup callback. The
+				// original key may now be null/pending kill; never ask its Blueprint
+				// getter again or erase a replacement registered by OnRemoved.
+				for (auto It = Goals[GoalToRemove->GetClass()].GoalUniqueObjectMap.CreateIterator(); It; ++It)
+				{ if (It.Value() == GoalToRemove) { It.RemoveCurrent(); } }
+				RefreshGoalKeyActorBindings();
 				GoalToRemove->OnRemoved();
-			}
-
-			if (UObject* Key = GoalToRemove->GetGoalKey())
-			{
-				Goals[GoalToRemove->GetClass()].GoalUniqueObjectMap.Remove(Key);
 			}
 
 			
@@ -743,6 +893,7 @@ void UNPCActivityComponent::RemoveAllGoals()
 		GoalContainer.GoalUniqueObjectMap.Empty();
 	}
 
+	RefreshGoalKeyActorBindings();
 	StopCurrentActivity();
 }
 
@@ -791,70 +942,261 @@ void UNPCActivityComponent::StopActivity_Internal(UNPCActivity* Activity, bool b
 	}
 }
 
+bool UNPCActivityComponent::ValidateSaveRecord(const TArray<uint8>& RecordBytes) const
+{
+	// Detached decode invokes serialization only, never Load, BeginPlay or an
+	// activity/goal initialization event. Reject malformed rows synchronously
+	// before the save subsystem mutates the real actor/component.
+	TStrongObjectPtr<UNPCActivityComponent> Decoded(NewObject<UNPCActivityComponent>(GetTransientPackage(), GetClass()));
+	FMemoryReader Reader(RecordBytes);
+	FObjectAndNameAsStringProxyArchive Ar(Reader, true);
+	Ar.ArIsSaveGame = true;
+	Decoded->Serialize(Ar);
+	if (Ar.IsError() || Reader.Tell() != RecordBytes.Num()) { return false; }
+	const auto ValidRows = [&Decoded](const auto& Records)
+	{
+		for (const auto& Record : Records)
+		{
+			if (!IsValid(Record.Class) || Record.Class->HasAnyClassFlags(CLASS_Abstract)) { return false; }
+			TStrongObjectPtr<UObject> Object(NewObject<UObject>(Decoded.Get(), Record.Class));
+			FMemoryReader RowReader(Record.Data);
+			FObjectAndNameAsStringProxyArchive RowAr(RowReader, true);
+			RowAr.ArIsSaveGame = true;
+			Object->Serialize(RowAr);
+			if (RowAr.IsError() || RowReader.Tell() != Record.Data.Num()) { return false; }
+		}
+		return true;
+	};
+	return ValidRows(Decoded->SavedActivities) && ValidRows(Decoded->SavedGoalGenerators) && ValidRows(Decoded->SavedGoals);
+}
+
 void UNPCActivityComponent::Load_Implementation()
 {
-	//Add our activities back 
-	for (auto& Activity : SavedActivities)
-	{
-		if (UNPCActivity* NewActivity = AddActivity(Activity.Class, true))
-		{
-			FMemoryReader MemReader(Activity.Data);
-			FObjectAndNameAsStringProxyArchive Ar(MemReader, true);
-			Ar.ArIsSaveGame = true;
-
-			NewActivity->Serialize(Ar);
-		}
-	}
-
-	//Add our goalgens back
-	for (auto& GoalGen : SavedGoalGenerators)
-	{
-		if (UNPCGoalGenerator* NewGoalGen = AddGoalGenerator(GoalGen.Class, true))
-		{
-			FMemoryReader MemReader(GoalGen.Data);
-			FObjectAndNameAsStringProxyArchive Ar(MemReader, true);
-			Ar.ArIsSaveGame = true;
-
-			NewGoalGen->Serialize(Ar);
-		}
-	}
-
-	for (auto& SaveGoal : SavedGoals)
-	{
-		if (SaveGoal.Class)
-		{
-			if (UNPCGoalItem* NewGoal = NewObject<UNPCGoalItem>(this, SaveGoal.Class))
-			{
-				FMemoryReader MemReader(SaveGoal.Data);
-				FObjectAndNameAsStringProxyArchive Ar(MemReader, true);
-				Ar.ArIsSaveGame = true;
-
-				NewGoal->Serialize(Ar);
-
-				NewGoal->OwnerController = OwnerController; 
-
-				/*No one will have a pointer to the remade goal, but thats okay imo, stuff like followplayer can just 
-				search the goals for it if it needs. */
-				AddGoal(NewGoal);
-			}
-		}
-	}
-
-	//Now that our rescore interval has loaded, we need to restart the rescore ticker 
+	++SavedActivityLoadGeneration;
+	bSavedActivityRestorePending = true;
+	auto* Controller = Cast<ANarrativeNPCController>(GetOwner());
+	SavedActivityLoadController = Controller;
+	SavedActivityLoadPawn = Controller ? Controller->GetPawn() : nullptr;
+	SavedActivityLoadPawnGeneration = Controller ? Controller->GetPawnAssignmentGeneration() : 0;
+	bSavedActivityLoadAccepted = !bActivityComponentEndingPlay && IsValid(Controller)
+		&& !Controller->IsActorBeingDestroyed() && Controller->HasAuthority()
+		&& Controller->GetActivityComponent() == this && IsRegistered();
 	if (UWorld* World = GetWorld())
 	{
-		World->GetTimerManager().SetTimer(TimerHandle_RescoreGoals, this, &UNPCActivityComponent::RescoreGoals, RescoreInterval, true);
+		World->GetTimerManager().ClearTimer(TimerHandle_RescoreGoals);
+		World->GetTimerManager().ClearTimer(TimerHandle_SavedActivityRestore);
+	}
+	if (!bSavedActivityLoadAccepted) { return; }
+
+	if (bApplyingSavedActivities || !HasBegunPlay() || !Controller->HasActorBegunPlay())
+	{
+		// BeginPlay schedules pre-initialization loads. A reentrant load on an
+		// already initialized controller is applied on the next tick, never by
+		// recursively continuing the retired snapshot's callback stack.
+		if (HasBegunPlay()) { QueueSavedActivityRestore(); }
+		return;
+	}
+	RestoreSavedActivities();
+}
+
+void UNPCActivityComponent::QueueSavedActivityRestore()
+{
+	if (!bSavedActivityRestorePending || !bSavedActivityLoadAccepted || bActivityComponentEndingPlay) { return; }
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(TimerHandle_SavedActivityRestore);
+		TimerHandle_SavedActivityRestore = World->GetTimerManager().SetTimerForNextTick(
+			this, &UNPCActivityComponent::RestoreSavedActivities);
+	}
+}
+
+bool UNPCActivityComponent::OwnsSavedActivityRestore(uint64 Generation) const
+{
+	const auto* Controller = SavedActivityLoadController.Get();
+	return !bActivityComponentEndingPlay && IsRegistered() && HasBegunPlay()
+		&& SavedActivityLoadGeneration == Generation && bSavedActivityLoadAccepted
+		&& IsValid(Controller) && !Controller->IsActorBeingDestroyed() && Controller->HasActorBegunPlay()
+		&& Controller->HasAuthority() && GetOwner() == Controller && OwnerController == Controller
+		&& Controller->GetActivityComponent() == this && Controller->GetWorld() == GetWorld()
+		&& Controller->GetPawnAssignmentGeneration() == SavedActivityLoadPawnGeneration
+		&& !SavedActivityLoadPawn.IsStale() && Controller->GetPawn() == SavedActivityLoadPawn.Get();
+}
+
+void UNPCActivityComponent::RestoreSavedActivities()
+{
+	if (!bSavedActivityRestorePending || bApplyingSavedActivities) { return; }
+	const uint64 Generation = SavedActivityLoadGeneration;
+	if (!OwnsSavedActivityRestore(Generation))
+	{
+		bSavedActivityLoadAccepted = false;
+		return;
 	}
 
-	RescoreGoals();
+	// Copies prevent Blueprint callbacks that load a newer snapshot from
+	// invalidating the active iteration or mixing the two sets of saved rows.
+	const auto ActivityRecords = SavedActivities;
+	const auto GeneratorRecords = SavedGoalGenerators;
+	const auto GoalRecords = SavedGoals;
+	const auto IsCurrent = [this, Generation]()
+	{
+		const bool bCurrent = OwnsSavedActivityRestore(Generation);
+		if (!bCurrent && SavedActivityLoadGeneration == Generation) { bSavedActivityLoadAccepted = false; }
+		return bCurrent;
+	};
+	const auto Deserialize = [this, &IsCurrent](UObject* Object, const TArray<uint8>& Data)
+	{
+		FMemoryReader Reader(Data);
+		FObjectAndNameAsStringProxyArchive Ar(Reader, true);
+		Ar.ArIsSaveGame = true;
+		Object->Serialize(Ar);
+		if (!IsCurrent()) { return false; }
+		if (Ar.IsError()) { bSavedActivityLoadAccepted = false; return false; }
+		return true;
+	};
+	{
+		TGuardValue<bool> ApplyingGuard(bApplyingSavedActivities, true);
+		// Retire the old execution before restoring its configuration. Publish
+		// the null pointer before outward EndActivity callbacks can load again.
+		UNPCActivity* PreviousActivity = CurrentActivity;
+		CurrentActivity = nullptr;
+		if (PreviousActivity)
+		{
+			PreviousActivity->EndActivity();
+			if (!IsCurrent()) { return; }
+			PreviousActivity->K2_EndActivity();
+			if (!IsCurrent()) { return; }
+			PreviousActivity->StopBehaviorTree();
+			if (!IsCurrent()) { return; }
+		}
 
+		// Preserve ordinary unsaved generator goals. Replace only the saved
+		// goals owned by the previous snapshot, using their normal removal event.
+		TArray<TStrongObjectPtr<UNPCGoalItem>> PreviousSavedGoals;
+		for (const auto& Pair : Goals)
+		{
+			for (UNPCGoalItem* Goal : Pair.Value.Goals)
+			{
+				if (IsValid(Goal) && Goal->bSaveGoal) { PreviousSavedGoals.Emplace(Goal); }
+			}
+		}
+		for (const auto& Goal : PreviousSavedGoals)
+		{
+			if (auto* Container = Goals.Find(Goal->GetClass()))
+			{
+				Container->Goals.Remove(Goal.Get());
+				for (auto It = Container->GoalUniqueObjectMap.CreateIterator(); It; ++It)
+				{
+					if (It.Value() == Goal.Get()) { It.RemoveCurrent(); }
+				}
+			}
+			RefreshGoalKeyActorBindings();
+			Goal->OnRemoved();
+			if (!IsCurrent()) { return; }
+		}
+
+		for (const auto& Record : ActivityRecords)
+		{
+			if (!IsValid(Record.Class) || Record.Class->HasAnyClassFlags(CLASS_Abstract))
+			{ bSavedActivityLoadAccepted = false; return; }
+			UNPCActivity* Activity = GetActivity(Record.Class);
+			if (!Activity) { Activity = AddActivity(Record.Class, true); }
+			if (!Activity || !IsCurrent() || !Deserialize(Activity, Record.Data)) { return; }
+			Activity->bSaveActivity = true;
+		}
+
+		// Older writers appended generator rows on every save. Use the latest
+		// row for each class, initializing at most one actual generator instance.
+		for (int32 Index = 0; Index < GeneratorRecords.Num(); ++Index)
+		{
+			const auto& Record = GeneratorRecords[Index];
+			bool bHasLaterRecord = false;
+			for (int32 Later = Index + 1; Later < GeneratorRecords.Num(); ++Later)
+			{ bHasLaterRecord |= GeneratorRecords[Later].Class == Record.Class; }
+			if (bHasLaterRecord) { continue; }
+			if (!IsValid(Record.Class) || Record.Class->HasAnyClassFlags(CLASS_Abstract))
+			{ bSavedActivityLoadAccepted = false; return; }
+			UNPCGoalGenerator* Generator = GetGoalGenerator(Record.Class);
+			const bool bNewGenerator = !Generator;
+			if (bNewGenerator)
+			{
+				Generator = NewObject<UNPCGoalGenerator>(this, Record.Class);
+				GoalGenerators.Add(Generator);
+			}
+			if (!Deserialize(Generator, Record.Data)) { return; }
+			Generator->bSaveGoalGenerator = true;
+			if (bNewGenerator)
+			{
+				// Its initialization event observes the saved settings and the
+				// real initialized controller, rather than a temporary fake owner.
+				Generator->Initialize(OwnerController, this);
+				if (!IsCurrent()) { return; }
+			}
+		}
+
+		for (const auto& Record : GoalRecords)
+		{
+			if (!IsValid(Record.Class) || Record.Class->HasAnyClassFlags(CLASS_Abstract))
+			{ bSavedActivityLoadAccepted = false; return; }
+			TStrongObjectPtr<UNPCGoalItem> Goal(NewObject<UNPCGoalItem>(this, Record.Class));
+			if (!Deserialize(Goal.Get(), Record.Data)) { return; }
+			Goal->OwnerController = OwnerController;
+			// Retain the saved creation/TOD/expiry fields; AddGoal is the new-goal
+			// entry point and intentionally stamps the current time instead.
+			Goal->Initialize();
+			if (!IsCurrent()) { return; }
+			UObject* Key = Goal->GetGoalKey();
+			if (!IsCurrent()) { return; }
+			if (const FNPCGoalContainer* Existing = Goals.Find(Goal->GetClass());
+				Existing && Existing->Goals.Contains(Goal.Get())) { continue; }
+			const AActor* ActorKey = Cast<AActor>(Key);
+			if (Key && (!IsValid(Key) || (ActorKey && ActorKey->IsActorBeingDestroyed())))
+			{
+				Goal->OnRemoved();
+				if (!IsCurrent()) { return; }
+				continue;
+			}
+			auto& Container = Goals.FindOrAdd(Goal->GetClass());
+			if (Key && Container.GoalUniqueObjectMap.Contains(Key))
+			{
+				// A preserved generator goal may already own this key. Retire
+				// only the deserialized candidate's initialized work, then fence
+				// callbacks that replaced the active snapshot.
+				Goal->OnRemoved();
+				if (!IsCurrent()) { return; }
+				continue;
+			}
+			Container.Goals.Add(Goal.Get());
+			if (Key) { Container.GoalUniqueObjectMap.Add(Key, Goal.Get()); }
+			RefreshGoalKeyActorBindings();
+		}
+		if (!IsCurrent()) { return; }
+		bSavedActivityRestorePending = false;
+	}
+	if (!IsCurrent()) { return; }
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimer(TimerHandle_RescoreGoals, this,
+			&UNPCActivityComponent::RescoreGoals, RescoreInterval, true);
+	}
+	RescoreGoals();
+	// Scoring and behavior-tree start are authored callbacks too. A successful
+	// deserialization cannot authorize completion after they retire this owner.
+	if (!IsCurrent() && SavedActivityLoadGeneration == Generation)
+	{
+		if (UWorld* World = GetWorld()) { World->GetTimerManager().ClearTimer(TimerHandle_RescoreGoals); }
+	}
 }
 
 void UNPCActivityComponent::PrepareForSave_Implementation()
 {
-	//Store all our goals and their SaveGame vars to our save record where we can read them back later 
+	// A load may be accepted before BeginPlay, or from a callback during another
+	// restore. The serialized rows remain authoritative until fully applied.
+	if (bSavedActivityRestorePending || bApplyingSavedActivities) { return; }
+
+	//Store all our goals and their SaveGame vars to our save record where we can read them back later
 	SavedGoals.Empty();
 	SavedActivities.Empty();
+	SavedGoalGenerators.Empty();
 
 	for (auto& Activity : Activities)
 	{

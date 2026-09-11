@@ -1,8 +1,10 @@
 // Copyright Narrative Tools 2024. 
 
 #include "UnrealFramework/NarrativeNPCCharacter.h"
+#include "UObject/StrongObjectPtr.h"
 #include "UnrealFramework/NarrativePlayerState.h"
 #include "Character/CharacterMapMarker.h"
+#include "Character/NarrativeCharacterVisual.h"
 #include "Interaction/NPCInteractionComponent.h"
 #include "Items/InventoryComponent.h"
 #include "AI/NPCDefinition.h"
@@ -240,21 +242,37 @@ TArray<TSoftObjectPtr<class UTriggerSet>> ANarrativeNPCCharacter::GetDefaultTrig
 
 void ANarrativeNPCCharacter::OnCharacterVisualInitialized()
 {
+	if (!IsValid(this) || IsActorBeingDestroyed()) { return; }
 	check(NPCDefinition);
+	if (!IsValid(CharVisual))
+	{
+		// Keep the base diagnostic for a live character with no visual.
+		Super::OnCharacterVisualInitialized();
+		return;
+	}
+	const TWeakObjectPtr<ANarrativeCharacterVisual> InitialVisual(CharVisual);
+	const auto IsCurrentVisual = [this, InitialVisual]()
+	{
+		return IsValid(this) && !IsActorBeingDestroyed() && InitialVisual.IsValid()
+			&& !InitialVisual->IsActorBeingDestroyed() && CharVisual == InitialVisual.Get();
+	};
+	if (!IsCurrentVisual()) { return; }
+	TStrongObjectPtr<ANarrativeCharacter> KeepCharacter(this);
+	TStrongObjectPtr<ANarrativeCharacterVisual> KeepVisual(InitialVisual.Get());
 
 	if (IsValid(NPCDefinition))
 	{
 		const bool bWasLoadedFromSave = USaveSystemStatics::LoadSingleActor(this);
-
-		//Lets try load, and if we have nothing to load we're a new character and need initialized
+		// A saved placed-actor tombstone destroys this NPC and its separate visual.
+		// Restore callbacks may also replace the visual. Neither owns this continuation.
+		if (!IsCurrentVisual()) { return; }
 		if (!bWasLoadedFromSave)
 		{
 			InitNewCharacter(NPCDefinition);
+			if (!IsCurrentVisual()) { return; }
 		}
 	}
-
 	Super::OnCharacterVisualInitialized();
-	
 }
 
 FString ANarrativeNPCCharacter::GetHumanReadableName() const
@@ -451,7 +469,7 @@ void ANarrativeNPCCharacter::HandleDeath_Implementation(AActor* KilledActor, UNa
 			NPCInteractableComponent->SetInteractableActionText(NSLOCTEXT("NPCCharacter", "LootInteractText", "Loot"));
 		}
 
-		//Dead NPCs should never save, remove this NPCs record from the save system. TODO think about whether record could be added back later accidentally? 
+		// Retire the world record now; IsSaveRecordDestroyed also preserves terminal state if a checkpoint captures the visible corpse.
 		if (UNarrativeSaveSubsystem* SaveSub = GetWorld()->GetSubsystem<UNarrativeSaveSubsystem>())
 		{
 			SaveSub->RemoveSingleActor(this);
@@ -477,6 +495,12 @@ void ANarrativeNPCCharacter::Load_Implementation()
 		}
 	}
 
+}
+
+bool ANarrativeNPCCharacter::IsSaveRecordDestroyed() const
+{
+	return AbilitySystemComponent && AbilitySystemComponent->GetAvatarActor() == this
+		&& AbilitySystemComponent->IsDead();
 }
 
 void ANarrativeNPCCharacter::PrepareForSave_Implementation()

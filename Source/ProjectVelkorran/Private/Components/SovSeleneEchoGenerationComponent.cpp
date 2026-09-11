@@ -431,9 +431,24 @@ void USovSeleneEchoGenerationComponent::HandleDamageResolvedAsSource(
 	// A team policy or earlier multicast receiver can restore the same actor/ASC.
 	// Its pointer identity is unchanged, but this damage belongs to an older life.
 	if (!DamageResult.IsCurrentTargetLife()) return;
-	if (!bHostile || IsEchoAbilityDamage(DamageResult) || !CanGenerateSeleneEcho())
+	if (!bHostile)
 	{
 		ResetPrecisionChain();
+		return;
+	}
+	// Echo-spender damage, and damage that resolves while a paid Echo ability owns
+	// Sov.State.EchoAbility.Active, are excluded from awards - but neither is an
+	// authored chain break. EchoResourceAndPresentation.md lists exactly three breaks:
+	// ordinary body hits (handled below via !bPrecision), incoming applied damage
+	// (HandleDamageResolvedAsTarget) and encounter boundaries (HandleEncounterScopeChanged).
+	// Collapsing "excluded from awards" into "breaks the chain" punished the build-then-spend
+	// loop the slice teaches: weak point -> Axiom -> weak point lost its chain link.
+	// This deliberately adds no award path; only the invalidation is removed.
+	// TPrecisionChain::Advance still enforces both the three-second window and the
+	// three-bonus-link cap, and returning early leaves ResourceScopeEpoch untouched
+	// because nothing mutated.
+	if (IsEchoAbilityDamage(DamageResult) || !CanGenerateSeleneEcho())
+	{
 		return;
 	}
 	const uint32 ExpectedScope = ResourceScopeEpoch;

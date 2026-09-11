@@ -96,9 +96,9 @@ bool ASovAurelionPriorityTerminal::Validate(const APawn* Pawn, FText& Error, boo
     const auto Status = State->GetObjectiveState(Mission->MissionId, Outcome);
     if (Status != ESovObjectiveState::Available && Status != ESovObjectiveState::Active && Status != ESovObjectiveState::Succeeded)
     { return Reject(LOCTEXT("Earlier", "Complete the current objective first")); }
-    const auto& Tags = FNarrativeGameplayTags::Get();
-    if (ASC->HasMatchingGameplayTag(Tags.State_Busy) || ASC->HasMatchingGameplayTag(Tags.State_SequencerControlled)
-        || ASC->HasMatchingGameplayTag(Tags.State_DialogueControlled) || ASC->HasMatchingGameplayTag(Tags.State_Movement_Lock))
+    const auto& NarrativeTags = FNarrativeGameplayTags::Get();
+    if (ASC->HasMatchingGameplayTag(NarrativeTags.State_Busy) || ASC->HasMatchingGameplayTag(NarrativeTags.State_SequencerControlled)
+        || ASC->HasMatchingGameplayTag(NarrativeTags.State_DialogueControlled) || ASC->HasMatchingGameplayTag(NarrativeTags.State_Movement_Lock))
     { return Reject(LOCTEXT("Busy", "Finish the current action first")); }
     if (!IsValid(Interactable) || !Interactable->IsRegistered() || !Interactable->IsActive() || Interactable->GetOwner() != this
         || Player->GetActorLocation().ContainsNaN() || GetActorLocation().ContainsNaN()

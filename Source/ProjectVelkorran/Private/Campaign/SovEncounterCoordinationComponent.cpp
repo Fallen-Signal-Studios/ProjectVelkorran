@@ -3,7 +3,11 @@
 #include "AI/NarrativeNPCController.h"
 #include "Campaign/SovEncounterCoordinationPolicy.h"
 #include "Campaign/SovEncounterDirector.h"
+#include "Campaign/SovAurelionCrucibleDirector.h"
+#include "Components/SovCommandLinkComponent.h"
+#include "World/SovWorldTransitActor.h"
 #include "Characters/SovNPCCharacterBase.h"
+#include "Character/NarrativeCharacterVisual.h"
 #include "Characters/SovPlayerCharacterBase.h"
 #include "AIController.h"
 #include "AbilitySystemGlobals.h"
@@ -40,6 +44,18 @@ namespace
 		return IsValid(Target) && Target->GetWorld() == World && !Target->IsActorBeingDestroyed()
 			&& ASC && ASC->GetAvatarActor() == Target && (!NarrativeASC || !NarrativeASC->IsDead())
 			&& ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()) > 0.f;
+	}
+	bool IsOwnedPresentationActor(const AActor* Actor, const ASovNPCCharacterBase* Character)
+	{
+		if (!IsValid(Actor) || !IsValid(Character) || Actor == Character || Actor->GetWorld() != Character->GetWorld()) { return false; }
+		const AActor* Current = Actor->GetOwner();
+		for (int32 Depth = 0; IsValid(Current) && Depth < 16; ++Depth)
+		{
+			if (Current == Character) { return true; }
+			if (Current == Current->GetOwner()) { break; }
+			Current = Current->GetOwner();
+		}
+		return false;
 	}
 	bool IsDecisionComponent(const UActorComponent* Component)
 	{
@@ -148,12 +164,42 @@ bool USovEncounterCoordinationComponent::ValidateComposition(FString& Error) con
 		if (Combatants > MaximumCombatants || Supporting > MaximumSupporting || (Waves.Num() > 1 && Required == 0))
 		{ Error = TEXT("Each wave must fit the A/B budget; multiwave encounters require a defeat gate in every wave."); return false; }
 	}
+	TSet<int32> RuledWaves;
+	for (const auto& Rule : WaveReleaseRules)
+	{
+		if (Rule.Wave <= 0 || !Waves.Contains(Rule.Wave) || RuledWaves.Contains(Rule.Wave)
+			|| Rule.MaximumLivingReleasedHostiles < 0 || Rule.MaximumLivingReleasedHostiles > 40
+			|| static_cast<uint8>(Rule.Condition) > static_cast<uint8>(ESovEncounterWaveCondition::AcceptedCrucibleLink))
+		{ Error = TEXT("Event release rules require distinct existing future waves and bounded living-hostile ceilings."); return false; }
+		RuledWaves.Add(Rule.Wave);
+		if (Rule.Condition == ESovEncounterWaveCondition::CommandSourceDefeated)
+		{
+			const auto* Link = ResolveRuleLink(Rule);
+			const FName SourceId = Link ? OwnerDirector->FindParticipantId(Link->GetCommandSource()) : NAME_None;
+			const auto* Source = OwnerDirector->Participants.FindByPredicate([SourceId](const auto& Entry) { return Entry.ParticipantId == SourceId; });
+			if (!Link || !Source || !Source->bRequiredForVictory || Member(SourceId).Wave >= Rule.Wave
+				|| Member(Rule.CommandLinkParticipantId).Wave >= Rule.Wave || Rule.TransitDoor)
+			{ Error = TEXT("Formation gates require an exact registered link and an earlier-wave required command source."); return false; }
+			if (OwnerDirector->GetEncounterState() == ESovEncounterState::Inactive
+				&& (!Link->IsCommandLinkActive() || !Link->HasValidCommandLinkConfiguration()))
+			{ Error = TEXT("The authored formation must be active before capturing its entry checkpoint."); return false; }
+		}
+		else if (Rule.Condition == ESovEncounterWaveCondition::TransitDoorOpen)
+		{
+			if (!IsValid(Rule.TransitDoor) || Rule.TransitDoor->GetWorld() != GetWorld() || Rule.TransitDoor->TransitId.IsNone()
+				|| Rule.TransitDoor->Kind != ESovWorldTransitKind::Door || !Rule.CommandLinkParticipantId.IsNone() || !Rule.CommandLinkComponentName.IsNone())
+			{ Error = TEXT("Transit gates require a named native door in this world, without unrelated link bindings."); return false; }
+		}
+		else if (!OwnerDirector->IsA<ASovAurelionLinkPhaseDirector>() || Rule.TransitDoor
+			|| !Rule.CommandLinkParticipantId.IsNone() || !Rule.CommandLinkComponentName.IsNone())
+		{ Error = TEXT("First-link gates belong only to the native Crucible link-phase director."); return false; }
+	}
 	return true;
 }
 
 void USovEncounterCoordinationComponent::ResetAttempt()
 {
-	BoundAttempt.Invalidate(); Reservations.Reset(); Warnings.Reset(); NextAttackAt.Reset(); RuntimeTiers.Reset();
+	BoundAttempt.Invalidate(); BoundGeneration = 0; WaveActors.Reset(); BoundWaveRules.Reset(); Reservations.Reset(); Warnings.Reset(); NextAttackAt.Reset(); RuntimeTiers.Reset();
 	const TArray<TWeakObjectPtr<UNarrativeAbilitySystemComponent>> OldASCs = MoveTemp(BoundASCs);
 	for (auto ASC : OldASCs)
 	{
@@ -185,9 +231,10 @@ void USovEncounterCoordinationComponent::HandleEncounterState(ESovEncounterState
 	FString Error;
 	bValidComposition = ValidateComposition(Error);
 	if (!bValidComposition) { return; }
-	BoundAttempt = Director->GetAttemptId();
+	BoundAttempt = Director->GetAttemptId(); BoundGeneration = Director->GetLifecycleGeneration();
+	if (!BindWaveRules()) { bValidComposition = false; return; }
 	RefreshComposition();
-	if (Director.IsValid() && Director->GetEncounterState() == ESovEncounterState::Active && BoundAttempt == Director->GetAttemptId())
+	if (IsWaveContextCurrent(BoundAttempt, BoundGeneration, CurrentWave))
 	{ OnWaveChanged.Broadcast(CurrentWave); }
 }
 
@@ -216,6 +263,7 @@ void USovEncounterCoordinationComponent::StageParticipant(FName Id, ASovNPCChara
 	}
 	Saved.ThreatController = Cast<ANarrativeNPCController>(Character->GetController());
 	Staged.Add(Id, Saved); // Commit ownership before tag callbacks.
+	Character->CharacterVisualInitialized.AddUniqueDynamic(this, &ThisClass::HandleStagedVisualReady);
 	if (Saved.ThreatController.IsValid())
 	{
 		Saved.ThreatController->SetThreatMemorySuspended(this, true);
@@ -229,7 +277,55 @@ void USovEncounterCoordinationComponent::StageParticipant(FName Id, ASovNPCChara
 	if (!Live || Live->Character.Get() != Character || !IsValid(Character) || !IsValid(ASC)) { return; }
 	Live->bOwnsInvulnerability = true;
 	ASC->AddLooseGameplayTag(FNarrativeGameplayTags::Get().State_Invulnerable, 1, EGameplayTagReplicationState::TagAndCountToAll);
-	if (Staged.Contains(Id) && IsValid(Character)) { Character->SetActorHiddenInGame(true); Character->SetActorEnableCollision(false); }
+	const FStaged* Current = Staged.Find(Id);
+	if (Current && Current->Identity == Saved.Identity && IsValid(Character))
+	{
+		Character->SetActorHiddenInGame(true); Character->SetActorEnableCollision(false);
+		Current = Staged.Find(Id);
+		if (Current && Current->Identity == Saved.Identity) { RefreshStagedPresentation(Id); }
+	}
+}
+
+void USovEncounterCoordinationComponent::HandleStagedVisualReady(ANarrativeCharacter* Character)
+{
+	TArray<FName> Ids; Staged.GetKeys(Ids);
+	for (FName Id : Ids)
+	{
+		const FStaged* Current = Staged.Find(Id);
+		if (Current && Current->Character.Get() == Character) { RefreshStagedPresentation(Id); }
+	}
+}
+
+void USovEncounterCoordinationComponent::RefreshStagedPresentation(FName Id)
+{
+	FStaged* Saved = Staged.Find(Id);
+	if (!Saved || !Saved->Character.IsValid() || !Saved->ASC.IsValid()
+		|| Saved->ASC->GetAvatarActor() != Saved->Character.Get()) { return; }
+	const FGuid Identity = Saved->Identity;
+	ASovNPCCharacterBase* Character = Saved->Character.Get();
+	TArray<AActor*> Actors;
+	if (ANarrativeCharacterVisual* Visual = Character->GetCharacterVisual())
+	{
+		Actors.Add(Visual);
+		Visual->GetAttachedActors(Actors, false, true);
+	}
+	Character->GetAttachedActors(Actors, false, true);
+	for (AActor* Actor : Actors)
+	{
+		Saved = Staged.Find(Id);
+		if (!Saved || Saved->Identity != Identity || Saved->Character.Get() != Character
+			|| !Saved->ASC.IsValid() || Saved->ASC->GetAvatarActor() != Character) { return; }
+		if (!IsOwnedPresentationActor(Actor, Character)) { continue; }
+		if (!Saved->Presentation.ContainsByPredicate([Actor](const FStagedPresentation& Entry) { return Entry.Actor.Get() == Actor; }))
+		{
+			FStagedPresentation Entry; Entry.Actor = Actor; Entry.bHidden = Actor->IsHidden(); Entry.bCollision = Actor->GetActorEnableCollision();
+			Saved->Presentation.Add(Entry); // Capture once, before any collision callbacks.
+		}
+		Actor->SetActorHiddenInGame(true);
+		Saved = Staged.Find(Id);
+		if (!Saved || Saved->Identity != Identity || !IsOwnedPresentationActor(Actor, Character)) { return; }
+		Actor->SetActorEnableCollision(false);
+	}
 }
 
 void USovEncounterCoordinationComponent::ReleaseStagedParticipant(FName Id)
@@ -237,14 +333,43 @@ void USovEncounterCoordinationComponent::ReleaseStagedParticipant(FName Id)
 	FStaged Saved;
 	if (!Staged.RemoveAndCopyValue(Id, Saved)) { return; }
 	if (Saved.Character.IsValid())
+	{ Saved.Character->CharacterVisualInitialized.RemoveDynamic(this, &ThisClass::HandleStagedVisualReady); }
+	// Reentrant restaging inherits the original baseline instead of capturing our still-hidden visual as its authored state.
+	const auto TransferToReplacement = [&]()
+	{
+		FStaged* Replacement = Staged.Find(Id);
+		if (!Replacement || Replacement->Character != Saved.Character || Replacement->ASC != Saved.ASC) { return false; }
+		Replacement->bHidden = Saved.bHidden; Replacement->bCollision = Saved.bCollision;
+		Replacement->MovementMode = Saved.MovementMode; Replacement->CustomMovementMode = Saved.CustomMovementMode;
+		for (auto Component : Saved.DisabledTicks) { Replacement->DisabledTicks.AddUnique(Component); }
+		for (const FStagedPresentation& Prior : Saved.Presentation)
+		{
+			if (FStagedPresentation* Current = Replacement->Presentation.FindByPredicate(
+				[&](const FStagedPresentation& Entry) { return Entry.Actor == Prior.Actor; }))
+			{ Current->bHidden = Prior.bHidden; Current->bCollision = Prior.bCollision; }
+		}
+		return true;
+	};
+	for (const FStagedPresentation& Entry : Saved.Presentation)
+	{
+		if (TransferToReplacement()) { break; }
+		AActor* Actor = Entry.Actor.Get();
+		if (!IsOwnedPresentationActor(Actor, Saved.Character.Get())) { continue; }
+		Actor->SetActorHiddenInGame(Entry.bHidden);
+		if (TransferToReplacement()) { break; }
+		if (IsOwnedPresentationActor(Actor, Saved.Character.Get())) { Actor->SetActorEnableCollision(Entry.bCollision); }
+	}
+	TransferToReplacement();
+	if (Saved.Character.IsValid() && !TransferToReplacement())
 	{
 		Saved.Character->SetActorHiddenInGame(Saved.bHidden); Saved.Character->SetActorEnableCollision(Saved.bCollision);
-		if (auto* Movement = Saved.Character->GetCharacterMovement())
+		if (auto* Movement = Saved.Character->GetCharacterMovement(); Movement && !TransferToReplacement())
 		{
 			if (Movement->MovementMode == MOVE_None) { Movement->SetMovementMode(static_cast<EMovementMode>(Saved.MovementMode), Saved.CustomMovementMode); }
 		}
 	}
-	for (auto Component : Saved.DisabledTicks) { if (Component.IsValid()) { Component->SetComponentTickEnabled(true); } }
+	for (auto Component : Saved.DisabledTicks)
+	{ if (TransferToReplacement()) { break; } if (Component.IsValid()) { Component->SetComponentTickEnabled(true); } }
 	if (Saved.ASC.IsValid())
 	{
 		if (Saved.bOwnsBusy) { Saved.ASC->RemoveLooseGameplayTag(FNarrativeGameplayTags::Get().State_Busy, 1, EGameplayTagReplicationState::TagAndCountToAll); }
@@ -262,9 +387,11 @@ void USovEncounterCoordinationComponent::RefreshComposition()
 {
 	if (bRefreshing || !Director.IsValid() || !bValidComposition || Director->GetEncounterState() != ESovEncounterState::Active) { return; }
 	TGuardValue<bool> Refreshing(bRefreshing, true);
+	const FGuid Attempt = BoundAttempt; const uint64 Generation = BoundGeneration; const int32 Wave = CurrentWave;
 	const auto Participants = Director->Participants;
 	for (const auto& Participant : Participants)
 	{
+		if (!IsWaveContextCurrent(Attempt, Generation, Wave)) { return; }
 		if (Director->IsParticipantMassRepresented(Participant.ParticipantId)) { continue; }
 		auto* Character = Participant.Character.Get();
 		if (!IsValid(Character) || !Character->IsAlive()) { continue; }
@@ -274,6 +401,7 @@ void USovEncounterCoordinationComponent::RefreshComposition()
 		const auto Entry = Member(Participant.ParticipantId);
 		if (Entry.Wave > CurrentWave) { StageParticipant(Participant.ParticipantId, Character); continue; }
 		ReleaseStagedParticipant(Participant.ParticipantId);
+		if (!IsWaveContextCurrent(Attempt, Generation, Wave) || !IsValid(Character)) { return; }
 		TInlineComponentArray<UActorComponent*> Components(Character);
 		if (auto* AI = Cast<AAIController>(Character->GetController()))
 		{ TInlineComponentArray<UActorComponent*> ControllerComponents(AI); Components.Append(ControllerComponents); }
@@ -523,6 +651,11 @@ void USovEncounterCoordinationComponent::TickComponent(float Delta, ELevelTick T
 	Super::TickComponent(Delta, TickType, TickFunction);
 	if (!Director.IsValid() || !Director->HasAuthority() || !bValidComposition || bRefreshing
 		|| Director->GetEncounterState() != ESovEncounterState::Active || BoundAttempt != Director->GetAttemptId()) { return; }
+	// Visual actors and async weapon attachments have independent Actor flags.
+	// Body publication is handled immediately; this existing 0.1s tick also observes later attachments.
+	TArray<FName> StagedIds; Staged.GetKeys(StagedIds);
+	for (FName Id : StagedIds) { RefreshStagedPresentation(Id); }
+	if (!Director.IsValid() || Director->GetEncounterState() != ESovEncounterState::Active || BoundAttempt != Director->GetAttemptId()) { return; }
 	for (auto It = Reservations.CreateIterator(); It; ++It)
 	{
 		const auto& Lease = It.Value();
@@ -546,10 +679,16 @@ void USovEncounterCoordinationComponent::TickComponent(float Delta, ELevelTick T
 		if (Entry.Wave <= CurrentWave + 1)
 		{ if (Entry.Tier == ESovEncounterDecisionTier::Combatant) { ++NextCombatants; } else { ++NextSupporting; } }
 	}
-	if (!bRequiredAlive && bHasNext && NextCombatants <= MaximumCombatants && NextSupporting <= MaximumSupporting)
+	const bool bEventGate = BoundWaveRules.Contains(CurrentWave + 1);
+	const bool bRelease = bEventGate ? CanReleaseEventWave(CurrentWave + 1)
+		: !bRequiredAlive && bHasNext && NextCombatants <= MaximumCombatants && NextSupporting <= MaximumSupporting;
+	if (bRelease)
 	{
-		++CurrentWave; RefreshComposition(); OnWaveChanged.Broadcast(CurrentWave);
-		if (!Director.IsValid() || Director->GetEncounterState() != ESovEncounterState::Active || BoundAttempt != Director->GetAttemptId()) { return; }
+		const FGuid Attempt = BoundAttempt; const uint64 Generation = BoundGeneration; const int32 ReleasedWave = ++CurrentWave;
+		RefreshComposition();
+		if (!IsWaveContextCurrent(Attempt, Generation, ReleasedWave)) { return; }
+		OnWaveChanged.Broadcast(CurrentWave);
+		if (!IsWaveContextCurrent(Attempt, Generation, ReleasedWave)) { return; }
 	}
 	auto* Player = Director->GetEncounterPlayer();
 	const auto* ASC = Player ? Player->GetAbilitySystemComponent() : nullptr;
@@ -568,4 +707,126 @@ void USovEncounterCoordinationComponent::TickComponent(float Delta, ELevelTick T
 		if (!Director.IsValid() || Director->GetEncounterState() != ESovEncounterState::Active || BoundAttempt != Director->GetAttemptId()) { return; }
 	}
 	UpdateWarnings();
+}
+
+USovCommandLinkComponent* USovEncounterCoordinationComponent::ResolveRuleLink(const FSovEncounterWaveReleaseRule& Rule) const
+{
+	const auto* OwnerDirector = Cast<ASovEncounterDirector>(GetOwner());
+	const auto* NPC = OwnerDirector ? OwnerDirector->GetParticipant(Rule.CommandLinkParticipantId) : nullptr;
+	if (!IsValid(NPC) || Rule.CommandLinkComponentName.IsNone()) { return nullptr; }
+	TArray<USovCommandLinkComponent*> Links; NPC->GetComponents(Links);
+	for (auto* Link : Links)
+	{
+		if (IsValid(Link) && Link->GetFName() == Rule.CommandLinkComponentName && Link->GetOwner() == NPC && Link->IsRegistered()) { return Link; }
+	}
+	return nullptr;
+}
+
+bool USovEncounterCoordinationComponent::IsWaveContextCurrent(FGuid Attempt, uint64 Generation, int32 Wave) const
+{
+	return !IsBeingDestroyed() && Director.IsValid() && !Director->IsActorBeingDestroyed() && Director->HasAuthority()
+		&& bValidComposition && BoundAttempt == Attempt && Attempt.IsValid() && Director->GetAttemptId() == Attempt
+		&& BoundGeneration == Generation && Director->GetLifecycleGeneration() == Generation
+		&& Director->GetEncounterState() == ESovEncounterState::Active && CurrentWave == Wave;
+}
+
+bool USovEncounterCoordinationComponent::BindWaveRules()
+{
+	WaveActors.Reset(); BoundWaveRules.Reset();
+	if (WaveReleaseRules.IsEmpty()) { return true; }
+	if (!Director.IsValid()) { return false; }
+	for (const auto& Participant : Director->Participants)
+	{
+		auto* NPC = Participant.Character.Get();
+		auto* ASC = IsValid(NPC) ? NPC->GetNarrativeAbilitySystemComponent() : nullptr;
+		// An event-gated encounter requires exact authored actors, not an unknown Mass proxy.
+		if (!IsValid(NPC) || !IsValid(ASC) || ASC->GetAvatarActor() != NPC || !NPC->IsAlive()
+			|| Director->IsParticipantMassRepresented(Participant.ParticipantId)) { return false; }
+		FWaveActor Captured; Captured.Character = NPC; Captured.ASC = ASC;
+		Captured.bRequired = Participant.bRequiredForVictory; Captured.Wave = Member(Participant.ParticipantId).Wave;
+		WaveActors.Add(Participant.ParticipantId, Captured);
+	}
+	for (const auto& Rule : WaveReleaseRules)
+	{
+		FWaveRule Binding; Binding.Rule = Rule;
+		if (Rule.Condition == ESovEncounterWaveCondition::CommandSourceDefeated)
+		{
+			auto* Link = ResolveRuleLink(Rule);
+			if (!Link || !Link->IsCommandLinkActive() || !Link->HasValidCommandLinkConfiguration() || !Link->GetLinkInstanceId().IsValid()) { return false; }
+			Binding.Link = Link; Binding.SourceId = Director->FindParticipantId(Link->GetCommandSource()); Binding.LinkInstance = Link->GetLinkInstanceId();
+			if (!WaveActors.Contains(Binding.SourceId)) { return false; }
+		}
+		BoundWaveRules.Add(Rule.Wave, Binding);
+	}
+	return true;
+}
+
+bool USovEncounterCoordinationComponent::CanReleaseEventWave(int32 Wave) const
+{
+	const auto* Binding = BoundWaveRules.Find(Wave);
+	if (!Binding || Wave != CurrentWave + 1 || !IsWaveContextCurrent(BoundAttempt, BoundGeneration, CurrentWave)
+		|| Director->Participants.Num() != WaveActors.Num()) { return false; }
+	int32 LivingReleasedHostiles = 0, Combatants = 0, Supporting = 0;
+	bool bHasNext = false;
+	for (const auto& Participant : Director->Participants)
+	{
+		const auto* Captured = WaveActors.Find(Participant.ParticipantId);
+		const auto Entry = Member(Participant.ParticipantId);
+		if (!Captured || Captured->Character != TWeakObjectPtr<ASovNPCCharacterBase>(Participant.Character.Get())
+			|| Captured->bRequired != Participant.bRequiredForVictory || Captured->Wave != Entry.Wave) { return false; }
+		if (Entry.Wave > Wave) { continue; }
+		if (Director->HasConfirmedParticipantDefeat(Participant.ParticipantId)) { continue; }
+		const auto* NPC = Captured->Character.Get(); const auto* ASC = Captured->ASC.Get();
+		if (!IsValid(NPC) || NPC->IsActorBeingDestroyed() || !IsValid(ASC) || NPC->GetNarrativeAbilitySystemComponent() != ASC
+			|| ASC->GetAvatarActor() != NPC || !NPC->IsAlive() || ASC->IsDead()
+			|| !(ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()) > 0.f)
+			|| Director->IsParticipantMassRepresented(Participant.ParticipantId)) { return false; }
+		if (Entry.Wave <= CurrentWave && Participant.bRequiredForVictory) { ++LivingReleasedHostiles; }
+		if (Entry.Wave == Wave) { bHasNext = true; }
+		if (Entry.Tier == ESovEncounterDecisionTier::Combatant) { ++Combatants; } else { ++Supporting; }
+	}
+	if (!bHasNext || LivingReleasedHostiles > Binding->Rule.MaximumLivingReleasedHostiles
+		|| Combatants > MaximumCombatants || Supporting > MaximumSupporting) { return false; }
+	switch (Binding->Rule.Condition)
+	{
+	case ESovEncounterWaveCondition::CommandSourceDefeated:
+		// The source was registered and the exact formation active at this attempt's entry.
+		// Only the director's authoritative ASC death receipt can retire it. Destroy/end-play cannot.
+		return Binding->LinkInstance.IsValid() && Director->HasConfirmedParticipantDefeat(Binding->SourceId);
+	case ESovEncounterWaveCondition::TransitDoorOpen:
+		return IsValid(Binding->Rule.TransitDoor) && Binding->Rule.TransitDoor->GetWorld() == GetWorld()
+			&& Binding->Rule.TransitDoor->IsOpenTraversableDoor();
+	case ESovEncounterWaveCondition::AcceptedCrucibleLink:
+		if (const auto* Phase = Cast<ASovAurelionLinkPhaseDirector>(Director.Get())) { return Phase->HasAcceptedCurrentLinkReceipt(); }
+		return false;
+	default: return false;
+	}
+}
+
+bool USovEncounterCoordinationComponent::HasUnreleasedWaves() const
+{
+	return !Staged.IsEmpty() || Composition.ContainsByPredicate([this](const auto& Entry) { return Entry.Wave > CurrentWave; });
+}
+
+bool USovEncounterCoordinationComponent::ReleaseCompletedPhaseBindings()
+{
+	if (!Director.IsValid() || !Director->HasAuthority() || Director->IsActorBeingDestroyed() || bRefreshing || bReserving
+		|| Director->GetEncounterState() != ESovEncounterState::Succeeded || Director->IsCampaignReceiptPending()
+		|| HasUnreleasedWaves()) { return false; }
+	// No staged actor can be released here. Reset only this owner's attack binding and decision interval;
+	// the director's Busy, protection, brain pause and threat lease remain in place throughout transfer.
+	ResetAttempt();
+	return true;
+}
+
+bool USovEncounterCoordinationComponent::RestoreCompletedWaveState(int32 ReleasedWave)
+{
+	const auto* OwnerDirector = Cast<ASovEncounterDirector>(GetOwner());
+	if (!OwnerDirector || !OwnerDirector->HasAuthority() || OwnerDirector->GetEncounterState() != ESovEncounterState::Succeeded
+		|| OwnerDirector->IsActorBeingDestroyed() || !OwnerDirector->HasConfirmedVictory() || !Staged.IsEmpty() || bRefreshing || bReserving) { return false; }
+	int32 LastWave = 0;
+	for (const auto& Entry : Composition) { LastWave = FMath::Max(LastWave, Entry.Wave); }
+	if (ReleasedWave != LastWave || ReleasedWave < 0 || ReleasedWave > 63) { return false; }
+	CurrentWave = ReleasedWave;
+	return true;
 }

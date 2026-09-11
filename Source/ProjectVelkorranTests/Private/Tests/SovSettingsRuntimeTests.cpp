@@ -52,7 +52,7 @@ bool FSovSettingsPortable::RunTest(const FString& Parameters)
 	FSovUserSettingsSnapshot Custom = Settings->GetSettingsSnapshot();
 	Custom.DefenseWindowScale = 2.f; Custom.ExertionCostScale = .25f; Custom.bReduceCorruptionEffects = true;
 	Custom.bAutomaticSprint = true; Custom.bAimSnap = true; Custom.bProjectileLead = true;
-	Custom.bShowObjectiveText = false;
+	Custom.bShowObjectiveText = false; Custom.bReduceCombatEffects = true;
 	Custom.IncomingDamageScale = 1.5f; Custom.Preset = ESovDifficultyPreset::Custom;
 	Settings->ApplySettingsSnapshot(Custom, Error);
 	TestTrue(TEXT("Explicit restore succeeds"), Settings->RestorePortableSettings(Bytes, Error));
@@ -64,6 +64,7 @@ bool FSovSettingsPortable::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Aim snap accessibility survives portable gameplay import"), Settings->UseAimSnap());
 	TestTrue(TEXT("Projectile lead accessibility survives portable gameplay import"), Settings->UseProjectileLead());
 	TestFalse(TEXT("Local objective visibility survives portable gameplay import"), Settings->GetSettingsSnapshot().bShowObjectiveText);
+	TestTrue(TEXT("Local combat comfort survives portable gameplay import"), Settings->IsReducedCombatEffectsEnabled());
 	Bytes[0] = 99;
 	TestFalse(TEXT("Unknown future schema rejected before mutation"), USovGameUserSettings::ValidatePortableSettings(Bytes, Error));
 	TestFalse(TEXT("Corrupted import rejected"), Settings->RestorePortableSettings(Bytes, Error));
@@ -93,7 +94,7 @@ bool FSovObjectiveSettingsPersistence::RunTest(const FString& Parameters)
 	};
 	auto* Settings = NewObject<USovSettingsTestSettings>();
 	FString Error;
-	FSovUserSettingsSnapshot Value; Value.bShowObjectiveText = false; Value.UIScale = 1.5f;
+	FSovUserSettingsSnapshot Value; Value.bShowObjectiveText = false; Value.UIScale = 1.5f; Value.bReduceCombatEffects = true;
 	TestTrue(TEXT("Visibility transaction accepted"), Settings->ApplySettingsSnapshot(Value, Error));
 	// Isolate both disk output and CDO state. SaveConfig's default allows copying
 	// instance values into the class default, which would pollute later tests.
@@ -104,11 +105,13 @@ bool FSovObjectiveSettingsPersistence::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Config save preserves fixture visibility default"), GetDefault<USovSettingsTestSettings>()->GetSettingsSnapshot().bShowObjectiveText, DefaultsBefore.bShowObjectiveText);
 	TestEqual(TEXT("Config save preserves fixture UI scale default"), GetDefault<USovSettingsTestSettings>()->GetSettingsSnapshot().UIScale, DefaultsBefore.UIScale);
 	auto* Reloaded = NewObject<USovSettingsTestSettings>();
-	FSovUserSettingsSnapshot Opposite = Value; Opposite.bShowObjectiveText = true; Opposite.UIScale = 1.f;
+	FSovUserSettingsSnapshot Opposite = Value; Opposite.bShowObjectiveText = true; Opposite.UIScale = 1.f; Opposite.bReduceCombatEffects = false;
 	TestTrue(TEXT("Reload destination starts with different values"), Reloaded->ApplySettingsSnapshot(Opposite, Error));
 	Reloaded->LoadConfig(Reloaded->GetClass(), *ConfigPath);
 	TestFalse(TEXT("Hidden objectives survive a config round trip"), Reloaded->GetSettingsSnapshot().bShowObjectiveText);
 	TestEqual(TEXT("Other local preferences survive the same round trip"), Reloaded->GetSettingsSnapshot().UIScale, 1.5f);
+	TestTrue(TEXT("Combat comfort survives a config round trip"), Reloaded->IsReducedCombatEffectsEnabled());
+	TestEqual(TEXT("Config save preserves fixture combat comfort default"), GetDefault<USovSettingsTestSettings>()->IsReducedCombatEffectsEnabled(), DefaultsBefore.bReduceCombatEffects);
 	const FString LegacyConfig = FString::Printf(TEXT("[%s]\nSettingsSchemaVersion=1\nSettings=(UIScale=1.5)\n"), *Settings->GetClass()->GetPathName());
 	TestTrue(TEXT("Pre-objective config fixture written"), FFileHelper::SaveStringToFile(LegacyConfig, *LegacyPath));
 	auto* Legacy = NewObject<USovSettingsTestSettings>();
@@ -116,6 +119,7 @@ bool FSovObjectiveSettingsPersistence::RunTest(const FString& Parameters)
 	Legacy->ApplySettingsSnapshot(FSovUserSettingsSnapshot(), Error);
 	Legacy->LoadConfig(Legacy->GetClass(), *LegacyPath);
 	TestTrue(TEXT("A legacy config without the new field keeps objective text visible"), Legacy->GetSettingsSnapshot().bShowObjectiveText);
+	TestFalse(TEXT("Legacy config retains the standard combat effects default"), Legacy->IsReducedCombatEffectsEnabled());
 	TestEqual(TEXT("Additive field does not reset legacy UI scale"), Legacy->GetSettingsSnapshot().UIScale, 1.5f);
 	return true;
 }

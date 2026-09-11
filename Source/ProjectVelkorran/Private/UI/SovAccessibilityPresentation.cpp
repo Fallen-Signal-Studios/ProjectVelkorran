@@ -1,5 +1,10 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "UI/SovAccessibilityPresentation.h"
+#include "UI/SovCombatVitalsWidget.h"
+#include "UI/SovHUDStyle.h"
+#include "Characters/SovPlayerCharacterBase.h"
+#include "Framework/SovPlayerController.h"
+#include "Components/SceneComponent.h"
 #include "UI/SovAccessibilityPolicy.h"
 #include "UI/SovPlayerInformationPolicy.h"
 #include "Blueprint/WidgetLayoutLibrary.h"
@@ -91,13 +96,14 @@ TSharedRef<SWidget> USovAccessibilityPresentation::RebuildWidget()
 		auto* Rows = WidgetTree->ConstructWidget<UVerticalBox>(); ObjectiveSize->AddChild(Rows);
 		for (int32 Index = 0; Index < MaximumObjectiveRows; ++Index)
 		{
-			auto* Row = WidgetTree->ConstructWidget<UTextBlock>(); Row->SetAutoWrapText(true); Row->SetJustification(ETextJustify::Left);
+			auto* Row = WidgetTree->ConstructWidget<UTextBlock>(); Row->SetAutoWrapText(false); Row->SetJustification(ETextJustify::Left);
 			Rows->AddChildToVerticalBox(Row)->SetPadding(FMargin(0, 0, 0, 8)); ObjectiveRows.Add(Row);
 		}
 		ObjectiveText = ObjectiveRows[0];
-		ObjectiveOverflow = WidgetTree->ConstructWidget<UTextBlock>(); ObjectiveOverflow->SetAutoWrapText(true); Rows->AddChild(ObjectiveOverflow);
+		ObjectiveOverflow = WidgetTree->ConstructWidget<UTextBlock>(); ObjectiveOverflow->SetAutoWrapText(false); Rows->AddChild(ObjectiveOverflow);
 		UCanvasPanelSlot* ObjectiveSlot = SafeTextCanvas->AddChildToCanvas(ObjectiveBackground);
-		ObjectiveSlot->SetAnchors(FAnchors(.02f, .02f)); ObjectiveSlot->SetAutoSize(true);
+		ObjectiveSlot->SetAnchors(FAnchors(0.f, 0.f)); ObjectiveSlot->SetAlignment(FVector2D::ZeroVector);
+		ObjectiveSlot->SetPosition(FVector2D(12.f, 12.f)); ObjectiveSlot->SetAutoSize(true);
 	}
 	RefreshText(); return Super::RebuildWidget();
 }
@@ -122,7 +128,7 @@ void USovAccessibilityPresentation::NativeDestruct()
 {
 	if (BoundSettings) { BoundSettings->OnUserSettingsChanged.RemoveDynamic(this,&ThisClass::SettingsChanged); }
 	if (Interaction) { Interaction->OnFoundInteractable.RemoveDynamic(this,&ThisClass::FoundInteractable); Interaction->OnLostInteractable.RemoveDynamic(this,&ThisClass::LostInteractable); }
-	FocusedInteractable.Reset(); Interaction = nullptr; BoundSettings = nullptr; ResetMarkerRegistry(); ++ObjectiveViewGeneration; ClearObjectives(); ClearSceneHistory(); Super::NativeDestruct();
+	FocusedInteractable.Reset(); Interaction = nullptr; BoundSettings = nullptr; ResetMarkerRegistry(); ResetWaypointRegistry(); ++ObjectiveViewGeneration; ClearObjectives(); ClearSceneHistory(); Super::NativeDestruct();
 }
 void USovAccessibilityPresentation::FoundInteractable(UNarrativeInteractableComponent* Value) { FocusedInteractable = Value; }
 void USovAccessibilityPresentation::LostInteractable(UNarrativeInteractableComponent* Value) { if (FocusedInteractable == Value) { FocusedInteractable.Reset(); } }
@@ -208,6 +214,7 @@ void USovAccessibilityPresentation::RetireSpeechPresentation()
 void USovAccessibilityPresentation::PresentObjectives(const TArray<FSovObjectivePresentationEntry>& Entries, int32 AdditionalCount)
 {
 	const auto Previous = ObjectiveReviewEntries;
+    ObjectiveWaypoint = {}; MarkerRefreshRemaining = 0.f;
 	Objectives.Reset(); ObjectiveReviewEntries.Reset(); VisibleObjectiveRows = 0; AdditionalObjectiveCount = FMath::Max(0, AdditionalCount);
 	TSet<FName> Seen;
 	for (const FSovObjectivePresentationEntry& Entry : Entries)
@@ -233,6 +240,7 @@ void USovAccessibilityPresentation::PresentObjectives(const TArray<FSovObjective
 void USovAccessibilityPresentation::ClearObjectives()
 {
 	const bool bChanged = !ObjectiveReviewEntries.IsEmpty();
+    ObjectiveWaypoint = {};
 	Objectives.Reset(); ObjectiveReviewEntries.Reset(); AdditionalObjectiveCount = 0; VisibleObjectiveRows = 0; RefreshObjectiveText();
 	if (bChanged) { OnObjectiveViewChanged.Broadcast(); }
 }
@@ -257,64 +265,104 @@ void USovAccessibilityPresentation::RefreshObjectiveText()
 		if (!Entry.FailureRule.IsEmpty()) { Row = FText::Format(LOCTEXT("ObjectiveRule", "{0}\n{1}"), Row, Entry.FailureRule); }
 		Label->SetText(Row);
 	}
-	ObjectiveBackground->SetBrushColor(FLinearColor(0, 0, 0, Settings.bHighContrastHUD ? 1.f : .8f));
+    const auto* Player = GetOwningPlayer() ? Cast<ASovPlayerCharacterBase>(GetOwningPlayer()->GetPawn()) : nullptr;
+    const auto Theme = SovHUDStyle::ForProtagonist(Player ? Player->GetProtagonistIdentityTag() : FGameplayTag(), Settings.bHighContrastHUD);
+    FLinearColor ObjectiveFill = Theme.Background;
+    ObjectiveFill.A = Settings.bHighContrastHUD ? 1.f : .32f;
+    ObjectiveBackground->SetBrushColor(ObjectiveFill);
 	const FVector2D Size = SafeTextCanvas ? SafeTextCanvas->GetCachedGeometry().GetLocalSize() : GetCachedGeometry().GetLocalSize();
 	LayoutObjectives(Size.X > 0.f ? float(Size.X) : 1280.f, Size.Y > 0.f ? float(Size.Y) : 720.f);
 }
 void USovAccessibilityPresentation::LayoutObjectives(float SafeWidth, float SafeHeight)
 {
 	if (!ObjectiveBackground || !ObjectiveSize || !ObjectiveOverflow) { return; }
+	constexpr float CornerInset = 12.f, RowGap = 8.f, PriorityGap = 12.f;
+	const FMargin ObjectivePadding = ObjectiveBackground->GetPadding();
 	const float Width = FMath::Max(1.f, FMath::Min(440.f * Settings.UIScale, SafeWidth * .38f) - 24.f);
 	const auto Font = FCoreStyle::GetDefaultFontStyle("Regular", FMath::RoundToInt(20.f * Settings.UIScale));
-	for (auto* Label : { ObjectiveText.Get(), ObjectiveOverflow.Get() })
-	{ Label->SetFont(Font); Label->SetWrapTextAt(Width); Label->SetColorAndOpacity(FSlateColor(FLinearColor::White)); }
+	ObjectiveOverflow->SetFont(Font); ObjectiveOverflow->SetWrapTextAt(Width);
+	ObjectiveOverflow->SetColorAndOpacity(FSlateColor(FLinearColor::White));
+	// Explicit wrapping uses this safe width immediately, not the previous frame's
+	// arranged width. Measure rows even when their parent was collapsed last frame.
 	for (int32 Index = 0; Index < ObjectiveRows.Num(); ++Index)
 	{
 		auto* Label = ObjectiveRows[Index].Get(); Label->SetFont(Font); Label->SetWrapTextAt(Width);
 		Label->SetColorAndOpacity(FSlateColor(FLinearColor::White));
 		Label->SetVisibility(Objectives.IsValidIndex(Index) ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+		if (Objectives.IsValidIndex(Index)) { Label->ForceLayoutPrepass(); }
 	}
-	// Fit whole rows, including their failure rules, between the higher-priority sound
-	// and speech surfaces. A long localized row is deferred whole rather than clipped.
-	float Top = SafeHeight * .02f, Bottom = SafeHeight * .65f;
+	TArray<FBox2D> PriorityPanels;
+	const auto MeasurePriorityPanel = [&](UBorder* Panel, UTextBlock* Text, const float WrapWidth)
+	{
+		if (!Panel || !Text) { return; }
+		Text->SetWrapTextAt(FMath::Max(1.f, WrapWidth)); Panel->ForceLayoutPrepass();
+		const auto* PrioritySlot = Cast<UCanvasPanelSlot>(Panel->Slot);
+		if (!PrioritySlot) { return; }
+		const FVector2D PanelSize = Panel->GetDesiredSize();
+		const FVector2D Anchor = PrioritySlot->GetAnchors().Minimum * FVector2D(SafeWidth, SafeHeight);
+		const FVector2D Min = Anchor + PrioritySlot->GetPosition() - PrioritySlot->GetAlignment() * PanelSize;
+		PriorityPanels.Emplace(Min, Min + PanelSize);
+	};
 	if (Settings.bClosedCaptions && CaptionRemaining > 0.f)
-	{
-		const float CaptionHeight = FMath::Max(CaptionBackground ? float(CaptionBackground->GetDesiredSize().Y) : 0.f,
-			32.f * Settings.SubtitleScale * (Settings.SubtitleMaximumLines + 1) + 16.f);
-		Top = SafeHeight * .13f + CaptionHeight + 12.f;
-	}
+	{ MeasurePriorityPanel(CaptionBackground, CaptionText, SafeWidth * .8f); }
 	if (Settings.bSubtitles && SpeechPages.IsValidIndex(PageIndex))
+	{ MeasurePriorityPanel(SubtitleBackground, SubtitleText, SafeWidth * .84f); }
+	const auto AvailableHeight = [&](const float ContentWidth)
 	{
-		const float SpeechHeight = FMath::Max(SubtitleBackground ? float(SubtitleBackground->GetDesiredSize().Y) : 0.f,
-			32.f * Settings.SubtitleScale * (Settings.SubtitleMaximumLines + 1) + 20.f);
-		Bottom = FMath::Min(Bottom, SafeHeight * (ActiveSpeech.bCinematic ? .9f : .8f) - SpeechHeight - 12.f);
-	}
-	const float Budget = FMath::Max(0.f, Bottom - Top - 16.f);
-	ObjectiveSize->SetMaxDesiredHeight(Budget);
-	ObjectiveOverflow->SetText(FText::Format(LOCTEXT("AdditionalObjectives", "{0} more objectives in Accessibility > Review current objectives"), FText::AsNumber(AdditionalObjectiveCount + Objectives.Num())));
-	ObjectiveOverflow->SetVisibility(ESlateVisibility::HitTestInvisible);
-	ObjectiveBackground->ForceLayoutPrepass();
-	const float CounterHeight = float(ObjectiveOverflow->GetDesiredSize().Y);
-	float Used = 0.f; VisibleObjectiveRows = 0;
-	for (int32 Index = 0; Index < Objectives.Num(); ++Index)
+		float Bottom = FMath::Min(SafeHeight * .65f, SafeHeight - CornerInset);
+		const float Right = CornerInset + ObjectivePadding.Left + ContentWidth + ObjectivePadding.Right;
+		for (const FBox2D& Panel : PriorityPanels)
+		{
+			if (Panel.Max.Y > CornerInset && CornerInset < Panel.Max.X + PriorityGap && Right > Panel.Min.X - PriorityGap)
+			{ Bottom = FMath::Min(Bottom, float(Panel.Min.Y) - PriorityGap); }
+		}
+		return FMath::Max(0.f, Bottom - CornerInset - ObjectivePadding.Top - ObjectivePadding.Bottom);
+	};
+	// Captions never move the corner. Try at most four complete row counts against
+	// the actual competing rectangles, including the exact remaining-count label.
+	VisibleObjectiveRows = 0; float ContentHeight = 0.f, Budget = 0.f; bool bFitsContent = false;
+	for (int32 Count = Objectives.Num(); Count >= 0; --Count)
 	{
-		const float RowHeight = float(ObjectiveRows[Index]->GetDesiredSize().Y) + 8.f;
-		const bool bMoreAfter = Index + 1 < Objectives.Num() || AdditionalObjectiveCount > 0;
-		if (Used + RowHeight + (bMoreAfter ? CounterHeight : 0.f) > Budget) { break; }
-		Used += RowHeight; ++VisibleObjectiveRows;
+		const int32 Remaining = AdditionalObjectiveCount + Objectives.Num() - Count;
+		ObjectiveOverflow->SetText(FText::Format(LOCTEXT("AdditionalObjectives", "{0} more objectives in Accessibility > Review current objectives"), FText::AsNumber(Remaining)));
+		ObjectiveOverflow->SetVisibility(Remaining > 0 ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+		float Height = 0.f, ContentWidth = 0.f;
+		for (int32 Index = 0; Index < Count; ++Index)
+		{
+			const FVector2D RowSize = ObjectiveRows[Index]->GetDesiredSize();
+			Height += float(RowSize.Y); ContentWidth = FMath::Max(ContentWidth, float(RowSize.X));
+			if (Index + 1 < Count || Remaining > 0) { Height += RowGap; }
+		}
+		if (Remaining > 0)
+		{
+			ObjectiveOverflow->ForceLayoutPrepass();
+			const FVector2D CounterSize = ObjectiveOverflow->GetDesiredSize();
+			Height += float(CounterSize.Y); ContentWidth = FMath::Max(ContentWidth, float(CounterSize.X));
+		}
+		Budget = AvailableHeight(ContentWidth);
+		if (Height > 0.f && Height <= Budget)
+		{ VisibleObjectiveRows = Count; ContentHeight = Height; bFitsContent = true; break; }
 	}
-	for (int32 Index = VisibleObjectiveRows; Index < ObjectiveRows.Num(); ++Index)
-	{ ObjectiveRows[Index]->SetVisibility(ESlateVisibility::Collapsed); }
 	const int32 Remaining = GetAdditionalObjectiveCount();
-	ObjectiveOverflow->SetText(FText::Format(LOCTEXT("AdditionalObjectives", "{0} more objectives in Accessibility > Review current objectives"), FText::AsNumber(Remaining)));
-	ObjectiveOverflow->SetVisibility(Remaining > 0 ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
-	const bool bFitsContent = Remaining > 0 ? CounterHeight > 0.f && Budget >= CounterHeight : VisibleObjectiveRows > 0;
+	for (int32 Index = 0; Index < ObjectiveRows.Num(); ++Index)
+	{
+		ObjectiveRows[Index]->SetVisibility(Index < VisibleObjectiveRows ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+		if (auto* RowSlot = Cast<UVerticalBoxSlot>(ObjectiveRows[Index]->Slot))
+		{ RowSlot->SetPadding(FMargin(0.f, 0.f, 0.f, Index + 1 < VisibleObjectiveRows || (Index < VisibleObjectiveRows && Remaining > 0) ? RowGap : 0.f)); }
+	}
+	ObjectiveOverflow->SetVisibility(bFitsContent && Remaining > 0 ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+	ObjectiveSize->SetMaxDesiredHeight(Budget);
+	ObjectiveSize->SetHeightOverride(ContentHeight);
 	ObjectiveBackground->SetVisibility(Settings.bShowObjectiveText && !Objectives.IsEmpty() && Budget > 0.f && bFitsContent
 		? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
 	if (auto* CanvasSlot = Cast<UCanvasPanelSlot>(ObjectiveBackground->Slot))
 	{
-		CanvasSlot->SetAnchors(FAnchors(.02f, 0.f)); CanvasSlot->SetPosition(FVector2D(0.f, Top));
+		CanvasSlot->SetAnchors(FAnchors(0.f, 0.f)); CanvasSlot->SetAlignment(FVector2D::ZeroVector);
+		CanvasSlot->SetPosition(FVector2D(CornerInset, CornerInset));
 	}
+	// The temporary overflow measurement must not survive as empty panel space.
+	// Recompute the final desired width/height after every visibility and padding decision.
+	ObjectiveBackground->ForceLayoutPrepass();
 }
 FText USovAccessibilityPresentation::DirectionText(const FVector& Location) const
 {
@@ -327,8 +375,7 @@ FText USovAccessibilityPresentation::DirectionText(const FVector& Location) cons
 }
 void USovAccessibilityPresentation::RefreshText()
 {
-	RefreshObjectiveText();
-	if (!SubtitleText || !CaptionText) { return; }
+	if (!SubtitleText || !CaptionText) { RefreshObjectiveText(); return; }
 	const int32 Size = FMath::RoundToInt(26 * Settings.SubtitleScale);
 	SubtitleText->SetWrapTextAt(FMath::Max(1.f,GetSafeTextWidth() * .84f));
 	SubtitleText->SetFont(FCoreStyle::GetDefaultFontStyle("Regular",Size)); CaptionText->SetFont(FCoreStyle::GetDefaultFontStyle("Bold",Size));
@@ -348,6 +395,8 @@ void USovAccessibilityPresentation::RefreshText()
 	}
 	CaptionText->SetWrapTextAt(FMath::Max(1.f,GetSafeTextWidth() * .8f));
 	CaptionText->SetText(FText::Format(LOCTEXT("CaptionLayout","[sound] {0}\n{1}"),DirectionText(ActiveCaption.Location),CaptionPages.IsValidIndex(CaptionPageIndex) ? FText::FromString(CaptionPages[CaptionPageIndex]) : FText::GetEmpty()));
+	// Objective fitting must see this frame's caption/speech text and visibility.
+	RefreshObjectiveText();
 }
 void USovAccessibilityPresentation::NativeTick(const FGeometry& Geometry, float DeltaSeconds)
 {
@@ -391,7 +440,8 @@ void USovAccessibilityPresentation::NativeTick(const FGeometry& Geometry, float 
 	}
 	RefreshText();
 	MarkerRefreshRemaining -= DeltaSeconds; if (MarkerRefreshRemaining > 0) { return; } MarkerRefreshRemaining = .25f; Markers.Reset();
-	APlayerController* PC = GetOwningPlayer(); if (!PC) { return; }
+	APlayerController* PC = GetOwningPlayer(); if (!PC) { ObjectiveWaypoint = {}; return; }
+    RefreshObjectiveWaypoint();
 	if (Settings.bWeakPointOutlines)
 	{
 		RefreshWeakPointMarkers(PC);
@@ -406,6 +456,33 @@ void USovAccessibilityPresentation::NativeTick(const FGeometry& Geometry, float 
 			Markers.Add({Marker->GetMarkerTransform().GetLocation(),Title,false,true});
 		}
 	}
+}
+void USovAccessibilityPresentation::RegisterWaypointSource(AActor* Actor)
+{
+    if (SovObjectiveWaypoint::IsSupportedSource(Actor)) { WaypointSources.AddUnique(Actor); }
+}
+void USovAccessibilityPresentation::ResetWaypointRegistry()
+{
+    if (WaypointWorld.IsValid() && WaypointSpawnedHandle.IsValid())
+    { WaypointWorld->RemoveOnActorSpawnedHandler(WaypointSpawnedHandle); }
+    WaypointSpawnedHandle.Reset(); WaypointWorld.Reset(); WaypointSources.Reset(); ObjectiveWaypoint = {};
+}
+void USovAccessibilityPresentation::RefreshObjectiveWaypoint()
+{
+    ObjectiveWaypoint = {};
+    auto* PC = Cast<ASovPlayerController>(GetOwningPlayer());
+    FSovCombatVitalsSnapshot Current;
+    if (!Settings.bShowObjectiveText || Objectives.IsEmpty() || !GetWorld()
+        || !USovCombatVitalsWidget::ReadCurrentVitals(PC, Current) || Current.Values[0].Current <= 0.f) { return; }
+    if (WaypointWorld.Get() != GetWorld())
+    {
+        ResetWaypointRegistry(); WaypointWorld = GetWorld();
+        for (TActorIterator<AActor> It(GetWorld()); It; ++It) { RegisterWaypointSource(*It); }
+        WaypointSpawnedHandle = GetWorld()->AddOnActorSpawnedHandler(
+            FOnActorSpawned::FDelegate::CreateUObject(this, &ThisClass::RegisterWaypointSource));
+    }
+    WaypointSources.RemoveAll([](const auto& Actor) { return !Actor.IsValid() || Actor->IsActorBeingDestroyed(); });
+    SovObjectiveWaypoint::Resolve(PC, Objectives, WaypointSources, ObjectiveWaypoint);
 }
 void USovAccessibilityPresentation::RegisterMarkerCharacter(AActor* Actor)
 {
@@ -468,6 +545,42 @@ int32 USovAccessibilityPresentation::NativePaint(const FPaintArgs& Args, const F
 	APlayerController* PC = GetOwningPlayer(); if (!PC) { return Layer; }
 	const float DPI = UWidgetLayoutLibrary::GetViewportScale(this); if (DPI <= 0) { return Layer; }
 	const FVector2D Size = Geometry.GetLocalSize(); const auto Font = FCoreStyle::GetDefaultFontStyle("Bold",FMath::RoundToInt(18 * Settings.UIScale));
+    // Child paint geometry shares this window origin; tick geometry includes the desktop offset.
+    // A restrained faction accent leaves the actual objective text in the corner.
+    // No surrounding frame or lower corners expand its apparent footprint.
+    if (ObjectiveBackground && ObjectiveBackground->IsRendered())
+    {
+        const auto* Player = Cast<ASovPlayerCharacterBase>(PC->GetPawn());
+        const auto Theme = SovHUDStyle::ForProtagonist(Player ? Player->GetProtagonistIdentityTag() : FGameplayTag(), Settings.bHighContrastHUD);
+        const float FrameScale = FMath::IsFinite(Settings.UIScale) ? FMath::Clamp(Settings.UIScale, .75f, 2.f) : 1.f;
+        const auto& ObjectiveGeometry = ObjectiveBackground->GetPaintSpaceGeometry();
+        const FVector2D PanelSize = ObjectiveGeometry.GetLocalSize();
+        if (PanelSize.X > 8.f * FrameScale && PanelSize.Y > 8.f * FrameScale)
+        {
+            const FVector2D Inset(2.f * FrameScale);
+            const FVector2D Min = Geometry.AbsoluteToLocal(ObjectiveGeometry.LocalToAbsolute(FVector2D::ZeroVector)) + Inset;
+            const FVector2D Max = Geometry.AbsoluteToLocal(ObjectiveGeometry.LocalToAbsolute(PanelSize)) - Inset;
+            const FLinearColor Tint = Theme.Accent * Style.GetColorAndOpacityTint()
+                * FLinearColor(1.f, 1.f, 1.f, ObjectiveBackground->GetRenderOpacity());
+            const auto FrameLine = [&](const TArray<FVector2D>& Points, const float Width)
+            {
+                TArray<FVector2f> SlatePoints;
+                SlatePoints.Reserve(Points.Num());
+                for (const auto& Point : Points) { SlatePoints.Add(FVector2f(Point)); }
+                FSlateDrawElement::MakeLines(Elements, ++Layer, Geometry.ToPaintGeometry(), SlatePoints,
+                    ESlateDrawEffect::None, Tint, true, Width * FrameScale);
+            };
+            Elements.PushClip(FSlateClippingZone(ObjectiveGeometry));
+            const float Stroke = Settings.bHighContrastHUD ? 2.f : 1.f;
+            FrameLine({Min, FVector2D(Min.X, FMath::Min(Max.Y, Min.Y + 56. * FrameScale))}, Stroke);
+            if (Max.X - Min.X > 8. * FrameScale)
+            {
+                FrameLine({FVector2D(Min.X + 8. * FrameScale, Min.Y),
+                    FVector2D(FMath::Min(Max.X, Min.X + 128. * FrameScale), Min.Y)}, Stroke);
+            }
+            Elements.PopClip();
+        }
+    }
 	auto Project = [&](const FVector& Location,FVector2D& Point) { return PC->ProjectWorldLocationToScreen(Location,Point,true) && (Point /= DPI, true) && Point.X >= 16 && Point.Y >= 16 && Point.X < Size.X-16 && Point.Y < Size.Y-16; };
 	auto DrawOutline = [&](const TArray<FVector2D>& Points,const FLinearColor& Tint)
 	{
@@ -478,7 +591,7 @@ int32 USovAccessibilityPresentation::NativePaint(const FPaintArgs& Args, const F
 	auto DrawLabel = [&](const FVector2D& Point,const FText& Text,const FLinearColor& Tint)
 	{
 		if (!SafeTextCanvas || !FSlateApplication::IsInitialized()) { return; }
-		const FGeometry& SafeGeometry=SafeTextCanvas->GetCachedGeometry();
+		const FGeometry& SafeGeometry=SafeTextCanvas->GetPaintSpaceGeometry();
 		if (SafeGeometry.GetLocalSize().X <= 0 || SafeGeometry.GetLocalSize().Y <= 0) { return; }
 		const FVector2D SafeMin=Geometry.AbsoluteToLocal(SafeGeometry.LocalToAbsolute(FVector2D::ZeroVector));
 		const FVector2D SafeMax=Geometry.AbsoluteToLocal(SafeGeometry.LocalToAbsolute(SafeGeometry.GetLocalSize()));
@@ -491,6 +604,71 @@ int32 USovAccessibilityPresentation::NativePaint(const FPaintArgs& Args, const F
 		FSlateDrawElement::MakeText(Elements,++Layer,Geometry.ToPaintGeometry(FVector2D(1,1),FSlateLayoutTransform(LabelPoint)),Text,Font,ESlateDrawEffect::None,Tint);
 		Elements.PopClip();
 	};
+    FSovCombatVitalsSnapshot CurrentVitals;
+    const auto* SovPC = Cast<ASovPlayerController>(PC);
+    if (Settings.bShowObjectiveText && SafeTextCanvas && USovCombatVitalsWidget::ReadCurrentVitals(SovPC, CurrentVitals)
+        && CurrentVitals.Values[0].Current > 0.f && SovObjectiveWaypoint::IsCurrent(SovPC, ObjectiveWaypoint))
+    {
+        const auto& SafeGeometry = SafeTextCanvas->GetPaintSpaceGeometry();
+        const FVector2D SafeSize = SafeGeometry.GetLocalSize();
+        if (SafeSize.X > 0. && SafeSize.Y > 0.)
+        {
+            const FVector2D Min = Geometry.AbsoluteToLocal(SafeGeometry.LocalToAbsolute(FVector2D::ZeroVector));
+            const FVector2D Max = Geometry.AbsoluteToLocal(SafeGeometry.LocalToAbsolute(SafeSize));
+            // Keep the outer safe-edge ring available for directional threat cues.
+            const double WaypointInset = 72. * Settings.UIScale;
+            const FVector Location = ObjectiveWaypoint.Anchor->GetComponentLocation();
+            FVector View; FRotator Rotation; PC->GetPlayerViewPoint(View, Rotation);
+            const FVector Delta = Location - View;
+            const double Forward = FVector::DotProduct(Delta, Rotation.Vector());
+            FVector2D Screen = FVector2D::ZeroVector;
+            const bool bFront = Forward > 0. && PC->ProjectWorldLocationToScreen(Location, Screen, true);
+            if (bFront) { Screen /= DPI; }
+            const FVector2D Bearing(FVector::DotProduct(Delta, Rotation.RotateVector(FVector::RightVector)), -Forward);
+            FVector2D Point; bool bAtEdge = false;
+            if (SovObjectiveWaypoint::FitToSafeRect(Screen, bFront, Bearing,
+                Min + FVector2D(WaypointInset, WaypointInset), Max - FVector2D(WaypointInset, WaypointInset), Point, bAtEdge))
+            {
+                const auto Theme = SovHUDStyle::ForProtagonist(CurrentVitals.Protagonist, Settings.bHighContrastHUD);
+                FLinearColor Tint = Settings.bNavigationContrast ? FLinearColor::White : Theme.Accent;
+                Tint.A = SovAccessibilityPolicy::Pulse(GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f, Settings.bNavigationPulse);
+                const double Radius = 12. * Settings.UIScale;
+                if (bAtEdge)
+                {
+                    const FVector2D Direction = (Point - (Min + Max) * .5).GetSafeNormal();
+                    const FVector2D Side(-Direction.Y, Direction.X);
+                    DrawOutline({Point + Direction*Radius, Point - Direction*Radius + Side*Radius*.7,
+                        Point - Direction*Radius - Side*Radius*.7, Point + Direction*Radius}, Tint);
+                }
+                else if (Theme.Frame == SovHUDStyle::EFrame::Shield)
+                {
+                    DrawOutline({Point+FVector2D(-Radius,-Radius), Point+FVector2D(Radius,-Radius),
+                        Point+FVector2D(Radius,Radius*.45), Point+FVector2D(0,Radius),
+                        Point+FVector2D(-Radius,Radius*.45), Point+FVector2D(-Radius,-Radius)}, Tint);
+                }
+                else
+                {
+                    DrawOutline({Point+FVector2D(0,-Radius), Point+FVector2D(Radius,0),
+                        Point+FVector2D(0,Radius), Point+FVector2D(-Radius,0), Point+FVector2D(0,-Radius)}, Tint);
+                }
+                FNumberFormattingOptions DistanceFormat; DistanceFormat.SetMaximumFractionalDigits(0);
+                const FText Distance = FText::AsNumber(FVector::Dist(Location, PC->GetPawn()->GetActorLocation()) / 100., &DistanceFormat);
+                const TCHAR* Key = ObjectiveWaypoint.Kind == FSovObjectiveWaypoint::EKind::Retry ? TEXT("Waypoint.Retry")
+                    : ObjectiveWaypoint.Kind == FSovObjectiveWaypoint::EKind::Receiver ? TEXT("Waypoint.Receiver")
+                    : ObjectiveWaypoint.Kind == FSovObjectiveWaypoint::EKind::Encounter ? TEXT("Waypoint.Encounter") : TEXT("Waypoint.Interaction");
+                const FText Label = FText::Format(SovHUDStyle::Text(Key), Distance);
+                if (FSlateApplication::IsInitialized())
+                {
+                    const FVector2D LabelSize = FSlateApplication::Get().GetRenderer()->GetFontMeasureService()->Measure(Label, Font);
+                    const FVector2D Center = (Min + Max) * .5;
+                    // Text grows inward, rather than covering the outer threat-indicator band.
+                    const FVector2D LabelPoint(Point.X > Center.X ? Point.X-Radius-6.-LabelSize.X : Point.X+Radius+6.,
+                        Point.Y > Center.Y ? Point.Y-Radius-6.-LabelSize.Y : Point.Y+Radius+6.);
+                    DrawLabel(LabelPoint, Label, Tint);
+                }
+            }
+        }
+    }
 	if (Settings.bInteractableOutlines && FocusedInteractable.IsValid() && Interaction && Interaction->IsInteractableInReach(FocusedInteractable.Get()))
 	{
 		const FBox Bounds = FocusedInteractable->GetInteractableBounds(); FVector2D Min(FLT_MAX,FLT_MAX),Max(-FLT_MAX,-FLT_MAX); bool bValid = Bounds.IsValid != 0;

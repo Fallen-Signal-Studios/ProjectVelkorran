@@ -103,7 +103,8 @@ struct FThermalWorld
         Box->SetCollisionEnabled(ECollisionEnabled::QueryOnly); Box->SetCollisionObjectType(ECC_WorldStatic);
         Box->SetCollisionResponseToAllChannels(ECR_Block); Box->RegisterComponent(); Floor->SetActorLocation(FVector(0,0,-105));
         if (!Fracture->InitializeBindings()) { return; }
-        Director->StartTestAttempt(); bReady = true;
+        Director->StartTestAttempt(Player);
+        bReady = Director->GetEncounterPlayer() == Player && Director->HasEncounterPlayer(Player);
     }
     ~FThermalWorld()
     { if (World) { World->DestroyWorld(false); if (GEngine) { GEngine->DestroyWorldContext(World); } } }
@@ -175,7 +176,7 @@ bool FSovAurelionThermalRetirementTest::RunTest(const FString& Parameters)
         {
             F.Hit();
             if (Case == 2) { F.Player->GetNarrativeAbilitySystemComponent()->SetCharacterReadyEpoch(F.Player->GetNarrativeAbilitySystemComponent()->GetCharacterReadyEpoch() + 1); }
-            if (Case == 3) { F.Director->StartTestAttempt(); }
+            if (Case == 3) { F.Director->StartTestAttempt(F.Player); }
             if (Case == 4) { F.Fracture->Load_Implementation(); }
         }
         F.NextFrame(); TestFalse(TEXT("Forged, expired, readiness, attempt and loaded callbacks cannot fracture"), F.Complete());

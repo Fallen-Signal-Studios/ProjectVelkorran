@@ -536,6 +536,10 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Narrative|NarrativeCharacter|Attributes")
 	float GetMaxStamina() const;
+
+	//Check if our character is waiting to be loaded in - default loading screen uses this.
+	UFUNCTION(BlueprintPure, Category = "Narrative|NarrativeCharacter")
+	virtual bool IsCharacterPendingLoad() const;
 protected:
 	
 	UFUNCTION(BlueprintNativeEvent, Category = "Narrative|NarrativeCharacter")
@@ -555,10 +559,6 @@ protected:
 	//Called once all our character definition stuff has been applied/loaded from disk. IE default items, factions, etc. 
 	UFUNCTION()
 	virtual void HandleCharacterDefinitionDataLoaded(FPrimaryAssetId LoadedId);
-
-	//Check if our character is waiting to be loaded in - default loading screen uses this. 
-	UFUNCTION(BlueprintPure, Category = "Narrative|NarrativeCharacter")
-	virtual bool IsCharacterPendingLoad() const;
 
 	TSharedPtr<FStreamableHandle> CharacterDefinitionLoadHandle; 
 

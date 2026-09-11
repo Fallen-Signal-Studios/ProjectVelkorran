@@ -3,6 +3,7 @@
 #include "Characters/SovSeleneCharacter.h"
 
 #include "Components/SovDeflectionComponent.h"
+#include "GAS/NarrativeAbilitySystemComponent.h"
 #include "Components/SovSeleneEchoGenerationComponent.h"
 #include "Sovereign/SovGameplayTags.h"
 

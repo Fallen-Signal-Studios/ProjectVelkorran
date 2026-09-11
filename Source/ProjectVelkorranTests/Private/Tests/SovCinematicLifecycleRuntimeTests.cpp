@@ -1,10 +1,14 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Tests/SovCinematicLifecycleRuntimeTestFixtures.h"
+#include "Tests/SovNPCVisualLifecycleTestFixtures.h"
+#include "GAS/AbilityConfiguration.h"
+#include "Engine/EngineBaseTypes.h"
 #include "Tests/SovAxiomRuntimeTestFixtures.h"
 #include "Tests/SovHandoffRuntimeTestFixtures.h"
 #include "Tests/SovCinematicInventoryRuntimeTestFixtures.h"
 #include "Tests/SovCompanionApproachTestFixtures.h"
 #include "Components/EquipmentComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Cinematics/SovCampaignCinematicComponent.h"
 #include "Campaign/SovCampaignDefinition.h"
 #include "Campaign/SovCampaignStateComponent.h"
@@ -56,6 +60,8 @@ struct FNarrativeSequenceLifecycleTestAccess
 };
 struct FSovCinematicTestAccess
 {
+    static bool ValidateParticipantState(USovCampaignCinematicComponent* C, FString& Error)
+    { return C->ValidateParticipants(false, Error); }
 	static bool ResolveParticipantSnapshot(USovCampaignCinematicComponent* C, FString& Error) { return C->ResolveParticipants(Error); }
 	static bool ValidateSequence(USovCampaignCinematicComponent* C, ULevelSequence* Sequence, FString& Error)
 	{ return C->ValidatePresentationSequence(Sequence, Error); }
@@ -770,4 +776,207 @@ bool FSovCinematicInventoryUnregisterTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("Input ownership released"), F.PC->IsMoveInputIgnored());
     return true;
 }
+
+namespace SovRequiredCharacterSequenceTests
+{
+	struct FWorld
+	{
+		FEditorScriptExecutionGuard ScriptGuard;
+		UWorld* World = nullptr;
+		ASovRequiredCharacterSequenceTestActor* Actor = nullptr;
+		ASovNPCVisualLifecycleTestCharacter* Character = nullptr;
+		ASovNPCVisualLifecycleTestVisual* Visual = nullptr;
+		UNPCDefinition* Definition = nullptr;
+		UNarrativeAbilitySystemComponent* ASC = nullptr;
+		USovSequenceLifecycleProbe* Probe = nullptr;
+		ULevelSequence* Sequence = nullptr;
+		FWorld()
+		{
+			const auto Values = UWorld::InitializationValues().AllowAudioPlayback(false).CreatePhysicsScene(true)
+				.CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false);
+			World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Values);
+			if (!World) { return; }
+			if (GEngine) { GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World); }
+			World->InitializeActorsForPlay(FURL());
+			FActorSpawnParameters Params;
+			Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			Character = World->SpawnActor<ASovNPCVisualLifecycleTestCharacter>(FVector::ZeroVector, FRotator::ZeroRotator, Params);
+			Actor = World->SpawnActor<ASovRequiredCharacterSequenceTestActor>();
+			if (!Character || !Actor) { return; }
+			Definition = NewObject<UNPCDefinition>(Character);
+			Definition->NPCID = TEXT("RequiredSequenceCharacterFixture");
+			Definition->bAllowMultipleInstances = true;
+			Definition->NPCClassPath = ASovNPCVisualLifecycleTestCharacter::StaticClass();
+			// This real shipped seed exercises native attribute/startup/ability grants.
+			// Only appearance IO is replaced by the existing empty-mesh producer fixture.
+			const auto* Seed = LoadObject<UNPCDefinition>(nullptr,
+				TEXT("/Game/SciFi_Drone_1/Textures/NPC_ReformationCombatDrone.NPC_ReformationCombatDrone"));
+			if (!Seed || !Seed->AbilityConfiguration) { return; }
+			Definition->AbilityConfiguration = Seed->AbilityConfiguration;
+			Character->AuthoredPlacedDefinition = Definition;
+			ASC = Character->GetNarrativeAbilitySystemComponent();
+			Sequence = NewObject<ULevelSequence>(Actor); Sequence->Initialize();
+			auto* Scene = Sequence->GetMovieScene(); Scene->SetPlaybackRange(0, 240000);
+			const FGuid Binding = Scene->AddPossessable(TEXT("RequiredCharacter"), ANarrativeCharacter::StaticClass());
+			Scene->TagBinding(TEXT("RequiredCharacter"), UE::MovieScene::FFixedObjectBindingID(Binding, MovieSceneSequenceID::Root));
+			Actor->InitializeTestSequence(Sequence);
+			FNarrativeSequencePlaybackSettings Settings;
+			Settings.bAutoPlay = false; Settings.RequiredParticipantBindingTags.Add(TEXT("RequiredCharacter"));
+			Actor->UpdateSequence(Sequence, Settings);
+			Actor->SetBindingByTag(TEXT("RequiredCharacter"), {Character});
+			Probe = NewObject<USovSequenceLifecycleProbe>(Actor);
+			Actor->OnPlaybackFailed.AddDynamic(Probe, &USovSequenceLifecycleProbe::Failed);
+		}
+		~FWorld()
+		{
+			if (Actor && IsValid(Actor)) { Actor->GetSequencePlayer()->Stop(); Actor->Destroy(); }
+			if (Character && IsValid(Character)) { Character->Destroy(); }
+			if (Visual && IsValid(Visual)) { Visual->Destroy(); }
+			if (World) { World->DestroyWorld(false); if (GEngine) { GEngine->DestroyWorldContext(World); } }
+		}
+		bool Valid() const { return World && Actor && Character && Definition && Definition->AbilityConfiguration && ASC && Probe; }
+		void InitializeCharacter() { Character->DispatchBeginPlay(); }
+		void CreateVisual()
+		{
+			FActorSpawnParameters Params; Params.Owner = Character;
+			Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			Visual = World->SpawnActor<ASovNPCVisualLifecycleTestVisual>(FVector::ZeroVector, FRotator::ZeroRotator, Params);
+			if (Visual) { Visual->SetCharacterForTest(Character); Character->SetVisualForTest(Visual); }
+		}
+		void Play() { Actor->GetSequencePlayer()->Play(); }
+		void Stop() { Actor->GetSequencePlayer()->Stop(); }
+		bool IsPlaying() const { return Actor->GetSequencePlayer()->IsPlaying(); }
+	};
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovRealConfiguredCinematicParticipantTest,
+	"ProjectVelkorran.Campaign.Cinematic.RequiredCharacterUsesActualNativeStartup",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FSovRealConfiguredCinematicParticipantTest::RunTest(const FString& Parameters)
+{
+	using namespace SovRequiredCharacterSequenceTests;
+	FWorld Scope;
+	if (!TestTrue(TEXT("Real config, native character and tagged sequence prerequisites"), Scope.Valid())) { return false; }
+	TestFalse(TEXT("No manually applied startup effects"), Scope.ASC->bStartupEffectsApplied);
+	Scope.InitializeCharacter();
+	TestTrue(TEXT("Real character BeginPlay ran"), Scope.Character->HasActorBegunPlay());
+	TestTrue(TEXT("Real AddStartupEffects completed the authored configuration"), Scope.ASC->bStartupEffectsApplied);
+	TestFalse(TEXT("Unmaintained legacy field remains false; no test seeding"), Scope.ASC->bInitializedFromConfig);
+	TestTrue(TEXT("Actual default attribute effect supplied living health"), Scope.Character->GetHealth() > 0.f);
+	for (const auto& Ability : Scope.Definition->AbilityConfiguration->DefaultAbilities)
+	{
+		const auto* Spec = Scope.ASC->FindAbilitySpecFromClass(Ability);
+		if (TestNotNull(TEXT("Actual startup ability was granted"), Spec))
+		{ TestTrue(TEXT("Grant retains its actual configuration source"), Spec->SourceObject.Get() == Scope.Definition->AbilityConfiguration); }
+	}
+	Scope.CreateVisual();
+	if (!TestNotNull(TEXT("Current owned visual"), Scope.Visual)) { return false; }
+	Scope.Visual->CompleteMeshesForTest();
+	TestFalse(TEXT("Real visual producer completed pending-load state"), Scope.Character->IsCharacterPendingLoad());
+	const float Health = Scope.Character->GetHealth();
+	TestTrue(TEXT("Required actor binding exists without any transform track"),
+		Scope.Sequence->GetMovieScene()->GetBindings().Num() == 1 && Scope.Sequence->GetMovieScene()->GetBindings()[0].GetTracks().IsEmpty());
+	Scope.Play();
+	TestTrue(TEXT("Real SequencePlayer.OnPlay admits the configured required character"), Scope.IsPlaying());
+	TestEqual(TEXT("No permanent-false participant failure"), Scope.Probe->FailedCount, 0);
+	TestTrue(TEXT("Real binding resolver returns the exact actor"), Scope.Actor->GetBoundObjects().Contains(Scope.Character));
+	TestTrue(TEXT("Native participant ownership acquired"), Scope.ASC->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_SequencerControlled));
+	Scope.Stop();
+	TestFalse(TEXT("Normal stop releases only the cinematic-owned tag"), Scope.ASC->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_SequencerControlled));
+	TestEqual(TEXT("Playback admission never rewrites health"), Scope.Character->GetHealth(), Health);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovRequiredCinematicParticipantRefusalTest,
+	"ProjectVelkorran.Campaign.Cinematic.RequiredCharacterStillRefusesUnreadyOrRetiredState",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FSovRequiredCinematicParticipantRefusalTest::RunTest(const FString& Parameters)
+{
+	using namespace SovRequiredCharacterSequenceTests;
+	FWorld Scope;
+	if (!TestTrue(TEXT("Real required participant prerequisites"), Scope.Valid())) { return false; }
+	auto Refused = [this, &Scope](const TCHAR* Reason)
+	{
+		const int32 Before = Scope.Probe->FailedCount;
+		Scope.Play();
+		TestFalse(Reason, Scope.IsPlaying());
+		TestEqual(TEXT("Native failure delegate fired exactly once"), Scope.Probe->FailedCount, Before + 1);
+		TestFalse(TEXT("Rejected participant acquired no cinematic lease"), Scope.ASC->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_SequencerControlled));
+	};
+	Refused(TEXT("Before native startup no required participant admission"));
+	Scope.InitializeCharacter();
+	Refused(TEXT("Configured character without its visual is refused"));
+	Scope.CreateVisual();
+	if (!TestNotNull(TEXT("Actual pending visual"), Scope.Visual)) { return false; }
+	TestTrue(TEXT("Uncompleted visual is genuinely pending"), Scope.Character->IsCharacterPendingLoad());
+	Refused(TEXT("Pending base meshes still refuse playback"));
+	Scope.Visual->CompleteMeshesForTest();
+	Scope.Play();
+	if (!TestTrue(TEXT("Same actor admits after real initialization/visual completion"), Scope.IsPlaying())) { return false; }
+	Scope.Stop();
+	FActorSpawnParameters AvatarParams;
+	AvatarParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	auto* ReplacementAvatar = Scope.World->SpawnActor<ASovNPCVisualLifecycleTestCharacter>(
+		FVector(500.f, 0.f, 0.f), FRotator::ZeroRotator, AvatarParams);
+	if (!TestNotNull(TEXT("Distinct Narrative character avatar"), ReplacementAvatar)) { return false; }
+	Scope.ASC->InitAbilityActorInfo(Scope.Character, ReplacementAvatar);
+	if (!TestTrue(TEXT("Native ASC actually accepted the replacement avatar"), Scope.ASC->GetAvatarActor() == ReplacementAvatar)) { return false; }
+	Refused(TEXT("A replaced ASC avatar still refuses playback"));
+	Scope.ASC->InitAbilityActorInfo(Scope.Character, Scope.Character);
+	if (!TestTrue(TEXT("Original ASC avatar restored before later refusal cases"), Scope.ASC->GetAvatarActor() == Scope.Character)) { return false; }
+	const auto Configuration = Scope.Definition->AbilityConfiguration;
+	Scope.Definition->AbilityConfiguration = nullptr;
+	Refused(TEXT("Current definition without its configuration refuses playback"));
+	Scope.Definition->AbilityConfiguration = Configuration;
+	const FGameplayTag Dead = FNarrativeGameplayTags::Get().State_IsDead;
+	Scope.ASC->AddLooseGameplayTag(Dead);
+	Refused(TEXT("Actual native StopTags retain the dead-character veto"));
+	TestTrue(TEXT("Rejected playback preserves an external stop tag"), Scope.ASC->HasMatchingGameplayTag(Dead));
+	Scope.ASC->RemoveLooseGameplayTag(Dead);
+	Scope.ASC->ClearTrackedStartupEffects();
+	TestFalse(TEXT("Actual startup-effect retirement invalidates maintained completion"), Scope.ASC->bStartupEffectsApplied);
+	Refused(TEXT("Retired authoritative startup configuration refuses playback"));
+	return true;
+}
+
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCinematicDetachedBodyExitTest,
+    "ProjectVelkorran.Campaign.Cinematic.DetachedBodyCannotAdmitRootOnlyExit",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCinematicDetachedBodyExitTest::RunTest(const FString& Parameters)
+{
+    FManagedSequenceWorld F;
+    if (!TestNotNull(TEXT("Managed cinematic fixture"), F.Component)) { return false; }
+    auto* Mesh = F.Pawn->GetMesh();
+    if (!TestNotNull(TEXT("Actual character skeletal component"), Mesh)) { return false; }
+    FSovCinematicTestAccess::StageOwnedSession(F.Component, F.PC, F.Pawn, F.ASC);
+    F.Component->Participants[0].bApplyExitTransform = true;
+    F.Component->Participants[0].ExitTransform = F.Pawn->GetActorTransform();
+    const FTransform OriginalRoot = F.Pawn->GetActorTransform(), OriginalMesh = Mesh->GetRelativeTransform();
+    auto* Parent = Mesh->GetAttachParent();
+    if (!TestNotNull(TEXT("Root-owned mesh parent"), Parent)) { return false; }
+    const float Health = F.Pawn->GetHealth();
+    FString Error;
+    TestTrue(TEXT("Attached non-ragdolled participant admits exit ownership"), FSovCinematicTestAccess::ValidateParticipantState(F.Component, Error));
+    Mesh->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
+    TestFalse(TEXT("A detached body refuses root-only exit admission"), FSovCinematicTestAccess::ValidateParticipantState(F.Component, Error));
+    TestTrue(TEXT("Refusal identifies body ownership"), Error.Contains(TEXT("attached, non-ragdolled")));
+    TestNull(TEXT("Refusal does not forcibly reattach another body owner"), Mesh->GetAttachParent());
+    F.Component->Participants[0].bApplyExitTransform = false;
+    TestTrue(TEXT("Presentation without root relocation keeps its existing admission policy"), FSovCinematicTestAccess::ValidateParticipantState(F.Component, Error));
+    F.Component->Participants[0].bApplyExitTransform = true;
+    Mesh->AttachToComponent(Parent, FAttachmentTransformRules::KeepRelativeTransform); Mesh->SetRelativeTransform(OriginalMesh);
+    TestTrue(TEXT("Normal attached ownership admits again"), FSovCinematicTestAccess::ValidateParticipantState(F.Component, Error));
+    const FGameplayTag Ragdoll = FNarrativeGameplayTags::Get().State_Movement_Ragdoll;
+    F.ASC->AddLooseGameplayTag(Ragdoll);
+    TestFalse(TEXT("Native ragdoll state also vetoes transform ownership"), FSovCinematicTestAccess::ValidateParticipantState(F.Component, Error));
+    TestTrue(TEXT("Refusal preserves the external ragdoll tag"), F.ASC->HasMatchingGameplayTag(Ragdoll));
+    F.ASC->RemoveLooseGameplayTag(Ragdoll);
+    TestTrue(TEXT("Neither refusal moves the actor"), F.Pawn->GetActorTransform().Equals(OriginalRoot));
+    TestEqual(TEXT("Neither refusal changes health"), F.Pawn->GetHealth(), Health);
+    TestTrue(TEXT("No scene receipt is created by state validation"), F.PC->GetCampaignState()->GetJournal().IsEmpty());
+    FSovCinematicTestAccess::RetireInventorySession(F.Component);
+    return true;
+}
+
 #endif

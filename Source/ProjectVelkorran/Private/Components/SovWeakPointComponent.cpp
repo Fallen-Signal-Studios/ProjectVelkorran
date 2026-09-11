@@ -802,17 +802,33 @@ void USovWeakPointComponent::ApplyWeakPointRevealState()
 		ClearWeakPointRevealPresentation();
 	}
 
-	if (bLocalWeakPointRevealActive != bShouldBeActive)
+	AActor* const RevealInstigator = bShouldBeActive
+		? WeakPointRevealState.RevealInstigator.Get()
+		: nullptr;
+	// A reveal landing on an already-revealed target extends EndServerWorldTime without
+	// flipping bShouldBeActive. Broadcasting only on that boolean edge swallowed the
+	// extension: E4's second Weaver sever left USovResonanceTargetComponent's ExposureUntil
+	// pinned to the first window, so exposure lapsed while the reveal decals were still lit.
+	// Re-broadcast whenever the live window actually moves forward or changes owner.
+	const bool bRevealStateChanged = bLocalWeakPointRevealActive != bShouldBeActive;
+	const bool bRevealWindowExtended = bShouldBeActive
+		&& bLocalWeakPointRevealActive
+		&& (WeakPointRevealState.EndServerWorldTime
+				> LastBroadcastRevealEndServerWorldTime + KINDA_SMALL_NUMBER
+			|| RevealInstigator != LastBroadcastRevealInstigator.Get());
+	if (bRevealStateChanged || bRevealWindowExtended)
 	{
 		bLocalWeakPointRevealActive = bShouldBeActive;
+		LastBroadcastRevealEndServerWorldTime = bShouldBeActive
+			? WeakPointRevealState.EndServerWorldTime
+			: 0.0f;
+		LastBroadcastRevealInstigator = RevealInstigator;
 		OnWeakPointRevealStateChanged.Broadcast(
 			bShouldBeActive,
 			bShouldBeActive
 				? GetWeakPointRevealRemainingSeconds()
 				: 0.0f,
-			bShouldBeActive
-				? WeakPointRevealState.RevealInstigator.Get()
-				: nullptr);
+			RevealInstigator);
 	}
 }
 
@@ -1308,6 +1324,8 @@ void USovWeakPointComponent::HandleDeathStateChanged(
 			if (bLocalWeakPointRevealActive)
 			{
 				bLocalWeakPointRevealActive = false;
+				LastBroadcastRevealEndServerWorldTime = 0.0f;
+				LastBroadcastRevealInstigator = nullptr;
 				OnWeakPointRevealStateChanged.Broadcast(
 					false,
 					0.0f,

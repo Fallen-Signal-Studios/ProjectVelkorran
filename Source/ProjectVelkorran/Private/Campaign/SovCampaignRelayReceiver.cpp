@@ -113,9 +113,9 @@ bool ASovCampaignRelayReceiver::CanUseInternal(const APawn* Pawn, FText& Error, 
     if (!EncounterObjective->CanDisableReceiver(this, Player, ContextError))
     { return Fail(FText::FromString(ContextError)); }
     const auto* ASC = Cast<UNarrativeAbilitySystemComponent>(Player->GetAbilitySystemComponent());
-    const auto& Tags = FNarrativeGameplayTags::Get();
-    if (!ASC || ASC->HasMatchingGameplayTag(Tags.State_Busy) || ASC->HasMatchingGameplayTag(Tags.State_SequencerControlled)
-        || ASC->HasMatchingGameplayTag(Tags.State_DialogueControlled) || ASC->HasMatchingGameplayTag(Tags.State_Movement_Lock))
+    const auto& NarrativeTags = FNarrativeGameplayTags::Get();
+    if (!ASC || ASC->HasMatchingGameplayTag(NarrativeTags.State_Busy) || ASC->HasMatchingGameplayTag(NarrativeTags.State_SequencerControlled)
+        || ASC->HasMatchingGameplayTag(NarrativeTags.State_DialogueControlled) || ASC->HasMatchingGameplayTag(NarrativeTags.State_Movement_Lock))
     { return Fail(LOCTEXT("Busy", "Finish the current action first")); }
     if (!IsValid(Interactable) || !Interactable->IsRegistered() || !Interactable->IsActive() || Interactable->GetOwner() != this
         || !FMath::IsFinite(Interactable->InteractionDistance) || Interactable->InteractionDistance <= 0.f

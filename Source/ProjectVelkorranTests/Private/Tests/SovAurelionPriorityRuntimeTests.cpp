@@ -2,6 +2,7 @@
 #include "Tests/SovHandoffRuntimeTestFixtures.h"
 #include "Campaign/SovAurelionPrioritySupport.h"
 #include "Campaign/SovAurelionCheckpoint.h"
+#include "Campaign/SovAurelionMedicalCache.h"
 #include "Campaign/SovAurelionPriorityTerminal.h"
 #include "Campaign/SovCampaignStateComponent.h"
 #include "Campaign/SovEncounterSnapshotLibrary.h"
@@ -13,6 +14,11 @@
 #include "Misc/AutomationTest.h"
 #include "TimerManager.h"
 #include "UObject/Script.h"
+#include "GAS/NarrativeAbilitySystemComponent.h"
+#include "GAS/NarrativeAttributeSetBase.h"
+#include "Serialization/MemoryReader.h"
+#include "Serialization/MemoryWriter.h"
+#include "Serialization/ObjectAndNameAsStringProxyArchive.h"
 
 #if WITH_AUTOMATION_TESTS
 namespace SovAurelionPriorityTests
@@ -188,6 +194,65 @@ bool FSovAurelionCheckpointBoundaryTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Checkpoint capture never completes a beat"), F.State->GetJournal().Num(), 0);
     TestEqual(TEXT("Advance through real state boundary"), F.State->CompleteBeat(TEXT("TarrikArrival")), ESovCampaignResult::Applied);
     TestFalse(TEXT("Old checkpoint cannot label later progress as prearrival"), ASovAurelionCheckpoint::MatchesProgress(ESovAurelionCheckpoint::ContextCP0, F.State));
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAurelionMedicalCacheOnceTest,
+    "ProjectVelkorran.Campaign.AurelionPriority.MedicalCacheRealHealAndSavedConsumption", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FSovAurelionMedicalCacheOnceTest::RunTest(const FString& Parameters)
+{
+    using namespace SovAurelionPriorityTests;
+    FWorld F; if (!TestNotNull(TEXT("Ready campaign"),F.State)) { return false; }
+    auto* Cache=F.World->SpawnActor<ASovAurelionMedicalCache>(); Cache->CacheId=TEXT("WestCache"); Cache->Support=F.Support;
+    Cache->SetActorLocation(F.Player->GetActorLocation()+FVector(170,0,0)); Cache->Interactable->Activate();
+    auto* ASC=F.Player->GetNarrativeAbilitySystemComponent();
+    ASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetMaxHealthAttribute(),100);
+    ASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetHealthAttribute(),20);
+    FText Error;
+    TestFalse(TEXT("No medical grant before the real choice"),Cache->TryUse(F.Player,Error));
+    TestEqual(TEXT("Native choice owns west access"),F.State->ResolveChoice(TEXT("ImmediateProtection"),TEXT("PriorityWestStretchers")),ESovCampaignResult::Applied);
+    ASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetHealthAttribute(),100);
+    TestFalse(TEXT("Full health preserves the single use"),Cache->TryUse(F.Player,Error));
+    TestFalse(TEXT("Full-health rejection does not consume"),Cache->IsConsumed());
+    ASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetHealthAttribute(),20);
+    bool bReentrantRejected=false, bSaveRejected=false;
+    const FDelegateHandle Watch=ASC->GetGameplayAttributeValueChangeDelegate(UNarrativeAttributeSetBase::GetHealthAttribute()).AddLambda(
+        [&](const FOnAttributeChangeData& Change)
+        {
+            FText RetryError; bReentrantRejected=!Cache->TryUse(F.Player,RetryError);
+            TArray<uint8> MidBytes; FMemoryWriter Writer(MidBytes); FObjectAndNameAsStringProxyArchive Ar(Writer,false); Ar.ArIsSaveGame=true;
+            Cache->Serialize(Ar); bSaveRejected=Ar.IsError();
+        });
+    const bool bGranted=Cache->TryUse(F.Player,Error);
+    ASC->GetGameplayAttributeValueChangeDelegate(UNarrativeAttributeSetBase::GetHealthAttribute()).Remove(Watch);
+    if (!TestTrue(TEXT("Actual instant GAS medical effect grants"),bGranted)) { AddError(Error.ToString()); return false; }
+    TestEqual(TEXT("One aid adds 35 percent of maximum health"),ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()),55.f);
+    TestTrue(TEXT("Synchronous healing cannot reenter the cache"),bReentrantRejected);
+    TestTrue(TEXT("A half-committed medical record cannot be saved"),bSaveRejected);
+    TestTrue(TEXT("Consumption remains spent"),Cache->IsConsumed());
+    TArray<uint8> Bytes; { FMemoryWriter Writer(Bytes); FObjectAndNameAsStringProxyArchive Ar(Writer,false); Ar.ArIsSaveGame=true; Cache->Serialize(Ar); TestFalse(TEXT("Settled cache record saves"),Ar.IsError()); }
+    auto* Reloaded=F.World->SpawnActor<ASovAurelionMedicalCache>(); Reloaded->CacheId=Cache->CacheId; Reloaded->Support=F.Support;
+    Reloaded->SetActorLocation(Cache->GetActorLocation()); Cache->Destroy(); Reloaded->Interactable->Activate();
+    { FMemoryReader Reader(Bytes); FObjectAndNameAsStringProxyArchive Ar(Reader,true); Ar.ArIsSaveGame=true; Reloaded->Serialize(Ar); TestFalse(TEXT("Consumption record deserializes"),Ar.IsError()); }
+    Reloaded->Load_Implementation();
+    TestTrue(TEXT("A fresh map instance restores consumption"),Reloaded->IsConsumed());
+    ASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetHealthAttribute(),20);
+    TestFalse(TEXT("Injury after reload does not refill an exhausted cache"),Reloaded->TryUse(F.Player,Error));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAurelionMedicalCacheAccessTest,
+    "ProjectVelkorran.Campaign.AurelionPriority.MedicalCacheRejectsWrongPriority", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FSovAurelionMedicalCacheAccessTest::RunTest(const FString& Parameters)
+{
+    using namespace SovAurelionPriorityTests;
+    FWorld F; if (!TestNotNull(TEXT("Ready campaign"),F.State)) { return false; }
+    auto* Cache=F.World->SpawnActor<ASovAurelionMedicalCache>(); Cache->CacheId=TEXT("WestCache"); Cache->Support=F.Support;
+    Cache->SetActorLocation(F.Player->GetActorLocation()+FVector(170,0,0)); Cache->Interactable->Activate();
+    auto* ASC=F.Player->GetNarrativeAbilitySystemComponent(); ASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetHealthAttribute(),20);
+    FText Error;
+    TestEqual(TEXT("Native east choice applies"),F.State->ResolveChoice(TEXT("ImmediateProtection"),TEXT("PriorityEastWalkers")),ESovCampaignResult::Applied);
+    TestFalse(TEXT("Walking around a barrier cannot claim the unselected aid"),Cache->TryUse(F.Player,Error));
+    TestFalse(TEXT("Wrong priority leaves the aid unspent"),Cache->IsConsumed());
     return true;
 }
 #endif

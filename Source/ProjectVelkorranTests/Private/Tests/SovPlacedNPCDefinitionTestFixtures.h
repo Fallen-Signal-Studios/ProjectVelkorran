@@ -10,7 +10,16 @@ class ASovPlacedNPCDefinitionTestCharacter : public ASovNPCCharacterBase
 {
 	GENERATED_BODY()
 public:
+	using ANarrativeNPCCharacter::SpawnInfo;
 	int32 DefinitionDispatches = 0;
 	bool InitializePlaced(FString& Error) { return InitializeAuthoredPlacedDefinition(Error); }
-	virtual void OnDefinitionSet_Implementation(UCharacterDefinition* NewDefinition) override { ++DefinitionDispatches; }
+	FTransform SpawnTransformAtDefinitionDispatch = FTransform::Identity;
+	FGuid SpawnIdentityAtDefinitionDispatch;
+	void SetNativeIdentityForTest(const FGuid& Identity) { NativeSaveGuid = Identity; }
+	virtual void OnDefinitionSet_Implementation(UCharacterDefinition* NewDefinition) override
+	{
+		++DefinitionDispatches;
+		SpawnTransformAtDefinitionDispatch = SpawnInfo.SpawnTransform;
+		SpawnIdentityAtDefinitionDispatch = SpawnInfo.SpawnAssignedSaveGUID;
+	}
 };

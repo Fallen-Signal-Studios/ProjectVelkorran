@@ -328,6 +328,7 @@ protected:
 
 private:
 	uint64 CombatActorInfoEpoch = 0;
+	uint64 SavedAttributeLoadEpoch = 0;
 	friend struct FSovCombatInputTestAccess;
 	uint64 InputActivationSerial = 0;
 	bool IsCombatInputWindowValid() const;

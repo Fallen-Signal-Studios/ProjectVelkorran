@@ -1,5 +1,18 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Tests/SovSaveRuntimeTestFixtures.h"
+#include "Tests/SovLifecycleTestFixtures.h"
+#include "UI/SovAurelionPauseMenu.h"
+#include "UI/SovAccessibilitySettingsMenu.h"
+#include "Framework/SovPlayerController.h"
+#include "Engine/LocalPlayer.h"
+#include "Engine/GameViewportClient.h"
+#include "CommonGameViewportClient.h"
+#include "GenericPlatform/GenericPlatformInputDeviceMapper.h"
+#include "Blueprint/WidgetTree.h"
+#include "Components/SafeZone.h"
+#include "Components/TextBlock.h"
+#include "ICommonInputModule.h"
+#include "HAL/PlatformProperties.h"
 #include "Save/SovSaveSubsystem.h"
 #include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
@@ -350,4 +363,212 @@ bool FSovSaveLegacyChecksumCompatibilityTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("Compatibility cannot accept changed label contents"), Restored->HasValidIntegrity());
     return true;
 }
+
+
+struct FSovAurelionPauseMenuTestAccess
+{
+    static void Bind(USovAurelionPauseMenu* Menu, USovSaveSubsystem* Save)
+    { Menu->BoundSave = Save; Menu->RefreshCheckpoint(); }
+    static void LoadClick(USovAurelionPauseMenu* Menu) { Menu->LoadButton->OnClicked.Broadcast(); }
+    static void ResumeClick(USovAurelionPauseMenu* Menu) { Menu->ResumeButton->OnClicked.Broadcast(); }
+    static bool Back(USovAurelionPauseMenu* Menu) { return Menu->NativeOnHandleBackAction(); }
+    static bool OffersLoad(const USovAurelionPauseMenu* Menu) { return Menu->bHasCheckpoint && Menu->LoadButton->GetIsEnabled(); }
+    static bool OffersRecovery(const USovAurelionPauseMenu* Menu) { return Menu->bAcceptRecovery; }
+    static FString Message(const USovAurelionPauseMenu* Menu) { return Menu->Message->GetText().ToString(); }
+    static bool Bound(const USovAurelionPauseMenu* Menu) { return Menu->BoundSave.IsValid(); }
+};
+namespace
+{
+    struct FAurelionPauseWorld
+    {
+        TStrongObjectPtr<UGameInstance> Instance { NewObject<UGameInstance>() };
+        TStrongObjectPtr<ULocalPlayer> LocalPlayer { NewObject<ULocalPlayer>(GEngine) };
+        TStrongObjectPtr<UCommonGameViewportClient> Viewport { NewObject<UCommonGameViewportClient>(GEngine) };
+        TStrongObjectPtr<USovSaveSubsystem> Save { NewObject<USovSaveSubsystem>(Instance.Get()) };
+        TStrongObjectPtr<USovAurelionPauseMenu> Menu;
+        UWorld* World = nullptr;
+        ASovPlayerController* PC = nullptr;
+        FMemorySaveStorage* Storage = nullptr;
+        FAurelionPauseWorld()
+        {
+            ICommonInputModule::GetSettings().LoadData();
+            const auto IVS = UWorld::InitializationValues().AllowAudioPlayback(false).CreatePhysicsScene(false)
+                .RequiresHitProxies(false).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
+            World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &IVS, true);
+            World->SetGameInstance(Instance.Get());
+            if (GEngine)
+            {
+                auto& Context = GEngine->CreateNewWorldContext(EWorldType::Game);
+                Context.SetCurrentWorld(World); Context.OwningGameInstance = Instance.Get(); Context.GameViewport = Viewport.Get();
+                Instance->OnWorldChanged(nullptr, World);
+            }
+            World->InitWorld(IVS); World->UpdateWorldComponents(!FPlatformProperties::RequiresCookedData(), false);
+            FURL URL; URL.AddOption(*(TEXT("game=") + ASovLifecycleTestGameMode::StaticClass()->GetPathName()));
+            if (!World->SetGameMode(URL)) { return; }
+            World->InitializeActorsForPlay(URL);
+            Viewport->Init(*Instance->GetWorldContext(), Instance.Get(), false);
+            PC = World->SpawnActor<ASovPlayerController>();
+            if (!PC) { return; }
+            PC->Player = LocalPlayer.Get(); LocalPlayer->PlayerController = PC; PC->SetAsLocalPlayerController(); World->AddController(PC);
+            Instance->AddLocalPlayer(LocalPlayer.Get(), IPlatformInputDeviceMapper::Get().GetPrimaryPlatformUser());
+            if (Instance->GetWorld() != World || LocalPlayer->GetGameInstance() != Instance.Get()
+                || LocalPlayer->GetLocalPlayerIndex() != 0 || LocalPlayer->GetPlatformUserId() == PLATFORMUSERID_NONE) { return; }
+            Storage = FSovSaveTestAccess::Initialize(*Save);
+            Menu.Reset(NewObject<USovAurelionPauseMenu>(PC));
+            Menu->SetOwningPlayer(PC); Menu->Initialize(); Menu->TakeWidget();
+        }
+        void Open()
+        {
+            Menu->ActivateWidget();
+            // Only save-subsystem discovery is supplied by this isolated in-memory fixture.
+            // The real widget, buttons, pause controller, storage, header reader and LoadSlot all execute unchanged.
+            FSovAurelionPauseMenuTestAccess::Bind(Menu.Get(), Save.Get());
+        }
+        ~FAurelionPauseWorld()
+        {
+            if (Menu.IsValid()) { Menu->DeactivateWidget(); static_cast<UWidget*>(Menu.Get())->ReleaseSlateResources(true); Menu.Reset(); }
+            LocalPlayer->PlayerController = nullptr;
+            Instance->RemoveLocalPlayer(LocalPlayer.Get());
+            World->DestroyWorld(false);
+            Instance->OnWorldChanged(World, nullptr);
+            if (GEngine) { GEngine->DestroyWorldContext(World); }
+        }
+    };
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAurelionNativePauseOwnership,
+    "ProjectVelkorran.UI.AurelionPause.RealButtonsPreserveForeignPause",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovAurelionNativePauseOwnership::RunTest(const FString&)
+{
+    FAurelionPauseWorld F;
+    if (!TestNotNull(TEXT("Real project controller and menu"), F.PC) || !F.Menu.IsValid()) { return false; }
+    F.Open();
+    TestTrue(TEXT("Actual native tree has a safe-area root"), F.Menu->WidgetTree && Cast<USafeZone>(F.Menu->WidgetTree->RootWidget));
+    TestTrue(TEXT("Ordinary menu activation pauses the actual game world"), F.World->IsPaused());
+    TestFalse(TEXT("Empty native profile cannot expose legacy slots"), FSovAurelionPauseMenuTestAccess::OffersLoad(F.Menu.Get()));
+    TestTrue(TEXT("Independent save failure acquires its own pause"), F.PC->AcquireSystemPause(TEXT("SaveFailure")));
+    FSovAurelionPauseMenuTestAccess::ResumeClick(F.Menu.Get());
+    TestFalse(TEXT("Actual Resume button deactivates the menu"), F.Menu->IsActivated());
+    TestTrue(TEXT("Resume preserves the foreign save-failure pause"), F.World->IsPaused());
+    TestFalse(TEXT("Retirement releases its save reference"), FSovAurelionPauseMenuTestAccess::Bound(F.Menu.Get()));
+    F.PC->ReleaseSystemPause(TEXT("SaveFailure"));
+    TestFalse(TEXT("Last real pause owner resumes simulation"), F.World->IsPaused());
+    F.Open(); TestTrue(TEXT("Second activation acquires a fresh pause"), F.World->IsPaused());
+    TestTrue(TEXT("CommonUI Back is handled"), FSovAurelionPauseMenuTestAccess::Back(F.Menu.Get()));
+    TestFalse(TEXT("Back releases this menu's pause"), F.World->IsPaused());
+    FSovAurelionPauseMenuTestAccess::LoadClick(F.Menu.Get());
+    TestFalse(TEXT("Retired control cannot start travel"), F.Save->IsLoadPending());
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAurelionCheckpointNativeMenuRecovery,
+    "ProjectVelkorran.UI.AurelionPause.NativeBankPreviewAndExplicitRecovery",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovAurelionCheckpointNativeMenuRecovery::RunTest(const FString&)
+{
+    FAurelionPauseWorld F;
+    if (!TestNotNull(TEXT("Real project controller"), F.PC) || !F.Storage || !F.Menu.IsValid()) { return false; }
+    FString Error;
+    TStrongObjectPtr<USovCampaignSaveGame> Envelope(FSovSaveTestAccess::Envelope(*F.Save));
+    Envelope->Header.Kind = ESovSaveSlotKind::Checkpoint; Envelope->Header.SlotIndex = 0;
+    if (!TestEqual(TEXT("An unrelated native campaign checkpoint is valid storage"),
+        FSovSaveTestAccess::Write(*F.Save, Envelope.Get(), Error), ESovSaveResult::Success)) { return false; }
+    F.Open();
+    TestFalse(TEXT("A different campaign checkpoint is not offered as Aurelion"), FSovAurelionPauseMenuTestAccess::OffersLoad(F.Menu.Get()));
+    Envelope->Header.MissionId = TEXT("M12_FireAndFrost"); Envelope->Header.MissionLabel = FText::FromString(TEXT("Fire and Frost"));
+    Envelope->Header.MapPackage = TEXT("/Game/Aurelion/Maps/L_Aurelion_M12");
+    // Deliberately unavailable definition: accepting recovery must still obey native required-asset validation.
+    Envelope->Header.MissionDefinition = FSoftObjectPath(TEXT("/Game/Tests/DA_MissingPauseDefinition.DA_MissingPauseDefinition"));
+    if (!TestEqual(TEXT("Aurelion checkpoint writes through actual envelope storage"),
+        FSovSaveTestAccess::Write(*F.Save, Envelope.Get(), Error), ESovSaveResult::Success)) { return false; }
+    // The second alternating write used B; corrupt only A so the actual loader offers verified B.
+    const TArray<uint8> Broken { 0, 1, 2, 3 };
+    F.Storage->Write(FSovSaveTestAccess::Name(*F.Save, ESovSaveSlotKind::Checkpoint, 0, 0), 0, Broken);
+    const auto Before = F.Storage->Slots;
+    FSovAurelionPauseMenuTestAccess::Bind(F.Menu.Get(), F.Save.Get());
+    TestTrue(TEXT("The exact Aurelion checkpoint is visible"), FSovAurelionPauseMenuTestAccess::OffersLoad(F.Menu.Get()));
+    TestTrue(TEXT("Preview displays the stored mission"), FSovAurelionPauseMenuTestAccess::Message(F.Menu.Get()).Contains(TEXT("Fire and Frost")));
+    TStrongObjectPtr<USovSaveLoadCompletionProbe> Probe(NewObject<USovSaveLoadCompletionProbe>());
+    Probe->Subsystem = F.Save.Get(); F.Save->OnLoadCompleted.AddDynamic(Probe.Get(), &USovSaveLoadCompletionProbe::OnCompleted);
+    FSovAurelionPauseMenuTestAccess::LoadClick(F.Menu.Get());
+    TestEqual(TEXT("Actual button dispatch reaches the native damaged-bank branch once"), Probe->Notifications, 1);
+    TestEqual(TEXT("Native result is recovery offered, never fabricated success"), Probe->LastResult, ESovSaveResult::RecoveryAvailable);
+    TestTrue(TEXT("Menu requires another explicit recovery click"), F.Menu->IsActivated() && FSovAurelionPauseMenuTestAccess::OffersRecovery(F.Menu.Get()));
+    TestFalse(TEXT("First click never initiates damaged-bank travel"), F.Save->IsLoadPending());
+    TestTrue(TEXT("Recovery offer includes its actual stored timestamp"), FSovAurelionPauseMenuTestAccess::Message(F.Menu.Get()).Contains(Probe->LastMessage)
+        && FSovAurelionPauseMenuTestAccess::Message(F.Menu.Get()).Contains(TEXT("UTC")));
+    AddExpectedError(TEXT("Failed to find object"), EAutomationExpectedErrorFlags::Contains, 0);
+    FSovAurelionPauseMenuTestAccess::LoadClick(F.Menu.Get());
+    TestFalse(TEXT("Explicit acceptance cannot bypass missing required content"), F.Save->IsLoadPending());
+    TestTrue(TEXT("Native validation failure keeps an actionable menu"), F.Menu->IsActivated());
+    TestFalse(TEXT("Acceptance is one click, not a persistent recovery bypass"), FSovAurelionPauseMenuTestAccess::OffersRecovery(F.Menu.Get()));
+    TestTrue(TEXT("Header inspection/rejected load preserve both banks byte-for-byte"), F.Storage->Slots.OrderIndependentCompareEqual(Before));
+    F.Save->OnLoadCompleted.RemoveDynamic(Probe.Get(), &USovSaveLoadCompletionProbe::OnCompleted);
+    return true;
+}
+
+
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCampaignMalformedSavePreambleRecovery,
+    "ProjectVelkorran.Campaign.Save.MalformedPreambleFallsBackAndPreservesRepairBytes",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCampaignMalformedSavePreambleRecovery::RunTest(const FString&)
+{
+    // Each case starts from a real verified bank and mutates only its alternate.
+    // No malformed preamble is passed directly to the unsafe engine legacy decoder.
+    for (int32 Case = 0; Case < 5; ++Case)
+    {
+        TStrongObjectPtr<UGameInstance> Instance(NewObject<UGameInstance>());
+        TStrongObjectPtr<USovSaveSubsystem> S(NewObject<USovSaveSubsystem>(Instance.Get()));
+        auto* Storage = FSovSaveTestAccess::Initialize(*S);
+        TStrongObjectPtr<USovCampaignSaveGame> Save(FSovSaveTestAccess::Envelope(*S));
+        Save->Header.Kind = ESovSaveSlotKind::Checkpoint;
+        FString Error;
+        if (!TestEqual(TEXT("Real initial envelope writes and verifies"), FSovSaveTestAccess::Write(*S, Save.Get(), Error), ESovSaveResult::Success)) { return false; }
+        const FString GoodName = FSovSaveTestAccess::Name(*S, ESovSaveSlotKind::Checkpoint, 0, 0);
+        const FString BadName = FSovSaveTestAccess::Name(*S, ESovSaveSlotKind::Checkpoint, 0, 1);
+        TArray<uint8> Good;
+        if (!TestTrue(TEXT("Read exact native serialized bytes"), Storage->Read(GoodName, 0, Good))
+            || !TestTrue(TEXT("Native envelope contains its complete preamble"), Good.Num() >= 8)) { return false; }
+        TArray<uint8> Broken = Good;
+        switch (Case)
+        {
+        case 0: Broken = { 0, 1, 2, 3 }; break;
+        case 1: Broken.Reset(); break;
+        case 2: Broken.SetNum(7); break;
+        case 3: Broken[0] ^= 1; break;
+        case 4:
+        {
+            int32 Version = 0; FMemory::Memcpy(&Version, Good.GetData() + sizeof(int32), sizeof(Version));
+            ++Version; FMemory::Memcpy(Broken.GetData() + sizeof(int32), &Version, sizeof(Version));
+            break;
+        }
+        }
+        Storage->Write(BadName, 0, Broken);
+        const auto Before = Storage->Slots;
+        bool bDamaged = false;
+        TStrongObjectPtr<USovCampaignSaveGame> Loaded(FSovSaveTestAccess::Read(*S, ESovSaveSlotKind::Checkpoint, 0, bDamaged));
+        if (!TestNotNull(FString::Printf(TEXT("Malformed preamble case%d falls back to the real valid bank"), Case), Loaded.Get())) { return false; }
+        TestTrue(TEXT("Rejected alternate is reported damaged"), bDamaged);
+        TestEqual(TEXT("Fallback preserves the verified generation"), Loaded->Header.Generation, int64(1));
+        const auto Headers = S->ListSlots();
+        TestEqual(TEXT("The public menu header reader still exposes one valid checkpoint"), Headers.Num(), 1);
+        TestTrue(TEXT("All reads preserve both exact physical byte arrays"), Storage->Slots.OrderIndependentCompareEqual(Before));
+        Save->Header.PlaySeconds = 42.;
+        if (!TestEqual(TEXT("Normal later write repairs the alternate via existing writer"), FSovSaveTestAccess::Write(*S, Save.Get(), Error), ESovSaveResult::Success)) { return false; }
+        TArray<uint8> RetainedGood; Storage->Read(GoodName, 0, RetainedGood);
+        TestTrue(TEXT("Repair never overwrites the last good bank"), RetainedGood == Good);
+        int32 Preserved = 0;
+        for (const auto& File : Storage->Slots)
+        {
+            if (File.Key.StartsWith(TEXT("0") + BadName + TEXT("_Recovery_")))
+            { ++Preserved; TestTrue(TEXT("Support recovery file retains original malformed bytes including empty input"), File.Value == Broken); }
+        }
+        TestEqual(TEXT("Exactly one preservation copy precedes the repair"), Preserved, 1);
+        Loaded.Reset(FSovSaveTestAccess::Read(*S, ESovSaveSlotKind::Checkpoint, 0, bDamaged));
+        TestTrue(TEXT("Repaired newest generation is real and no longer damaged"), Loaded.IsValid() && !bDamaged
+            && Loaded->Header.Generation == 2 && Loaded->Header.PlaySeconds == 42.);
+    }
+    return true;
+}
+
 #endif

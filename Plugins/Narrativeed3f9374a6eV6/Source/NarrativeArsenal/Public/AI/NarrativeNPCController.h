@@ -70,6 +70,8 @@ public:
 	/** Existing encounter/restore owners hold independent, idempotent suspension contributions. */
 	void SetThreatMemorySuspended(UObject* SuspensionOwner, bool bSuspend);
 	bool IsThreatMemorySuspended() const;
+	/** Read-only admission for one exact native suspension owner; expired weak owners do not count. */
+	bool IsThreatMemorySuspendedOnlyBy(const UObject* SuspensionOwner) const;
 	/** Selected archetypes must opt into these nonvisual sensing capabilities. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative|Threat") bool bRequireThreatMemoryForTargeting = false;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative|Threat") bool bAcceptNetworkThreats = false;
@@ -107,6 +109,9 @@ public:
 	//Grab the controlled NPC. This will return nullptr if NPC is controlling a car, or some other pawn. Use GetOwnedNPC() for a version that returns the NPC regardless of what GetPawn() is 
 	UFUNCTION(BlueprintPure, Category = "NarrativeNPCController")
 	ANarrativeNPCCharacter* GetControlledNPC() const;
+
+	/** Native lifecycle fence, including an unpossess/repossess of the same pawn. */
+	uint64 GetPawnAssignmentGeneration() const { return PawnAssignmentGeneration; }
 
 	UFUNCTION(BlueprintPure, Category = "NarrativeNPCController")
 	ANarrativeNPCCharacter* GetOwnedNPC() const;
@@ -186,6 +191,23 @@ private:
 	TWeakObjectPtr<AActor> InvestigationTarget;
 	FVector InvestigationPosition = FVector::ZeroVector;
 	bool bOwnsInvestigationLocation = false;
+
+	// Only the exact active goal whose attack key threat cleanup removed may
+	// recover it after fresh direct observation. These are never saved owners.
+	struct FRetiredThreatAttackTarget
+	{
+		TWeakObjectPtr<AActor> Target;
+		TWeakObjectPtr<APawn> Pawn;
+		TWeakObjectPtr<class UBlackboardComponent> Blackboard;
+		TWeakObjectPtr<class UNPCActivity> Activity;
+		TWeakObjectPtr<class UNPCGoalItem> Goal;
+		uint64 PawnAssignment = 0;
+		// A destination already owned by this activity is not a later foreign write.
+		FVector PreCleanupTargetLocation = FVector::ZeroVector;
+		bool bHadPreCleanupTargetLocation = false;
+	};
+	FRetiredThreatAttackTarget RetiredThreatAttackTarget;
+	void RestoreRetiredThreatAttackTarget();
 
 	void SetGrantedAttackToken(
 		UNarrativeAbilitySystemComponent* NewGrantedToken);
