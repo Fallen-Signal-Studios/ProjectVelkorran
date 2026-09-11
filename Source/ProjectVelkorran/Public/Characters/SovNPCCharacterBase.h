@@ -11,6 +11,9 @@ UCLASS(Blueprintable)
 class PROJECTVELKORRAN_API ASovNPCCharacterBase : public ANarrativeNPCCharacter
 {
 	GENERATED_BODY()
+#if WITH_EDITOR
+	friend class USovAurelionNPCIdentityLibrary;
+#endif
 
 public:
 	ASovNPCCharacterBase(const FObjectInitializer& ObjectInitializer);

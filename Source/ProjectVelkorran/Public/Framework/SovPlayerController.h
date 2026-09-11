@@ -27,6 +27,10 @@ public:
 	ASovPlayerController(const FObjectInitializer& ObjectInitializer);
 	UFUNCTION(BlueprintPure, Category="Campaign") USovCampaignStateComponent* GetCampaignState() const { return CampaignState; }
 	class USovConvergenceCompanionState* GetConvergenceCompanionState() const { return ConvergenceCompanionState; }
+	/** Read-only input schema; current Enhanced Input mappings still own the active keys. */
+	const class UNarrativeAbilityInputMapping* GetAbilityHUDInputMappings() const { return AbilityInputMappings.Get(); }
+	/** Read the same lifecycle gate used by native ability input, without issuing input. */
+	virtual bool IsGameplayAbilityInputSuppressed() const override;
 	UFUNCTION(BlueprintPure, Category="Narrative") class USovNarrativeCueComponent* GetNarrativeCues() const { return NarrativeCues; }
 	UFUNCTION(BlueprintPure, Category="Feedback") class USovHapticFeedbackComponent* GetHapticFeedback() const { return HapticFeedback; }
 	UFUNCTION(BlueprintPure, Category="Accessibility") class USovFrontendComponent* GetFrontend() const { return Frontend; }
@@ -60,7 +64,9 @@ public:
 	virtual bool ShouldRespawn_Implementation() const override { return false; }
 
 protected:
-	virtual bool IsGameplayAbilityInputSuppressed() const override;
+	virtual void RouteDeathNotification(AActor* KilledActor, UNarrativeAbilitySystemComponent* KilledActorASC, bool bIsDead) override;
+	/** Set to the project's existing actionable death menu. Unconfigured controllers retain stock routing. */
+	UPROPERTY(EditDefaultsOnly, Category="Campaign|Recovery") TSubclassOf<class UNarrativeMenu> FatalRecoveryFailureMenuClass;
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Campaign") TObjectPtr<USovCampaignStateComponent> CampaignState;
@@ -68,6 +74,22 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="Campaign", meta=(ClampMin="1",ClampMax="120")) float InitializationTimeoutSeconds = 30.f;
 
 private:
+	friend struct FSovFatalPresentationTestAccess;
+	void RetireFatalPresentation();
+	bool IsFatalPresentationCurrent(uint64 Serial) const;
+	void PollFatalPresentation(uint64 Serial);
+	FTimerHandle FatalPresentationTimer;
+	uint64 FatalPresentationSerial = 0;
+	uint64 FatalPresentationTransitionEpoch = 0;
+	uint64 FatalPresentationLifeEpoch = 0;
+	uint64 FatalPresentationActorInfoEpoch = 0;
+	int32 FatalPresentationReadyEpoch = 0;
+	double FatalPresentationNotBefore = 0.;
+	TWeakObjectPtr<ASovPlayerCharacterBase> FatalPresentationPawn;
+	TWeakObjectPtr<UNarrativeAbilitySystemComponent> FatalPresentationASC;
+	TWeakObjectPtr<const class UNarrativeAttributeSetBase> FatalPresentationAttributes;
+	TWeakObjectPtr<class USovFatalRecoveryComponent> FatalPresentationRecovery;
+	TWeakObjectPtr<class UNarrativeMenu> FatalPresentationMenu;
 	friend class USovSaveSubsystem;
 	friend struct FSovLifecycleTestAccess;
 	friend struct FSovTransitionCallbackTestAccess;

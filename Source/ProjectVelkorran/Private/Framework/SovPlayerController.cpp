@@ -5,9 +5,13 @@
 #include "Feedback/SovHapticFeedbackComponent.h"
 #include "UI/SovFrontendComponent.h"
 #include "UI/SovNativeGameplayHUD.h"
+#include "Recovery/SovFatalRecoveryComponent.h"
+#include "Widgets/NarrativeMenu.h"
 #include "UI/Dialogue/SovDialoguePresentationComponent.h"
 
 #include "AI/NarrativeCharacterSubsystem.h"
+#include "AI/NarrativeNPCController.h"
+#include "AI/Activities/NPCActivityComponent.h"
 #include "Campaign/SovCampaignDefinition.h"
 #include "Campaign/SovCampaignHandoffAnchor.h"
 #include "Save/SovSaveSubsystem.h"
@@ -49,6 +53,88 @@ ASovPlayerController::ASovPlayerController(const FObjectInitializer& ObjectIniti
 	DialoguePresentation = CreateDefaultSubobject<USovDialoguePresentationComponent>(TEXT("DialoguePresentation"));
 	ApplicationLifecycle = CreateDefaultSubobject<USovApplicationLifecycleComponent>(TEXT("ApplicationLifecycle"));
 	GameplayHUDClass = USovNativeGameplayHUD::StaticClass();
+}
+
+
+void ASovPlayerController::RetireFatalPresentation()
+{
+	++FatalPresentationSerial;
+	GetWorldTimerManager().ClearTimer(FatalPresentationTimer);
+	const TWeakObjectPtr<UNarrativeMenu> OldMenu = FatalPresentationMenu;
+	FatalPresentationMenu.Reset(); FatalPresentationPawn.Reset(); FatalPresentationASC.Reset();
+	FatalPresentationAttributes.Reset(); FatalPresentationRecovery.Reset();
+	if (OldMenu.IsValid()) { OldMenu->DeactivateWidget(); }
+}
+
+bool ASovPlayerController::IsFatalPresentationCurrent(uint64 Serial) const
+{
+	const ASovPlayerCharacterBase* P = FatalPresentationPawn.Get();
+	const UNarrativeAbilitySystemComponent* ASC = FatalPresentationASC.Get();
+	const UNarrativeAttributeSetBase* Attributes = FatalPresentationAttributes.Get();
+	const USovFatalRecoveryComponent* Recovery = FatalPresentationRecovery.Get();
+	return Serial == FatalPresentationSerial && IsValid(P) && IsValid(ASC) && IsValid(Attributes)
+		&& IsValid(Recovery) && GetPawn() == P && P->GetController() == this && GetNarrativeCharacter() == P
+		&& GetAbilitySystemComponent() == ASC && ASC->GetAvatarActor() == P
+		&& ASC->GetSet<UNarrativeAttributeSetBase>() == Attributes && P->GetRecoveryComponent() == Recovery
+		&& Recovery->OwnsFatalRecovery() && ASC->IsDead()
+		&& TransitionState == ESovCampaignTransitionState::Idle && TransitionEpoch == FatalPresentationTransitionEpoch
+		&& ASC->GetCombatActorInfoEpoch() == FatalPresentationActorInfoEpoch
+		&& ASC->GetCharacterReadyEpoch() == FatalPresentationReadyEpoch
+		&& Attributes->GetCombatLifeEpoch() == FatalPresentationLifeEpoch;
+}
+
+void ASovPlayerController::RouteDeathNotification(AActor* KilledActor, UNarrativeAbilitySystemComponent* KilledActorASC, bool bIsDead)
+{
+	auto* P = Cast<ASovPlayerCharacterBase>(KilledActor);
+	// Retired avatars on a persistent player ASC cannot open or close the current pawn's UI.
+	if (!IsValid(P) || !IsValid(KilledActorASC) || GetPawn() != P || P->GetController() != this
+		|| GetAbilitySystemComponent() != KilledActorASC || KilledActorASC->GetAvatarActor() != P)
+	{
+		if (!P) { Super::RouteDeathNotification(KilledActor, KilledActorASC, bIsDead); }
+		return;
+	}
+	const uint64 Serial = FatalPresentationSerial + 1;
+	RetireFatalPresentation();
+	if (Serial != FatalPresentationSerial) { return; }
+	if (!IsValid(P) || !IsValid(KilledActorASC) || GetPawn() != P || P->GetController() != this
+		|| GetAbilitySystemComponent() != KilledActorASC || KilledActorASC->GetAvatarActor() != P) { return; }
+	USovFatalRecoveryComponent* Recovery = P->GetRecoveryComponent();
+	const UNarrativeAttributeSetBase* Attributes = KilledActorASC->GetSet<UNarrativeAttributeSetBase>();
+	if (!bIsDead || !FatalRecoveryFailureMenuClass || !IsValid(Recovery) || !Recovery->OwnsFatalRecovery() || !Attributes)
+	{
+		Super::RouteDeathNotification(KilledActor, KilledActorASC, bIsDead);
+		return;
+	}
+	FatalPresentationPawn = P; FatalPresentationASC = KilledActorASC;
+	FatalPresentationAttributes = Attributes; FatalPresentationRecovery = Recovery;
+	FatalPresentationTransitionEpoch = TransitionEpoch;
+	FatalPresentationLifeEpoch = Attributes->GetCombatLifeEpoch();
+	FatalPresentationActorInfoEpoch = KilledActorASC->GetCombatActorInfoEpoch();
+	FatalPresentationReadyEpoch = KilledActorASC->GetCharacterReadyEpoch();
+	FatalPresentationNotBefore = GetWorld()->GetTimeSeconds() + 1.5;
+	// Preserve native interaction cancellation and input mapping without starting the Blueprint's unfenced latent timer.
+	ANarrativePlayerController::HandleDeath_Implementation(KilledActor, KilledActorASC, bIsDead);
+	if (!IsFatalPresentationCurrent(Serial)) { if (Serial == FatalPresentationSerial) { RetireFatalPresentation(); } return; }
+	GetWorldTimerManager().SetTimer(FatalPresentationTimer,
+		FTimerDelegate::CreateWeakLambda(this, [this, Serial]() { PollFatalPresentation(Serial); }), .05f, true);
+}
+
+void ASovPlayerController::PollFatalPresentation(uint64 Serial)
+{
+	if (Serial != FatalPresentationSerial) { return; }
+	if (!IsFatalPresentationCurrent(Serial)) { RetireFatalPresentation(); return; }
+	if (FatalPresentationRecovery->GetRecoveryState() != ESovRecoveryState::Failed
+		|| GetWorld()->GetTimeSeconds() < FatalPresentationNotBefore || FatalPresentationMenu.IsValid()) { return; }
+	const TSubclassOf<UNarrativeMenu> ExpectedClass = FatalRecoveryFailureMenuClass;
+	EnsureGameplayHUDCreated();
+	if (!IsFatalPresentationCurrent(Serial) || ExpectedClass != FatalRecoveryFailureMenuClass) { return; }
+	UNarrativeGameplayHUD* HUD = GetNarrativeGameplayHUD();
+	if (!IsValid(HUD) || !ExpectedClass) { return; }
+	UNarrativeMenu* Menu = HUD->OpenMenu(ExpectedClass, FNarrativeGameplayTags::Get().UI_Layer_Modal);
+	// Widget construction/activation can revive, hand off, or otherwise replace this exact fatal context.
+	if (!IsFatalPresentationCurrent(Serial) || HUD != GetNarrativeGameplayHUD() || ExpectedClass != FatalRecoveryFailureMenuClass)
+	{ if (IsValid(Menu)) { Menu->DeactivateWidget(); } return; }
+	FatalPresentationMenu = Menu;
 }
 
 void ASovPlayerController::BeginPlay()
@@ -419,7 +505,29 @@ void ASovPlayerController::PollCampaignInitialization(uint64 ExpectedEpoch)
 		{ FailCampaignInitialization(CompanionError.IsEmpty() ? TEXT("The protagonist companion initialization timed out.") : CompanionError); }
 		return;
 	}
-	if (TransitionEpoch != ExpectedEpoch || PendingPawn != PollPawn || PendingMission != PollMission || !IsValid(PollPawn) || GetPawn() != PollPawn) { return; }
+	if (TransitionEpoch != ExpectedEpoch || PendingPawn != PollPawn || PendingMission != PollMission || !IsValid(PollPawn) || GetPawn() != PollPawn) { return; }	if (bHasPendingRecords && !bFromLevelTravel)
+	{
+		// World records arrive before BeginPlay. Wait for their actual NPC
+		// activity owners before committing the player and reporting load success.
+		for (TActorIterator<ANarrativeNPCController> It(GetWorld()); It; ++It)
+		{
+			if (It->IsActorBeingDestroyed()) { continue; }
+			const UNPCActivityComponent* Activity = It->GetActivityComponent();
+			if (!IsValid(Activity)) { continue; }
+			if (!Activity->WasSaveRecordLoadAccepted())
+			{
+				FailCampaignInitialization(TEXT("A saved NPC activity could not restore its controller ownership."));
+				return;
+			}
+			if (Activity->HasPendingSavedActivityRestore())
+			{
+				if (GetWorld()->GetTimeSeconds() >= InitializationDeadline)
+				{ FailCampaignInitialization(TEXT("Saved NPC activity initialization timed out.")); }
+				return;
+			}
+		}
+	}
+
 	GetWorldTimerManager().ClearTimer(InitializationTimer);
 	ASovPlayerCharacterBase* const RestoringPawn = PendingPawn;
 	USovCampaignDefinition* const RestoringMission = PendingMission;
@@ -733,6 +841,7 @@ bool ASovPlayerController::TravelToMission(USovCampaignDefinition* Destination, 
 
 void ASovPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	RetireFatalPresentation();
 	if (HapticFeedback) { HapticFeedback->CancelAllFeedback(); }
 	++TransitionEpoch;
 	GetWorldTimerManager().ClearTimer(InitializationTimer);

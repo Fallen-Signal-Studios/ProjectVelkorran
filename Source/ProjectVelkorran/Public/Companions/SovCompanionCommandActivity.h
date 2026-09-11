@@ -16,6 +16,9 @@ public:
 	UPROPERTY(Transient) TObjectPtr<AActor> Target;
 	ESovCompanionCommand Command = ESovCompanionCommand::Regroup;
 	FVector HoldLocation = FVector::ZeroVector;
+	/** Explicit ordinary positioning has no co-action/campaign receipt. The fixed
+	 * point remains owned by its same-world target's lifetime. */
+	bool bExplicitHoldTarget = false;
 	FGuid RequestId;
 	virtual float GetGoalScore_Implementation() const override;
 	virtual bool ShouldCleanup_Implementation() const override;

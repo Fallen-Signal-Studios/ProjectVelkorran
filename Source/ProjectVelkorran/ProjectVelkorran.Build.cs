@@ -15,6 +15,7 @@ public class ProjectVelkorran : ModuleRules
 				"CoreUObject",
 				"Engine",
 				"AIModule",
+				"NavigationSystem",
 				"InputCore",
 				"ApplicationCore",
 				"EnhancedInput",
@@ -23,7 +24,7 @@ public class ProjectVelkorran : ModuleRules
 				"GameplayTasks",
 				"Niagara",
 				"PhysicsCore",
-				"NarrativeArsenal",
+				"NarrativeArsenal", "LevelSequence", "MovieScene",
 				"NarrativeSaveSystem",
 				"NarrativeCommonUI",
 				"UMG",
@@ -37,7 +38,7 @@ public class ProjectVelkorran : ModuleRules
 			}
 		);
 
-		PrivateDependencyModuleNames.AddRange(new string[] { "AnimGraphRuntime", "MassLOD", "NavigationSystem", "AssetRegistry", "LevelSequence", "MovieScene", "MovieSceneTracks", "Slate", "SlateCore", "OnlineSubsystem", "OnlineSubsystemUtils" });
+		PrivateDependencyModuleNames.AddRange(new string[] { "AnimGraphRuntime", "MassLOD", "AssetRegistry", "MovieSceneTracks", "Slate", "SlateCore", "OnlineSubsystem", "OnlineSubsystemUtils" });
 		if (Target.Platform == UnrealTargetPlatform.Win64)
 		{
 			PrivateDependencyModuleNames.Add("TextToSpeech");

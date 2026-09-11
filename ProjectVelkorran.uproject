@@ -13,13 +13,17 @@
 			"Name": "ProjectVelkorranEditor",
 			"Type": "Editor",
 			"LoadingPhase": "Default",
-			"TargetAllowList": [ "Editor" ]
+			"TargetAllowList": [
+				"Editor"
+			]
 		},
 		{
 			"Name": "ProjectVelkorranTests",
 			"Type": "Editor",
 			"LoadingPhase": "PostEngineInit",
-			"TargetAllowList": [ "Editor" ]
+			"TargetAllowList": [
+				"Editor"
+			]
 		}
 	],
 	"Plugins": [
@@ -34,7 +38,9 @@
 		{
 			"Name": "TextToSpeech",
 			"Enabled": true,
-			"PlatformAllowList": [ "Win64" ]
+			"PlatformAllowList": [
+				"Win64"
+			]
 		},
 		{
 			"Name": "NarrativePro",
@@ -57,9 +63,15 @@
 			"Enabled": false
 		},
 		{
+			"Name": "USDImporter",
+			"Enabled": true
+		},
+		{
 			"Name": "MetaHuman",
 			"Enabled": true,
-			"TargetAllowList": [ "Editor" ],
+			"TargetAllowList": [
+				"Editor"
+			],
 			"SupportedTargetPlatforms": [
 				"Win64",
 				"Linux"
@@ -68,7 +80,9 @@
 		{
 			"Name": "MetaHumanCoreTech",
 			"Enabled": true,
-			"TargetAllowList": [ "Editor" ],
+			"TargetAllowList": [
+				"Editor"
+			],
 			"SupportedTargetPlatforms": [
 				"Win64",
 				"Linux"
@@ -77,12 +91,16 @@
 		{
 			"Name": "MetaHumanCharacter",
 			"Enabled": true,
-			"TargetAllowList": [ "Editor" ]
+			"TargetAllowList": [
+				"Editor"
+			]
 		},
 		{
 			"Name": "MetaHumanLiveLink",
 			"Enabled": true,
-			"TargetAllowList": [ "Editor" ]
+			"TargetAllowList": [
+				"Editor"
+			]
 		},
 		{
 			"Name": "RigLogic",
@@ -95,7 +113,9 @@
 		{
 			"Name": "MetaHumanCalibrationProcessing",
 			"Enabled": true,
-			"TargetAllowList": [ "Editor" ],
+			"TargetAllowList": [
+				"Editor"
+			],
 			"SupportedTargetPlatforms": [
 				"Win64",
 				"Linux"

@@ -44,6 +44,7 @@ struct PROJECTVELKORRAN_API FSovUserSettingsSnapshot
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bReduceLensEffects = false;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bReduceCorruptionEffects = false;
 	// Local accessibility preferences: never part of the eleven-byte gameplay export.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bReduceCombatEffects = false;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) float UIScale = 1.f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bShowObjectiveText = true;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) float SubtitleScale = 1.f;
@@ -136,6 +137,7 @@ public:
 	virtual bool IsCameraShakeDisabled() const override { return Settings.bDisableCameraShake; }
 	virtual bool IsReducedLensEffectsEnabled() const override { return Settings.bReduceLensEffects; }
 	virtual bool IsReducedCorruptionEffectsEnabled() const override { return Settings.bReduceCorruptionEffects; }
+	UFUNCTION(BlueprintPure, Category="Sovereign|Settings") bool IsReducedCombatEffectsEnabled() const { return Settings.bReduceCombatEffects; }
 	bool CapturePortableSettings(TArray<uint8>& OutData) const;
 	static bool ValidatePortableSettings(const TArray<uint8>& Data, FString& Error);
 	/** Explicit opt-in import only: current local accessibility/comfort/consent settings are retained. */

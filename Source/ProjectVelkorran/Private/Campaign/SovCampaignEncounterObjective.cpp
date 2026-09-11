@@ -6,6 +6,7 @@
 #include "Campaign/SovEncounterDirector.h"
 #include "Characters/SovPlayerCharacterBase.h"
 #include "Components/BoxComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Framework/SovPlayerController.h"
@@ -22,6 +23,7 @@ ASovCampaignEncounterObjective::ASovCampaignEncounterObjective()
     StartVolume->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
     StartVolume->SetGenerateOverlapEvents(true);
     StartVolume->OnComponentBeginOverlap.AddDynamic(this, &ThisClass::HandleStartOverlap);
+    StartVolume->OnComponentEndOverlap.AddDynamic(this, &ThisClass::HandleEndOverlap);
 }
 void ASovCampaignEncounterObjective::BeginPlay()
 {
@@ -88,12 +90,16 @@ bool ASovCampaignEncounterObjective::StartEncounter(ASovPlayerCharacterBase* Pla
     if (bStarting || bExecuting || bPending)
     { Error = TEXT("Encounter objective is processing its current request."); LastError = Error; return false; }
     if (!ValidateContext(Player, Error)) { LastError = Error; return false; }
+    if (bRetryingInitialEntry && !OwnsInitialEntryRetry())
+    { Error = TEXT("Initial encounter entry was retired during validation."); LastError = Error; return false; }
     TGuardValue<bool> Starting(bStarting, true);
     BindDirector();
     const auto Current = EncounterDirector->GetEncounterState();
     EncounterDirector->bAwaitingCampaignReceipt = true;
     if (Current == ESovEncounterState::Failed)
     {
+        if (bRetryingInitialEntry)
+        { Error = TEXT("Initial entry polling never retries a failed combat attempt."); LastError = Error; return false; }
         const bool bStarted = EncounterDirector->RetryEncounter(Error); LastError = Error; return bStarted;
     }
     if (Current == ESovEncounterState::Succeeded && OwnsAttempt(Attempt, Current) && !HasRequiredReceiverProof())
@@ -104,6 +110,8 @@ bool ASovCampaignEncounterObjective::StartEncounter(ASovPlayerCharacterBase* Pla
     if (!EncounterDirector->HasEncounterPlayer(Player) && !EncounterDirector->CaptureEntryCheckpoint(Player, Error))
     { LastError = Error; return false; }
     if (!ValidateContext(Player, Error) || !EncounterDirector->HasEncounterPlayer(Player)) { LastError = Error; return false; }
+    if (bRetryingInitialEntry && !OwnsInitialEntryRetry())
+    { Error = TEXT("Initial encounter entry was retired during checkpoint capture."); LastError = Error; return false; }
     const bool bStarted = EncounterDirector->BeginEncounter();
     if (!bStarted && Error.IsEmpty()) { Error = TEXT("Encounter entry was not released. Check its restore failure and save status."); }
     LastError = Error; return bStarted;
@@ -114,13 +122,100 @@ void ASovCampaignEncounterObjective::HandleStartOverlap(UPrimitiveComponent* Com
     if (bStartOnPlayerOverlap && HasAuthority())
     {
         if (auto* Player = Cast<ASovPlayerCharacterBase>(Actor))
-        { FString Error; if (!StartEncounter(Player, Error)) { LastError = Error; } }
+        {
+            // Multiple overlapping body components must not reset the same retry cadence.
+            if (InitialEntry.Player == Player && OwnsInitialEntryRetry()) { return; }
+            FString Error;
+            if (!StartEncounter(Player, Error))
+            { LastError = Error; ArmInitialEntryRetry(Player); }
+        }
     }
 }
+void ASovCampaignEncounterObjective::ArmInitialEntryRetry(ASovPlayerCharacterBase* Player)
+{
+    StopInitialEntryRetry();
+    if (!bRetryInitialEntryWhileOverlapping || !bStartOnPlayerOverlap || !IsValid(Player)) { return; }
+    auto* PC = Cast<ASovPlayerController>(Player->GetController());
+    auto* ASC = Cast<UNarrativeAbilitySystemComponent>(Player->GetAbilitySystemComponent());
+    auto* State = PC ? PC->GetCampaignState() : nullptr;
+    if (!PC || !ASC || !State || !IsValid(EncounterDirector)) { return; }
+    InitialEntry.Player = Player; InitialEntry.Controller = PC; InitialEntry.ASC = ASC; InitialEntry.State = State;
+    InitialEntry.Mission = State->GetActiveMission(); InitialEntry.Director = EncounterDirector;
+    InitialEntry.MissionId = MissionId; InitialEntry.BeatId = CompletionBeat; InitialEntry.EncounterId = EncounterDirector->EncounterId;
+    InitialEntry.ReadyEpoch = ASC->GetCharacterReadyEpoch(); InitialEntry.ActorInfoEpoch = ASC->GetCombatActorInfoEpoch();
+    InitialEntry.TransitionEpoch = PC->GetCampaignTransitionEpoch(); InitialEntry.DirectorGeneration = EncounterDirector->GetLifecycleGeneration();
+    InitialEntryVolume = StartVolume;
+    if (!OwnsInitialEntryRetry()) { StopInitialEntryRetry(); return; }
+    BindDirector();
+    State->OnCampaignStateRestored.AddUniqueDynamic(this, &ThisClass::HandleInitialEntryCampaignRestored);
+    State->OnMissionChanged.AddUniqueDynamic(this, &ThisClass::HandleInitialEntryMissionChanged);
+    GetWorldTimerManager().SetTimer(InitialEntryTimer, this, &ThisClass::RetryInitialEntry, .2f, true);
+}
+bool ASovCampaignEncounterObjective::OwnsInitialEntryRetry() const
+{
+    const auto* Player = InitialEntry.Player.Get(); const auto* PC = InitialEntry.Controller.Get();
+    const auto* ASC = InitialEntry.ASC.Get(); const auto* State = InitialEntry.State.Get();
+    const auto* Mission = InitialEntry.Mission.Get(); const auto* Beat = Mission ? Mission->FindBeat(InitialEntry.BeatId) : nullptr;
+    const auto* Capsule = Player ? Player->GetCapsuleComponent() : nullptr;
+    if (!HasAuthority() || GetNetMode() != NM_Standalone || bEnding || IsActorBeingDestroyed()
+        || !bStartOnPlayerOverlap || !bRetryInitialEntryWhileOverlapping
+        || !Player || Player->IsActorBeingDestroyed() || Player->GetWorld() != GetWorld()
+        || !PC || PC->IsActorBeingDestroyed() || PC->GetWorld() != GetWorld() || PC->GetPawn() != Player || Player->GetController() != PC
+        || !ASC || Player->GetAbilitySystemComponent() != ASC || ASC->GetAvatarActor() != Player
+        || !Player->IsCharacterReady() || !Player->IsAlive() || ASC->GetCharacterReadyEpoch() != InitialEntry.ReadyEpoch
+        || ASC->GetCombatActorInfoEpoch() != InitialEntry.ActorInfoEpoch || PC->GetCampaignTransitionEpoch() != InitialEntry.TransitionEpoch
+        || PC->GetCampaignTransitionState() != ESovCampaignTransitionState::Idle
+        || !State || PC->GetCampaignState() != State || !State->IsStateValid() || State->IsMutationInProgress()
+        || !Mission || State->GetActiveMission() != Mission || !Beat || Mission->MissionId != MissionId
+        || MissionId != InitialEntry.MissionId || CompletionBeat != InitialEntry.BeatId
+        || State->GetActiveProtagonist() != Player->GetProtagonistIdentityTag() || Beat->RequiredProtagonist != Player->GetProtagonistIdentityTag()
+        || !InitialEntry.Director.IsValid() || EncounterDirector != InitialEntry.Director.Get()
+        || EncounterDirector->IsActorBeingDestroyed() || EncounterDirector->GetWorld() != GetWorld()
+        || EncounterDirector->GetEncounterState() != ESovEncounterState::Inactive
+        || EncounterDirector->GetLifecycleGeneration() != InitialEntry.DirectorGeneration || EncounterDirector->EncounterId != InitialEntry.EncounterId
+        || Beat->RequiredEncounterId != EncounterDirector->EncounterId
+        || !InitialEntryVolume.IsValid() || StartVolume != InitialEntryVolume.Get() || StartVolume->GetOwner() != this
+        || !StartVolume->IsRegistered() || !StartVolume->IsQueryCollisionEnabled() || !StartVolume->GetGenerateOverlapEvents()
+        || !Capsule || !Capsule->IsRegistered() || !StartVolume->IsOverlappingComponent(Capsule)) { return false; }
+    const auto Status = State->GetObjectiveState(MissionId, CompletionBeat);
+    return Status == ESovObjectiveState::Available || Status == ESovObjectiveState::Active;
+}
+void ASovCampaignEncounterObjective::RetryInitialEntry()
+{
+    if (!OwnsInitialEntryRetry()) { StopInitialEntryRetry(); return; }
+    if (bStarting || bExecuting || bPending) { return; }
+    const uint64 Serial = InitialEntrySerial;
+    FString Error;
+    TGuardValue<bool> InitialEntryScope(bRetryingInitialEntry, true);
+    // Exactly the ordinary entry validation/capture/release path. OwnsInitialEntryRetry
+    // rejects Failed before this call, so the existing explicit combat retry is unreachable.
+    const bool bStarted = StartEncounter(InitialEntry.Player.Get(), Error);
+    if (Serial != InitialEntrySerial) { return; }
+    if (bStarted || !OwnsInitialEntryRetry()) { StopInitialEntryRetry(); }
+}
+void ASovCampaignEncounterObjective::StopInitialEntryRetry()
+{
+    ++InitialEntrySerial;
+    if (GetWorld()) { GetWorldTimerManager().ClearTimer(InitialEntryTimer); }
+    if (InitialEntry.State.IsValid())
+    {
+        InitialEntry.State->OnCampaignStateRestored.RemoveDynamic(this, &ThisClass::HandleInitialEntryCampaignRestored);
+        InitialEntry.State->OnMissionChanged.RemoveDynamic(this, &ThisClass::HandleInitialEntryMissionChanged);
+    }
+    InitialEntry = {}; InitialEntryVolume.Reset();
+}
+void ASovCampaignEncounterObjective::HandleEndOverlap(UPrimitiveComponent* Component, AActor* Actor,
+    UPrimitiveComponent* OtherComponent, int32 BodyIndex)
+{
+    if (Actor == InitialEntry.Player.Get() && !OwnsInitialEntryRetry()) { StopInitialEntryRetry(); }
+}
+void ASovCampaignEncounterObjective::HandleInitialEntryCampaignRestored(bool bValid) { StopInitialEntryRetry(); }
+void ASovCampaignEncounterObjective::HandleInitialEntryMissionChanged(FName ChangedMissionId, bool bSucceeded) { StopInitialEntryRetry(); }
 void ASovCampaignEncounterObjective::HandleEncounterState(ESovEncounterState Previous, ESovEncounterState Current)
 {
     if (bEnding || !HasAuthority() || !BoundDirector.IsValid() || BoundDirector.Get() != EncounterDirector
         || EncounterDirector->GetEncounterState() != Current) { return; }
+    if (Current != ESovEncounterState::Inactive) { StopInitialEntryRetry(); }
     if (Current == ESovEncounterState::Active)
     {
         RetireAttempt(); FString Error;
@@ -302,7 +397,7 @@ void ASovCampaignEncounterObjective::HandleCampaignRestored(bool bValid) { Retir
 void ASovCampaignEncounterObjective::HandleMissionChanged(FName ChangedMissionId, bool bSucceeded) { RetireAttempt(); }
 void ASovCampaignEncounterObjective::EndPlay(EEndPlayReason::Type Reason)
 {
-    bEnding = true; RetireAttempt();
+    bEnding = true; StopInitialEntryRetry(); RetireAttempt();
     if (BoundDirector.IsValid()) { BoundDirector->OnEncounterStateChanged.RemoveDynamic(this, &ThisClass::HandleEncounterState); }
     Super::EndPlay(Reason);
 }

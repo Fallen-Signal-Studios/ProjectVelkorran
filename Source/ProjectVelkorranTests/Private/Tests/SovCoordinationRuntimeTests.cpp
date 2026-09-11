@@ -7,6 +7,8 @@
 #include "Campaign/SovEncounterDirector.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "Character/NarrativeCharacterVisual.h"
+#include "Components/SceneComponent.h"
 #include "GAS/NarrativeAttributeSetBase.h"
 #include "Misc/AutomationTest.h"
 #include "NarrativeGameplayTags.h"
@@ -222,6 +224,95 @@ bool FSovCoordinationAdmissionTest::RunTest(const FString& Parameters)
 	FSovCoordinationTestAccess::Stop(Test.Director);
 	TestFalse(TEXT("Attempt failure invalidates an active reservation"), ASC(Second)->IsBotAttackExecutionValid(Test.Player, SecondHandle));
 	TestFalse(TEXT("Stale cue cannot authorize another attempt"), Coordination->AcknowledgeOffscreenWarning(Warning));
+	return true;
+}
+namespace
+{
+	ANarrativeCharacterVisual* MakeReservedTestVisual(FCoordinationWorld& Fixture, ASovCoordinationTestNPC* Character)
+	{
+		auto* Visual = Fixture.World->SpawnActor<ANarrativeCharacterVisual>();
+		if (!Visual) { return nullptr; }
+		Visual->SetOwner(Character);
+		Visual->AttachToActor(Character, FAttachmentTransformRules::KeepRelativeTransform);
+		Character->PublishTestVisual(Visual);
+		return Visual;
+	}
+	AActor* MakeReservedTestAttachment(FCoordinationWorld& Fixture, AActor* Parent, AActor* LogicalOwner)
+	{
+		auto* Actor = Fixture.World->SpawnActor<AActor>();
+		if (!Actor) { return nullptr; }
+		auto* Root = NewObject<USceneComponent>(Actor);
+		Actor->AddInstanceComponent(Root); Actor->SetRootComponent(Root); Root->RegisterComponent();
+		Actor->SetOwner(LogicalOwner); Actor->AttachToActor(Parent, FAttachmentTransformRules::KeepRelativeTransform);
+		return Actor;
+	}
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovReservedPresentationTest,
+	"ProjectVelkorran.Campaign.Encounter.Coordination.ReservedVisualsAndLateAttachmentsPreserveFlags",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FSovReservedPresentationTest::RunTest(const FString& Parameters)
+{
+	FCoordinationWorld Fixture;
+	auto* First = Fixture.Add(TEXT("First"), FVector(200, 0, 0));
+	auto* Future = Fixture.Add(TEXT("Future"), FVector(400, 0, 0), 1);
+	auto* CurrentVisual = MakeReservedTestVisual(Fixture, First);
+	auto* Visual = MakeReservedTestVisual(Fixture, Future);
+	if (!CurrentVisual || !Visual) { AddError(TEXT("Actual separate Narrative visuals failed to spawn")); return false; }
+	auto* Weapon = MakeReservedTestAttachment(Fixture, Visual, Future);
+	auto* AlreadyHidden = MakeReservedTestAttachment(Fixture, Visual, Visual);
+	auto* Foreign = MakeReservedTestAttachment(Fixture, Visual, nullptr);
+	if (!Weapon || !AlreadyHidden || !Foreign) { AddError(TEXT("Attachment fixtures failed to spawn")); return false; }
+	AlreadyHidden->SetActorHiddenInGame(true); AlreadyHidden->SetActorEnableCollision(false);
+	auto* Coordination = Fixture.Director->GetCoordinationComponent();
+	FSovCoordinationTestAccess::Start(Fixture.Director, Fixture.Player);
+	TestTrue(TEXT("Reserved character, separate body and owned weapon are all hidden"), Future->IsHidden() && Visual->IsHidden() && Weapon->IsHidden());
+	TestFalse(TEXT("Reserved visual actor cannot block a shot"), Visual->GetActorEnableCollision());
+	TestFalse(TEXT("Reserved weapon actor cannot block a shot"), Weapon->GetActorEnableCollision());
+	TestTrue(TEXT("Active wave presentation remains unchanged"), !First->IsHidden() && !CurrentVisual->IsHidden() && CurrentVisual->GetActorEnableCollision());
+	TestTrue(TEXT("Merely attached foreign actor is untouched"), !Foreign->IsHidden() && Foreign->GetActorEnableCollision());
+	auto* LateWeapon = MakeReservedTestAttachment(Fixture, Visual, Visual);
+	FSovCoordinationTestAccess::Step(Coordination);
+	TestTrue(TEXT("Existing coordination cadence observes a later async attachment"), LateWeapon && LateWeapon->IsHidden() && !LateWeapon->GetActorEnableCollision());
+	auto* ReplacementVisual = MakeReservedTestVisual(Fixture, Future);
+	TestTrue(TEXT("Actual visual-published delegate immediately suspends a late body"), ReplacementVisual && ReplacementVisual->IsHidden() && !ReplacementVisual->GetActorEnableCollision());
+	TestEqual(TEXT("Visibility staging does not write resources"), ASC(Future)->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()), 100.f);
+	CastChecked<USovCoordinationTestASC>(ASC(First))->SeedDead(true);
+	FSovCoordinationTestAccess::Step(Coordination);
+	TestEqual(TEXT("Normal confirmed wave policy promotes the next roster"), Coordination->GetCurrentWave(), 1);
+	TestTrue(TEXT("Promotion restores previous visible/colliding body and weapon flags"), !Visual->IsHidden() && Visual->GetActorEnableCollision() && !Weapon->IsHidden() && Weapon->GetActorEnableCollision());
+	TestTrue(TEXT("Previously hidden noncolliding attachment remains so"), AlreadyHidden->IsHidden() && !AlreadyHidden->GetActorEnableCollision());
+	TestTrue(TEXT("Late body and weapon restore their captured authored states"), !ReplacementVisual->IsHidden() && ReplacementVisual->GetActorEnableCollision() && !LateWeapon->IsHidden() && LateWeapon->GetActorEnableCollision());
+	auto* ReleasedVisual = MakeReservedTestVisual(Fixture, Future);
+	TestTrue(TEXT("A stale visual delegate cannot restage a released wave"), ReleasedVisual && !ReleasedVisual->IsHidden() && ReleasedVisual->GetActorEnableCollision());
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovReservedPresentationReentryTest,
+	"ProjectVelkorran.Campaign.Encounter.Coordination.ReservedPresentationReleaseRespectsNewOwners",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FSovReservedPresentationReentryTest::RunTest(const FString& Parameters)
+{
+	FCoordinationWorld Fixture;
+	Fixture.Add(TEXT("First"), FVector(200, 0, 0));
+	auto* Future = Fixture.Add(TEXT("Future"), FVector(400, 0, 0), 1);
+	auto* Visual = MakeReservedTestVisual(Fixture, Future);
+	auto* Weapon = MakeReservedTestAttachment(Fixture, Visual, Future);
+	auto* Adopted = MakeReservedTestAttachment(Fixture, Visual, Future);
+	if (!Visual || !Weapon || !Adopted) { AddError(TEXT("Presentation fixtures failed")); return false; }
+	Adopted->SetActorHiddenInGame(true); Adopted->SetActorEnableCollision(false);
+	auto* Coordination = Fixture.Director->GetCoordinationComponent();
+	FSovCoordinationTestAccess::Start(Fixture.Director, Fixture.Player);
+	Adopted->SetOwner(Fixture.Player); Adopted->SetActorHiddenInGame(false); Adopted->SetActorEnableCollision(true);
+	auto* Probe = NewObject<USovCoordinationCollisionProbe>(Visual);
+	Visual->AddInstanceComponent(Probe); Probe->RegisterComponent();
+	Probe->OnEnabled = [Coordination, Future]() { FSovCoordinationTestAccess::Stage(Coordination, TEXT("Future"), Future); };
+	FSovCoordinationTestAccess::ReleaseStage(Coordination, TEXT("Future"));
+	TestTrue(TEXT("A collision callback can establish a newer exact staging lease"), Future->IsHidden() && Visual->IsHidden() && Weapon->IsHidden());
+	TestTrue(TEXT("New lease preserves collision suspension"), !Visual->GetActorEnableCollision() && !Weapon->GetActorEnableCollision());
+	TestTrue(TEXT("Old lease cannot change an actor adopted by another owner"), !Adopted->IsHidden() && Adopted->GetActorEnableCollision());
+	FSovCoordinationTestAccess::ReleaseStage(Coordination, TEXT("Future"));
+	TestTrue(TEXT("Last release restores original body/weapon state, not an inherited hidden baseline"), !Future->IsHidden() && !Visual->IsHidden() && Visual->GetActorEnableCollision() && !Weapon->IsHidden() && Weapon->GetActorEnableCollision());
 	return true;
 }
 #endif

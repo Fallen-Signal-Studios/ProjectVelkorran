@@ -3,6 +3,8 @@
 #include "Tests/SovAxiomRuntimeTestFixtures.h"
 #include "Campaign/SovEncounterDirector.h"
 #include "Character/PlayerDefinition.h"
+#include "Character/NarrativeCharacterVisual.h"
+#include "Weapons/WeaponVisual.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "Framework/SovPlayerState.h"
@@ -24,6 +26,10 @@ struct FSovEncounterCallbackTestAccess
         Director->RestoreController = Player->GetController(); Director->RestorePlayerState = Player->GetPlayerState<ASovPlayerState>(); Director->RestorePlayerASC = Player->GetNarrativeAbilitySystemComponent();
     }
     static void Finish(ASovEncounterDirector* Director) { Director->FinishRestore(); }
+    static void SeedAttempt(ASovEncounterDirector* Director, ASovPlayerCharacterBase* Player)
+    { Director->State = ESovEncounterState::Failed; Director->EncounterPlayer = Player; }
+    static void SeedLegacyActor(ASovEncounterDirector* Director, AActor* Actor) { Director->AttemptActors.AddUnique(Actor); }
+    static void Cleanup(ASovEncounterDirector* Director) { Director->CleanupAttemptActors(); }
 };
 struct FSovTransitionCallbackTestAccess
 {
@@ -51,6 +57,31 @@ struct FRestoreWorld
     }
     ~FRestoreWorld() { if (World) { World->DestroyWorld(false); if (GEngine) { GEngine->DestroyWorldContext(World); } } }
 };
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovRetryPreservesPresentationTest, "ProjectVelkorran.Campaign.Encounter.RetryPreservesCharacterAndWeaponVisuals",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovRetryPreservesPresentationTest::RunTest(const FString& Parameters)
+{
+    FRestoreWorld F;
+    auto* Director = F.World->SpawnActor<ASovEncounterDirector>();
+    auto* Pawn = F.World->SpawnActor<ASovHandoffRuntimeTestPawn>();
+    auto* Visual = F.World->SpawnActor<ANarrativeCharacterVisual>();
+    auto* WeaponVisual = F.World->SpawnActor<AWeaponVisual>();
+    auto* Projectile = F.World->SpawnActor<AActor>();
+    if (!Director || !Pawn || !Visual || !WeaponVisual || !Projectile) { return false; }
+    FSovEncounterCallbackTestAccess::SeedAttempt(Director, Pawn);
+    Visual->SetOwner(Pawn); WeaponVisual->SetOwner(Pawn); Projectile->SetOwner(WeaponVisual);
+    TestFalse(TEXT("Player appearance is not disposable encounter content"), Director->RegisterAttemptActor(Visual));
+    TestFalse(TEXT("Equipped weapon presentation is not disposable encounter content"), Director->RegisterAttemptActor(WeaponVisual));
+    TestTrue(TEXT("A projectile owned through the weapon remains attempt content"), Director->RegisterAttemptActor(Projectile));
+    // Old checkpoints may already contain the formerly overbroad classification.
+    FSovEncounterCallbackTestAccess::SeedLegacyActor(Director, Visual);
+    FSovEncounterCallbackTestAccess::SeedLegacyActor(Director, WeaponVisual);
+    FSovEncounterCallbackTestAccess::Cleanup(Director);
+    TestTrue(TEXT("Retry preserves the existing character visual"), IsValid(Visual) && !Visual->IsActorBeingDestroyed());
+    TestTrue(TEXT("Retry preserves the existing weapon visual"), IsValid(WeaponVisual) && !WeaponVisual->IsActorBeingDestroyed());
+    TestTrue(TEXT("Retry still retires attributed projectiles"), !IsValid(Projectile) || Projectile->IsActorBeingDestroyed());
+    return true;
 }
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovSuspensionCallbackRuntimeTest, "ProjectVelkorran.Campaign.Encounter.SuspensionCallbackOwnership",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)

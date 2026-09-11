@@ -48,6 +48,8 @@ struct FSovEncounterNPCRecord
 	UPROPERTY(SaveGame) bool bRequiredForVictory = true;
 	UPROPERTY(SaveGame) bool bAllowMassRepresentation = false;
 	UPROPERTY(SaveGame) FNarrativeActorRecord ActorRecord;
+	/** AActor::Tags is not SaveGame; retain semantic story bindings across native replacement. */
+	UPROPERTY(SaveGame) TArray<FName> ActorTags;
 	UPROPERTY(SaveGame) TSoftObjectPtr<UNPCDefinition> Definition;
 	UPROPERTY(SaveGame) FNPCSpawnInfo SpawnInfo;
 	/** Narrative's FNPCSpawnParams fields lack SaveGame flags; retain authored overrides explicitly. */
@@ -90,6 +92,14 @@ public:
 	/** Stable and globally unique (e.g. M01.Courtyard); never rename after shipping saves. */
 	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Encounter") FName EncounterId;
 	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Replicated, Category = "Encounter") TArray<FSovEncounterParticipant> Participants;
+	/** Keep authored participants under this director's existing checkpoint hold until entry begins.
+	 * Readiness still initializes; no wave is hidden or released before the checkpoint exists. */
+	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="Encounter|Entry") bool bHoldParticipantsBeforeEntry = false;
+	UPROPERTY(Transient, BlueprintReadOnly, Category="Encounter|Entry") FString PreEntryHoldError;
+	/** Authoring opt-out for story cast before entry; actual checkpoint capture still freezes the full roster. */
+	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="Encounter|Entry") bool bHoldNonVictoryParticipantsBeforeEntry = true;
+	/** Exact, exclusive native pre-entry lease; permits fresh link setup without admitting another busy owner. */
+	bool IsOwnedPreEntryHold(const ASovNPCCharacterBase* NPC) const;
 	/** Registered non-victory NPCs whose death fails this attempt. Kept as actors throughout combat. */
 	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="Encounter|Protection") TSet<FName> ProtectedParticipantIds;
 	/** Current native confirmed-defeat and survivor result; scripted empty completion is not campaign proof. */
@@ -110,6 +120,8 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Encounter") bool HasEncounterPlayer(const AActor* Actor) const;
 	ASovPlayerCharacterBase* GetEncounterPlayer() const { return EncounterPlayer; }
 	UFUNCTION(BlueprintPure, Category="Encounter") class USovEncounterCoordinationComponent* GetCoordinationComponent() const { return Coordination; }
+	/** Current native death receipt; arbitrary destruction is never a defeat. */
+	bool HasConfirmedParticipantDefeat(FName ParticipantId) const;
 	/** Save admission may ignore only these registered, frozen entry participants. */
 	bool IsEntryCheckpointQuiescentForSave(const ASovPlayerCharacterBase* Player) const;
 	UFUNCTION(BlueprintPure, Category = "Encounter") FGuid GetAttemptId() const { return AttemptId; }
@@ -173,10 +185,13 @@ private:
 	friend struct FSovCampaignMassTestAccess;
 	friend struct FSovEncounterCallbackTestAccess;
 	friend struct FSovCoordinationTestAccess;
+	friend struct FSovObjectivePresentationTestAccess;
 	friend struct FSovCrucibleRuntimeTestAccess;
+	friend struct FSovRelayRuntimeTestAccess;
 	friend class ASovCampaignEncounterObjective;
 	friend class ASovAurelionLinkPhaseDirector;
 	friend class ASovAurelionThermalPhaseDirector;
+	friend class ASovAurelionThermalTestDirector;
 	UPROPERTY(VisibleAnywhere, Category="Encounter") TObjectPtr<class USovEncounterCoordinationComponent> Coordination;
 	bool bPlayerAndControllerRestored = false;
 	void SetState(ESovEncounterState NewState);
@@ -188,7 +203,15 @@ private:
 	void CleanupAttemptActors();
 	bool CleanupAttemptActors(TFunctionRef<bool()> CanContinue);
 	void HandleActorSpawned(AActor* Actor);
-	void SuspendActor(AActor* Actor);
+	void SuspendActor(AActor* Actor, bool bSuspendAbilitySystem = true);
+	void RefreshPreEntryHold();
+	/** A loaded checkpoint remains Failed until explicit retry; transient owners can initialize later. */
+	void RefreshLoadedParticipantHold();
+	bool bMaintainLoadedParticipantHold = false;
+	uint64 LoadedParticipantHoldGeneration = 0;
+	double NextLoadedParticipantHoldAt = 0.;
+	double NextPreEntryHoldAt = 0.;
+	bool bRefreshingPreEntryHold = false;
 	void ReleaseSuspensions();
 	bool ReleaseSuspensions(TFunctionRef<bool()> CanContinue);
 	bool ReleaseActorSuspension(AActor* Actor, TFunctionRef<bool()> CanContinue);

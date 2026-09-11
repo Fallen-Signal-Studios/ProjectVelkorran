@@ -1,5 +1,7 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "UI/SovCombatVitalsWidget.h"
+#include "UI/SovHUDStyle.h"
+#include "Sovereign/SovGameplayTags.h"
 #include "Tests/SovReadinessRuntimeTestFixtures.h"
 #include "Character/PlayerDefinition.h"
 #include "Blueprint/WidgetTree.h"
@@ -257,6 +259,28 @@ bool FSovCombatVitalsContextLayoutTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("A full replacement does not inherit outgoing stamina history"), StaminaRow->GetVisibility(), ESlateVisibility::Collapsed);
     TestEqual(TEXT("Projection does not change replacement stamina"), ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetStaminaAttribute()), 80.f);
     F.PC->Player = nullptr; LocalPlayer->PlayerController = nullptr;
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCombatHUDIdentityTest,
+    "ProjectVelkorran.Campaign.Frontend.ProtagonistHUDIdentitySurvivesHighContrast",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCombatHUDIdentityTest::RunTest(const FString&)
+{
+    const auto& Tags = FSovGameplayTags::Get();
+    const auto Tarrik = SovHUDStyle::ForProtagonist(Tags.Character_Player_Tarrik, false);
+    const auto Selene = SovHUDStyle::ForProtagonist(Tags.Character_Player_Selene, false);
+    TestTrue(TEXT("Tarrik has the closed shield frame"), Tarrik.Frame == SovHUDStyle::EFrame::Shield);
+    TestTrue(TEXT("Selene has the distinct split frame"), Selene.Frame == SovHUDStyle::EFrame::Split);
+    TestFalse(TEXT("Known protagonists have distinct identity text"), Tarrik.Identity.EqualTo(Selene.Identity));
+    const auto ContrastTarrik = SovHUDStyle::ForProtagonist(Tags.Character_Player_Tarrik, true);
+    const auto ContrastSelene = SovHUDStyle::ForProtagonist(Tags.Character_Player_Selene, true);
+    TestEqual(TEXT("High contrast uses a white signal"), ContrastTarrik.Accent, FLinearColor::White);
+    TestEqual(TEXT("High contrast does not depend on a faction hue"), ContrastSelene.Accent, FLinearColor::White);
+    TestTrue(TEXT("Frame distinction survives removal of color"), ContrastTarrik.Frame != ContrastSelene.Frame);
+    TestTrue(TEXT("Stable identity text survives high contrast"), ContrastTarrik.Identity.EqualTo(Tarrik.Identity)
+        && ContrastSelene.Identity.EqualTo(Selene.Identity));
+    TestTrue(TEXT("An unknown owner cannot masquerade as either protagonist"),
+        SovHUDStyle::ForProtagonist(FGameplayTag(), false).Frame == SovHUDStyle::EFrame::Neutral);
     return true;
 }
 #endif

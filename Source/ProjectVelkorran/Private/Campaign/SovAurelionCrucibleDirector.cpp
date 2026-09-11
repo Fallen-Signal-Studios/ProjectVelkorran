@@ -1,11 +1,13 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Campaign/SovAurelionCrucibleDirector.h"
+#include "Campaign/SovEncounterCoordinationComponent.h"
 #include "Campaign/SovCampaignEncounterObjective.h"
 #include "Campaign/SovCampaignHandoffAnchor.h"
 #include "Campaign/SovCampaignStateComponent.h"
 #include "Characters/SovNPCCharacterBase.h"
 #include "Characters/SovPlayerCharacterBase.h"
 #include "Components/SovAurelionThermalFractureComponent.h"
+#include "Components/SovCommandLinkComponent.h"
 #include "AI/NarrativeNPCController.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -13,6 +15,7 @@
 #include "GAS/NarrativeAbilitySystemComponent.h"
 #include "GAS/NarrativeAttributeSetBase.h"
 #include "Sovereign/SovGameplayTags.h"
+#include "UObject/StrongObjectPtr.h"
 
 ASovAurelionLinkPhaseDirector::ASovAurelionLinkPhaseDirector()
 {
@@ -29,7 +32,7 @@ USovCommandLinkComponent* ASovAurelionLinkPhaseDirector::ResolveLink(const FSovA
 }
 void ASovAurelionLinkPhaseDirector::UnbindLinks()
 {
-    for (auto* Link : BoundLinks)
+    for (USovCommandLinkComponent* Link : BoundLinks)
     { if (IsValid(Link)) { Link->OnCommandLinkSevered.RemoveDynamic(this, &ThisClass::HandleLinkSever); } }
     BoundLinks.Reset();
 }
@@ -94,6 +97,24 @@ void ASovAurelionLinkPhaseDirector::HandleLinkSever(const FSovCommandLinkSeverRe
         || Receipt.TransactionId.IsValid()) { return; }
     Receipt.TransactionId = Result.TransactionId;
 }
+bool ASovAurelionLinkPhaseDirector::HasAcceptedCurrentLinkReceipt() const
+{
+    if (!HasAuthority() || IsActorBeingDestroyed() || bPhaseMutation || GetEncounterState() != ESovEncounterState::Active
+        || !ProofAttemptId.IsValid() || GetAttemptId() != ProofAttemptId || !LastPhaseError.IsEmpty()
+        || !ProofPlayer.IsValid() || !ProofController.IsValid() || !ProofASC.IsValid()
+        || ProofController->GetPawn() != ProofPlayer.Get() || ProofPlayer->GetController() != ProofController.Get()
+        || GetEncounterPlayer() != ProofPlayer.Get() || ProofPlayer->GetNarrativeAbilitySystemComponent() != ProofASC.Get()
+        || ProofASC->GetAvatarActor() != ProofPlayer.Get() || !ProofPlayer->IsCharacterReady() || !ProofPlayer->IsAlive()
+        || ProofASC->GetCharacterReadyEpoch() != ProofReadyEpoch || ProofASC->GetCombatActorInfoEpoch() != ProofActorInfoEpoch
+        || ProofController->GetCampaignTransitionEpoch() != ProofTransitionEpoch || RequiredLinks.Num() != 2 || LinkReceipts.Num() != 2) { return false; }
+    for (int32 Index = 0; Index < RequiredLinks.Num(); ++Index)
+    {
+        const auto& Receipt = LinkReceipts[Index];
+        if (Receipt.LinkId == RequiredLinks[Index].LinkId && Receipt.InstanceId.IsValid() && Receipt.TransactionId.IsValid()) { return true; }
+    }
+    return false;
+}
+
 bool ASovAurelionLinkPhaseDirector::HasLinkProof() const
 {
     if (!ProofAttemptId.IsValid() || ProofAttemptId != GetAttemptId() || LinkReceipts.Num() != 2 || RequiredLinks.Num() != 2) { return false; }
@@ -109,9 +130,11 @@ bool ASovAurelionLinkPhaseDirector::HasConfirmedVictory() const
 }
 bool ASovAurelionLinkPhaseDirector::CompleteEncounter()
 {
-    if (bPhaseMutation || !HasLinkProof() || !bBoundaryFrozen || !AreOwnedParticipantsQuiescent(true)) { return false; }
+    if (bPhaseMutation || !HasLinkProof() || !bBoundaryFrozen || !AreOwnedParticipantsQuiescent(true)
+        || !GetCoordinationComponent() || GetCoordinationComponent()->HasUnreleasedWaves()) { return false; }
     const auto* Elite = GetParticipant(EliteParticipantId);
     if (!IsValid(Elite) || !Elite->IsAlive()) { FailEncounter(); return false; }
+    CompletedReleaseWave = GetCoordinationComponent()->GetCurrentWave();
     const bool bCompleted = Super::CompleteEncounter();
     if (bCompleted && !IsActorBeingDestroyed()) { SetActorTickEnabled(true); }
     return bCompleted;
@@ -177,6 +200,8 @@ bool ASovAurelionLinkPhaseDirector::TransferFrozenParticipants(ASovAurelionTherm
     if (!IsValid(Elite) || !Elite->IsAlive() || !AreProtectedParticipantsAlive())
     { Error = TEXT("The elite and protected survivor groups must persist alive across the phase boundary."); return false; }
     TGuardValue<bool> Mutation(bPhaseMutation, true);
+    if (!GetCoordinationComponent() || !GetCoordinationComponent()->ReleaseCompletedPhaseBindings())
+    { Error = TEXT("The source coordinator must release its completed roster before phase transfer."); return false; }
     // Transfer native ownership without releasing frozen actors or altering resources, links, or transforms.
     for (const auto& Participant : Participants)
     {
@@ -222,6 +247,8 @@ void ASovAurelionLinkPhaseDirector::Tick(float DeltaSeconds)
             }
             return;
         }
+        // Both receipts can arrive before the coordinator tick. Never freeze a still-hidden reinforcement.
+        if (!GetCoordinationComponent() || GetCoordinationComponent()->HasUnreleasedWaves()) { return; }
         if (!bBoundaryFrozen)
         {
             TGuardValue<bool> Mutation(bPhaseMutation, true);
@@ -251,6 +278,8 @@ void ASovAurelionLinkPhaseDirector::Load_Implementation()
     Super::Load_Implementation(); UnbindLinks(); ProofPlayer.Reset(); ProofController.Reset(); ProofASC.Reset();
     if (GetEncounterState() == ESovEncounterState::Succeeded && bBoundaryFrozen && !bTransferred)
     {
+        if (!HasConfirmedVictory() || !GetCoordinationComponent() || !GetCoordinationComponent()->RestoreCompletedWaveState(CompletedReleaseWave))
+        { LastPhaseError = TEXT("The completed phase's saved wave release does not match its authored roster."); return; }
         for (const auto& Participant : Participants)
         { if (IsValid(Participant.Character) && Participant.Character->IsAlive()) { SuspendActor(Participant.Character); } }
         SetActorTickEnabled(true);
@@ -261,6 +290,79 @@ void ASovAurelionLinkPhaseDirector::EndPlay(EEndPlayReason::Type Reason)
 
 ASovAurelionThermalPhaseDirector::ASovAurelionThermalPhaseDirector()
 { OnEncounterStateChanged.AddDynamic(this, &ThisClass::HandlePhaseState); }
+void ASovAurelionThermalPhaseDirector::Load_Implementation()
+{
+    const uint64 PreviousGeneration = RestoreGeneration;
+    Super::Load_Implementation();
+    const uint64 ExpectedGeneration = PreviousGeneration + 1;
+    const ESovEncounterState LoadedState = GetEncounterState();
+    if (!HasAuthority() || IsActorBeingDestroyed() || RestoreGeneration != ExpectedGeneration
+        || !bHasEntryCheckpoint || SnapshotSchemaVersion != 1 || !ProtectedParticipantIds.IsEmpty()
+        || EntryProtectedParticipantIds.IsEmpty() || !TransferredParticipantIds.IsEmpty()
+        || (LoadedState != ESovEncounterState::Succeeded && LoadedState != ESovEncounterState::Failed)) { return; }
+
+    // Phase B is authored empty and receives these roles through the actual phase transfer.
+    // They already exist in the saved entry snapshot; fresh map construction must reconstruct
+    // that metadata before the unchanged protection/victory checks can evaluate the saved result.
+    const TSet<FName> SavedProtection = EntryProtectedParticipantIds;
+    TArray<TStrongObjectPtr<ASovNPCCharacterBase>> ProtectedPins;
+    TArray<FName> CheckedIds;
+    TArray<FGuid> CheckedGUIDs;
+    TSet<FGuid> ProtectedGUIDs;
+    const auto StillOwnsLoad = [this, ExpectedGeneration, LoadedState, &SavedProtection]()
+    {
+        if (!IsValid(this) || IsActorBeingDestroyed() || RestoreGeneration != ExpectedGeneration
+            || GetEncounterState() != LoadedState || !ProtectedParticipantIds.IsEmpty()
+            || EntryProtectedParticipantIds.Num() != SavedProtection.Num()) { return false; }
+        for (const FName Id : SavedProtection) { if (!EntryProtectedParticipantIds.Contains(Id)) { return false; } }
+        return true;
+    };
+    for (const FName Id : SavedProtection)
+    {
+        const FSovEncounterNPCRecord* Record = nullptr;
+        for (const auto& Candidate : EntryParticipants)
+        { if (Candidate.ParticipantId == Id) { if (Record) { return; } Record = &Candidate; } }
+        if (Id.IsNone() || !Record || Record->bRequiredForVictory || Record->bAllowMassRepresentation
+            || !Record->ActorRecord.ActorGUID.IsValid()) { return; }
+        const FGuid SavedGUID = Record->ActorRecord.ActorGUID;
+        const FSovEncounterParticipant* Participant = nullptr;
+        for (const auto& Candidate : Participants)
+        { if (Candidate.ParticipantId == Id) { if (Participant) { return; } Participant = &Candidate; } }
+        if (!Participant || Participant->bRequiredForVictory || Participant->bAllowMassRepresentation
+            || IsParticipantMassRepresented(Id)) { return; }
+        auto* NPC = Participant->Character.Get();
+        if (!IsValid(NPC) || NPC->IsActorBeingDestroyed() || NPC->GetWorld() != GetWorld()) { return; }
+        if (ProtectedGUIDs.Contains(SavedGUID)) { return; }
+        ProtectedGUIDs.Add(SavedGUID); ProtectedPins.Emplace(NPC);
+        CheckedIds.Add(Id); CheckedGUIDs.Add(SavedGUID);
+        const FGuid CurrentGUID = INarrativeSavableActor::Execute_GetActorGUID(NPC);
+        if (!StillOwnsLoad() || !IsValid(NPC) || NPC->IsActorBeingDestroyed() || NPC->GetWorld() != GetWorld()
+            || GetParticipant(Id) != NPC || CurrentGUID != SavedGUID) { return; }
+    }
+    if (!StillOwnsLoad()) { return; }
+    // A later actor's GUID callback may have retired or replaced an earlier validated row.
+    for (int32 Index = 0; Index < ProtectedPins.Num(); ++Index)
+    {
+        const auto* NPC = ProtectedPins[Index].Get();
+        const FName Id = CheckedIds[Index];
+        if (!IsValid(NPC) || NPC->IsActorBeingDestroyed() || NPC->GetWorld() != GetWorld() || GetParticipant(Id) != NPC) { return; }
+        int32 SavedMatches = 0, LiveMatches = 0;
+        for (const auto& Record : EntryParticipants)
+        {
+            if (Record.ParticipantId != Id) { continue; }
+            if (Record.bRequiredForVictory || Record.bAllowMassRepresentation || Record.ActorRecord.ActorGUID != CheckedGUIDs[Index]) { return; }
+            ++SavedMatches;
+        }
+        for (const auto& Participant : Participants)
+        {
+            if (Participant.ParticipantId != Id) { continue; }
+            if (Participant.bRequiredForVictory || Participant.bAllowMassRepresentation || Participant.Character != NPC) { return; }
+            ++LiveMatches;
+        }
+        if (SavedMatches != 1 || LiveMatches != 1 || IsParticipantMassRepresented(Id)) { return; }
+    }
+    ProtectedParticipantIds = SavedProtection;
+}
 void ASovAurelionThermalPhaseDirector::BindFracture()
 {
     auto* Elite = GetParticipant(EliteParticipantId);

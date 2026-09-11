@@ -1,6 +1,8 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 
 #include "Characters/SovNPCCharacterBase.h"
+#include "UObject/StrongObjectPtr.h"
+#include "Character/NarrativeCharacterVisual.h"
 
 #include "Components/SovCombatSustainDropComponent.h"
 #include "Components/SovDismembermentComponent.h"
@@ -23,6 +25,21 @@ ASovNPCCharacterBase::ASovNPCCharacterBase(const FObjectInitializer& ObjectIniti
 
 void ASovNPCCharacterBase::BeginPlay()
 {
+	// NPC Super::BeginPlay initializes attributes, startup effects and default
+	// abilities from GetNPCDefinition(). Match a normal deferred Narrative spawn:
+	// publish the placed fallback before that one-time startup pipeline executes.
+	// A spawner or restore definition already supplied before BeginPlay still wins.
+	bool bInitializePlacedController = false;
+	if (HasAuthority() && IsValid(AuthoredPlacedDefinition) && !GetNPCDefinition())
+	{
+		FString Error;
+		bInitializePlacedController = InitializeAuthoredPlacedDefinition(Error);
+		if (!bInitializePlacedController)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Placed encounter NPC %s: %s"), *GetPathName(), *Error);
+		}
+	}
+
 	Super::BeginPlay();
 
 	// Narrative initializes an NPC's pawn-owned ASC during its BeginPlay. The
@@ -32,11 +49,9 @@ void ASovNPCCharacterBase::BeginPlay()
 		StatusComponent->InitializeWithAbilitySystem(
 			GetNarrativeAbilitySystemComponent());
 	}
-	if (HasAuthority() && IsValid(AuthoredPlacedDefinition) && !GetNPCDefinition())
+	if (bInitializePlacedController && IsValid(this) && !IsActorBeingDestroyed())
 	{
-		FString Error;
-		if (InitializeAuthoredPlacedDefinition(Error)) { EnsureEncounterController(); }
-		else { UE_LOG(LogTemp, Warning, TEXT("Placed encounter NPC %s: %s"), *GetPathName(), *Error); }
+		EnsureEncounterController();
 	}
 }
 
@@ -64,6 +79,30 @@ bool ASovNPCCharacterBase::InitializeAuthoredPlacedDefinition(FString& Error)
 			if (Other == Definition || (Other && Other->NPCID == Definition->NPCID))
 			{ Error = TEXT("A unique NPC definition is assigned to more than one live/placed character."); return false; }
 		}
+	}
+	// Normal Narrative spawners publish this home transform as part of their
+	// spawn metadata. A directly authored fallback has no spawner to do that:
+	// capture its real placement before definition/activity callbacks can use it.
+	// Existing spawner metadata (including an intentional origin home), explicit
+	// transforms, overrides and durable actor identities remain externally owned.
+	if (!SpawnInfo.OwningSpawnerGUID.IsValid() && SpawnInfo.SpawnName.IsNone()
+		&& !SpawnInfo.OwningSpawn.IsValid() && SpawnInfo.SpawnTransform.Equals(FTransform::Identity, 0.f))
+	{
+		const FTransform Placement = GetActorTransform();
+		if (Placement.ContainsNaN())
+		{ Error = TEXT("Placed NPC needs a finite home transform before definition initialization."); return false; }
+		SpawnInfo.SpawnTransform = Placement;
+	}
+	// Repeatable Narrative Blueprint NPCs return this spawn metadata directly
+	// from their GetActorGUID override. A placed actor has no spawner to publish
+	// it, so bridge the existing native stable identity before definition callbacks.
+	// Keep supplied/save identities, and do not re-enter the Blueprint query.
+	if (!SpawnInfo.SpawnAssignedSaveGUID.IsValid())
+	{
+		const FGuid PlacedIdentity = ASovNPCCharacterBase::GetActorGUID_Implementation();
+		if (!PlacedIdentity.IsValid())
+		{ Error = TEXT("Placed NPC needs a valid native identity before definition initialization."); return false; }
+		SpawnInfo.SpawnAssignedSaveGUID = PlacedIdentity;
 	}
 	SetNPCDefinition(Definition);
 	if (!IsValid(this) || IsActorBeingDestroyed() || GetNPCDefinition() != Definition)
@@ -115,16 +154,36 @@ void ASovNPCCharacterBase::EnsureEncounterController()
 
 void ASovNPCCharacterBase::OnCharacterVisualInitialized()
 {
+	if (!IsValid(this) || IsActorBeingDestroyed()) { return; }
+	if (!IsValid(GetCharacterVisual()))
+	{
+		ANarrativeCharacter::OnCharacterVisualInitialized();
+		return;
+	}
+	const TWeakObjectPtr<ANarrativeCharacterVisual> InitialVisual(GetCharacterVisual());
+	const auto IsCurrentVisual = [this, InitialVisual]()
+	{
+		return IsValid(this) && !IsActorBeingDestroyed() && InitialVisual.IsValid()
+			&& !InitialVisual->IsActorBeingDestroyed() && GetCharacterVisual() == InitialVisual.Get();
+	};
+	if (!IsCurrentVisual()) { return; }
+	TStrongObjectPtr<ANarrativeCharacter> KeepCharacter(this);
+	TStrongObjectPtr<ANarrativeCharacterVisual> KeepVisual(InitialVisual.Get());
 	if (bEncounterRestoreInitialization)
 	{
 		// Narrative's normal path auto-loads the last world record. A retry owns
 		// a different (entry) record and applies it only after initialization.
-		if (!bEncounterSnapshotReady) { InitNewCharacter(GetNPCDefinition()); }
+		if (!bEncounterSnapshotReady)
+		{
+			InitNewCharacter(GetNPCDefinition());
+			if (!IsCurrentVisual()) { return; }
+		}
 		ANarrativeCharacter::OnCharacterVisualInitialized();
 	}
 	else
 	{
 		Super::OnCharacterVisualInitialized();
 	}
-	bEncounterSnapshotReady = true;
+	// A restore or notification may have retired this pawn/body pair.
+	if (IsCurrentVisual()) { bEncounterSnapshotReady = true; }
 }

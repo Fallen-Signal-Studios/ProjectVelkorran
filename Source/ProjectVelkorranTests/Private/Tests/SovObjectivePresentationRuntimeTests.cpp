@@ -1,9 +1,18 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Tests/SovFrontendRuntimeTestFixtures.h"
+#include "Campaign/SovCampaignInteractionTerminal.h"
+#include "Campaign/SovCampaignEncounterObjective.h"
+#include "Campaign/SovAurelionRequestActor.h"
+#include "Campaign/SovEncounterDirector.h"
+#include "Campaign/SovEncounterCoordinationComponent.h"
+#include "World/SovWorldTransitActor.h"
+#include "Components/BoxComponent.h"
+#include "UI/SovObjectiveWaypoint.h"
 #include "Tests/SovCampaignRuntimeTestFixtures.h"
 #include "Campaign/SovCampaignStateComponent.h"
 #include "Character/PlayerDefinition.h"
 #include "Components/Border.h"
+#include "Components/CanvasPanelSlot.h"
 #include "Components/SizeBox.h"
 #include "Components/TextBlock.h"
 #include "Engine/Engine.h"
@@ -40,6 +49,9 @@ namespace
 }
 struct FSovObjectivePresentationTestAccess
 {
+    // Presentation fixture only; this does not qualify encounter gameplay.
+    static void ActiveEncounter(ASovEncounterDirector& Director) { Director.State = ESovEncounterState::Active; }
+    static void FailedEncounter(ASovEncounterDirector& Director) { Director.State = ESovEncounterState::Failed; }
 	static void Bind(USovFrontendComponent& Frontend, USovAccessibilityPresentation* Presentation,
 		ASovPlayerController* Controller, USovCampaignStateComponent* Campaign)
 	{
@@ -67,7 +79,21 @@ struct FSovObjectivePresentationTestAccess
 	{ Presentation.LayoutObjectives(Width, Height); }
 	static int32 VisibleRows(const USovAccessibilityPresentation& Presentation) { return Presentation.VisibleObjectiveRows; }
 	static float HeightBudget(const USovAccessibilityPresentation& Presentation) { return Presentation.ObjectiveSize->GetMaxDesiredHeight(); }
-	static float FirstRowHeight(const USovAccessibilityPresentation& Presentation) { return float(Presentation.ObjectiveRows[0]->GetDesiredSize().Y) + 8.f; }
+	static float FirstRowHeight(const USovAccessibilityPresentation& Presentation) { return float(Presentation.ObjectiveRows[0]->GetDesiredSize().Y); }
+	static float PanelHeight(const USovAccessibilityPresentation& Presentation) { return float(Presentation.ObjectiveBackground->GetDesiredSize().Y); }
+	static float PanelPaddingHeight(const USovAccessibilityPresentation& Presentation)
+	{ const auto Padding = Presentation.ObjectiveBackground->GetPadding(); return Padding.Top + Padding.Bottom; }
+	static bool OverflowVisible(const USovAccessibilityPresentation& Presentation)
+	{ return Presentation.ObjectiveOverflow->GetVisibility() != ESlateVisibility::Collapsed; }
+	static const UCanvasPanelSlot* ObjectiveSlot(const USovAccessibilityPresentation& Presentation)
+	{ return Cast<UCanvasPanelSlot>(Presentation.ObjectiveBackground->Slot); }
+	static FBox2D PanelRect(const UBorder& Panel, const FVector2D& SafeSize)
+	{
+		const auto* Slot = CastChecked<UCanvasPanelSlot>(Panel.Slot);
+		const FVector2D Size = Panel.GetDesiredSize();
+		const FVector2D Min = Slot->GetAnchors().Minimum * SafeSize + Slot->GetPosition() - Slot->GetAlignment() * Size;
+		return FBox2D(Min, Min + Size);
+	}
 	static void Reconstruct(USovAccessibilityPresentation& Presentation)
 	{ Presentation.NativeDestruct(); Presentation.NativeConstruct(); }
 	static void ConstructReview(USovAccessibleRecordMenu& Menu) { Menu.NativeConstruct(); }
@@ -316,11 +342,23 @@ bool FSovObjectivePresentationLayoutTest::RunTest(const FString&)
 {
 	FObjectivePresentationWorld F; if (!F.Frontend || !F.Presentation) { AddError(TEXT("Fixture failed")); return false; }
 	auto* Mission = F.Mission(); F.State->BeginMission(Mission);
-	FSovObjectivePresentationTestAccess::Layout(*F.Presentation, 640.f, 720.f);
-	const float OneRowSafeHeight = (FSovObjectivePresentationTestAccess::FirstRowHeight(*F.Presentation) + 17.f) / .63f;
+	// Find the actual Slate row's fit boundary instead of copying the layout's height formula.
+	float OneRowSafeHeight = 0.f;
+	for (float Height = 80.f; Height <= 720.f; Height += 8.f)
+	{
+		FSovObjectivePresentationTestAccess::Layout(*F.Presentation, 640.f, Height);
+		if (FSovObjectivePresentationTestAccess::VisibleRows(*F.Presentation) == 1) { OneRowSafeHeight = Height; break; }
+	}
+	if (!TestTrue(TEXT("A real measured goal fits within the supported safe height"), OneRowSafeHeight > 80.f)) { return false; }
+	FSovObjectivePresentationTestAccess::Layout(*F.Presentation, 640.f, OneRowSafeHeight - 8.f);
+	TestEqual(TEXT("Just below the measured fit boundary no partial goal is shown"), FSovObjectivePresentationTestAccess::VisibleRows(*F.Presentation), 0);
 	FSovObjectivePresentationTestAccess::Layout(*F.Presentation, 640.f, OneRowSafeHeight);
 	TestEqual(TEXT("One fitting goal requires no room for the hidden overflow link"), FSovObjectivePresentationTestAccess::VisibleRows(*F.Presentation), 1);
 	TestTrue(TEXT("Hidden overflow label cannot hide a fitting single goal"), FSovObjectivePresentationTestAccess::Visible(*F.Presentation));
+	TestFalse(TEXT("No hidden-overflow row consumes visible space"), FSovObjectivePresentationTestAccess::OverflowVisible(*F.Presentation));
+	TestTrue(TEXT("The visible panel ends after the complete goal and its border padding"), FMath::IsNearlyEqual(
+		FSovObjectivePresentationTestAccess::PanelHeight(*F.Presentation),
+		FSovObjectivePresentationTestAccess::FirstRowHeight(*F.Presentation) + FSovObjectivePresentationTestAccess::PanelPaddingHeight(*F.Presentation), .1f));
 	F.State->CompleteBeat(TEXT("ReachSurvivors"));
 	F.State->TransitionObjective(TEXT("OptionalRescue"), ESovObjectiveState::Active);
 	if (!TestTrue(TEXT("Layout fixture has actionable rows"), F.Has(TEXT("OptionalRescue")))) { return false; }
@@ -337,6 +375,84 @@ bool FSovObjectivePresentationLayoutTest::RunTest(const FString&)
 	TestFalse(TEXT("No room cannot paint over critical captions or speech"), FSovObjectivePresentationTestAccess::Visible(*F.Presentation));
 	TestEqual(TEXT("Deferred rows remain counted"), F.Presentation->GetAdditionalObjectiveCount(), 2);
 	TestTrue(TEXT("Failure rule remains intact for later presentation"), F.Presentation->GetPresentedObjectives()[0].FailureRule.EqualTo(Mission->Beats[1].FailureRuleText));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovObjectivePresentationCornerTest, "ProjectVelkorran.UI.Objectives.CornerStaysFixedThroughPriorityText",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovObjectivePresentationCornerTest::RunTest(const FString&)
+{
+	FObjectivePresentationWorld F; if (!F.Frontend || !F.Presentation) { AddError(TEXT("Fixture failed")); return false; }
+	F.State->BeginMission(F.Mission()); const auto Before = F.Save();
+	const auto CheckCorner = [&]()
+	{
+		const auto* Slot = FSovObjectivePresentationTestAccess::ObjectiveSlot(*F.Presentation);
+		if (!TestNotNull(TEXT("Objective retains its safe-canvas slot"), Slot)) { return; }
+		TestEqual(TEXT("Corner anchor minimum stays fixed"), Slot->GetAnchors().Minimum, FVector2D::ZeroVector);
+		TestEqual(TEXT("Corner anchor maximum stays fixed"), Slot->GetAnchors().Maximum, FVector2D::ZeroVector);
+		TestEqual(TEXT("Corner alignment stays fixed"), Slot->GetAlignment(), FVector2D::ZeroVector);
+		TestEqual(TEXT("Corner uses a small pixel inset at every safe size"), Slot->GetPosition(), FVector2D(12.f, 12.f));
+	};
+	const FVector2D WideSize(1280.f, 720.f);
+	FSovObjectivePresentationTestAccess::Layout(*F.Presentation, float(WideSize.X), float(WideSize.Y)); CheckCorner();
+	const float UnobstructedBudget = FSovObjectivePresentationTestAccess::HeightBudget(*F.Presentation);
+	F.Presentation->PresentCaption(LOCTEXT("ShortCornerWarning", "Ping"), 5.f, FVector::ZeroVector, ESovCaptionPriority::Critical);
+	FSovObjectivePresentationTestAccess::Layout(*F.Presentation, float(WideSize.X), float(WideSize.Y)); CheckCorner();
+	const auto ShortObjective = FSovObjectivePresentationTestAccess::PanelRect(*F.Presentation->GetObjectivePanel(), WideSize);
+	const auto ShortCaption = FSovObjectivePresentationTestAccess::PanelRect(*F.Presentation->GetCaptionPanel(), WideSize);
+	TestTrue(TEXT("Short centered caption is actually horizontally clear of the corner"), ShortObjective.Max.X + 12.f < ShortCaption.Min.X);
+	TestTrue(TEXT("A horizontally clear critical caption does not remove the goal"), FSovObjectivePresentationTestAccess::Visible(*F.Presentation));
+	TestEqual(TEXT("A horizontally clear caption does not reduce the goal budget"), FSovObjectivePresentationTestAccess::HeightBudget(*F.Presentation), UnobstructedBudget);
+	F.Presentation->ClearSceneHistory();
+	const FVector2D SmallSize(640.f, 360.f);
+	FSovObjectivePresentationTestAccess::Layout(*F.Presentation, float(SmallSize.X), float(SmallSize.Y)); CheckCorner();
+	const auto BeforeWarningRect = FSovObjectivePresentationTestAccess::PanelRect(*F.Presentation->GetObjectivePanel(), SmallSize);
+	if (!TestTrue(TEXT("Goal fits in the small safe area before priority text"), FSovObjectivePresentationTestAccess::Visible(*F.Presentation))) { return false; }
+	F.Presentation->PresentCaption(LOCTEXT("LongCornerWarning", "The corridor is collapsing. Move away from the broken support immediately."), 5.f, FVector::ZeroVector, ESovCaptionPriority::Critical);
+	F.Presentation->PresentSpeech(LOCTEXT("CornerSpeaker", "Selene"), LOCTEXT("CornerSpeech", "Keep clear of the collapsing corridor."), 5.f, FVector::ZeroVector, false);
+	FSovObjectivePresentationTestAccess::Layout(*F.Presentation, float(SmallSize.X), float(SmallSize.Y)); CheckCorner();
+	const auto LongCaption = FSovObjectivePresentationTestAccess::PanelRect(*F.Presentation->GetCaptionPanel(), SmallSize);
+	TestTrue(TEXT("Long caption really occupies the goal's horizontal range"), BeforeWarningRect.Max.X > LongCaption.Min.X && BeforeWarningRect.Min.X < LongCaption.Max.X);
+	TestFalse(TEXT("Critical caption remains visible while the corner is deferred"), F.Presentation->GetCaptionPanel()->GetVisibility() == ESlateVisibility::Collapsed);
+	TestFalse(TEXT("Speech remains visible while the corner is deferred"), F.Presentation->GetSubtitlePanel()->GetVisibility() == ESlateVisibility::Collapsed);
+	TestEqual(TEXT("No complete goal can overlap the long critical caption"), FSovObjectivePresentationTestAccess::VisibleRows(*F.Presentation), 0);
+	TestFalse(TEXT("Deferred panel cannot overlap priority text"), FSovObjectivePresentationTestAccess::Visible(*F.Presentation));
+	TestEqual(TEXT("Deferred goal stays available for review"), F.Presentation->GetAdditionalObjectiveCount(), 1);
+	F.Presentation->ClearSceneHistory();
+	FSovObjectivePresentationTestAccess::Layout(*F.Presentation, float(SmallSize.X), float(SmallSize.Y)); CheckCorner();
+	TestTrue(TEXT("Goal returns to the same corner when priority text retires"), FSovObjectivePresentationTestAccess::Visible(*F.Presentation));
+	FSovObjectivePresentationTestAccess::Layout(*F.Presentation, 1920.f, 1080.f); CheckCorner();
+	TestTrue(TEXT("Corner fitting never changes serialized campaign truth"), Before == F.Save());
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovObjectivePresentationCompactTest, "ProjectVelkorran.UI.Objectives.VisibleContentShrinksAfterOverflow",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovObjectivePresentationCompactTest::RunTest(const FString&)
+{
+	FObjectivePresentationWorld F; if (!F.Frontend || !F.Presentation) { AddError(TEXT("Fixture failed")); return false; }
+	F.State->BeginMission(F.Mission()); const auto Before = F.Save();
+	const auto Entries = F.Presentation->GetPresentedObjectives();
+	for (const float Scale : { 1.f, 2.f })
+	{
+		FSovUserSettingsSnapshot Settings; Settings.UIScale = Scale;
+		FSovObjectivePresentationTestAccess::Settings(*F.Presentation, Settings);
+		F.Presentation->PresentObjectives(Entries, 12);
+		FSovObjectivePresentationTestAccess::Layout(*F.Presentation, 1920.f, 1080.f);
+		if (!TestTrue(TEXT("Fixture measures a visible review overflow row"), FSovObjectivePresentationTestAccess::OverflowVisible(*F.Presentation))) { return false; }
+		const float WithOverflow = FSovObjectivePresentationTestAccess::PanelHeight(*F.Presentation);
+		F.Presentation->PresentObjectives(Entries, 0);
+		FSovObjectivePresentationTestAccess::Layout(*F.Presentation, 1920.f, 1080.f);
+		TestEqual(TEXT("The complete goal remains visible after overflow retires"), FSovObjectivePresentationTestAccess::VisibleRows(*F.Presentation), 1);
+		TestFalse(TEXT("Retired overflow is not painted"), FSovObjectivePresentationTestAccess::OverflowVisible(*F.Presentation));
+		const float CompactHeight = FSovObjectivePresentationTestAccess::PanelHeight(*F.Presentation);
+		TestTrue(TEXT("Final prepass shrinks the panel after overflow removal"), CompactHeight < WithOverflow);
+		TestTrue(TEXT("Final height contains only measured goal and border padding at both scales"), FMath::IsNearlyEqual(CompactHeight,
+			FSovObjectivePresentationTestAccess::FirstRowHeight(*F.Presentation) + FSovObjectivePresentationTestAccess::PanelPaddingHeight(*F.Presentation), .1f));
+		TestTrue(TEXT("Complete row remains within the available safe-height budget"),
+			FSovObjectivePresentationTestAccess::FirstRowHeight(*F.Presentation) <= FSovObjectivePresentationTestAccess::HeightBudget(*F.Presentation));
+	}
+	TestTrue(TEXT("Overflow layout does not change serialized campaign truth"), Before == F.Save());
 	return true;
 }
 
@@ -369,5 +485,136 @@ bool FSovObjectivePresentationReviewTest::RunTest(const FString&)
 	Review->DeactivateWidget(); FSovObjectivePresentationTestAccess::DestructReview(*Review);
 	return true;
 }
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovObjectiveWaypointBindingTest, "ProjectVelkorran.UI.Objectives.WaypointUsesCurrentAuthoredBinding",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovObjectiveWaypointBindingTest::RunTest(const FString&)
+{
+    FObjectivePresentationWorld F;
+    if (!F.State || !F.Presentation) { AddError(TEXT("Fixture failed")); return false; }
+    // This existing state fixture stages only Controller.Pawn. Its override calls the real
+    // APawn possession path while deliberately excluding Narrative content initialization.
+    F.Pawn->PossessedBy(F.PC);
+    if (!TestTrue(TEXT("Native pawn/controller ownership is reciprocal"), F.Pawn->GetController() == F.PC)) { return false; }
+    auto* Mission = F.Mission();
+    if (!TestEqual(TEXT("Native mission begins"), F.State->BeginMission(Mission), ESovCampaignResult::Applied)) { return false; }
+    auto* Current = F.World->SpawnActor<ASovCampaignInteractionTerminal>();
+    auto* Future = F.World->SpawnActor<ASovCampaignInteractionTerminal>();
+    auto* Foreign = F.World->SpawnActor<ASovCampaignInteractionTerminal>();
+    if (!Current || !Future || !Foreign) { AddError(TEXT("Native terminals failed to spawn")); return false; }
+    Current->TerminalId = TEXT("CurrentTerminal"); Current->MissionId = Mission->MissionId; Current->CompletionBeat = TEXT("ReachSurvivors");
+    Future->TerminalId = TEXT("FutureTerminal"); Future->MissionId = Mission->MissionId; Future->CompletionBeat = TEXT("EscapeTogether");
+    Foreign->TerminalId = TEXT("ForeignTerminal"); Foreign->MissionId = TEXT("OtherMission"); Foreign->CompletionBeat = Current->CompletionBeat;
+    TArray<TWeakObjectPtr<AActor>> Sources = {Future, Foreign, Current};
+    FSovObjectiveWaypoint View;
+    const auto Before = F.Save();
+    TestTrue(TEXT("Existing authoritative terminal resolves even before interaction range"),
+        SovObjectiveWaypoint::Resolve(F.PC, F.Presentation->GetPresentedObjectives(), Sources, View));
+    TestTrue(TEXT("Future and foreign matching names cannot win"), View.Target.Get() == Current);
+    TestTrue(TEXT("Waypoint pins the real native Body, not imported visual bounds"), View.Anchor.Get() == Current->Body.Get());
+    TestTrue(TEXT("Resolved goal is still current before paint"), SovObjectiveWaypoint::IsCurrent(F.PC, View));
+    TestTrue(TEXT("Navigation does not mutate the serialized campaign"), Before == F.Save());
+    auto* Duplicate = F.World->SpawnActor<ASovCampaignInteractionTerminal>();
+    if (!Duplicate) { return false; }
+    Duplicate->TerminalId = Current->TerminalId; Duplicate->MissionId = Current->MissionId; Duplicate->CompletionBeat = Current->CompletionBeat;
+    Sources.Add(Duplicate);
+    TestFalse(TEXT("Duplicate native terminal identity refuses a guessed destination"),
+        SovObjectiveWaypoint::Resolve(F.PC, F.Presentation->GetPresentedObjectives(), Sources, View));
+    Duplicate->Destroy();
+    TestTrue(TEXT("Retiring the duplicate restores the exact authored hint"),
+        SovObjectiveWaypoint::Resolve(F.PC, F.Presentation->GetPresentedObjectives(), Sources, View));
+    F.Pawn->TestHero = FSovGameplayTags::Get().Character_Player_Selene;
+    TestFalse(TEXT("Outgoing protagonist hint retires before handoff commit"), SovObjectiveWaypoint::IsCurrent(F.PC, View));
+    F.Pawn->TestHero = Mission->Protagonist;
+    F.State->CompleteBeat(TEXT("ReachSurvivors"));
+    TestFalse(TEXT("Native completion immediately invalidates the previous marker"), SovObjectiveWaypoint::IsCurrent(F.PC, View));
+    TestTrue(TEXT("Newly actionable native terminal becomes the next marker"),
+        SovObjectiveWaypoint::Resolve(F.PC, F.Presentation->GetPresentedObjectives(), Sources, View));
+    TestTrue(TEXT("New marker is the future terminal only after its prerequisite commits"), View.Target.Get() == Future);
+    Future->Destroy();
+    TestFalse(TEXT("Destroyed target cannot leave a screen-space ghost"), SovObjectiveWaypoint::IsCurrent(F.PC, View));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovObjectiveRescueDoorWaypointTest, "ProjectVelkorran.UI.Objectives.RescueDoorWaypointFollowsPendingWave",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovObjectiveRescueDoorWaypointTest::RunTest(const FString&)
+{
+    FObjectivePresentationWorld F;
+    if (!F.State || !F.Presentation) { return false; }
+    F.Pawn->PossessedBy(F.PC);
+    auto* Mission = F.Mission();
+    Mission->Beats[0].RequiredEncounterId = TEXT("Test.Rescue");
+    Mission->Beats[0].RequiredProtagonist = Mission->Protagonist;
+    Mission->Beats[0].ObjectiveType = ESovObjectiveType::EliminateDisable;
+    if (!TestEqual(TEXT("Mission begins"), F.State->BeginMission(Mission), ESovCampaignResult::Applied)) { return false; }
+    auto* Director = F.World->SpawnActor<ASovEncounterDirector>();
+    auto* Objective = F.World->SpawnActor<ASovCampaignEncounterObjective>();
+    auto* Door = F.World->SpawnActor<ASovWorldTransitActor>();
+    if (!Director || !Objective || !Door) { return false; }
+    Director->EncounterId = TEXT("Test.Rescue");
+    FSovObjectivePresentationTestAccess::ActiveEncounter(*Director);
+    Objective->MissionId = Mission->MissionId; Objective->CompletionBeat = TEXT("ReachSurvivors");
+    Objective->EncounterDirector = Director;
+    Door->TransitId = TEXT("Test.RescueAccess"); Door->RequiredMission = Mission->MissionId;
+    auto* Coordination = Director->GetCoordinationComponent();
+    FSovEncounterWaveReleaseRule Rule; Rule.Wave = 1;
+    Rule.Condition = ESovEncounterWaveCondition::TransitDoorOpen; Rule.TransitDoor = Door;
+    Coordination->WaveReleaseRules.Add(Rule);
+    TArray<TWeakObjectPtr<AActor>> Sources = {Objective};
+    FSovObjectiveWaypoint View; const auto Before = F.Save();
+    TestTrue(TEXT("Active rescue points to the door needed for its next wave"),
+        SovObjectiveWaypoint::Resolve(F.PC, F.Presentation->GetPresentedObjectives(), Sources, View));
+    TestTrue(TEXT("Marker follows the physical moving door"), View.Target.Get() == Door && View.Anchor.Get() == Door->MovingBody.Get());
+    Door->SetPower(false);
+    TestFalse(TEXT("Unpowered door cannot retain a stale usable marker"), SovObjectiveWaypoint::IsCurrent(F.PC, View));
+    Door->SetPower(true); Coordination->WaveReleaseRules[0].Wave = 2;
+    TestFalse(TEXT("A later wave cannot redirect the current rescue"),
+        SovObjectiveWaypoint::Resolve(F.PC, F.Presentation->GetPresentedObjectives(), Sources, View));
+    Coordination->WaveReleaseRules[0].Wave = 1; Door->RequiredMission = TEXT("OtherMission");
+    TestFalse(TEXT("Foreign mission door is never suggested"),
+        SovObjectiveWaypoint::Resolve(F.PC, F.Presentation->GetPresentedObjectives(), Sources, View));
+    TestTrue(TEXT("Guidance never supplies campaign completion"), Before == F.Save());
+    TestEqual(TEXT("Guidance never opens the door"), Door->GetTransitState(), ESovWorldTransitState::AtOrigin);
+    auto* Retry = F.World->SpawnActor<ASovAurelionRequestActor>();
+    if (!Retry) { return false; }
+    Retry->MissionId = Mission->MissionId; Retry->BeatId = TEXT("ReachSurvivors");
+    Retry->RequestId = TEXT("Test.RescueRetry"); Retry->Operation = ESovAurelionRequest::RetryEncounter;
+    Retry->RetryObjective = Objective; Retry->RetryDirector = Director; Sources.Add(Retry);
+    FSovObjectivePresentationTestAccess::FailedEncounter(*Director);
+    TestTrue(TEXT("Loaded or failed rescue points to its authored retry control"),
+        SovObjectiveWaypoint::Resolve(F.PC, F.Presentation->GetPresentedObjectives(), Sources, View));
+    TestTrue(TEXT("Retry control is the physical target"), View.Target.Get() == Retry && View.Anchor.Get() == Retry->Body.Get());
+    TestTrue(TEXT("Failed attempt exposes retry guidance instead of a generic objective"), View.Kind == FSovObjectiveWaypoint::EKind::Retry);
+    Retry->RetryObjective = nullptr;
+    TestFalse(TEXT("Broken retry binding retires its marker"), SovObjectiveWaypoint::IsCurrent(F.PC, View));
+    Retry->RetryObjective = Objective; FSovObjectivePresentationTestAccess::ActiveEncounter(*Director);
+    TestFalse(TEXT("A restarted encounter retires the retry marker"), SovObjectiveWaypoint::IsCurrent(F.PC, View));
+    TestTrue(TEXT("Retry guidance never mutates the campaign"), Before == F.Save());
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovObjectiveWaypointProjectionTest, "ProjectVelkorran.UI.Objectives.WaypointSafeAreaAndBehindCamera",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovObjectiveWaypointProjectionTest::RunTest(const FString&)
+{
+    FVector2D Position; bool bAtEdge = false;
+    const FVector2D Min(100, 80), Max(900, 640);
+    TestTrue(TEXT("Visible target projects inside the actual safe rectangle"),
+        SovObjectiveWaypoint::FitToSafeRect(FVector2D(320, 240), true, FVector2D(0, -1), Min, Max, Position, bAtEdge));
+    TestEqual(TEXT("Visible marker retains its target position"), Position, FVector2D(320, 240));
+    TestFalse(TEXT("Visible target is not an edge cue"), bAtEdge);
+    TestTrue(TEXT("Off-screen right target gets a bounded bearing"),
+        SovObjectiveWaypoint::FitToSafeRect(FVector2D(1500, 360), true, FVector2D(1, 0), Min, Max, Position, bAtEdge));
+    TestEqual(TEXT("Right edge respects the safe area"), Position, FVector2D(900, 360));
+    TestTrue(TEXT("Off-screen bearing is explicit"), bAtEdge);
+    TestTrue(TEXT("Behind-camera target ignores misleading projected coordinates"),
+        SovObjectiveWaypoint::FitToSafeRect(FVector2D(320, 240), false, FVector2D(0, 1), Min, Max, Position, bAtEdge));
+    TestEqual(TEXT("Behind target points down, never onto the visible world"), Position, FVector2D(500, 640));
+    TestTrue(TEXT("Behind cue is an edge cue"), bAtEdge);
+    TestFalse(TEXT("Empty safe area draws nothing"),
+        SovObjectiveWaypoint::FitToSafeRect(FVector2D::ZeroVector, false, FVector2D::ZeroVector, Min, Min, Position, bAtEdge));
+    return true;
+}
+
 #undef LOCTEXT_NAMESPACE
 #endif

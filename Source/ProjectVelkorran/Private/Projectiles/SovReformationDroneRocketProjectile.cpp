@@ -148,6 +148,7 @@ ASovReformationDroneRocketProjectile::
 		CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("ProjectileMovement"));
 	ProjectileMovement->UpdatedComponent = CollisionSphere;
 	ProjectileMovement->bAutoActivate = false;
+	ProjectileMovement->bTickBeforeOwner = false; // Homing validity must run before movement.
 	ProjectileMovement->bInitialVelocityInLocalSpace = false;
 	ProjectileMovement->bRotationFollowsVelocity = true;
 	ProjectileMovement->bSweepCollision = true;
@@ -489,6 +490,10 @@ void ASovReformationDroneRocketProjectile::ConfigureHoming()
 		? FlightState.HomingAccelerationMagnitude
 		: 0.0f;
 	// Retire lost tracking before this frame's movement computes homing acceleration.
+	// Older Blueprint defaults may already have registered MovementComponent's
+	// opposite owner dependency. Remove only that edge; preserve collision/update ordering.
+	ProjectileMovement->bTickBeforeOwner = false;
+	PrimaryActorTick.RemovePrerequisite(ProjectileMovement, ProjectileMovement->PrimaryComponentTick);
 	ProjectileMovement->AddTickPrerequisiteActor(this);
 	SetActorTickEnabled(HasAuthority() && bCanHome);
 }

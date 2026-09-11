@@ -244,6 +244,68 @@ bool FSovEchoSelenePrecisionRuntimeTest::RunTest(const FString&)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovEchoPrecisionChainSurvivesEchoAbilityTest,
+	"ProjectVelkorran.Campaign.Echo.PrecisionChainSurvivesEchoAbility", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovEchoPrecisionChainSurvivesEchoAbilityTest::RunTest(const FString&)
+{
+	FEchoWorld F;
+	auto* Player = F.Character(0.f, 0);
+	auto* A = F.Character(200.f, 1);
+	auto* B = F.Character(400.f, 1);
+	auto* C = F.Character(600.f, 1);
+	auto* D = F.Character(800.f, 1);
+	auto* E = F.Character(1000.f, 1);
+	if (!TestNotNull(TEXT("Player"), Player) || !TestNotNull(TEXT("A"), A) || !TestNotNull(TEXT("B"), B)
+		|| !TestNotNull(TEXT("C"), C) || !TestNotNull(TEXT("D"), D) || !TestNotNull(TEXT("E"), E)) return false;
+	AddEchoResourceWeakPoints(A); AddEchoResourceWeakPoints(B); AddEchoResourceWeakPoints(C);
+	AddEchoResourceWeakPoints(D); AddEchoResourceWeakPoints(E);
+	auto* ASC = Player->GetNarrativeAbilitySystemComponent();
+	const FSovGameplayTags& Tags = FSovGameplayTags::Get();
+	Player->TestEcho->RestoreEchoFromCheckpoint(0.f);
+
+	Hit(Player, A, 1.f, 0.f, TEXT("weapon"));
+	TestEqual(TEXT("First precision target awards8"), Player->TestEcho->GetEcho(), 8.f);
+
+	// A paid Echo ability owns the window. Damage resolving inside it stays excluded from
+	// awards, but an Echo ability is not one of the three authored chain breaks.
+	ASC->AddLooseGameplayTag(Tags.State_EchoAbility_Active);
+	Hit(Player, B, 1.f, 0.f, TEXT("weapon"));
+	TestEqual(TEXT("Damage inside an Echo ability window awards nothing"), Player->TestEcho->GetEcho(), 8.f);
+	ASC->RemoveLooseGameplayTag(Tags.State_EchoAbility_Active);
+
+	Hit(Player, C, 1.f, 0.f, TEXT("weapon"));
+	TestEqual(TEXT("Chain survives the ability window and still links the next distinct target"),
+		Player->TestEcho->GetEcho(), 20.f);
+
+	// The three-bonus-link cap is unchanged: C was link 1, D is link 2, E is link 3,
+	// and a fourth distinct target earns its weak-point award with no further bonus.
+	Hit(Player, D, 1.f, 0.f, TEXT("weapon"));
+	TestEqual(TEXT("Second chain link still pays"), Player->TestEcho->GetEcho(), 32.f);
+	Hit(Player, E, 1.f, 0.f, TEXT("weapon"));
+	TestEqual(TEXT("Third chain link still pays"), Player->TestEcho->GetEcho(), 44.f);
+	Hit(Player, A, 1.f, 0.f, TEXT("sensor"));
+	TestEqual(TEXT("Fourth distinct target is capped at three bonus links"), Player->TestEcho->GetEcho(), 52.f);
+
+	// The authored breaks are untouched: an ordinary body hit still ends the chain.
+	Hit(Player, C, 1.f);
+	TestEqual(TEXT("An ordinary body hit awards nothing"), Player->TestEcho->GetEcho(), 52.f);
+	Hit(Player, B, 1.f, 0.f, TEXT("sensor"));
+	TestEqual(TEXT("An ordinary body hit still breaks the chain"), Player->TestEcho->GetEcho(), 60.f);
+
+	// Incoming applied damage remains a break as well.
+	Hit(Player, D, 1.f, 0.f, TEXT("sensor"));
+	TestEqual(TEXT("Distinct target after the break links again"), Player->TestEcho->GetEcho(), 72.f);
+	Hit(B, Player, 5.f);
+	Hit(Player, E, 1.f, 0.f, TEXT("sensor"));
+	TestEqual(TEXT("Incoming applied damage still breaks the chain"), Player->TestEcho->GetEcho(), 80.f);
+
+	// And an encounter boundary still resets it.
+	Player->TestEcho->BeginEncounter();
+	Hit(Player, C, 1.f, 0.f, TEXT("sensor"));
+	TestEqual(TEXT("Encounter boundary still resets the chain"), Player->TestEcho->GetEcho(), 88.f);
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovUnbrokenWeakPointHitRewardTest,
 	"ProjectVelkorran.Campaign.Echo.UnbrokenWeakPointHit", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovUnbrokenWeakPointHitRewardTest::RunTest(const FString&)

@@ -168,4 +168,54 @@ bool FSovConvergenceDefinitionRuntimeTest::RunTest(const FString& Parameters)
     Mission->ProtagonistCompanions.Pop(); TestFalse(TEXT("Joint play requires both canonical companion profiles"), Mission->ValidateDefinition(Reason));
     return true;
 }
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovResonanceExposureExtensionTest,
+    "ProjectVelkorran.Campaign.Resonance.SecondRevealExtendsExposureWindow",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+
+bool FSovResonanceExposureExtensionTest::RunTest(const FString& Parameters)
+{
+    FResonanceWorld Fixture;
+    if (!Fixture.World) { AddError(TEXT("World creation failed")); return false; }
+    auto* Selene = Fixture.Character();
+    auto* Target = Fixture.Character();
+    if (!TestNotNull(TEXT("Selene"), Selene) || !TestNotNull(TEXT("Target"), Target)) { return false; }
+
+    auto* WeakPoints = NewObject<USovWeakPointRoutingTestComponent>(Target);
+    Target->AddInstanceComponent(WeakPoints);
+    WeakPoints->RegisterComponent();
+    WeakPoints->InitializeWithAbilitySystem(Target->GetNarrativeAbilitySystemComponent());
+    WeakPoints->OnWeakPointRevealStateChanged.AddDynamic(
+        Selene, &ASovAxiomRuntimeTestCharacter::RecordWeakPointReveal);
+
+    // E4 severs two independent Weaver anchors. The first opens the reveal; the second
+    // arrives while it is still lit and extends it. RevealWeakPoints is documented to
+    // "begin or extend" the window and takes the max end time, so the extension is real
+    // state - the defect was that the edge-gated broadcast never published it, leaving
+    // USovResonanceTargetComponent's ExposureUntil pinned to the first window.
+    if (!TestTrue(TEXT("First anchor sever opens the reveal"), WeakPoints->RevealWeakPoints(5.f, Selene))) { return false; }
+    if (!TestEqual(TEXT("Opening the reveal broadcasts once"), Selene->RecordedRevealActive.Num(), 1)) { return false; }
+    TestTrue(TEXT("First broadcast reports an active reveal"), Selene->RecordedRevealActive[0]);
+    const float FirstRemaining = Selene->RecordedRevealRemaining[0];
+    TestTrue(TEXT("First broadcast advertises the opening window"), FirstRemaining > 4.f && FirstRemaining <= 5.f + KINDA_SMALL_NUMBER);
+
+    if (!TestTrue(TEXT("Second anchor sever extends the reveal"), WeakPoints->RevealWeakPoints(9.f, Selene))) { return false; }
+    if (!TestEqual(TEXT("Extending an active reveal broadcasts again"), Selene->RecordedRevealActive.Num(), 2)) { return false; }
+    TestTrue(TEXT("Second broadcast still reports an active reveal"), Selene->RecordedRevealActive[1]);
+    TestTrue(TEXT("Second broadcast advertises the extended window, not the first"),
+        Selene->RecordedRevealRemaining[1] > FirstRemaining + 1.f);
+    TestTrue(TEXT("Second broadcast retains the severing instigator"),
+        Selene->RecordedRevealInstigators[1].Get() == Selene);
+
+    // A shorter reveal cannot retract a longer live window, and must not re-broadcast.
+    TestTrue(TEXT("A shorter reveal is still accepted"), WeakPoints->RevealWeakPoints(1.f, Selene));
+    TestEqual(TEXT("A shorter reveal does not shorten or re-broadcast the live window"),
+        Selene->RecordedRevealActive.Num(), 2);
+
+    WeakPoints->ClearWeakPointReveal();
+    if (!TestEqual(TEXT("Clearing the reveal broadcasts the inactive edge"), Selene->RecordedRevealActive.Num(), 3)) { return false; }
+    TestFalse(TEXT("Final broadcast reports an inactive reveal"), Selene->RecordedRevealActive[2]);
+    TestEqual(TEXT("Final broadcast advertises no remaining window"), Selene->RecordedRevealRemaining[2], 0.f);
+    return true;
+}
 #endif

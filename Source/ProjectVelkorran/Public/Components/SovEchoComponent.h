@@ -92,6 +92,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Echo")
 	float GetSecondsUntilDecay() const;
 
+	/** Read the existing participation clock for presentation, including outside encounter scope. */
+	float GetSecondsSinceCombatActivity() const;
+
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Echo")
 	FGameplayTag GetLastActivityTag() const { return LastActivityTag; }
 

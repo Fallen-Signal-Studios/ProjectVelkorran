@@ -41,6 +41,27 @@ public:
 	bool bReentrantReleaseAccepted = false;
 	bool bCancelPulseOnDamage = false;
 	FVector TestEyeOffset = FVector::ZeroVector;
+	TArray<FSovCommandLinkSeverResult> RecordedSevers;
+	bool bCancelPulseOnSever = false;
+	/** Every OnWeakPointRevealStateChanged broadcast this fixture observed, in order. */
+	TArray<bool> RecordedRevealActive;
+	TArray<float> RecordedRevealRemaining;
+	TArray<TWeakObjectPtr<AActor>> RecordedRevealInstigators;
+
+	UFUNCTION(CallInEditor)
+	void RecordWeakPointReveal(bool bIsRevealed, float RemainingSeconds, AActor* RevealInstigator)
+	{
+		RecordedRevealActive.Add(bIsRevealed);
+		RecordedRevealRemaining.Add(RemainingSeconds);
+		RecordedRevealInstigators.Add(RevealInstigator);
+	}
+
+	UFUNCTION(CallInEditor)
+	void RecordSever(const FSovCommandLinkSeverResult& Result)
+	{
+		RecordedSevers.Add(Result);
+		if (bCancelPulseOnSever && ReentrantPulse.IsValid()) { ReentrantPulse->FinishEchoAbility(true); }
+	}
 
 	// These EditorContext tests observe damage without initializing actors for play.
 	UFUNCTION(CallInEditor)
@@ -63,6 +84,8 @@ class USovAxiomRuntimeTestCommandLink : public USovCommandLinkComponent
 	GENERATED_BODY()
 public:
 	USovAxiomRuntimeTestCommandLink();
+	void SetTestSeverable(bool bValue) { bSeverable = bValue; }
+	void SetTestIncludeOwner(bool bValue) { bIncludeOwnerAsParticipant = bValue; }
 };
 
 /** An authored wielded item for the real source/wielded-weapon validation. */

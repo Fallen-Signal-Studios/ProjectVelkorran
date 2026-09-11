@@ -30,6 +30,9 @@ public:
     UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="Campaign|Receivers") TArray<TObjectPtr<ASovCampaignRelayReceiver>> RequiredReceivers;
     /** Re-entering the volume after a failed attempt requests the existing director's entry retry. */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Campaign") bool bStartOnPlayerOverlap = false;
+    /** Opt-in startup tolerance: retry an INACTIVE initial entry every .2 seconds while
+     * the same ready controlled player remains physically inside. Never retries failed combat. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Campaign") bool bRetryInitialEntryWhileOverlapping = false;
     UPROPERTY(BlueprintReadOnly, Transient, Category="Campaign") FString LastError;
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Campaign") bool StartEncounter(ASovPlayerCharacterBase* Player, FString& Error);
     /** Save admission holds an uncommitted victory, including a retired authority context. */
@@ -72,14 +75,25 @@ private:
     void BindDirector();
     void RetireAttempt();
     void CommitVictory(FAttemptContext Context);
+    void ArmInitialEntryRetry(ASovPlayerCharacterBase* Player);
+    void RetryInitialEntry();
+    void StopInitialEntryRetry();
+    bool OwnsInitialEntryRetry() const;
+    UFUNCTION() void HandleInitialEntryCampaignRestored(bool bValid);
+    UFUNCTION() void HandleInitialEntryMissionChanged(FName ChangedMissionId, bool bSucceeded);
     UFUNCTION() void HandleEncounterState(ESovEncounterState Previous, ESovEncounterState Current);
     UFUNCTION() void HandleCampaignRestored(bool bValid);
     UFUNCTION() void HandleMissionChanged(FName ChangedMissionId, bool bSucceeded);
     UFUNCTION() void HandleStartOverlap(UPrimitiveComponent* Component, AActor* Actor, UPrimitiveComponent* OtherComponent,
         int32 BodyIndex, bool bFromSweep, const FHitResult& Hit);
+    UFUNCTION() void HandleEndOverlap(UPrimitiveComponent* Component, AActor* Actor, UPrimitiveComponent* OtherComponent, int32 BodyIndex);
     TWeakObjectPtr<ASovEncounterDirector> BoundDirector;
     TWeakObjectPtr<USovCampaignStateComponent> BoundCampaign;
     FAttemptContext Attempt;
+    FAttemptContext InitialEntry;
+    TWeakObjectPtr<UBoxComponent> InitialEntryVolume;
+    FTimerHandle InitialEntryTimer;
+    uint64 InitialEntrySerial = 0;
     FTimerHandle ResultTimer;
-    bool bPending = false, bExecuting = false, bStarting = false, bEnding = false;
+    bool bPending = false, bExecuting = false, bStarting = false, bEnding = false, bRetryingInitialEntry = false;
 };

@@ -100,6 +100,11 @@ bool USovCompanionComponent::CanRequestCommand(ASovPlayerCharacterBase* Player, 
 		return Resonance && Resonance->GetInteraction().State == ESovResonanceState::Offered && Resonance->GetInteraction().Partner == NPC;
 	}
 	if (Leader != Player) { Reason = TEXT("Set the mission-permitted leader before issuing tactical commands."); return false; }
+	if (Command == ESovCompanionCommand::HoldPosition && Target && Target != Player
+		&& (!IsValid(Target) || Target->IsActorBeingDestroyed() || Target->GetWorld() != GetWorld()
+			|| !Target->GetRootComponent() || Target->GetActorLocation().ContainsNaN()
+			|| FVector::DistSquared(Player->GetActorLocation(), Target->GetActorLocation()) > FMath::Square(3000.f)))
+	{ Reason = TEXT("Hold position requires a valid nearby same-world mark."); return false; }
 	if (CommandState == ESovCompanionCommandState::MovingToAnchor)
 	{ Reason = TEXT("Complete or cancel the required co-action before issuing another command."); return false; }
 	if (UNPCActivity* Current = Controller->GetActivityComponent()->GetCurrentActivity(); Current && !Current->IsInterruptable())
@@ -129,15 +134,33 @@ bool USovCompanionComponent::RequestCommand(ASovPlayerCharacterBase* Player, ESo
 		? USovProtagonistCompanionActivity::StaticClass() : USovCompanionCommandActivity::StaticClass();
 	if (!Activities->GetActivity(ActivityClass)) { Activities->AddActivity(ActivityClass, false); }
 	CommandGoal = NewObject<USovCompanionCommandGoal>(Activities); CommandGoal->Companion = this; CommandGoal->RequestId = FGuid::NewGuid();
-	CommandGoal->Command = Command; CommandGoal->Target = IsValid(Target) ? Target : Player; CommandGoal->HoldLocation = Player->GetActorLocation();
+	CommandGoal->Command = Command; CommandGoal->Target = IsValid(Target) ? Target : Player;
+	CommandGoal->bExplicitHoldTarget = Command == ESovCompanionCommand::HoldPosition && IsValid(Target) && Target != Player;
+	CommandGoal->HoldLocation = CommandGoal->bExplicitHoldTarget ? Target->GetActorLocation() : Player->GetActorLocation();
 	CommandGoal->GoalKey = this; Leader = Player; bCommandInterrupted = false; SetComponentTickEnabled(true);
 	if (!Activities->AddGoal(CommandGoal, true)) { Reason = TEXT("Narrative rejected the contextual command."); CancelContextCommand(); return false; }
 	return true;
 }
 bool USovCompanionComponent::IsCommandCurrent(const USovCompanionCommandGoal* Goal) const
-{ return IsValid(Goal) && Goal == CommandGoal && Goal->RequestId.IsValid() && !bCommandInterrupted && IsValid(Leader); }
+{
+	return IsValid(Goal) && Goal == CommandGoal && Goal->RequestId.IsValid() && !bCommandInterrupted && IsValid(Leader)
+		&& (!Goal->bExplicitHoldTarget || (IsValid(Goal->Target) && !Goal->Target->IsActorBeingDestroyed()
+			&& Goal->Target->GetWorld() == GetWorld() && Leader->IsPlayerControlled() && Leader->IsCharacterReady()
+			&& IsValid(LeaderASC) && LeaderASC->GetAvatarActor() == Leader));
+}
 void USovCompanionComponent::NotifyCommandInterrupted(USovCompanionCommandGoal* Goal)
 { if (IsCommandCurrent(Goal)) { bCommandInterrupted = true; SetComponentTickEnabled(true); } }
+bool USovCompanionComponent::HasAcceptedHoldPosition(const AActor* Target) const
+{
+	const auto* NPC = Cast<ANarrativeNPCCharacter>(GetOwner());
+	if (bMutation || !IsValid(Target) || !IsCommandCurrent(CommandGoal) || !IsValid(Activities)
+		|| !NPC || Activities->GetOwner() != NPC->GetController()
+		|| CommandGoal->Command != ESovCompanionCommand::HoldPosition
+		|| !CommandGoal->bExplicitHoldTarget || CommandGoal->Target != Target) { return false; }
+	bool bFound = false;
+	const auto* AcceptedGoal = Activities->GetGoalByKey(USovCompanionCommandGoal::StaticClass(), this, bFound);
+	return bFound && AcceptedGoal == CommandGoal;
+}
 void USovCompanionComponent::CancelContextCommand()
 {
 	USovCompanionCommandGoal* Previous = CommandGoal; CommandGoal = nullptr; bCommandInterrupted = false;
@@ -164,6 +187,8 @@ void USovCompanionComponent::ResetContribution(bool bStarted)
 { PlayerContribution = 0.f; CompanionContribution = 0.f; }
 void USovCompanionComponent::TickContextCommand(USovCompanionCommandGoal* Goal)
 {
+	if (IsValid(Goal) && Goal == CommandGoal && Goal->bExplicitHoldTarget && !IsCommandCurrent(Goal))
+	{ CancelContextCommand(); return; }
 	if (!IsCommandCurrent(Goal) || !GetOwner()->HasAuthority()) { return; }
 	auto* NPC = Cast<ANarrativeNPCCharacter>(GetOwner()); auto* Controller = NPC ? Cast<ANarrativeNPCController>(NPC->GetController()) : nullptr;
 	auto* Abilities = CompanionASC(GetOwner());
@@ -179,7 +204,9 @@ void USovCompanionComponent::TickContextCommand(USovCompanionCommandGoal* Goal)
 		OwnedCommandAttack = {};
 	}
 	if (Abilities->HasMatchingGameplayTag(N.State_Busy)) { return; }
-	if (TryRecoverSeparation()) { return; }
+	// An authored hold mark is explicit movement intent, not a lost companion.
+	// Never use hidden recovery to teleport it away from that mark.
+	if (!Goal->bExplicitHoldTarget && TryRecoverSeparation()) { return; }
 	AActor* Focus = Goal->Command == ESovCompanionCommand::FocusTarget ? Goal->Target.Get() : nullptr;
 	const FVector Destination = Goal->Command == ESovCompanionCommand::HoldPosition ? Goal->HoldLocation
 		: Goal->Command == ESovCompanionCommand::DefendPerson && IsValid(Goal->Target) ? Goal->Target->GetActorLocation() : Leader->GetActorLocation();
@@ -228,11 +255,13 @@ void USovCompanionComponent::TickContextCommand(USovCompanionCommandGoal* Goal)
 			}
 		}
 	}
-	if (FVector::DistSquared(NPC->GetActorLocation(), Destination) > FMath::Square(250.f)
+	const float MovementThreshold = Goal->bExplicitHoldTarget ? 75.f : 250.f;
+	if (FVector::DistSquared(NPC->GetActorLocation(), Destination) > FMath::Square(MovementThreshold)
 		&& Controller->GetMoveStatus() != EPathFollowingStatus::Moving && GetWorld()->GetTimeSeconds() >= NextMoveAttempt)
 	{
 		NextMoveAttempt = GetWorld()->GetTimeSeconds() + 1.f;
-		FAIMoveRequest Request(Destination); Request.SetAcceptanceRadius(150.f); Request.SetAllowPartialPath(false); Request.SetUsePathfinding(true);
+		FAIMoveRequest Request(Destination); Request.SetAcceptanceRadius(Goal->bExplicitHoldTarget ? 25.f : 150.f);
+		Request.SetAllowPartialPath(false); Request.SetUsePathfinding(true);
 		const auto Move = Controller->MoveTo(Request); CommandMoveId = Move.MoveId;
 		// Retain authored intent and retry at a bounded cadence. Hidden recovery has its own stricter gate.
 		if (Move.Code == EPathFollowingRequestResult::Failed) { CommandMoveId = FAIRequestID::InvalidRequest; }

@@ -9,6 +9,9 @@
 #include "AI/NPCDefinition.h"
 #include "Character/PlayerDefinition.h"
 #include "Components/BoxComponent.h"
+#include "Components/CapsuleComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
+#include "Tests/SovEncounterObjectiveRuntimeTestFixtures.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "Framework/SovPlayerState.h"
@@ -51,6 +54,12 @@ namespace SovRelayTests
             auto* Definition = NewObject<UPlayerDefinition>(PC); PC->KeepAlive.Add(Definition);
             Player->PrepareCampaignInitialization(Definition); PC->SetTestPlayerState(PS); PC->Possess(Player);
             if (!Player->StageTestReadiness(PS, true) || !Player->CompleteCampaignDataInitialization(false)) { return; }
+            auto* Ground = World->SpawnActor<AActor>(); auto* GroundShape = NewObject<UBoxComponent>(Ground);
+            Ground->SetRootComponent(GroundShape); Ground->AddInstanceComponent(GroundShape);
+            GroundShape->SetBoxExtent(FVector(4000, 2000, 10)); GroundShape->SetCollisionProfileName(TEXT("BlockAll"));
+            GroundShape->RegisterComponent(); Ground->SetActorLocation(FVector(0, 0, -10));
+            Player->SetActorLocation(FVector(0, 0, Player->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() + 2.f));
+            Player->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
             ASC = Player->GetNarrativeAbilitySystemComponent();
             Mission = NewObject<USovCampaignDefinition>(PC); PC->KeepAlive.Add(Mission);
             Mission->MissionId = TEXT("RelayReceiverTest"); Mission->Protagonist = Player->GetProtagonistIdentityTag();
@@ -77,7 +86,7 @@ namespace SovRelayTests
             {
                 Receivers[I] = World->SpawnActor<ASovCampaignRelayReceiver>();
                 Receivers[I]->ReceiverId = I == 0 ? FName(TEXT("West")) : FName(TEXT("East"));
-                Receivers[I]->EncounterObjective = Objective; Receivers[I]->SetActorLocation(FVector(300 + I * 400, I * 300, 0));
+                Receivers[I]->EncounterObjective = Objective; Receivers[I]->SetActorLocation(FVector(300 + I * 400, I * 300, Player->GetActorLocation().Z));
                 Objective->RequiredReceivers.Add(Receivers[I]);
             }
             Interaction = NewObject<USovCampaignTerminalTestInteraction>(PC); PC->AddInstanceComponent(Interaction);
@@ -180,12 +189,14 @@ bool FSovRelayRetirementTest::RunTest(const FString& Parameters)
     }
     {
         SovRelayTests::FWorld F; if (!TestNotNull(TEXT("Ready relay fixture"), F.ASC) || !F.Start()) { AddError(F.Error); return false; }
+        auto* RestoreObserver = NewObject<USovEncounterObjectiveTestObserver>(F.PC); F.PC->KeepAlive.Add(RestoreObserver);
+        F.Director->OnEncounterRestoreFailed.AddDynamic(RestoreObserver, &USovEncounterObjectiveTestObserver::RestoreFailed);
         F.Operate(0); F.FrameOnce(); TestTrue(TEXT("Receiver disabled in failed attempt"), F.Receivers[0]->IsDisabled());
         F.Director->FailEncounter(); TestFalse(TEXT("Failure withdraws that attempt's receiver state"), F.Receivers[0]->IsDisabled());
         if (!TestTrue(TEXT("Production entry retry is accepted"), F.Start())) { AddError(F.Error); return false; }
         for (int32 Step = 0; Step < 8 && F.Director->GetEncounterState() == ESovEncounterState::Restoring; ++Step)
-        { F.FrameOnce(); F.Director->Tick(.016f); }
-        if (!TestEqual(TEXT("Retry reopens a fresh encounter"), F.Director->GetEncounterState(), ESovEncounterState::Active)) { return false; }
+        { F.FrameOnce(); static_cast<AActor*>(F.Director)->Tick(.016f); }
+        if (!TestEqual(TEXT("Retry reopens a fresh encounter"), F.Director->GetEncounterState(), ESovEncounterState::Active)) { AddError(RestoreObserver->RestoreError); return false; }
         TestFalse(TEXT("Retry never imports the old partial receiver receipt"), F.Receivers[0]->IsDisabled());
         F.KillGuard(); F.FrameOnce();
         TestEqual(TEXT("Fresh attempt still requires both receivers"), F.PC->GetCampaignState()->GetJournal().Num(), 0);

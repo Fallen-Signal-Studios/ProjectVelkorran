@@ -54,6 +54,8 @@ public:
 	UFUNCTION(BlueprintPure, Category="Companion|Rescue") bool CanProvideRescue(ASovPlayerCharacterBase* Player, FString& Reason) const;
 	virtual bool LimitSovDamage(AActor* Target, const FGameplayEffectContextHandle& Context, float& ShieldDamage, float& HealthDamage, float& PoiseDamage) const override;
 	bool IsCommandCurrent(const USovCompanionCommandGoal* Goal) const;
+	/** Includes a real accepted goal awaiting a suspended Narrative activity's selection. */
+	bool HasAcceptedHoldPosition(const AActor* Target) const;
 	void TickContextCommand(USovCompanionCommandGoal* Goal);
 	void NotifyCommandInterrupted(USovCompanionCommandGoal* Goal);
 	/** Defeat during a required action fails this active encounter; no resurrection or damage immunity is invented. */

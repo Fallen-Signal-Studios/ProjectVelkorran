@@ -276,6 +276,8 @@ bool ASovEncounterDirector::SetParticipantRepresentation(FName Id, ESovCampaignR
 	MassPromotions.Add(Id, NPC); MassPromotionStarts.Add(Id, GetWorld()->GetTimeSeconds());
 	Participant = Participants.FindByPredicate([Id](const auto& P) { return P.ParticipantId == Id; });
 	Participant->Character = NPC;
+	// Merge before initialization callbacks; preserve new class/constructor tags as well.
+	for (const FName Tag : Record.ActorTags) { NPC->Tags.AddUnique(Tag); }
 	NPC->PrepareForEncounterRestore(SpawnInfo, Record.ActorRecord.ActorGUID); NPC->SetNPCDefinition(Definition);
 	NPC->SetActorHiddenInGame(true); NPC->SetActorEnableCollision(false);
 	NPC->FinishSpawning(Record.ActorRecord.Transform);

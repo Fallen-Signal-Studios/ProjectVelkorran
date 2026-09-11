@@ -7,6 +7,7 @@
 #include "Engine/World.h"
 #include "Framework/SovPlayerState.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
+#include "GAS/NarrativeGameplayAbility.h"
 #include "GAS/NarrativeAttributeSetBase.h"
 #include "Misc/AutomationTest.h"
 #include "Progression/SovTechniqueComponent.h"
@@ -134,5 +135,36 @@ bool FSovManagedReadinessRestoreTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Failure invalidates published readiness"), Pawn->IsCharacterReady());
 	TestFalse(TEXT("Failed initialization cannot reopen data gate"), Pawn->IsCampaignDataReadyToApply());
 	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovRepeatedAbilitySourceGrantTest, "ProjectVelkorran.Campaign.Handoff.RepeatedSourceGrantKeepsCleanupHandle",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovRepeatedAbilitySourceGrantTest::RunTest(const FString&)
+{
+    FHandoffWorld F; if (!F.World) { return false; }
+    auto* PC = F.World->SpawnActor<ASovHandoffRuntimeTestController>();
+    auto* Pawn = F.World->SpawnActor<ASovHandoffRuntimeTestPawn>();
+    auto* PS = F.World->SpawnActor<ASovPlayerState>();
+    if (!PC || !Pawn || !PS) { return false; }
+    auto* Definition = NewObject<UPlayerDefinition>(PC); PC->KeepAlive.Add(Definition);
+    if (!Pawn->PrepareCampaignInitialization(Definition)) { return false; }
+    PC->SetTestPlayerState(PS); PC->Possess(Pawn);
+    if (!Pawn->StageTestReadiness(PS, true) || !Pawn->CompleteCampaignDataInitialization(false)) { return false; }
+    auto* ASC = Cast<UNarrativeAbilitySystemComponent>(PS->GetAbilitySystemComponent());
+    if (!ASC) { return false; }
+    auto* FirstSource = NewObject<UPlayerDefinition>(Pawn); PC->KeepAlive.Add(FirstSource);
+    auto* OtherSource = NewObject<UPlayerDefinition>(Pawn); PC->KeepAlive.Add(OtherSource);
+    const auto First = Pawn->AddAbility(UNarrativeGameplayAbility::StaticClass(), FirstSource);
+    const int32 Count = ASC->GetActivatableAbilities().Num();
+    const auto Repeated = Pawn->AddAbility(UNarrativeGameplayAbility::StaticClass(), FirstSource);
+    TestTrue(TEXT("Repeated grant retains its real cleanup handle"), First.IsValid() && Repeated == First);
+    TestEqual(TEXT("Reapplication creates no duplicate spec"), ASC->GetActivatableAbilities().Num(), Count);
+    const auto Other = Pawn->AddAbility(UNarrativeGameplayAbility::StaticClass(), OtherSource);
+    TestTrue(TEXT("Different source retains independent ownership"), Other.IsValid() && Other != First);
+    Pawn->RemoveAbilities({Repeated});
+    TestNull(TEXT("Unwield cleanup can retire the originally granted spec"), ASC->FindAbilitySpecFromHandle(First));
+    TestNotNull(TEXT("Cleanup leaves the other source's grant intact"), ASC->FindAbilitySpecFromHandle(Other));
+    Pawn->RemoveAbilities({Other});
+    return true;
 }
 #endif

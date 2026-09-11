@@ -48,6 +48,11 @@ public:
 		const FGameplayAbilityActorInfo* ActorInfo,
 		FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
 
+	/** Same cost/payload/weapon checks as CheckCost, with caller-owned diagnostics and no ability state writes.
+	 * This is not CanActivateAbility: target-specific and Blueprint activation remain input-owned. */
+	bool CheckEchoPresentationCost(FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
+		FString& OutReason, FGameplayTagContainer* OptionalRelevantTags = nullptr) const;
+
 	virtual void ApplyCost(
 		const FGameplayAbilitySpecHandle Handle,
 		const FGameplayAbilityActorInfo* ActorInfo,
