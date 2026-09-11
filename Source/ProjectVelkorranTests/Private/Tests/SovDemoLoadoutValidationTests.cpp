@@ -5,7 +5,11 @@
 // packaged build granted them at runtime. Soft paths are asserted rather than loaded, so
 // these tests never pull demo content into the process.
 #include "Validation/SovCampaignContentValidation.h"
+#include "Blueprint/UserWidget.h"
 #include "Character/CharacterDefinition.h"
+#include "Engine/DataTable.h"
+#include "GameFramework/Actor.h"
+#include "GameplayEffect.h"
 #include "Items/InventoryComponent.h"
 #include "Misc/AutomationTest.h"
 #if WITH_DEV_AUTOMATION_TESTS
@@ -64,6 +68,43 @@ bool FSovAuthoredLoadoutAccepted::RunTest(const FString& Parameters)
         SovCampaignContentValidation::DemoItemLoadoutReason(NewObject<UItemCollection>()).IsEmpty());
     TestTrue(TEXT("A null asset is handled"),
         SovCampaignContentValidation::DemoItemLoadoutReason(nullptr).IsEmpty());
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovLootEconomyRejected, "ProjectVelkorran.Campaign.Validation.LootEconomyRejected", EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+bool FSovLootEconomyRejected::RunTest(const FString& Parameters)
+{
+    // TDD Appendix F forbids a loot economy in the campaign cook. The project carries
+    // copies of Narrative's looting widgets under Content/UI/Narrative/Menus/Inventory/Loot.
+    // The rule table is queried by name and class rather than by fabricating assets:
+    // UUserWidget is abstract, so the prohibited widgets cannot be instantiated at all.
+    auto Reason = [](const TCHAR* Name, UClass* Class) -> FString
+    {
+        return SovCampaignContentValidation::ProhibitedSystemReasonForName(Name, Class);
+    };
+    TestFalse(TEXT("The looting menu is rejected"),
+        Reason(TEXT("W_NarrativeMenu_Looting"), UUserWidget::StaticClass()).IsEmpty());
+    TestFalse(TEXT("The loot source inventory panel is rejected"),
+        Reason(TEXT("WBP_Loot_TheirInventory"), UUserWidget::StaticClass()).IsEmpty());
+    TestFalse(TEXT("The loot destination inventory panel is rejected"),
+        Reason(TEXT("WBP_Loot_YourInventory"), UUserWidget::StaticClass()).IsEmpty());
+    TestFalse(TEXT("The loot chest table is rejected"),
+        Reason(TEXT("DT_LootChest"), UDataTable::StaticClass()).IsEmpty());
+    TestFalse(TEXT("The lootable chest actor is rejected"),
+        Reason(TEXT("BP_LootableChest"), AActor::StaticClass()).IsEmpty());
+    // The framework's ordinary grant path must stay usable: FLootTableRoll and item
+    // collections are how the protagonists receive their fixed equipment.
+    TestTrue(TEXT("An item collection is not mistaken for a loot economy"),
+        Reason(TEXT("IC_Tarrik"), UItemCollection::StaticClass()).IsEmpty());
+    TestTrue(TEXT("A loot-table-shaped grant asset is not rejected by name"),
+        Reason(TEXT("IC_SeleneLoadout"), UItemCollection::StaticClass()).IsEmpty());
+    // Class matters as well as name: BP_LootableChest is prohibited only as an Actor.
+    TestTrue(TEXT("A non-actor asset named like the loot chest actor is not rejected"),
+        Reason(TEXT("BP_LootableChest"), UItemCollection::StaticClass()).IsEmpty());
+    // The previously covered systems must keep working through the same entry point.
+    TestFalse(TEXT("The legacy XP award effect is still rejected"),
+        Reason(TEXT("GE_GiveXP"), UGameplayEffect::StaticClass()).IsEmpty());
+    TestFalse(TEXT("The multiplayer main menu is still rejected"),
+        Reason(TEXT("W_NarrativeMenu_MPMainMenu"), UUserWidget::StaticClass()).IsEmpty());
     return true;
 }
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovDemoLoadoutThroughCollection, "ProjectVelkorran.Campaign.Validation.DemoItemLoadoutThroughCollection", EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)

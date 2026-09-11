@@ -15,6 +15,12 @@ PROJECTVELKORRAN_API bool ParseAssetListArgument(const FString& Params, const TC
  * Empty means no known prohibited system was identified, not arbitrary Blueprint certification. */
 PROJECTVELKORRAN_API FString ProhibitedAssetReason(const UObject* Asset);
 
+/** The authored-name plus class rule table behind ProhibitedAssetReason.
+ * Exposed so the rules can be exercised without fabricating assets: several prohibited
+ * systems are widgets, and UUserWidget is abstract and cannot be instantiated directly.
+ * Takes the authored name with any "_C" suffix already removed. */
+PROJECTVELKORRAN_API FString ProhibitedSystemReasonForName(const FString& AuthoredName, const UClass* EffectiveClass);
+
 /** Narrative Pro demo/template items granted by a campaign character's default loadout.
  * Aurelion roles must carry authored project equipment or rely on their ability kit; a demo
  * placeholder reaching a campaign actor is a content defect, not a framework fault. Soft paths

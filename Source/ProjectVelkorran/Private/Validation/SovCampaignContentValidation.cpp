@@ -6,6 +6,8 @@
 #include "Character/CharacterDefinition.h"
 #include "Engine/AssetManager.h"
 #include "Engine/Blueprint.h"
+#include "Engine/DataTable.h"
+#include "GameFramework/Actor.h"
 #include "GameplayEffect.h"
 #include "Misc/Parse.h"
 #include "GAS/NarrativeAttributeSetBase.h"
@@ -35,6 +37,35 @@ namespace
         if (Name.Equals(TEXT("W_NarrativeMenu_MPMainMenu"), ESearchCase::IgnoreCase)
             && EffectiveClass->IsChildOf(UUserWidget::StaticClass()))
         { return TEXT("multiplayer main menu W_NarrativeMenu_MPMainMenu"); }
+
+        // Loot economy. Matched by authored name and class rather than by the word
+        // "loot": FLootTableRoll is the framework's ordinary grant struct and is how
+        // IC_Tarrik and IC_Selene equip the protagonists, so a keyword rule here would
+        // reject the campaign's own fixed-equipment path.
+        static const TCHAR* LootWidgets[] = {
+            TEXT("W_NarrativeMenu_Looting"),
+            TEXT("WBP_Loot_TheirInventory"),
+            TEXT("WBP_Loot_YourInventory"),
+        };
+        for (const TCHAR* LootWidget : LootWidgets)
+        {
+            if (Name.Equals(LootWidget, ESearchCase::IgnoreCase)
+                && EffectiveClass->IsChildOf(UUserWidget::StaticClass()))
+            { return FString::Printf(TEXT("loot economy interface %s"), LootWidget); }
+        }
+        static const TCHAR* LootActors[] = {
+            TEXT("BP_LootableChest"),
+            TEXT("Interactable_Loot"),
+        };
+        for (const TCHAR* LootActor : LootActors)
+        {
+            if (Name.Equals(LootActor, ESearchCase::IgnoreCase)
+                && EffectiveClass->IsChildOf(AActor::StaticClass()))
+            { return FString::Printf(TEXT("loot economy actor %s"), LootActor); }
+        }
+        if (Name.Equals(TEXT("DT_LootChest"), ESearchCase::IgnoreCase)
+            && EffectiveClass->IsChildOf(UDataTable::StaticClass()))
+        { return TEXT("loot economy table DT_LootChest"); }
         return {};
     }
 
@@ -46,6 +77,12 @@ namespace
     {
         return !Path.IsNull() && Path.ToString().Contains(DemoItemRoot, ESearchCase::IgnoreCase);
     }
+}
+
+FString SovCampaignContentValidation::ProhibitedSystemReasonForName(
+    const FString& AuthoredName, const UClass* EffectiveClass)
+{
+    return KnownSystemReason(AuthoredName, EffectiveClass);
 }
 
 FString SovCampaignContentValidation::DemoItemLoadoutReason(const UObject* Asset)
