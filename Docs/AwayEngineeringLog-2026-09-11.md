@@ -229,11 +229,111 @@ before/after comparison exposed the problem.
 
 ---
 
-## Priorities 4–8
+## Priority 4 — Intermittent AI startup stall
 
-Not yet started. Order per the revised brief: AI startup stall, performance harness,
-progression, pause/menu, fresh-clone audit. Each verified against the current tree before
-any change, per working rule 1.
+**Status: defect NOT reproduced under unattended automation. One deterministic precondition
+measured for the first time. No fork modification made.**
+
+### Instrumentation
+
+`sov.AIStartupTrace` exists, in the **fork** at
+`NarrativeArsenal/Private/AI/NarrativeAIStartupDiagnostics.cpp` — a `Source/`-scoped search
+misses it. `ECVF_Default`, non-Shipping only, armed at `OnPreWorldInitialization`, capped at
+120 s / 2000 events / 32 controllers.
+
+**Arming in a packaged build requires `-dpcvars`.** `-ExecCmds="sov.AIStartupTrace 1"` sets
+the variable — the log shows `sov.AIStartupTrace = "1"` — but runs *after* world
+initialization, so the capture window has already closed and **zero events** are recorded.
+`-dpcvars="sov.AIStartupTrace=1"` applies during engine PreInit and captures correctly.
+Do not change the harness flag without re-verifying that events appear.
+
+### Map selection — M12 is the wrong map
+
+M12 captured 699 events, 34 controllers and **231 perception callbacks**, but:
+
+```
+callbacks targeting the PLAYER: 0
+```
+
+Every callback is an NPC seeing another NPC. Tarrik stands at the southern approach and no
+hostile perceives him, so the race cannot be exercised. Twenty identical M12 runs would have
+produced twenty identical null results.
+
+The documented stall is a Selene/Hound encounter, and `/Game/Maps/Development/L_SeleneCombat`
+exists and spawns **3 Dominion Hounds + 1 Handler**. That is the correct scenario.
+
+### Result — 8 cold starts of L_SeleneCombat
+
+| Measure | Result |
+|---|---|
+| Runs | 8, fresh `UserDir` each |
+| Controllers per run | 4 (3 Hounds + Handler) |
+| Perception callbacks | **0 in all 8 runs** |
+| Player perceived | **never** |
+| All generators initialize before faction publication | **8 of 8** |
+| Window between last generator return and faction publication | **55.5 – 58.8 ms** |
+
+Final snapshots explain the zero callbacks:
+
+```
+perception_active   = False
+current_sight_count = 0
+tree                = None
+players.factions    = (GameplayTags=)      <- empty
+players.attitude    = 1 (Neutral)
+players.currently_seen = False
+asc_ready_epoch     = 0
+```
+
+The Hounds' perception components are **inactive** and the controllers are not ticking — all
+32 events occur inside the first 0.5 s and nothing follows for the remaining 45 s. These NPCs
+stay dormant until something activates the encounter, which a human does by walking into it.
+
+**So the stall is not reproducible without a driven player.** That is a statement about the
+automation, not about the defect: the precondition (a hostile perceiving the player) never
+occurs, so a null result carries no information about whether the race would fire.
+
+### What was established, and it is new
+
+**Every goal generator completes initialization 55–59 ms *before* the player's factions are
+published, deterministically, in 8 of 8 runs.** At generator-initialization time the player
+has empty factions and reads as attitude **Neutral** from the Hound's perspective.
+
+That is the ordering precondition for hypothesis 2, and it is **deterministic rather than
+intermittent**. It also explains *why* the observed stall is intermittent: the precondition
+always holds, so the failure additionally requires a Sight event for the player to land
+inside that ~56 ms window. Combined with the previously documented facts that
+`GoalGenerator_Attack`'s only wake-up signals are a new Sight event and GameState's
+`OnFactionAttitudeChanged`, that `ANarrativePlayerState::OnRep_Faction` broadcasts the
+*player's* `OnFactionUpdated` instead, and that UE 5.7 `ProcessStimuli` suppresses same-state
+Sight notifications, the model is a closed loop with no retry edge.
+
+This upgrades the 6 September assessment from "candidate cause" to "precondition confirmed
+deterministic; failure requires a Sight event inside a measured ~56 ms window".
+
+### Not done, deliberately
+
+No fork modification. The brief requires the failure reproduced or the causal ordering
+demonstrated before touching plugin AI behaviour, and only the *precondition* is
+demonstrated — the failing transition itself has not been observed. A fix would need to add
+the missing retry/subscription edge so that generators re-evaluate when player factions
+publish, and that belongs in fork Blueprint/source with the failure in hand.
+
+**Blocker for further progress: requires a driven player.** Either a human playthrough, or
+automated input driving Selene into Hound perception range. The latter is buildable but is
+new automation rather than diagnosis, so it is recorded here as the decision point.
+
+### Tooling added
+
+`Scripts/Run-AIStartupColdStarts.ps1` — parameterised repeated cold starts with trace
+arming and per-run extraction. Reusable for any future intermittent-startup investigation.
+
+---
+
+## Priorities 5–8
+
+Not yet started. Order per the revised brief: performance harness, progression, pause/menu,
+fresh-clone audit. Each verified against the current tree before any change.
 
 ---
 
