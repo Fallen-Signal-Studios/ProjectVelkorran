@@ -50,6 +50,7 @@ public:
 	UNPCActivityComponent();
 
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	UFUNCTION()
 	void RescoreGoals();
@@ -60,6 +61,10 @@ public:
 	virtual void Deactivate();
 
 	virtual void Load_Implementation() override;
+	virtual bool ValidateSaveRecord(const TArray<uint8>& RecordBytes) const override;
+	virtual bool WasSaveRecordLoadAccepted() const override { return bSavedActivityLoadAccepted; }
+	/** Read-only completion gate for managed world restoration. Check acceptance first. */
+	bool HasPendingSavedActivityRestore() const { return bSavedActivityRestorePending || bApplyingSavedActivities; }
 	virtual void PrepareForSave_Implementation() override; 
 
 	#if ENABLE_VISUAL_LOG
@@ -145,6 +150,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Goals")
 	UNPCGoalItem* AddGoal(UNPCGoalItem* NewGoal, const bool bTriggerReselect=false);
 
+	/** Native-only admission: no Blueprint callbacks. Keyless goals remain valid.
+	 * A goal registered against an object cannot outlive that exact object. */
+	bool HasStaleRegisteredGoalKey(const UNPCGoalItem* Goal) const;
+
 	//Remove the goal with the given handle 
 	UFUNCTION(BlueprintCallable, Category = "Goals")
 	void RemoveGoal(UNPCGoalItem* GoalToRemove);
@@ -166,6 +175,29 @@ public:
 	UNPCGoalItem* GetGoalByKey(const TSubclassOf<UNPCGoalItem>& GoalType, const UObject* Key, bool& OutSucceeded);
 
 protected:
+
+	// Actor-backed registered goals retire at destruction, before their own
+	// Blueprint timers can query a stale target. No saved fields or new tick.
+	void RefreshGoalKeyActorBindings();
+	UFUNCTION()
+	void OnGoalKeyActorDestroyed(AActor* DestroyedActor);
+	TSet<TWeakObjectPtr<AActor>> BoundGoalKeyActors;
+
+	// Saved component bytes can arrive during GameMode::InitGame, before the
+	// controller/component BeginPlay owner cache exists. Keep them intact until
+	// the real controller finishes initialization; never synthesize an owner.
+	void QueueSavedActivityRestore();
+	void RestoreSavedActivities();
+	bool OwnsSavedActivityRestore(uint64 Generation) const;
+	FTimerHandle TimerHandle_SavedActivityRestore;
+	TWeakObjectPtr<ANarrativeNPCController> SavedActivityLoadController;
+	TWeakObjectPtr<APawn> SavedActivityLoadPawn;
+	uint64 SavedActivityLoadPawnGeneration = 0;
+	uint64 SavedActivityLoadGeneration = 0;
+	bool bSavedActivityRestorePending = false;
+	bool bApplyingSavedActivities = false;
+	bool bSavedActivityLoadAccepted = true;
+	bool bActivityComponentEndingPlay = false;
 
 	void StopActivity_Internal(UNPCActivity* Activity, bool bCleanupBT = true);
 

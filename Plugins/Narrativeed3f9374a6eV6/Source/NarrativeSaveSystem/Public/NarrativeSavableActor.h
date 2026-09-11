@@ -30,6 +30,8 @@ public:
     virtual ENarrativeRestorePhase GetSaveRestorePhase() const { return ENarrativeRestorePhase::Interactables; }
 	/** Native owners may serialize this actor explicitly inside an existing owner record instead of world enumeration. */
 	virtual bool ShouldSaveWorldRecord() const { return true; }
+	/** Native terminal state can outlive an actor UObject (for example a visible NPC corpse). */
+	virtual bool IsSaveRecordDestroyed() const { return false; }
 	/** Required by default. Use only for cosmetic/DLC state whose absence cannot change canon or progression. */
 	UFUNCTION(BlueprintNativeEvent)
 	bool IsOptionalSaveRecord() const;

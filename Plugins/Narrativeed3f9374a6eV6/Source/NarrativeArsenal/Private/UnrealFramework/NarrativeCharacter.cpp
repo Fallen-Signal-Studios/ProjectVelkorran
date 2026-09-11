@@ -2,6 +2,7 @@
 
 
 #include "UnrealFramework/NarrativeCharacter.h"
+#include "UObject/StrongObjectPtr.h"
 #include "Net/UnrealNetwork.h"
 #include "GAS/NarrativeAttributeSetBase.h"
 #include "GAS/NarrativeGameplayAbility.h"
@@ -16,6 +17,7 @@
 #include <GameFramework/PlayerState.h>
 #include <MotionWarpingComponent.h>
 #include "Items/EquippableItem.h"
+#include "Items/InventoryComponent.h"
 #include <GameplayEffectTypes.h>
 #include <GameplayEffectExtension.h>
 #include "NarrativeGameplayTags.h"
@@ -662,34 +664,43 @@ void ANarrativeCharacter:: OnRep_CharVisual()
 
 void ANarrativeCharacter::OnCharacterVisualInitialized()
 {
-	//NPC and Player versions of this each grant items in here - that way appearance related items are guaranteed that the weapon visual is loaded in.
+	if (!IsValid(this) || IsActorBeingDestroyed()) { return; }
+	if (!ensureMsgf(IsValid(CharVisual), TEXT("OnCharacterVisualInitialized was called on %s but CharVisual pointer was null. This will cause fixups to fail."), *GetCharacterName().ToString())) { return; }
+	const TWeakObjectPtr<ANarrativeCharacterVisual> InitialVisual(CharVisual);
+	const auto IsCurrentVisual = [this, InitialVisual]()
+	{
+		return IsValid(this) && !IsActorBeingDestroyed() && InitialVisual.IsValid()
+			&& !InitialVisual->IsActorBeingDestroyed() && CharVisual == InitialVisual.Get();
+	};
+	if (!IsCurrentVisual()) { return; }
+	TStrongObjectPtr<ANarrativeCharacter> KeepCharacter(this);
+	TStrongObjectPtr<ANarrativeCharacterVisual> KeepVisual(InitialVisual.Get());
+
+	// NPC and Player versions have granted items before this notification.
 	CharacterVisualInitialized.Broadcast(this);
-
-	//NPC and Player characters now have their factions granted so we can add the map marker 
+	if (!IsCurrentVisual()) { return; }
 	RegisterCharacterMapMarker();
+	if (!IsCurrentVisual()) { return; }
 
-	ensureMsgf(IsValid(CharVisual), TEXT("OnCharacterVisualInitialized was called on %s but CharVisual pointer was null. This will cause fixups to fail."), *GetCharacterName().ToString());
-	
-	FString RoleStr = HasAuthority() ? "Server" : "Client";
-	
+	const FString RoleStr = HasAuthority() ? TEXT("Server") : TEXT("Client");
 	UE_LOG(LogNarrativeNet, Warning, TEXT("%s: Character %s is performing post visual fixups on our items. "), *RoleStr, *GetCharacterName().ToString());
 
-	if (!HasAuthority())
+	if (!HasAuthority() && IsValid(InventoryComponent))
 	{
-		/* In networked games, the visual may have not been available when our items replicated back - in fact this is typically the case.
-		What we need to do is iterate our items, and re-equip them now that the visual is ready. */
-		for (auto& Item : InventoryComponent->GetItems())
+		// Equip callbacks may replace the appearance or mutate the inventory.
+		const TWeakObjectPtr<UNarrativeInventoryComponent> InitialInventory(InventoryComponent);
+		const auto Items = InventoryComponent->GetItems();
+		for (auto& Item : Items)
 		{
 			if (UEquippableItem* Equippable = Cast<UEquippableItem>(Item))
 			{
-				if (Equippable->IsEquipped())
+				if (IsValid(Equippable) && Equippable->IsEquipped())
 				{
 					Equippable->HandleEquip();
+					if (!IsCurrentVisual() || !InitialInventory.IsValid() || InventoryComponent != InitialInventory.Get()) { return; }
 				}
-			}           
+			}
 		}
-
-		//Recall this as our character visual may not have been ready when these initially repped back.
 		OnRep_WieldState(FWeaponWieldState());
 	}
 }
@@ -996,10 +1007,12 @@ FGameplayAbilitySpecHandle ANarrativeCharacter::AddAbility(TSubclassOf<class UNa
 
 		for (const FGameplayAbilitySpec& Spec : AbilitySystemComponent->GetActivatableAbilities())
 		{
-			if ((Spec.SourceObject == SourceObject) && Spec.Ability->GetClass() == Ability)
+			if (!Spec.PendingRemove && Spec.Ability && (Spec.SourceObject == SourceObject) && Spec.Ability->GetClass() == Ability)
 			{
-				UE_LOG(LogNarrativeAbilities, Verbose, TEXT("tried granting ability %s that was already granted"), *GetNameSafe(Ability));
-				return FGameplayAbilitySpecHandle();
+				// Reapplying an equipment/wield state must retain the source's cleanup
+				// handle. Returning an invalid handle loses ownership of the existing
+				// grant, leaving stale weapon abilities behind on inventory restore.
+				return Spec.Handle;
 			}
 		}
 				

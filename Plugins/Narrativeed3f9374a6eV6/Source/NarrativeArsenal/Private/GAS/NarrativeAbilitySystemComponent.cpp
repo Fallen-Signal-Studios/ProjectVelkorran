@@ -903,27 +903,53 @@ void UNarrativeAbilitySystemComponent::OnRep_bIsDead(const bool bOldIsDead)
 
 void UNarrativeAbilitySystemComponent::Load_Implementation()
 {
+	const uint64 LoadEpoch = ++SavedAttributeLoadEpoch;
+	const uint64 ActorEpoch = CombatActorInfoEpoch;
+	const TWeakObjectPtr<AActor> Avatar = GetAvatarActor();
+	const TWeakObjectPtr<AActor> Owner = GetOwner();
+	const bool bHadAvatar = Avatar.IsValid(), bHadOwner = Owner.IsValid();
+	const auto Values = SavedAttributes;
+	const auto AllowedAttributes = AttributesToSave;
+	const auto IsCurrent = [this, LoadEpoch, ActorEpoch, Avatar, Owner, bHadAvatar, bHadOwner]()
+	{
+		return IsValid(this) && !IsBeingDestroyed() && SavedAttributeLoadEpoch == LoadEpoch && CombatActorInfoEpoch == ActorEpoch
+			&& GetOwner() == Owner.Get() && (!bHadOwner || (Owner.IsValid() && !Owner->IsActorBeingDestroyed()))
+			&& GetAvatarActor() == Avatar.Get() && (!bHadAvatar || (Avatar.IsValid() && !Avatar->IsActorBeingDestroyed()));
+	};
 	TArray<FGameplayAttribute> OurAttributes;
 	GetAllAttributes(OurAttributes);
-
-	//Iterate our attributes
-	for (auto& Attribute : OurAttributes)
+	for (const auto& Attribute : OurAttributes)
 	{
-		if (AttributesToSave.Contains(Attribute))
+		if (!IsCurrent()) { return; }
+		if (!AllowedAttributes.Contains(Attribute)) { continue; }
+		for (const auto& Value : Values)
 		{
-			//Search the attribute in the saved ones
-			for (auto& SA : SavedAttributes)
+			if (Value.AttributeName == Attribute.AttributeName)
 			{
-				//Once we find, restore it, and break
-				if (SA.AttributeName == Attribute.AttributeName)
-				{
-					ApplyModToAttribute(Attribute, EGameplayModOp::Override, SA.Value);
-					break;
-				}
+				ApplyModToAttribute(Attribute, EGameplayModOp::Override, Value.Value);
+				if (!IsCurrent()) { return; }
+				break;
 			}
 		}
 	}
-
+	// Older NPC records saved initialized zero Health but omitted the native death latch.
+	// Restore that terminal state without replaying damage, death gameplay events or rewards.
+	const auto Health = UNarrativeAttributeSetBase::GetHealthAttribute();
+	const auto MaxHealth = UNarrativeAttributeSetBase::GetMaxHealthAttribute();
+	const auto* SavedHealth = Values.FindByPredicate([&Health](const FSavedAttribute& Value)
+		{ return Value.AttributeName == Health.AttributeName; });
+	const auto* SavedMax = Values.FindByPredicate([&MaxHealth](const FSavedAttribute& Value)
+		{ return Value.AttributeName == MaxHealth.AttributeName; });
+	const auto* NPC = Cast<ANarrativeNPCCharacter>(Avatar.Get());
+	if (IsCurrent() && NPC && NPC->GetNarrativeAbilitySystemComponent() == this && GetOwnerRole() >= ROLE_Authority
+		&& !bIsDead && AllowedAttributes.Contains(Health) && AllowedAttributes.Contains(MaxHealth)
+		&& SavedHealth && FMath::IsFinite(SavedHealth->Value) && SavedHealth->Value == 0.f
+		&& SavedMax && FMath::IsFinite(SavedMax->Value) && SavedMax->Value > 0.f
+		&& GetNumericAttribute(Health) == 0.f && GetNumericAttribute(MaxHealth) > 0.f)
+	{
+		bIsDead = true;
+		OnRep_bIsDead(false);
+	}
 }
 
 void UNarrativeAbilitySystemComponent::PrepareForSave_Implementation()

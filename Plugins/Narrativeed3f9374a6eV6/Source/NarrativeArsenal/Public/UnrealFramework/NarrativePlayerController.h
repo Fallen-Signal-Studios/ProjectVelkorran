@@ -169,6 +169,10 @@ public:
 
 protected:
 
+	/** Native admission precedes Blueprint death presentation; default behavior is unchanged. */
+	UFUNCTION() void HandleDeathNotification(AActor* KilledActor, UNarrativeAbilitySystemComponent* KilledActorASC, bool bIsDead);
+	virtual void RouteDeathNotification(AActor* KilledActor, UNarrativeAbilitySystemComponent* KilledActorASC, bool bIsDead);
+
 	//Gives our playercontroller a chance to react to death.
 	UFUNCTION(BlueprintNativeEvent, Category = "Narrative|NarrativeCharacter")
 	void HandleDeath(AActor* KilledActor, UNarrativeAbilitySystemComponent* KilledActorASC, const bool bIsDead);

@@ -58,6 +58,16 @@ ANarrativePlayerController::ANarrativePlayerController(const class FObjectInitia
 
 }
 
+void ANarrativePlayerController::HandleDeathNotification(AActor* KilledActor, UNarrativeAbilitySystemComponent* KilledActorASC, bool bIsDead)
+{
+	RouteDeathNotification(KilledActor, KilledActorASC, bIsDead);
+}
+
+void ANarrativePlayerController::RouteDeathNotification(AActor* KilledActor, UNarrativeAbilitySystemComponent* KilledActorASC, bool bIsDead)
+{
+	HandleDeath(KilledActor, KilledActorASC, bIsDead);
+}
+
 void ANarrativePlayerController::HandleDeath_Implementation(AActor* KilledActor, UNarrativeAbilitySystemComponent* KilledActorASC, const bool bIsDead)
 {
 	if (bIsDead)
@@ -96,7 +106,7 @@ void ANarrativePlayerController::OnPossess(APawn* InPawn)
 	{
 		if (UNarrativeAbilitySystemComponent* NASC = Cast<UNarrativeAbilitySystemComponent>(PS->GetAbilitySystemComponent()))
 		{
-			NASC->OnDeathStateChanged.AddUniqueDynamic(this, &ThisClass::HandleDeath);
+			NASC->OnDeathStateChanged.AddUniqueDynamic(this, &ThisClass::HandleDeathNotification);
 		}
 	}
 
@@ -138,7 +148,7 @@ void ANarrativePlayerController::OnRep_PlayerState()
 		// Init ASC with PS (Owner) and our new Pawn (AvatarActor)
 		if (UNarrativeAbilitySystemComponent* NASC = Cast<UNarrativeAbilitySystemComponent>(PS->GetAbilitySystemComponent()))
 		{
-			NASC->OnDeathStateChanged.AddUniqueDynamic(this, &ThisClass::HandleDeath);
+			NASC->OnDeathStateChanged.AddUniqueDynamic(this, &ThisClass::HandleDeathNotification);
 		}
 	}
 
