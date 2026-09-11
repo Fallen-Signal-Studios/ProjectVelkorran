@@ -875,6 +875,17 @@ void USovCommandLinkComponent::DeactivateWithoutSever()
 	{
 		return;
 	}
+	// A completed sever is a durable transaction: it has a recorded transaction id, a
+	// retained receipt, and it may already have paid an Echo reward. Losing the command
+	// source afterwards ends nothing that is still running, so Severed must survive.
+	// Withdrawing it would strip the earned Severed tag from living participants and
+	// let a later activation sever the same link a second time.
+	// Checked here rather than at the call sites so the deferred source-loss paths are
+	// evaluated when they actually run, not when they were requested.
+	if (ReplicationState.State == ESovCommandLinkState::Severed)
+	{
+		return;
+	}
 	if (bCommandLinkMutationInProgress)
 	{
 		bDeferredDeactivateRequested = true;
@@ -1061,6 +1072,12 @@ void USovCommandLinkComponent::HandleParticipantDeathStateChanged(
 	{
 		if (bIsDead)
 		{
+			// Retire the dead source's own contributions before attempting deactivation.
+			// On a severed link the deactivation below is deliberately a no-op, so this
+			// is what stops a dead commander from retaining a live tag count while the
+			// survivors keep the severed state they earned. Removal is idempotent, so
+			// the non-severed path that clears every participant is unaffected.
+			RemoveParticipantContributions(ChangedActor);
 			DeactivateWithoutSever();
 		}
 		else if (bStartsActive)
