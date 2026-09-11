@@ -6,6 +6,7 @@
 #include "GameplayEffect.h"
 #include "Tales/NarrativeEvent.h"
 #include "Campaign/SovCampaignDefinition.h"
+#include "Character/CharacterDefinition.h"
 #include "Framework/SovPlayerController.h"
 #include "Misc/PackageName.h"
 #include "Misc/Parse.h"
@@ -139,6 +140,9 @@ namespace
 						&& !KnownClass->IsChildOf(USovCorruptionProfile::StaticClass()) && !KnownClass->IsChildOf(UDialogue::StaticClass())
 						&& !KnownClass->IsChildOf(UBlueprint::StaticClass())
                         && !KnownClass->IsChildOf(UGameplayEffect::StaticClass())
+                        // Character definitions carry the default item loadout, which is where a
+                        // Narrative demo/template weapon can reach a campaign actor.
+                        && !KnownClass->IsChildOf(UCharacterDefinition::StaticClass())
                         && !KnownClass->IsChildOf(UNarrativeEvent::StaticClass())) { continue; }
 					UObject* Asset = Data.GetAsset();
 					if (!Asset) { UE_LOG(LogSovMission, Error, TEXT("Could not load dependency asset %s."), *Data.GetObjectPathString()); ++Errors; continue; }

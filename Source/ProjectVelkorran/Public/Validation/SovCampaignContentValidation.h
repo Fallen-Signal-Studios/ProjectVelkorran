@@ -15,6 +15,13 @@ PROJECTVELKORRAN_API bool ParseAssetListArgument(const FString& Params, const TC
  * Empty means no known prohibited system was identified, not arbitrary Blueprint certification. */
 PROJECTVELKORRAN_API FString ProhibitedAssetReason(const UObject* Asset);
 
+/** Narrative Pro demo/template items granted by a campaign character's default loadout.
+ * Aurelion roles must carry authored project equipment or rely on their ability kit; a demo
+ * placeholder reaching a campaign actor is a content defect, not a framework fault. Soft paths
+ * are inspected without loading, so demo content is never pulled into the validation process.
+ * Empty means no demo item grant was found. */
+PROJECTVELKORRAN_API FString DemoItemLoadoutReason(const UObject* Asset);
+
 /** Read effective production AlwaysCook rules, including bundle packages, without changing cook settings.
  * The existing dependency walker must traverse these roots as well as explicit mission roots. */
 PROJECTVELKORRAN_API bool GatherAlwaysCookPackages(UAssetManager& Manager, TArray<FName>& OutPackages, FString& Error);

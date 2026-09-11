@@ -3,6 +3,7 @@
 #include "AssetRegistry/AssetBundleData.h"
 #include "AssetRegistry/AssetData.h"
 #include "Blueprint/UserWidget.h"
+#include "Character/CharacterDefinition.h"
 #include "Engine/AssetManager.h"
 #include "Engine/Blueprint.h"
 #include "GameplayEffect.h"
@@ -36,6 +37,46 @@ namespace
         { return TEXT("multiplayer main menu W_NarrativeMenu_MPMainMenu"); }
         return {};
     }
+
+    /** Narrative ships its demo items under this root. Demo VFX and audio are legitimately
+     * referenced elsewhere, so only the item tree is treated as a loadout defect. */
+    const TCHAR* DemoItemRoot = TEXT("/NarrativePro/Pro/Demo/Items/");
+
+    bool IsDemoItemPath(const FSoftObjectPath& Path)
+    {
+        return !Path.IsNull() && Path.ToString().Contains(DemoItemRoot, ESearchCase::IgnoreCase);
+    }
+}
+
+FString SovCampaignContentValidation::DemoItemLoadoutReason(const UObject* Asset)
+{
+    const UCharacterDefinition* Definition = Cast<UCharacterDefinition>(Asset);
+    if (!Definition) { return {}; }
+    for (const FLootTableRoll& Roll : Definition->DefaultItemLoadout)
+    {
+        for (const FItemWithQuantity& Grant : Roll.ItemsToGrant)
+        {
+            // Soft path only: a demo placeholder must never be loaded to be reported.
+            if (IsDemoItemPath(Grant.Item.ToSoftObjectPath()))
+            {
+                return FString::Printf(TEXT("Narrative demo/template item grant %s in the default loadout"),
+                    *Grant.Item.ToString());
+            }
+        }
+        for (const UItemCollection* Collection : Roll.ItemCollectionsToGrant)
+        {
+            if (!IsValid(Collection)) { continue; }
+            for (const FItemWithQuantity& Grant : Collection->Items)
+            {
+                if (IsDemoItemPath(Grant.Item.ToSoftObjectPath()))
+                {
+                    return FString::Printf(TEXT("Narrative demo/template item grant %s through collection %s"),
+                        *Grant.Item.ToString(), *Collection->GetName());
+                }
+            }
+        }
+    }
+    return {};
 }
 
 bool SovCampaignContentValidation::ParseAssetListArgument(const FString& Params, const TCHAR* Match, TArray<FString>& OutPaths)
@@ -60,6 +101,9 @@ FString SovCampaignContentValidation::ProhibitedAssetReason(const UObject* Asset
     if (!EffectiveClass) { EffectiveClass = Asset->GetClass(); }
 
     FString Reason = KnownSystemReason(AuthoredName(Asset->GetName()), EffectiveClass);
+    if (!Reason.IsEmpty()) { return Reason; }
+
+    Reason = DemoItemLoadoutReason(Asset);
     if (!Reason.IsEmpty()) { return Reason; }
     // A renamed child retains its actual authored parent, even when moved outside the legacy directory.
     for (const UClass* Ancestor = EffectiveClass; Ancestor; Ancestor = Ancestor->GetSuperClass())
