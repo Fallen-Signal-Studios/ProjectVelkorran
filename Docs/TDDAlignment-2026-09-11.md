@@ -38,7 +38,7 @@ base for domain internals; this one has the more current repository facts.
 |---|---:|---:|---:|---|
 | Combat, protagonists, movement and AI | 30% | 39.8–54.8% | 42–57% | Threat memory, attack integration, +176 tests |
 | Campaign, narrative, progression, world, companions | 35% | 18.7–26.75% | 22–30% | Aurelion contracts, graybox, Evidence/Data authoring |
-| HUD, accessibility and localization | 10% | 30–45% | 33–48% | Contextual HUD landed |
+| HUD, accessibility and localization | 10% | 30–45% | 33–48% | Contextual HUD landed; see section 13 conformance below — likely near the top of this band |
 | Art, animation, cinematics and audio | 10% | 15–30% | 15–30% | **Unchanged** — no art/VO/cinematic work |
 | Runtime architecture and save contracts | 8% | 50–65% | 55–70% | Save/world coverage, build integrity |
 | Asset pipeline, platforms, production and QA | 7% | 15–30% | 18–33% | Content preflight, validation harness |
@@ -99,6 +99,44 @@ These are code- or data-level and remain unresolved:
 6. **`ProjectVelkorranTests` sets `bUseUnity = false`**, which masks this class of collision in the test
    module. The Editor module's collisions were fixed at the root rather than papered over; the Tests
    module workaround remains and could hide future duplicates.
+
+## Section 13 conformance findings
+
+`SovTDDSection13ConformanceTests.cpp` adds seven suites that assert TDD section 13 clauses against the
+live settings surface, each naming the clause it enforces. Before this, 584 automation tests existed and
+none referenced a TDD clause — alignment was estimated by hand against a document the suite had no link
+to. Assertions read through the gameplay-facing getters rather than the stored snapshot, so a control
+that persists a value but never reaches gameplay fails rather than passes.
+
+Results on first run: **six of seven passed unchanged.** The seventh failed on a fault in the test, not
+the product — it assumed a fresh instance begins at first boot, but `USovSettingsTestSettings` inherits
+`config=GameUserSettings`, so this PC's `bAccessibilitySetupCompleted=True` loads into the class default
+and every new instance copies it. `SovAccessibilityFrontendRuntimeTests.cpp` had already documented this
+hazard; the conformance test now uses the same reflection idiom to stage the precondition and compares
+persistence counts relatively rather than absolutely.
+
+Two findings follow, and both push this domain **upward** relative to the previous report:
+
+1. **The six-second combat fade is delivered.** The 2026-09-06 report recorded it as a separate gap
+   requiring "a reliable shared threat/participation signal." `SovCombatHUDQuiet` now provides exactly
+   that: `HasNativeThreat` walks native AI threat memory, and `FState::Update` returns opacity after six
+   quiet seconds plus a 0.35s transition. It is wired into `SovCombatVitalsWidget` and covered by
+   `SovCombatHUDQuietRuntimeTests.cpp`, including cross-world isolation, confidence expiry, hidden actors
+   and retired controllers.
+2. **Sections 13.3, 13.4, 13.8 and 13.9 were already satisfied** by the existing settings surface. Several
+   section 13.9 controls that appear absent from `FSovUserSettingsSnapshot` — audio dynamic range,
+   ambience and tinnitus volumes, motion blur, field of view — are inherited from
+   `UNarrativeGameUserSettings` and were wrongly counted as missing on first inspection.
+
+**No percentage credit is claimed for adding tests.** Coverage is not alignment. The estimate stays at
+~37%: this domain carries 10% weight, so even moving it to the top of its band shifts the weighted total
+by under half a point. What changed is confidence, not completion.
+
+Section 13 clauses that remain **outside native scope** and still gate this domain: authored widget
+layout and safe-zone behaviour across 80–100% display areas (13.4); per-language subtitle collision
+against HUD and ultrawide safe areas (13.10); recruited accessibility testing (13.10); and localization
+string-table discipline with 30–40% expansion allowance (13.11). These need real displays, real
+languages and real testers.
 
 ## Approved differences preserved
 
