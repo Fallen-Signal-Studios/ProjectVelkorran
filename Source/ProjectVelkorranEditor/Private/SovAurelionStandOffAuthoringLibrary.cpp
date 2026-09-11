@@ -18,13 +18,13 @@
 namespace SovStandOff
 {
 constexpr TCHAR QueryPackage[] = TEXT("/Game/Aurelion/Enemies/EQS_AurelionSecurityStandOff");
-constexpr TCHAR QueryPath[] = TEXT("/Game/Aurelion/Enemies/EQS_AurelionSecurityStandOff.EQS_AurelionSecurityStandOff");
-constexpr TCHAR TreePath[] = TEXT("/Game/Aurelion/Enemies/BT_AurelionSecurityCrossfire.BT_AurelionSecurityCrossfire");
+constexpr TCHAR StandOffQueryPath[] = TEXT("/Game/Aurelion/Enemies/EQS_AurelionSecurityStandOff.EQS_AurelionSecurityStandOff");
+constexpr TCHAR StandOffTreePath[] = TEXT("/Game/Aurelion/Enemies/BT_AurelionSecurityCrossfire.BT_AurelionSecurityCrossfire");
 constexpr TCHAR SourcePath[] = TEXT("/NarrativePro/Pro/Core/AI/Activities/Attacks/EQS/EQS_Move_ToAttackTarget.EQS_Move_ToAttackTarget");
 constexpr TCHAR ContextPath[] = TEXT("/NarrativePro/Pro/Core/AI/Activities/Attacks/EQS/EQSContext_AttackTarget.EQSContext_AttackTarget_C");
 constexpr TCHAR BusyPath[] = TEXT("/NarrativePro/Pro/Core/AI/Activities/Attacks/EQS/EQS_Move_LookBusy.EQS_Move_LookBusy");
 constexpr TCHAR CrossfirePath[] = TEXT("/Game/Aurelion/Enemies/EQS_AurelionSecurityCrossfire.EQS_AurelionSecurityCrossfire");
-constexpr TCHAR StrafePath[] = TEXT("/NarrativePro/Pro/Core/AI/Activities/Attacks/EQS/EQS_Move_RangedStrafe_GetClose.EQS_Move_RangedStrafe_GetClose");
+constexpr TCHAR StandOffStrafePath[] = TEXT("/NarrativePro/Pro/Core/AI/Activities/Attacks/EQS/EQS_Move_RangedStrafe_GetClose.EQS_Move_RangedStrafe_GetClose");
 constexpr TCHAR GuardName[] = TEXT("StandOffTargetRange");
 constexpr float Radius = 1200.f, Spacing = 240.f, Minimum = 1000.f, Maximum = 3000.f;
 
@@ -177,7 +177,7 @@ UBTTask_RunEQSQuery* Fallback(UBehaviorTree* Tree, bool bInstalled, FString& Err
         if (!Node) { return; }
         if (Node->Children.Num() == 4)
         {
-            const TCHAR* Paths[] = {BusyPath, CrossfirePath, StrafePath, bInstalled ? QueryPath : SourcePath};
+            const TCHAR* Paths[] = {BusyPath, CrossfirePath, StandOffStrafePath, bInstalled ? StandOffQueryPath : SourcePath};
             bool Match = true;
             for (int32 I = 0; I < 4; ++I)
             {
@@ -241,15 +241,15 @@ FSovAurelionStandOffInspection USovAurelionStandOffAuthoringLibrary::InspectStan
     FSovAurelionStandOffInspection R; R.bInstalled = bRequireInstalled;
     if (!GEditor || GEditor->PlayWorld) { R.Error = TEXT("Requires editor outside PIE."); return R; }
     auto* Source = LoadObject<UEnvQuery>(nullptr, SourcePath);
-    auto* Tree = LoadObject<UBehaviorTree>(nullptr, TreePath); R.Tree = Tree;
+    auto* Tree = LoadObject<UBehaviorTree>(nullptr, StandOffTreePath); R.Tree = Tree;
     if (!SourceShape(Source, R.Error)) { return R; }
     R.SourceQuerySnapshot = QuerySnapshot(Source, true);
     auto* Task = Fallback(Tree, bRequireInstalled, R.Error);
     if (!Task) { return R; }
     R.TreeSnapshot = TreeSnapshot(Tree, nullptr, Source);
     R.TreePreservedSnapshot = TreeSnapshot(Tree, bRequireInstalled ? Task : nullptr, Source);
-    UEnvQuery* Query = FindObject<UEnvQuery>(nullptr, QueryPath);
-    if (!Query && FPackageName::DoesPackageExist(QueryPackage)) { Query = LoadObject<UEnvQuery>(nullptr, QueryPath); }
+    UEnvQuery* Query = FindObject<UEnvQuery>(nullptr, StandOffQueryPath);
+    if (!Query && FPackageName::DoesPackageExist(QueryPackage)) { Query = LoadObject<UEnvQuery>(nullptr, StandOffQueryPath); }
     R.Query = Query;
     if (bRequireInstalled || Query)
     {
@@ -377,7 +377,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovStandOffTreeDeltaTest,
 bool FSovStandOffTreeDeltaTest::RunTest(const FString& Parameters)
 {
     using namespace SovStandOff;
-    auto* Actual = LoadObject<UBehaviorTree>(nullptr, TreePath);
+    auto* Actual = LoadObject<UBehaviorTree>(nullptr, StandOffTreePath);
     auto* Source = LoadObject<UEnvQuery>(nullptr, SourcePath);
     if (!TestNotNull(TEXT("Saved owned tree"), Actual) || !TestNotNull(TEXT("Stock query"), Source)) { return false; }
     auto* Tree = Cast<UBehaviorTree>(StaticDuplicateObject(Actual, GetTransientPackage(), MakeUniqueObjectName(GetTransientPackage(), UBehaviorTree::StaticClass())));

@@ -26,7 +26,7 @@ constexpr TCHAR StrafePath[] = TEXT("/NarrativePro/Pro/Core/AI/Activities/Attack
 constexpr TCHAR LookBusyPath[] = TEXT("/NarrativePro/Pro/Core/AI/Activities/Attacks/EQS/EQS_Move_LookBusy.EQS_Move_LookBusy");
 bool Editing() { return GEditor && !GEditor->PlayWorld; }
 
-FString RuntimeSnapshot(const UBehaviorTree* Tree, const UBTNode* Omit = nullptr)
+FString AuthoringRuntimeSnapshot(const UBehaviorTree* Tree, const UBTNode* Omit = nullptr)
 {
     FString Result;
     const auto Normalize = [Tree](FString Text)
@@ -119,7 +119,7 @@ FSovAurelionCrossfireAuthoringResult USovAurelionCrossfireAuthoringLibrary::Crea
     TArray<UBTCompositeNode*> SourceChoosers; FindChoosers(Source ? Source->RootNode.Get() : nullptr, SourceChoosers);
     if (!Source || !Source->BlackboardAsset || SourceChoosers.Num() != 1)
     { R.Error = TEXT("Installed stock ranged chooser differs from the reviewed three-branch structure."); return R; }
-    R.SourceRuntimeNodes = RuntimeSnapshot(Source);
+    R.SourceRuntimeNodes = AuthoringRuntimeSnapshot(Source);
     // Actual Z01_Floor top is 0cm, XY [-8300,-5700] x [-17500,-11900].
     // The authored 0..2m combat elevation band admits Recast's small floor offset.
     FSovAurelionCrossfireBounds Bounds;
@@ -144,8 +144,8 @@ FSovAurelionCrossfireAuthoringResult USovAurelionCrossfireAuthoringLibrary::Crea
     // No stale editable graph may reconstruct away the inserted runtime node.
     // Stock BehaviorTree editor reconstructs a missing graph from runtime nodes.
     Tree->BTGraph = nullptr; Tree->LastEditedDocuments.Reset(); uint16 Index = 0; IndexTree(Tree->RootNode, nullptr, 0, Index);
-    R.PreservedRuntimeNodes = RuntimeSnapshot(Tree,Task);
-    if (R.SourceRuntimeNodes != R.PreservedRuntimeNodes || RuntimeSnapshot(Source) != R.SourceRuntimeNodes)
+    R.PreservedRuntimeNodes = AuthoringRuntimeSnapshot(Tree,Task);
+    if (R.SourceRuntimeNodes != R.PreservedRuntimeNodes || AuthoringRuntimeSnapshot(Source) != R.SourceRuntimeNodes)
     { R.Error = TEXT("An original attack service, fallback, decorator, blackboard or MoveTo changed during duplication."); return R; }
     FAssetRegistryModule::AssetCreated(Query); FAssetRegistryModule::AssetCreated(Tree);
     Query->MarkPackageDirty(); Tree->MarkPackageDirty();
