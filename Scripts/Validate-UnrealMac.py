@@ -163,6 +163,36 @@ def describe_failures(report: dict) -> str:
     return "\nFailing tests:\n" + "\n".join(lines)
 
 
+# A test that genuinely cannot execute because a declared prerequisite is absent emits this marker.
+# It is deliberately a distinct state from both pass and fail: the code was never exercised, so the
+# run carries no evidence about it either way. Nothing may treat it as a pass.
+UNRUNNABLE_MARKER = "PREREQUISITE_MISSING"
+
+
+def classify_tests(report: dict, filter_name: str) -> tuple:
+    """Split selected tests into passed, failed and unrunnable.
+
+    Unrunnable is detected from the test's own entries rather than inferred by the gate, so a test
+    declares its own inability to run and cannot be silently excused from outside.
+    """
+    passed, failed, unrunnable = [], [], []
+    for test in report.get("tests", []):
+        path = test.get("fullTestPath", "")
+        if not path.startswith(filter_name):
+            continue
+        entries = test.get("entries", [])
+        declares_unrunnable = any(
+            UNRUNNABLE_MARKER in str(entry.get("event", {}).get("message", ""))
+            for entry in entries)
+        if test.get("state") not in ("Success", "SuccessWithWarnings"):
+            failed.append(path)
+        elif declares_unrunnable:
+            unrunnable.append(path)
+        else:
+            passed.append(path)
+    return passed, failed, unrunnable
+
+
 def validate_report(report_path: Path, filter_name: str) -> tuple:
     """Validate the automation report itself. A zero process exit code is not a pass."""
     if not report_path.is_file():
@@ -186,7 +216,37 @@ def validate_report(report_path: Path, filter_name: str) -> tuple:
         state = test.get("state")
         if state not in ("Success", "SuccessWithWarnings"):
             raise ValidationError(f"Automation test did not pass: {test.get('fullTestPath')} (state={state}).")
-    return report, selected
+    _, _, unrunnable = classify_tests(report, filter_name)
+    return report, selected, unrunnable
+
+
+PREREQUISITE_EXITS = {
+    0: "all satisfied",
+    2: "a required production dependency is MISSING — dependent tests are expected to fail",
+    3: "a prerequisite is missing, so dependent tests are UNRUNNABLE",
+    4: "the prerequisite manifest itself is violated",
+}
+
+
+def check_prerequisites(run_dir: Path, python_exe) -> dict:
+    """Run the content prerequisite check before automation, so a content cause is visible first.
+
+    Never raises: the run continues so every other result is still gathered. The aggregate verdict
+    at the end refuses qualification on anything but exit 0.
+    """
+    checker = ROOT / "Scripts/Check-ContentPrerequisites.py"
+    report_path = run_dir / "content-prerequisites.json"
+    exit_code = run_logged(run_dir, "ContentPrerequisites",
+                           [str(python_exe), str(checker), "--json", str(report_path)], 300)
+    meaning = PREREQUISITE_EXITS.get(exit_code, f"unexpected exit {exit_code}")
+    print(f"     content prerequisites: {meaning}")
+    detail = {}
+    if report_path.is_file():
+        try:
+            detail = json.loads(report_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            detail = {}
+    return {"exit": exit_code, "meaning": meaning, "summary": detail.get("summary", {})}
 
 
 def main() -> int:
@@ -254,6 +314,10 @@ def main() -> int:
                                             "--output", str(before_manifest)], 300) != 0:
         raise ValidationError("Could not capture build inputs and native registrations.")
 
+    prerequisites = check_prerequisites(run_dir, python_exe)
+    summary["contentPrerequisites"] = prerequisites
+    flush_summary()
+
     if not args.skip_build:
         targets = ["ProjectVelkorranEditor"] + (["ProjectVelkorran"] if args.build_game else [])
         for target in targets:
@@ -289,8 +353,10 @@ def main() -> int:
         flush_summary()
         print("Build skipped; module binary freshness verified. Automation was not run."
               if args.skip_build else "Mac build succeeded. Automation was not run.")
+        if prerequisites["exit"] != 0:
+            print(f"  content prerequisites: {prerequisites['meaning']}")
         report_outstanding()
-        return 0
+        return 0 if prerequisites["exit"] == 0 else 3
 
     report_dir = run_dir / "AutomationReport"
     editor_log = run_dir / "UnrealEditor.log"
@@ -307,7 +373,7 @@ def main() -> int:
     if exit_code != 0:
         raise ValidationError(f"Unreal automation process failed with exit code {exit_code}.")
 
-    report, selected = validate_report(report_dir / "index.json", args.filter)
+    report, selected, unrunnable = validate_report(report_dir / "index.json", args.filter)
 
     coverage = run_dir / "coverage.json"
     if run_logged(run_dir, "ReportCoverage", [str(python_exe), str(ROOT / "Scripts/Check-UnrealReport.py"),
@@ -325,12 +391,35 @@ def main() -> int:
 
     summary["sourceIntegrity"] = ("unchanged during automation; binary freshness asserted by mtime"
                                   if args.skip_build else "unchanged during build and automation")
-    summary["automation"] = (f"passed {len(selected)} matching tests; "
-                             f"warnings={report['succeededWithWarnings']}")
+    summary["automation"] = (f"passed {len(selected) - len(unrunnable)} matching tests; "
+                             f"unrunnable={len(unrunnable)}; warnings={report['succeededWithWarnings']}")
+    summary["unrunnableTests"] = unrunnable
     summary["finishedUtc"] = _dt.datetime.now(_dt.timezone.utc).isoformat()
+
+    # Aggregate verdict. Every automation test passed by this point, but that alone is not
+    # qualification: a missing prerequisite or an unrunnable test means the run carries no evidence
+    # about part of the suite, and absence of evidence is never a pass.
+    blockers = []
+    if prerequisites["exit"] != 0:
+        blockers.append(f"content prerequisites: {prerequisites['meaning']}")
+    if unrunnable:
+        blockers.append(f"{len(unrunnable)} test(s) declared themselves unrunnable: "
+                        + ", ".join(unrunnable[:5]))
+    summary["verdict"] = "NOT QUALIFIED" if blockers else "QUALIFIED"
     flush_summary()
 
-    print(f"\nmacOS validation passed: {len(selected)} matching automation tests.")
+    if blockers:
+        print(f"\nmacOS run NOT QUALIFIED, though every executed test passed "
+              f"({len(selected) - len(unrunnable)} of {len(selected)} matched tests ran).")
+        for blocker in blockers:
+            print(f"  - {blocker}")
+        print("Unrunnable and missing prerequisites are not passes.")
+        print(f"Report: {report_dir / 'index.json'}")
+        report_outstanding()
+        return 3
+
+    print(f"\nmacOS validation passed: {len(selected)} matching automation tests, "
+          f"0 unrunnable, all content prerequisites satisfied.")
     print(f"Report: {report_dir / 'index.json'}")
     report_outstanding()
     return 0

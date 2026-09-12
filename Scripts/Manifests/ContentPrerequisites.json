@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "policy": {
+    "rule": "An automation test may only depend on version-controlled content. Content that exists on one machine and nowhere else cannot qualify the project, because its result describes the machine rather than the code.",
+    "tracked_content_roots": [
+      "Source/",
+      "Config/",
+      "Scripts/",
+      "Tests/",
+      "Content/Aurelion/",
+      "Content/Cues/",
+      "Plugins/"
+    ],
+    "categories": {
+      "project_owned": "Project-authored production asset. Belongs in version control. Absence FAILS validation; it is never downgraded to unrunnable, because a missing required production dependency is a defect.",
+      "external": "Third-party, marketplace or plugin dependency that stays outside this repository by licensing or policy. Absence makes dependent tests UNRUNNABLE. Never passed.",
+      "optional": "Content whose absence genuinely prevents a test from executing, and whose presence is not required for production. UNRUNNABLE. Never passed."
+    },
+    "aggregate_rule": "A gate may report full qualification only when no required prerequisite is missing AND no dependent test is unrunnable. Absence of evidence is never equivalent to pass.",
+    "on_absence_values": ["fail", "unrunnable", "ignore"]
+  },
+  "prerequisites": [
+    {
+      "id": "gameplay-cue-override-root",
+      "content_path": "/Game/Cues",
+      "disk_path": "Content/Cues",
+      "kind": "directory",
+      "category": "project_owned",
+      "origin": "Project-authored forked copies of the eleven cue notifies under /NarrativePro/Pro/Core/Abilities/Cues, carrying the same GameplayCue tags and overriding them.",
+      "production_dependency": true,
+      "required_for_runtime": true,
+      "evidence": [
+        "Config/DefaultGame.ini declares exactly one scan root: +GameplayCueNotifyPaths=\"/Game/Cues\".",
+        "Editor enumeration by native parent class in this checkout finds 22 cue notify registry entries, all under /NarrativePro/Pro/Core/Abilities/Cues and zero under /Game/Cues, so a clone registers no project cue notifies at all.",
+        "Docs/AwayEngineeringLog-2026-09-11.md Priority 3 recorded 22 entries (11 assets) in each root on the authoring machine."
+      ],
+      "consequence_if_absent": "Cue resolution is broken at runtime, not merely in tests: the single configured root contributes nothing, so no project cue notify registers.",
+      "licensing": {
+        "tracking_permitted": true,
+        "rationale": "The repository already tracks 10,270 .uasset files of the customised Narrative fork under Plugins/, including the eleven cue originals these assets override. Tracking project-authored derivatives of already-tracked content introduces no new licensing exposure."
+      },
+      "tracked": false,
+      "on_absence": "fail",
+      "dependent_tests": [
+        "ProjectVelkorran.Campaign.Validation.GameplayCuesStillResolve"
+      ],
+      "action_required": "Commit Content/Cues from the authoring machine. .gitignore now permits the path (!/Content/Cues/). Until then this prerequisite is missing and validation fails, which is the correct signal.",
+      "do_not": "Do not widen GameplayCueNotifyPaths back to /Game or add the fork root to accommodate the absence. Priority 3 measured that adding the fork root registers duplicate tags and silently discards some project overrides."
+    }
+  ],
+  "retired_dependencies": [
+    {
+      "id": "reformation-combat-drone-seed",
+      "content_path": "/Game/SciFi_Drone_1/Textures/NPC_ReformationCombatDrone",
+      "classification": "optional",
+      "origin": "Project-authored. It is an instance of NPCDefinition, a Narrative Pro class, so no art pack can have shipped it; it was created in a Narrative-based project and left inside the SciFi_Drone_1 marketplace pack's Textures folder.",
+      "production_dependency": false,
+      "evidence": [
+        "Never tracked: zero add-commits anywhere in history.",
+        "Referenced only by two test files. No tracked production asset, Config entry, source file or plugin asset references it or its pack.",
+        "The authored campaign drones NPC_AurelionSecurityDrone and NPC_AurelionContaminatedDrone use /NarrativePro/Pro/Core/Abilities/Configurations/AC_NPC_ReformationDrone directly, verified by loading them."
+      ],
+      "resolution": "Dependency removed. Four tests now load /Game/Aurelion/Enemies/NPC_AurelionSecurityDrone, which is tracked production data carrying the same ability configuration, so they exercise shipped data and reproduce in any clone. See Source/ProjectVelkorranTests/Private/Tests/SovTrackedContentPaths.h.",
+      "on_absence": "ignore",
+      "residual_uncertainty": "The asset cannot be inspected from a clone that lacks it. Its class and location make project authorship certain, but whether it was intended as production data can only be confirmed on the authoring machine. Nothing now depends on the answer."
+    }
+  ],
+  "expected_absent_fixtures": [
+    {
+      "reason": "Negative-path fixtures. These paths must NOT resolve; the tests assert how absence and failure are handled. Creating an asset at one of these paths would make its test vacuous.",
+      "content_paths": [
+        "/Game/Tests/CloudMissingMap",
+        "/Game/Tests/CloudMissingMission",
+        "/Game/Tests/DA_MissingPauseDefinition",
+        "/Game/Tests/DA_SaveOwnership",
+        "/Game/Tests/SaveOwnership",
+        "/Game/Tests/DifferentMap",
+        "/Game/Tests/VerifiedOrigin",
+        "/Game/FailedDestination"
+      ]
+    },
+    {
+      "reason": "String-only fixtures. Passed to pure classification helpers and never loaded, so their absence is irrelevant. Weapon_AurelionRifle is additionally the intended Enforcer fix and is expected to exist later without changing these tests.",
+      "content_paths": [
+        "/Game/Items/Weapons/Weapon_AurelionRifle",
+        "/Game/Campaign/DA_Only",
+        "/Game/Campaign/DA_Selene",
+        "/Game/Campaign/DA_Tarrik",
+        "/Game/Dialogue/DA_Voice",
+        "/Game/Effects/DA_Solver",
+        "/Game/Missions/DA_M01",
+        "/Game/Missions/M01",
+        "/Game/AurelionTests/LS_Assent",
+        "/Game/AurelionTests/LS_Fifth"
+      ]
+    }
+  ]
+}

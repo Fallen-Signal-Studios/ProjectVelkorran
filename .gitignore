@@ -59,6 +59,11 @@ Content/
 !/Content/Aurelion/
 !/Content/Aurelion/**/*.uasset
 !/Content/Aurelion/**/*.umap
+# /Game/Cues is the sole configured GameplayCueNotifyPaths root (Config/DefaultGame.ini). Its
+# assets are project-authored overrides of the Narrative originals and are required for cue
+# resolution at runtime, so they belong in version control like any other production asset.
+!/Content/Cues/
+!/Content/Cues/**/*.uasset
 
 # Raw source assets that normally belong in LFS
 SourceArt/
