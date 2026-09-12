@@ -369,10 +369,162 @@ started" from "finished and disengaged". Prefer a time series whenever the metri
 
 ---
 
-## Priorities 5–8
+## macOS as a second engineering environment
 
-Not yet started. Order per the revised brief: performance harness, progression, pause/menu,
-fresh-clone audit. Each verified against the current tree before any change.
+Work continued from a macOS checkout with UE 5.7. macOS is treated as a **second supported
+engineering environment, not a Windows substitute**; full detail in
+[MacEngineeringEnvironment-2026-09-11.md](MacEngineeringEnvironment-2026-09-11.md).
+
+The away-pass branch was recovered intact from `origin/engineering/away-pass-20260911` at
+`90d6c866` — three commits, `main` a clean ancestor, 2169 insertions and no deletions.
+
+What was established here:
+
+- The Mac editor target builds. Apple clang, Mac SDK 15.2. UBT resolves its own toolchain, so the
+  host's broken `xcrun`/`xcodebuild` does not affect compilation.
+- The Mac **Game** target compiles and links, which proves the runtime module carries no editor-only
+  dependency. It does **not** prove a packaged Win64 build; that gate stands.
+- 42 portable policy suites pass under Apple clang with UBSan.
+- `Scripts/Validate-UnrealMac.py` is the Mac gate. It mirrors `Validate-Unreal.ps1`'s checks rather
+  than a looser subset, and prints the outstanding Windows-only gates on every successful run so a
+  green Mac run cannot later be misread as full validation.
+
+### A Mac-only defect in the vendored fork's descriptor
+
+The first full Mac suite run **crashed**, in `ReevaluationCannotDuplicateGoalsForSameTarget` — one of
+this pass's own tests, which passes on Windows. The cause was not the test:
+
+```
+VerifyImport: Failed to find script package for import object 'Package /Script/NarrativeArsenalEditor'
+Unable to load Weapon_Shield_Base ... because its class (WeaponItemBlueprint) does not exist
+Fatal error: BlueprintGeneratedClass.cpp:691
+UBlueprintGeneratedClass::GetAuthoritativeClass: ClassGeneratedBy is null
+```
+
+`NarrativePro.uplugin` sets `PlatformAllowList: ["Win64", "Android", "Linux"]` on seven of its eight
+modules. Mac is absent, so the three `UncookedOnly` editor modules were never compiled — confirmed by
+their absence from both `Binaries/Mac` and `Intermediate/Build/Mac`. Demo content importing
+`/Script/NarrativeArsenalEditor` then loads a Blueprint class with a null `ClassGeneratedBy`, and the
+Kismet compiler dereferences it while validating a cast node.
+
+Adding `"Mac"` to those allow lists is **7 insertions and no deletions**, leaves Win64, Android and
+Linux untouched, and cannot change Windows behaviour. All three modules then compiled on Mac first
+try, and are registered in `UnrealEditor.modules`.
+
+This is the one fork-descriptor change in the pass. It is platform enablement, not a behaviour change,
+and no fork source was touched.
+
+### Five suite failures that are a fresh-clone content gap, not a platform or code fault
+
+The full Mac suite is **612 passed of 617, 5 failed**, reproducibly and identically across two runs.
+All five new performance tests pass. The five failures are not Mac-specific and not regressions:
+
+| Failing test | Requires |
+|---|---|
+| `Campaign.Cinematic.RequiredCharacterStillRefusesUnreadyOrRetiredState` | `/Game/SciFi_Drone_1/.../NPC_ReformationCombatDrone` |
+| `Campaign.Cinematic.RequiredCharacterUsesActualNativeStartup` | same |
+| `Campaign.PlacedNPC.AuthoredDefinitionPrecedesNativeASCStartup` | same |
+| `Campaign.PlacedNPC.SpawnerAndRestoreDefinitionsOwnNativeStartup` | same |
+| `Campaign.Validation.GameplayCuesStillResolve` | `/Game/Cues` |
+
+Both paths are **absent from disk and untracked by git**, confirmed per asset. `.gitignore` tracks
+only `Content/Aurelion/`, so no clone of this repository — Windows or macOS — has them. The Aurelion
+assets those same files reference (`NPC_AurelionEnforcer`, `NPC_AurelionSecurityDrone`) are tracked,
+present, and their tests pass, which isolates the cause to content availability rather than to the
+suite or the host.
+
+These tests passed on the work PC because that machine holds the untracked content locally. **The
+612/612 Windows figure recorded earlier in this log was therefore obtained against content that is
+not in the repository**, and it would not reproduce on a fresh Windows clone either. That is a
+property of the repository, not of either platform.
+
+One of the five, `GameplayCuesStillResolve`, was added by this away pass (Priority 3). It is
+fresh-clone-fragile for the same reason, and that is this pass's own oversight rather than an
+inherited one.
+
+The Mac gate deliberately **still fails** on these. A suite that cannot load its assets has not
+qualified the project, and reporting green would be false. It now prints each failing test with its
+first error, and labels a failure as probable content absence where the report's own entries show a
+missing package or object. The label explains; it never excuses, and there is no suppression list.
+
+**Decision needed, not taken here** — this is a content policy question rather than an engineering
+one, and it belongs to the project owner:
+
+1. Track the required assets (they are small definition assets, not the marketplace art packs), or
+2. give these tests an explicit content precondition that reports them as unrunnable rather than
+   failed, or
+3. accept that the suite is only fully green on a content-complete checkout, and record that as a
+   standing gate.
+
+Deliberately not done: silently skipping the tests, or adding them to an ignore list. Either would
+turn a real gap into a permanently green suite.
+
+---
+
+## Priority 5 — Performance capture harness
+
+Implemented. Full design and rationale in
+[PerformanceCaptureEngineering.md](PerformanceCaptureEngineering.md).
+
+Scope was chosen against what code can actually close. The TDD alignment review scores the
+performance row as *not closable by code* — it needs console devkits. So this harness does not attempt
+to produce a performance verdict for the project; it makes a capture repeatable, self-describing, and
+hard to quote out of context.
+
+| Piece | Verified by |
+|---|---|
+| `SovPerformancePolicy.h` — admission, percentiles, budget verdicts | `Tests/Portable/SovPerformancePolicyTests.cpp`, 60,856 checks, no Unreal build needed |
+| `USovPerformanceCaptureSubsystem` — cvars, ticking, bounds, export | 5 automation tests under `ProjectVelkorran.Diagnostics.Performance` |
+
+The decision worth carrying forward: **absence of data is never a pass.** A capture with too few
+steady-state samples returns `Insufficient`, and an unusable budget returns `InvalidBudget`. Neither
+is a pass, and `QualifiesCapture()` exists so a caller cannot accidentally treat one as an outcome.
+That is the Priority 4 retraction encoded as a type rather than as a comment.
+
+Every summary and every exported report records `platform`, `build_configuration`, `editor_build` and
+`rendering_disabled`, plus a `scope` line stating the capture is local to that platform and is not a
+console or certification capture. One automation test asserts `rendering_disabled` matches
+`FApp::CanEverRender()`, so a capture taken under `-NullRHI` — as all automation is — declares that it
+cannot qualify a frame budget.
+
+### Negative controls
+
+Each layer was shown to fail against an injected defect, and the controls were rerun after the fix:
+
+| Defect | Result |
+|---|---|
+| Under-sampled capture treated as a pass | portable suite fails |
+| Percentile floors instead of nearest-rank ceiling | portable suite fails — **only after coverage was added**; see below |
+| Hard stall treated as exclusive rather than inclusive | portable suite fails |
+| Warm-up frames admitted instead of discarded | 4 of 5 automation tests fail |
+| `rendering_disabled` hardcoded false | exactly 1 automation test fails |
+
+The percentile control initially **passed against the defect** — a real gap. Every explicit assertion
+used a sample count of 100, where `Fraction × Count` is a whole number and ceiling equals floor, so
+the rounding rule was never actually tested. The fix pins the rule against `std::ceil` for every size
+1..200 and every percentile 1..100. Worth recording as the same failure mode as the Priority 4
+retraction in a smaller form: a check that looked like evidence and was not.
+
+### Two bugs in the Mac gate's own freshness check
+
+`Validate-UnrealMac.py` adds a per-module binary freshness assertion the PowerShell gate does not
+have, because a cook in this pass once consumed a binary that predated its source. The check itself
+was wrong twice, both caught on real data:
+
+1. It compared every binary against the *globally* newest source file, so an unrelated test edit
+   marked plugin binaries stale. Now compared per module, against that module's own directory.
+2. It then failed on any binary it could not map to a module — and a Mac Game build stages boost and
+   tbb into `Binaries/Mac`. Now restricted to `UnrealEditor-*` module binaries, and it still fails on
+   a module binary it cannot map.
+
+Its negative control: touching one runtime source file names exactly
+`Binaries/Mac/UnrealEditor-ProjectVelkorran.dylib` and nothing else.
+
+---
+
+## Priorities 6–8
+
+Not yet started. Order per the revised brief: progression, pause/menu, fresh-clone audit.
 
 ---
 
