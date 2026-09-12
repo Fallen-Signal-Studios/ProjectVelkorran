@@ -116,6 +116,49 @@ Five of six sources are implemented and proven:
    AI-enabled world fixture, and this host currently takes minutes per verification cycle. It is a
    clean, small, scoped slice — not something to bolt onto this audit.
 
+### Attempt on 12 September, and where it stopped
+
+The AI-enabled fixture was built as specified and is preserved at
+`Docs/Attic/SovBypassRewardRuntimeTests.cpp.wip`. It does **not** expose `ConsumeUndetectedBypass`, add
+a test friend, or weaken the gate-owned receipt model. It establishes every precondition the gate
+enforces: an `ASovEncounterRuntimeTestDirector` seeded Active with a valid attempt id, a registered
+hostile threat participant, an `AAIController` carrying a registered `UAIPerceptionComponent` with a
+configured Sight sense, a Selene-tagged player carrying `USovSeleneEchoGenerationComponent`, and
+box-volume traversal inside `MaximumTraversalSeconds`. Three cases were written: undetected traversal
+awards +15 once, detected traversal awards nothing, inactive encounter awards nothing.
+
+**It is not committed to the suite because it does not pass, and the reason is a harness problem rather
+than a product one.** The gate requires `EntryVolume->IsOverlappingActor(Player)`, and that never
+becomes true in this headless world. Measured, not guessed:
+
+```
+player  loc=(0,0,0) capsuleEnabled=QueryOnly objType=Pawn respToWorldStatic=Overlap genOverlap=1
+entry   loc=(0,0,0) extent=200 enabled=QueryOnly objType=WorldStatic respToPawn=Overlap
+        genOverlap=1 registered=1 hasValidPhysicsState=1
+world   OverlapMultiByObjectType(Pawn) at the volume  -> FOUND, hits=1
+comps   capsule->IsOverlappingComponent(entry)=0   entry->IsOverlappingActor(player)=0
+```
+
+So the capsule **is** in the physics scene and **is** geometrically inside the volume — a world query
+finds it — but neither component records the overlap. Tried without effect: initialising the world for
+play before spawning (the order the working `SovCorruptionRuntimeTests` fixture uses), `DispatchBeginPlay`
+on every actor, explicit `UpdateOverlaps()` on both sides, `RecreatePhysicsState()`, and ticking the
+world between moves.
+
+Two hypotheses remain untested, and are the place to resume:
+
+1. **Component mobility.** `EntryVolume` is the gate's root `CreateDefaultSubobject<UBoxComponent>`,
+   which defaults to Static. `UpdateOverlaps` has different behaviour for static primitives, and the
+   normal gameplay flow depends on the *moving* capsule registering the overlap rather than the volume.
+2. **Character capsule overlap bookkeeping.** The shared Axiom fixture character disables movement
+   component ticking and ignores all channels but Visibility. Overriding one response may be
+   insufficient; a capsule that never moves through the movement component may never run the overlap
+   update path that gameplay relies on.
+
+A false start worth recording: the first version of these tests **passed** the two "awards nothing"
+cases while the overlap was silently never happening. They were vacuous. Asserting the entry overlap
+first is what exposed it, and any resumption should keep that assertion.
+
 I did **not** widen production access to make it testable. Adding a test friend or a public reward
 call would weaken the encapsulation the comment deliberately establishes.
 

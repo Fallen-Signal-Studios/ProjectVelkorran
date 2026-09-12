@@ -1,0 +1,290 @@
+// Copyright Fallen Signal Studios. All Rights Reserved.
+// Closes PC04: proves the undetected live-threat bypass reward (TDD 7.4, +15, encounter-limited).
+//
+// The award is driven through the real gate path -- entry volume overlap, threat perception binding,
+// exit volume overlap -- because USovSeleneEchoGenerationComponent::ConsumeUndetectedBypass is private
+// and friended only to ASovEchoBypassGate. That encapsulation is deliberate ("Gate-owned native receipt
+// only; no freely callable boolean reward API") and is preserved: nothing here calls the award, widens
+// access, or adds a test friend.
+//
+// The assertions are observable outcomes -- Echo delta on the protagonist -- not implementation
+// details. An AI-enabled world is required because the gate refuses a candidate whose threats lack a
+// registered Sight perception component, which is the whole point of "undetected".
+#include "Abilities/SovGameplayAbility_SeleneEcho.h"
+#include "AIController.h"
+#include "Campaign/SovEchoBypassGate.h"
+#include "Components/BoxComponent.h"
+#include "Components/CapsuleComponent.h"
+#include "Components/SovEchoComponent.h"
+#include "Components/SovSeleneEchoGenerationComponent.h"
+#include "Engine/Engine.h"
+#include "Engine/OverlapResult.h"
+#include "Engine/World.h"
+#include "GAS/NarrativeAbilitySystemComponent.h"
+#include "GAS/NarrativeAttributeSetBase.h"
+#include "Misc/AutomationTest.h"
+#include "Perception/AIPerceptionComponent.h"
+#include "Perception/AISenseConfig_Sight.h"
+#include "Perception/AISense_Sight.h"
+#include "Sovereign/SovGameplayTags.h"
+#include "Tests/SovAxiomRuntimeTestFixtures.h"
+#include "Tests/SovCoordinationRuntimeTestFixtures.h"
+#include "Tests/SovEncounterRuntimeTestFixtures.h"
+#if WITH_AUTOMATION_TESTS
+namespace SovBypassRewardTests
+{
+const FName ThreatId(TEXT("Bypass.Sentry"));
+constexpr float EntryX = 0.f;
+constexpr float ExitX = 1200.f;
+
+/** AI-enabled world: the gate requires a registered Sight sense on every threat participant. */
+struct FBypassWorld
+{
+	UWorld* World = nullptr;
+	ASovEncounterRuntimeTestDirector* Director = nullptr;
+	ASovAxiomRuntimeTestCharacter* Player = nullptr;
+	ASovCoordinationTestNPC* Threat = nullptr;
+	AAIController* ThreatController = nullptr;
+	UAIPerceptionComponent* Perception = nullptr;
+	ASovEchoBypassGate* Gate = nullptr;
+
+	FBypassWorld()
+	{
+		const UWorld::InitializationValues Values = UWorld::InitializationValues().AllowAudioPlayback(false)
+			.RequiresHitProxies(false).CreatePhysicsScene(true).CreateNavigation(false)
+			.CreateAISystem(true).ShouldSimulatePhysics(false).SetTransactional(false);
+		World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true,
+			ERHIFeatureLevel::Num, &Values);
+		if (!World) { return; }
+		if (GEngine) { GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World); }
+		// Collision actors must be registered for play before they are spawned, not after: UE overlap
+		// tracking only starts once the world is initialised and the owning actor has begun play.
+		World->InitializeActorsForPlay(FURL());
+	}
+	~FBypassWorld()
+	{
+		if (World) { World->DestroyWorld(false); if (GEngine) { GEngine->DestroyWorldContext(World); } }
+	}
+
+	/** Returns false if any precondition the gate enforces could not be established. */
+	bool Build(ESovEncounterState EncounterState)
+	{
+		if (!World) { return false; }
+		FActorSpawnParameters Spawn;
+		Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+		Player = World->SpawnActor<ASovAxiomRuntimeTestCharacter>(
+			ASovAxiomRuntimeTestCharacter::StaticClass(), FVector(EntryX, 0.f, 0.f), FRotator::ZeroRotator, Spawn);
+		if (!Player) { return false; }
+		Player->InitializeTestCombat(0);
+		// The shared Axiom fixture character ignores every collision channel except Visibility, which is
+		// enough for damage traces but means it cannot overlap a trigger volume. A real player capsule
+		// uses the Pawn profile and does overlap WorldStatic triggers, so this restores the behaviour the
+		// gate is entitled to expect rather than altering the gate.
+		if (UCapsuleComponent* Capsule = Player->GetCapsuleComponent())
+		{
+			Capsule->SetCollisionResponseToChannel(ECC_WorldStatic, ECR_Overlap);
+			Capsule->SetGenerateOverlapEvents(true);
+		}
+
+		Threat = World->SpawnActor<ASovCoordinationTestNPC>(
+			ASovCoordinationTestNPC::StaticClass(), FVector(600.f, 800.f, 0.f), FRotator::ZeroRotator, Spawn);
+		if (!Threat) { return false; }
+		Threat->InitializeTestCombat();
+
+		ThreatController = World->SpawnActor<AAIController>();
+		if (!ThreatController) { return false; }
+		ThreatController->Possess(Threat);
+		Perception = NewObject<UAIPerceptionComponent>(ThreatController);
+		ThreatController->AddInstanceComponent(Perception);
+		auto* Sight = NewObject<UAISenseConfig_Sight>(Perception);
+		Sight->DetectionByAffiliation.bDetectEnemies = true;
+		Sight->DetectionByAffiliation.bDetectFriendlies = true;
+		Sight->DetectionByAffiliation.bDetectNeutrals = true;
+		Perception->ConfigureSense(*Sight);
+		ThreatController->SetPerceptionComponent(*Perception);
+		Perception->RegisterComponent();
+		Perception->Activate(true);
+
+		Director = World->SpawnActor<ASovEncounterRuntimeTestDirector>();
+		if (!Director) { return false; }
+		Director->EncounterId = TEXT("Test.BypassCorridor");
+		if (!Director->RegisterParticipant(ThreatId, Threat, true)) { return false; }
+		Director->SeedState(EncounterState);
+
+		Gate = World->SpawnActor<ASovEchoBypassGate>(ASovEchoBypassGate::StaticClass(),
+			FVector::ZeroVector, FRotator::ZeroRotator, Spawn);
+		if (!Gate || !Gate->EntryVolume || !Gate->ExitVolume) { return false; }
+		Gate->Encounter = Director;
+		Gate->ThreatParticipantIds = { ThreatId };
+		Gate->MaximumTraversalSeconds = 30.f;
+		Gate->EntryVolume->SetBoxExtent(FVector(200.f));
+		Gate->ExitVolume->SetBoxExtent(FVector(200.f));
+		Gate->EntryVolume->SetWorldLocation(FVector(EntryX, 0.f, 0.f));
+		Gate->ExitVolume->SetWorldLocation(FVector(ExitX, 0.f, 0.f));
+
+		// Overlap events require the actors to be initialised for play; without this the volumes never
+		// publish a begin-overlap and every assertion below would pass vacuously.
+		Player->DispatchBeginPlay();
+		Threat->DispatchBeginPlay();
+		Gate->DispatchBeginPlay();
+		// The physics scene only builds its query structures during a tick; without one, overlap queries
+		// return nothing even though every component reports a valid physics state.
+		Advance(0.1f);
+		return true;
+	}
+
+	/** Move the protagonist and let the volume publish its overlap, as a real traversal would. */
+	void MoveTo(float X)
+	{
+		Player->SetActorLocation(FVector(X, 0.f, 0.f), false, nullptr, ETeleportType::TeleportPhysics);
+		if (UCapsuleComponent* Capsule = Player->GetCapsuleComponent()) { Capsule->UpdateOverlaps(); }
+		Gate->EntryVolume->UpdateOverlaps();
+		Gate->ExitVolume->UpdateOverlaps();
+		if (UCapsuleComponent* Capsule = Player->GetCapsuleComponent()) { Capsule->RecreatePhysicsState(); }
+		Gate->EntryVolume->RecreatePhysicsState();
+		Gate->ExitVolume->RecreatePhysicsState();
+		if (UCapsuleComponent* Capsule = Player->GetCapsuleComponent()) { Capsule->UpdateOverlaps(); }
+		Gate->EntryVolume->UpdateOverlaps();
+		Gate->ExitVolume->UpdateOverlaps();
+		// Let the move settle so overlap begin/end events are published before anything is asserted.
+		Advance(0.1f);
+	}
+
+	/** True once the gate has accepted the protagonist as a traversal candidate. */
+	bool EntryRegistered() const { return Gate->EntryVolume->IsOverlappingActor(Player); }
+
+	/** Temporary: report the collision state so the overlap failure can be diagnosed from evidence. */
+	void DiagnoseOverlap() const
+	{
+		UCapsuleComponent* Capsule = Player->GetCapsuleComponent();
+		UE_LOG(LogTemp, Warning, TEXT("BYPASSDIAG player=%s capsuleEnabled=%d objType=%d respWS=%d genOverlap=%d actorCollision=%d"),
+			*Player->GetActorLocation().ToString(), Capsule ? (int32)Capsule->GetCollisionEnabled() : -1,
+			Capsule ? (int32)Capsule->GetCollisionObjectType() : -1,
+			Capsule ? (int32)Capsule->GetCollisionResponseToChannel(ECC_WorldStatic) : -1,
+			Capsule ? (int32)Capsule->GetGenerateOverlapEvents() : -1,
+			(int32)Player->GetActorEnableCollision());
+		UE_LOG(LogTemp, Warning, TEXT("BYPASSDIAG entry=%s extent=%s enabled=%d objType=%d respPawn=%d genOverlap=%d registered=%d hasPhysics=%d"),
+			*Gate->EntryVolume->GetComponentLocation().ToString(), *Gate->EntryVolume->GetScaledBoxExtent().ToString(),
+			(int32)Gate->EntryVolume->GetCollisionEnabled(), (int32)Gate->EntryVolume->GetCollisionObjectType(),
+			(int32)Gate->EntryVolume->GetCollisionResponseToChannel(ECC_Pawn),
+			(int32)Gate->EntryVolume->GetGenerateOverlapEvents(),
+			(int32)Gate->EntryVolume->IsRegistered(), (int32)Gate->EntryVolume->HasValidPhysicsState());
+		// Is the capsule in the physics scene at all? A world query answers that independently of the
+		// components' own overlap bookkeeping.
+		TArray<FOverlapResult> Hits;
+		FCollisionObjectQueryParams ObjectParams;
+		ObjectParams.AddObjectTypesToQuery(ECC_Pawn);
+		const bool bWorldFound = World->OverlapMultiByObjectType(Hits, FVector(EntryX, 0.f, 0.f),
+			FQuat::Identity, ObjectParams, FCollisionShape::MakeBox(FVector(200.f)));
+		UE_LOG(LogTemp, Warning, TEXT("BYPASSDIAG worldQueryFoundPawn=%d hits=%d"), (int32)bWorldFound, Hits.Num());
+		UE_LOG(LogTemp, Warning, TEXT("BYPASSDIAG capsuleOverlapsEntry=%d entryOverlapsActor=%d physScene=%d"),
+			Capsule ? (int32)Capsule->IsOverlappingComponent(Gate->EntryVolume) : -1,
+			(int32)Gate->EntryVolume->IsOverlappingActor(Player),
+			World->GetPhysicsScene() != nullptr);
+	}
+
+	void Advance(float Seconds)
+	{
+		const double Until = World->GetTimeSeconds() + Seconds;
+		uint64 Frame = GFrameCounter;
+		while (World->GetTimeSeconds() + UE_DOUBLE_SMALL_NUMBER < Until)
+		{
+			TGuardValue<uint64> Guard(GFrameCounter, ++Frame);
+			World->Tick(LEVELTICK_All, FMath::Min(0.05, Until - World->GetTimeSeconds()));
+		}
+	}
+
+	float Echo() const { return Player->TestEcho->GetEcho(); }
+	void SetEcho(float Value) { Player->TestEcho->RestoreEchoFromCheckpoint(Value); }
+
+	/** A genuine sight detection of the protagonist, through the real perception system. */
+	void Detect()
+	{
+		FAIStimulus Seen(*GetDefault<UAISense_Sight>(), 1.f,
+			Player->GetActorLocation(), Threat->GetActorLocation());
+		Perception->RegisterStimulus(Player, Seen);
+		Perception->ProcessStimuli();
+	}
+};
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovBypassUndetectedAwardsOnce,
+	"ProjectVelkorran.Campaign.Echo.UndetectedBypassAwardsOnce",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovBypassUndetectedAwardsOnce::RunTest(const FString&)
+{
+	using namespace SovBypassRewardTests;
+	FBypassWorld F;
+	if (!TestTrue(TEXT("Bypass fixture built"), F.Build(ESovEncounterState::Active))) { return false; }
+	// Below the cap, so the award is observable as a delta rather than absorbed by the ceiling.
+	F.SetEcho(0.f);
+
+	F.MoveTo(EntryX);
+	F.DiagnoseOverlap();
+	if (!TestTrue(TEXT("The protagonist genuinely overlaps the entry volume"), F.EntryRegistered()))
+	{
+		return false;
+	}
+	TestEqual(TEXT("Entering the corridor is not itself a reward"), F.Echo(), 0.f);
+
+	F.MoveTo(ExitX);
+	TestEqual(TEXT("An undetected traversal awards exactly 15"), F.Echo(), 15.f);
+
+	// Same attempt: the encounter-limited reward must not pay again.
+	F.MoveTo(EntryX);
+	F.MoveTo(ExitX);
+	TestEqual(TEXT("The reward cannot replay during the same attempt"), F.Echo(), 15.f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovBypassDetectedDoesNotAward,
+	"ProjectVelkorran.Campaign.Echo.DetectedBypassDoesNotAward",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovBypassDetectedDoesNotAward::RunTest(const FString&)
+{
+	using namespace SovBypassRewardTests;
+	FBypassWorld F;
+	if (!TestTrue(TEXT("Bypass fixture built"), F.Build(ESovEncounterState::Active))) { return false; }
+	F.SetEcho(0.f);
+
+	F.MoveTo(EntryX);
+	// Without a real entry the "no award" assertion below would be vacuous.
+	if (!TestTrue(TEXT("The protagonist genuinely overlaps the entry volume"), F.EntryRegistered()))
+	{
+		return false;
+	}
+	// A real sight stimulus through the threat's own perception component. "Undetected" is the
+	// requirement, so being seen mid-traversal must forfeit the reward entirely.
+	F.Detect();
+	F.MoveTo(ExitX);
+	TestEqual(TEXT("A detected traversal awards nothing"), F.Echo(), 0.f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovBypassInactiveEncounterDoesNotAward,
+	"ProjectVelkorran.Campaign.Echo.InactiveEncounterBypassDoesNotAward",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovBypassInactiveEncounterDoesNotAward::RunTest(const FString&)
+{
+	using namespace SovBypassRewardTests;
+	FBypassWorld F;
+	// Inactive encounter: the reward is encounter-limited, so there is no attempt to claim against.
+	if (!TestTrue(TEXT("Bypass fixture built"), F.Build(ESovEncounterState::Inactive))) { return false; }
+	F.SetEcho(0.f);
+
+	F.MoveTo(EntryX);
+	if (!TestTrue(TEXT("The protagonist genuinely overlaps the entry volume"), F.EntryRegistered()))
+	{
+		return false;
+	}
+	F.MoveTo(ExitX);
+	TestEqual(TEXT("An inactive encounter awards nothing"), F.Echo(), 0.f);
+
+	// Activating after the traversal must not retroactively pay for it.
+	F.Director->SeedState(ESovEncounterState::Active);
+	F.MoveTo(ExitX);
+	TestEqual(TEXT("Activation cannot retroactively pay a finished traversal"), F.Echo(), 0.f);
+	return true;
+}
+#endif
