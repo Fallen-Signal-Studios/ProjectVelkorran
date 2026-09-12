@@ -1,6 +1,7 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Diagnostics/SovPerformanceCaptureSubsystem.h"
 
+#include "Diagnostics/SovLogChannels.h"
 #include "Diagnostics/SovPerformancePolicy.h"
 #include "Engine/World.h"
 #include "HAL/IConsoleManager.h"
@@ -10,8 +11,6 @@
 #include "HAL/FileManager.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
-
-DEFINE_LOG_CATEGORY_STATIC(LogSovPerformance, Log, All);
 
 namespace SovPerformanceCapture
 {
