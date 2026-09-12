@@ -194,14 +194,14 @@ bool USovTechniqueComponent::CanBuyPerk(TSubclassOf<UTreePerk> Perk, FText& OutC
 	for (UTreePerk* Purchased : PurchasedPerks)
 	{
 		if (!Purchased) { continue; }
-		if (FindBranch(Purchased->GetClass()) == Branch && Purchased->GetClass() != Perk.Get()) { Investment += Purchased->PerkLevel + 1; }
+		if (FindBranch(Purchased->GetClass()) == Branch && Purchased->GetClass() != Perk.Get()) { Investment += SovTechniquePolicy::RankWeight(Purchased->PerkLevel); }
 		const auto* Native = Cast<USovTechniquePerk>(Purchased);
 		if (Defaults->IncompatiblePerks.Contains(Purchased->GetClass()) || (Native && Native->IncompatiblePerks.Contains(Perk)))
 		{
 			OutCantBuyReason = NSLOCTEXT("SovTechnique", "Exclusive", "Choose one of these Techniques."); return false;
 		}
 	}
-	if (Investment < Defaults->RequiredBranchInvestment)
+	if (!SovTechniquePolicy::MeetsBranchInvestment(Investment, Defaults->RequiredBranchInvestment))
 	{
 		OutCantBuyReason = NSLOCTEXT("SovTechnique", "Investment", "More investment in this branch is required."); return false;
 	}
@@ -274,7 +274,7 @@ void USovTechniqueComponent::RebuildBranchLevels()
 	}
 	for (UTreePerk* Perk : PurchasedPerks)
 	{
-		if (Perk) { if (auto* Branch = FindBranch(Perk->GetClass())) { Branch->SkillLevel += Perk->PerkLevel + 1; } }
+		if (Perk) { if (auto* Branch = FindBranch(Perk->GetClass())) { Branch->SkillLevel += SovTechniquePolicy::RankWeight(Perk->PerkLevel); } }
 	}
 }
 void USovTechniqueComponent::PrepareForSave_Implementation()
@@ -293,7 +293,7 @@ bool USovTechniqueComponent::ValidateSavedState() const
 		const auto* Branch = FindBranch(Saved.PerkClass);
 		if (!Default || !Branch || Branch->Protagonist != LedgerProtagonist || Seen.Contains(Saved.PerkClass.Get())
 			|| Saved.PerkLevel < 0 || Saved.PerkLevel >= Default->MaxLevels || !Default->HasValidNativeGrantPolicy()) { return false; }
-		Seen.Add(Saved.PerkClass.Get()); Spent += Saved.PerkLevel + 1;
+		Seen.Add(Saved.PerkClass.Get()); Spent += SovTechniquePolicy::RankWeight(Saved.PerkLevel);
 	}
 	if (SelectedAugments.Num()>16) { return false; }
 	for (const auto& Selection:SelectedAugments)
@@ -312,9 +312,9 @@ bool USovTechniqueComponent::ValidateSavedState() const
 		int32 Investment = 0;
 		for (const FSavedPerk& Other : SkillTreeSaveData.SavedPerks)
 		{
-			if (Other.PerkClass != Saved.PerkClass && FindBranch(Other.PerkClass) == FindBranch(Saved.PerkClass)) { Investment += Other.PerkLevel + 1; }
+			if (Other.PerkClass != Saved.PerkClass && FindBranch(Other.PerkClass) == FindBranch(Saved.PerkClass)) { Investment += SovTechniquePolicy::RankWeight(Other.PerkLevel); }
 		}
-		if (Investment < Default->RequiredBranchInvestment) { return false; }
+		if (!SovTechniquePolicy::MeetsBranchInvestment(Investment, Default->RequiredBranchInvestment)) { return false; }
 	}
 	return SovTechniquePolicy::ValidLedger(GetEarnedTechniquePoints(), SkillTreePoints, Spent, PointBudget());
 }

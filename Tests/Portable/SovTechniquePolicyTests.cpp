@@ -27,5 +27,45 @@ int main()
 			}
 		}
 	}
+	// Rank weight: the zero-based rule that spend accounting, branch investment and branch-level
+	// rebuild all share. It was written out five times in the component before being named once.
+	Check(RankWeight(0) == 1);
+	Check(RankWeight(1) == 2);
+	Check(RankWeight(4) == 5);
+	// A failed grant sets the level to -1, so negative levels genuinely occur. They are not
+	// purchases and must contribute nothing; a bare PerkLevel + 1 would let a level below -1
+	// subtract from another perk's investment.
+	Check(RankWeight(-1) == 0);
+	Check(RankWeight(-2) == 0);
+	Check(RankWeight(-100) == 0);
+	// Monotonic and never negative across the authored rank range and well past it.
+	for (int Level = -20; Level <= 40; ++Level)
+	{
+		Check(RankWeight(Level) >= 0);
+		if (Level > 0) { Check(RankWeight(Level) >= RankWeight(Level - 1)); }
+	}
+	// A tree carries 24-30 purchasable ranks; five ranks is the authored per-perk maximum.
+	{
+		int Total = 0;
+		for (int Level = 0; Level < 5; ++Level) { Total += RankWeight(Level); }
+		Check(Total == 15);
+	}
+
+	// Branch investment gate. A perk never counts toward its own requirement; callers exclude it
+	// while accumulating, so this compares totals only.
+	Check(MeetsBranchInvestment(0, 0));
+	Check(MeetsBranchInvestment(1, 0));
+	Check(MeetsBranchInvestment(3, 3));
+	Check(!MeetsBranchInvestment(2, 3));
+	Check(!MeetsBranchInvestment(0, 1));
+	Check(MeetsBranchInvestment(30, 30));
+	for (int Required = 0; Required <= 30; ++Required)
+	{
+		for (int Investment = 0; Investment <= 30; ++Investment)
+		{
+			Check(MeetsBranchInvestment(Investment, Required) == (Investment >= Required));
+		}
+	}
+
 	std::cout << Checks << " Technique production-policy checks passed\n";
 }
