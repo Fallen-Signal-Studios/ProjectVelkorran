@@ -30,7 +30,7 @@ These are kept distinct throughout and never collapsed into "passed":
 
 | # | Finding | Class |
 |---|---|---|
-| C1 | Authored protagonist handoff and separate persistent state | **PARTIAL** |
+| C1 | Authored protagonist handoff and separate persistent state | **CLOSED** (12 Sep, see updates) |
 | C2 | Campaign resource save defaults not established in native code | **CLOSED** |
 | C3 | Campaign checkpoint contract incomplete | **PARTIAL** |
 | E1 | Selene pulse not connected to combat | **CLOSED** |
@@ -62,7 +62,11 @@ These are kept distinct throughout and never collapsed into "passed":
 | X1 | `/Game/Cues` absent from version control | **EXTERNAL CONTENT GATE** (see below) |
 | X2 | `SciFi_Drone_1` marketplace pack absent | **EXTERNAL CONTENT GATE** (see below) |
 
-Closed: 14. Partial: 7. Open: 1. Content/editor gated: 8. Superseded: 2. External gates: 2.
+Closed: 14. Partial: 6. Open: 1. Content/editor gated: 9. Superseded: 2. External gates: 2.
+
+_Recounted from the table above on 12 September after C1 closed. The earlier totals line did not
+reconcile with its own rows. K1–K4 count as four gated items; PC06 counts as superseded, its small
+remaining part recorded under its own heading._
 
 The single remaining OPEN item is T5, the packaged Win64 Game target, which is a Windows
 environment gate rather than code. **There is currently no open source-only code defect in the
@@ -120,20 +124,57 @@ missing implementation.
 
 ## OPEN and PARTIAL detail
 
-### C1 — Authored protagonist handoff (PARTIAL)
+### C1 — Authored protagonist handoff (CLOSED 12 September)
 
-1. **TDD.** §§3.3–3.4, 15.4: M01 is Tarrik, M02 is Selene; handoff retains individual
-   equipment/progression, correct tags and ability sets, coherent save data.
-2. **Evidence.** `USovTechniqueComponent::InitializeNewProtagonist` exists and is referenced from
-   `SovPlayerController.cpp`; the Technique component saves protagonist identity and a reward ledger
-   and validates identity on load (automation-verified, 9 suites).
-3. **Missing.** Progression handoff is covered; a protagonist-keyed *save partition* across inventory
-   and quest context was not confirmed in this pass. `UNarrativeSave` holding one `FNarrativeSavePlayer`
-   was the audit's core claim and was not re-verified.
-4. **Source-only?** Likely yes for the partition; the M01→M02 boundary itself is authored.
-5. **Priority.** Medium-high, but larger than a slice.
-6. **Verification.** Automation save/restore across two protagonist identities asserting no
-   cross-contamination.
+1. **TDD.** §§3.3–3.4 (authored alternation, never free switching), §10.7 (inventory is signature
+   equipment, augments, charges, mission items, evidence), §15.4 (initialization idempotent across
+   handoff and restore), §15.9 (save holds campaign state and canon gates *separately from*
+   protagonist progression/equipment).
+2. **Boundary as implemented, established before testing.**
+   - *Protagonist-owned*, keyed by protagonist tag in `ASovPlayerState::ProtagonistSnapshots`: pawn
+     inventory, equipment and currency (each hero is a separate pawn; `FSovProtagonistSnapshot::PawnRecord`),
+     the Technique ledger (one shared component, a per-hero `SkillTreeRecord`), factions, resources and
+     wield slots.
+   - *Shared by design*, on the controller: canon state values, mission records and completion, the
+     journal, evidence records, and Narrative quest records.
+   - *Partitioned inside shared storage*: `CharacterKnowledge` is keyed by protagonist. Evidence knowledge
+     crosses only to a named witness or copy recipient.
+   - *Transient*, cleared at handoff and never persisted: ability specs, active effects and
+     definition-owned tags.
+3. **Evidence — automation-verified on Mac.** `ProjectVelkorran.Campaign.ProtagonistPartition`, three
+   tests driving the controller's own `StartPawnHandoff`, `StageCampaignLoad` and
+   `PollCampaignInitialization` with two distinct pawn classes on one shared PlayerState:
+   `RepeatedHandoffsKeepOwnedStateSeparate` (four round trips; owned state neither merges nor overwrites;
+   transient state does not cross; canon facts shared, knowledge not), `SaveSwitchMutateReloadEitherProtagonist`
+   (save, switch, mutate, save; each save reloaded in a fresh world, then handed off to the other hero),
+   `MissingProtagonistRecordFailsClosed` (one hero's record is refused by the other's pawn; a save lacking
+   the active hero's record fails explicitly rather than borrowing). With the Handoff, Companion and Save
+   suites: **48 passed, 0 failed**.
+   After the negative control was reverted, the full forced-unity suite gave **621 passed, 1 failed** of
+   622; the one failure is `GameplayCuesStillResolve` (X1), identical to the prior stable baseline plus
+   the three new tests.
+   *Provenance of that run:* a concurrent session sharing this checkout rebuilt the test module at 16:28,
+   before the run started. UBT recompiled only the unity blob holding `ProjectVelkorranTestsModule.cpp`,
+   which carried an uncommitted diagnostic probe that stays inert unless `-SovActorEventProbe` or
+   `-SovForceActorScript` is passed; the run passed neither. Every other blob, including the partition
+   tests, was this commit's code. The 48-test run and the negative control were built entirely here.
+4. **Negative control.** Skipping first-visit faction replacement and Echo reserve in the controller made
+   all three tests fail, and the contaminated factions were visibly carried into later snapshots and both
+   reloads. The controller was restored from git before the confirming run.
+5. **Harness finding worth knowing.** Narrative's save dispatches the PlayerState's `PrepareForSave`
+   through `AActor::ProcessEvent`, which silently does nothing in a world whose actors never began play
+   unless `FEditorScriptExecutionGuard` is held. Without it the save appeared to lose the active hero's
+   record. That was the harness, not the product: real game worlds initialize actors. Any runtime test
+   relying on actor interface events without the guard is exercising less than it appears to.
+6. **Not proven here, stated so it is not assumed.**
+   - *Content-gated:* on a hero's **first** visit, Health/Shield/Stamina/Poise come from the authored
+     `DefaultAttributes` effect. No production code resets them on the shared ASC; with no effect authored,
+     the fixture observed the previous hero's values carrying over. Echo is reset natively and is proven.
+   - Technique **perk grants** across heroes (the fixture has no authored branches; rewards and point
+     ledgers are proven). Narrative quest records with real quest assets. Disk I/O (the real
+     `UNarrativeSave` serialization is used in memory). `TravelToMission` map travel. M13 companion swaps
+     are covered by the Companion suites instead.
+   - Windows/MSVC remains a separate gate.
 
 ### C3 — Campaign checkpoint contract (PARTIAL)
 
@@ -224,6 +265,12 @@ suppression added. Untested hypotheses for a later harness pass: volume mobility
 tied to the fixture character's disabled movement ticking. Nothing observed indicates a source defect in
 the gate. Detail in [AbilityPayloadAudit-2026-09-12.md](AbilityPayloadAudit-2026-09-12.md).
 
+**12 September — C1 closed.** Protagonist isolation was treated as the invariant and tested through
+the production handoff and load sequencing rather than by comparing keys or structs. Detail, the
+negative control and the explicit limits are under C1 above. One content dependency surfaced and is
+recorded there rather than closed: first-visit non-Echo resources depend on the authored
+`DefaultAttributes` effect.
+
 ## X2 — `SciFi_Drone_1` marketplace pack, an external content gate
 
 Also excluded from the source-engineering assessment.
@@ -248,6 +295,9 @@ Two consequences worth keeping distinct:
    that is fine: they use synchronous `LoadObject`, so any error is charged to them.
 
 ## Source-engineering assessment
+
+_Written at the start of 12 September and now historical; the
+updates section and counts above are current._
 
 Excluding content/editor gates and X1, the source-only backlog is **four OPEN items**, of which two
 (T5, MSVC conformance) are Windows-environment gates rather than code. That leaves **PC05 and PC07 as
