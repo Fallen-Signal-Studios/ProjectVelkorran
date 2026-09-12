@@ -228,7 +228,7 @@ PREREQUISITE_EXITS = {
 }
 
 
-def check_prerequisites(run_dir: Path, python_exe) -> dict:
+def check_prerequisites(run_dir: Path, python_exe, timeout: int) -> dict:
     """Run the content prerequisite check before automation, so a content cause is visible first.
 
     Never raises: the run continues so every other result is still gathered. The aggregate verdict
@@ -237,7 +237,7 @@ def check_prerequisites(run_dir: Path, python_exe) -> dict:
     checker = ROOT / "Scripts/Check-ContentPrerequisites.py"
     report_path = run_dir / "content-prerequisites.json"
     exit_code = run_logged(run_dir, "ContentPrerequisites",
-                           [str(python_exe), str(checker), "--json", str(report_path)], 300)
+                           [str(python_exe), str(checker), "--json", str(report_path)], timeout)
     meaning = PREREQUISITE_EXITS.get(exit_code, f"unexpected exit {exit_code}")
     print(f"     content prerequisites: {meaning}")
     detail = {}
@@ -258,6 +258,12 @@ def main() -> int:
     parser.add_argument("--output-directory", type=Path)
     parser.add_argument("--python", type=Path, help="Python for the manifest/coverage helpers.")
     parser.add_argument("--automation-timeout", type=int, default=1800)
+    parser.add_argument("--helper-timeout", type=int, default=1800,
+                        help="Budget for the manifest, coverage and prerequisite helpers. The source "
+                             "manifest walks every build input under Source, Plugins, Config, Scripts "
+                             "and Tests and lstats each entry; measured at 639s on this host and 2102s "
+                             "while a storage scan was running, because enterprise endpoint protection "
+                             "intercepts every stat. 300s is ample on a machine without that.")
     parser.add_argument("--build-only", action="store_true")
     parser.add_argument("--skip-build", action="store_true")
     parser.add_argument("--build-game", action="store_true",
@@ -311,10 +317,11 @@ def main() -> int:
     before_manifest = run_dir / "source-before.json"
     if run_logged(run_dir, "SourceBefore", [str(python_exe), str(manifest_tool),
                                             "--source-root", str(ROOT), "--filter", args.filter,
-                                            "--output", str(before_manifest)], 300) != 0:
+                                            "--output", str(before_manifest)],
+                                           args.helper_timeout) != 0:
         raise ValidationError("Could not capture build inputs and native registrations.")
 
-    prerequisites = check_prerequisites(run_dir, python_exe)
+    prerequisites = check_prerequisites(run_dir, python_exe, args.helper_timeout)
     summary["contentPrerequisites"] = prerequisites
     flush_summary()
 
@@ -379,14 +386,16 @@ def main() -> int:
     if run_logged(run_dir, "ReportCoverage", [str(python_exe), str(ROOT / "Scripts/Check-UnrealReport.py"),
                                              "--report", str(report_dir / "index.json"),
                                              "--source-root", str(ROOT), "--filter", args.filter,
-                                             "--output", str(coverage)], 300) != 0:
+                                             "--output", str(coverage)],
+                                            args.helper_timeout) != 0:
         raise ValidationError("Automation source coverage validation failed. Inspect ReportCoverage.log.")
 
     after_manifest = run_dir / "source-after.json"
     if run_logged(run_dir, "SourceAfter", [str(python_exe), str(manifest_tool),
                                            "--source-root", str(ROOT), "--filter", args.filter,
                                            "--verify", str(before_manifest),
-                                           "--output", str(after_manifest)], 300) != 0:
+                                           "--output", str(after_manifest)],
+                                          args.helper_timeout) != 0:
         raise ValidationError("Source changed during validation. This run cannot qualify the current source.")
 
     summary["sourceIntegrity"] = ("unchanged during automation; binary freshness asserted by mtime"
