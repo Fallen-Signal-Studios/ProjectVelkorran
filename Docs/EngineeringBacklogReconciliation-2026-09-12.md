@@ -56,15 +56,18 @@ These are kept distinct throughout and never collapsed into "passed":
 | T3 | Campaign UI carries template behaviour | **PARTIAL** |
 | T4 | Intermittent hostile AI startup | **CLOSED** |
 | T5 | Packaged Win64 Game target unverified | **OPEN (Windows gate)** |
-| T6 | `ProjectVelkorranTests` sets `bUseUnity = false` | **OPEN** |
+| T6 | `ProjectVelkorranTests` sets `bUseUnity = false` | **CLOSED** |
 | K1–K4 | Cargo miplevels, navmesh export, camera FOV, Enforcer demo pistol | **CONTENT/EDITOR GATE** |
 | K5 | `BP_SovPlayerController::ReceiveBeginPlay` ordering | **CONTENT/EDITOR GATE** |
 | X1 | `/Game/Cues` absent from version control | **EXTERNAL CONTENT GATE** (see below) |
+| X2 | `SciFi_Drone_1` marketplace pack absent | **EXTERNAL CONTENT GATE** (see below) |
 
-Closed: 10. Partial: 10. Open: 2. Content/editor gated: 8. Superseded: 2.
+Closed: 14. Partial: 7. Open: 1. Content/editor gated: 8. Superseded: 2. External gates: 2.
 
-Both remaining OPEN items are T5 and T6. T5 is a Windows environment gate rather than code,
-so **T6 is the only open source-only code item in the tree.**
+The single remaining OPEN item is T5, the packaged Win64 Game target, which is a Windows
+environment gate rather than code. **There is currently no open source-only code defect in the
+tree**, with PC04 the nearest thing to one and its gap being missing evidence rather than
+missing implementation.
 
 ## Closed, with the evidence that closed them
 
@@ -189,6 +192,49 @@ configured `GameplayCueNotifyPaths` root; its eleven project-authored override a
 committed, so a clone registers zero cue notifies. `.gitignore` now admits `Content/Cues`. Closing it
 requires committing those assets from the authoring machine. No source change is pending, and no
 source work is blocked by it. See [ContentDependencyPolicy.md](ContentDependencyPolicy.md).
+
+
+## Updates since the initial pass
+
+Recorded as work lands, rather than deferred to another broad audit.
+
+**12 September — PC01, PC02, PC03 closed; PC04 partial.** See
+[AbilityPayloadAudit-2026-09-12.md](AbilityPayloadAudit-2026-09-12.md). Every ability traced
+activation → targeting → payload → application → observable result, with each CLOSED verdict resting on
+a test asserting the outcome. PC04's remaining gap is evidence, not implementation: nothing asserts the
+undetected-bypass reward pays +15 once.
+
+**12 September — T6 closed.** The cause was not anonymous namespaces but two file-scope
+using-directives leaking across concatenated translation units. Compile-verified under forced unity
+with blob membership confirmed, and automation-verified.
+
+**12 September — validation trustworthiness restored.** Two consecutive full-suite runs now produce an
+identical, attributable result: **618 passed, 1 failed**, the failure being X1. Before this, runs failed
+two tests and the second varied between runs. Cause and fix are in X2 below. No suppression or
+ignored-error mechanism was added, and no gameplay changed.
+
+## X2 — `SciFi_Drone_1` marketplace pack, an external content gate
+
+Also excluded from the source-engineering assessment.
+
+The authored `NPC_AurelionSecurityDrone` genuinely needs this pack: its appearance targets
+`SKM_SciFi_Drone_1`, and its configuration `AC_NPC_ReformationDrone` targets `GA_DroneGunfire` and
+`GA_DroneRocketAbility`. `ABP_RefDrone` targets `SKEL_SciFi_Drone_1` and three of its animations. That
+runtime dependency is **preserved, not engineered around**; the pack is marketplace content and
+tracking it is not permitted.
+
+Two consequences worth keeping distinct:
+
+1. **Runtime.** The SecurityDrone cannot render or grant its gunfire and rocket abilities without the
+   pack. This is a real gap for anyone validating that enemy, and it is why the two unresolved
+   `DefaultAbilities` entries in `AC_NPC_ReformationDrone` are empty. An earlier note in this pass
+   described them as authored-empty; that was wrong.
+2. **Validation.** Those are soft references resolved asynchronously, so load failures and the
+   `ABP_RefDrone` compile error surfaced after the causing test ended and were charged to whichever
+   test was then active. That produced a failure that moved between runs. Four tests now load
+   `NPC_AurelionEnforcer`, whose transitive closure is entirely tracked, which removes the async chain
+   without touching the dependency. Editor identity tests still load the drone roster deliberately, and
+   that is fine: they use synchronous `LoadObject`, so any error is charged to them.
 
 ## Source-engineering assessment
 
