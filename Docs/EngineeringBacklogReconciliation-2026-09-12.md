@@ -39,9 +39,9 @@ These are kept distinct throughout and never collapsed into "passed":
 | E4 | Link and weak-point state not checkpoint-persistent | **CLOSED** |
 | E5 | Dismemberment completion is content-dependent | **CONTENT/EDITOR GATE** |
 | E6 | Faction repertoire and perception/encounter fairness | **PARTIAL** |
-| PC01 | Selene Echo expenditure does not deliver the control kit | **PARTIAL** |
-| PC02 | Tarrik release depends on Blueprint for two paths | **PARTIAL** |
-| PC03 | Tarrik Echo generation incomplete | **PARTIAL** |
+| PC01 | Selene Echo expenditure does not deliver the control kit | **CLOSED** (12 Sep, see updates) |
+| PC02 | Tarrik release depends on Blueprint for two paths | **CLOSED** (12 Sep, see updates) |
+| PC03 | Tarrik Echo generation incomplete | **CLOSED** (12 Sep, see updates) |
 | PC04 | Selene generation covers only three reward sources | **PARTIAL** |
 | PC05 | Signature-readiness feedback disagrees with ability thresholds | **CLOSED** |
 | PC06 | Echo encounter/checkpoint wiring not demonstrated | **SUPERSEDED (in part) / PARTIAL** |
@@ -177,7 +177,7 @@ approval assets, so rules for those categories would be dead code.
 Mac compiles and links the Game target, which proves the runtime module carries no editor-only
 dependency. It does not prove a shipping Win64 build. Windows-only; not closable here.
 
-### T6 — Tests module disables unity (OPEN)
+### T6 — Tests module disables unity (CLOSED 12 September; original detail kept below)
 
 `ProjectVelkorranTests.Build.cs` sets `bUseUnity = false`. This is not hypothetical: a
 `DEFINE_LOG_CATEGORY_STATIC(LogSovPerformance, …)` collision with `SovLogChannels.h` stayed hidden
@@ -212,6 +212,17 @@ with blob membership confirmed, and automation-verified.
 identical, attributable result: **618 passed, 1 failed**, the failure being X1. Before this, runs failed
 two tests and the second varied between runs. Cause and fix are in X2 below. No suppression or
 ignored-error mechanism was added, and no gameplay changed.
+
+**12 September — PC04 attempted; remains PARTIAL on a test-harness blocker.** The AI-enabled
+bypass fixture was built against the real gate entry/exit path, with `ConsumeUndetectedBypass` kept
+private and the gate-owned receipt model untouched. It does not pass because, in a headless automation
+world, the gate's entry volume never records the player's overlap: a world overlap query at the volume
+finds the pawn, but `IsOverlappingActor` stays false, so no candidate is admitted. The two "no award"
+cases passed vacuously until an entry-overlap assertion was added; that assertion stays. The fixture is
+preserved at `Docs/Attic/SovBypassRewardRuntimeTests.cpp.wip` and is outside the suite, with no
+suppression added. Untested hypotheses for a later harness pass: volume mobility, and overlap processing
+tied to the fixture character's disabled movement ticking. Nothing observed indicates a source defect in
+the gate. Detail in [AbilityPayloadAudit-2026-09-12.md](AbilityPayloadAudit-2026-09-12.md).
 
 ## X2 — `SciFi_Drone_1` marketplace pack, an external content gate
 
