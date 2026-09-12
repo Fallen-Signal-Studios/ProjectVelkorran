@@ -93,6 +93,7 @@ private:
 	friend class USovSaveSubsystem;
 	friend struct FSovLifecycleTestAccess;
 	friend struct FSovTransitionCallbackTestAccess;
+	friend struct FSovProtagonistPartitionTestAccess;
 	UPROPERTY(VisibleAnywhere, Category="Narrative") TObjectPtr<class USovNarrativeCueComponent> NarrativeCues;
 	UPROPERTY(VisibleAnywhere, Category="Feedback") TObjectPtr<class USovHapticFeedbackComponent> HapticFeedback;
 	UPROPERTY(VisibleAnywhere, Category="Accessibility") TObjectPtr<class USovFrontendComponent> Frontend;
