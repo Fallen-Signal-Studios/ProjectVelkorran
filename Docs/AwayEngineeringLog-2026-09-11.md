@@ -459,6 +459,38 @@ one, and it belongs to the project owner:
 Deliberately not done: silently skipping the tests, or adding them to an ignore list. Either would
 turn a real gap into a permanently green suite.
 
+#### Resolved
+
+Classified and resolved in [ContentDependencyPolicy.md](ContentDependencyPolicy.md), with the
+machine-readable form in `Scripts/Manifests/ContentPrerequisites.json`.
+
+- **`/Game/Cues` — project-owned production asset.** The only configured `GameplayCueNotifyPaths`
+  root, so a clone registers **zero** project cue notifies; an editor enumeration here finds 22 cue
+  notifies, all in the fork root and none in `/Game/Cues`. Tracking is permitted — the repository
+  already tracks 10,270 fork `.uasset` files including the eleven originals these override.
+  `.gitignore` now admits the path; the test **stays Failed**; the cue configuration is unchanged.
+  Closing it requires committing `Content/Cues` from the authoring machine.
+- **`NPC_ReformationCombatDrone` — project-authored, not a production dependency.** It is an
+  `NPCDefinition` instance, so no art pack shipped it; never tracked; referenced only by two test
+  files. The authored campaign drones use `AC_NPC_ReformationDrone` directly, verified by loading
+  them. The four tests now load the tracked `NPC_AurelionSecurityDrone`, so they exercise shipped
+  production data and reproduce in any clone. No asset was committed; no third-party content added.
+- **A content defect surfaced by that repoint.** `AC_NPC_ReformationDrone`, shared by both authored
+  campaign drones, leaves the first two of its four `DefaultAbilities` entries `None`. The untracked
+  fixture had been masking it. The tests skip unset entries, cannot pass vacuously (each requires at
+  least one real grant), and warn naming the configuration. Whether those slots are meant to be empty
+  is a content authoring question, left open.
+- **Validation semantics.** Three states now exist: Passed, Failed, and Unrunnable /
+  PrerequisiteMissing. A required production dependency's absence is **Failed**, never downgraded.
+  `Check-ContentPrerequisites.py` refuses a manifest that softens a `project_owned` dependency, and
+  the gate returns `NOT QUALIFIED` (exit 3) when a prerequisite is missing or any test is unrunnable
+  **even when every executed test passed** — verified end to end.
+- **Suite is now 616 passed, 1 failed, 0 unrunnable**, the single failure being the cue prerequisite.
+
+One correction to the record: while checking this I read a run directory from *before* the ability-loop
+fix and briefly took it for an order-dependent failure. It was not; the directories simply sort by
+time and I picked a stale one.
+
 ---
 
 ## Priority 5 — Performance capture harness
