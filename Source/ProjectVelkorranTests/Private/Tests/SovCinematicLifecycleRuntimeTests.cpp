@@ -38,6 +38,7 @@
 #include "Serialization/ObjectAndNameAsStringProxyArchive.h"
 #include "Sovereign/SovGameplayTags.h"
 #include "EngineUtils.h"
+#include "Tests/SovTrackedContentPaths.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 struct FSovCinematicInterruptionTestAccess
@@ -807,10 +808,11 @@ namespace SovRequiredCharacterSequenceTests
 			Definition->NPCID = TEXT("RequiredSequenceCharacterFixture");
 			Definition->bAllowMultipleInstances = true;
 			Definition->NPCClassPath = ASovNPCVisualLifecycleTestCharacter::StaticClass();
-			// This real shipped seed exercises native attribute/startup/ability grants.
-			// Only appearance IO is replaced by the existing empty-mesh producer fixture.
+			// The authored SecurityDrone, tracked under Content/Aurelion/, exercises native
+			// attribute/startup/ability grants with shipped data. Only appearance IO is replaced
+			// by the existing empty-mesh producer fixture.
 			const auto* Seed = LoadObject<UNPCDefinition>(nullptr,
-				TEXT("/Game/SciFi_Drone_1/Textures/NPC_ReformationCombatDrone.NPC_ReformationCombatDrone"));
+				SovTrackedContentPaths::AuthoredCombatDroneDefinition);
 			if (!Seed || !Seed->AbilityConfiguration) { return; }
 			Definition->AbilityConfiguration = Seed->AbilityConfiguration;
 			Character->AuthoredPlacedDefinition = Definition;
@@ -863,12 +865,20 @@ bool FSovRealConfiguredCinematicParticipantTest::RunTest(const FString& Paramete
 	TestTrue(TEXT("Real AddStartupEffects completed the authored configuration"), Scope.ASC->bStartupEffectsApplied);
 	TestFalse(TEXT("Unmaintained legacy field remains false; no test seeding"), Scope.ASC->bInitializedFromConfig);
 	TestTrue(TEXT("Actual default attribute effect supplied living health"), Scope.Character->GetHealth() > 0.f);
+	int32 GrantedAbilities = 0;
 	for (const auto& Ability : Scope.Definition->AbilityConfiguration->DefaultAbilities)
 	{
+		// Unset entries cannot be granted; see SovPlacedNPCDefinitionRuntimeTests for the shared
+		// configuration that carries them.
+		if (!Ability.Get()) { continue; }
 		const auto* Spec = Scope.ASC->FindAbilitySpecFromClass(Ability);
-		if (TestNotNull(TEXT("Actual startup ability was granted"), Spec))
-		{ TestTrue(TEXT("Grant retains its actual configuration source"), Spec->SourceObject.Get() == Scope.Definition->AbilityConfiguration); }
+		if (TestNotNull(*FString::Printf(TEXT("Actual startup ability %s was granted"), *GetNameSafe(Ability.Get())), Spec))
+		{
+			++GrantedAbilities;
+			TestTrue(TEXT("Grant retains its actual configuration source"), Spec->SourceObject.Get() == Scope.Definition->AbilityConfiguration);
+		}
 	}
+	TestTrue(TEXT("At least one real startup ability was granted"), GrantedAbilities > 0);
 	Scope.CreateVisual();
 	if (!TestNotNull(TEXT("Current owned visual"), Scope.Visual)) { return false; }
 	Scope.Visual->CompleteMeshesForTest();

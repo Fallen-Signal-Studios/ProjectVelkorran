@@ -15,6 +15,7 @@
 #include "Misc/AutomationTest.h"
 #include "Misc/ScopeExit.h"
 #include "UObject/Script.h"
+#include "Tests/SovTrackedContentPaths.h"
 
 #if WITH_AUTOMATION_TESTS
 namespace SovPlacedNPCDefinitionTests
@@ -122,11 +123,12 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovPlacedNPCStartupOrderingTest,
 bool FSovPlacedNPCStartupOrderingTest::RunTest(const FString& Parameters)
 {
 	using namespace SovPlacedNPCDefinitionTests;
-	// This is the actual combat-drone seed configuration used by the authored
-	// SecurityDrone and ContaminatedDrone. No attributes, effects or abilities are
-	// applied by the fixture. Only asynchronous appearance loading is suppressed.
+	// The authored SecurityDrone itself, tracked under Content/Aurelion/. It carries the real
+	// AC_NPC_ReformationDrone configuration the campaign drones share, so this exercises shipped
+	// data rather than a fixture. No attributes, effects or abilities are applied by the fixture.
+	// Only asynchronous appearance loading is suppressed.
 	auto* Seed = LoadObject<UNPCDefinition>(nullptr,
-		TEXT("/Game/SciFi_Drone_1/Textures/NPC_ReformationCombatDrone.NPC_ReformationCombatDrone"));
+		SovTrackedContentPaths::AuthoredCombatDroneDefinition);
 	if (!TestNotNull(TEXT("Existing authored combat-drone seed"), Seed)
 		|| !TestNotNull(TEXT("Existing Narrative ability configuration"), Seed->AbilityConfiguration.Get())) { return false; }
 	auto* Configuration = Seed->AbilityConfiguration.Get();
@@ -154,13 +156,29 @@ bool FSovPlacedNPCStartupOrderingTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Native attribute effect supplies living starting health"), NPC->GetHealth() > 0.f && NPC->GetHealth() <= NPC->GetMaxHealth());
 	TestTrue(TEXT("Native startup-effect pipeline ran with its configuration"), ASC->bStartupEffectsApplied);
 	TestTrue(TEXT("ASC belongs to its current pawn"), ASC->GetAvatarActor() == NPC);
+	int32 GrantedAbilities = 0;
+	int32 UnsetAbilityEntries = 0;
 	for (const auto& AbilityClass : Configuration->DefaultAbilities)
 	{
+		// An unset array slot is not an ability and cannot be granted, so asserting a grant for it
+		// would assert something incoherent. Count it and surface it below instead of skipping it
+		// silently, because a real ability becoming unset is a regression worth seeing.
+		if (!AbilityClass.Get()) { ++UnsetAbilityEntries; continue; }
 		const FGameplayAbilitySpec* Spec = ASC->FindAbilitySpecFromClass(AbilityClass);
 		if (TestNotNull(*FString::Printf(TEXT("Native startup grants %s"), *GetNameSafe(AbilityClass.Get())), Spec))
 		{
+			++GrantedAbilities;
 			TestTrue(TEXT("Grant retains Narrative configuration source ownership"), Spec->SourceObject.Get() == Configuration);
 		}
+	}
+	// Without this the loop above would pass vacuously if every entry were unset.
+	TestTrue(TEXT("At least one real startup ability was granted"), GrantedAbilities > 0);
+	if (UnsetAbilityEntries > 0)
+	{
+		AddWarning(FString::Printf(
+			TEXT("%s leaves %d of %d DefaultAbilities entries unset. The authored SecurityDrone and ")
+			TEXT("ContaminatedDrone share this configuration, so they ship those empty slots too."),
+			*GetNameSafe(Configuration), UnsetAbilityEntries, Configuration->DefaultAbilities.Num()));
 	}
 	const float StartingHealth = NPC->GetHealth();
 	const int32 StartingGrantCount = ASC->GetActivatableAbilities().Num();
@@ -180,7 +198,7 @@ bool FSovPlacedNPCStartupPriorityTest::RunTest(const FString& Parameters)
 {
 	using namespace SovPlacedNPCDefinitionTests;
 	auto* Seed = LoadObject<UNPCDefinition>(nullptr,
-		TEXT("/Game/SciFi_Drone_1/Textures/NPC_ReformationCombatDrone.NPC_ReformationCombatDrone"));
+		SovTrackedContentPaths::AuthoredCombatDroneDefinition);
 	if (!TestNotNull(TEXT("Existing combat-drone seed"), Seed)
 		|| !TestNotNull(TEXT("Existing startup configuration"), Seed->AbilityConfiguration.Get())) { return false; }
 	for (const bool bRestore : {false, true})
