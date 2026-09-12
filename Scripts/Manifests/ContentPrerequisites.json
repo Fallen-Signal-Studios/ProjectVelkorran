@@ -17,7 +17,11 @@
       "optional": "Content whose absence genuinely prevents a test from executing, and whose presence is not required for production. UNRUNNABLE. Never passed."
     },
     "aggregate_rule": "A gate may report full qualification only when no required prerequisite is missing AND no dependent test is unrunnable. Absence of evidence is never equivalent to pass.",
-    "on_absence_values": ["fail", "unrunnable", "ignore"]
+    "on_absence_values": [
+      "fail",
+      "unrunnable",
+      "ignore"
+    ]
   },
   "prerequisites": [
     {
@@ -46,6 +50,32 @@
       ],
       "action_required": "Commit Content/Cues from the authoring machine. .gitignore now permits the path (!/Content/Cues/). Until then this prerequisite is missing and validation fails, which is the correct signal.",
       "do_not": "Do not widen GameplayCueNotifyPaths back to /Game or add the fork root to accommodate the absence. Priority 3 measured that adding the fork root registers duplicate tags and silently discards some project overrides."
+    },
+    {
+      "id": "reformation-drone-skeleton",
+      "content_path": "/Game/SciFi_Drone_1/Mesh/FullMesh/SKEL_SciFi_Drone_1",
+      "disk_path": "Content/SciFi_Drone_1/Mesh/FullMesh/SKEL_SciFi_Drone_1",
+      "kind": "asset",
+      "category": "external",
+      "origin": "Marketplace SciFi_Drone_1 pack. The tracked plugin asset ABP_RefDrone targets it directly, so a tracked asset depends on untracked marketplace content.",
+      "production_dependency": false,
+      "required_for_runtime": false,
+      "evidence": [
+        "ABP_RefDrone.uasset records Skeleton'/Game/SciFi_Drone_1/Mesh/FullMesh/SKEL_SciFi_Drone_1.SKEL_SciFi_Drone_1', plus AS_SciFi_Drone_1_Idle and two move animations from the same pack.",
+        "Every suite run logs: ABP_RefDrone - The skeleton asset for this animation Blueprint is missing, so it cannot be compiled!",
+        "Present in the 11 September pre-unity run (5 occurrences) and both 12 September runs, so it predates the unity change.",
+        "git ls-files finds no drone skeleton under Plugins/*/Content/**."
+      ],
+      "consequence_if_absent": "The Blueprint compile error surfaces during asynchronous loading and the automation framework attributes it to whichever test is active at that moment. That produces a FAILING test that varies between runs: PlatformServices.ConsoleOwnerRoutingAndSignout in one run, PlatformOutput.HapticOwnershipAndAccessibility in the next, neither of which is at fault. This is the known cause of suite flakiness.",
+      "licensing": {
+        "tracking_permitted": false,
+        "rationale": "Marketplace art pack content. The repository deliberately drops marketplace asset packs; this is not a project-authored asset like the /Game/Cues overrides."
+      },
+      "tracked": false,
+      "on_absence": "unrunnable",
+      "dependent_tests": [],
+      "action_required": "Decide between installing the pack on validation machines, or preventing the suite from loading ABP_RefDrone so an unrelated test cannot inherit its compile error. The second is source-side and is the reason this is recorded rather than left as folklore about a flaky suite.",
+      "note": "Recorded as SATISFIED earlier by mistake: the first entry pointed at ABP_RefDrone, which is present. The absent asset is the skeleton it references."
     }
   ],
   "retired_dependencies": [
