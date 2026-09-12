@@ -28,6 +28,13 @@ PROJECTVELKORRAN_API FString ProhibitedSystemReasonForName(const FString& Author
  * Empty means no demo item grant was found. */
 PROJECTVELKORRAN_API FString DemoItemLoadoutReason(const UObject* Asset);
 
+/** Narrative Pro demo tale content: a demo quest or dialogue reached by campaign content.
+ * TDD Appendix F forbids vendor systems, and Narrative's demo root carries a SecretMerchant quest
+ * and dialogue. A path match alone is deliberately not the rule: demo VFX, audio and meshes are
+ * legitimately reused, so the asset must also be a quest or dialogue. Empty means no demo tale
+ * content was identified. */
+PROJECTVELKORRAN_API FString DemoTaleContentReason(const UObject* Asset);
+
 /** Read effective production AlwaysCook rules, including bundle packages, without changing cook settings.
  * The existing dependency walker must traverse these roots as well as explicit mission roots. */
 PROJECTVELKORRAN_API bool GatherAlwaysCookPackages(UAssetManager& Manager, TArray<FName>& OutPackages, FString& Error);

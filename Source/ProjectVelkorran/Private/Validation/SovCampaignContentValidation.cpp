@@ -1,5 +1,9 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Validation/SovCampaignContentValidation.h"
+
+#include "Validation/SovCampaignContentPolicy.h"
+#include "Tales/Dialogue.h"
+#include "Tales/Quest.h"
 #include "AssetRegistry/AssetBundleData.h"
 #include "AssetRegistry/AssetData.h"
 #include "Blueprint/UserWidget.h"
@@ -142,6 +146,9 @@ FString SovCampaignContentValidation::ProhibitedAssetReason(const UObject* Asset
 
     Reason = DemoItemLoadoutReason(Asset);
     if (!Reason.IsEmpty()) { return Reason; }
+
+    Reason = DemoTaleContentReason(Asset);
+    if (!Reason.IsEmpty()) { return Reason; }
     // A renamed child retains its actual authored parent, even when moved outside the legacy directory.
     for (const UClass* Ancestor = EffectiveClass; Ancestor; Ancestor = Ancestor->GetSuperClass())
     {
@@ -169,6 +176,27 @@ FString SovCampaignContentValidation::ProhibitedAssetReason(const UObject* Asset
         }
     }
     return {};
+}
+
+FString SovCampaignContentValidation::DemoTaleContentReason(const UObject* Asset)
+{
+    if (!IsValid(Asset)) { return {}; }
+    const UClass* EffectiveClass = Cast<UClass>(Asset);
+    if (const UBlueprint* Blueprint = Cast<UBlueprint>(Asset))
+    { EffectiveClass = Blueprint->GeneratedClass ? Blueprint->GeneratedClass : Blueprint->ParentClass; }
+    if (!EffectiveClass) { EffectiveClass = Asset->GetClass(); }
+
+    // Tale content only. The demo root also holds VFX, audio and meshes that the campaign may
+    // legitimately reference, so location alone never decides this.
+    const bool bTaleContent = EffectiveClass->IsChildOf(UQuest::StaticClass())
+        || EffectiveClass->IsChildOf(UDialogue::StaticClass());
+    if (!bTaleContent) { return {}; }
+
+    const FString Path = Asset->GetPathName();
+    if (!SovCampaignContentPolicy::IsDemoContentPath(*Path, static_cast<std::size_t>(Path.Len())))
+    { return {}; }
+
+    return FString::Printf(TEXT("Narrative demo tale content %s"), *AuthoredName(Asset->GetName()));
 }
 
 bool SovCampaignContentValidation::GatherAlwaysCookPackages(UAssetManager& Manager,
