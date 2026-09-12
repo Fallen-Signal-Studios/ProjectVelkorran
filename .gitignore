@@ -7,6 +7,8 @@ DerivedDataCache/
 Intermediate/
 Saved/
 StagedBuilds/
+# UBT writes Mac packaging resources and a version counter here during a Mac build.
+/Build/Mac/
 
 # IDE and generated project files
 .vs/

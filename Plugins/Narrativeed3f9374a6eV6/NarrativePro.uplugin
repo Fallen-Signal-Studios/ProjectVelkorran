@@ -19,6 +19,7 @@
 			"Type": "Runtime",
 			"LoadingPhase": "PreDefault",
 			"PlatformAllowList": [
+				"Mac",
 				"Win64",
 				"Android",
 				"Linux"
@@ -29,6 +30,7 @@
 			"Type": "Runtime",
 			"LoadingPhase": "Default",
 			"PlatformAllowList": [
+				"Mac",
 				"Win64",
 				"Android",
 				"Linux"
@@ -39,6 +41,7 @@
 			"Type": "UncookedOnly",
 			"LoadingPhase": "PreDefault",
 			"PlatformAllowList": [
+				"Mac",
 				"Win64",
 				"Android",
 				"Linux"
@@ -49,6 +52,7 @@
 			"Type": "UncookedOnly",
 			"LoadingPhase": "PreDefault",
 			"PlatformAllowList": [
+				"Mac",
 				"Win64",
 				"Android",
 				"Linux"
@@ -59,6 +63,7 @@
 			"Type": "Runtime",
 			"LoadingPhase": "Default",
 			"PlatformAllowList": [
+				"Mac",
 				"Win64",
 				"Android",
 				"Linux"
@@ -69,6 +74,7 @@
 			"Type": "UncookedOnly",
 			"LoadingPhase": "PostEngineInit",
 			"PlatformAllowList": [
+				"Mac",
 				"Win64",
 				"Android",
 				"Linux"
@@ -79,6 +85,7 @@
 			"Type": "Runtime",
 			"LoadingPhase": "PreDefault",
 			"PlatformAllowList": [
+				"Mac",
 				"Win64",
 				"Android",
 				"Linux"
