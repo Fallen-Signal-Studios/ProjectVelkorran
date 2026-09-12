@@ -181,13 +181,12 @@ namespace SovStatusCheckpointTests
 	}
 }
 
-using namespace SovStatusCheckpointTests;
-
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovStatusCheckpointDefaultClearTest,
 	"ProjectVelkorran.Campaign.Status.Checkpoint.DefaultPoliciesRoundTripClear",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovStatusCheckpointDefaultClearTest::RunTest(const FString& Parameters)
 {
+	using namespace SovStatusCheckpointTests;
 	FEditorScriptExecutionGuard ScriptGuard;
 	FWorld Fixture;
 	auto* Actor = Fixture.Actor();
@@ -216,6 +215,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovStatusCheckpointPersistentRoundTripTest,
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovStatusCheckpointPersistentRoundTripTest::RunTest(const FString& Parameters)
 {
+	using namespace SovStatusCheckpointTests;
 	FEditorScriptExecutionGuard ScriptGuard;
 	FWorld Fixture;
 	auto* Actor = Fixture.Actor(false);
@@ -258,6 +258,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovStatusCheckpointElapsedPolicyTest,
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovStatusCheckpointElapsedPolicyTest::RunTest(const FString& Parameters)
 {
+	using namespace SovStatusCheckpointTests;
 	FEditorScriptExecutionGuard ScriptGuard;
 	FWorld Fixture;
 	auto* Actor = Fixture.Actor(false);
@@ -292,6 +293,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovStatusCheckpointResistanceTest,
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovStatusCheckpointResistanceTest::RunTest(const FString& Parameters)
 {
+	using namespace SovStatusCheckpointTests;
 	FEditorScriptExecutionGuard ScriptGuard;
 	FWorld Fixture;
 	auto* Actor = Fixture.Actor(false);
@@ -324,6 +326,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovStatusCheckpointRepeatedLoadTest,
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovStatusCheckpointRepeatedLoadTest::RunTest(const FString& Parameters)
 {
+	using namespace SovStatusCheckpointTests;
 	FEditorScriptExecutionGuard ScriptGuard;
 	FWorld Fixture;
 	auto* Actor = Fixture.Actor(false);
@@ -365,6 +368,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovStatusCheckpointQueuedCaptureTest,
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovStatusCheckpointQueuedCaptureTest::RunTest(const FString& Parameters)
 {
+	using namespace SovStatusCheckpointTests;
 	FEditorScriptExecutionGuard ScriptGuard;
 	FWorld Fixture;
 	auto* Source = Fixture.Actor(false);
@@ -409,6 +413,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovStatusCheckpointMalformedPreflightTest,
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovStatusCheckpointMalformedPreflightTest::RunTest(const FString& Parameters)
 {
+	using namespace SovStatusCheckpointTests;
 	FEditorScriptExecutionGuard ScriptGuard;
 	FWorld Fixture;
 	auto* Actor = Fixture.Actor(false);
@@ -495,6 +500,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovStatusCheckpointLegacyMissingRecordTest,
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovStatusCheckpointLegacyMissingRecordTest::RunTest(const FString& Parameters)
 {
+	using namespace SovStatusCheckpointTests;
 	FEditorScriptExecutionGuard ScriptGuard;
 	FWorld Fixture;
 	auto* Actor = Fixture.Actor(false);
@@ -525,6 +531,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovStatusCheckpointUnsafeEffectAuthoringTest,
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovStatusCheckpointUnsafeEffectAuthoringTest::RunTest(const FString& Parameters)
 {
+	using namespace SovStatusCheckpointTests;
 	FEditorScriptExecutionGuard ScriptGuard;
 	FWorld Fixture;
 	auto* Actor = Fixture.Actor(false);
@@ -570,6 +577,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovStatusCheckpointSafePeriodicTest,
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovStatusCheckpointSafePeriodicTest::RunTest(const FString& Parameters)
 {
+	using namespace SovStatusCheckpointTests;
 	FEditorScriptExecutionGuard ScriptGuard;
 	FWorld Fixture;
 	auto* Actor = Fixture.Actor(false);
@@ -603,6 +611,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovStatusCheckpointAvatarReplacementTest,
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovStatusCheckpointAvatarReplacementTest::RunTest(const FString& Parameters)
 {
+	using namespace SovStatusCheckpointTests;
 	FEditorScriptExecutionGuard ScriptGuard;
 	FWorld Fixture;
 	auto* Actor = Fixture.Actor(false);
@@ -639,6 +648,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovStatusCheckpointRestoredCallbackOwnershipTe
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovStatusCheckpointRestoredCallbackOwnershipTest::RunTest(const FString& Parameters)
 {
+	using namespace SovStatusCheckpointTests;
 	FEditorScriptExecutionGuard ScriptGuard;
 	FWorld Fixture;
 	auto* Actor = Fixture.Actor(false);
@@ -672,6 +682,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovStatusCheckpointNestedMutationTest,
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovStatusCheckpointNestedMutationTest::RunTest(const FString& Parameters)
 {
+	using namespace SovStatusCheckpointTests;
 	FEditorScriptExecutionGuard ScriptGuard;
 	FWorld Fixture;
 	auto* Actor = Fixture.Actor(false);
@@ -722,6 +733,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovStatusCheckpointUnrelatedEffectsTest,
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovStatusCheckpointUnrelatedEffectsTest::RunTest(const FString& Parameters)
 {
+	using namespace SovStatusCheckpointTests;
 	FEditorScriptExecutionGuard ScriptGuard;
 	FWorld Fixture;
 	auto* Actor = Fixture.Actor();

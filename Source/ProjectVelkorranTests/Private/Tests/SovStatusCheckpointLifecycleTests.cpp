@@ -83,13 +83,12 @@ namespace SovStatusCheckpointLifecycleTests
 	};
 }
 
-using namespace SovStatusCheckpointLifecycleTests;
-
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovStatusCheckpointManagedReadinessTest,
 	"ProjectVelkorran.Campaign.Status.Checkpoint.ManagedPlayerReadinessBoundary",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovStatusCheckpointManagedReadinessTest::RunTest(const FString& Parameters)
 {
+	using namespace SovStatusCheckpointLifecycleTests;
 	FEditorScriptExecutionGuard ScriptGuard;
 	FWorld Fixture;
 	if (!Fixture.World) { AddError(TEXT("World creation failed")); return false; }
@@ -136,6 +135,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovStatusCheckpointNativeResourceBoundaryTest,
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovStatusCheckpointNativeResourceBoundaryTest::RunTest(const FString& Parameters)
 {
+	using namespace SovStatusCheckpointLifecycleTests;
 	FEditorScriptExecutionGuard ScriptGuard;
 	FNarrativeActorFixture Fixture;
 	if (!Fixture.Actor || !Fixture.ASC || !Fixture.Status) { AddError(TEXT("Narrative fixture creation failed")); return false; }
@@ -177,6 +177,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovStatusCheckpointGenericNarrativeFallbackTes
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovStatusCheckpointGenericNarrativeFallbackTest::RunTest(const FString& Parameters)
 {
+	using namespace SovStatusCheckpointLifecycleTests;
 	FEditorScriptExecutionGuard ScriptGuard;
 	FNarrativeActorFixture Fixture;
 	if (!Fixture.Actor || !Fixture.ASC || !Fixture.Status) { AddError(TEXT("Narrative fixture creation failed")); return false; }
@@ -199,6 +200,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovStatusCheckpointClearModifierBoundaryTest,
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovStatusCheckpointClearModifierBoundaryTest::RunTest(const FString& Parameters)
 {
+	using namespace SovStatusCheckpointLifecycleTests;
 	FEditorScriptExecutionGuard ScriptGuard;
 	FNarrativeActorFixture Fixture;
 	if (!Fixture.Actor || !Fixture.ASC || !Fixture.Status) { AddError(TEXT("Narrative fixture creation failed")); return false; }
@@ -240,6 +242,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovStatusCheckpointNativeStageOwnershipTest,
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovStatusCheckpointNativeStageOwnershipTest::RunTest(const FString& Parameters)
 {
+	using namespace SovStatusCheckpointLifecycleTests;
 	FEditorScriptExecutionGuard ScriptGuard;
 	FNarrativeActorFixture Fixture;
 	if (!Fixture.Actor || !Fixture.ASC || !Fixture.Status) { AddError(TEXT("Narrative fixture creation failed")); return false; }
@@ -273,6 +276,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovStatusCheckpointRetiredResourceBoundaryTest
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovStatusCheckpointRetiredResourceBoundaryTest::RunTest(const FString& Parameters)
 {
+	using namespace SovStatusCheckpointLifecycleTests;
 	FEditorScriptExecutionGuard ScriptGuard;
 	FNarrativeActorFixture Fixture;
 	if (!Fixture.Actor || !Fixture.ASC || !Fixture.Status) { AddError(TEXT("Narrative fixture creation failed")); return false; }
