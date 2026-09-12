@@ -1,60 +1,78 @@
-# Aurelion AI startup stall — reproduced, 11 September 2026
+# Aurelion AI hostile-acquisition delay — measured, 11 September 2026
 
-The intermittent hostile-startup stall first recorded in
-`WorkPCAIStartupObservation-2026-09-06.md` is **reproduced deterministically under
-automation**, with a measured rate. No Narrative Pro code was modified to obtain this.
+**Correction, same day.** This document first reported an intermittent *stall* reproduced at
+18/20. That finding was wrong and is retracted below. The startup ordering race is real and
+deterministic, but its cost is a **~1.18 s delay in acquiring the attack goal**, not a failure
+to acquire one. No run in any sweep, before or after the repair, ever failed to acquire it.
 
-Reproduce with:
+Measure with:
 
 ```powershell
 .\Scripts\Run-AIStartupColdStarts.ps1 `
   -ArchiveDirectory '<archive>\Windows' -Runs 20 -HoldSeconds 25 -ApproachHostile
+python Scripts\Classify-AIStartupRuns.py <after-directory> <before-directory>
 ```
 
 Map `/Game/Maps/Development/L_SeleneCombat` (3 Dominion Hounds + Handler), packaged
-Development, `sov.AIStartupTrace` armed through `-dpcvars`.
+Development, `sov.AIStartupTrace` armed through `-dpcvars`. 20 runs x 4 controllers = 80
+samples per configuration.
 
-## Distribution over 20 cold starts
+## What the retracted claim got wrong
 
-| Measure | Result |
-|---|---:|
-| Player first seen **before** faction publication | **20 / 20** |
-| Attitude at that first Sight | **Neutral (1) in 20 / 20** |
-| Ended with **zero** goals, still seeing the player, attitude Hostile, in `BT_ReturnToSpawn` | **18 / 20** |
-| Recovered and acquired an attack goal (`BT_Attack_DominionHound`) | 2 / 20 (runs 8, 17) |
-| Ended not currently seeing the player (legitimate loss) | 1 / 20 (run 13) |
+The original classification read each run's **last** snapshot and called "zero goals while
+still seeing a hostile player" a stall. Re-examined per controller over time:
 
-The **precondition is deterministic**; the **failure is 90%**. The two recoveries show a
-working path exists — most likely a genuine sight-lost/sight-regained cycle producing a new
-event after factions became valid — which is why the defect reads as intermittent in play.
+- **100% of goal drops occur because the player is already dead.** The NPC engaged, killed
+  Selene, dropped the attack goal and correctly returned to spawn. A terminal snapshot taken
+  after that is indistinguishable from a stall by the old rule, and is correct behaviour.
+- The trace line read as `Sight(player) sight=False <- LOSS, not gain` was misread. In this
+  schema `sight` means *the stimulus is the Sight sense*, and `success` means *successfully
+  sensed*. That row is `sight=False, success=True`: a **different sense succeeding** — and it
+  is the recovery edge, not a loss.
+- The claim that "no attack goal is created" and that the loop has "no retry edge" was
+  therefore false in both halves.
+
+## What is actually true
+
+| Measure | Baseline | With repair |
+|---|---:|---:|
+| Controllers that acquired an attack goal | **80 / 80** | **80 / 80** |
+| Attack-goal acquisition, median | **1.4064 s** | **0.2285 s** |
+| Acquisition range | 1.4012 – 1.4242 s | 0.2241 – 0.3226 s |
+| Goal drops explained by player death | 72 / 72 (100%) | 56 / 57 (98%) |
+
+The precondition is still deterministic: in 20/20 runs the player is first seen at t≈0.0005 s
+with attitude **Neutral (1)**, because the player's factions do not exist yet, so the attack
+predicate correctly rejects the target.
+
+What recovers it in the baseline is **another sense** firing at t≈1.41 s, which produces a new
+`OnPerceptionUpdated` callback and re-runs the predicate against now-valid factions. That
+recovery is remarkably consistent (1.401–1.424 s across all 80 baseline controllers), which is
+why the behaviour looked like a hang for a little over a second rather than a random stall.
 
 ## The causal chain
 
 ```
-t=0.178s  seq 14,22,30,38   Sight(player)  sight=True   attitude=1 (Neutral)  factions empty
-t=0.381s  seq 71            player_faction_publication  -> Narrative.Factions.Heroes
-t=1.580s  seq 85+           Sight(player)  sight=False  attitude=2 (Hostile)  <- LOSS, not gain
-t=18.4s   final snapshot    tree=BT_ReturnToSpawn  goal_count=0
-                            players.currently_seen=True
-                            players.attitude=2 (Hostile)
-                            players.factions=Narrative.Factions.Heroes
+t=0.0005s  seq 38   Sight(player)      sight=True  success=True  attitude=1 Neutral, factions empty
+t=0.186s   seq 71   player_faction_publication -> Narrative.Factions.Heroes
+                    (baseline: reaches nothing that re-evaluates)
+t=1.4108s  seq 91   NON-Sight stimulus sight=False success=True  attitude=2 Hostile
+t=1.4108s  seq 92   attack goal created -> BT_Attack_DominionHound
 ```
 
-1. **Sight is acquired ~200 ms before the player's factions exist.** `GoalGenerator_Attack`'s
-   attack predicate uses `GetAttitude`, which resolves **Neutral** against a factionless
-   player, so the target is rejected and no attack goal is created.
-2. **Faction publication does not reach the generator.**
-   `ANarrativePlayerState::OnRep_Faction` broadcasts the *player's* `OnFactionUpdated`. The
-   generator listens to the controller's perception delegate and GameState's
-   `OnFactionAttitudeChanged` — neither fires, so nothing triggers reevaluation.
-3. **No further Sight event arrives.** UE 5.7 `UAIPerceptionComponent::ProcessStimuli`
-   suppresses same-state notifications, so continuing to see an already-seen actor generates
-   nothing. Subsequent callbacks in the trace are `sight=False` losses.
-4. **Terminal state is self-consistent and wrong**: attitude correct, factions valid, player
-   actively perceived, zero goals, permanently in the fallback tree.
+1. **Sight is acquired ~185 ms before the player's factions exist.** `GetAttitude` resolves
+   **Neutral** against a factionless player, so the target is correctly rejected.
+2. **Faction publication reaches no re-evaluation path.** `OnRep_Faction` broadcast only
+   `ANarrativeCharacter::OnFactionUpdated`, a bare member with no `UPROPERTY`. The generator
+   binds the controller's perception delegate and the game state's `OnFactionAttitudeChanged`;
+   a membership change raises neither.
+3. **UE suppresses the same-state Sight notification**, so merely continuing to see an
+   already-seen actor produces nothing.
+4. **Recovery waits for an unrelated sense.** The decision is corrected only when some other
+   stimulus happens to generate a fresh callback — here consistently ~1.18 s later.
 
-The loop has **no retry edge**. Every input that could correct the decision has either
-already fired (factions) or is suppressed (Sight).
+So there *is* a retry edge; it is incidental and slow. Closing the intended edge removes the
+wait.
 
 ## Why this was not visible before
 
@@ -153,12 +171,136 @@ problem, and would mask rather than repair the missing edge.
 **Recommended next step before any edit:** survey option C. If the fork already has a
 reconsideration hook, it is almost certainly the smallest framework-consistent repair.
 
+## The implemented repair — targeted reevaluation
+
+C1 was rejected: raising `OnFactionAttitudeChanged` for a membership change would leave that
+delegate's name and parameters untrustworthy for every existing subscriber. What follows
+instead reuses the reconsideration path the framework already has.
+
+### What the Blueprint already contains
+
+`GoalGenerator_Attack` was inspected by exporting it to T3D and reading the node graph
+(Python cannot enumerate Blueprint-defined functions, and the Kismet text backend produced
+nothing). It already implements the whole flow:
+
+```
+InitializeGoalGenerator (override)
+  ├─ bind BP_NarrativeNPCController.OnPerceptionUpdated → OnPerceptionUpdated_Event
+  ├─ bind NarrativeGameState.OnFactionAttitudeChanged   → OnFactionsUpdated → RefreshPerceivedActors()
+  └─ call RefreshPerceivedActors()        ← once-only initial pass, ~55 ms too early
+
+RefreshPerceivedActors()   [Public | BlueprintCallable, 0 parameters]
+  └─ OwnerController → GetAIPerceptionComponent → GetCurrentlyPerceivedActors
+       ForEach → Try Add Attack Goal From Actor
+
+Try Add Attack Goal From Actor   ← the sole hostility predicate
+  └─ GetAttitude → Map_Find(AttackAffiliationMap) → DoesAttitudeMatchFilter → AddGoalItem
+```
+
+Two of the author's own comments confirm the intent. On `OnFactionsUpdated`: *"when factions
+update a previously sensed friendly/neutral may now be an enemy - check for this"*. On
+`RefreshPerceivedActors`: *"TODO figure out how to actually refresh UE5's perception. This
+works okay in the meantime however, where we just make a fake AIStimulus and send that
+through."* — it synthesises a local stimulus struct rather than pushing into the perception
+system, which is exactly the constraint the repair had to respect.
+
+`OnFactionsUpdated` discards all three delegate parameters and calls `RefreshPerceivedActors`.
+So the generator never needed the attitude payload; it only needed to be told to look again.
+
+### The missing edge
+
+`RefreshPerceivedActors` runs at initialization and on a faction **attitude** change. A faction
+**membership** change raises neither. `ANarrativePlayerState::OnRep_Faction` — the single
+funnel for `SetFactions`, `AddFaction`, `RemoveFaction` and replication — broadcast only
+`ANarrativeCharacter::OnFactionUpdated`, a bare member with no `UPROPERTY`, so nothing outside
+the character could bind it.
+
+### Changes
+
+| # | File | Change |
+|---|---|---|
+| 1 | `NarrativeGameState.h/.cpp` | New `FOnFactionMembershipChanged(AActor*, FGameplayTagContainer)` + `NotifyFactionMembershipChanged`. Separate name, parameters and meaning from `OnFactionAttitudeChanged`; no existing subscriber's contract changes. |
+| 2 | `NarrativePlayerState.cpp` | `OnRep_Faction` republishes the same fact through the game state. |
+| 3 | `NPCGoalGenerator.h/.cpp` | New `ReevaluatePerceivedActors()` `BlueprintNativeEvent`. Default implementation forwards to an authored zero-parameter `RefreshPerceivedActors`, refusing any other signature. |
+| 4 | `NPCActivityComponent.h/.cpp` | Subscribes in `BeginPlay`, unsubscribes in `EndPlay`; gates on authority, on a restore not being in flight, and on actually perceiving the changed actor; then asks each generator. |
+
+**No fork content was modified.** Headless Blueprint graph authoring is not available —
+`BlueprintEditorLibrary.add_function_graph` creates only an empty graph and there is no
+node or pin API — so a one-node override could not be authored without a GUI session. The
+native default therefore surfaces the existing Blueprint-callable entry point by its
+established name, which is preferable to restating the predicate in native code. When the
+editor is next open this can be replaced by a proper override node with no behaviour change.
+
+### How each constraint is met
+
+- **Not a rebroadcast under false semantics** — a new delegate that says what happened.
+- **No duplicated predicate** — the hostility test stays only in `Try Add Attack Goal From Actor`.
+- **No forced perception update** — nothing calls into the perception system; the existing pass
+  reads `GetCurrentlyPerceivedActors` and synthesises its own stimulus, as it already did.
+- **No global rescoring** — an NPC that does not currently perceive the changed actor is
+  skipped outright. It holds no stale decision, and its next perception event evaluates against
+  valid factions.
+- **Server-authoritative** — `UNPCActivityComponent::ReevaluatePerceivedActors` returns without
+  authority. The delegate itself fires on both sides because the membership change is true on
+  both; the consumer gates.
+- **Idempotent** — `UNPCActivityComponent::AddGoal` already rejects a second goal for a
+  registered key via `GoalUniqueObjectMap`, so a repeated pass cannot duplicate a goal, and the
+  existing recovery runs cannot gain a second one.
+- **No behaviour-tree restart** — nothing calls `PerformActivitySelection` directly; goals are
+  offered through the existing `AddGoalItem(..., bTriggerReselect)` path.
+- **Checkpoint/restore** — a reevaluation is refused while a saved-activity restore is pending.
+
 ## Regression coverage a fix must carry
 
 1. A hostile that first perceives the player before faction publication **eventually acquires
    its attack goal** once factions become authoritative.
 2. Normal post-initialization perception is unchanged — a hostile that first sees the player
    after factions are valid behaves exactly as today.
-3. Reevaluation **cannot duplicate goals** or repeatedly restart the behaviour tree. The
-   18/20 stalled runs must become attack-goal runs without the 2/20 recovering runs gaining a
-   second goal.
+3. Reevaluation **cannot duplicate goals** or repeatedly restart the behaviour tree. Every
+   controller must still end with exactly one attack goal for the target, not two.
+
+### Coverage as implemented
+
+`Source/ProjectVelkorranTests/Private/Tests/SovFactionMembershipReevaluationTests.cpp`, five
+suites under `ProjectVelkorran.Campaign.AI`. The first drives the **real** publication path —
+`ANarrativePlayerState::SetFactions` on a player state bound to a narrative player character —
+rather than calling the new notifier directly, so it exercises the edge that was missing.
+
+| Suite | Asserts |
+|---|---|
+| `FactionMembershipChangeReachesPerceivingNPC` | Publication after perception reaches the NPC; a repeat is delivered once more, not amplified |
+| `FactionMembershipChangeSkipsUnperceivingNPC` | An NPC not perceiving the actor is untouched |
+| `ReevaluationRequiresAuthority` | Refused as a simulated proxy; honoured once authority is restored |
+| `ReevaluationUsesAuthoredRefreshEntryPoint` | The default hook invokes a zero-parameter `RefreshPerceivedActors`, and refuses a same-named function with a different signature |
+| `ReevaluationCannotDuplicateGoalsForSameTarget` | A second distinct goal for the same target is rejected; exactly one remains |
+
+**Negative control performed.** With change 2 removed and change 3's body emptied, rebuilt and
+rerun: `FactionMembershipChangeReachesPerceivingNPC` fails (`0`, expected `1` and `2`) and
+`ReevaluationUsesAuthoredRefreshEntryPoint` fails (`0`, expected `1`); the three invariant
+suites correctly stay green. The implementation was then restored. An earlier control attempt
+did not compile under warnings-as-errors, so its apparently passing run reused a stale binary
+and was discarded rather than reported.
+
+Full suite after the repair: **612 passing, 0 failing** (607 before, +5 new).
+
+### Packaged result
+
+80 controllers per configuration, same archive settings, classified by
+`Scripts/Classify-AIStartupRuns.py`:
+
+```
+median acquisition: baseline 1.4064s -> with repair 0.2285s  (-1.1779s)
+never acquired a goal: 0 / 80 in both configurations
+goal drops with player already dead: baseline 72/72, repaired 56/57
+```
+
+Acquisition now lands ~40 ms after faction publication (0.186 s -> 0.229 s) instead of waiting
+~1.22 s for an unrelated sense. The improvement is deterministic: every one of the 80 repaired
+controllers acquired between 0.224 s and 0.323 s, with no overlap against the baseline's
+1.401–1.424 s band.
+
+**What this repair does not do.** It does not fix a stall, because there was no stall. It
+removes a consistent ~1.18 s delay before hostiles engage. That is worth having for encounter
+feel, and the ordering defect it closes is real, but it should not be described as fixing a
+hang. The 6 September observation that originally motivated this work is **still unexplained**
+— nothing in these 40 packaged runs reproduces an NPC that never engages.

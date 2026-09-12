@@ -14,6 +14,7 @@
 
 // Delegate signature
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnFactionAttitudeChanged, FGameplayTag, Faction, FGameplayTag, OtherFaction, ETeamAttitude::Type, NewAttitude);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnFactionMembershipChanged, AActor*, Actor, FGameplayTagContainer, NewFactions);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FTimeOfDayEvent, float, EventTime, float, TimeAtFire, float, TimePassedDelta, bool, bFiredFromAdvanceTime);
 
 
@@ -314,6 +315,28 @@ public:
 	//Called when a factions attitude towards another faction changes - bots bind this to recheck if they are perceiving someone who has become a hostile 
 	UPROPERTY(BlueprintAssignable, Category = "Factions")
 	FOnFactionAttitudeChanged OnFactionAttitudeChanged;
+
+	/**
+	 * Called when an actor's faction MEMBERSHIP changes - it joined or left factions, or had
+	 * its factions published for the first time.
+	 *
+	 * Deliberately separate from OnFactionAttitudeChanged. That event reports a change to the
+	 * attitude BETWEEN two factions and carries the faction pair plus the new attitude; this
+	 * one reports that a specific actor's own membership changed and carries the actor. Both
+	 * can alter the effective attitude toward an actor, but they are different facts, and
+	 * raising one to mean the other would leave existing subscribers unable to trust the
+	 * parameters they receive.
+	 *
+	 * Broadcast on both server and client, because the membership change is true on both.
+	 * Subscribers that produce authoritative state - AI goal generation in particular - must
+	 * gate themselves on authority rather than assume this is server-only.
+	 */
+	UPROPERTY(BlueprintAssignable, Category = "Factions")
+	FOnFactionMembershipChanged OnFactionMembershipChanged;
+
+	/** Announce that an actor's faction membership changed. Safe to call with a null actor. */
+	UFUNCTION(BlueprintCallable, Category = "Factions")
+	virtual void NotifyFactionMembershipChanged(AActor* Actor, UPARAM(meta = (Categories="Narrative.Factions"))const FGameplayTagContainer& NewFactions);
 
 
 protected:

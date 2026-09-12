@@ -330,6 +330,45 @@ arming and per-run extraction. Reusable for any future intermittent-startup inve
 
 ---
 
+## Priority 4B — repair, and a retraction
+
+**Retraction.** Priority 4's headline finding, "stall reproduced at 18/20", was **wrong**. It
+classified each run by its last snapshot, and in 100% of cases a zero-goal terminal snapshot
+occurred because the NPC had already killed Selene and correctly returned to spawn. Re-read
+per controller over time, **80/80 baseline controllers acquired their attack goal and entered
+`BT_Attack_DominionHound`**. Two supporting readings were also wrong: a `sight=False,
+success=True` row is a non-Sight sense *succeeding*, not a sight loss, and it is the recovery
+edge; and the claim that the loop had "no retry edge" was false.
+
+**What the race actually costs.** Acquisition is delayed, not prevented:
+
+| | Baseline | With repair |
+|---|---:|---:|
+| Acquired an attack goal | 80/80 | 80/80 |
+| Median acquisition | 1.4064 s | 0.2285 s |
+| Range | 1.4012–1.4242 s | 0.2241–0.3226 s |
+
+The baseline recovers only when an unrelated sense fires (~1.41 s, strikingly consistent). The
+repair closes the intended edge, so acquisition lands ~40 ms after faction publication.
+
+**The repair** is documented in `AIStartupRaceReproduction-2026-09-11.md`: a new
+`OnFactionMembershipChanged` signal on the game state, raised from `OnRep_Faction`, consumed by
+`UNPCActivityComponent` under authority/perception/restore gates, dispatched to generators
+through a new `ReevaluatePerceivedActors` hook that reuses the Blueprint's existing
+`RefreshPerceivedActors` pass. Four fork files, purely additive, no fork content modified.
+612/612 automation tests, with a negative control proving the two new-behaviour suites fail
+against the defect.
+
+**Still unexplained:** the 6 September observation of an NPC that never engages. Nothing in 40
+packaged runs reproduces it. The delay fixed here is real but is not that.
+
+**Method note.** The error was caught only by plotting goal count per controller over time
+instead of reading a terminal snapshot. A single end-state sample cannot distinguish "never
+started" from "finished and disengaged". Prefer a time series whenever the metric is the
+*absence* of something.
+
+---
+
 ## Priorities 5–8
 
 Not yet started. Order per the revised brief: performance harness, progression, pause/menu,

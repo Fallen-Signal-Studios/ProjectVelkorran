@@ -313,6 +313,21 @@ void ANarrativeGameState::SetFactionAttitude(FGameplayTag SourceFaction,FGamepla
 	OnFactionAttitudeChanged.Broadcast(SourceFaction, TargetFaction, NewAttitude);
 }
 
+void ANarrativeGameState::NotifyFactionMembershipChanged(AActor* Actor, const FGameplayTagContainer& NewFactions)
+{
+	// A null actor is not an error - faction data can be assigned before a pawn is possessed.
+	// Nothing can be perceiving an actor that does not exist yet, so there is nothing to
+	// reconsider; the eventual perception event will evaluate against valid factions.
+	if (!IsValid(Actor))
+	{
+		return;
+	}
+
+	FNarrativeAIStartupDiagnostics::Record(this, TEXT("faction_membership_publication"),
+		FString::Printf(TEXT("%s -> %s"), *GetNameSafe(Actor), *NewFactions.ToString()));
+	OnFactionMembershipChanged.Broadcast(Actor, NewFactions);
+}
+
 void ANarrativeGameState::AdvanceTimeOfDay(const float TimeToAdd) 
 {	
 	if (TimeToAdd > 0.01f)

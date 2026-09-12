@@ -55,6 +55,14 @@ public:
 	UFUNCTION()
 	void RescoreGoals();
 
+	/**
+	 * An actor's faction membership changed, so an attitude this NPC already resolved may now
+	 * be wrong. Narrowed to actors this NPC is actually perceiving - an NPC that cannot see the
+	 * actor has no stale decision about it, and will evaluate correctly when it next does.
+	 */
+	UFUNCTION()
+	void HandleFactionMembershipChanged(AActor* Actor, FGameplayTagContainer NewFactions);
+
 	FTimerHandle TimerHandle_RescoreGoals;
 
 	virtual void Activate(bool bReset=false);
@@ -111,6 +119,16 @@ public:
 	/** Remove n GoalGenerator from our list. */
 	UFUNCTION(BlueprintCallable, Category = "Activities")
 	bool RemoveGoalGenerator(TSubclassOf<UNPCGoalGenerator> GoalGeneratorClass);
+
+	/**
+	 * Ask every generator to reconsider the actors this NPC already perceives.
+	 *
+	 * Server-authoritative: goals are produced on the authority and replicated, so this does
+	 * nothing without it. Safe to call repeatedly - generators are required to be idempotent,
+	 * and goal admission rejects a duplicate for an already-registered key.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Activities")
+	void ReevaluatePerceivedActors();
 
 	/** Start the given activity, and pass the goal to it. Goal can be nullptr  */
 	UFUNCTION(BlueprintCallable, Category = "Activities")

@@ -16,6 +16,8 @@
 
 #include "BehaviorTree/BehaviorTreeComponent.h"
 #include "UObject/StrongObjectPtr.h"
+#include "AI/NarrativeNPCController.h"
+#include "Perception/AIPerceptionComponent.h"
 
 // Sets default values for this component's properties
 UNPCActivityComponent::UNPCActivityComponent()
@@ -32,6 +34,17 @@ void UNPCActivityComponent::BeginPlay()
 	Super::BeginPlay();
 
 	OwnerController = CastChecked<ANarrativeNPCController>(GetOwner());
+
+	// Subscribed before the restore early-out below, so a restoring NPC still hears a
+	// membership change that lands while its activities are being reapplied.
+	if (const UWorld* World = GetWorld())
+	{
+		if (ANarrativeGameState* NarrativeGameState = World->GetGameState<ANarrativeGameState>())
+		{
+			NarrativeGameState->OnFactionMembershipChanged.AddDynamic(this, &UNPCActivityComponent::HandleFactionMembershipChanged);
+		}
+	}
+
 	if (bSavedActivityRestorePending)
 	{
 		// Actor::BeginPlay is still dispatching component callbacks here. A next
@@ -59,6 +72,11 @@ void UNPCActivityComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	{
 		World->GetTimerManager().ClearTimer(TimerHandle_SavedActivityRestore);
 		World->GetTimerManager().ClearTimer(TimerHandle_RescoreGoals);
+
+		if (ANarrativeGameState* NarrativeGameState = World->GetGameState<ANarrativeGameState>())
+		{
+			NarrativeGameState->OnFactionMembershipChanged.RemoveDynamic(this, &UNPCActivityComponent::HandleFactionMembershipChanged);
+		}
 	}
 	OwnerController = nullptr;
 	SavedActivityLoadController.Reset();
@@ -69,6 +87,74 @@ void UNPCActivityComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 void UNPCActivityComponent::RescoreGoals()
 {
 	PerformActivitySelection(true);
+}
+
+void UNPCActivityComponent::HandleFactionMembershipChanged(AActor* Actor, FGameplayTagContainer NewFactions)
+{
+	if (!IsValid(Actor) || !IsValid(OwnerController))
+	{
+		return;
+	}
+
+	// The delegate fires on clients too, since the membership change is true there. Leave
+	// before querying perception rather than doing that work once per NPC for nothing.
+	const AActor* Owner = GetOwner();
+	if (!Owner || !Owner->HasAuthority())
+	{
+		return;
+	}
+
+	UAIPerceptionComponent* Perception = OwnerController->GetAIPerceptionComponent();
+	if (!Perception)
+	{
+		return;
+	}
+
+	// Our own membership changing alters our attitude toward everything we perceive, not just
+	// toward the changed actor - and we never perceive ourselves, so the check below would
+	// otherwise discard it.
+	const bool bChangedActorIsUs = (Actor == OwnerController) || (Actor == OwnerController->GetPawn());
+
+	if (!bChangedActorIsUs)
+	{
+		// A null sense class means "perceived by any sense". An NPC that cannot currently
+		// perceive this actor holds no stale decision about it: whenever it does perceive it,
+		// that perception event evaluates against the factions in force at the time. Skipping
+		// keeps one player's faction publication from touching every NPC in the level.
+		TArray<AActor*> PerceivedActors;
+		Perception->GetCurrentlyPerceivedActors(nullptr, PerceivedActors);
+
+		if (!PerceivedActors.Contains(Actor))
+		{
+			return;
+		}
+	}
+
+	ReevaluatePerceivedActors();
+}
+
+void UNPCActivityComponent::ReevaluatePerceivedActors()
+{
+	const AActor* Owner = GetOwner();
+	if (!Owner || !Owner->HasAuthority())
+	{
+		return;
+	}
+
+	// A restore in flight owns goal state and is mid-way through reapplying it. Reconsidering
+	// now would interleave with that; the restore finishes against already-valid factions.
+	if (HasPendingSavedActivityRestore())
+	{
+		return;
+	}
+
+	for (UNPCGoalGenerator* GoalGenerator : GoalGenerators)
+	{
+		if (IsValid(GoalGenerator))
+		{
+			GoalGenerator->ReevaluatePerceivedActors();
+		}
+	}
 }
 
 void UNPCActivityComponent::Activate(bool bReset)

@@ -74,6 +74,29 @@ public:
 	void InitializeGoalGenerator();
 	virtual void InitializeGoalGenerator_Implementation();
 
+	/**
+	 * Reconsider the actors this NPC ALREADY perceives, because an input to the decision
+	 * changed rather than the perception itself.
+	 *
+	 * Generators decide from more than the perception event: faction membership, attitude and
+	 * their own configuration all feed the same predicate. When one of those changes after an
+	 * actor was perceived, no new perception event arrives - UE suppresses the same-state
+	 * notification - so the stale decision stands forever unless something asks for a recheck.
+	 * This is that ask.
+	 *
+	 * Implementations must re-run their EXISTING predicate over currently perceived actors.
+	 * They must not force a perception refresh, and they must be idempotent: this can fire
+	 * repeatedly for an actor already handled, and must not produce a duplicate goal or
+	 * restart work that is already running.
+	 *
+	 * The default implementation forwards to a generator's authored "RefreshPerceivedActors"
+	 * pass when it defines one, so generators written before this hook existed participate
+	 * without duplicating their predicate in native code. Override it to do something else.
+	 */
+	UFUNCTION(BlueprintNativeEvent, Category = "Goal Generator")
+	void ReevaluatePerceivedActors();
+	virtual void ReevaluatePerceivedActors_Implementation();
+
 	////Use this to tell the NPC activity component to add the goal. 
 	UFUNCTION(BlueprintCallable, Category = "Activities") 
 	UNPCGoalItem* AddGoalItem(class UNPCGoalItem* Goal, const bool bTriggerReselect=false);

@@ -119,6 +119,22 @@ void ANarrativePlayerState::OnRep_Faction()
 
 		FNarrativeAIStartupDiagnostics::Record(PlayerCharacter, TEXT("player_faction_publication"), Factions.ToString());
 		PlayerCharacter->OnFactionUpdated.Broadcast();
+
+		// OnFactionUpdated is a bare member on the character, so nothing outside the character
+		// can bind it. Republish the same fact through the game state, which is the broker AI
+		// already reaches for faction questions.
+		//
+		// This is the edge that was missing: an NPC that perceived this character before its
+		// factions existed resolved Neutral, rejected it, and then received no further signal -
+		// UE suppresses the same-state Sight notification, and a membership change raises no
+		// faction event of its own.
+		if (const UWorld* World = GetWorld())
+		{
+			if (ANarrativeGameState* NarrativeGameState = World->GetGameState<ANarrativeGameState>())
+			{
+				NarrativeGameState->NotifyFactionMembershipChanged(PlayerCharacter, Factions);
+			}
+		}
 	}
 }
 //
