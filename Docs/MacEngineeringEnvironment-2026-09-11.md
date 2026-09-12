@@ -62,6 +62,25 @@ Unreal is unaffected for compilation because UBT resolves the toolchain itself r
 The real fix is a current Xcode plus `sudo xcode-select -s`. That needs the machine owner's password
 and is not something an agent should do.
 
+## Git on this host has read access only
+
+`git ls-remote` and `git fetch` work. **`git push` does not**: there is no `gh`, no SSH key, and no
+credential helper configured, so the push fails with `could not read Username for
+'https://github.com'`. Commits therefore land locally and wait.
+
+Setting this up needs a credential the machine owner supplies, not something an agent should handle.
+Once, in a terminal:
+
+```bash
+/Library/Developer/CommandLineTools/usr/bin/git config --global credential.helper osxkeychain
+```
+
+Then push, entering the GitHub username and a personal access token when prompted. `osxkeychain` is
+present in the Command Line Tools git, so nothing needs installing.
+
+Note the explicit path. `/usr/bin/git` is one of the shims broken by the Xcode fault above, so it
+fails for interactive use as well. Either use the full path or repair `xcode-select`.
+
 ## Commands
 
 ```bash
