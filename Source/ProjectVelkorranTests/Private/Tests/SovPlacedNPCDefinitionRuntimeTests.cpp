@@ -123,12 +123,13 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovPlacedNPCStartupOrderingTest,
 bool FSovPlacedNPCStartupOrderingTest::RunTest(const FString& Parameters)
 {
 	using namespace SovPlacedNPCDefinitionTests;
-	// The authored SecurityDrone itself, tracked under Content/Aurelion/. It carries the real
-	// AC_NPC_ReformationDrone configuration the campaign drones share, so this exercises shipped
-	// data rather than a fixture. No attributes, effects or abilities are applied by the fixture.
-	// Only asynchronous appearance loading is suppressed.
+	// The authored Enforcer, tracked under Content/Aurelion/ with every transitive dependency
+	// tracked too, so this exercises shipped data without reaching the untracked SciFi_Drone_1
+	// pack. It carries AC_Enforcer, whose six abilities and startup attributes all resolve. No
+	// attributes, effects or abilities are applied by the fixture. Only asynchronous appearance
+	// loading is suppressed.
 	auto* Seed = LoadObject<UNPCDefinition>(nullptr,
-		SovTrackedContentPaths::AuthoredCombatDroneDefinition);
+		SovTrackedContentPaths::AuthoredEnforcerDefinition);
 	if (!TestNotNull(TEXT("Existing authored combat-drone seed"), Seed)
 		|| !TestNotNull(TEXT("Existing Narrative ability configuration"), Seed->AbilityConfiguration.Get())) { return false; }
 	auto* Configuration = Seed->AbilityConfiguration.Get();
@@ -175,9 +176,14 @@ bool FSovPlacedNPCStartupOrderingTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("At least one real startup ability was granted"), GrantedAbilities > 0);
 	if (UnsetAbilityEntries > 0)
 	{
+		// An entry can be unset either because it was authored empty or because its asset is absent
+		// from this checkout. AC_NPC_ReformationDrone is the known example of the latter: two of its
+		// four entries point at GA_DroneGunfire and GA_DroneRocketAbility inside the untracked
+		// SciFi_Drone_1 pack. The warning states the fact without guessing which cause applies.
 		AddWarning(FString::Printf(
-			TEXT("%s leaves %d of %d DefaultAbilities entries unset. The authored SecurityDrone and ")
-			TEXT("ContaminatedDrone share this configuration, so they ship those empty slots too."),
+			TEXT("%s has %d of %d DefaultAbilities entries that do not resolve in this checkout. ")
+			TEXT("That is either authored-empty or an absent dependency; see ")
+			TEXT("Scripts/Manifests/ContentPrerequisites.json for known external packs."),
 			*GetNameSafe(Configuration), UnsetAbilityEntries, Configuration->DefaultAbilities.Num()));
 	}
 	const float StartingHealth = NPC->GetHealth();
@@ -198,7 +204,7 @@ bool FSovPlacedNPCStartupPriorityTest::RunTest(const FString& Parameters)
 {
 	using namespace SovPlacedNPCDefinitionTests;
 	auto* Seed = LoadObject<UNPCDefinition>(nullptr,
-		SovTrackedContentPaths::AuthoredCombatDroneDefinition);
+		SovTrackedContentPaths::AuthoredEnforcerDefinition);
 	if (!TestNotNull(TEXT("Existing combat-drone seed"), Seed)
 		|| !TestNotNull(TEXT("Existing startup configuration"), Seed->AbilityConfiguration.Get())) { return false; }
 	for (const bool bRestore : {false, true})

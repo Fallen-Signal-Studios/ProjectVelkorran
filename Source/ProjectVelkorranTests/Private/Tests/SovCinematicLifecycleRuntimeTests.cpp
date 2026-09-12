@@ -808,11 +808,11 @@ namespace SovRequiredCharacterSequenceTests
 			Definition->NPCID = TEXT("RequiredSequenceCharacterFixture");
 			Definition->bAllowMultipleInstances = true;
 			Definition->NPCClassPath = ASovNPCVisualLifecycleTestCharacter::StaticClass();
-			// The authored SecurityDrone, tracked under Content/Aurelion/, exercises native
-			// attribute/startup/ability grants with shipped data. Only appearance IO is replaced
-			// by the existing empty-mesh producer fixture.
+			// The authored Enforcer, tracked under Content/Aurelion/ with fully tracked transitive
+			// dependencies, exercises native attribute/startup/ability grants with shipped data.
+			// Only appearance IO is replaced by the existing empty-mesh producer fixture.
 			const auto* Seed = LoadObject<UNPCDefinition>(nullptr,
-				SovTrackedContentPaths::AuthoredCombatDroneDefinition);
+				SovTrackedContentPaths::AuthoredEnforcerDefinition);
 			if (!Seed || !Seed->AbilityConfiguration) { return; }
 			Definition->AbilityConfiguration = Seed->AbilityConfiguration;
 			Character->AuthoredPlacedDefinition = Definition;
