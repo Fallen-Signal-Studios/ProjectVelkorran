@@ -323,6 +323,8 @@ def make_profiles():
              activity_configuration=required('/NarrativePro/Pro/Core/AI/Configs/AC_Pacifist'),
              default_item_loadout=[],trading_item_loadout=[],dialogue=None,tagged_dialogue_set=None)
         retain_aurelion_npc(npc)
+        from configure_aurelion_companion_equipment import configure as configure_companion_equipment
+        configure_companion_equipment(hero, npc)
         save(npc)
         disable_unconfigured_companion_talk(companion_bp,npc,hero)
         defense=required('/Game/Abilities/'+hero+'/GA_'+hero+('_Guard' if hero=='Tarrik' else '_Deflection')).generated_class()
