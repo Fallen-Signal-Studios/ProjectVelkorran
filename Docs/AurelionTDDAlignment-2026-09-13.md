@@ -87,3 +87,8 @@ under `Art/Source/Aurelion`. Its FBX passed a clean Blender round-trip check for
 dimensions, pivot, UVs, material slots and simple UCX collision; its studio preview
 was visually inspected. It has not been imported or placed in Unreal and earns
 no additional acceptance points. The slice estimate remains 63.75% (about 64%).
+
+The security prompt was absent on the next editor check and editor access
+resumed. `AurelionCrucibleLighting-2026-09-13.md` records the saved ceiling material
+and lighting review, physical-geometry checks, and fresh-route validation. The
+recess-panel candidate is still unplaced; the 90% target remains unproven.
