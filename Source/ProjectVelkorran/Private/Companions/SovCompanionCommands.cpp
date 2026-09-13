@@ -258,7 +258,7 @@ void USovCompanionComponent::TickContextCommand(USovCompanionCommandGoal* Goal)
 		const bool bProtected = TargetASC->HasMatchingGameplayTag(Tags.State_Resonance_ProtectedTarget)
 			|| TargetASC->HasMatchingGameplayTag(Tags.Character_Enemy_Boss) || (Context && Context->bRequiresPlayerFinish);
 		// Only the protagonist proxy gets its copied defense kit. Ordinary allies do not become guard/deflect clones.
-		if (NPC->IsA<ASovProtagonistCompanionCharacter>() && GetWorld()->GetTimeSeconds() >= NextCommandAttack
+		if (NPC->IsA<ASovProtagonistCompanionCharacter>() && GetWorld()->GetTimeSeconds() >= NextCommandDefense
 			&& TargetASC->HasMatchingGameplayTag(N.State_NPC_Activity_Attacking) && Controller->LineOfSightTo(Focus))
 		{
 			for (const auto& Class : CuratedAbilities)
@@ -268,7 +268,12 @@ void USovCompanionComponent::TickContextCommand(USovCompanionCommandGoal* Goal)
 				if (!Spec) { continue; }
 				OwnedCommandAttack = Spec->Handle; CommandAttackStarted = GetWorld()->GetTimeSeconds() - 1.f;
 				if (Abilities->TryActivateAbility(OwnedCommandAttack))
-				{ NextCommandAttack = GetWorld()->GetTimeSeconds() + 4.f; return; }
+				{
+					// Defense has its own cadence. An enemy's sustained attacking tag
+					// must not repeatedly postpone our next ordinary weapon attack.
+					NextCommandDefense = GetWorld()->GetTimeSeconds() + 4.f;
+					return;
+				}
 				OwnedCommandAttack = {}; // An unavailable defense must not starve ordinary attacks.
 			}
 		}

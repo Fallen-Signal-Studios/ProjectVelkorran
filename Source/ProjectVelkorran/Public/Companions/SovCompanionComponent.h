@@ -97,6 +97,7 @@ private:
 	float CompanionContribution = 0.f;
 	float CommandAttackStarted = 0.f;
 	float NextCommandAttack = 0.f;
+	float NextCommandDefense = 0.f;
 	bool bCommandInterrupted = false;
 	FAIRequestID CommandMoveId;
 	TWeakObjectPtr<AActor> OwnedFocus;

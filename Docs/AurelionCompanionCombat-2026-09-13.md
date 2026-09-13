@@ -110,3 +110,40 @@ Original live report is under the retained run's
 `UserData/Saved/Validation/Aurelion/CompanionCombat-20260913/live.json`.
 The diagnostic script now writes subsequent reports to the project validation
 folder and also captures inventory and activity/goal details.
+
+The next retained run, `HolographicHUDRoute-20260913-141207-5e409161`,
+again showed Tarrik wielding Velkorran with an available primary attack but no
+attributed companion damage. Passive animation observation included the actual
+CharacterMesh0/ABP_Biped driver, since the modular visual meshes use leader pose
+and have no independent AnimInstance. No weapon attack montage was recorded.
+The first observer attempt stopped on a protected goal property; its error
+report was preserved before a corrected observer was started. The run passed
+through E4 entry. E4A's second pulse paid 30 Echo without a sever; it remained a
+failed run and the editor was subsequently closed cleanly for rebuilding.
+
+Code inspection identified a separate scheduling defect: a successful defense
+advanced the same `NextCommandAttack` deadline checked before both defense and
+ordinary attacks. A sustained enemy attacking tag could therefore select defense
+again whenever that shared deadline elapsed, indefinitely postponing offense.
+Defense now uses its own four-second cadence. Ordinary attacks retain their
+two-second cadence and native completion, costs, attack-token and contribution
+gates. This correction still needs rendered combat qualification.
+
+The ordinary E4A input pilot now records missed pulses and their actual spending,
+releases input and allows at most two re-aim/normal-combat retries. It checks that
+the native links did not change without an observed receipt, supplies no Echo,
+and still requires both real sever transactions to pass. A dynamic obstruction
+during the charge is a possible explanation for the observed miss, not a proven
+root cause. The failed evidence is not rewritten as a passing route.
+
+UE 5.7 Development Editor rebuilt successfully, and all 13 companion tests
+passed in `Saved/Validation/CompanionDefenseCadence/20260913-143126-488462a3`.
+The new scheduler regression uses real command/activity selection, a completed
+defense test ability and an ordinary native bot attack. It verifies contribution
+budget admission, defense completion, immediate offense eligibility, and retained
+offense cadence while the enemy's attacking tag stays present. Its first fixture
+placement intersected the terminal test scene; moving the combat pair into a
+clear lane and explicitly asserting eligibility corrected that fixture. An earlier
+compile attempt also caught a test parameter shadowing APawn::Controller. Failed
+runs are retained. Source/report coverage and unchanged-source checks passed;
+all three changed/new validation Python scripts compiled successfully.

@@ -52,7 +52,7 @@ class Run(prior.Run):
                 'native Axiom independent-link selector fix compiled; actual wheel input adapter available',
                 'existing Axiom, ammunition and native Echo generation; no resources are supplied'],
             wheels=[], link_receipts=[], link_samples=[], echo_awards=[], echo_spends=[], waves=[],
-            pulses=[], precision_shots=[], saves=[], route_paths=[], request_results=[],
+            pulses=[], missed_pulses=[], precision_shots=[], saves=[], route_paths=[], request_results=[],
             native_phase_a=None, native_phase_b=None)
         self.report['native_deaths'] = []
         self.weapon_trace_type = None
@@ -511,7 +511,19 @@ class Run(prior.Run):
         receipts=self.report['link_receipts'][self.pulse_before['receipts']:]
         spends=self.report['echo_spends'][self.pulse_before['spends']:]
         if not receipts:
-            assert time.monotonic()-self.phase_at<3., 'Normal pulse supplied no required sever: '+json.dumps(dict(aim=self.report.get('last_pulse_aim'),before=self.pulse_before,spends=spends,links=self.link_rows()))
+            if time.monotonic()-self.phase_at<3.:
+                return
+            # A moving enemy can obstruct a charged pulse after the initial aim
+            # check. Preserve the real miss/cost, release input and earn any
+            # needed Echo normally before another bounded attempt.
+            links=self.link_rows()
+            assert links==self.pulse_before['links'], 'Unobserved link mutation cannot count as a pulse retry'
+            assert len(spends)<=1 and all(abs(s['amount']-30.)<.001 for s in spends), 'Unexpected pulse spending'
+            miss=dict(aim=self.report.get('last_pulse_aim'),before=self.pulse_before,
+                spends=spends,links=links,elapsed=time.monotonic()-self.started)
+            self.report['missed_pulses'].append(miss)
+            assert len(self.report['missed_pulses'])<=2, 'Bounded ordinary pulse retries exhausted: '+json.dumps(miss)
+            self.stage('aim_pulse')
             return
         assert len(receipts)==1, 'One Weaver pulse must commit only one of its independent links'
         receipt=receipts[0]

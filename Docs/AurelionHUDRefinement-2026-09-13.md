@@ -34,3 +34,12 @@ All three presentation/threat-cue tests passed against the rebuilt editor in
 `Saved/Validation/HolographicHUD/20260913-141047-7f8e07b9` with matching source
 coverage. These check direction, safe placement and overlap behavior; they do
 not establish rendered readability of the translucent panel.
+
+The subsequent live run `HolographicHUDRoute-20260913-141207-5e409161`
+rendered the translucent threat panel in E2 and correctly hid objective text
+and waypoints during the rescue scenes, restoring them after the scenes.
+Caption backgrounds remain as configured. At the small embedded editor viewport,
+the E2 warning and sound-caption text still crowded each other; broad HUD layout
+acceptance remains open. This run passed E1, E2, E3 entry/rescue and E4 entry,
+then stopped on an E4A pulse without a second sever. It did not reach the M13
+camera changes and must not be counted as a complete successful route.
