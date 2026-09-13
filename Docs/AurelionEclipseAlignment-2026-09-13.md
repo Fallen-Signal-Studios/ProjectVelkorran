@@ -246,7 +246,36 @@ Fresh startup inspection now rejects mesh-incompatible Eclipse weak-point bones
 before the route begins.
 `AurelionParasiteWeakpoints-20260913-071815-d00732a4` passed the new complete
 startup contract with zero contract/inspection errors and fresh entry at 48.500
-seconds. Its later route is pending.
+seconds. E1 passed again at 116.125 seconds, followed by E2, E3 entry/rescue and
+E4 entry. The editor crashed at E4A startup before precision-hit qualification.
+`route-termination.json` preserves hashes of the unchanged running report and log.
+The log records a PythonScriptPlugin/CoreUObject MTAccessDetector ensure followed
+by an access violation during garbage collection. The new damage observer had
+retained borrowed delegate-property wrappers across defeated-NPC cleanup. It now
+retains UObject owners, reacquires valid delegate properties and unbinds dead NPCs
+promptly. This is an instrumentation correction requiring a repeat, not a proven
+native gameplay defect. `AurelionObserverLifetime-20260913-072904-a2e8126b` is the
+fresh repeat with that correction.
+
+That repeat passed E1 at 150.813 seconds and E2/E3 rescue/E4 entry. The
+automatic chain stopped on the E4A wheel's 60-second click timeout (operator
+missed the click); its failed report is preserved. A separate `E4A-WheelRetry`
+continued from the unchanged native encounter, selected Axiom with a visible
+left click and passed at 23.015 seconds: five real weak-point awards, two native
+Weaver sever receipts, WallRunner release, Tarrik handoff and ArenaEntry save.
+Both spiders completed their assigned wall routes (12 and 13 traversing samples).
+The corrected damage observer completed without errors through E4B, recording
+15 Linkbound, 5 Elite and 2 WallRunner outgoing transactions; the WallRunner
+record includes 18 applied shield damage and 10 applied poise damage.
+
+`E4B-Continuation` failed at 42.000 seconds. MovePartner was accepted, but the
+elite moved outside the overlapping heat/control reach intervals while the
+pilot waited to set up frost. The log then records a Dominion stretcher patient
+death and the encounter leaving its active state. No Thermal Fracture, Core
+follow-up or M13 pass is claimed. The idle interval around manual continuation
+also prevents treating this as an uninterrupted route qualification. Remaining
+work includes keeping the protected roster safe while executing the actual
+frost/heat sequence; no range, health or proof bypass was introduced.
 
 The read-only damage observer installed after E3 recorded **22 Linkbound and
 8 Elite outgoing native damage transactions**, including applied shield damage
@@ -259,6 +288,9 @@ The Axiom main-hand choice was made with one real left click in the visible whee
 Player-view observations also retain visual issues: the nearby E4 monsters can be
 too dark to read against the crucible floor, and the native subtitle panel wraps
 some words across lines. These are not qualified as final presentation.
+Three attempted read-only Python subtitle geometry inspections hit unavailable or
+protected widget properties. Their failed reports and final attempted script are
+preserved in the interrupted run. No widget or subtitle source was changed.
 
 `AurelionControlledBursts-20260913-065420-beae6009` failed at 80.828 seconds
 on player death after two drone defeats. The final pilot state was stationary in

@@ -21,9 +21,10 @@ def callback_for(path, role):
 
 
 def finish(reason):
-    for delegate, callback in state['bindings'].values():
+    for actor, asc, callback in state['bindings'].values():
         try:
-            delegate.remove_callable(callback)
+            if unreal.SystemLibrary.is_valid(asc):
+                asc.on_damage_resolved_as_source.remove_callable(callback)
         except Exception as error:
             report['errors'].append(str(error))
     state['bindings'].clear()
@@ -51,16 +52,24 @@ def tick(_delta):
         return
     if world:
         state['world'] = path
+        # Delegate property wrappers are borrowed native-memory views. Do not
+        # retain one after its NPC's delayed destruction/garbage collection.
+        # Retire dead actors promptly and reacquire the property only while its
+        # owner is valid, retaining the UObject owners rather than the wrapper.
+        for key, (actor, asc, callback) in list(state['bindings'].items()):
+            if not unreal.SystemLibrary.is_valid(actor) or not actor.is_alive():
+                if unreal.SystemLibrary.is_valid(asc):
+                    asc.on_damage_resolved_as_source.remove_callable(callback)
+                del state['bindings'][key]
         for actor in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.SovNPCCharacterBase):
             role = roles.get(actor.get_class().get_name())
             key = actor.get_path_name()
-            if not role or key in state['bindings'] or actor.is_character_pending_load(): continue
+            if not role or key in state['bindings'] or actor.is_character_pending_load() or not actor.is_alive(): continue
             asc = actor.get_narrative_ability_system_component()
             if not asc: continue
             callback = callback_for(key, role)
-            delegate = asc.on_damage_resolved_as_source
-            delegate.add_callable(callback)
-            state['bindings'][key] = (delegate, callback)
+            asc.on_damage_resolved_as_source.add_callable(callback)
+            state['bindings'][key] = (actor, asc, callback)
             report['bindings'].append(dict(actor=key, role=role, elapsed=now-state['start']))
     report['elapsed_seconds'] = now-state['start']
     out.write_text(json.dumps(report, indent=2), encoding='utf8')
