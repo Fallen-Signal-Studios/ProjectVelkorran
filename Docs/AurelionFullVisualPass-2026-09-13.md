@@ -93,3 +93,55 @@ placement and inventory reports are under `CrucibleLightingValidated-20260913-10
 This is a completed first cladding pass, not the full environment pass or a fix
 for the survivor-protection failure. Cast-in-place, both-priority gameplay,
 packaged rendering and dynamic-light performance remain to be verified.
+
+## Player-height entry review and relay fill
+
+Raw views under `Saved/Validation/Aurelion/RoomReview-20260913` cover M12 Z00,
+Z01, Z02, Z03, Z04, Z06, Z07, Z08 and Z09. These are stopped-editor views from
+authored entry marks at approximately 165 cm above the floor, not gameplay
+traversal or per-mesh acceptance. They expose the following priorities:
+
+- Z00/Z02: broad, very bright upper surfaces; refine material scale and exposure
+  transitions while retaining clear entrances and the exterior vista.
+- Z01: readable axial route, raised side circulation and repeated structural
+  rhythm. Preserve the layout; review the heavy metallic/gold finish in context.
+- Z03/Z06: low dark ceilings, generic repeated wall/column forms and oversized
+  instructional signs need architectural and signage work.
+- Z04: dark cover silhouettes and walls lacked separation. Four broad downward
+  rect fills now reveal the walls and balcony without the rejected upward
+  ceiling hotspots. Existing cover, terminals and navigation geometry remain.
+- Z07/Z09: route lines read clearly; floor reflection noise and repeated wall
+  surfaces dominate. The Wound itself requires a separate closer review.
+- Z08: the pale ceiling is visible, but remains a flat slab with bright edge
+  pools and oversized signs. It still misses the reference's tall structural
+  rhythm; the new recess cladding does not resolve that larger mismatch.
+
+The saved relay change uses `M_Radiance_IvoryStone` on
+`Aurelion_Art_M12_Z04_86_7c5bc5` and four ceiling-mounted rect fills at
+X=5000/9000, Y=-11900/-10100, Z=600, pitch=-90, 1200 lumens each,
+2300 cm radius and 1200 x 900 cm source. The historical actor labels retain
+`ENVL_Z04_CeilingBounce_1..4`, although the selected lighting points downward.
+`verify_relay_lighting.py` checks the actual parameters. The preview comparison
+confirmed unchanged transforms and collision settings for 1714 existing actors
+and their primitive components. Runtime and packaged GPU cost are not yet tested.
+
+`review_aurelion_zone.py` moves only the stopped editor camera and clears editor
+selection. It never starts PIE, advances objectives or changes gameplay actors.
+M12 contains entry marks for later rooms whose production art is in M13; a view
+from those marks in M12 is not evidence that M13 content is missing.
+The camera helper now limits each map to its own authored-room entry views.
+
+M13 Z11/Z12 entry views were subsequently captured in the actual M13 map, with
+editor camera/sequence overlays visible. The briefing table and chairs are
+present, but need arrangement and cast/cinematic review against the six-seat
+brief. Departure's entry view reads as an empty floor facing a blank wall; the
+ship anchors sit to either side outside this initial view. The inventory still
+identifies the Dominion/Reformation hull and wing placeholders as basic cubes.
+Ship art and departure staging therefore remain major unfinished visual items;
+the entry view alone does not qualify their visibility or cinematic behavior.
+Neither M13 nor its cinematics was modified by this review.
+
+After reloading the saved M12 map from M13, both relay parameter verification
+and the expanded recess placement/collision-baseline verification passed again.
+The reload's Map Check reported zero errors and zero warnings; this is separate
+from the known startup/navigation/optional MetaHuman warnings recorded earlier.
