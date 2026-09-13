@@ -292,6 +292,33 @@ Three attempted read-only Python subtitle geometry inspections hit unavailable o
 protected widget properties. Their failed reports and final attempted script are
 preserved in the interrupted run. No widget or subtitle source was changed.
 
+Subsequent native investigation reproduced the narrow dialogue panel: Slate's
+automatic wrapping takes the smaller of explicit wrap width and last painted
+width, while these HUD panels size themselves to their contents. A short line
+therefore trapped later text in a narrow column. The isolated correction disables
+automatic wrapping on subtitle/caption text and retains the existing explicit
+safe-area limits. `ProjectVelkorran.UI.Accessibility.DialogueWidthRecovery` paints
+a short line on both actual HUD text widgets and then checks long-line expansion,
+width bounds and height. It fails on the original implementation in
+`SubtitleBefore/Report` and passes without warnings in `SubtitleAfter/Report`.
+`SubtitleFixedBuild.log` records a successful UE5.7 Editor build. This does not
+qualify pagination, all viewport sizes, localization or final cinematic layout.
+The runtime correction and regression are isolated in `02926f96`.
+
+`DialogueWidthPIE-20260913-075130-933524d5` did not reach the HUD preview:
+entry failed while placed Enforcers and an E2 drone were still loading. The
+entry-only path had skipped the roster readiness wait used by combat runs.
+The validator now uses the same bounded native readiness phase for both paths;
+syntax validation passed, but its PIE repeat remains pending. The desktop tool
+could capture the stopped editor but repeatedly failed to activate it, including
+an attempt to dismiss an unrelated old crash dialog without sending a report.
+`preview_dialogue_width.py` is an explicit synthetic HUD-only preview, not yet
+executed; it supplies no story/gameplay qualification and writes no content.
+
+That rebuild also exposed a C4459 variable shadow in the Eclipse editor helper
+when compiled in its normal unity group. Commit `bf72cea7` uses a distinct local
+name and was verified with that grouping, preserving authoring behavior.
+
 `AurelionControlledBursts-20260913-065420-beae6009` failed at 80.828 seconds
 on player death after two drone defeats. The final pilot state was stationary in
 cover with 32 rounds loaded and 122 in reserve. Cover selection did not recheck

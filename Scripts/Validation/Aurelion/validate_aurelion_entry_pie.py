@@ -200,18 +200,21 @@ def tick(dt):
             assert not ctl['weapon_selector'].done or wheel_report['status']=='passed', wheel_report.get('reason')
             if len(selected)==1 and ctl['weapon_selector'].done and wheel_report['status']=='passed':
                 report['weapon_selection']=dict(item=selected[0].get_path_name(),method='Observed current owned Cinderline wield state; no inventory/equip writes')
-                # Finish streaming the complete placed roster before walking into
-                # the active encounter. Keep pending samples and the existing
-                # 180-second stage bound; structural failures still fail at once.
-                if now-ctl.get('roster_ready_sample_at',0.)<1.: return
-                ctl['roster_ready_sample_at']=now
-                inspected=inspect_enemies(world,OUT/'enemy-pre-entry-readiness.json',require_initialized=True)
-                report.setdefault('pre_entry_roster_readiness',[]).append(dict(elapsed=now-START,
-                    status=inspected['status'],pending=inspected.get('startup_pending',[])))
-                assert not inspected.get('contract_failures') and not inspected.get('inspection_errors'), 'Placed roster structural failure'
-                if inspected.get('startup_pending'): return
-                assert inspected['status']=='passed_observable_startup_contract'
-                stage('walk_to_pressure_hall')
+                stage('await_roster_readiness')
+            return
+        if ctl['phase']=='await_roster_readiness':
+            # Both entry-only and combat continuations must wait for the actual
+            # placed roster. Pending streaming is not an authored contract failure.
+            inject(owner)
+            if now-ctl.get('roster_ready_sample_at',0.)<1.: return
+            ctl['roster_ready_sample_at']=now
+            inspected=inspect_enemies(world,OUT/'enemy-pre-entry-readiness.json',require_initialized=True)
+            report.setdefault('pre_entry_roster_readiness',[]).append(dict(elapsed=now-START,
+                status=inspected['status'],pending=inspected.get('startup_pending',[])))
+            assert not inspected.get('contract_failures') and not inspected.get('inspection_errors'), 'Placed roster structural failure'
+            if inspected.get('startup_pending'): return
+            assert inspected['status']=='passed_observable_startup_contract'
+            stage('walk_to_pressure_hall')
             return
         if unreal.GameplayStatics.is_game_paused(world): return
         if ctl['phase']=='wait_ready':
@@ -280,7 +283,7 @@ def tick(dt):
                 complete=complete,building=unreal.SovAurelionNavigationLibrary.is_navigation_being_built_or_locked(world),
                 points=[p.export_text() for p in path.path_points] if path else [])
             if complete and not gates[0].is_blocking_route():
-                stage('await_cinderline_selection' if os.environ.get('SOV_AURELION_ENTRY_CONTINUE_E1')=='1' else 'walk_to_pressure_hall')
+                stage('await_cinderline_selection' if os.environ.get('SOV_AURELION_ENTRY_CONTINUE_E1')=='1' else 'await_roster_readiness')
         elif ctl['phase']=='walk_to_pressure_hall':
             rejected=[o.last_error for o in objectives if str(o.completion_beat)=='PressureHall'
                       and o.start_volume.is_overlapping_actor(pawn) and ('failed canonical combat-resource capture' in o.last_error
