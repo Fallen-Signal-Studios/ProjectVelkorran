@@ -5,6 +5,15 @@
 #include "Campaign/SovEncounterDirector.h"
 #include "SovAurelionEnemyRoleTestFixtures.generated.h"
 
+/** Runs the real component bootstrap/timer in the isolated role world. */
+UCLASS(Transient, NotBlueprintable)
+class USovAurelionBootstrapTestLink : public USovAurelionFreshCommandLink
+{
+    GENERATED_BODY()
+public:
+    void StartBootstrapForTest() { if (!HasBegunPlay()) { BeginPlay(); } }
+};
+
 UCLASS(Transient, NotBlueprintable)
 class ASovAurelionTestWallRunner : public ASovAurelionWallRunner
 {

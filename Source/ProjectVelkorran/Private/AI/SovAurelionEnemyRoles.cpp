@@ -401,7 +401,9 @@ void USovAurelionFreshCommandLink::BeginPlay()
 {
     Super::BeginPlay();
     if (!bAutoInitializeFreshLink || !GetOwner() || !GetOwner()->HasAuthority() || !GetWorld() || GetLinkId().IsNone()) { return; }
-    BootstrapDeadline = GetWorld()->GetTimeSeconds() + 30.;
+    // Cold appearance/weapon streaming can exceed 30 game seconds on the authored
+    // roster. Keep startup bounded without abandoning a still-loading formation.
+    BootstrapDeadline = GetWorld()->GetTimeSeconds() + 180.;
     PollReadiness();
     if (!GetLinkInstanceId().IsValid())
     { GetWorld()->GetTimerManager().SetTimer(ReadinessTimer, this, &ThisClass::PollReadiness, .1f, true); }

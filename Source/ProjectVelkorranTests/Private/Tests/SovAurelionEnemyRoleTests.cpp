@@ -20,6 +20,7 @@
 #include "Serialization/MemoryReader.h"
 #include "Serialization/MemoryWriter.h"
 #include "Serialization/ObjectAndNameAsStringProxyArchive.h"
+#include "TimerManager.h"
 #include "UObject/Script.h"
 
 namespace
@@ -432,6 +433,50 @@ bool FSovAurelionFormationReadinessTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Formation can be severed through the real link API"), Link->TrySeverCommandLink(Severer, Sever) == ESovCommandLinkSeverResolution::NewlySevered);
     TestFalse(TEXT("Readiness cannot rearm the severed instance"), Link->InitializeFreshLink());
     TestTrue(TEXT("Severed instance remains exact and retired"), Link->GetLinkInstanceId() == Instance && Link->GetCommandLinkState() == ESovCommandLinkState::Severed);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAurelionSlowFormationBootstrapTest, "ProjectVelkorran.Campaign.Aurelion.EnemyRoles.FormationBootstrapSurvivesSlowMemberReadiness",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FSovAurelionSlowFormationBootstrapTest::RunTest(const FString& Parameters)
+{
+    FRoleWorld F;
+    if (!F.Valid()) { return false; }
+    FActorSpawnParameters Spawn; Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+    auto* Member = F.World->SpawnActor<ASovAurelionTestWeaver>(ASovAurelionTestWeaver::StaticClass(), FVector(700.,0.,60.), FRotator::ZeroRotator, Spawn);
+    if (!Member) { return false; }
+    F.Runner->GetCharacterMovement()->DisableMovement();
+    Member->GetCharacterMovement()->DisableMovement();
+    auto* Link = NewObject<USovAurelionBootstrapTestLink>(F.Runner);
+    Link->bAutoInitializeFreshLink = true;
+    F.Runner->AddInstanceComponent(Link); Link->RegisterComponent();
+    Link->ConfigureLinkId(TEXT("Test.SlowFormation"));
+    Link->RegisterLinkedActor(Member);
+    Link->StartBootstrapForTest();
+    const double Started = F.World->GetTimeSeconds();
+    int32 TimerTicks = 0;
+    FTimerHandle ClockProbe;
+    F.World->GetTimerManager().SetTimer(ClockProbe, FTimerDelegate::CreateLambda([&TimerTicks]() { ++TimerTicks; }), .1f, true);
+    uint64 Frame = GFrameCounter;
+    const auto TickFrame = [&F, &Frame]()
+    {
+        // TimerManager runs once per engine frame, even if an isolated test
+        // advances UWorld repeatedly within one automation callback.
+        TGuardValue<uint64> ScopedFrame(GFrameCounter, ++Frame);
+        F.World->Tick(LEVELTICK_TimeOnly, .1f);
+        // TimeOnly deliberately skips timers and actor simulation in UWorld.
+        F.World->GetTimerManager().Tick(.1f);
+    };
+    for (int32 Index=0; Index<320; ++Index) { TickFrame(); }
+    F.World->GetTimerManager().ClearTimer(ClockProbe);
+    if (!TestTrue(TEXT("Fixture delivered at least 310 actual timer ticks"), TimerTicks >= 310)) { return false; }
+    TestTrue(TEXT("The real game clock passed the old 30-second bootstrap cutoff"), F.World->GetTimeSeconds()-Started > 31.);
+    TestFalse(TEXT("An unready member cannot create an active formation"), Link->GetLinkInstanceId().IsValid());
+    Member->InitializeTestRole();
+    Member->GetCharacterMovement()->DisableMovement();
+    for (int32 Index=0; Index<3; ++Index) { TickFrame(); }
+    TestTrue(TEXT("Native polling activates when the late member becomes ready, without a manual activation call"), Link->IsCommandLinkActive());
+    TestTrue(TEXT("The initialized command source is the real owner"), Link->GetCommandSource()==F.Runner);
     return true;
 }
 
