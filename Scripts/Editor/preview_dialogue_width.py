@@ -15,7 +15,9 @@ out = Path(os.environ['SOV_AURELION_RUN_DIRECTORY']) / 'dialogue-width-preview.j
 assert not out.exists(), 'Preserve the previous preview report'
 world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_game_world()
 assert world, 'PIE must be running'
-widgets = unreal.WidgetBlueprintLibrary.get_all_widgets_of_class(world, unreal.SovAccessibilityPresentation, False)
+pc = unreal.GameplayStatics.get_player_controller(world, 0)
+widgets = [widget for widget in unreal.ObjectIterator(unreal.SovAccessibilityPresentation)
+           if widget.get_owning_player() == pc]
 assert len(widgets) == 1, 'Expected one actual native HUD presentation'
 hud = widgets[0]
 report = dict(status='previewing', scope='Synthetic HUD layout only; no story or gameplay qualification', stages=[])
