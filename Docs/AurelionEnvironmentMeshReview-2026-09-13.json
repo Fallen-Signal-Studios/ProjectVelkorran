@@ -1,0 +1,672 @@
+{
+  "scope": "All distinct static meshes observed across M12 and M13 before recess panel import",
+  "count": 95,
+  "source": "CrucibleLightingValidated-20260913-101809-9be0c273/environment-cast-audit.json",
+  "meshes": [
+    {
+      "mesh": "/Engine/BasicShapes/Cube.Cube",
+      "M12_instances": 1054,
+      "M13_instances": 977,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Engine/BasicShapes/Cylinder.Cylinder",
+      "M12_instances": 93,
+      "M13_instances": 95,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Engine/BasicShapes/Plane.Plane",
+      "M12_instances": 1,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Engine/BasicShapes/Sphere.Sphere",
+      "M12_instances": 2,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Engine/EditorMeshes/Camera/SM_CineCam.SM_CineCam",
+      "M12_instances": 16,
+      "M13_instances": 20,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Engine/EditorMeshes/MatineeCam_SM.MatineeCam_SM",
+      "M12_instances": 5,
+      "M13_instances": 5,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Engine/EngineMeshes/Sphere.Sphere",
+      "M12_instances": 64,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Engine/MapTemplates/Sky/SM_SkySphere.SM_SkySphere",
+      "M12_instances": 1,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Aurelion/Art/Props/aURELION_pILLAR/StaticMeshes/aURELION_pILLAR.aURELION_pILLAR",
+      "M12_instances": 1,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Aurelion/Art/Props/aureliondoors/StaticMeshes/aureliondoors.aureliondoors",
+      "M12_instances": 1,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Aurelion/Art/Props/aureliondoors/StaticMeshes/console.console",
+      "M12_instances": 4,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Aurelion/Art/Props/aureliondoors/StaticMeshes/door/door.door",
+      "M12_instances": 2,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Aurelion/Art/Props/aureliontarrikfloor/StaticMeshes/aureliontarrikfloor.aureliontarrikfloor",
+      "M12_instances": 1,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Aurelion/Art/Props/aurelionwalls/StaticMeshes/aurelionwalls.aurelionwalls",
+      "M12_instances": 1,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Aurelion/Art/Props/bridge/bridge.bridge",
+      "M12_instances": 8,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Aurelion/Art/Props/ramp.ramp",
+      "M12_instances": 1,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Aurelion/Art/Props/SM_RuntimeBarrierPanel100.SM_RuntimeBarrierPanel100",
+      "M12_instances": 2,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Aurelion/Art/Props/StartingRoomTarrik/Cube_001.Cube_001",
+      "M12_instances": 2,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Aurelion/Art/Props/StartingRoomTarrik/Cube_002.Cube_002",
+      "M12_instances": 2,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Aurelion/Art/Props/StartingRoomTarrik/Cube_003.Cube_003",
+      "M12_instances": 3,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Aurelion/Art/Props/StartingRoomTarrik/Cube_004.Cube_004",
+      "M12_instances": 1,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Aurelion/Art/Props/StartingRoomTarrik/Cube_005.Cube_005",
+      "M12_instances": 3,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Aurelion/Art/Props/StartingRoomTarrik/Cube.Cube",
+      "M12_instances": 2,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Aurelion/Art/Props/things.things",
+      "M12_instances": 1,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Aurelion/Environment/Blender/SM_AurelionCanopyPylon.SM_AurelionCanopyPylon",
+      "M12_instances": 60,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Aurelion/Environment/KitBash/KB3D_CPI_IntGarage_A_Column_A/KB3D_CPI_IntGarage_A_Column_A/StaticMeshes/SM_KB3D_CPI_IntGarage_A_Column_A.SM_KB3D_CPI_IntGarage_A_Column_A",
+      "M12_instances": 79,
+      "M13_instances": 4,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Aurelion/Environment/KitBash/KB3D_CPI_IntGarage_A_SupportBeam_A/KB3D_CPI_IntGarage_A_SupportBeam_A/StaticMeshes/SM_KB3D_CPI_IntGarage_A_SupportBeam_A.SM_KB3D_CPI_IntGarage_A_SupportBeam_A",
+      "M12_instances": null,
+      "M13_instances": 244,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Aurelion/Environment/KitBash/KB3D_CPI_PropConsoleLarge_A/KB3D_CPI_PropConsoleLarge_A/StaticMeshes/SM_KB3D_CPI_PropConsoleLarge_A.SM_KB3D_CPI_PropConsoleLarge_A",
+      "M12_instances": 26,
+      "M13_instances": 15,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Aurelion/Environment/KitBash/KB3D_CPI_PropGarageCabinet_A/KB3D_CPI_PropGarageCabinet_A/StaticMeshes/SM_KB3D_CPI_PropGarageCabinet_A.SM_KB3D_CPI_PropGarageCabinet_A",
+      "M12_instances": 1,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Aurelion/Environment/KitBashRadiance/KB3D_OAS_PropHologramWall_A/KB3D_OAS_PropHologramWall_A/StaticMeshes/SM_KB3D_OAS_PropHologramWall_A.SM_KB3D_OAS_PropHologramWall_A",
+      "M12_instances": 8,
+      "M13_instances": 5,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Aurelion/Environment/KitBashRadiance/KB3D_OAS_PropSculpture_A/KB3D_OAS_PropSculpture_A/StaticMeshes/SM_KB3D_OAS_PropSculpture_A.SM_KB3D_OAS_PropSculpture_A",
+      "M12_instances": null,
+      "M13_instances": 2,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Aurelion/Environment/ValidatedMeshes/SM_AurelionRadianceBench.SM_AurelionRadianceBench",
+      "M12_instances": null,
+      "M13_instances": 3,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Aurelion/Environment/ValidatedMeshes/SM_KB3D_HTS_PathB_C_822a44c6840f.SM_KB3D_HTS_PathB_C_822a44c6840f",
+      "M12_instances": 4,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Aurelion/Environment/ValidatedMeshes/SM_KB3D_UTP_BldgLG_B_fd853cceacde.SM_KB3D_UTP_BldgLG_B_fd853cceacde",
+      "M12_instances": null,
+      "M13_instances": 2,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Aurelion/Environment/ValidatedMeshes/SM_KB3D_UTP_BldgLG_D_2e1cf0516ee1.SM_KB3D_UTP_BldgLG_D_2e1cf0516ee1",
+      "M12_instances": 1,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Aurelion/Environment/ValidatedMeshes/SM_KB3D_UTP_BldgMD_I_f4af91037a57.SM_KB3D_UTP_BldgMD_I_f4af91037a57",
+      "M12_instances": null,
+      "M13_instances": 1,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Aurelion/Meshes/SM_RingSector_26p7_27_0p6.SM_RingSector_26p7_27_0p6",
+      "M12_instances": 32,
+      "M13_instances": 64,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Aurelion/Meshes/SM_RingSector_28_36_0p6.SM_RingSector_28_36_0p6",
+      "M12_instances": 64,
+      "M13_instances": 32,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Aurelion/Meshes/SM_RingSector_9_18_0p6.SM_RingSector_9_18_0p6",
+      "M12_instances": 64,
+      "M13_instances": 32,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Cargo/kb3d_blackmarket/StaticMeshes/SM_KB3D_BMK_PropGunB.SM_KB3D_BMK_PropGunB",
+      "M12_instances": 4,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Cargo/kb3d_blackmarket/StaticMeshes/SM_KB3D_BMK_PropGunC.SM_KB3D_BMK_PropGunC",
+      "M12_instances": 18,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Cargo/kb3d_blackmarket/StaticMeshes/SM_KB3D_BMK_PropWeaponRackA.SM_KB3D_BMK_PropWeaponRackA",
+      "M12_instances": 2,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Cargo/kb3d_cyberpunkinteriors/StaticMeshes/SM_KB3D_CPI_PropCatalog_A.SM_KB3D_CPI_PropCatalog_A",
+      "M12_instances": 3,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Cargo/kb3d_cyberpunkinteriors/StaticMeshes/SM_KB3D_CPI_PropSmallCrate_A.SM_KB3D_CPI_PropSmallCrate_A",
+      "M12_instances": 12,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Cargo/kb3d_dmz/StaticMeshes/SM_KB3D_DMZ_Crate_B_Main.SM_KB3D_DMZ_Crate_B_Main",
+      "M12_instances": 17,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Cargo/kb3d_everycityemergencyresponse/StaticMeshes/SM_KB3D_ECE_PropBody_B_Main.SM_KB3D_ECE_PropBody_B_Main",
+      "M12_instances": 3,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Cargo/kb3d_everycitypolicedept/StaticMeshes/SM_KB3D_ECP_BldgIntHoldingCells_A_CeilingLampC_transparent.SM_KB3D_ECP_BldgIntHoldingCells_A_CeilingLampC_transparent",
+      "M12_instances": 1,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Cargo/kb3d_futurewarfare/StaticMeshes/SM_KB3D_FTW_PropMedicalStretcher_A_Main.SM_KB3D_FTW_PropMedicalStretcher_A_Main",
+      "M12_instances": 2,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Cargo/kb3d_gaea/StaticMeshes/SM_KB3D_GAE_Flag_E_Main.SM_KB3D_GAE_Flag_E_Main",
+      "M12_instances": 2,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Cargo/kb3d_gaea/StaticMeshes/SM_KB3D_GAE_Pilllar_A_Main.SM_KB3D_GAE_Pilllar_A_Main",
+      "M12_instances": 4,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Cargo/kb3d_gaea/StaticMeshes/SM_KB3D_GAE_Window_C_Main.SM_KB3D_GAE_Window_C_Main",
+      "M12_instances": 8,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Cargo/kb3d_goliath/StaticMeshes/SM_KB3D_GOL_Trim_B_Main.SM_KB3D_GOL_Trim_B_Main",
+      "M12_instances": 1,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Cargo/kb3d_ironforge/StaticMeshes/SM_KB3D_IRF_PropStoneTable_C_Main.SM_KB3D_IRF_PropStoneTable_C_Main",
+      "M12_instances": 6,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Cargo/kb3d_missiontominerva/StaticMeshes/SM_KB3D_MTM_Asset_M.SM_KB3D_MTM_Asset_M",
+      "M12_instances": 4,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Cargo/kb3d_missiontominerva/StaticMeshes/SM_KB3D_MTM_PropCargo_B_Straps.SM_KB3D_MTM_PropCargo_B_Straps",
+      "M12_instances": 3,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Cargo/kb3d_missiontominerva/StaticMeshes/SM_KB3D_MTM_PropTanks_B.SM_KB3D_MTM_PropTanks_B",
+      "M12_instances": 36,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Space_Creator_Pro/Asteroid_Library/Static_Meshes/SM_AsteroidFragment_1.SM_AsteroidFragment_1",
+      "M12_instances": 504,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Space_Creator_Pro/Asteroid_Library/Static_Meshes/SM_AsteroidFragment_2.SM_AsteroidFragment_2",
+      "M12_instances": 504,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Space_Creator_Pro/Asteroid_Library/Static_Meshes/SM_AsteroidFragment_3.SM_AsteroidFragment_3",
+      "M12_instances": 504,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Space_Creator_Pro/Asteroid_Library/Static_Meshes/SM_AsteroidFragment_4.SM_AsteroidFragment_4",
+      "M12_instances": 504,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Space_Creator_Pro/Meshy_AI_splitting_star_game_r_0909162327_texture.Meshy_AI_splitting_star_game_r_0909162327_texture",
+      "M12_instances": 2,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Space_Creator_Pro/PlanetCreator_1_V2/Meshes/SM_PlanetUVSphere_1.SM_PlanetUVSphere_1",
+      "M12_instances": 2,
+      "M13_instances": 1,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Space_Creator_Pro/PlanetCreator_1_V2/Meshes/SM_PlanetUVSphere_Concave.SM_PlanetUVSphere_Concave",
+      "M12_instances": 1,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Space_Creator_Pro/Star_Creator/Star_Creator_Original/Meshes/SM_Skysphere.SM_Skysphere",
+      "M12_instances": 1,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Space_Creator_Pro/Star_Creator/StarCreator_Update_1/Static_Meshes/SM_SolarFlare_5.SM_SolarFlare_5",
+      "M12_instances": 63,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Crate.SM_Scifi_Crate",
+      "M12_instances": 36,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Door_01_Door.SM_Scifi_Door_01_Door",
+      "M12_instances": 14,
+      "M13_instances": 2,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Floor_04_Small.SM_Scifi_Floor_04_Small",
+      "M12_instances": 404,
+      "M13_instances": 32,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Floor_04.SM_Scifi_Floor_04",
+      "M12_instances": 4194,
+      "M13_instances": 356,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Railing_4m.SM_Scifi_Railing_4m",
+      "M12_instances": 997,
+      "M13_instances": 384,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Railing_8m.SM_Scifi_Railing_8m",
+      "M12_instances": 14,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Wall_01_4m.SM_Scifi_Wall_01_4m",
+      "M12_instances": 813,
+      "M13_instances": 6,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Wall_02_Lowerbase_8m.SM_Scifi_Wall_02_Lowerbase_8m",
+      "M12_instances": 8,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Wall_03_4m.SM_Scifi_Wall_03_4m",
+      "M12_instances": null,
+      "M13_instances": 1441,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Wall_Trim_4m.SM_Scifi_Wall_Trim_4m",
+      "M12_instances": 7,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/UltraDynamicSky/Meshes/Compass.Compass",
+      "M12_instances": null,
+      "M13_instances": 1,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/UltraDynamicSky/Meshes/EditorLabels/ClockDisk.ClockDisk",
+      "M12_instances": null,
+      "M13_instances": 1,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/UltraDynamicSky/Meshes/EditorLabels/Compass_E.Compass_E",
+      "M12_instances": null,
+      "M13_instances": 1,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/UltraDynamicSky/Meshes/EditorLabels/Compass_N.Compass_N",
+      "M12_instances": null,
+      "M13_instances": 1,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/UltraDynamicSky/Meshes/EditorLabels/Compass_S.Compass_S",
+      "M12_instances": null,
+      "M13_instances": 1,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/UltraDynamicSky/Meshes/EditorLabels/Compass_W.Compass_W",
+      "M12_instances": null,
+      "M13_instances": 1,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/UltraDynamicSky/Meshes/EditorLabels/Editor_SunMoon_Handle.Editor_SunMoon_Handle",
+      "M12_instances": null,
+      "M13_instances": 2,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/UltraDynamicSky/Meshes/EditorLabels/UDS_Text.UDS_Text",
+      "M12_instances": null,
+      "M13_instances": 1,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/UltraDynamicSky/Meshes/Ultra_Dynamic_Sky_Sphere.Ultra_Dynamic_Sky_Sphere",
+      "M12_instances": null,
+      "M13_instances": 1,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Underground_Base/Meshes/SM_box_2.SM_box_2",
+      "M12_instances": 1,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Underground_Base/Meshes/SM_camera.SM_camera",
+      "M12_instances": 2,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Underground_Base/Meshes/SM_chair.SM_chair",
+      "M12_instances": null,
+      "M13_instances": 6,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Underground_Base/Meshes/SM_desk_1.SM_desk_1",
+      "M12_instances": 2,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Underground_Base/Meshes/SM_floor_2.SM_floor_2",
+      "M12_instances": null,
+      "M13_instances": 1,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Underground_Base/Meshes/SM_hospital_bed.SM_hospital_bed",
+      "M12_instances": 2,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Underground_Base/Meshes/SM_info_box.SM_info_box",
+      "M12_instances": 2,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Underground_Base/Meshes/SM_research_unit_1.SM_research_unit_1",
+      "M12_instances": null,
+      "M13_instances": 1,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Underground_Base/Meshes/SM_research_unit_glass.SM_research_unit_glass",
+      "M12_instances": null,
+      "M13_instances": 1,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Underground_Base/Meshes/SM_table.SM_table",
+      "M12_instances": null,
+      "M13_instances": 6,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    },
+    {
+      "mesh": "/Game/Underground_Base/Meshes/SM_wall_column.SM_wall_column",
+      "M12_instances": 11,
+      "M13_instances": null,
+      "visual_review": "pending",
+      "decision": "Inspect in context before retain, replace or remodel decision"
+    }
+  ]
+}
