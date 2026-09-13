@@ -43,3 +43,18 @@ the E2 warning and sound-caption text still crowded each other; broad HUD layout
 acceptance remains open. This run passed E1, E2, E3 entry/rescue and E4 entry,
 then stopped on an E4A pulse without a second sever. It did not reach the M13
 camera changes and must not be counted as a complete successful route.
+
+The next run, `CompanionCadenceRoute-20260913-143402-6e41e7f1`, ended in
+an actual E1 player defeat. Before closing it, the read-only HUD probe captured
+visible caption/objective/vitals widgets with nonzero desired sizes but zero
+paint and tick geometry. Threat avoidance discarded those empty rectangles.
+`SovWidgetGeometry::FindRenderedBounds` now falls back to the live arranged
+Slate widget path when cached geometry is empty, preserving DPI, safe-area and
+render transforms. Hidden/collapsed widgets reserve no space. No warning
+acknowledgement, lifetime, size or direction rules changed.
+
+UE 5.7 Development Editor rebuilt in 28.85 seconds. All four presentation tests
+passed in `Saved/Validation/ThreatPanelGeometry/20260913-143936-b429c2f0`,
+including a real native border in a test-owned hidden Slate window with empty
+geometry caches. Source/report coverage and unchanged-source checks passed.
+Fresh rendered verification remains pending.

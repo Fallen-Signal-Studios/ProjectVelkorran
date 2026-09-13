@@ -19,6 +19,7 @@ class Observer:
         assert not self.output.exists(), 'Preserve previous observation'
         self.started = time.monotonic()
         self.last = 0.
+        self.seen_world = False
         self.report = dict(read_only=True, samples=[], errors=[], status='observing')
         self.handle = unreal.register_slate_post_tick_callback(self.tick)
 
@@ -29,9 +30,12 @@ class Observer:
         self.last = now
         try:
             world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_game_world()
-            if not world or now - self.started > 900:
+            if now - self.started > 900 or (not world and self.seen_world):
                 self.stop('PIE ended or observation time bound reached')
                 return
+            if not world:
+                return
+            self.seen_world = True
             for actor in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.NarrativeNPCCharacter):
                 companion = actor.get_component_by_class(unreal.SovCompanionComponent)
                 if not companion or actor.get_editor_property('hidden') or not actor.is_alive():

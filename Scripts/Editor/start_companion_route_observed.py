@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import runpy
+import sys
 import time
 import traceback
 import unreal
@@ -75,4 +76,7 @@ def _tick(delta):
 
 
 _state['handle'] = unreal.register_slate_post_tick_callback(_tick)
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'Validation' / 'Aurelion'))
+import observe_companion_animation
+observe_companion_animation.start()
 runpy.run_path(str(Path(__file__).with_name('start_aurelion_combat_observed.py')))

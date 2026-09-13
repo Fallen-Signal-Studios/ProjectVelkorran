@@ -13,6 +13,7 @@
 #include "Styling/CoreStyle.h"
 #include "Settings/SovGameUserSettings.h"
 #include "UI/SovThreatCueLayout.h"
+#include "UI/SovWidgetGeometry.h"
 #include "UI/SovFrontendComponent.h"
 #include "UI/SovCombatVitalsWidget.h"
 #include "UI/SovAccessibilityPresentation.h"
@@ -122,8 +123,10 @@ int32 USovAurelionThreatWidget::NativePaint(const FPaintArgs& Args, const FGeome
         if (!IsValid(Owner) || Owner->GetOwningPlayer() != GetOwningPlayer()
             || Owner->GetWorld() != GetWorld() || !Owner->IsInViewport() || !Owner->IsRendered()
             || !IsValid(Panel) || !Panel->IsRendered() || Panel->GetRenderOpacity() <= .01f) { return; }
-        // Cached geometry includes the actual DPI, SafeZone and accessibility render scale.
-        const auto Bounds = Panel->GetCachedGeometry().GetRenderBoundingRect();
+        // Native UMG panels can render with empty geometry caches. Resolve their
+        // arranged Slate path in that case, retaining DPI/SafeZone transforms.
+        FSlateRect Bounds;
+        if (!SovWidgetGeometry::FindRenderedBounds(Panel, Bounds)) { return; }
         const FVector2D Min = Geometry.AbsoluteToLocal(FVector2D(Bounds.Left, Bounds.Top));
         const FVector2D Max = Geometry.AbsoluteToLocal(FVector2D(Bounds.Right, Bounds.Bottom));
         if (!Min.ContainsNaN() && !Max.ContainsNaN() && Max.X > Min.X && Max.Y > Min.Y)

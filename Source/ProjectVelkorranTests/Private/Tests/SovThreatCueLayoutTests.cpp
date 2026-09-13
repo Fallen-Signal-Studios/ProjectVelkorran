@@ -1,8 +1,36 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "UI/SovThreatCueLayout.h"
+#include "UI/SovWidgetGeometry.h"
+#include "Components/Border.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Widgets/SWindow.h"
+#include "Widgets/Layout/SBox.h"
+#include "UObject/StrongObjectPtr.h"
 #include "Misc/AutomationTest.h"
 
 #if WITH_AUTOMATION_TESTS
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovThreatCueUncachedPanelTest,
+    "ProjectVelkorran.Campaign.Presentation.ThreatCueUncachedNativePanel",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovThreatCueUncachedPanelTest::RunTest(const FString& Parameters)
+{
+    if (!TestTrue(TEXT("Slate is initialized"), FSlateApplication::IsInitialized())) { return false; }
+    TStrongObjectPtr<UBorder> Panel(NewObject<UBorder>());
+    auto Window = SNew(SWindow).ClientSize(FVector2D(800,600)).SupportsMaximize(false).SupportsMinimize(false);
+    Window->SetContent(SNew(SBox).HAlign(HAlign_Center).VAlign(VAlign_Top)
+        [SNew(SBox).WidthOverride(280.f).HeightOverride(66.f)[Panel->TakeWidget()]]);
+    FSlateApplication::Get().AddWindow(Window, false); // Test-owned hidden window; no rendered frame populates caches.
+    Window->SlatePrepass();
+    TestTrue(TEXT("Fixture reproduces missing cached geometry"), Panel->GetCachedGeometry().GetLocalSize().IsNearlyZero());
+    FSlateRect Bounds;
+    TestTrue(TEXT("Arranged visible native panel still has usable bounds"), SovWidgetGeometry::FindRenderedBounds(Panel.Get(), Bounds));
+    TestTrue(TEXT("Bounds have real extent"), Bounds.Right > Bounds.Left && Bounds.Bottom > Bounds.Top);
+    Panel->SetVisibility(ESlateVisibility::Collapsed);
+    TestFalse(TEXT("Collapsed panel reserves no warning space"), SovWidgetGeometry::FindRenderedBounds(Panel.Get(), Bounds));
+    FSlateApplication::Get().RequestDestroyWindow(Window);
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovThreatCueDirectionTest,
     "ProjectVelkorran.Campaign.Presentation.ThreatCueCameraRelativeDirection",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
