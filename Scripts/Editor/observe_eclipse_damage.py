@@ -21,9 +21,15 @@ def callback_for(path, role):
 
 
 def finish(reason):
-    for actor, asc, callback in state['bindings'].values():
+    world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_game_world()
+    actors = unreal.GameplayStatics.get_all_actors_of_class(world, unreal.SovNPCCharacterBase) if world else []
+    for actor in actors:
+        callback = state['bindings'].get(actor.get_path_name())
+        if callback is None:
+            continue
         try:
-            if unreal.SystemLibrary.is_valid(asc):
+            asc = actor.get_narrative_ability_system_component()
+            if asc:
                 asc.on_damage_resolved_as_source.remove_callable(callback)
         except Exception as error:
             report['errors'].append(str(error))
@@ -52,24 +58,26 @@ def tick(_delta):
         return
     if world:
         state['world'] = path
-        # Delegate property wrappers are borrowed native-memory views. Do not
-        # retain one after its NPC's delayed destruction/garbage collection.
-        # Retire dead actors promptly and reacquire the property only while its
-        # owner is valid, retaining the UObject owners rather than the wrapper.
-        for key, (actor, asc, callback) in list(state['bindings'].items()):
-            if not unreal.SystemLibrary.is_valid(actor) or not actor.is_alive():
-                if unreal.SystemLibrary.is_valid(asc):
+        # Even IsValid cannot accept a Python wrapper whose native object has
+        # already been collected. Retain only paths and Python callbacks across
+        # ticks; reacquire actors and delegates from the current world each time.
+        actors = {actor.get_path_name(): actor for actor in
+            unreal.GameplayStatics.get_all_actors_of_class(world, unreal.SovNPCCharacterBase)}
+        for key, callback in list(state['bindings'].items()):
+            actor = actors.get(key)
+            if actor is None or not actor.is_alive():
+                asc = actor.get_narrative_ability_system_component() if actor else None
+                if asc:
                     asc.on_damage_resolved_as_source.remove_callable(callback)
                 del state['bindings'][key]
-        for actor in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.SovNPCCharacterBase):
+        for key, actor in actors.items():
             role = roles.get(actor.get_class().get_name())
-            key = actor.get_path_name()
             if not role or key in state['bindings'] or actor.is_character_pending_load() or not actor.is_alive(): continue
             asc = actor.get_narrative_ability_system_component()
             if not asc: continue
             callback = callback_for(key, role)
             asc.on_damage_resolved_as_source.add_callable(callback)
-            state['bindings'][key] = (actor, asc, callback)
+            state['bindings'][key] = callback
             report['bindings'].append(dict(actor=key, role=role, elapsed=now-state['start']))
     report['elapsed_seconds'] = now-state['start']
     out.write_text(json.dumps(report, indent=2), encoding='utf8')

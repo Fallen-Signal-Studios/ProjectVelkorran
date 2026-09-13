@@ -147,3 +147,13 @@ clear lane and explicitly asserting eligibility corrected that fixture. An earli
 compile attempt also caught a test parameter shadowing APawn::Controller. Failed
 runs are retained. Source/report coverage and unchanged-source checks passed;
 all three changed/new validation Python scripts compiled successfully.
+
+The next two live attempts (`CompanionCadenceRoute-20260913-143402-6e41e7f1`
+and `HUDGeometryRoute-20260913-144115-df8125cd`) ended in E1 player defeats,
+before shared companion combat. Neither qualifies the cadence correction.
+The latter also exposed an Eclipse observer lifetime error: calling Python
+`SystemLibrary.is_valid` on an already collected actor wrapper itself raises.
+The observer now retains only path strings and Python callbacks between ticks,
+reacquiring current-world actors before accessing delegates. Three isolated
+observer regressions pass for collection, dead-actor detachment and preserved
+damage records. These are diagnostic tests, not evidence of gameplay damage.

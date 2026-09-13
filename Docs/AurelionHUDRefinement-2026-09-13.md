@@ -58,3 +58,9 @@ passed in `Saved/Validation/ThreatPanelGeometry/20260913-143936-b429c2f0`,
 including a real native border in a test-owned hidden Slate window with empty
 geometry caches. Source/report coverage and unchanged-source checks passed.
 Fresh rendered verification remains pending.
+
+`HUDGeometryRoute-20260913-144115-df8125cd` subsequently ended in an E1
+player defeat after 133.438 seconds. Its small embedded viewport still showed
+the incoming-fire cue crowding the sound caption. The arranged-path regression
+passes, but this does not establish that the live collision is resolved; the
+actual viewport placement needs further diagnosis before HUD acceptance.

@@ -23,10 +23,14 @@ Visual work now takes priority, while the following acceptance gaps remain:
   Tharne uses `SK_ScifiSoldierUE4_unmasked_`. None is accepted against the new
   cast references. Faces, hair, wardrobe, skeleton compatibility, idle/walk,
   dialogue and rescue/cinematic poses must be reviewed together.
-- Uninterrupted E4B fails when the Elite pursues and kills Tharne inside the west
-  recess. Partner positioning succeeds, but the Elite leaves usable Thermal
-  range. Survivor protection, readable recovery, Thermal/Core victory and
-  earned M13 travel remain unqualified.
+- A normal-order M12/M13 route with separately recorded input retries now
+  reaches CP9, including Thermal/Core victory and seven protected survivors at
+  full health. Uninterrupted reliability remains open: subsequent runs stopped
+  at an E4A pulse without a sever and at an actual E1 player defeat.
+- Companion weapon ownership/drawing is verified, but ordinary attack animation
+  and attributed damage are not yet accepted. Native fixes now release Selene's
+  completed frost hold and separate defense from offensive cadence; fresh live
+  qualification is still required.
 - HUD alert/caption overlap, combat effect clarity, final audio/cinematic
   presentation, both priorities, checkpoint/reload reliability and representative
   packaged GPU/input/audio performance still lack complete acceptance evidence.
@@ -45,6 +49,13 @@ M12 without saving either map. It recorded 1,543 relevant actor rows in M12 and
 There are 95 distinct meshes in the union. The adjacent
 `AurelionEnvironmentMeshReview-2026-09-13.json` tracks the full set for review;
 inventory is not visual acceptance. No missing material slots were observed.
+
+The read-only `inspect_aurelion_surface_palette.py` census captured both black
+stone base-color, normal and roughness graphs and the ivory-stone graph in
+`HUDGeometryRoute-20260913-144115-df8125cd/surface-palette.json`. Both black
+variants use the base-color texture at full strength; the world variant repeats
+at 400 cm. This identifies the source of the prominent veining for a subsequent
+reviewed material adjustment. The census changed no assets.
 Most potentially visible engine primitives are intentional gold channels,
 corruption, discontinuity surfaces or effects. Do not blindly replace every
 cube or disable gameplay collision to improve a count.
