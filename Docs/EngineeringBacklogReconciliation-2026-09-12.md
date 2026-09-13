@@ -32,7 +32,7 @@ These are kept distinct throughout and never collapsed into "passed":
 |---|---|---|
 | C1 | Authored protagonist handoff and separate persistent state | **CLOSED** (12 Sep, see updates) |
 | C2 | Campaign resource save defaults not established in native code | **CLOSED** |
-| C3 | Campaign checkpoint contract incomplete | **PARTIAL** |
+| C3 | Campaign checkpoint contract incomplete | **CLOSED** (12 Sep, see updates) |
 | E1 | Selene pulse not connected to combat | **CLOSED** |
 | E2 | Enemy ability selection is an authoring responsibility | **CLOSED** |
 | E3 | Weak-point break does not change enemy equipment | **CLOSED** |
@@ -62,9 +62,9 @@ These are kept distinct throughout and never collapsed into "passed":
 | X1 | `/Game/Cues` absent from version control | **EXTERNAL CONTENT GATE** (see below) |
 | X2 | `SciFi_Drone_1` marketplace pack absent | **EXTERNAL CONTENT GATE** (see below) |
 
-Closed: 14. Partial: 6. Open: 1. Content/editor gated: 9. Superseded: 2. External gates: 2.
+Closed: 15. Partial: 5. Open: 1. Content/editor gated: 9. Superseded: 2. External gates: 2.
 
-_Recounted from the table above on 12 September after C1 closed. The earlier totals line did not
+_Recounted from the table above on 12 September after C1 closed, and again after C3 closed. The earlier totals line did not
 reconcile with its own rows. K1–K4 count as four gated items; PC06 counts as superseded, its small
 remaining part recorded under its own heading._
 
@@ -176,12 +176,51 @@ missing implementation.
      are covered by the Companion suites instead.
    - Windows/MSVC remains a separate gate.
 
-### C3 — Campaign checkpoint contract (PARTIAL)
+### C3 — Campaign checkpoint contract (CLOSED 12 September)
 
-Extensive native types now exist — `SovAurelionCheckpoint`, `SovCampaignDefinition`,
-`SovAurelionMissionDefinition`, `SovEncounterSnapshotLibrary` — so "no project checkpoint types beyond
-empty seams" is stale. The two specific defects the audit cited are closed (see above). Not re-verified: rolling
-autosave/backup and version migration. Source-only; medium priority.
+Work done in an isolated git worktree (`ProjectVelkorran-c3`, branch `engineering/c3-checkpoint-contract`),
+not the shared checkout.
+
+1. **TDD.** §11.9 (three rolling autosaves, one checkpoint slot, ten manual slots; never claim a save before
+   serialisation and platform write both succeed), §15.9 (temporary-slot/atomic replacement where the
+   platform permits, retain last known-good on failure, validate schema before applying, deterministic
+   migrations with golden-file tests, migration history in the header), §15.16 (failed write keeps the old
+   save; corrupted save offers last known-good and preserves the file), §18.5 (kill during write, denied
+   write, load after migration, corrupted newest autosave, protagonist transition), §19.7 (schema 1.0 at the
+   first external build; prototype saves unsupported, so no envelope migration exists to test).
+2. **What the source implements** (read before any change). Two physical banks per logical slot with a
+   generation counter and readback verification (the contract's replacement for an atomic rename, which
+   Unreal's generic save API does not offer); rolling autosave selection by oldest generation in the
+   subsystem tick; explicit recovery confirmation and byte-preserving recovery files; one payload
+   migration, campaign state schema 1 to 2.
+3. **Evidence — automation-verified on Mac.** `ProjectVelkorran.Campaign.CheckpointContract`, five tests
+   through the production capture, autosave tick, writer, reader and decoder, staged through the controller
+   as the game mode stages them, on C1's two-protagonist fixtures:
+   `RollingAutosavesReplaceOldestAcrossRestart`, `InterruptedWriteRecoversLastGoodCampaign`,
+   `SchemaOneCampaignMigratesThroughLoaderDeterministically`, `MissingActiveRecordStaysRejectedAfterMigration`,
+   `CorruptOrIncompleteCampaignSaveIsRejected`. Outcomes are asserted on the stored bytes and on each
+   protagonist's reloaded state, not on helper existence. Detail in [SaveSlotEngineering.md](SaveSlotEngineering.md).
+4. **Defect found and fixed.** TDD §15.9 requires migration history in the save header.
+   `FSovSaveSlotHeader::MigrationHistory` existed but nothing wrote it, so a campaign migrated from schema 1
+   was re-saved with no record of the migration. The campaign state now records `CampaignState 1->2` when the
+   migration runs and `CaptureAndWrite` copies it into the header. The test failed before the fix and passes
+   after it.
+5. **Negative controls.** Three temporary breaks, reverted from git before confirmation: autosave rotation
+   always choosing slot 0 failed the rotation test; writes targeting the last good bank failed the
+   interrupted-write and corruption tests; a migration that no longer advances the schema version failed the
+   migration and missing-record tests. The C1 partition tests stayed green throughout.
+6. **Suites.** With CheckpointContract, ProtagonistPartition, Objectives, Save, Handoff, Companion, Travel and
+   the Aurelion pause UI: **68 passed, 0 failed.** Full forced-unity suite, run twice on the same build
+   in the fresh worktree: **624 passed, 3 failed** and **625 passed, 2 failed**, of 627. In both runs one
+   failure is `GameplayCuesStillResolve` (X1). Every other failure is the `SciFi_Drone_1` spillover (X2):
+   `ABP_RefDrone`/`BS_Drone` errors from a deliberate drone-roster load landing on whichever `PlacedNPC` test
+   runs next, a different one each run. `Campaign.PlacedNPC` run alone on that build passed 12 of 12. No
+   failure involves the save, checkpoint or campaign-state code changed here.
+7. **Not proven here, stated so it is not assumed.** Map travel and required-asset existence preflight (the
+   fixture missions are transient objects); real platform write APIs and a process kill mid-write (the
+   storage seam is in-memory, so tears are simulated at that seam); golden-file migration fixtures, which need
+   stable asset paths and are therefore content-gated. Migration determinism is shown by repeated
+   byte-identical output instead. Windows/MSVC remains a separate gate.
 
 ### E6 — Perception and encounter fairness (PARTIAL)
 
@@ -270,6 +309,12 @@ the production handoff and load sequencing rather than by comparing keys or stru
 negative control and the explicit limits are under C1 above. One content dependency surfaced and is
 recorded there rather than closed: first-visit non-Echo resources depend on the authored
 `DefaultAttributes` effect.
+
+**12 September — C3 closed, one source defect fixed.** The checkpoint contract was qualified through the
+production save path in an isolated worktree. The missing save-header migration history (TDD §15.9) was the
+one defect; it is fixed and covered. Negative controls, suite results and explicit limits are under C3 above.
+The fresh worktree also showed that X2's error spillover still reaches unrelated tests, contrary to the X2
+note below; that is recorded for its own slice rather than folded into C3.
 
 ## X2 — `SciFi_Drone_1` marketplace pack, an external content gate
 
