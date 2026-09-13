@@ -347,3 +347,29 @@ ordinary look response and avoids re-querying cover while already waiting there.
 
 The older full-TDD planning estimate was about 37%, with a 31–43% range. This pass supplies
 new narrow in-engine evidence; it does not justify replacing that estimate with 90%.
+
+## Packaged workstation build, September 13
+
+The Win64 Development game target passed in `Win64GameBounded-20260913.log`
+with `-MaxParallelActions=2`. The initial parallel attempt failed allocating
+compiler PCH memory (Windows error 1455); no Windows settings were changed.
+Both maps cooked, staged and archived successfully in
+`Saved/Validation/PlaytestCook-20260913-075834-7d6efb8e`: 8,250 packages,
+0 errors, 943 warnings, exit 0. Warnings include missing Narrative character
+creator references and Niagara warnings; successful cooking does not certify
+those dependencies or effects as visually correct.
+
+The local artifact is `Saved/AurelionParasitePlaytest-20260913`, with an explicit
+`Launch-M12.cmd`. Its manifest records source `de89f419`, game-binary and project
+descriptor hashes, and the preserved workstation Cues assets. It is not a clean
+checkout reproduction or release candidate. The native game target includes the
+subtitle correction and current Eclipse content.
+
+Packaged M12 loaded `BP_AurelionGameMode_M12_C`, ran with `-nullrhi -nosound
+-seconds=45` and a fresh isolated profile, and exited 0. Packaged M13 direct cold
+launch exited 3: its native login rejected missing prior protagonist kit and
+companion anchor, then Unreal terminated player startup. The M13 result is
+failed, not waived; qualify it through the genuine M12 handoff. The startup
+results and log hashes are preserved beside the cook report and copied into the
+archive. Neither test qualifies rendering, audio, input, route progression or
+the 90% target. Desktop activation remains unavailable pending user clarification.
