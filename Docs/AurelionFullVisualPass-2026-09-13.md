@@ -276,3 +276,20 @@ translation keys, actor locations, focal lengths and light parameters passed.
 The editor camera clears the old obstruction, but no animated participants
 were present for this preview. Live scene framing/exposure, non-colliding
 occluders, other scenes and packaged GPU cost remain unqualified.
+
+## Black-stone floor finish
+
+The actual `M_Radiance_LowerBlack` and `M_Radiance_LowerBlackWorld` roughness
+graphs were 0.18 plus 0.08 times their texture sample. They now use 0.48 plus
+0.12 times that same sample, giving a satin finish instead of sharp floor
+reflections. Metallic remains zero and specular remains 0.28. No base-color,
+normal, texture-coordinate, geometry or material-assignment changes were made.
+M13's Grammar camera preview shows softer light pools; high-contrast veining
+and surface repetition remain separate art issues. These shared materials may
+also affect M12, whose affected rooms still require review.
+
+`Saved/Validation/Aurelion/FloorFinish-20260913` contains original material
+backups, the floor assignment/graph census, preview parameters, saved graph
+checks and `satin-floor-editor.png`. The two materials recompiled and saved;
+their connected roughness and unchanged metallic/specular values passed checks.
+This is editor evidence, not fresh-process gameplay or packaged GPU acceptance.
