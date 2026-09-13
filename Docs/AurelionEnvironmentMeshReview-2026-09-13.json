@@ -668,5 +668,31 @@
       "visual_review": "pending",
       "decision": "Inspect in context before retain, replace or remodel decision"
     }
+  ],
+  "subsequent_authored_meshes": [
+    {
+      "mesh": "/Game/Aurelion/Environment/Blender/SM_Aurelion_RecessPanel_2m",
+      "M12_instances": 10,
+      "M13_instances": 0,
+      "visual_review": "Two recess wall views reviewed; runtime pending"
+    },
+    {
+      "mesh": "/Game/Aurelion/Environment/Blender/Shuttles/SM_Aurelion_Dominion_Shuttle",
+      "M12_instances": 0,
+      "M13_instances": 1,
+      "visual_review": "Dock side approach reviewed; rear lighting and cinematic staging pending"
+    },
+    {
+      "mesh": "/Game/Aurelion/Environment/Blender/Shuttles/SM_Aurelion_Reformation_Shuttle",
+      "M12_instances": 0,
+      "M13_instances": 1,
+      "visual_review": "Dock side approach reviewed; rear lighting and cinematic staging pending"
+    },
+    {
+      "mesh": "/Game/Aurelion/Environment/Blender/SM_Aurelion_CrucibleVault",
+      "M12_instances": 1,
+      "M13_instances": 0,
+      "visual_review": "Entry and balcony-height views reviewed; lighting, material scale and runtime pending"
+    }
   ]
 }

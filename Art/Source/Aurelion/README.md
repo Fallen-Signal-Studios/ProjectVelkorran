@@ -51,3 +51,21 @@ These are first-pass exterior assets, not final hero-asset acceptance. Cockpit,
 surface detail, rear lighting, central approach composition, boarding/flight
 animation and earned-route cinematic review remain open. See
 `Docs/AurelionFullVisualPass-2026-09-13.md` for editor evidence and limitations.
+
+## Crucible upper enclosure
+
+`build_crucible_vault.py` authors `SM_Aurelion_CrucibleVault` as a static upper
+enclosure above the existing seven-metre wall head. Five angular portal ribs,
+inset bays and longitudinal roof coffers follow the architectural direction on
+layout-plan page 23. The enclosure is 71.4 x 49.4 x 15.4 m, 25,488 triangles,
+with four material slots and no collision. Local Z0 is the wall-head datum;
+placement in M12 is (0,20800,-500) cm with unit scale. Existing floor is Z=-1200.
+The principal visual roof is approximately 22 m above that floor.
+
+The Blender preview includes lower walls/floor and studio lights for context;
+these are excluded from the exported FBX. Unreal uses the existing Radiance
+stone, gold, dark trim and warm-inlay materials. The former 216-instance low
+ceiling is hidden without deletion or movement. Original navigation geometry,
+balconies, cover and survivor recesses remain authoritative. This is a reviewed
+architectural proposal; wall-light balance, material scale, full-route combat
+and packaged GPU cost still need acceptance.

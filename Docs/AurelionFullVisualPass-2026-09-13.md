@@ -188,3 +188,51 @@ The map was saved, unloaded via M12 and reloaded from disk. The read-only shuttl
 verifier passed at 18:45:14 UTC; reload Map Check reported zero errors and zero
 warnings. Both ships, all material slots, lights, docking envelopes, original
 instance transforms and original collision settings passed persistence checks.
+
+## Crucible upper-volume pass
+
+The previous visual ceiling sat seven metres above the floor of the 70 x 48 m
+Crucible. Its 216 floor-panel instances on `Aurelion_Art_M12_Z08_89_b5e7cb` are
+now hidden, while their transforms and collision settings remain intact. A new
+Blender-authored upper enclosure adds five angular white-stone portal ribs,
+gold inlays, inset wall bays and roof coffers. The main roof reads approximately
+22 m above the floor. The new mesh starts at the old wall head, leaving existing
+floor-level circulation, balconies, cover and survivor recesses unchanged.
+
+`SM_Aurelion_CrucibleVault` is 25,488 triangles, 71.4 x 49.4 x 15.4 m and has four
+resolved material slots and no collision. It is placed at (0,20800,-500) cm with
+unit scale and no rotation. Four movable rect wall washes at X=+/-2300,
+Y=19600/22000, Z=300, pitch=18 and outward yaw use 2,500 lumens each, 3000 cm
+radius and 1400 x 800 cm sources. The initial 9,000-lumen washes were reduced
+after excessive brightness in the editor review. Existing lights were retained.
+
+The oversized floating `Aurelion_Art_Sign_Z08_1cd400` component is hidden. A new
+`WOUND GALLERY` destination label sits above the existing north exit at
+(0,23160,-590), yaw=-90, world size 45, with dark lettering. The closed quarantine
+barrier remains in place; the art pass does not open it or advance progression.
+
+Entry, balcony-height and north-exit views were inspected in the stopped editor.
+The taller enclosure is a substantial composition change, but is not complete
+reference fidelity: bright wall pools, large-scale stone texture, further
+structural detail, localized corruption and cinematic/combat framing remain.
+No new gameplay or performance acceptance is claimed. E4B's survivor/Elite
+failure remains unresolved and this architecture does not repair it.
+
+`verify_crucible_vault.py` compares all 1,718 original actor transforms,
+component collision and static-mesh instance transforms against the pre-change
+snapshot. Camera/sky-controlled non-colliding UDS billboards have the same
+explicit transform exclusions as the shuttle check. Evidence and the original
+map backup are in `Saved/Validation/Aurelion/CrucibleVault-20260913`.
+
+Save/reload result: the vault, all four lights, old-ceiling visibility and exit
+sign passed persistence checks; Map Check reported zero errors and warnings.
+The wider world-instance check failed for six `BP_AsteroidField_Globular`
+actors: their four components each retain 84 instances, but all 2,016 instance
+transforms change on reload. These are large changes, not rounding. No vault
+script edits those fields. All other checked instance transforms remained
+stable. The subsequent complete component comparison also found regenerated
+non-colliding `BP_Star_C_1` render components. `verified.json` explicitly
+separates `vault_status=PASS` from
+`world_instance_invariance=FAIL_PROCEDURAL_ENVIRONMENT_DRIFT`. This is an open
+environment determinism issue, not waived acceptance. The diagnostic script
+records counts, samples and maximum differences in `reload-instance-differences.json`.
