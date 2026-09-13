@@ -275,3 +275,9 @@ and Core-break delegates independently of the input driver. It was attached
 during this E1 run and found the existing elite's Core initially unbroken with
 no observer errors. The startup wrapper includes it for subsequent routes so
 the source transaction can be identified if the premature Core break recurs.
+
+The subsequent [Verity Twin Blade pass](VerityTwinBlades-2026-09-13.md) replaces
+the ordinary third-person Verity combo with four retargeted pack attacks and
+authors a weapon-specific idle/walk/run stance. It preserves the command-target
+bridge and native damage path. This animation change still requires actual
+Selene and companion damage qualification; it is not an additional route pass.

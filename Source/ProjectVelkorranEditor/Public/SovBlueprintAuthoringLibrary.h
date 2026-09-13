@@ -21,6 +21,16 @@ class PROJECTVELKORRANEDITOR_API USovBlueprintAuthoringLibrary : public UBluepri
 {
     GENERATED_BODY()
 public:
+    /** Replace the copied melee overlay's third-person idle with a speed-driven stance blend. No save. */
+    UFUNCTION(BlueprintCallable, Category="Velkorran|Editor")
+    static FSovBlueprintAuthoringResult ConfigureVerityTwinLocomotion(UObject* Asset, UObject* Blend,
+        const TArray<UObject*>& Clips);
+
+    /** Configure only a project-owned Verity montage; preserves native notify classes. Does not save. */
+    UFUNCTION(BlueprintCallable, Category="Velkorran|Editor")
+    static FSovBlueprintAuthoringResult ConfigureVerityTwinMontage(UObject* Asset, UObject* Sequence,
+        float AttackStart, float AttackEnd);
+
     /** Read-only digests of persistent UObject properties, including graph objects and CDOs. */
     UFUNCTION(BlueprintCallable, Category="Velkorran|Editor")
     static FString FingerprintBlueprint(UObject* Asset);

@@ -77,6 +77,21 @@ Content/
 !/Content/Items/Weapons/
 /Content/Items/Weapons/*
 !/Content/Items/Weapons/WI_Cinderline.uasset
+!/Content/Items/Weapons/WI_Verity.uasset
+
+# Project-owned Verity presentation and retargeted Twin Blade animation.
+!/Content/Characters/
+/Content/Characters/*
+!/Content/Characters/Animation/
+/Content/Characters/Animation/*
+!/Content/Characters/Animation/ABP_SovVerityOverlay.uasset
+!/Content/Characters/Animation/VerityTwinBlades/
+!/Content/Characters/Animation/VerityTwinBlades/**/*.uasset
+!/Content/Weapons/
+/Content/Weapons/*
+!/Content/Weapons/Visuals/
+/Content/Weapons/Visuals/*
+!/Content/Weapons/Visuals/BP_SovVerityWeaponVisual.uasset
 
 # Raw source assets that normally belong in LFS
 SourceArt/
