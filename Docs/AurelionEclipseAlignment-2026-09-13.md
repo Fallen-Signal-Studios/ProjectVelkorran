@@ -222,8 +222,43 @@ movement and capsule collision. This does not remove cover or allow shots throug
 seconds, E1 victory/secure approach/native Selene handoff in 137.390 seconds,
 and the E2 continuation in 53.594 seconds. E1 reports unchanged assets and no
 direct gameplay/resource/transform writes. This is the first successful opening
-route with the current Thermal and Eclipse content. The subsequent chain is still
-in progress; it does not yet qualify E3/E4 or M13, and one pass is not reliability.
+route with the current Thermal and Eclipse content. It subsequently passed E3
+entry, E3 rescue/victory with both protected characters alive, and E4 entry.
+E4A failed at 37.782 seconds because no eligible living enemy had a usable native
+weak point. M13 remains unqualified, and one pass is not reliability.
+
+The actual E4A audit found inherited mannequin matcher names (`head`, `spine_03`,
+`spine_02`, `spine_01`) absent from the Parasites meshes. After stopping PIE,
+the three owned Blueprint weak-point components were remapped as follows:
+
+| Role | Existing head zone matcher | Existing torso zone matchers |
+|---|---|---|
+| Linkbound | CATRigHub002 | CATRigSpine2, CATRigSpine1 |
+| WallRunner | CATRigHub002 | CATRigSpine |
+| Weaver | CATRigHub005 | CATRigHub004, CATRigSpine |
+
+Current component-space hub/spine positions and actual physics-body exports
+support those bindings. Zone IDs, descendant matching, reveal settings and native
+consequences are preserved; Elite Core remains unchanged. All three Blueprints
+compiled and saved. Backups and before/after values are in the run's
+`weakpoint-authoring` directory. Native hit/Echo qualification requires a new run.
+Fresh startup inspection now rejects mesh-incompatible Eclipse weak-point bones
+before the route begins.
+`AurelionParasiteWeakpoints-20260913-071815-d00732a4` passed the new complete
+startup contract with zero contract/inspection errors and fresh entry at 48.500
+seconds. Its later route is pending.
+
+The read-only damage observer installed after E3 recorded **22 Linkbound and
+8 Elite outgoing native damage transactions**, including applied shield damage
+and poise damage. It completed without errors when PIE ended. The pose observer
+recorded Linkbound/WallRunner movement and Linkbound/Elite attack montages.
+This supplies narrow movement and accepted-hit evidence; WallRunner/Weaver
+attacks, visible timing, precise floor contact and Core-hit consequences remain open.
+The Axiom main-hand choice was made with one real left click in the visible wheel.
+
+Player-view observations also retain visual issues: the nearby E4 monsters can be
+too dark to read against the crucible floor, and the native subtitle panel wraps
+some words across lines. These are not qualified as final presentation.
 
 `AurelionControlledBursts-20260913-065420-beae6009` failed at 80.828 seconds
 on player death after two drone defeats. The final pilot state was stationary in

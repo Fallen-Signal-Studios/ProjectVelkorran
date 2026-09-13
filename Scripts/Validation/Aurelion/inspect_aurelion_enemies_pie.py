@@ -209,6 +209,19 @@ def inspect_enemies(world, output_path, require_initialized=True):
             class_path = BASE+'BP_Aurelion'+role+'.BP_Aurelion'+role+'_C'
             if row['actor_class'] != class_path:
                 fail(identity+': wrong actual role class '+row['actor_class'])
+            if role in ('Linkbound','WallRunner','Weaver','Elite') and not actor.is_character_pending_load():
+                mesh = actor.get_editor_property('mesh')
+                weak = list(actor.get_components_by_class(unreal.SovWeakPointComponent))
+                row['weak_point_bone_bindings'] = []
+                if not weak:
+                    fail(identity+': no native weak-point component')
+                for component in weak:
+                    startup(component.is_initialized(), identity+': weak-point initialization pending')
+                    for zone in component.get_editor_property('weak_point_zones'):
+                        bindings = {str(b): bool(mesh and mesh.does_socket_exist(b)) for b in zone.hit_bones}
+                        row['weak_point_bone_bindings'].append(dict(zone=str(zone.zone_id),bones=bindings))
+                        if not bindings or not all(bindings.values()):
+                            fail(identity+': weak-point bones do not match the visible authoritative mesh: '+str(zone.zone_id))
             for director, _ in entries:
                 if director.get_participant(unreal.Name(identity)) != actor or str(director.find_participant_id(actor)) != identity:
                     fail(identity+': native identity lookup disagrees with roster')
