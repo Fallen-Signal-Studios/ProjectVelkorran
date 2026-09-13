@@ -372,4 +372,24 @@ companion anchor, then Unreal terminated player startup. The M13 result is
 failed, not waived; qualify it through the genuine M12 handoff. The startup
 results and log hashes are preserved beside the cook report and copied into the
 archive. Neither test qualifies rendering, audio, input, route progression or
-the 90% target. Desktop activation remains unavailable pending user clarification.
+the 90% target. Desktop activation subsequently recovered; the rendered HUD
+checks are recorded in `HUDHolographicDirection-2026-09-13.md`.
+
+## Full-route qualification with the holographic HUD
+
+`HolographicFullRoute-20260913-085115-4f5b8283` passed fresh entry in
+59.187 seconds, then failed E1 at 258.938 seconds: existing Cinderline ammunition
+was exhausted with one drone still alive and no reachable matching pickup.
+The observer recorded 126 outgoing transactions and no observer errors; authored
+asset hashes were unchanged. Long gaps between hits allowed shield recovery.
+This does not qualify E2 or later stages, and no resources were supplied.
+
+`HolographicSettledRoute-20260913-085915-50f4e615` tested brief stationary
+bursts with native spread/speed admission. It failed on player death at 98.687
+seconds. Forced firing stops were rejected and removed from the pilot.
+`HolographicSpreadRoute-20260913-090340-53e52105` retained evasive movement
+and tested a spread/tighter-angle firing gate; it also failed on player death,
+at 104.328 seconds. Both candidate policies were rejected. The previously
+passing firing/movement policy is restored, with spread/speed telemetry retained
+for diagnosis. Gameplay tuning, encounter gates and weapon payloads are unchanged.
+These runs do not provide new E4B or M13 qualification.

@@ -520,11 +520,18 @@ class Run:
             if threat:
                 self.report['rocket_reactions'].append(dict(elapsed=time.monotonic()-self.started, **threat))
         evade_input = 1. if phase_time < self.evade_until else 0.
+        # Diagnostic only: attempted spread/settling gates did not qualify.
+        # Preserve the previously passing ordinary firing/movement policy.
+        spread = float(weapon.get_weapon_spread())
+        velocity = pawn.get_velocity()
+        speed = math.sqrt(velocity.x**2 + velocity.y**2 + velocity.z**2)
+        assert math.isfinite(spread) and spread >= 0. and math.isfinite(speed)
         attack = 1. if cover_move is None and not reloading and clear and in_range and error < 1.2 and phase_time % .6 < .4 else 0.
         self.report['last_combat'] = dict(target=str(self.e1.find_participant_id(target)), distance=distance,
             angle_error=error, clip=clip, reserve=reserve, visible_line=clear, in_range=in_range,
             primary_pressed=bool(attack), target_health=target.get_health(), movement=movement,
-            evade_requested=bool(evade_input), seeking_cover=cover_move is not None, seeking_ammo=pickup_move is not None)
+            evade_requested=bool(evade_input), seeking_cover=cover_move is not None, seeking_ammo=pickup_move is not None,
+            native_spread_degrees=spread, native_speed_cm_s=speed)
         self.inject(move=movement, look=look, aim=0. if reloading or evade_input or cover_move is not None else 1.,
                     attack=0. if evade_input else attack, reload=reload_input, evade=evade_input)
 
