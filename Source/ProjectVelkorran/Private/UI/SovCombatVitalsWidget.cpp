@@ -87,7 +87,7 @@ TSharedRef<SWidget> USovCombatVitalsWidget::RebuildWidget()
         const auto MakePanel = [&](const FName Name, const bool bEcho)
         {
             auto* Border = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), Name);
-            Border->SetPadding(bEcho ? FMargin(0.f) : FMargin(12.f, 8.f));
+            Border->SetPadding(bEcho ? FMargin(0.f) : FMargin(12.f, 6.f));
             const FVector2D Corner(bEcho ? 1.f : 0.f, 1.f);
             Border->SetRenderTransformPivot(Corner);
             auto* CanvasSlot = Canvas->AddChildToCanvas(Border);
@@ -109,6 +109,7 @@ TSharedRef<SWidget> USovCombatVitalsWidget::RebuildWidget()
         {
             auto* Header = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), Name);
             Header->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 15));
+            Header->SetShadowOffset(FVector2D(1.f)); Header->SetShadowColorAndOpacity(FLinearColor::Black);
             Header->SetAutoWrapText(true);
             Rows->AddChildToVerticalBox(Header)->SetPadding(FMargin(0.f, 0.f, 0.f, 10.f));
             return Header;
@@ -117,6 +118,7 @@ TSharedRef<SWidget> USovCombatVitalsWidget::RebuildWidget()
         EchoLabel = AddHeader(EchoRows, TEXT("EchoIdentity"));
         CompanionStatus = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("CompanionReadiness"));
         CompanionStatus->SetFont(FCoreStyle::GetDefaultFontStyle("Regular", 13));
+        CompanionStatus->SetShadowOffset(FVector2D(1.f)); CompanionStatus->SetShadowColorAndOpacity(FLinearColor::Black);
         CompanionStatus->SetAutoWrapText(true);
         CompanionStatus->SetVisibility(ESlateVisibility::Collapsed);
         SurvivalRows->AddChildToVerticalBox(CompanionStatus)->SetPadding(FMargin(0.f, 0.f, 0.f, 8.f));
@@ -129,16 +131,16 @@ TSharedRef<SWidget> USovCombatVitalsWidget::RebuildWidget()
         {
             auto* Row = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), RowNames[Index]);
             auto* Rows = Index == 4 ? EchoRows : SurvivalRows;
-            Rows->AddChildToVerticalBox(Row)->SetPadding(FMargin(0.f, Index == 0 || Index == 4 ? 0.f : 5.f, 0.f, 0.f));
+            Rows->AddChildToVerticalBox(Row)->SetPadding(FMargin(0.f, Index == 0 || Index == 4 ? 0.f : 3.f, 0.f, 0.f));
             auto* Label = WidgetTree->ConstructWidget<UTextBlock>();
             Label->SetFont(FCoreStyle::GetDefaultFontStyle("Regular", Index == 4 ? 13 : 16));
-            if (Index == 4) { Label->SetShadowOffset(FVector2D(1.f)); Label->SetShadowColorAndOpacity(FLinearColor::Black); }
+            Label->SetShadowOffset(FVector2D(1.f)); Label->SetShadowColorAndOpacity(FLinearColor::Black);
             Label->SetColorAndOpacity(FSlateColor(FLinearColor::White));
             Row->AddChildToVerticalBox(Label)->SetPadding(FMargin(0.f, 0.f, 0.f, 2.f));
-            auto* Height = WidgetTree->ConstructWidget<USizeBox>(); Height->SetHeightOverride(Index == 0 ? 10.f : Index == 4 ? 3.f : 6.f);
+            auto* Height = WidgetTree->ConstructWidget<USizeBox>(); Height->SetHeightOverride(Index == 0 ? 6.f : Index == 1 ? 4.f : 2.f);
             auto* Bar = WidgetTree->ConstructWidget<UProgressBar>(); Height->SetContent(Bar);
             FProgressBarStyle BarStyle;
-            BarStyle.SetBackgroundImage(FSlateColorBrush(FLinearColor(.12f, .15f, .19f, .9f)));
+            BarStyle.SetBackgroundImage(FSlateColorBrush(FLinearColor(.12f, .20f, .25f, .45f)));
             BarStyle.SetFillImage(FSlateColorBrush(FLinearColor::White));
             Bar->SetWidgetStyle(BarStyle);
             Row->AddChildToVerticalBox(Height);
@@ -271,11 +273,18 @@ int32 USovCombatVitalsWidget::NativePaint(const FPaintArgs& Args, const FGeometr
     {
         TArray<FVector2f> SlatePoints;
         for (const auto& Point : Points) { SlatePoints.Add(FVector2f(Point)); }
+        if (!bDisplayedHighContrast)
+        {
+            // Static low-opacity bloom: no flicker, scan animation or extra texture.
+            FSlateDrawElement::MakeLines(Elements, ++Layer, Geometry.ToPaintGeometry(), SlatePoints,
+                ESlateDrawEffect::None, Theme.Accent.CopyWithNewOpacity(.10f*FrameOpacity), true, (Width+3.f)*Scale);
+        }
         FSlateDrawElement::MakeLines(Elements, ++Layer, Geometry.ToPaintGeometry(), SlatePoints,
-            ESlateDrawEffect::None, Theme.Accent.CopyWithNewOpacity(Theme.Accent.A*FrameOpacity), true, Width * Scale);
+            ESlateDrawEffect::None, Theme.Accent.CopyWithNewOpacity((bDisplayedHighContrast ? 1.f : .72f)*FrameOpacity), true, Width * Scale);
     };
     // Child paint geometry shares this window origin; tick geometry includes the desktop offset.
-    // Only survival retains a faction plate. Echo is an invisible layout/fade/avoidance owner.
+    // Open faction marks leave the survival readout floating in the scene.
+    // Echo remains an invisible layout/fade/avoidance owner.
     for (const auto* Border : {Panel.Get()})
     {
         if (!Border || Border->GetVisibility() == ESlateVisibility::Collapsed) { continue; }
@@ -287,18 +296,18 @@ int32 USovCombatVitalsWidget::NativePaint(const FPaintArgs& Args, const FGeometr
         const double Cut = 12. * Scale;
         if (Theme.Frame == SovHUDStyle::EFrame::Shield)
         {
-            // Broad, closed shield plate with clipped lower shoulders.
-            Lines({Min, FVector2D(Max.X, Min.Y), FVector2D(Max.X, Max.Y-Cut), FVector2D(Max.X-Cut, Max.Y),
-                FVector2D(Min.X+Cut, Max.Y), FVector2D(Min.X, Max.Y-Cut), Min}, 2.f);
-            Lines({Min+FVector2D(8, 5)*Scale, FVector2D(Min.X+54*Scale, Min.Y+5*Scale)}, 3.f);
+            // Clipped Dominion corners retain identity without enclosing a plate.
+            const float Stroke = bDisplayedHighContrast ? 2.f : 1.f;
+            Lines({FVector2D(Min.X, Min.Y+28.*Scale), FVector2D(Min.X, Min.Y+Cut),
+                FVector2D(Min.X+Cut, Min.Y), FVector2D(Min.X+72.*Scale, Min.Y)}, Stroke);
+            Lines({FVector2D(Max.X-36.*Scale, Max.Y), FVector2D(Max.X-Cut, Max.Y),
+                FVector2D(Max.X, Max.Y-Cut), FVector2D(Max.X, Max.Y-28.*Scale)}, Stroke);
         }
         else
         {
             // Fine separated brackets retain their gaps in high contrast and with motion disabled.
-            const double Arm = 34. * Scale;
+            const double Arm = 22. * Scale;
             Lines({FVector2D(Min.X, Min.Y+Arm), Min, FVector2D(Min.X+Arm, Min.Y)}, 1.f);
-            Lines({FVector2D(Max.X-Arm, Min.Y), FVector2D(Max.X, Min.Y), FVector2D(Max.X, Min.Y+Arm)}, 1.f);
-            Lines({FVector2D(Min.X, Max.Y-Arm), FVector2D(Min.X, Max.Y), FVector2D(Min.X+Arm, Max.Y)}, 1.f);
             Lines({FVector2D(Max.X-Arm, Max.Y), Max, FVector2D(Max.X, Max.Y-Arm)}, 1.f);
         }
     }

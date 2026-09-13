@@ -99,6 +99,7 @@ TSharedRef<SWidget> USovAccessibilityPresentation::RebuildWidget()
 		for (int32 Index = 0; Index < MaximumObjectiveRows; ++Index)
 		{
 			auto* Row = WidgetTree->ConstructWidget<UTextBlock>(); Row->SetAutoWrapText(false); Row->SetJustification(ETextJustify::Left);
+			Row->SetShadowOffset(FVector2D(1.f)); Row->SetShadowColorAndOpacity(FLinearColor::Black);
 			Rows->AddChildToVerticalBox(Row)->SetPadding(FMargin(0, 0, 0, 8)); ObjectiveRows.Add(Row);
 		}
 		ObjectiveText = ObjectiveRows[0];
@@ -270,7 +271,7 @@ void USovAccessibilityPresentation::RefreshObjectiveText()
     const auto* Player = GetOwningPlayer() ? Cast<ASovPlayerCharacterBase>(GetOwningPlayer()->GetPawn()) : nullptr;
     const auto Theme = SovHUDStyle::ForProtagonist(Player ? Player->GetProtagonistIdentityTag() : FGameplayTag(), Settings.bHighContrastHUD);
     FLinearColor ObjectiveFill = Theme.Background;
-    ObjectiveFill.A = Settings.bHighContrastHUD ? 1.f : .32f;
+    ObjectiveFill.A = Settings.bHighContrastHUD ? 1.f : .20f;
     ObjectiveBackground->SetBrushColor(ObjectiveFill);
 	const FVector2D Size = SafeTextCanvas ? SafeTextCanvas->GetCachedGeometry().GetLocalSize() : GetCachedGeometry().GetLocalSize();
 	LayoutObjectives(Size.X > 0.f ? float(Size.X) : 1280.f, Size.Y > 0.f ? float(Size.Y) : 720.f);
