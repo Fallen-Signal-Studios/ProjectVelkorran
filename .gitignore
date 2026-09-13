@@ -65,6 +65,19 @@ Content/
 !/Content/Cues/
 !/Content/Cues/**/*.uasset
 
+# Project-owned Cinderline correction; retain the surrounding pack/template exclusions.
+!/Content/Abilities/
+/Content/Abilities/*
+!/Content/Abilities/Tarrik/
+/Content/Abilities/Tarrik/*
+!/Content/Abilities/Tarrik/GE_CinderlineThermal.uasset
+!/Content/Abilities/Tarrik/GA_CinderlinePrimary.uasset
+!/Content/Items/
+/Content/Items/*
+!/Content/Items/Weapons/
+/Content/Items/Weapons/*
+!/Content/Items/Weapons/WI_Cinderline.uasset
+
 # Raw source assets that normally belong in LFS
 SourceArt/
 *.blend

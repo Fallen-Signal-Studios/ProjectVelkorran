@@ -361,7 +361,9 @@ try:
     attack = {
         "Velkorran": bp_class(asset("/NarrativePro/Pro/Demo/Items/Examples/Items/Weapons/Melee/Abilities/GA_Attack_Melee_Sword_1H_Tarrik")),
         "Verity": bp_class(asset("/NarrativePro/Pro/Demo/Items/Examples/Items/Weapons/Melee/Abilities/GA_Attack_Melee_Verity")),
-        "Cinderline": stock("Attacks/Firearms/GA_Firearm_Cinderline"),
+        "Cinderline": (bp_class(asset("/Game/Abilities/Tarrik/GA_CinderlinePrimary"))
+                       if unreal.EditorAssetLibrary.does_asset_exist("/Game/Abilities/Tarrik/GA_CinderlinePrimary")
+                       else stock("Attacks/Firearms/GA_Firearm_Cinderline")),
         "Staccato": stock("Attacks/Firearms/GA_Staccato"),
         "Axiom": stock("Attacks/Firearms/GA_Firearm_Pistol"),
     }
