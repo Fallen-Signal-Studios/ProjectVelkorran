@@ -318,6 +318,15 @@ void USovAurelionThermalFractureComponent::ExecuteFracture(FContext Captured, FG
     Receipt.FrostApplicationId = FrostId; Receipt.HeatTransactionId = HeatId; Receipt.PayoffTransactionId = ObservedPayoffId;
     CloseWindow(); LastError.Reset();
     const FSovAurelionThermalFractureReceipt Published = Receipt;
+    // The frost mark is temporary mission intent. Release only that still-
+    // accepted hold after the real payoff; preserve any newer player command.
+    if (auto* Companion = Captured.Selene->GetCompanionComponent(); Companion
+        && Companion->GetCurrentLeader() == Captured.Player.Get()
+        && Companion->HasAcceptedHoldPosition(FrostAnchor))
+    {
+        FString CommandError;
+        Companion->RequestCommand(Captured.Player.Get(), ESovCompanionCommand::Regroup, Captured.Player.Get(), CommandError);
+    }
     OnThermalFractureCompleted.Broadcast(Published);
 }
 bool USovAurelionThermalFractureComponent::HasCompletedFracture(const ASovEncounterDirector* Director, const FGuid& AttemptId) const

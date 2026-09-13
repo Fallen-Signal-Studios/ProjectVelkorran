@@ -252,7 +252,16 @@ class Run(phase_a.Run):
             self.stage('hold_control')
 
     def hold_control(self,pc):
-        remaining=float(pc.get_interaction_component().get_editor_property('remaining_interact_time'))
+        interaction=pc.get_interaction_component()
+        remaining=float(interaction.get_editor_property('remaining_interact_time'))
+        focus=interaction.get_editor_property('viewed_interactable')
+        admission=self.hold_actor.interactable.can_interact(pc.get_controlled_pawn(),interaction)
+        sample=dict(control=self.control_name,focus=_path(focus),remaining=remaining,
+            admitted=admission is not None,admission=str(admission))
+        trace=self.report.setdefault('hold_trace',[])
+        if not trace or any(trace[-1].get(k)!=v for k,v in sample.items()):
+            sample['elapsed']=time.monotonic()-self.started
+            trace.append(sample)
         if 0.<remaining<=.35:
             self.saw_countdown=True
         if self.hold_actor.is_request_pending() or self.request_result is not None:
@@ -262,8 +271,20 @@ class Run(phase_a.Run):
                 input_game_seconds=unreal.GameplayStatics.get_time_seconds(self.world)-self.hold_started))
             self.stage('wait_control')
         else:
+            if focus!=self.hold_actor.interactable or admission is None or (self.saw_countdown and remaining<=-998.):
+                # Native focus/reach loss cancels a hold. A continuously held
+                # input cannot generate another Started event: release and aim
+                # again, with a bounded retry count and no admission override.
+                self.inject()
+                retries=self.report.setdefault('hold_retries',{})
+                retries[self.control_name]=retries.get(self.control_name,0)+1
+                assert retries[self.control_name]<=3, 'Contextual focus repeatedly lost during ordinary hold'
+                self.unbind_request()
+                self.stage('aim_control')
+                return
             assert time.monotonic()-self.phase_at<8., 'Native contextual hold did not complete'
-            self.inject(interact=1.)
+            look,error=self.look(self.world,pc,self.hold_actor.get_actor_location())
+            self.inject(interact=1.,look=look)
 
     def wait_control(self,pc,pawn):
         self.inject()

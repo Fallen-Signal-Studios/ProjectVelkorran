@@ -56,8 +56,55 @@ non-Narrative ability; the fixture was corrected before the passing run.
 
 Fresh normal-order runtime observation is running in
 `Saved/Validation/Aurelion/CompanionCombatValidated-20260913-131444-1b27325d`.
-Both actual handoffs, animated draw/holster and attributed companion damage
-remain unqualified until observed. The user-reported bug remains open.
+Both actual handoffs now have runtime evidence of their correct wielded weapons:
+Tarrik/Velkorran and Selene/Verity. The passive observer recorded native primary
+attack candidates as available, but no attributed companion damage. This does
+not establish attack animation or damage acceptance. The bug remains open.
+
+The retained run passed E1, E2, E3 entry/rescue and E4 entry. E4A's first input
+driver timed out waiting for the manual Axiom main-hand assignment; the guarded
+`E4AInputRetry` passed in 20.297 seconds after clicking the real wheel action.
+It earned the actual nineteen-beat journal and Tarrik handoff. No encounter,
+inventory or campaign state was reset to retry the input.
+
+E4B first timed out during FrostSetup. A diagnostic retry recorded native
+interaction focus moving from the control to Elite/Linkbound NPC interactables,
+with the hold countdown cancelled. A held input cannot start another hold after
+that cancellation. The pilot now records the hold trace, releases/re-aims when
+focus/admission is lost, and permits at most three retries per control.
+`E4BFocusRetry/e4b-input-continuation.json` passed in 12.797 seconds, using one
+FrostSetup reacquisition. Real native frost/heat/payoff transactions, Core
+follow-up, conventional kills and the ThermalFracture victory were observed.
+All seven protected participants survived at 100 health. The earlier failed
+reports remain separate. This qualifies the baffles in this encounter run;
+it is not packaged, audio, performance or broad visual acceptance.
+
+The post-victory continuation passed in 74.953 seconds: quarantine, recognition,
+CP6, durable travel checkpoint and actual M13 arrival retained journal, logical
+companion identity, inventory and resources. See the same run's
+`m13-entry-input-continuation.json` and `e4b-victory.png`.
+
+M13 then passed in 286.734 seconds through contrary positioning, both real
+handoffs, all scenes, native lift, separate departures and CP9. The report
+`m13-input-continuation.json` confirms unchanged content hashes. PIE was stopped
+only after the driver passed and released its gameplay references. This is a
+complete normal-order route with separately recorded input retries, not an
+uninterrupted first-attempt pass or packaged qualification.
+
+The next native correction releases Selene's still-accepted frost-anchor hold
+after a verified fracture payoff, returning her to Regroup. It preserves a
+newer command or different leader. The previous implementation left that hold
+active through conventional combat, which intentionally suppresses automatic
+target selection. A regression covers release after real payoff and preservation
+of a newer hold. UE 5.7 Development Editor rebuilt successfully (28.65 seconds),
+and all five thermal-fracture tests passed, including that regression, in
+`Saved/Validation/CompanionFrostRelease/20260913-134642-45c0e569`.
+All twelve companion tests also passed against that rebuilt editor in
+`Saved/Validation/CompanionFrostRelease/20260913-134838-a86f71c3`; both runs
+passed source/report coverage and unchanged-source checks. The four edited/new
+validation Python scripts passed compilation.
+Fresh gameplay qualification is still required: this correction was not loaded
+in the successful route above.
 
 Original live report is under the retained run's
 `UserData/Saved/Validation/Aurelion/CompanionCombat-20260913/live.json`.

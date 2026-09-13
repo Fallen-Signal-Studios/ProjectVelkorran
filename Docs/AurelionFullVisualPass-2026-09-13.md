@@ -236,3 +236,20 @@ separates `vault_status=PASS` from
 `world_instance_invariance=FAIL_PROCEDURAL_ENVIRONMENT_DRIFT`. This is an open
 environment determinism issue, not waived acceptance. The diagnostic script
 records counts, samples and maximum differences in `reload-instance-differences.json`.
+
+## Retained runtime review after companion equipment changes
+
+`CompanionCombatValidated-20260913-131444-1b27325d` earned E4B victory with
+all seven protected characters at 100 health, then completed quarantine,
+recognition and native M13 travel. This supersedes the earlier unqualified
+survivor result for this particular run; other variants and packaged play
+remain untested. `e4b-victory.png` captures the post-combat Crucible.
+
+M13's GrammarPropagation frame in `m13-grammar-framing.png` shows foreground
+terminal geometry obscuring the lower part of both protagonists. The terminal
+arrival is also too dark, while some character highlights are too bright.
+Story scenes retain black letterboxing and readable subtitle backgrounds, but
+the upper-left objective overlaps the letterbox. These are open framing,
+lighting and HUD issues, not accepted visual fidelity. The room still needs
+more distinct surfaces and local detail beyond the reflective dark floor and
+large stone panels. No 90% visual-alignment claim is supported by route proof.
