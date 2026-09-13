@@ -393,3 +393,33 @@ at 104.328 seconds. Both candidate policies were rejected. The previously
 passing firing/movement policy is restored, with spread/speed telemetry retained
 for diagnosis. Gameplay tuning, encounter gates and weapon payloads are unchanged.
 These runs do not provide new E4B or M13 qualification.
+
+With the original firing policy restored,
+`HolographicRestoredRoute-20260913-091514-6454dcf0` passed E1 (160.797s),
+E2 (52.954s), shared entry/meeting (93.344s), rescue (76.985s), and E4 entry
+(96.719s). Native rescue participants survived and the earlier checkpoint/scene
+receipts were preserved. Actual campaign dialogue showed the corrected word
+wrapping (`native-dialogue.png`). E4A failed at 60.985s because Axiom's main-hand
+wheel confirmation did not register within its deadline. The first click focused
+the viewport; selection still showed no owned main-hand item, and the next click
+was too late. Future operation must immediately re-observe and confirm after
+focus acquisition rather than assuming the first click equipped the weapon.
+
+The pose observer ended with no errors. On editor closure, the damage observer
+recorded five invalid UObject-wrapper errors while attempting to unbind already
+destroyed ability-system owners; those errors are retained. This attempt does
+not newly qualify E4A, E4B, M13, observer shutdown, or overall 90% alignment.
+
+The updated workstation archive is
+`Saved/AurelionHolographicPlaytest-20260913`, built from source `7468e602`.
+Its manifest records the preserved project descriptor/Cues and game-binary hash;
+the staged executable matches the newly built executable. The game build passed
+in 58.06 seconds. Cook/stage/archive passed in
+`PlaytestCook-20260913-092721-1e378ea4`: 8,250 packages, zero errors, 943
+warnings, exit 0. This archive includes the holographic HUD and word-wrap fix.
+
+`HolographicPackagedM12-20260913` loaded the actual M12 game mode in 2.210
+seconds and exited normally with code 0 after the bounded 45-second headless
+startup check. `Launch-M12.cmd`, `README.md`, the source manifest and startup
+result are included in the archive. Rendering, input, audio, full route and
+performance acceptance remain unqualified in this packaged artifact.

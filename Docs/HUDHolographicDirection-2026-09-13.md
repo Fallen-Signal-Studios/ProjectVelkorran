@@ -47,3 +47,7 @@ text to complete-word subtitle/caption lines; `dialogue-word-wrap.png` preserves
 the unmodified viewport. The preview completed normally. An incoming-fire
 warning overlapped the short caption, so simultaneous alert/caption stacking
 remains open. This preview is not campaign or combat qualification.
+
+The newer `Saved/AurelionHolographicPlaytest-20260913` archive includes these
+changes. Its Win64 build and cook passed, and packaged M12 headless startup
+exited 0. See the alignment report for the exact source and qualification limits.
