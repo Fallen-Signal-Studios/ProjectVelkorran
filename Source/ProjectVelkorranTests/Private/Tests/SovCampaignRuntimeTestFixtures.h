@@ -13,6 +13,7 @@ class ASovCampaignRuntimeTestPawn : public ASovPlayerCharacterBase
 	GENERATED_BODY()
 public:
 	ASovCampaignRuntimeTestPawn(const FObjectInitializer& ObjectInitializer);
+	void InitializePresentationTestASC();
 	FGameplayTag TestHero;
 	virtual FGameplayTag GetProtagonistIdentityTag() const override { return TestHero; }
 	virtual FVector GetPawnViewLocation() const override { return GetActorLocation(); }

@@ -35,6 +35,18 @@
 #include "Layout/Clipping.h"
 #include "Styling/CoreStyle.h"
 #include "UnrealFramework/NarrativeCharacter.h"
+#include "GAS/NarrativeAbilitySystemComponent.h"
+#include "NarrativeGameplayTags.h"
+
+namespace
+{
+bool IsCinematicControlled(const APlayerController* PC)
+{
+    const auto* Player = PC ? Cast<ASovPlayerCharacterBase>(PC->GetPawn()) : nullptr;
+    const auto* ASC = Player ? Player->GetNarrativeAbilitySystemComponent() : nullptr;
+    return ASC && ASC->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_SequencerControlled);
+}
+}
 
 #define LOCTEXT_NAMESPACE "SovAccessibilityPresentation"
 USovAccessibilityPresentation::USovAccessibilityPresentation(const FObjectInitializer& Initializer) : Super(Initializer)
@@ -369,7 +381,7 @@ void USovAccessibilityPresentation::LayoutObjectives(float SafeWidth, float Safe
 	ObjectiveOverflow->SetVisibility(bFitsContent && Remaining > 0 ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
 	ObjectiveSize->SetMaxDesiredHeight(Budget);
 	ObjectiveSize->SetHeightOverride(ContentHeight);
-	ObjectiveBackground->SetVisibility(Settings.bShowObjectiveText && !Objectives.IsEmpty() && Budget > 0.f && bFitsContent
+	ObjectiveBackground->SetVisibility(Settings.bShowObjectiveText && !IsCinematicControlled(GetOwningPlayer()) && !Objectives.IsEmpty() && Budget > 0.f && bFitsContent
 		? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
 	if (auto* CanvasSlot = Cast<UCanvasPanelSlot>(ObjectiveBackground->Slot))
 	{
@@ -488,7 +500,7 @@ void USovAccessibilityPresentation::RefreshObjectiveWaypoint()
     ObjectiveWaypoint = {};
     auto* PC = Cast<ASovPlayerController>(GetOwningPlayer());
     FSovCombatVitalsSnapshot Current;
-    if (!Settings.bShowObjectiveText || Objectives.IsEmpty() || !GetWorld()
+    if (!Settings.bShowObjectiveText || IsCinematicControlled(PC) || Objectives.IsEmpty() || !GetWorld()
         || !USovCombatVitalsWidget::ReadCurrentVitals(PC, Current) || Current.Values[0].Current <= 0.f) { return; }
     if (WaypointWorld.Get() != GetWorld())
     {
@@ -622,7 +634,7 @@ int32 USovAccessibilityPresentation::NativePaint(const FPaintArgs& Args, const F
 	};
     FSovCombatVitalsSnapshot CurrentVitals;
     const auto* SovPC = Cast<ASovPlayerController>(PC);
-    if (Settings.bShowObjectiveText && SafeTextCanvas && USovCombatVitalsWidget::ReadCurrentVitals(SovPC, CurrentVitals)
+    if (Settings.bShowObjectiveText && !IsCinematicControlled(SovPC) && SafeTextCanvas && USovCombatVitalsWidget::ReadCurrentVitals(SovPC, CurrentVitals)
         && CurrentVitals.Values[0].Current > 0.f && SovObjectiveWaypoint::IsCurrent(SovPC, ObjectiveWaypoint))
     {
         const auto& SafeGeometry = SafeTextCanvas->GetPaintSpaceGeometry();
