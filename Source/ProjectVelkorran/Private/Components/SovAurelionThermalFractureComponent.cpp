@@ -181,7 +181,7 @@ bool USovAurelionThermalFractureComponent::RequestConfirmFracture(ASovPlayerChar
     if (!bAccepted) { Error = TEXT("The elite did not accept Tarrik's native heat impact. Reopen frost after its defense recovers."); }
     LastError = Error; return bAccepted;
 }
-bool USovAurelionThermalFractureComponent::IsContextCurrent(const FContext& C, bool bRequireLivingElite) const
+bool USovAurelionThermalFractureComponent::IsContextCurrent(const FContext& C, bool bRequireActiveSetup) const
 {
     if (bEnding || !IsValid(GetOwner()) || GetOwner()->IsActorBeingDestroyed() || !GetOwner()->HasAuthority()
         || !C.Director.IsValid() || C.Director != BoundDirector || C.Director->IsActorBeingDestroyed()
@@ -198,7 +198,10 @@ bool USovAurelionThermalFractureComponent::IsContextCurrent(const FContext& C, b
         || C.Selene->GetNarrativeAbilitySystemComponent() != C.SeleneASC.Get() || C.SeleneASC->GetAvatarActor() != C.Selene.Get()
         || UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner()) != C.TargetASC.Get() || C.TargetASC->GetAvatarActor() != GetOwner()
         || !C.Player->IsCharacterReady() || !C.Player->IsAlive() || !C.Selene->IsEncounterSnapshotReady() || !C.Selene->IsAlive()
-        || HeroIsInterrupted(C.PlayerASC.Get()) || HeroIsInterrupted(C.SeleneASC.Get())
+        // Interruptions reject an open setup/payoff. Subsequent combat actions
+        // cannot erase its completed native receipt; ownership/life/attempt
+        // checks still apply when querying that receipt.
+        || (bRequireActiveSetup && (HeroIsInterrupted(C.PlayerASC.Get()) || HeroIsInterrupted(C.SeleneASC.Get())))
         || C.PlayerASC->GetCharacterReadyEpoch() != C.PlayerReadyEpoch || C.SeleneASC->GetCharacterReadyEpoch() != C.SeleneReadyEpoch
         || C.PlayerASC->GetCombatActorInfoEpoch() != C.PlayerActorInfoEpoch || C.SeleneASC->GetCombatActorInfoEpoch() != C.SeleneActorInfoEpoch
         || C.TargetASC->GetCombatActorInfoEpoch() != C.TargetActorInfoEpoch
@@ -214,8 +217,8 @@ bool USovAurelionThermalFractureComponent::IsContextCurrent(const FContext& C, b
         || C.Selene->GetCompanionComponent()->GetCurrentLeader() != C.Player.Get()
         || C.Selene->GetCompanionComponent()->IsDisabled()) { return false; }
     const auto State = C.Director->GetEncounterState();
-    return (State == ESovEncounterState::Active || (!bRequireLivingElite && State == ESovEncounterState::Succeeded))
-        && (!bRequireLivingElite || (!C.TargetASC->IsDead()
+    return (State == ESovEncounterState::Active || (!bRequireActiveSetup && State == ESovEncounterState::Succeeded))
+        && (!bRequireActiveSetup || (!C.TargetASC->IsDead()
             && C.TargetASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()) > 0.f));
 }
 void USovAurelionThermalFractureComponent::HandleControlApplied(UAbilitySystemComponent* ASC,

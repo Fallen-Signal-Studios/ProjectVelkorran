@@ -43,6 +43,7 @@ class Observer:
                 activities = actor.get_activity_component()
                 goal = activities.get_current_activity_goal() if activities else None
                 controller = actor.get_controller()
+                focus = controller.get_focus_actor() if controller else None
                 visual = actor.get_character_visual()
                 meshes = list(actor.get_components_by_class(unreal.SkeletalMeshComponent))
                 if visual:
@@ -56,7 +57,10 @@ class Observer:
                     identity=str(companion.get_editor_property('companion_id')),
                     position=actor.get_actor_location().export_text(), velocity=actor.get_velocity().export_text(),
                     weapon=ref(actor.get_weapon()), goal=ref(goal),
-                    focus=ref(controller.get_focus_actor()) if controller else None,
+                    focus=ref(focus),
+                    focus_position=focus.get_actor_location().export_text() if focus else None,
+                    focus_distance_cm=actor.get_distance_to(focus) if focus else None,
+                    focus_health=focus.get_health() if isinstance(focus, unreal.NarrativeCharacter) else None,
                     animations=animations))
             self.write()
         except Exception:

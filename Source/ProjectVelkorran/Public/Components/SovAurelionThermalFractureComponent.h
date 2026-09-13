@@ -88,7 +88,7 @@ private:
         uint64 Generation = 0, TransitionEpoch = 0, PlayerActorInfoEpoch = 0, SeleneActorInfoEpoch = 0, TargetActorInfoEpoch = 0;
     };
     bool CaptureContext(FContext& Out) const;
-    bool IsContextCurrent(const FContext& Candidate, bool bRequireLivingElite) const;
+    bool IsContextCurrent(const FContext& Candidate, bool bRequireActiveSetup) const;
     bool ValidateCleanAnchor(const FContext& Candidate, FString& Error) const;
     bool HasLineOfSight(AActor* Source, AActor* Target) const;
     void BindHeroInterruptions();

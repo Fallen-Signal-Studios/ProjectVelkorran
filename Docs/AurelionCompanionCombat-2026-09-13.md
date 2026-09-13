@@ -157,3 +157,30 @@ The observer now retains only path strings and Python callbacks between ticks,
 reacquiring current-world actors before accessing delegates. Three isolated
 observer regressions pass for collection, dead-actor detachment and preserved
 damage records. These are diagnostic tests, not evidence of gameplay damage.
+
+`CompanionObserverRoute-20260913-144904-612f07d0` passed E1 (207.03 s), E2
+(51.05 s), E3 entry (94.08 s), rescue (92.48 s), E4 entry (96.84 s) and E4A
+(51.88 s), including the real Axiom main-hand click. The repaired Eclipse
+observer recorded no errors. Selene's real CharacterMesh0 animation instance
+played `AM_Sword_3P_1H_Attack_1` during E3. The subsequent distance recorder
+captured Tarrik's `AM_Sword_3P_1H_Attack_2_Variation_1_Tarrik` during E4A,
+including target distances of about 234–255 cm. This proves native attack
+activation for both companions. The outgoing damage observer still recorded
+zero companion transactions; hit connection and damage remain unqualified.
+
+E4B stopped at 29 seconds: real frost, heat and payoff transaction IDs were
+recorded, with the elite alive, its Core revealed and actual Poise broken, but
+`HasCompletedFracture` subsequently returned false. Its shared context predicate
+still rejected temporary hero busy/interacting/movement-lock/stagger tags after
+completion, exposing a conflict with resumed companion actions. A new native
+regression reproduced all eight hero/tag cases while the five existing thermal
+tests passed (`ThermalCompletedAction/20260913-150303-c1fa608f`). Completed
+receipt queries now omit those pending-setup interruption restrictions while
+retaining actor, ownership, life, encounter, attempt, epoch and reload checks.
+Pending setup and payoff still require uninterrupted heroes. Fresh live
+qualification of this correction remains necessary.
+
+The corrected UE 5.7 editor rebuilt in 32.27 seconds; all six thermal tests
+passed with source/report coverage and unchanged-source validation in
+`ThermalCompletedAction/20260913-150454-f90b4b48`. The failed regression run is
+retained as the before-fix evidence.
