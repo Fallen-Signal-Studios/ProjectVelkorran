@@ -92,14 +92,23 @@ class Run:
         self.route_then = None
         self.last_position = None
         self.last_motion_at = self.started
+        self.last_evade_request = -1000.
+        self.evade_until = -1000.
+        self.cover_goal = None
+        self.cover_until = -1000.
+        self.next_cover_search = -1000.
+        self.last_pickup = None
         self.report = dict(status='running', scope='E1 combat, secure approach, first native handoff',
                            method='Ordinary Enhanced Input actions in an existing PIE world',
                            physical_keyboard_validation=False, rendered_image_review=False,
                            direct_state_or_resource_or_transform_writes=False,
-                           samples=[], stages=[], holds=[], targets=[], input_frames={},
+                           driver_source_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+                           samples=[], stages=[], holds=[], targets=[], input_frames={}, rocket_reactions=[],
+                           cover_attempts=[], cover_exposures=[], pickup_approaches=[],
                            assets_before=self.before)
         self.actions = {name: unreal.load_asset(ACTION_ROOT + name) for name in
                         ('IA_Move', 'IA_Look', 'IA_Attack', 'IA_AltAttack', 'IA_Reload', 'IA_Interact')}
+        self.actions['IA_Evade'] = unreal.load_asset('/Game/Input/IA_Evade')
         assert all(self.actions.values()), 'Required existing Narrative input actions are missing'
 
     def hashes(self):
@@ -120,12 +129,13 @@ class Run:
         self.report['stages'].append(dict(phase=name, elapsed=self.phase_at-self.started, detail=detail))
         self.write()
 
-    def inject(self, move=(0., 0.), look=(0., 0.), attack=0., aim=0., reload=0., interact=0.):
+    def inject(self, move=(0., 0.), look=(0., 0.), attack=0., aim=0., reload=0., interact=0., evade=0.):
         if not self.owner:
             return
         values = {'IA_Move': (*move, 0.), 'IA_Look': (*look, 0.),
                   'IA_Attack': (attack, 0., 0.), 'IA_AltAttack': (aim, 0., 0.),
-                  'IA_Reload': (reload, 0., 0.), 'IA_Interact': (interact, 0., 0.)}
+                  'IA_Reload': (reload, 0., 0.), 'IA_Interact': (interact, 0., 0.),
+                  'IA_Evade': (evade, 0., 0.)}
         for name, vector in values.items():
             self.owner.inject_input_vector_for_action(self.actions[name], unreal.Vector(*vector), [], [])
             if any(vector):
@@ -200,8 +210,10 @@ class Run:
             if settings.get_invert_horizontal(): ys *= -1.
             if settings.get_invert_vertical(): ps *= -1.
         assert abs(ys) > .001 and abs(ps) > .001, 'Look input scales are zero'
-        clamp = lambda v: max(-.7, min(.7, v))
-        return (clamp(yaw*.12/ys), clamp(pitch*.12/ps)), max(abs(yaw), abs(pitch))
+        # Mouse-delta input must turn fast enough to follow an orbiting drone;
+        # the previous .7 cap repeatedly lagged behind during lateral movement.
+        clamp = lambda v: max(-6., min(6., v))
+        return (clamp(yaw*.8/ys), clamp(pitch*.8/ps)), max(abs(yaw), abs(pitch))
 
     def clear_sight(self, world, pawn, target):
         camera = unreal.GameplayStatics.get_player_camera_manager(world, 0)
@@ -245,6 +257,116 @@ class Run:
                 return result
             self.path_points.pop(0)
         return (0., 0.)
+
+    def approaching_rocket(self, world, pawn):
+        """Read actual visible projectiles; never alter their flight or resolution."""
+        location = pawn.get_actor_location()
+        for rocket in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.SovReformationDroneRocketProjectile):
+            if rocket.has_resolved() or rocket.get_editor_property('hidden'):
+                continue
+            p, velocity = rocket.get_actor_location(), rocket.get_velocity()
+            dx, dy, dz = location.x-p.x, location.y-p.y, location.z-p.z
+            distance = math.sqrt(dx*dx+dy*dy+dz*dz)
+            if distance < 1. or distance > 1000.:
+                continue
+            closing = (dx*velocity.x+dy*velocity.y+dz*velocity.z)/distance
+            if closing > 100. and distance/closing < .28 and self.clear_sight(world, pawn, rocket):
+                return dict(projectile=_path(rocket), distance=distance, estimated_seconds=distance/closing)
+        return None
+
+    def cover_movement(self, world, pc, pawn, enemies, phase_time):
+        shield = pawn.get_component_by_class(unreal.SovShieldComponent)
+        assert shield and shield.is_initialized(), 'Native shield readiness missing'
+        value = shield.get_shield()
+        if self.cover_goal is not None and (value >= shield.get_max_shield()*.85 or phase_time > self.cover_until):
+            self.cover_goal = None
+        if self.cover_goal is None and value < shield.get_max_shield()*.35 and phase_time > self.next_cover_search:
+            self.next_cover_search = phase_time+2.
+            location = pawn.get_actor_location()
+            choices = []
+            for radius in (450., 850.):
+                for index in range(8):
+                    angle = index*math.pi/4.
+                    goal = unreal.Vector(location.x+math.cos(angle)*radius, location.y+math.sin(angle)*radius, location.z)
+                    path = unreal.SovAurelionNavigationLibrary.find_path_to_location_synchronously(world, location, goal, pawn, None)
+                    if not path or not path.is_valid() or path.is_partial() or len(path.path_points)<2:
+                        continue
+                    end = path.path_points[-1]
+                    if abs(end.z-(location.z-88.))>150. or math.hypot(end.x-goal.x,end.y-goal.y)>150.:
+                        continue
+                    blocked = 0
+                    for enemy in enemies:
+                        ignored = [pawn,enemy]+list(pawn.get_attached_actors())
+                        ignored += [v for v in (pawn.get_character_visual(),enemy.get_character_visual()) if v]
+                        ray = unreal.SystemLibrary.line_trace_single(world, end+unreal.Vector(0.,0.,140.),
+                            enemy.get_actor_location(), unreal.TraceTypeQuery.TRACE_TYPE_QUERY1, False,
+                            ignored, unreal.DrawDebugTrace.NONE, True)
+                        if ray is not None:
+                            hits = [v for v in ray if isinstance(v,unreal.HitResult)] if isinstance(ray,tuple) else [ray]
+                            parts = hits[0].to_tuple()
+                            obstacle = parts[9]
+                            if parts[0] and obstacle and not isinstance(obstacle,unreal.NarrativeCharacter):
+                                blocked += 1
+                    if blocked:
+                        choices.append((-blocked, radius, [_xyz(p) for p in path.path_points[1:]]))
+            if choices:
+                _, _, points = min(choices, key=lambda c:(c[0],c[1]))
+                self.cover_goal = points
+                self.cover_until = phase_time+10.
+                self.report['cover_attempts'].append(dict(elapsed=time.monotonic()-self.started,
+                    shield=value, blocked_enemies=-min(c[0] for c in choices), points=points.copy()))
+        if self.cover_goal is not None:
+            while self.cover_goal:
+                movement, reached = self.local_move(pc,pawn,self.cover_goal[0],stop=65.)
+                if not reached:
+                    return movement
+                self.cover_goal.pop(0)
+            if value < shield.get_max_shield()*.85 and phase_time <= self.cover_until:
+                # Flying enemies can invalidate a previously sheltered point.
+                # Recheck from the pawn, not the camera (which can be behind a wall).
+                exposed = []
+                for enemy in enemies:
+                    ignored = [pawn, enemy] + list(pawn.get_attached_actors())
+                    ignored += [v for v in (pawn.get_character_visual(), enemy.get_character_visual()) if v]
+                    ray = unreal.SystemLibrary.line_trace_single(world,
+                        pawn.get_actor_location()+unreal.Vector(0.,0.,50.), enemy.get_actor_location(),
+                        unreal.TraceTypeQuery.TRACE_TYPE_QUERY1, False, ignored, unreal.DrawDebugTrace.NONE, True)
+                    if ray is None:
+                        exposed.append(_path(enemy))
+                if exposed:
+                    self.report['cover_exposures'].append(dict(elapsed=time.monotonic()-self.started,
+                        enemies=exposed, shield=value))
+                    self.cover_goal = None
+                    self.next_cover_search = phase_time+.5
+                    return None
+                return (0.,0.)
+        return None
+
+    def ammo_movement(self, world, pc, pawn, weapon):
+        if weapon.get_spare_ammo() >= 64:
+            self.last_pickup = None
+            return None
+        location = pawn.get_actor_location()
+        pickups = [a for a in unreal.GameplayStatics.get_all_actors_of_class(world,unreal.SovAmmoCombatSustainPickup)
+            if not a.is_claimed() and not a.get_editor_property('hidden')
+            and a.get_ammo_item_class() == weapon.get_editor_property('required_ammo')]
+        def pickup_distance(actor):
+            p = actor.get_actor_location()
+            return (p.x-location.x)**2+(p.y-location.y)**2+(p.z-location.z)**2
+        pickups.sort(key=pickup_distance)
+        for pickup in pickups:
+            p = pickup.get_actor_location()
+            if math.hypot(p.x-location.x,p.y-location.y)>1800.:
+                continue
+            path = unreal.SovAurelionNavigationLibrary.find_path_to_location_synchronously(world,location,p,pawn,None)
+            if not path or not path.is_valid() or path.is_partial():
+                continue
+            if self.last_pickup != _path(pickup):
+                self.last_pickup = _path(pickup)
+                self.report['pickup_approaches'].append(dict(elapsed=time.monotonic()-self.started,
+                    actor=self.last_pickup, quantity=pickup.get_ammo_quantity(), reserve=weapon.get_spare_ammo()))
+            return self.approach(world,pc,pawn,pickup)
+        return None
 
     def weapon(self, pawn):
         weapons = [w for w in pawn.get_wielded_weapons() if w and w.get_class().get_path_name() == WEAPON]
@@ -358,7 +480,10 @@ class Run:
             p = actor.get_actor_location()
             return (str(self.e1.find_participant_id(actor)) != 'E1.Drone2',
                     (p.x-location.x)**2+(p.y-location.y)**2)
-        target = min(candidates, key=ordering)
+        # Keep tracking a living visible target. Re-ranking moving drones every
+        # frame made the driver switch 60 times in one failed run, often turning
+        # away before it could fire. This changes only the ordinary-input pilot.
+        target = self.target if self.target in candidates else min(candidates, key=ordering)
         if target != self.target:
             self.target = target
             self.report['targets'].append(dict(elapsed=time.monotonic()-self.started,
@@ -369,18 +494,39 @@ class Run:
         clear = self.clear_sight(world, pawn, target)
         # Walking along a queried path still goes through the player's real collision/movement input.
         in_range = distance < min(2400., max(500., weapon.get_attack_range()*.8))
-        movement = self.approach(world, pc, pawn, target) if (not clear or not in_range) and distance > 450. else (0., 0.)
+        # Occlusion can persist inside 450 cm (for example across a ramp).
+        # Follow the queried path there too, preserving normal capsule collision.
+        movement = self.approach(world, pc, pawn, target) if (not clear or not in_range) and distance > 80. else (0., 0.)
         clip, reserve = weapon.get_ammo_in_clip(), weapon.get_spare_ammo()
-        assert clip > 0 or reserve > 0, 'Cinderline ammunition exhausted; no resources were manufactured'
         phase_time = unreal.GameplayStatics.get_time_seconds(world)
+        # Do not stand exposed through every shot/reload. These alternating
+        # lateral inputs still obey the player's movement, collision and aim.
+        if clear and in_range:
+            movement = (.8 if phase_time % 5. < 2.5 else -.8, 0.)
+        cover_move = self.cover_movement(world,pc,pawn,candidates,phase_time)
+        pickup_move = self.ammo_movement(world,pc,pawn,weapon) if cover_move is None else None
+        assert clip > 0 or reserve > 0 or pickup_move is not None, 'Cinderline ammunition exhausted with no reachable matching pickup; no resources were manufactured'
+        if cover_move is not None:
+            movement = cover_move
+        elif pickup_move is not None:
+            movement = pickup_move
         # A short press/release cycle exercises normal input activation without holding through reload.
         reloading = clip <= 0
         reload_input = 1. if reloading and phase_time % 1.2 < .15 else 0.
-        attack = 1. if not reloading and clear and in_range and error < 1.5 and phase_time % .6 < .4 else 0.
+        threat = self.approaching_rocket(world, pawn)
+        if phase_time-self.last_evade_request > .45 and (threat or (cover_move is None and phase_time % 3. < .12)):
+            self.last_evade_request = phase_time
+            self.evade_until = phase_time+.12
+            if threat:
+                self.report['rocket_reactions'].append(dict(elapsed=time.monotonic()-self.started, **threat))
+        evade_input = 1. if phase_time < self.evade_until else 0.
+        attack = 1. if cover_move is None and not reloading and clear and in_range and error < 1.2 and phase_time % .6 < .4 else 0.
         self.report['last_combat'] = dict(target=str(self.e1.find_participant_id(target)), distance=distance,
             angle_error=error, clip=clip, reserve=reserve, visible_line=clear, in_range=in_range,
-            primary_pressed=bool(attack), target_health=target.get_health())
-        self.inject(move=movement, look=look, aim=0. if reloading else 1., attack=attack, reload=reload_input)
+            primary_pressed=bool(attack), target_health=target.get_health(), movement=movement,
+            evade_requested=bool(evade_input), seeking_cover=cover_move is not None, seeking_ammo=pickup_move is not None)
+        self.inject(move=movement, look=look, aim=0. if reloading or evade_input or cover_move is not None else 1.,
+                    attack=0. if evade_input else attack, reload=reload_input, evade=evade_input)
 
     def tick(self, delta):
         if self.done:

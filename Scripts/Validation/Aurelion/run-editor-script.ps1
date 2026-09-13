@@ -12,6 +12,7 @@ param(
     [switch]$KeepEntryOpen,
     [switch]$ContinueE1,
     [switch]$ContinueRoute,
+    [switch]$DisableAura,
     [ValidateSet('/Game/Aurelion/Maps/L_Aurelion_M12', '/Game/Aurelion/Maps/L_Aurelion_M13')]
     [string]$Map = '/Game/Aurelion/Maps/L_Aurelion_M12'
 )
@@ -44,12 +45,21 @@ if ($PipInstallPath) {
     if (-not (Test-Path -LiteralPath (Join-Path $PipInstallPath 'pyvenv.cfg') -PathType Leaf)) { throw 'Explicit pip cache is not an existing virtual environment.' }
 }
 New-Item -ItemType Directory -Path $AurelionRun | Out-Null
+$AurelionExecution = '-ExecutePythonScript=' + $AurelionScript.Replace('\', '/')
+if ($KeepEntryOpen) {
+    # ExecutePythonScript owns a persistent modal while keep_python_script_alive
+    # is true. A retained route needs normal UI input (notably Axiom's hand click).
+    # UE's deferred PY command accepts an unquoted pathname through its .py suffix.
+    if ($AurelionScript.Contains(',')) { throw 'Retained ExecCmds paths cannot contain a comma.' }
+    $AurelionExecution = '-ExecCmds=py ' + $AurelionScript.Replace('\', '/')
+}
 $AurelionArgs = @($AurelionProject, $Map, '-unattended', '-nosound', '-nosplash', '-nop4', '-NoEpicPortal',
-    ('-ExecutePythonScript=' + $AurelionScript.Replace('\', '/')),
+    $AurelionExecution,
     ('-UserDir=' + (Join-Path $AurelionRun 'UserData').Replace('\', '/') + '/'),
     ('-AbsLog=' + (Join-Path $AurelionRun 'Editor.log').Replace('\', '/')),
     '-ini:Engine:[/Script/PythonScriptPlugin.PythonScriptPluginSettings]:bRunPipInstallOnStartup=false')
 if (-not $Visible) { $AurelionArgs += '-RenderOffscreen' }
+if ($DisableAura) { $AurelionArgs += '-DisablePlugins=Aura' }
 foreach ($AurelionArg in $AurelionArgs) {
     if ($AurelionArg -match '["\r\n]' -or $AurelionArg.EndsWith('\')) { throw 'Unsupported argument quoting.' }
 }
@@ -83,6 +93,8 @@ $AurelionLaunch = [ordered]@{
     Script = $AurelionScript; ScriptSHA256 = (Get-FileHash -LiteralPath $AurelionScript -Algorithm SHA256).Hash.ToLowerInvariant()
     Project = $AurelionProject; Map = $Map; RunDirectory = $AurelionRun
     Visible = [bool]$Visible; Retained = [bool]$KeepEntryOpen; ProcessExitIsGameplayPass = $false
+    Execution = $(if ($KeepEntryOpen) { 'deferred_console_python' } else { 'python_process_executor' })
+    ExcludedEditorPlugins = @($(if ($DisableAura) { 'Aura' }))
 }
 $AurelionLaunch | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $AurelionRun 'launch.json') -Encoding UTF8
 Write-Output "Unreal $Label started; PID $($AurelionProcess.Id); results $AurelionRun"

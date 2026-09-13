@@ -1,5 +1,20 @@
 These are Aurelion QA tools for UE 5.7 Editor. Publication does not establish a route pass. Keep the generated run reports, source hashes, native build/test evidence and matching asset hashes together. A process exiting zero only establishes that the process exited successfully.
 
+Retained visible launches use the deferred `PY` console command so the editor remains available for ordinary UI input. Non-retained runs still use the process Python executor. The entry driver waits for Narrative's native loading gate before starting the wheel timer, within the unchanged entry-stage deadline. These launcher/driver changes require their own real route evidence.
+
+`-DisableAura` is an explicit per-process isolation option for the editor assistant plugin, which can launch a second headless editor and lock build outputs. It does not edit the project descriptor; excluded plugins are recorded in `launch.json`. A run using it must retain that environment distinction in its evidence.
+
+The September 13 E1 pilot revision retains a living visible target, uses more responsive
+look input, strafes during clear in-range shots/reloads and periodically requests the
+authored Evade action. These are ordinary input requests; native collision, stamina,
+ability admission and damage still govern the result. Reports record the pilot source
+hash. Earlier static-fire failures remain failures; the revised pilot needs its own
+completed live report and does not qualify physical keyboard/mouse operation.
+The pilot also queries reachable cover, rechecks exposure before waiting for native
+shield recovery, reacts to actual approaching rockets and approaches existing matching
+ammo pickups. Cover/pickup reports describe attempts, not successful protection or
+collection. No ammo, health, projectile or encounter state is supplied by the driver.
+
 The evidence snapshot records actual M12 completion with all 22 native receipts and normal mission travel to M13. This was earned across retained-world continuations, preserved QA failures and three explicitly documented layout iterations: the shared handoff destination, rescue-door dimensions and Heat station. Full Meeting, rescue/cage/Quarantine/Recognition scenes, E3 victory, two Weaver link severs, Tarrik handoff, Frost/Heat/Poise, Core followup and conventional E4B victory have separate actual reports. The normal M13 Cinderline wield restored its lazy ammo cache to the saved five rounds without changing inventory. The first M13 coaction then failed companion readiness before any M13 receipt. A later actual earned22 M12 checkpoint load passed its saved player/companion/storage/Heat checks and three standing non-ragdoll game seconds. A subsequently observed historical NPC roster problem remains under investigation, so whole-world recovery, a fresh complete route, M13 completion, CP9 reload and packaged execution remain unqualified. Older failed reports remain in the manifest beside later successful segments.
 
 The manifest records the exact completed current native Editor/Game/non-unity builds, test totals, warnings and source fingerprint supplied to the generator. It also records the matching saved two-map assembly, all 18 station surfaces, six handoff destinations and label checks. These engineering and static content checks do not establish a fresh gameplay pass. The complete authoring log and handled diagnostics remain visible in package_basis.authoring_log_caveat.

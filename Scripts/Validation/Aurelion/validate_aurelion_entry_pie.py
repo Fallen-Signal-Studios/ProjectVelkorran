@@ -181,6 +181,13 @@ def tick(dt):
         if not pawn.is_character_ready() or not state.is_state_valid() or pc.get_campaign_transition_state()!=unreal.SovCampaignTransitionState.IDLE: return
         owner=input_owner(world)
         if ctl['phase']=='await_cinderline_selection':
+            # CharacterReady can precede completion of Narrative's appearance/weapon
+            # streaming. Keep the existing bounded entry-stage deadline, but do not
+            # spend the wheel's input deadline before the native load gate admits it.
+            if pawn.is_character_pending_load():
+                report['selection_waiting_for_native_load'] = True
+                return
+            report['selection_waiting_for_native_load'] = False
             if 'enemy_before_selection' not in report:
                 inspected=inspect_enemies(world,OUT/'enemy-before-selection-readonly.json',require_initialized=True)
                 report['enemy_before_selection']={k:inspected.get(k) for k in ('status','contract_failures','startup_pending','inspection_errors')}
@@ -193,6 +200,17 @@ def tick(dt):
             assert not ctl['weapon_selector'].done or wheel_report['status']=='passed', wheel_report.get('reason')
             if len(selected)==1 and ctl['weapon_selector'].done and wheel_report['status']=='passed':
                 report['weapon_selection']=dict(item=selected[0].get_path_name(),method='Observed current owned Cinderline wield state; no inventory/equip writes')
+                # Finish streaming the complete placed roster before walking into
+                # the active encounter. Keep pending samples and the existing
+                # 180-second stage bound; structural failures still fail at once.
+                if now-ctl.get('roster_ready_sample_at',0.)<1.: return
+                ctl['roster_ready_sample_at']=now
+                inspected=inspect_enemies(world,OUT/'enemy-pre-entry-readiness.json',require_initialized=True)
+                report.setdefault('pre_entry_roster_readiness',[]).append(dict(elapsed=now-START,
+                    status=inspected['status'],pending=inspected.get('startup_pending',[])))
+                assert not inspected.get('contract_failures') and not inspected.get('inspection_errors'), 'Placed roster structural failure'
+                if inspected.get('startup_pending'): return
+                assert inspected['status']=='passed_observable_startup_contract'
                 stage('walk_to_pressure_hall')
             return
         if unreal.GameplayStatics.is_game_paused(world): return
