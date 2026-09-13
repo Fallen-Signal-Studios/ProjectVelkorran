@@ -47,7 +47,8 @@ These are kept distinct throughout and never collapsed into "passed":
 | PC06 | Echo encounter/checkpoint wiring not demonstrated | **SUPERSEDED (in part) / PARTIAL** |
 | PC07 | Full-meter Deflections do not refresh Echo combat activity | **CLOSED** |
 | PC08 | Zero-damage Poise/status packets outside the transaction | **CLOSED** |
-| PC09 | Guard cancellation weaker than Deflection/Echo adapters | **PARTIAL** |
+| PC09 | Guard cancellation weaker than Deflection/Echo adapters | **CLOSED** (source, 12 Sep, see updates) |
+| PC09-C | Guard/counter authoring: grant, input, counter classification, presentation | **CONTENT/EDITOR GATE** |
 | PC10 | Shield/Health/Poise balance and content gates | **CONTENT/EDITOR GATE** |
 | PC11 | Stamina, movement, combos, weapon transitions | **CONTENT/EDITOR GATE** |
 | PC12 | Coverage proves construction more than combat behaviour | **SUPERSEDED** |
@@ -62,10 +63,10 @@ These are kept distinct throughout and never collapsed into "passed":
 | X1 | `/Game/Cues` absent from version control | **EXTERNAL CONTENT GATE** (see below) |
 | X2 | `SciFi_Drone_1` marketplace pack absent | **EXTERNAL CONTENT GATE** (see below) |
 
-Closed: 16. Partial: 4. Open: 1. Content/editor gated: 9. Superseded: 2. External gates: 2.
+Closed: 17. Partial: 3. Open: 1. Content/editor gated: 10. Superseded: 2. External gates: 2.
 
-_Recounted from the table above on 12 September after C1 closed, and again after C3 and E6 closed. The earlier totals line did not
-reconcile with its own rows. K1–K4 count as four gated items; PC06 counts as superseded, its small
+_Recounted from the table above on 12 September after C1 closed, and again after C3, E6 and PC09 closed. The earlier totals line did not
+reconcile with its own rows. K1–K4 count as four gated items; PC09-C counts as one; PC06 counts as superseded, its small
 remaining part recorded under its own heading._
 
 The single remaining OPEN item is T5, the packaged Win64 Game target, which is a Windows
@@ -301,15 +302,88 @@ Work done in the isolated worktree `ProjectVelkorran-c3`, branch `engineering/e6
     `bDirectObservation` during the traversal window. Recorded only; PC04's overlap-harness blocker is not
     reopened here.
 
-### PC01–PC04, PC09 — Ability and generation completeness (PARTIAL)
+### PC01–PC04 — Ability and generation completeness (PARTIAL)
 
 All named spenders now exist as native files: six Selene abilities including `Deflection`, `Dispatch`,
 `StaccatoZero`, `StillpointGrenade`, `VeritysWake`, `AxiomNullPulse`; and `TarrikCinderSlam`,
 `TarrikCinderlineRequiem`, `TarrikGuard`. Generation components exist for both protagonists, and
-`GuardLifecycleValidation.md` records five guard lifecycle suites. **These are marked PARTIAL rather
+`GuardLifecycleValidation.md` records the guard lifecycle suites (PC09 closed separately, below). **These are marked PARTIAL rather
 than CLOSED deliberately:** this pass confirmed the files and entry points exist, not that each
 delivers its payload natively without a Blueprint release hook. Closing them requires per-ability
 review, which is a slice of its own rather than a reconciliation result.
+
+### PC09 — Guard cancellation (source CLOSED 12 September; authoring remainder is PC09-C)
+
+Work done in the isolated worktree `ProjectVelkorran-c3`, branch `engineering/pc09-guard-lifecycle`
+(stacked on E6), not the shared checkout. Evidence and reclassification pass; no production source changed.
+
+1. **Question.** Does Tarrik's native Guard state admit, cancel and transition correctly, so that the
+   only remaining gap is authored guard/counter content?
+2. **Authority.** TDD v2 §5.2.3 (holding guard establishes a frontal plane; perfect guard creates a fast
+   counter window and generates Echo), §6.5 (standard guard impact 8–20 Stamina; an exhausted guard breaks
+   posture), the Echo table (+12 perfect guard, +10 guard counter), the Resonance table (Selene's Sever
+   extends Tarrik's counter window), and `Config/DefaultEngine.ini` combat settings (start Stamina 8,
+   perfect cost 5, guard multiplier 0.25).
+3. **The audit claim is stale.** It said the ability observed only death, PoiseBroken and Sequencer while
+   active, and that only the newer Echo/Deflection adapters closed the activation-to-binding race. In the
+   current tree `USovGuardComponent` and `USovGameplayAbility_TarrikGuard` both refuse and live-cancel on
+   dead, interacting, sequencer-controlled, ragdoll, fatal, poise-broken, guard-broken, Echo-active and
+   deflecting, plus any Busy contribution beyond one activation-owned Busy (`AnyCountChange`). Both re-check
+   immediately after binding, and activation epochs stop a cancelled start from continuing.
+4. **Lifecycle, as implemented.**
+   - *Admission and start.* Direct `BeginGuard` and GAS activation share one blocker set; the component also
+     requires 8 Stamina and no existing guard or broken posture. Ownership flags are published before GAS tag
+     dispatch so a reentrant cancel removes the contribution being added.
+   - *Stamina and perfect defence.* Damage routing (`NarrativeAttributeSetBase`) resolves the frontal arc,
+     heavy/unblockable class and Stamina transactionally. Perfect guard costs 5, blocks fully and still
+     succeeds on the last Stamina, then breaks posture without a counter. Ordinary impact costs the clamped
+     8–20 and mitigates to 0.25; an unaffordable cost or a heavy attack outside perfect timing breaks posture.
+   - *Interruption and cancellation.* The component ends Guard on any blocker; ending broadcasts
+     `OnGuardEnded`, which ends the ability; ability end ends the component. Removal and component rebinding
+     end both.
+   - *Counter.* A perfect guard opens one owned counter window (0.8 s). It survives input release and
+     attack-state Busy changes, is cleared by incapacity or another defence, is consumed once by a landed
+     `Sov.Damage.Source.GuardCounter` hit, and can be extended only while open.
+   - *Cleanup.* Broken posture clears on its timer; rebinding removes every owned tag and cancels timers.
+5. **Adapter differences, classified.** Echo, Melee, Deflection and Axiom also observe
+   `Narrative.State.Weapon.Equipping`; Guard does not. No native code applies that tag (Narrative's authored
+   equip flow does) and the TDD sets no rule for guarding through an equip, so it is a PIE/content check, not a
+   source defect. `Sov.State.Status.Frozen` is not a gap: both native freeze paths (`SovSelenePayload`,
+   `SovStatusComponent`) grant Busy with it, and Guard cancels on Busy. Native Melee refuses activation while
+   `State.Guarding`, so a counter attack starts after release; the counter window surviving release is what
+   makes that work, and it is now proven.
+6. **Evidence — automation-verified on Mac.** `ProjectVelkorran.Campaign.Guard`, eight suites in a real
+   world with the Narrative ASC and attribute set and no authored assets. The five existing suites
+   (`AdmissionAndDirectInterrupts`, `GASCancellationAndEffectOwnership`, `ReentrantStartAndTagOwnership`,
+   `PerfectDefenseLastStamina`, `CounterSurvivesAttackBusy`) are joined by:
+   - `StaminaAdmissionImpactAndBreakRecovery`: 7.9 Stamina refuses both entries with no residue; 8 starts;
+     Narrative's production tag-input release ends Guard; perfect timing expires on its timer without ending
+     the hold; ordinary impact costs 10 and takes a quarter of the unguarded Shield loss; an unaffordable
+     impact breaks, spends only what remains and refuses restart; the break expires, empty Stamina still
+     refuses, 8 restarts; a heavy attack outside perfect timing breaks and also expires back to a startable
+     Guard; no owned tag or Busy remains and every start has one end.
+   - `CounterWindowReleaseExpiryAndSingleOwnership`: release preserves the counter; two concurrent attack
+     Busy contributions and their removal do not kill it; re-guarding and perfect-guarding again leaves one
+     counter contribution that pays once; the window expires, removing its tag, and then pays nothing; poise
+     break and Deflecting clear it; Guard reactivates afterwards with no residue.
+   - `RebindingReleasesOwnedStateAndReactivates`: rebinding with Guard and counter held, and again during
+     broken posture, leaves no owned tag on either ASC, applies nothing when the cancelled timers would have
+     fired, and Guard reactivates.
+   The first run of the new suites failed on the fixture, not source: a timer armed outside a timer tick is
+   pending until the next tick, so the test advanced 0.01 s short of each expiry. Margins were widened; no
+   assertion was removed.
+7. **Negative controls.** Seven seams were broken one at a time in production source, each rebuilt and run against the Guard suites, then restored from git (source diff empty; clean rebuild 8/8). All seven were caught: Busy clearing the counter (both counter suites); broken posture never expiring (StaminaAdmissionImpactAndBreakRecovery); Guarding tag leaking on end (7 of 8 suites); start-Stamina check removed (StaminaAdmissionImpactAndBreakRecovery); counter not consumed on landing (both counter suites); rebinding leaking counter and broken tags (RebindingReleasesOwnedStateAndReactivates); live interruption removed from component and ability (four suites including both cancellation suites). Three of the seven — stuck break, missing start-Stamina check, rebinding leak — were caught only by the new suites; the original five passed with those seams broken.
+8. **Suites.** Guard 8/8. Affected suites (Guard, Defense, WeakPoint, Finisher, Projectile, Foundation, Selene, Exertion, Echo, Readiness, AxiomNullPulse, DominionHound, Transactions, Resonance, Melee, Companion, Threat) 129/0. Full suite 630 passed, 2 failed of 632: Validation.GameplayCuesStillResolve (X1) and PlacedNPC.DefinitionFallbackAndExistingOwnership, whose only error was the ABP_RefDrone missing-skeleton log from the SciFi_Drone_1 pack (X2 spillover); that test passes 1/1 run alone.
+9. **Remainder, reclassified as PC09-C (content/editor gate).** A search of the on-disk `Content` tree,
+   untracked assets included, found no reference to `SovGameplayAbility_TarrikGuard`, `Sov.State.Guard*`,
+   `Sov.Event.Guard*`, `Damage.GuardClass` or `GuardCounter`. So no authored asset yet:
+   - grants Guard to Tarrik or maps it to `Narrative.Input.AltAttack`;
+   - implements the Blueprint presentation hooks (`Guard Ability Started/Ended`, `Guard Impact`,
+     `Perfect Defense`, `Guard Broken`, `Counter Landed`) or guard hold/block/break/counter animation;
+   - authors a counter attack node whose `AttackClassifications` carry `Sov.Damage.Source.GuardCounter`;
+   - classifies enemy attacks as `Damage.GuardClass.Heavy`/`Unblockable` where intended.
+   Also gated: the blocked-hit cue's `/Game/Cues` root (X1), guarding through an authored weapon equip, and
+   owning-client prediction under latency (no Mac network automation).
 
 ### PC06 — remaining part (PARTIAL)
 
@@ -389,6 +463,8 @@ The fresh worktree also showed that X2's error spillover still reaches unrelated
 note below; that is recorded for its own slice rather than folded into C3.
 
 **12 September — E6 closed, no source defect.** Every tracked hostile — the Aurelion roster and both Dominion Hound Blueprints — acquires the player only through its authored perception and threat memory. The Hound world scan is a gated combat-state fallback, not a stealth bypass. The latent legacy nonperception path is unreachable for the authored roster and is now pinned by automation. Detail, negative controls and the PC04 signal recommendation are under E6 above.
+
+**12 September — PC09 source closed, no source defect; authoring reclassified as PC09-C.** Native Guard admission, Stamina, perfect defence, interruption, re-entrant start, cancellation, counter survival and cleanup are automation-verified across eight suites with negative controls. The audit's cancellation complaint no longer describes the source. No authored asset grants, maps, presents or counter-classifies Guard yet; that remainder is PC09-C. Detail under PC09 above.
 
 ## X2 — `SciFi_Drone_1` marketplace pack, an external content gate
 
