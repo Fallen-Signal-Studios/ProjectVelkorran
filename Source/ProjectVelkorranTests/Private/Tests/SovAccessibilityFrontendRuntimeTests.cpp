@@ -12,10 +12,17 @@
 #include "Blueprint/WidgetNavigation.h"
 #include "Components/SafeZone.h"
 #include "Components/ScrollBox.h"
+#include "Components/TextBlock.h"
+#include "Input/HittestGrid.h"
+#include "Rendering/DrawElements.h"
+#include "Types/PaintArgs.h"
+#include "Widgets/SWindow.h"
 #include <limits>
 
 struct FSovAccessibilityFrontendTestAccess
 {
+	static TArray<UTextBlock*> DialogueText(USovAccessibilityPresentation* Presentation)
+	{ return {Presentation->SubtitleText, Presentation->CaptionText}; }
 	static bool Back(USovAccessibilitySettingsMenu* Menu) { return Menu->NativeOnHandleBackAction(); }
 	static UWidget* Navigate(USovAccessibilitySettingRow* Row, EUINavigation Direction) { return Row->NavigateValue(Direction); }
 	static UScrollBox* RecordScroll(USovAccessibleRecordMenu* Menu) { return Menu->RecordScroll; }
@@ -30,6 +37,36 @@ struct FSovAccessibilityFrontendTestAccess
 	}
 };
 #if WITH_DEV_AUTOMATION_TESTS
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovDialogueWidthRecoveryTest,"ProjectVelkorran.UI.Accessibility.DialogueWidthRecovery",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FSovDialogueWidthRecoveryTest::RunTest(const FString& Parameters)
+{
+	auto* Presentation = NewObject<USovAccessibilityPresentation>();
+	Presentation->Initialize(); Presentation->TakeWidget();
+	const auto Window = SNew(SWindow);
+	FHittestGrid Grid;
+	const FPaintArgs Args(&Window.Get(), Grid, FVector2D::ZeroVector, 0., 0.f);
+	for (auto* Text : FSovAccessibilityFrontendTestAccess::DialogueText(Presentation))
+	{
+		// Exercise the actual HUD text widgets after a short line has been painted
+		// into an auto-sized panel. The next line must recover its viewport budget.
+		Text->SetWrapTextAt(600.f);
+		Text->SetText(FText::FromString(TEXT("Yes.")));
+		const auto Slate = Text->TakeWidget();
+		Slate->SlatePrepass();
+		const FVector2D ShortSize = Slate->GetDesiredSize();
+		FSlateWindowElementList Elements(Window);
+		Slate->Paint(Args, FGeometry::MakeRoot(ShortSize, FSlateLayoutTransform()),
+			FSlateRect(0, 0, 800, 600), Elements, 0, FWidgetStyle(), true);
+		Text->SetText(FText::FromString(TEXT("Keep moving toward the evacuation point and protect the wounded.")));
+		Slate->SlatePrepass();
+		const FVector2D LongSize = Slate->GetDesiredSize();
+		TestTrue(TEXT("A longer line expands beyond the previously painted short line"), LongSize.X > ShortSize.X * 3.f);
+		TestTrue(TEXT("Dialogue remains inside its explicit safe-area width"), LongSize.X <= 601.f);
+		TestTrue(TEXT("Ordinary dialogue does not become a tall column"), LongSize.Y < 200.f);
+	}
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovConsoleMenuBackTest,"ProjectVelkorran.UI.Console.BackAndFirstBoot",EAutomationTestFlags_ApplicationContextMask|EAutomationTestFlags::EngineFilter)
 bool FSovConsoleMenuBackTest::RunTest(const FString& Parameters)
 {

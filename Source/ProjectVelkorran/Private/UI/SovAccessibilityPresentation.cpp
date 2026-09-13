@@ -83,11 +83,13 @@ TSharedRef<SWidget> USovAccessibilityPresentation::RebuildWidget()
 		USafeZone* Safe = WidgetTree->ConstructWidget<USafeZone>();
 		SafeTextCanvas = WidgetTree->ConstructWidget<UCanvasPanel>(); Safe->AddChild(SafeTextCanvas); WidgetTree->RootWidget = Safe;
 		SubtitleBackground = WidgetTree->ConstructWidget<UBorder>(); SubtitleBackground->SetPadding(FMargin(18,10));
-		SubtitleText = WidgetTree->ConstructWidget<UTextBlock>(); SubtitleText->SetJustification(ETextJustify::Center); SubtitleText->SetAutoWrapText(true);
+		// RefreshText supplies the safe-area wrap width. Auto-wrap also clamps to
+		// the last painted width, trapping auto-sized dialogue panels at short lines.
+		SubtitleText = WidgetTree->ConstructWidget<UTextBlock>(); SubtitleText->SetJustification(ETextJustify::Center); SubtitleText->SetAutoWrapText(false);
 		SubtitleBackground->AddChild(SubtitleText); SubtitleSlot = SafeTextCanvas->AddChildToCanvas(SubtitleBackground);
 		SubtitleSlot->SetAnchors(FAnchors(.5f,.88f)); SubtitleSlot->SetAlignment(FVector2D(.5f,1)); SubtitleSlot->SetAutoSize(true);
 		CaptionBackground = WidgetTree->ConstructWidget<UBorder>(); CaptionBackground->SetPadding(FMargin(14,8));
-		CaptionText = WidgetTree->ConstructWidget<UTextBlock>(); CaptionText->SetJustification(ETextJustify::Center); CaptionText->SetAutoWrapText(true);
+		CaptionText = WidgetTree->ConstructWidget<UTextBlock>(); CaptionText->SetJustification(ETextJustify::Center); CaptionText->SetAutoWrapText(false);
 		CaptionBackground->AddChild(CaptionText); UCanvasPanelSlot* CanvasSlot = SafeTextCanvas->AddChildToCanvas(CaptionBackground);
 		CanvasSlot->SetAnchors(FAnchors(.5f,.13f)); CanvasSlot->SetAlignment(FVector2D(.5f,0)); CanvasSlot->SetAutoSize(true);
 		ObjectiveBackground = WidgetTree->ConstructWidget<UBorder>(); ObjectiveBackground->SetPadding(FMargin(12, 8));
