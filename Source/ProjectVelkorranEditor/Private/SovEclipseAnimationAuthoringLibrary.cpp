@@ -14,10 +14,10 @@
 FString USovEclipseAnimationAuthoringLibrary::AdaptCopiedAnimation(UAnimBlueprint* Blueprint, UBlendSpace* BlendSpace,
     USkeleton* Skeleton, const TArray<UAnimationAsset*>& Sources, const TArray<UAnimationAsset*>& Replacements)
 {
-    const FString Folder = TEXT("/Game/Aurelion/Enemies/Animation/");
+    const FString EclipseAnimationFolder = TEXT("/Game/Aurelion/Enemies/Animation/");
     if (!GEditor || GEditor->PlayWorld || !Blueprint || !BlendSpace || !Skeleton
-        || !Blueprint->GetOutermost()->GetName().StartsWith(Folder)
-        || !BlendSpace->GetOutermost()->GetName().StartsWith(Folder)
+        || !Blueprint->GetOutermost()->GetName().StartsWith(EclipseAnimationFolder)
+        || !BlendSpace->GetOutermost()->GetName().StartsWith(EclipseAnimationFolder)
         || Blueprint->GetName() == TEXT("ABP_EclipseLinkbound")
         || Sources.Num() == 0 || Sources.Num() != Replacements.Num())
     { return TEXT("ERROR: requires copied Aurelion animation assets outside PIE"); }
