@@ -188,6 +188,20 @@ void USovCompanionComponent::ObserveContribution(const FSovDamageResult& Result)
 }
 void USovCompanionComponent::ResetContribution(bool bStarted)
 { PlayerContribution = 0.f; CompanionContribution = 0.f; }
+ANarrativeCharacter* USovCompanionComponent::ResolveCommandAttackTarget(ANarrativeCharacter* Character)
+{
+	if (!IsValid(Character)) { return nullptr; }
+	auto* Component = Character->FindComponentByClass<USovCompanionComponent>();
+	auto* Controller = Cast<ANarrativeNPCController>(Character->GetController());
+	auto* Abilities = CompanionASC(Character);
+	if (!Component || !Controller || !Abilities || !Component->IsCommandCurrent(Component->CommandGoal)
+		|| !IsValid(Component->Activities) || Component->Activities->GetCurrentActivityGoal() != Component->CommandGoal
+		|| !IsValid(Component->Leader) || !Component->Leader->IsAlive()
+		|| !Component->HasMissionPermission(Component->Leader)) { return nullptr; }
+	auto* Target = Cast<ANarrativeCharacter>(Component->OwnedFocus.Get());
+	return IsValid(Target) && Controller->GetFocusActor() == Target && HostileCompanionTarget(Character, Target)
+		&& Abilities->IsBotAttackExecutionValid(Target, Component->OwnedCommandAttack) ? Target : nullptr;
+}
 void USovCompanionComponent::TickContextCommand(USovCompanionCommandGoal* Goal)
 {
 	if (IsValid(Goal) && Goal == CommandGoal && Goal->bExplicitHoldTarget && !IsCommandCurrent(Goal))

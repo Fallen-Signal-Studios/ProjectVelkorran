@@ -184,3 +184,77 @@ The corrected UE 5.7 editor rebuilt in 32.27 seconds; all six thermal tests
 passed with source/report coverage and unchanged-source validation in
 `ThermalCompletedAction/20260913-150454-f90b4b48`. The failed regression run is
 retained as the before-fix evidence.
+
+The next run, `CompanionHitReview-20260913-152207-01c59eff`, initially timed
+out in E1 at 421.14 seconds. Its final drone remained alive behind a railing.
+The input driver's 80 cm path-point tolerance skipped two corners only 57 cm
+apart and drove across collision. Combat approach now uses the same 25 cm
+tolerance as route walking. Two corner regressions fail with the old tolerance;
+all three tests pass with the correction, including refusal to follow a partial
+path. `path-corners-before.txt` and `path-corners-after.txt` retain those results.
+This fixes validation input steering, not companion AI or map navigation.
+
+The original failure remains in `E1Continuation`. An initial fresh-start retry
+correctly refused the already partially defeated roster (`E1CornerRetry`). The
+guarded continuation checks the prior combat timeout, released inputs, unchanged
+assets, current world/pawn/attempt/journal and participant identities. It changes
+only ordinary input. `E1CornerRetryGuarded` passed in 31.34 seconds with two real
+holds and the native Selene handoff; its asset integrity check passed. This is
+a retained-state retry, not an uninterrupted fresh-route pass.
+
+`inspect_companion_melee_assets.py` exports the actual weapons, visuals, attack
+Blueprint inheritance and defaults. Native Blueprint fingerprints are unchanged
+before/after export. Both primary melee abilities inherit a 400 cm AI range;
+Verity's native damage-window hookup exists. These findings do not establish the
+cause of missed damage. The first inspection used editor-only asset-data lookup
+during PIE and emitted diagnostic errors; the corrected live asset-data export
+completed successfully in `companion-melee-assets-152545-665956`.
+`observe_companion_weapon_hit_path.py` records native collision-cache and hit
+history during real montages without initiating traces, attacks or damage.
+
+The guarded route then passed E2 (53.14 s), E3 entry (93.78 s), rescue
+(79.69 s), E4 entry (97.25 s) and E4A (40.33 s). E4B failed at 0.89 s:
+the inherited elite's Core was already broken before the thermal setup. The
+read-only `core-failure-readonly.json` confirms a broken Core, no active reveal,
+an empty fracture receipt and elite health 34.03. No reset or replacement proof
+was supplied. The source of the early break remains unqualified; the previous
+thermal completion correction still needs a successful fresh live exercise.
+
+The first hit-path report captured Tarrik's real sword montage at roughly
+277–285 cm from a Linkbound. The cache fields are not reflected to Python;
+their access failures are recorded under `inaccessible`, not treated as empty
+collision data. The repeated Verity's Wake cost messages came from candidate
+availability queries (including the observer), not evidence of actual frost
+activations.
+
+After preserving that route failure, `observe_companion_after_player_shot.py`
+used the ordinary weapon wheel and one bounded Cinderline trigger, then released
+input. The actual player transaction `4015FB7F4378A7C176707DBE71402912` dealt
+21 health damage to the WallRunner. Selene immediately started sword montages,
+confirming the phase's player-contribution gate had previously withheld attacks.
+Over the 100-second diagnostic, no companion damage was recorded. Native verbose
+logs accepted the actual montage, 30 cached samples and one collider, but recorded
+contacts with Tarrik and his weapon. This diagnostic does not upgrade E4B or
+qualify mission completion. Initial attempts stopped before input because the
+player weapon was holstered and the moving companion focus changed; those errors
+remain in the original editor log.
+
+The exported shared `GA_CombatAbilityBase.GetBotAttackTarget` only accepts
+Narrative's `Goal_Attack`; its failed cast has no return path. Following companions
+instead own `SovCompanionCommandGoal`, despite a valid controller focus. The new
+`ResolveCommandAttackTarget` query exposes only the current command's owned,
+active native attack target, retaining mission, activity, life, focus and attack
+execution checks. It does not create a target, attack, token or damage receipt.
+The scoped editor helper adds this lookup only to the legacy failure return.
+
+The initial editor-helper build failed on `auto*` iteration over `TObjectPtr`
+arrays; explicit pointer types corrected it. The next build passed in 10.35 s
+and all 13 companion tests passed, including the active target, changed focus
+and completed attack checks, with source/report coverage and unchanged-source
+verification (`CompanionTargetBridge/20260913-160214-787307e7`).
+
+`CompanionTargetAuthoring-20260913-160314-afd0ffce` saved the Blueprint with zero
+compiler errors or warnings. Before/after T3D comparison found exactly one changed
+graph section, `GetBotAttackTarget`; the original asset backup is retained beside
+those exports. The fresh normal route `CompanionTargetRoute-20260913-160457-c16c1427`
+is the subsequent live damage qualification attempt. Launching it is not a pass.

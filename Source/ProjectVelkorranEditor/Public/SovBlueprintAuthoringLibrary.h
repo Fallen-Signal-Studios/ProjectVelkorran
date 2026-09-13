@@ -25,6 +25,10 @@ public:
     UFUNCTION(BlueprintCallable, Category="Velkorran|Editor")
     static FString FingerprintBlueprint(UObject* Asset);
 
+    /** Add the current companion-command target only to the legacy attack-goal failure return. No save. */
+    UFUNCTION(BlueprintCallable, Category="Velkorran|Editor")
+    static FSovBlueprintAuthoringResult AddCompanionAttackTargetFallback(UObject* Asset);
+
     /** Remap hard Blueprint/class/default-object references only in explicitly supplied /Game copies.
      * Does not save assets; the caller must inspect the compilation report before saving.
      */

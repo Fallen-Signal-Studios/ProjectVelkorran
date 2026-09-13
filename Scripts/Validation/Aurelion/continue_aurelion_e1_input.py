@@ -60,13 +60,16 @@ def _journal(state):
 
 
 class Run:
-    def __init__(self, output_directory):
+    def __init__(self, output_directory, resume_report=None):
         self.out = Path(output_directory)
         self.out.mkdir(parents=True, exist_ok=True)
         self.root = Path(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_dir()))
         self.assets = sorted((self.root / 'Content/Aurelion').rglob('*.uasset'))
         self.assets += sorted((self.root / 'Content/Aurelion').rglob('*.umap'))
         self.before = self.hashes()
+        self.resume_report = resume_report
+        if resume_report:
+            assert resume_report['assets_after'] == self.before, 'Assets changed since retained combat failure'
         self.started = time.monotonic()
         self.phase_at = self.started
         self.phase = 'initialize'
@@ -252,7 +255,10 @@ class Run:
                                                   points=[_xyz(p) for p in path.path_points] if path else [])
             self.path_points = list(path.path_points)[1:] if valid else []
         while self.path_points:
-            result, reached = self.local_move(pc, pawn, _xyz(self.path_points[0]), stop=80.)
+            # Recast can place adjacent corners less than 80 cm apart around
+            # railings. Skipping both cuts across their collision instead of
+            # following the complete path. Match the route-walking tolerance.
+            result, reached = self.local_move(pc, pawn, _xyz(self.path_points[0]), stop=25.)
             if not reached:
                 return result
             self.path_points.pop(0)
@@ -569,8 +575,18 @@ class Run:
                 self.e1 = matches[0]
                 assert self.e1.get_encounter_state() == unreal.SovEncounterState.ACTIVE
                 roster = self.roster()
-                assert len(roster) == 6 and all(p['alive'] and p['health'] > 0. for p in roster)
-                assert sum(not p['hidden'] for p in roster) == 4, 'Initial E1 wave must be four live, two reserved'
+                if self.resume_report:
+                    initial = self.resume_report['initial']
+                    assert _path(world) == initial['world'] and self.initial_pawn == initial['pawn']
+                    assert self.e1.get_attempt_id().export_text() == initial['attempt'], 'Retained encounter attempt changed'
+                    assert events == initial['journal'], 'Retained journal changed'
+                    assert {p['id'] for p in roster} == {p['id'] for p in initial['roster']}
+                    assert any(p['alive'] and p['health'] > 0. for p in roster), 'No remaining live combat'
+                    self.report['retained_combat_retry'] = dict(previous_elapsed=self.resume_report['elapsed_seconds'],
+                        previous_reason=self.resume_report['reason'], previous_status='failed')
+                else:
+                    assert len(roster) == 6 and all(p['alive'] and p['health'] > 0. for p in roster)
+                    assert sum(not p['hidden'] for p in roster) == 4, 'Initial E1 wave must be four live, two reserved'
                 weapon = self.weapon(pawn)
                 self.attempt = self.e1.get_attempt_id().export_text()
                 self.report['initial'] = dict(pawn=self.initial_pawn, world=_path(world), attempt=self.attempt,
@@ -634,13 +650,26 @@ class Run:
             self.finish(False, self.report['error'])
 
 
-def start(output_directory=None):
-    """Run only after other input drivers stop and actual UI selection wields Cinderline."""
+def start(output_directory=None, resume_report_path=None):
+    """Use normal inputs; optional timeout retry requires the same retained encounter.
+
+    A retry keeps its own report and never upgrades the earlier failure to a pass.
+    It does not reset health, resources, targets, world, journal or encounter state.
+    """
     global _RUN
     assert _RUN is None or _RUN.done, 'Continuation already running; call stop() first'
+    assert _RUN is None or _RUN.handle is None, 'Previous callback must be retired'
     target = Path(output_directory or os.environ['SOV_AURELION_RUN_DIRECTORY'])
     assert not (target / 'e1-input-continuation.json').exists(), 'Use a new output directory to preserve prior evidence'
-    _RUN = Run(target)
+    previous = None
+    if resume_report_path:
+        previous = json.loads(Path(resume_report_path).read_text(encoding='utf-8-sig'))
+        assert previous.get('status') == 'failed' and previous.get('assets_unchanged') is True
+        assert 'release_input' in previous and previous['release_input'] is None, 'Previous driver did not release input'
+        assert 'AssertionError: Stage deadline: combat' in previous.get('reason', ''), 'Only retained combat timeout may resume'
+        assert not previous.get('holds'), 'Cannot resume after progression interactions'
+        assert Path(resume_report_path).resolve().parent != target.resolve(), 'Preserve failed evidence'
+    _RUN = Run(target, previous)
     _RUN.write()
     _RUN.handle = unreal.register_slate_post_tick_callback(_RUN.tick)
     return _RUN

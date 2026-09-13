@@ -329,7 +329,15 @@ bool FSovCompanionDefenseCadenceTest::RunTest(const FString& Parameters)
     Component->TickContextCommand(Goal);
     TestEqual(TEXT("Sustained enemy attack cannot repeat defense during its cadence"), Defense->ActivationCount, 1);
     TestEqual(TEXT("Completed defense leaves ordinary attack available immediately"), Attack->ActivationCount, 1);
+    TestEqual(TEXT("A command attack exposes its actual target without a legacy Goal_Attack"),
+        USovCompanionComponent::ResolveCommandAttackTarget(NPC), static_cast<ANarrativeCharacter*>(Target));
+    AI->SetFocus(F.Player);
+    TestNull(TEXT("Changed controller focus cannot retarget the owned swing"), USovCompanionComponent::ResolveCommandAttackTarget(NPC));
+    AI->SetFocus(Target);
+    TestEqual(TEXT("Restored exact attack focus remains valid"),
+        USovCompanionComponent::ResolveCommandAttackTarget(NPC), static_cast<ANarrativeCharacter*>(Target));
     Attack->FinishTestAttack();
+    TestNull(TEXT("Completed attack leaves no stale melee target"), USovCompanionComponent::ResolveCommandAttackTarget(NPC));
     Component->TickContextCommand(Goal);
     TestEqual(TEXT("Ordinary attack still respects its own cadence"), Attack->ActivationCount, 1);
     return true;
