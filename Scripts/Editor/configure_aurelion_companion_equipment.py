@@ -8,6 +8,17 @@ from pathlib import Path
 import unreal
 
 
+def curated_combat_classes(hero):
+    weapon_name = {'Tarrik': 'Velkorran', 'Selene': 'Verity'}[hero]
+    weapon = unreal.get_default_object(unreal.load_asset('/Game/Items/Weapons/WI_' + weapon_name).generated_class())
+    attacks = [cls for cls in weapon.get_editor_property('weapon_abilities')
+               if str(unreal.GameplayTagLibrary.get_tag_name(unreal.get_default_object(cls).get_editor_property('input_tag'))) == 'Narrative.Input.Attack']
+    assert len(attacks) == 1, 'Expected a single authored primary melee attack: ' + hero
+    defense = unreal.load_asset('/Game/Abilities/' + hero + '/GA_' + hero + ('_Guard' if hero == 'Tarrik' else '_Deflection')).generated_class()
+    punch = unreal.load_asset('/NarrativePro/Pro/Core/Abilities/GameplayAbilities/Attacks/Melee/GA_Melee_Punch_Unarmed').generated_class()
+    return [defense, punch, attacks[0]]
+
+
 def configure(hero, npc):
     weapon_name = {'Tarrik': 'Velkorran', 'Selene': 'Verity'}[hero]
     weapon = unreal.load_asset('/Game/Items/Weapons/WI_' + weapon_name)
@@ -37,6 +48,15 @@ def main():
         assert npc, hero
         result[hero] = configure(hero, npc)
         assert unreal.EditorAssetLibrary.save_loaded_asset(npc, only_if_is_dirty=False)
+    for mission_name in ('M12_FireAndFrost', 'M13_ContraryWitness'):
+        mission = unreal.load_asset('/Game/Aurelion/Data/DA_' + mission_name)
+        assert mission, mission_name
+        profiles = list(mission.get_editor_property('protagonist_companions'))
+        for profile in profiles:
+            hero = str(profile.get_editor_property('companion_id'))
+            profile.set_editor_property('curated_companion_abilities', curated_combat_classes(hero))
+        mission.set_editor_property('protagonist_companions', profiles)
+        assert unreal.EditorAssetLibrary.save_loaded_asset(mission, only_if_is_dirty=False)
     path = Path('F:/ProjectVelkorran/Saved/Validation/Aurelion/CompanionCombat-20260913/equipment.json')
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(result, indent=2), encoding='utf-8')

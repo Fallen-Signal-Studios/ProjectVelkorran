@@ -21,6 +21,8 @@ struct FSovCompanionKitGrant
 	GENERATED_BODY()
 	UPROPERTY(SaveGame) TSubclassOf<UGameplayAbility> Ability;
 	UPROPERTY(SaveGame) int32 Level = 1;
+	/** Owned weapon supplies this grant when drawn; never duplicate it on the proxy ASC. */
+	UPROPERTY(SaveGame) bool bWeaponGrant = false;
 };
 
 USTRUCT()

@@ -95,4 +95,6 @@ class USovAxiomRuntimeTestWeapon : public UWeaponItem
 	GENERATED_BODY()
 public:
 	USovAxiomRuntimeTestWeapon();
+	void SetTestHolsteredKit(const TArray<TSubclassOf<UNarrativeGameplayAbility>>& Classes)
+	{ WeaponAbilities = Classes; WieldedSlot = FGameplayTag(); }
 };

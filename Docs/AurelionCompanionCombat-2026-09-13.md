@@ -19,9 +19,9 @@ The full-route authoring recipe uses the same function so rebuilding content
 retains these loadouts. Stopped-editor readback and asset validation passed;
 `Saved/Validation/Aurelion/CompanionCombat-20260913/equipment.json` records them.
 
-The behavior defect remains open. The existing companion context command only
+The initial source investigation found that the companion context command only
 moves toward its leader/hold/defend destination. It does not request weapon draw
-or move into a selected attack's native range. The mission currently curates
+or move into a selected attack's native range. The mission originally curated
 only defense and unarmed punch; the proxy copies only classes present in the
 outgoing ASC. Simply adding an armed attack class can still fail when that
 player weapon was holstered at handoff, because its item grants are then absent.
@@ -29,14 +29,35 @@ The pacifist baseline deliberately leaves contextual command ownership to the
 native companion activity; replacing it with unrestricted combat AI would bypass
 the intended curated kit and damage contribution policy.
 
-Next runtime qualification must exercise both real protagonist handoffs, inspect
-equipped versus wielded items and native candidate rejection reasons, and verify
-actual draw/holster, locomotion and attributed damage. A narrowly scoped native
-correction may be needed for readiness and attack approach, preserving player
-unlocks, protected-target rules, cooldowns, contribution limits, cinematic marks,
-save restoration and co-action activity ownership. No such source change has
-been made or claimed qualified in this pass. Equipment authoring alone does not
-close the user-reported bug.
+The correction now recognizes allowlisted abilities supplied by a weapon in the
+actual outgoing inventory even when holstered. The snapshot marks those as
+item-owned grants; native weapon draw supplies them. Direct unlocked ASC grants
+retain their original copy behavior. A const weapon-kit accessor reads existing
+data without mutating it. M12 and M13 profiles now include the existing primary
+melee attack alongside defense/punch.
+
+The context command draws permitted equipped weapons through SetWieldState,
+approaches inside native candidate range within the existing ten-metre defense
+area, respects explicit holds, and stops its owned move before attacking.
+Ordinary attacks finish through their native ability/montage lifecycle rather
+than being forcibly cancelled after 1.5 seconds. Timed guard/deflection release
+is retained. Failed defense activation no longer delays ordinary attacks, and
+owned stale focus is released when no hostile focus remains. Native damage,
+costs, cooldowns, tokens, protected-target checks and contribution limits remain.
+
+UE 5.7 Development Editor rebuilt successfully. All 12 tests under
+`ProjectVelkorran.Campaign.Companion` passed in
+`Saved/Validation/CompanionCombatNative/20260913-131327-c74b2727`;
+source/report coverage matched 12/12, with five warnings. The expanded native
+inventory regression verifies holstered item recognition, exclusion of locked
+or unlisted choices, no extra player grant, and distinct direct/item ownership.
+The initial attempt failed because its fixture supplied a wielded item and a
+non-Narrative ability; the fixture was corrected before the passing run.
+
+Fresh normal-order runtime observation is running in
+`Saved/Validation/Aurelion/CompanionCombatValidated-20260913-131444-1b27325d`.
+Both actual handoffs, animated draw/holster and attributed companion damage
+remain unqualified until observed. The user-reported bug remains open.
 
 Original live report is under the retained run's
 `UserData/Saved/Validation/Aurelion/CompanionCombat-20260913/live.json`.

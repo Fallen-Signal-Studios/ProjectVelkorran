@@ -18,6 +18,8 @@
 #include "Misc/AutomationTest.h"
 #include "NarrativeGameplayTags.h"
 #include "Sovereign/SovGameplayTags.h"
+#include "Items/InventoryComponent.h"
+#include "Tests/SovBotAttackTestFixtures.h"
 #if WITH_AUTOMATION_TESTS
 struct FSovResonanceTestAccess
 {
@@ -121,6 +123,30 @@ bool FSovConvergenceProxyRuntimeTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Locked curated ability stays locked"), Grants.Num(), 1);
     if (Grants.Num() == 1) { TestEqual(TEXT("Actual upgrade level is copied"), Grants[0].Level, 3); }
     TestNotNull(TEXT("Source grant remains owned by player"), ASC->FindAbilitySpecFromHandle(SourceGrant));
+    auto* Inventory = Source->GetInventoryComponent();
+    if (!TestNotNull(TEXT("Source owns a real inventory"), Inventory)) { return false; }
+    Inventory->TryAddItemFromClass(USovAxiomRuntimeTestWeapon::StaticClass(), 1, false);
+    UWeaponItem* OwnedWeapon = nullptr;
+    for (auto* Item : Inventory->GetItems()) { if (auto* Weapon = Cast<UWeaponItem>(Item)) { OwnedWeapon = Weapon; break; } }
+    if (!TestNotNull(TEXT("Native inventory contains the owned holstered weapon"), OwnedWeapon)) { return false; }
+    CastChecked<USovAxiomRuntimeTestWeapon>(OwnedWeapon)->SetTestHolsteredKit({ USovBotTestAttackAlpha::StaticClass() });
+    TestFalse(TEXT("Owned weapon remains holstered"), OwnedWeapon->IsWielded());
+    TestNull(TEXT("Holstered item has no active player attack grant"), ASC->FindAbilitySpecFromClass(USovBotTestAttackAlpha::StaticClass()));
+    auto* ArmedProxy = F.DeferredProxy(Source);
+    TestTrue(TEXT("Proxy recognizes owned holstered kit"), ArmedProxy->PrepareProxy(Identity, TEXT("Tarrik"), ASC,
+        {USovWeakPointFireTestAbility::StaticClass(), USovBotTestAttackAlpha::StaticClass(), USovWeakPointMeleeTestAbility::StaticClass()}, Reason));
+    const auto& ArmedGrants = FSovConvergenceTestAccess::Kit(ArmedProxy);
+    TestEqual(TEXT("Owned primary joins unlocked direct grant"), ArmedGrants.Num(), 2);
+    if (ArmedGrants.Num() == 2)
+    {
+        TestFalse(TEXT("Direct grant retains direct ownership"), ArmedGrants[0].bWeaponGrant);
+        TestTrue(TEXT("Weapon draw must own the item grant"), ArmedGrants[1].bWeaponGrant);
+    }
+    TestNull(TEXT("Preparing AI never grants the holstered attack to player"), ASC->FindAbilitySpecFromClass(USovBotTestAttackAlpha::StaticClass()));
+    auto* RestrictedProxy = F.DeferredProxy(Source);
+    TestTrue(TEXT("Owned weapon does not expand mission allowlist"), RestrictedProxy->PrepareProxy(Identity, TEXT("Tarrik"), ASC,
+        {USovWeakPointFireTestAbility::StaticClass()}, Reason));
+    TestEqual(TEXT("Unlisted weapon attack stays unavailable"), FSovConvergenceTestAccess::Kit(RestrictedProxy).Num(), 1);
     TestEqual(TEXT("No player Echo was spent by AI preparation"), ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetEchoAttribute()), EchoBefore);
     auto* State = NewObject<USovConvergenceCompanionState>(Source); Source->AddInstanceComponent(State); State->RegisterComponent();
     FSovConvergenceTestAccess::SeedOwnership(State, Active, Staged);

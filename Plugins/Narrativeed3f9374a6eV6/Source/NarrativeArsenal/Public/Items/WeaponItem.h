@@ -346,6 +346,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Weapon|Damage")
 	float GetAttackDamage() const { return FMath::Max(AttackDamage, 0.f); }
 
+	/** Read the authored single-weapon kit without drawing it or granting abilities. */
+	const TArray<TSubclassOf<UNarrativeGameplayAbility>>& GetWeaponAbilities() const { return WeaponAbilities; }
+
 	/** True when this weapon has opted into a non-fixed primary-fire damage policy. */
 	UFUNCTION(BlueprintPure, Category = "Weapon|Damage")
 	bool HasDamageVariation() const { return DamageVariationMode != EWeaponDamageVariationMode::Fixed; }
