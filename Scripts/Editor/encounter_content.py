@@ -375,21 +375,21 @@ def build_encounters(ctx):
         sign('Priority'+key+'_Label',words,(position[0],position[1],-720),-90,18)
         result['priority'][key] = a
     support = spawn(unreal.SovAurelionPrioritySupport,'PrioritySupport',(0,0,0),0)
-    support.west_cache_barrier.set_world_location(api.vector((-3050,21985,-1060)),False,False)
+    support.west_cache_barrier.set_world_location(api.vector((-3050,22475,-1060)),False,False)
     support.west_cache_barrier.set_box_extent(api.vector((120,20,140)),False)
     # The real elevated through-route, not the walking wounded's sole recess exit.
     support.east_flank_barrier.set_world_location(api.vector((2350,20700,-675)),False,False)
     support.east_flank_barrier.set_box_extent(api.vector((450,20,225)),False)
     # Cabinet surrounds enforce physical access; the native one-time cache is root's transaction owner.
     for suffix,xyz,extent in (
-        ('West',(-3180,22110,-1060),(10,135,140)),
-        ('East',(-2920,22110,-1060),(10,135,140)),
-        ('Back',(-3050,22245,-1060),(130,10,140)),
-        ('Roof',(-3050,22110,-910),(140,145,10))):
+        ('West',(-3180,22600,-1060),(10,135,140)),
+        ('East',(-2920,22600,-1060),(10,135,140)),
+        ('Back',(-3050,22735,-1060),(130,10,140)),
+        ('Roof',(-3050,22600,-910),(140,145,10))):
         box('RecoveryCacheCabinet_'+suffix,xyz,extent,'wall')
     result['support'] = support
-    result['support_specs'] = dict(cache_position=(-3050,22110,-1140),
-        west_gate_position=(-3050,21985,-1060),west_gate_extent=(120,20,140),
+    result['support_specs'] = dict(cache_position=(-3050,22600,-1140),
+        west_gate_position=(-3050,22475,-1060),west_gate_extent=(120,20,140),
         east_gate_position=(2350,20700,-675),east_gate_extent=(450,20,225),
         manual_shutter_position=(2650,20550,-830))
     # Visible failed-entry requests, including overlap-disabled thermal phase B.
@@ -429,7 +429,7 @@ def build_encounters(ctx):
     old_cache = ctx['existing'].get('Z08_West_FieldCache_Placeholder')
     if old_cache:
         old_cache.set_actor_hidden_in_game(True); old_cache.set_actor_enable_collision(False)
-    cache = spawn(unreal.SovAurelionMedicalCache,'WestMedicalCache',(-3050,22110,-1140),-90)
+    cache = spawn(unreal.SovAurelionMedicalCache,'WestMedicalCache',(-3050,22600,-1140),-90)
     prop(cache,cache_id=unreal.Name('Aurelion.West.MedicalAid'),support=support,health_fraction=.35)
     cache.visual.set_static_mesh(api.required('/Engine/BasicShapes/Cube'))
     cache.visual.set_relative_scale3d(api.vector((1,.8,.9)))
