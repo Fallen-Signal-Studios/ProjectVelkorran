@@ -81,3 +81,9 @@ Windows Security prompt for the packaged game; the user must dismiss it before
 desktop interaction resumes. No environmental mesh or collision edits were made
 by this audit. The captured `crucible-before.png` includes the blocking prompt
 and is not a usable scene-fidelity comparison.
+
+While desktop access remained blocked, a Blender wall-panel candidate was authored
+under `Art/Source/Aurelion`. Its FBX passed a clean Blender round-trip check for
+dimensions, pivot, UVs, material slots and simple UCX collision; its studio preview
+was visually inspected. It has not been imported or placed in Unreal and earns
+no additional acceptance points. The slice estimate remains 63.75% (about 64%).

@@ -1,0 +1,20 @@
+{
+  "asset": "SM_Aurelion_RecessPanel_2m",
+  "status": "source_art_preview_only_not_imported_or_gameplay_qualified",
+  "reference": "Aurelion_Level_Layout_Plan.pdf pages 20 and 23; no heraldry or faction ownership",
+  "envelope_metres": [
+    2,
+    0.4,
+    3
+  ],
+  "pivot": "bottom centre",
+  "triangles": 1728,
+  "collision": "one UCX box; final Unreal scale and collision require inspection",
+  "materials": [
+    "M_Aurelion_IvoryStone",
+    "M_Aurelion_ChannelShadow",
+    "M_Aurelion_AncientGold",
+    "M_Aurelion_WarmInformation"
+  ],
+  "fbx_sha256": "1171b1af7121d14d3b25ad7648b4c35033d536f9d88c38147769297abcb28ee1"
+}
