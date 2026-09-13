@@ -304,3 +304,20 @@ backups, the floor assignment/graph census, preview parameters, saved graph
 checks and `satin-floor-editor.png`. The two materials recompiled and saved;
 their connected roughness and unchanged metallic/specular values passed checks.
 This is editor evidence, not fresh-process gameplay or packaged GPU acceptance.
+
+## Stone color contrast refinement
+
+The two black-stone variants now blend 55% of their original textured color
+with a dark blue-black base (0.012, 0.016, 0.022). Ivory stone blends 45% of
+its original textured color with a neutral base (0.50, 0.52, 0.54). This reduces
+vein contrast while retaining stone detail and the blue/amber lighting split.
+Z01 and Z08 were reviewed in the stopped editor. The Crucible's floor detail is
+quieter, and its white structural ribs read more cleanly; other rooms and M13
+still need contextual review. No geometry or material assignments changed.
+
+`Saved/Validation/Aurelion/StoneContrast-20260913` holds the original three
+material backups, Z01 before/preview captures, the clean Z08 preview, preview
+parameters and the saved verification report. The save checked the connected
+texture identities and color values and compared the complete normal/roughness
+graphs to the earlier census. All checks passed. This is a scoped material
+improvement, not full environment or runtime acceptance.
