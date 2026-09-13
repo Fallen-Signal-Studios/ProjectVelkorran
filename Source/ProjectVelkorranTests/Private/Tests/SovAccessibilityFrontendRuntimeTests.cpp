@@ -194,6 +194,17 @@ bool FSovAccessibilityTextPresentation::RunTest(const FString& Parameters)
 	TestEqual(TEXT("All text survives pagination"),Recovered,Original);
 	const auto Unicode=USovAccessibilityPresentation::PaginateText(TEXT("e\u0301e\u0301e\u0301"),1,1);
 	TestEqual(TEXT("Combining sequence is one grapheme"),Unicode.Num(),3); if(Unicode.Num()==3) { TestEqual(TEXT("No isolated combining mark"),Unicode[0],FString(TEXT("e\u0301"))); }
+	const FString Sentence=TEXT("Hold the evacuation corridor and wait.");
+	const auto Words=USovAccessibilityPresentation::PaginateText(Sentence,25,2);
+	TestEqual(TEXT("Ordinary sentence fits one two-line page"),Words.Num(),1);
+	if(Words.Num()==1)
+	{
+		TestEqual(TEXT("Wrapping preserves evacuation as a complete word"),Words[0],FString(TEXT("Hold the evacuation \ncorridor and wait.")));
+		TestEqual(TEXT("Soft wrapping preserves every original character"),Words[0].Replace(TEXT("\n"),TEXT("")),Sentence);
+	}
+	const auto Explicit=USovAccessibilityPresentation::PaginateText(TEXT("alpha\r\nbeta"),5,1);
+	TestEqual(TEXT("Hard break at exact width creates no extra blank page"),Explicit.Num(),2);
+	if(Explicit.Num()==2) { TestEqual(TEXT("First explicit line"),Explicit[0],FString(TEXT("alpha"))); TestEqual(TEXT("Second explicit line"),Explicit[1],FString(TEXT("beta"))); }
 	FSovUserSettingsSnapshot Settings; const auto Threat=USovAccessibilityPresentation::ThreatTint(Settings); Settings.bOverrideTeamColor=true; Settings.TeamColor=FLinearColor::Green;
 	TestTrue(TEXT("Team override affects team presentation"),USovAccessibilityPresentation::TeamTint(Settings).Equals(FLinearColor::Green));
 	TestTrue(TEXT("Team override cannot modify independent threat color"),USovAccessibilityPresentation::ThreatTint(Settings).Equals(Threat));

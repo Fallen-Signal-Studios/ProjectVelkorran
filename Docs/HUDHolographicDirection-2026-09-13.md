@@ -26,10 +26,24 @@ Validation:
   styling is isolated in commit `a7b9738a`.
 - The separate preceding run `DialogueWidthRetry-20260913-083057-167eadd7`
   passed fresh entry at 57.281 seconds and visibly expanded the subtitle/caption
-  panels from short to long QA text. Character-based word splitting remains a
-  separate issue. The first preview attempt used an unavailable Python widget
+  panels from short to long QA text. Character-based word splitting was still
+  visible in that run. The first preview attempt used an unavailable Python widget
   library; the corrected lookup uses actual widgets owned by the current player.
 
 The previously archived Win64 playtest predates this styling pass. No updated
 package, full gameplay route, all-resolution acceptance or 90% alignment is
 claimed by these changes.
+
+The subsequent dialogue correction uses Unreal's Unicode line-break iterator
+to prefer complete words within the existing character/line limits. Oversized
+tokens retain grapheme-safe splitting, and soft wrapping retains the original
+characters. The UE5.7 Editor build passed (`DialogueWordWrap-20260913-FinalBuild.log`)
+and the focused pagination/palette/privacy and dialogue-width tests both passed
+with zero warnings or failures (`DialogueWordWrapTests-20260913/Report`).
+
+`DialogueWordWrapPIE-20260913-091101-6cfd3dae` passed fresh entry in 38.407
+seconds. The existing synthetic HUD-only preview visibly expanded from short
+text to complete-word subtitle/caption lines; `dialogue-word-wrap.png` preserves
+the unmodified viewport. The preview completed normally. An incoming-fire
+warning overlapped the short caption, so simultaneous alert/caption stacking
+remains open. This preview is not campaign or combat qualification.

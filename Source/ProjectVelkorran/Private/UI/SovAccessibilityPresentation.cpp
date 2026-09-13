@@ -44,23 +44,36 @@ TArray<FString> USovAccessibilityPresentation::PaginateText(const FString& Text,
 	TArray<FString> Pages;
 	if (Text.IsEmpty()) { return Pages; }
 	CharactersPerLine = FMath::Clamp(CharactersPerLine, 1, 64); MaximumLines = FMath::Clamp(MaximumLines, 1, 4);
-	// Unicode character boundaries preserve combining sequences/surrogates; UMG shapes the final localized lines.
-	auto Iterator = FBreakIterator::CreateCharacterBoundaryIterator(); Iterator->SetString(Text);
-	FString Page; int32 LineLength = 0, Lines = 1, Start = Iterator->ResetToBeginning();
-	for (int32 End = Iterator->MoveToNext(); End != INDEX_NONE; Start = End, End = Iterator->MoveToNext())
+	const FString Normalized = Text.Replace(TEXT("\r"), TEXT(""));
+	// Prefer Unicode soft-wrap opportunities so ordinary words survive intact.
+	// Oversized tokens still fall back to grapheme boundaries, never UTF-16 units.
+	auto Characters = FBreakIterator::CreateCharacterBoundaryIterator(); Characters->SetString(Normalized);
+	TArray<int32> Offsets; Offsets.Add(Characters->ResetToBeginning());
+	for (int32 End = Characters->MoveToNext(); End != INDEX_NONE; End = Characters->MoveToNext()) { Offsets.Add(End); }
+	auto Breaks = FBreakIterator::CreateLineBreakIterator(); Breaks->SetString(Normalized);
+	Breaks->ResetToBeginning();
+	TSet<int32> SoftBreaks;
+	for (int32 End = Breaks->MoveToNext(); End != INDEX_NONE; End = Breaks->MoveToNext()) { SoftBreaks.Add(End); }
+	FString Page; int32 Lines = 0, Start = 0;
+	const int32 Count = Offsets.Num() - 1;
+	while (Start < Count)
 	{
-		const FString Character = Text.Mid(Start, End - Start);
-		if (Character == TEXT("\r")) { continue; }
-		const bool bNewLine = Character.Contains(TEXT("\n"));
-		if (LineLength >= CharactersPerLine || bNewLine)
+		int32 End = Start;
+		while (End < Count && End - Start < CharactersPerLine && Normalized[Offsets[End]] != TEXT('\n')) { ++End; }
+		const bool bHardBreak = End < Count && Normalized[Offsets[End]] == TEXT('\n');
+		if (!bHardBreak && End < Count)
 		{
-			if (Lines >= MaximumLines) { Pages.Add(MoveTemp(Page)); Page.Reset(); Lines = 1; }
-			else { Page += TEXT("\n"); ++Lines; }
-			LineLength = 0;
+			for (int32 Candidate = End; Candidate > Start; --Candidate)
+			{
+				if (SoftBreaks.Contains(Offsets[Candidate])) { End = Candidate; break; }
+			}
 		}
-		if (!bNewLine) { Page += Character; ++LineLength; }
+		if (Lines > 0) { Page += TEXT("\n"); }
+		Page += Normalized.Mid(Offsets[Start], Offsets[End] - Offsets[Start]);
+		Start = End + (bHardBreak ? 1 : 0);
+		if (++Lines == MaximumLines) { Pages.Add(MoveTemp(Page)); Page.Reset(); Lines = 0; }
 	}
-	if (!Page.IsEmpty()) { Pages.Add(MoveTemp(Page)); }
+	if (Lines > 0) { Pages.Add(MoveTemp(Page)); }
 	return Pages;
 }
 FLinearColor USovAccessibilityPresentation::TeamTint(const FSovUserSettingsSnapshot& Value)
