@@ -1,14 +1,14 @@
 # Aurelion recess wall candidate
 
 Source-art candidate for the layout plan's white stone and narrow gold channels
-(Aurelion_Level_Layout_Plan.pdf, pages 20 and 23). This is not installed in M12.
+(Aurelion_Level_Layout_Plan.pdf, pages 20 and 23). Ten panels are now installed in M12.
 The panel does not resolve survivor targeting or prove a safe recess entrance.
 
 `SM_Aurelion_RecessPanel_2m.blend` contains the editable mesh and studio scene;
 the FBX contains only the panel and one named UCX box. The PNG is a Blender
 studio preview, not an Unreal gameplay screenshot. Four material slots separate
-stone, gold, shadow channels and warm light inlays. Unreal materials still need
-authoring and review; FBX does not guarantee Blender shader equivalence.
+stone, gold, shadow channels and warm light inlays. The imported asset uses three
+existing Radiance materials and a dedicated warm emissive inlay material.
 
 Dimensions are 2 m wide, 0.4 m deep and 3 m tall, with a bottom-centre pivot.
 The detailed front faces local -Y. UV0 uses packed islands; Unreal lightmap UVs
@@ -26,5 +26,28 @@ Rebuild using Blender 4.5:
 The clean-process FBX round-trip verifies two mesh objects, metre dimensions,
 bottom-centre visual pivot, UVs, four material slots and eight collision vertices.
 See the adjacent verification JSON for exported triangle count. The preview was
-visually inspected on 2026-09-13. Unreal import, collision, lighting, navigation
-and performance acceptance remain open. No alignment points awarded yet.
+visually inspected on 2026-09-13. Unreal placement and preserved physical-wall
+checks passed; runtime navigation and performance acceptance remain open.
+
+## Departure shuttle exteriors
+
+`build_departure_shuttles.py` authors two editable Blender scenes and FBX static
+meshes following the layout plan's page 20 faction direction. Dominion uses a
+broader oxblood cabin and bronze trim; Reformation uses a slimmer navy cabin,
+slate outriggers and exposed connections. Each has five material slots and UV0.
+Source JSON records dimensions, triangle count, palette and exported-file hash.
+Run with the same Blender CLI above, substituting this script's filename.
+
+The two `*-preview.png` files are Blender studio renders. The models are imported
+under `/Game/Aurelion/Environment/Blender/Shuttles` and placed in M13 on the
+existing departure docks. They contain no collision, interiors or flight rigs.
+Their four landing pads define the bottom pivot. Unreal actors use yaw 180.
+Import verifies centimetre bounds against source metre bounds and resolves all
+material slots. Placement preserves the original physical actors and hides only
+the isolated 112-instance old ship dressing component; the adjacent 60-instance
+stone component remains visible. Original hidden cube actors are retained.
+
+These are first-pass exterior assets, not final hero-asset acceptance. Cockpit,
+surface detail, rear lighting, central approach composition, boarding/flight
+animation and earned-route cinematic review remain open. See
+`Docs/AurelionFullVisualPass-2026-09-13.md` for editor evidence and limitations.

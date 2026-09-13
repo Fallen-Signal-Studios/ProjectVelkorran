@@ -1,0 +1,61 @@
+"""Import owned shuttle exteriors and material slots; never edits a map."""
+import json
+from pathlib import Path
+import unreal
+
+root=Path(__file__).resolve().parents[2]
+source=root/'Art/Source/Aurelion'
+destination='/Game/Aurelion/Environment/Blender/Shuttles'
+assert not unreal.get_editor_subsystem(unreal.LevelEditorSubsystem).is_in_play_in_editor()
+reports=[]
+for faction in ('Dominion','Reformation'):
+    name='SM_Aurelion_'+faction+'_Shuttle'
+    spec=json.loads((source/(name+'.json')).read_text())
+    path=destination+'/'+name
+    if not unreal.EditorAssetLibrary.does_asset_exist(path):
+        task=unreal.AssetImportTask()
+        task.filename=str(source/(name+'.fbx')); task.destination_path=destination
+        task.destination_name=name; task.automated=True; task.replace_existing=False; task.save=False
+        task.factory=unreal.FbxFactory()
+        options=unreal.FbxImportUI(); options.import_mesh=True; options.import_as_skeletal=False
+        options.import_materials=False; options.import_textures=False
+        options.automated_import_should_detect_type=False
+        options.mesh_type_to_import=unreal.FBXImportType.FBXIT_STATIC_MESH
+        options.static_mesh_import_data.combine_meshes=True
+        options.static_mesh_import_data.auto_generate_collision=False
+        options.static_mesh_import_data.generate_lightmap_u_vs=True
+        task.options=options
+        unreal.AssetToolsHelpers.get_asset_tools().import_asset_tasks([task])
+    mesh=unreal.load_asset(path)
+    assert isinstance(mesh,unreal.StaticMesh)
+    assert Path(mesh.get_editor_property('asset_import_data').get_first_filename()).resolve()==(source/(name+'.fbx')).resolve()
+    extent=mesh.get_bounds().box_extent
+    dimensions=[extent.x*2,extent.y*2,extent.z*2]
+    assert all(abs(a-b*100)<1 for a,b in zip(dimensions,spec['dimensions_metres'])),dimensions
+    for i,slot in enumerate(mesh.get_editor_property('static_materials')):
+        key=str(slot.get_editor_property('imported_material_slot_name')); params=spec['materials'][key]
+        mpath=destination+'/'+key
+        material=unreal.load_asset(mpath) if unreal.EditorAssetLibrary.does_asset_exist(mpath) else None
+        if material is None:
+            material=unreal.AssetToolsHelpers.get_asset_tools().create_asset(key,destination,unreal.Material,unreal.MaterialFactoryNew())
+            def rgb_node(values,prop):
+                node=unreal.MaterialEditingLibrary.create_material_expression(material,unreal.MaterialExpressionConstant3Vector)
+                node.set_editor_property('constant',unreal.LinearColor(*values,1))
+                assert unreal.MaterialEditingLibrary.connect_material_property(node,'',prop)
+            rgb_node(params['rgb'],unreal.MaterialProperty.MP_BASE_COLOR)
+            for value,prop in ((params['metal'],unreal.MaterialProperty.MP_METALLIC),(params['rough'],unreal.MaterialProperty.MP_ROUGHNESS)):
+                node=unreal.MaterialEditingLibrary.create_material_expression(material,unreal.MaterialExpressionConstant)
+                node.set_editor_property('r',value)
+                assert unreal.MaterialEditingLibrary.connect_material_property(node,'',prop)
+            if params['emission']:
+                rgb_node([x*params['emission'] for x in params['rgb']],unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+            unreal.MaterialEditingLibrary.recompile_material(material)
+        mesh.set_material(i,material)
+        assert unreal.EditorAssetLibrary.save_loaded_asset(material)
+    sm=unreal.get_editor_subsystem(unreal.StaticMeshEditorSubsystem)
+    assert sm.get_simple_collision_count(mesh)==0 and sm.get_convex_collision_count(mesh)==0
+    assert unreal.EditorAssetLibrary.save_loaded_asset(mesh)
+    reports.append(dict(mesh=path,dimensions_cm=dimensions,material_slots=len(mesh.get_editor_property('static_materials')),collision='none'))
+out=root/'Saved/Validation/Aurelion/Shuttles-20260913'; out.mkdir(parents=True,exist_ok=True)
+(out/'import.json').write_text(json.dumps(reports,indent=2),encoding='utf8')
+unreal.log('AURELION_SHUTTLES_IMPORTED')

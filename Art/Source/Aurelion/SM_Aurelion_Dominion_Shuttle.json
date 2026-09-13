@@ -1,0 +1,65 @@
+{
+  "asset": "SM_Aurelion_Dominion_Shuttle",
+  "triangles": 5124,
+  "dimensions_metres": [
+    16.600000381469727,
+    14.02750015258789,
+    4.924999713897705
+  ],
+  "pivot": "bottom centre",
+  "nose": "-Y",
+  "collision": "none; static off-route dressing",
+  "materials": {
+    "M_Dominion_Armor": {
+      "rgb": [
+        0.22,
+        0.032,
+        0.024
+      ],
+      "metal": 0.65,
+      "rough": 0.32,
+      "emission": 0
+    },
+    "M_Dominion_Trim": {
+      "rgb": [
+        0.38,
+        0.205,
+        0.066
+      ],
+      "metal": 0.82,
+      "rough": 0.28,
+      "emission": 0
+    },
+    "M_Dominion_Structure": {
+      "rgb": [
+        0.025,
+        0.031,
+        0.038
+      ],
+      "metal": 0.65,
+      "rough": 0.42,
+      "emission": 0
+    },
+    "M_Dominion_Glass": {
+      "rgb": [
+        0.012,
+        0.028,
+        0.039
+      ],
+      "metal": 0.78,
+      "rough": 0.16,
+      "emission": 0
+    },
+    "M_Dominion_Signal": {
+      "rgb": [
+        1,
+        0.4,
+        0.07
+      ],
+      "metal": 0.2,
+      "rough": 0.3,
+      "emission": 2
+    }
+  },
+  "fbx_sha256": "671d2b63537d97b5981fd52dbdf1864c2ebbe6609f8a6b83e2f560d9dd0739a7"
+}

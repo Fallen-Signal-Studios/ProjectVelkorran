@@ -145,3 +145,46 @@ After reloading the saved M12 map from M13, both relay parameter verification
 and the expanded recess placement/collision-baseline verification passed again.
 The reload's Map Check reported zero errors and zero warnings; this is separate
 from the known startup/navigation/optional MetaHuman warnings recorded earlier.
+
+## Departure shuttle asset pass
+
+Origin/main was fetched again and remains at `9bfb44e1`. Two newly authored
+Blender shuttle exteriors now replace the box-shaped visual dressing on M13's
+departure docks. The Dominion model has a broader armored oxblood/bronze cabin;
+Reformation has a slimmer navy/slate cabin and technical outriggers, following
+layout-plan page 20. These are first-pass static exteriors, not accepted final
+hero assets or animated ships.
+
+Dominion: 5,124 triangles, 16.60 x 14.0275 x 4.925 m. Reformation: 5,532 triangles,
+15.3887 x 13.60 x 4.625 m. Both have five resolved Unreal material slots, UVs,
+bottom pivots, no gameplay collision and unit actor scale. They sit at existing
+X=-3800/+3800, Y=47500 dock anchors, Z=0, yaw=180. Bounds fit the 28 x 18 m docks
+and remain below the old 550 cm upper envelope.
+
+The original hidden cube hull/wing actors were already non-rendering. The actual
+box-shaped dressing was all 112 instances of `HierarchicalInstancedStaticMesh`
+on `Aurelion_Art_M13_Z12_5_9dba0c`. Only that component is now hidden. Its separate
+60-instance stone component stays visible. No original actor or instance was
+deleted or moved; all 1,300 original actor transforms, component collision and
+instance transforms were compared. Three UDS non-colliding editor billboards
+follow the camera or sky reconstruction and are excluded only from transform
+equality. Their component type and collision settings are still checked.
+
+Two movable rect fills at X=-3800/+3800, Y=46400, Z=800, pitch=-25/yaw=90 use
+4,500 lumens, 2400 cm radius and 1600 x 1200 cm sources. The first overhead
+position left undersides too dark; the forward fill improves nose separation.
+Rear surfaces are still dark. Each ship was reviewed in the stopped editor from
+its side approach with Game View on. The central departure composition, boarding
+and flight/cinematic behavior, earned M13 route and packaged GPU cost remain
+unqualified. No gameplay alignment points are awarded by this asset pass.
+
+Evidence: `Saved/Validation/Aurelion/Shuttles-20260913/` contains the map backup,
+original component visibility, all 112 instance transforms, import dimensions,
+physical baseline, placement report, verification report and the two actual
+Unreal editor screenshots. `placement.json` records the historical unsaved
+preview stage; the subsequent save/reload check is recorded separately.
+
+The map was saved, unloaded via M12 and reloaded from disk. The read-only shuttle
+verifier passed at 18:45:14 UTC; reload Map Check reported zero errors and zero
+warnings. Both ships, all material slots, lights, docking envelopes, original
+instance transforms and original collision settings passed persistence checks.
