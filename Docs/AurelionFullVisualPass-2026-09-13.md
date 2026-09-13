@@ -253,3 +253,26 @@ the upper-left objective overlaps the letterbox. These are open framing,
 lighting and HUD issues, not accepted visual fidelity. The room still needs
 more distinct surfaces and local detail beyond the reflective dark floor and
 large stone panels. No 90% visual-alignment claim is supported by route proof.
+
+## M13 Grammar camera and conversation fill correction
+
+The saved GrammarPropagation cameras used the same generic offsets as most
+other scenes. Its southwest close shot looked through the cylindrical terminal
+cap. Both cameras now sit east of the unchanged Hero/Partner marks. The wide
+shot uses 38 mm and the closer two-person shot 50 mm, retaining the existing
+30 cm camera drift and cut timing. `aurelion_camera_profiles.py` is shared by
+the scoped patch and the full cinematic authoring recipe.
+
+Three broad RectLights at (600,34100,-650), (600,35400,-650) and
+(600,36700,-650) add 3000 lumens each, with 1400 by 1000 cm sources and
+2100 cm attenuation radii. Existing lighting remains. The terminal conversation
+area is more readable in the editor; the reflective floor remains too strong.
+
+Evidence: `Saved/Validation/Aurelion/M13Framing-20260913` contains original
+map/sequence backups, original track census, preview parameters, 36 unblocked
+Visibility rays across both cameras' drift, and saved-map reload results.
+The actual Hero/Partner transform keys match the baseline exactly. Camera
+translation keys, actor locations, focal lengths and light parameters passed.
+The editor camera clears the old obstruction, but no animated participants
+were present for this preview. Live scene framing/exposure, non-colliding
+occluders, other scenes and packaged GPU cost remain unqualified.
