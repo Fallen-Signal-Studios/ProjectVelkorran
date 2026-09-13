@@ -122,6 +122,7 @@ private:
     friend struct FSovSaveWorldLoadTestAccess;
     friend struct FSovPlatformServicesTestAccess;
     friend struct FSovSaveOperationTestAccess;
+    friend struct FSovCheckpointContractTestAccess;
     /** Captured before any callback-capable boundary. Epochs reject authorization/suspend ABA. */
     struct FOperationOwner
     {

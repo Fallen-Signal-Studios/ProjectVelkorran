@@ -151,6 +151,7 @@ private:
 	friend struct FSovNarrativeStateTestAccess;
 	friend struct FSovCoActionTestAccess;
 	friend struct FSovObjectiveLifecycleTestAccess;
+	friend struct FSovCheckpointContractTestAccess;
 	friend class ASovCoActionAnchor;
 	friend class ASovCampaignEncounterObjective;
 	ESovCampaignResult CompleteEncounterObjective(class ASovCampaignEncounterObjective* Source);

@@ -5,6 +5,7 @@
 #include "Characters/SovPlayerCharacterBase.h"
 #include "GameplayEffect.h"
 #include "Items/NarrativeItem.h"
+#include "Tests/SovHandoffRuntimeTestFixtures.h"
 #include "SovProtagonistPartitionTestFixtures.generated.h"
 class ASovPlayerState;
 
@@ -41,6 +42,18 @@ class ASovPartitionTestSelene : public ASovPartitionTestPawn
 public:
 	ASovPartitionTestSelene(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) {}
 	virtual FGameplayTag GetProtagonistIdentityTag() const override;
+};
+
+/**
+ * A campaign controller for worlds that register a real local player. The fixture viewport has no
+ * overlay to host a gameplay HUD, so none is created; every campaign, save and readiness path is unchanged.
+ */
+UCLASS(Transient, NotBlueprintable)
+class ASovPartitionTestController : public ASovHandoffRuntimeTestController
+{
+	GENERATED_BODY()
+public:
+	ASovPartitionTestController(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer) { GameplayHUDClass = nullptr; }
 };
 
 /** Signature equipment stand-ins: each class is only ever granted to one protagonist. */
