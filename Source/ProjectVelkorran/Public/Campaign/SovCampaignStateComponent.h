@@ -122,6 +122,8 @@ public:
 	UFUNCTION(BlueprintPure, Category="Campaign") USovCampaignDefinition* GetActiveMission() const { return ActiveMission; }
 	bool IsMutationInProgress() const { return bMutating; }
 	UFUNCTION(BlueprintPure, Category="Campaign") bool IsStateValid() const { return bStateValid; }
+	/** Deterministic record of schema migrations applied to this campaign, oldest first (TDD 15.9). */
+	const TArray<FString>& GetMigrationHistory() const { return MigrationHistory; }
 	UFUNCTION(BlueprintPure, Category="Campaign") const TArray<FSovCampaignJournalEntry>& GetJournal() const { return Journal; }
 	UFUNCTION(BlueprintPure, Category="Campaign|Evidence") bool KnowsEvidence(FName EvidenceId, FGameplayTag Protagonist) const;
 	UFUNCTION(BlueprintPure, Category="Campaign|Evidence") ESovEvidenceStage GetEvidenceStage(FName EvidenceId, FGameplayTag Protagonist) const;
@@ -171,6 +173,7 @@ private:
 	static ESovEvidenceStage EvidenceStageIn(const TArray<FSovEvidenceAcquisition>& History, FName EvidenceId, FGameplayTag Hero);
 	static bool EvidenceKnownTo(const TArray<FSovEvidenceAcquisition>& History, FName EvidenceId, FName Observer);
 	UPROPERTY(SaveGame) int32 SavedSchemaVersion = 2;
+	UPROPERTY(SaveGame) TArray<FString> MigrationHistory;
 	UPROPERTY(SaveGame) TObjectPtr<USovCampaignDefinition> ActiveMission;
 	UPROPERTY(SaveGame) FGameplayTag ActiveProtagonist;
 	UPROPERTY(SaveGame) TMap<FName, FSovCampaignMissionRecord> Missions;

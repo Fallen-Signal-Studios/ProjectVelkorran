@@ -885,7 +885,7 @@ void USovCampaignStateComponent::Serialize(FArchive& Ar)
 	{
 		// Legacy archives do not contain these fields. Loading into a reused owner
 		// must not retain objective history from the campaign being replaced.
-		ObjectiveJournal.Reset();
+		ObjectiveJournal.Reset(); MigrationHistory.Reset();
 		for (auto& Pair : Missions) { Pair.Value.ObjectiveStates.Reset(); Pair.Value.SelectedChoices.Reset(); }
 	}
 	Super::Serialize(Ar);
@@ -905,6 +905,7 @@ bool USovCampaignStateComponent::MigrateLegacyObjectives()
 	}
 	for (auto& Pair : Missions)
 	{ for (FName BeatId : Pair.Value.CompletedBeats) { Pair.Value.ObjectiveStates.Add(BeatId, ESovObjectiveState::Succeeded); } }
+	MigrationHistory.Add(TEXT("CampaignState 1->2"));
 	SavedSchemaVersion = 2;
 	return true;
 }

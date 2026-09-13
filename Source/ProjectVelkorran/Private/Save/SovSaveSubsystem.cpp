@@ -645,6 +645,7 @@ ESovSaveResult USovSaveSubsystem::CaptureAndWrite(ESovSaveSlotKind Kind, int32 I
     H.TimestampUtc = FDateTime::UtcNow(); H.PlaySeconds = PlaySeconds;
     H.Build = FString(FApp::GetBuildVersion()) + TEXT("|") + FEngineVersion::Current().ToString(); H.MissionId = Mission->MissionId; H.MissionLabel = Mission->DisplayName;
     H.ActiveProtagonist = PC->GetCampaignState()->GetActiveProtagonist();
+    H.MigrationHistory = PC->GetCampaignState()->GetMigrationHistory();
     H.MissionDefinition = FSoftObjectPath(Mission); H.MapPackage = Mission->Map.ToSoftObjectPath().GetLongPackageName(); H.BoundaryId = BoundaryId; H.BoundaryKind = Boundary;
     Save->RequiredAssets.AddUnique(H.MissionDefinition);
     Save->RequiredAssets.AddUnique(Mission->ResolvePawnClass(H.ActiveProtagonist).ToSoftObjectPath());
