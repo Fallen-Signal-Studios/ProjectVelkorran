@@ -321,3 +321,9 @@ parameters and the saved verification report. The save checked the connected
 texture identities and color values and compared the complete normal/roughness
 graphs to the earlier census. All checks passed. This is a scoped material
 improvement, not full environment or runtime acceptance.
+
+Tharne's independent working MetaHuman now uses the dark-brown eye preset for
+both eyes. The stopped editor saved the asset and its WIP metadata; the capture
+and original asset backup are in `Saved/Validation/Aurelion/TharneEyes-20260913`.
+Face sculpt, skin, wardrobe, rigging and gameplay integration remain unfinished.
+This eye treatment does not qualify the requested likeness or replace the live cast.
