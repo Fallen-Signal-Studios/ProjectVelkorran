@@ -6,6 +6,8 @@ import unreal
 runpy.run_path(str(Path(__file__).with_name('start_companion_route_observed.py')))
 import observe_companion_weapon_hit_path
 observe_companion_weapon_hit_path.start()
+import observe_elite_core_lifecycle
+observe_elite_core_lifecycle.start()
 
 _log_handle = None
 def _enable_weapon_log(delta):

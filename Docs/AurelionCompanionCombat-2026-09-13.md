@@ -258,3 +258,20 @@ compiler errors or warnings. Before/after T3D comparison found exactly one chang
 graph section, `GetBotAttackTarget`; the original asset backup is retained beside
 those exports. The fresh normal route `CompanionTargetRoute-20260913-160457-c16c1427`
 is the subsequent live damage qualification attempt. Launching it is not a pass.
+
+That fresh route passed initial entry in 51.39 s, then timed out in E1 combat
+at 421.11 s. Input was released and the asset integrity check passed. The final
+drone remained at 140 health; the player stood in a stair pocket at
+(-8134.04, -14432.20, 90.15). A read-only comparison of 50 path destinations
+found only three complete paths, all still occluded by `StaticMeshActor_161`.
+The drone itself was at (-6918.81, -14620.63, 90.15), so airborne height alone
+does not explain the failed path. No partial path was followed and no navigation,
+actor, health or encounter state was altered. The failed report and
+`drone-approach-readonly.json` remain in that run. The companion targeting fix
+is built and saved, but fresh source-attributed enemy damage remains unqualified.
+
+`observe_elite_core_lifecycle.py` now records the elite's native target damage
+and Core-break delegates independently of the input driver. It was attached
+during this E1 run and found the existing elite's Core initially unbroken with
+no observer errors. The startup wrapper includes it for subsequent routes so
+the source transaction can be identified if the premature Core break recurs.
