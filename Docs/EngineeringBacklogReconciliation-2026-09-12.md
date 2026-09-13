@@ -38,7 +38,7 @@ These are kept distinct throughout and never collapsed into "passed":
 | E3 | Weak-point break does not change enemy equipment | **CLOSED** |
 | E4 | Link and weak-point state not checkpoint-persistent | **CLOSED** |
 | E5 | Dismemberment completion is content-dependent | **CONTENT/EDITOR GATE** |
-| E6 | Faction repertoire and perception/encounter fairness | **PARTIAL** |
+| E6 | Faction repertoire and perception/encounter fairness | **CLOSED** (12 Sep, see updates) |
 | PC01 | Selene Echo expenditure does not deliver the control kit | **CLOSED** (12 Sep, see updates) |
 | PC02 | Tarrik release depends on Blueprint for two paths | **CLOSED** (12 Sep, see updates) |
 | PC03 | Tarrik Echo generation incomplete | **CLOSED** (12 Sep, see updates) |
@@ -62,9 +62,9 @@ These are kept distinct throughout and never collapsed into "passed":
 | X1 | `/Game/Cues` absent from version control | **EXTERNAL CONTENT GATE** (see below) |
 | X2 | `SciFi_Drone_1` marketplace pack absent | **EXTERNAL CONTENT GATE** (see below) |
 
-Closed: 15. Partial: 5. Open: 1. Content/editor gated: 9. Superseded: 2. External gates: 2.
+Closed: 16. Partial: 4. Open: 1. Content/editor gated: 9. Superseded: 2. External gates: 2.
 
-_Recounted from the table above on 12 September after C1 closed, and again after C3 closed. The earlier totals line did not
+_Recounted from the table above on 12 September after C1 closed, and again after C3 and E6 closed. The earlier totals line did not
 reconcile with its own rows. K1–K4 count as four gated items; PC06 counts as superseded, its small
 remaining part recorded under its own heading._
 
@@ -222,12 +222,84 @@ not the shared checkout.
    stable asset paths and are therefore content-gated. Migration determinism is shown by repeated
    byte-identical output instead. Windows/MSVC remains a separate gate.
 
-### E6 — Perception and encounter fairness (PARTIAL)
+### E6 — Perception and encounter fairness (CLOSED 12 September)
 
-`SovEncounterDirector`, `SovEncounterCoordinationComponent`, `SovEncounterCoordinationPolicy.h` and
-`SovThreatTargeting.h` now exist, so "no encounter director in source" is stale. Not re-verified: that
-Hound acquisition respects perception rather than scanning all characters by distance. Source-only;
-medium. Verification: automation asserting no acquisition without authorised stimulus.
+Work done in the isolated worktree `ProjectVelkorran-c3`, branch `engineering/e6-perception-fairness`
+(stacked on C3), not the shared checkout.
+
+1. **Question.** Do hostile NPCs, especially Hounds and the Aurelion roster, acquire and pursue the player
+   only through perception and awareness, or can any of them target an undetected player by raw distance?
+2. **Authority.** TDD §8.3 (AI Perception for sensed stimuli; unaware → suspicious/investigating →
+   acquiring → engaging), §8.5 (cloak breaks direct target confidence; enemies may suppress the last known
+   area), §8.6 (sight, hearing, damage, ally alerts, network sensors for Reformation, Echo/corruption for
+   selected units, command broadcasts, spoofing), §8.7 (the director owns composition and escalation, not
+   individual attack timing).
+3. **Target-acquisition architecture, as implemented.**
+   - *Stimulus.* `ANarrativeNPCController::HandleThreatPerception` accepts Sight, Hearing and Damage from the
+     controller's AI Perception component. Other producers (the Aurelion sweep scanner, Echo, commands,
+     authored forced combat) call the Blueprint-callable `ReportThreatObservation` explicitly.
+   - *Awareness.* Each observation carries a confidence capped by source (Sight 1.0, Damage 0.9, network
+     sensor and Echo 0.8, Command 0.6, ally alert 0.55, Hearing 0.5), decays to zero at expiry, and keeps a
+     last-known position. Cloaked targets and a perception component that is not sight-ready cannot create
+     sight observations.
+   - *Acquisition gate.* `CanDirectlyTargetThreat` requires an eligible hostile target and, for a
+     threat-memory-managed controller, a direct observation (sight, damage, network sensor or Echo) at
+     confidence 0.65 or more. Hearing, commands and ally alerts are investigation only.
+   - *Aggro and combat request.* Narrative bot attack selection, `USovBTTask_UseCombatAbility`, the native
+     Hound, Drone and Handler abilities, the Aurelion role activities and crossfire queries all consume that
+     gate. Threat memory clears an attack target or focus that fails it and leaves the last-known position.
+   - *Communication.* `ShareThreatWith` needs mutual friendly attitude, a shared faction, a finite radius
+     (2,500 cm authored) and a managed recipient; alerts cannot be relayed, cannot outlive the original
+     observation and never authorise direct fire. The Weaver shares only a threat it is directly tracking.
+     The Aurelion sweep scanner reports only a player inside its cone and range with clear line of sight,
+     only to its two registered relay drones that opt into network threats.
+   - *Encounters.* The director and coordinator suspend threat memory for staging and restore; they never
+     assign a target or report a threat.
+4. **Distance-based fallback, classified.** The Hound attack abilities' `FindBestAttackTarget` scans the
+   world for the nearest valid character when focus is invalid, and the Handler's Horn Charge uses it.
+   Every candidate passes `SovThreatTargeting::CanTrack`, i.e. the controller gate. It is therefore an
+   intentional combat-state fallback after legitimate detection (case 1), not a stealth bypass, for any
+   managed controller. The gate has one documented exception: a controller with no perception component,
+   no report and no `bRequireThreatMemoryForTargeting` keeps Narrative's legacy nonperception targeting.
+5. **Content check (read-only editor probe).** Every tracked hostile resolves to a managed controller:
+   Enforcer, Elite, Linkbound, WallRunner, Weaver and Security Drone use `BP_NarrativeNPCController`; the
+   Contaminated Drone uses `BP_AurelionContaminatedDroneController`; `BP_DominionHound` and
+   `BP_DominionHoundMaster` use `BP_NarrativeNPCController`. Each carries AI Perception with Sight (6,000 cm,
+   lose at 7,000), Hearing (10,000 cm) and Damage. The legacy exception is unreachable for the authored
+   roster, so no case-2 defect exists in current content.
+6. **Evidence — automation-verified on Mac.** `ProjectVelkorran.Campaign.PerceptionFairness`:
+   `RosterControllersRequireObservationBeforeAcquisition` spawns each roster enemy's *authored* controller
+   class (resolved through its definition or pawn class) on a real combatant and asserts: managed; no direct
+   target and no Hound bite against an undetected player 250 cm away; hearing records an investigation
+   position only; no ally alert without any observation; a relayed noise and a relayed sighting are
+   investigation only for the ally; sight authorises acquisition and the bite; losing sight revokes it and
+   memory keeps the last-known position while the player moves.
+   `EncounterActivationGrantsNoTargetWithoutAuthoredReport`: an active encounter grants nothing; a command
+   broadcast is investigation only; an authored Damage report — the forced-combat override — authorises
+   acquisition. Existing coverage retained: `Threat.PerceptionLossAndForgetting`,
+   `Threat.SelectionCloakAndExpiry`, `Threat.FactionSharingAndLifecycle`,
+   `Threat.NativeAbilityAcquisitionAndWindupLoss` and
+   `Encounter.Coordination.ThreatSuspensionOwnersAndPawnReplacement`.
+   Portable-tested: `Tests/Portable/NarrativeThreatPolicyTests.cpp`, 36,660 decay/sharing boundaries.
+7. **Negative controls.** Two temporary breaks, reverted from git before confirmation: a 2,000 cm distance shortcut in `SovThreatTargeting::CanTrack`, and a 2,000 cm bypass inside the managed branch of `CanDirectlyTargetThreat`. Under both, 14 of 15 tests failed: every stealth assertion for all eight roster enemies (undetected target, Hound scan by distance, hearing, relayed alerts, loss of sight), the encounter-activation and command-broadcast assertions, and 12 of 13 existing `Campaign.Threat` suites.
+8. **Suites.** With PerceptionFairness, Threat, AI, Encounter, Drone and Aurelion: **129 passed, 0 failed.** Full forced-unity suite in the worktree: **627 passed, 2 failed** of 629. The failures are `GameplayCuesStillResolve` (X1) and `PlacedNPC.OwnedEditorAssignmentPreservesMetadataAndRefusesForeignIdentity` failing only on the `BS_Drone` invalid-sample error from the external drone pack (X2 spillover); neither involves perception, threat or acquisition code.
+9. **Not proven here, and not source defects.**
+   - *Content tuning:* the authored sight's peripheral angle is 180°, so these enemies see all round,
+     still only with line of sight. Hearing range is 10,000 cm. Stealth feel is a content/playtest gate.
+   - *Hearing producers:* no project or Narrative source emits noise events. Hearing is handled correctly
+     when a stimulus exists; whether weapons, movement and alarms produce it is Blueprint/content work.
+   - *Latent fail-open:* a future enemy authored with a controller lacking perception would regain legacy
+     distance targeting. The roster test pins the tracked roster so that regression fails automation.
+   - Security Drone behaviour is not exercised in automation (X2 pack); its controller class matches the
+     Enforcer's per the probe.
+10. **PC04 relationship.** The undetected-bypass gate reads raw `UAIPerceptionComponent::GetKnownPerceivedActors`
+    across all senses. With this roster's `max_age` of 0 a stimulus never ages out, so a player once heard
+    stays "known" and the bypass is withheld even though hearing never authorises targeting. That errs
+    conservative, not permissive, but it disagrees with the acquisition authority. The signal the gate
+    should rely on is threat memory's *direct observation* — `ANarrativeNPCController::CanDirectlyTargetThreat`
+    for each registered threat, or equivalently any `Sight`/`Damage`/`NetworkSensor` memory with
+    `bDirectObservation` during the traversal window. Recorded only; PC04's overlap-harness blocker is not
+    reopened here.
 
 ### PC01–PC04, PC09 — Ability and generation completeness (PARTIAL)
 
@@ -315,6 +387,8 @@ production save path in an isolated worktree. The missing save-header migration 
 one defect; it is fixed and covered. Negative controls, suite results and explicit limits are under C3 above.
 The fresh worktree also showed that X2's error spillover still reaches unrelated tests, contrary to the X2
 note below; that is recorded for its own slice rather than folded into C3.
+
+**12 September — E6 closed, no source defect.** Every tracked hostile — the Aurelion roster and both Dominion Hound Blueprints — acquires the player only through its authored perception and threat memory. The Hound world scan is a gated combat-state fallback, not a stealth bypass. The latent legacy nonperception path is unreachable for the authored roster and is now pinned by automation. Detail, negative controls and the PC04 signal recommendation are under E6 above.
 
 ## X2 — `SciFi_Drone_1` marketplace pack, an external content gate
 
