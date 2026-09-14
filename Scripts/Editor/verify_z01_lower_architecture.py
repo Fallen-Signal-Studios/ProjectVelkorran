@@ -13,7 +13,9 @@ actors = list(unreal.get_editor_subsystem(unreal.EditorActorSubsystem).get_all_l
 labels = {a.get_actor_label(): a for a in actors}
 vault_count = sum(a.get_actor_label().startswith(('KIT_Z01_Vault_', 'KIT_Z01_VaultEnd_')) for a in actors)
 assert vault_count in (0, 16), 'Partial or duplicate vault assembly'
-assert len(actors) == 1788 + vault_count, 'Unexpected actor additions or removals'
+uplight_count = sum(a.get_actor_label().startswith('KIT_Z01_Uplight_') for a in actors)
+assert uplight_count in (0, 12), 'Partial or duplicate uplight assembly'
+assert len(actors) == 1788 + vault_count + uplight_count, 'Unexpected actor additions or removals'
 shell = labels['aurelionwalls']
 assert shell.get_actor_enable_collision()
 assert not shell.static_mesh_component.get_editor_property('visible')
