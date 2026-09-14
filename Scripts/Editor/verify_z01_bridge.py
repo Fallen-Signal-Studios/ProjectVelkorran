@@ -4,7 +4,7 @@ import runpy
 import unreal
 root=Path(unreal.Paths.project_dir())
 exec(compile((root/'Scripts/Editor/verify_z01_paving.py').read_text(encoding='utf-8-sig'),'verify_z01_paving','exec'))
-assert len(actors)==1915+endwall_count+z02_paving_count
+assert len(actors)==1915+endwall_count+z02_paving_count+z02_vault_count
 bridge=labels['KIT_Z01_StoneBridge']; p=bridge.get_actor_location(); scale=bridge.get_actor_scale3d()
 assert abs(p.x+6164.686518)<.01 and abs(p.y+14700)<.01 and abs(p.z)<.01
 assert all(abs(v-1)<.001 for v in (scale.x,scale.y,scale.z))

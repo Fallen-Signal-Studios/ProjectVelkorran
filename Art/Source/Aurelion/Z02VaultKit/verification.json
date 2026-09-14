@@ -1,0 +1,42 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z02SideVault_2m",
+      "dimensions_m": [
+        2.0,
+        19.262144088745117,
+        9.91815185546875
+      ],
+      "triangles": 64484
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z02SideVault_Edge",
+      "dimensions_m": [
+        0.36970001459121704,
+        19.262144088745117,
+        9.795146942138672
+      ],
+      "triangles": 21620
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z02ArchFace",
+      "dimensions_m": [
+        0.566000759601593,
+        19.262142181396484,
+        9.690000534057617
+      ],
+      "triangles": 28268
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z02CentralCeiling",
+      "dimensions_m": [
+        12.880000114440918,
+        19.372142791748047,
+        0.25
+      ],
+      "triangles": 27448
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}

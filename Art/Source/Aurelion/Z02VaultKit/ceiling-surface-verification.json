@@ -1,0 +1,366 @@
+{
+  "status": "passed",
+  "coffer_surfaces": [
+    {
+      "column": 0,
+      "row": 0,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 0,
+      "row": 1,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 0,
+      "row": 2,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 0,
+      "row": 3,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 0,
+      "row": 4,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 0,
+      "row": 5,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 0,
+      "row": 6,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 0,
+      "row": 7,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 0,
+      "row": 8,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 0,
+      "row": 9,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 1,
+      "row": 0,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 1,
+      "row": 1,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 1,
+      "row": 2,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 1,
+      "row": 3,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 1,
+      "row": 4,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 1,
+      "row": 5,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 1,
+      "row": 6,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 1,
+      "row": 7,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 1,
+      "row": 8,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 1,
+      "row": 9,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 2,
+      "row": 0,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 2,
+      "row": 1,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 2,
+      "row": 2,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 2,
+      "row": 3,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 2,
+      "row": 4,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 2,
+      "row": 5,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 2,
+      "row": 6,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 2,
+      "row": 7,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 2,
+      "row": 8,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 2,
+      "row": 9,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 3,
+      "row": 0,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 3,
+      "row": 1,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 3,
+      "row": 2,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 3,
+      "row": 3,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 3,
+      "row": 4,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 3,
+      "row": 5,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 3,
+      "row": 6,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 3,
+      "row": 7,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 3,
+      "row": 8,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 3,
+      "row": 9,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 4,
+      "row": 0,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 4,
+      "row": 1,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 4,
+      "row": 2,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 4,
+      "row": 3,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 4,
+      "row": 4,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 4,
+      "row": 5,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 4,
+      "row": 6,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 4,
+      "row": 7,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 4,
+      "row": 8,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 4,
+      "row": 9,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 5,
+      "row": 0,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 5,
+      "row": 1,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 5,
+      "row": 2,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 5,
+      "row": 3,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 5,
+      "row": 4,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 5,
+      "row": 5,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 5,
+      "row": 6,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 5,
+      "row": 7,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 5,
+      "row": 8,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "column": 5,
+      "row": 9,
+      "underside_z": 0.0700000524520874,
+      "material": "M_Aurelion_IvoryStone"
+    }
+  ],
+  "scope": "Sixty exported coffer inset ray checks; not runtime or final visual acceptance"
+}

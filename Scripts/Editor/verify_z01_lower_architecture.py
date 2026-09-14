@@ -23,7 +23,9 @@ endwall_count = sum(a.get_actor_label().startswith('KIT_Z01_Endwall_') for a in 
 assert endwall_count in (0, 14), 'Partial or duplicate end-wall assembly'
 z02_paving_count = sum(a.get_actor_label().startswith('KIT_Z02_Paving_') for a in actors)
 assert z02_paving_count in (0, 45), 'Partial or duplicate Z02 paving assembly'
-assert len(actors) == 1788 + vault_count + uplight_count + paving_count + bridge_count + endwall_count + z02_paving_count, 'Unexpected actor additions or removals'
+z02_vault_count = sum(a.get_actor_label().startswith('KIT_Z02_Vault_') for a in actors)
+assert z02_vault_count in (0, 13), 'Partial or duplicate Z02 vault assembly'
+assert len(actors) == 1788 + vault_count + uplight_count + paving_count + bridge_count + endwall_count + z02_paving_count + z02_vault_count, 'Unexpected actor additions or removals'
 shell = labels['aurelionwalls']
 assert shell.get_actor_enable_collision()
 assert not shell.static_mesh_component.get_editor_property('visible')

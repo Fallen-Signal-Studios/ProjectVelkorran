@@ -3,7 +3,7 @@ from pathlib import Path
 import unreal
 root=Path(unreal.Paths.project_dir())
 exec(compile((root/'Scripts/Editor/verify_z01_lower_architecture.py').read_text(encoding='utf-8-sig'),'verify_z01_lower_architecture','exec'))
-assert len(actors)==1804+uplight_count+paving_count+bridge_count+endwall_count+z02_paving_count
+assert len(actors)==1804+uplight_count+paving_count+bridge_count+endwall_count+z02_paving_count+z02_vault_count
 for label in ('KIT_Z01_UpperEnclosure','things'):
     c=labels[label].static_mesh_component
     assert not c.get_editor_property('visible') and c.get_editor_property('hidden_in_game')

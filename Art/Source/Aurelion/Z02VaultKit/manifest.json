@@ -1,0 +1,72 @@
+{
+  "status": "Measured side-vault source candidate; room, collision correspondence and surface quality require review",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z02SideVault_2m",
+      "triangles": 64484,
+      "nominal_dimensions_m": [
+        2.0,
+        19.262144088745117,
+        9.91815185546875
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; retained inner-shell collision; decorative intrados offsets require live review"
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z02SideVault_Edge",
+      "triangles": 21620,
+      "nominal_dimensions_m": [
+        0.36970001459121704,
+        19.262144088745117,
+        9.795146942138672
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_IvoryStone"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; retained inner-shell collision; decorative intrados offsets require live review"
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z02ArchFace",
+      "triangles": 28268,
+      "nominal_dimensions_m": [
+        0.566000759601593,
+        19.262142181396484,
+        9.690000534057617
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; decorative front casing around retained side-vault collision"
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z02CentralCeiling",
+      "triangles": 27448,
+      "nominal_dimensions_m": [
+        12.880000114440918,
+        19.372142791748047,
+        0.25
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; retained central ceiling collision"
+    }
+  ]
+}
