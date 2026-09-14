@@ -1,0 +1,13 @@
+{
+  "world_origin_cm": [
+    -7015.958779,
+    -9005.37408,
+    0
+  ],
+  "inner_x_m": 6.2772,
+  "outer_x_m": 14.6469,
+  "roof_y_half_m": 9.6310712,
+  "wall_base_z_cm": 7.091656,
+  "roof_base_z_cm": 987.0,
+  "scope": "Measured vault footprint; new end walls and roof finish. Roof surface is elevated above the prior thin closure; live rooftop traversal unqualified."
+}

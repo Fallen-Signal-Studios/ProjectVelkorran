@@ -48,6 +48,12 @@ def import_owned_mesh(spec,source,destination,materials):
     extent=mesh.get_bounds().box_extent
     assert all(abs(a-b*100)<1 for a,b in zip((extent.x*2,extent.y*2,extent.z*2),spec['nominal_dimensions_m']))
     mesh.set_editor_property('light_map_coordinate_index',1)
-    nanite=sm.get_nanite_settings(mesh); nanite.set_editor_property('enabled',True); sm.set_nanite_settings(mesh,nanite,True)
+    nanite=sm.get_nanite_settings(mesh); nanite.set_editor_property('enabled',True)
+    if spec.get('preserve_fallback_geometry',False):
+        # Opt in for authored thin surfaces whose default reduced fallback moves collision.
+        nanite.set_editor_property('fallback_target',unreal.NaniteFallbackTarget.PERCENT_TRIANGLES)
+        nanite.set_editor_property('fallback_percent_triangles',1.0)
+        nanite.set_editor_property('fallback_relative_error',0.0)
+    sm.set_nanite_settings(mesh,nanite,True)
     assert unreal.EditorAssetLibrary.save_loaded_asset(mesh)
     return mesh
