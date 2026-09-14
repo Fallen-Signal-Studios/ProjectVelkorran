@@ -18,7 +18,14 @@ def check_z06_walls(world,actors):
                 assert sm.get_num_uv_channels(m,0)==2 and sm.get_nanite_settings(m).get_editor_property('enabled')
                 placed.append(a.get_actor_label())
     row=fit['wall'];c=labels[row['actor']].get_component_by_class(unreal.InstancedStaticMeshComponent)
-    assert sorted(c.get_instance_transform(i,world_space=True).export_text() for i in range(c.get_instance_count()))==sorted(fit['retained_transforms'])
+    expected=fit['retained_transforms'];end_count=sum(a.get_actor_label().startswith('KIT_Z06_End_') for a in actors)
+    assert end_count in (0,18)
+    if end_count:
+        end_fit=json.loads((root/'Art/Source/Aurelion/Z06EndwallFit/endwall-fit.json').read_text())
+        assert sorted(expected)==sorted([r['transform'] for r in end_fit['selected']]+end_fit['retained_transforms'])
+        expected=end_fit['retained_transforms']
+    assert sorted(c.get_instance_transform(i,world_space=True).export_text() for i in range(c.get_instance_count()))==sorted(expected)
+    retained_wall_count=c.get_instance_count()
     row=fit['columns'];c=labels[row['actor']].get_component_by_class(unreal.InstancedStaticMeshComponent)
     assert [c.get_instance_transform(i,world_space=True).export_text() for i in range(c.get_instance_count())]==row['all_instance_transforms']
     assert not c.get_editor_property('visible') and c.get_editor_property('hidden_in_game') and c.get_collision_enabled()==unreal.CollisionEnabled.NO_COLLISION
@@ -37,4 +44,4 @@ def check_z06_walls(world,actors):
                     hit=next(v for v in raw if isinstance(v,unreal.HitResult)) if isinstance(raw,tuple) else raw
                     assert hit and hit.to_tuple()[0];t=hit.to_tuple();assert t[9] in physical and abs(t[5].x-sign*face)<.01,(sign,y,z,t[5])
                     probes.append(dict(x=t[5].x,y=y,z=z,actor=t[9].get_actor_label()))
-    return dict(placements=placed,retained_wall_instances=53,removed_side_wall_instances=112,retained_hidden_column_instances=8,physical_probes=probes,qualification='Isolated editor wall/column controls and visual fit; live movement, wall-running, combat and performance remain unqualified.')
+    return dict(placements=placed,retained_wall_instances=retained_wall_count,removed_side_wall_instances=112,retained_hidden_column_instances=8,physical_probes=probes,qualification='Isolated editor wall/column controls and visual fit; live movement, wall-running, combat and performance remain unqualified.')

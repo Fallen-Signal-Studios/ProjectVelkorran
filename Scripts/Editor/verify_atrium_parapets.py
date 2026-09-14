@@ -5,7 +5,7 @@ import unreal
 root=Path(unreal.Paths.project_dir())
 def verify():
     exec(compile((root/'Scripts/Editor/verify_atrium_rings.py').read_text(),'verify_atrium_rings','exec'),globals())
-    assert len(actors)==2472+atrium_canopy_count+atrium_bridge_floor_count+atrium_crown_count+atrium_crown_light_count+z06_paving_count+z06_ceiling_count+z06_side_count+z06_light_count and atrium_parapet_count==266
+    assert len(actors)==2472+atrium_canopy_count+atrium_bridge_floor_count+atrium_crown_count+atrium_crown_light_count+z06_paving_count+z06_ceiling_count+z06_side_count+z06_light_count+z06_end_count and atrium_parapet_count==266
     geometry=runpy.run_path(str(root/'Scripts/Editor/check_atrium_parapets.py'))['check_parapets'](world,actors)
     fit=json.loads((root/'Art/Source/Aurelion/AtriumParapetKit/guard-fit.json').read_text())
     expected=json.loads((root/'Art/Source/Aurelion/AtriumParapetKit/ring-railing-retained.json').read_text())
