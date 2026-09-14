@@ -8,7 +8,7 @@ verify_z06_slab_stage=verify
 del DEFER_Z06_SLAB_AUTORUN
 def verify():
     verify_z06_slab_stage()
-    assert len(actors)==2834+z06_refuge_finish_count+z06_gate_assembly_count+z06_flank_landing_count+z07_paving_count and z06_refuge_count==2
+    assert len(actors)==2834+z06_refuge_finish_count+z06_gate_assembly_count+z06_flank_landing_count+z07_paving_count+z07_wall_count and z06_refuge_count==2
     geometry=runpy.run_path(str(root/'Scripts/Editor/check_z06_refuge.py'))['check_z06_refuge'](world,actors)
     assert not unreal.EditorLoadingAndSavingUtils.get_dirty_map_packages()
     (out/'z06-refuge-verification.json').write_text(json.dumps(dict(status='passed',actor_count=len(actors),geometry=geometry),indent=2))

@@ -18,7 +18,7 @@ def verify():
         rows.append(dict(actor=row['actor'],rgb8=row['after_rgb8']))
     assert unreal.SystemLibrary.get_console_variable_int_value('r.ShadowQuality')==5
     assert abs(unreal.SystemLibrary.get_console_variable_float_value('r.Nanite.MaxPixelsPerEdge')-1)<.0001
-    assert len(rows)==2 and len(actors)==2843+z07_paving_count and not unreal.EditorLoadingAndSavingUtils.get_dirty_map_packages()
+    assert len(rows)==2 and len(actors)==2843+z07_paving_count+z07_wall_count and not unreal.EditorLoadingAndSavingUtils.get_dirty_map_packages()
     (out/'z06-key-balance-verification.json').write_text(json.dumps(dict(status='passed',actor_count=len(actors),lights=rows,qualification='Saved light colors and prior architecture; final visual and live gameplay acceptance remain open.'),indent=2))
 if not globals().get('DEFER_Z06_KEY_BALANCE_AUTORUN',False):
     unreal.EditorPythonScripting.set_keep_python_script_alive(True);started=time.monotonic()

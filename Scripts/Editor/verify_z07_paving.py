@@ -9,7 +9,7 @@ del DEFER_Z06_KEY_BALANCE_AUTORUN
 def verify():
     verify_z06_key_balance_stage()
     geometry=runpy.run_path(str(root/'Scripts/Editor/check_z07_paving.py'))['check_z07_paving'](world,actors)
-    assert len(actors)==2897 and z07_paving_count==54
+    assert len(actors)==2897+z07_wall_count and z07_paving_count==54
     assert not unreal.EditorLoadingAndSavingUtils.get_dirty_map_packages()
     (out/'z07-paving-verification.json').write_text(json.dumps(dict(status='passed',actor_count=len(actors),geometry=geometry),indent=2))
     runpy.run_path(str(root/'Scripts/Editor/audit_z07_architecture.py'),init_globals={'INVENTORY_ONLY':True})
