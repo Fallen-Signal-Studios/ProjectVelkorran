@@ -5,7 +5,7 @@ import unreal
 root=Path(unreal.Paths.project_dir())
 def verify():
     exec(compile((root/'Scripts/Editor/verify_atrium_rings.py').read_text(),'verify_atrium_rings','exec'),globals())
-    assert len(actors)==2472 and atrium_parapet_count==266
+    assert len(actors)==2472+atrium_canopy_count and atrium_parapet_count==266
     geometry=runpy.run_path(str(root/'Scripts/Editor/check_atrium_parapets.py'))['check_parapets'](world,actors)
     fit=json.loads((root/'Art/Source/Aurelion/AtriumParapetKit/guard-fit.json').read_text())
     expected=json.loads((root/'Art/Source/Aurelion/AtriumParapetKit/ring-railing-retained.json').read_text())
@@ -16,11 +16,12 @@ def verify():
     (out/'atrium-parapet-verification.json').write_text(json.dumps(dict(status='passed',actor_count=len(actors),retained_railing_instances=116,geometry=geometry),indent=2))
 # The soffit diagnostic showed misses before the initial world ticks and exact
 # baseline hits after 15 seconds. Keep every assertion; defer only test setup.
-unreal.EditorPythonScripting.set_keep_python_script_alive(True)
-started=time.monotonic()
-def tick(delta):
-    if time.monotonic()-started<15:return
-    unreal.unregister_slate_post_tick_callback(handle)
-    try:verify()
-    finally:unreal.EditorPythonScripting.set_keep_python_script_alive(False)
-handle=unreal.register_slate_post_tick_callback(tick)
+if not globals().get('DEFER_ARCHITECTURE_AUTORUN',False):
+    unreal.EditorPythonScripting.set_keep_python_script_alive(True)
+    started=time.monotonic()
+    def tick(delta):
+        if time.monotonic()-started<15:return
+        unreal.unregister_slate_post_tick_callback(handle)
+        try:verify()
+        finally:unreal.EditorPythonScripting.set_keep_python_script_alive(False)
+    handle=unreal.register_slate_post_tick_callback(tick)

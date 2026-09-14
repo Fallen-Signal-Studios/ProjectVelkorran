@@ -1,0 +1,3050 @@
+{
+  "actors": [
+    {
+      "actor": "Aurelion_Radiance_Z05_BridgeCanopy_0",
+      "actor_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=2300.000000,Y=0.000000,Z=-700.000000),Scale3D=(X=3.500000,Y=3.500000,Z=3.500000))",
+      "component_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=2300.000000,Y=0.000000,Z=-700.000000),Scale3D=(X=3.500000,Y=3.500000,Z=3.500000))",
+      "mesh": "/Game/Aurelion/Environment/ValidatedMeshes/SM_KB3D_HTS_PathB_C_822a44c6840f.SM_KB3D_HTS_PathB_C_822a44c6840f",
+      "origin": [
+        2300.0,
+        0.0,
+        285.2783317565918
+      ],
+      "extent": [
+        350.94594955444336,
+        350.94661712646484,
+        458.3125190734863
+      ],
+      "visible": true,
+      "hidden": false,
+      "actor_collision": false,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "profile": "Custom"
+    },
+    {
+      "actor": "Aurelion_Radiance_Z05_BridgeCanopy_90",
+      "actor_transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.707107,W=0.707107),Translation=(X=0.000000,Y=2300.000000,Z=-700.000000),Scale3D=(X=3.500000,Y=3.500000,Z=3.500000))",
+      "component_transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.707107,W=0.707107),Translation=(X=0.000000,Y=2300.000000,Z=-700.000000),Scale3D=(X=3.500000,Y=3.500000,Z=3.500000))",
+      "mesh": "/Game/Aurelion/Environment/ValidatedMeshes/SM_KB3D_HTS_PathB_C_822a44c6840f.SM_KB3D_HTS_PathB_C_822a44c6840f",
+      "origin": [
+        0.0,
+        2300.0,
+        285.2783317565918
+      ],
+      "extent": [
+        350.9466171264651,
+        350.9459495544437,
+        458.3125190734863
+      ],
+      "visible": true,
+      "hidden": false,
+      "actor_collision": false,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "profile": "Custom"
+    },
+    {
+      "actor": "Aurelion_Radiance_Z05_BridgeCanopy_180",
+      "actor_transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=1.000000,W=0.000000),Translation=(X=-2300.000000,Y=0.000000,Z=-700.000000),Scale3D=(X=3.500000,Y=3.500000,Z=3.500000))",
+      "component_transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=1.000000,W=0.000000),Translation=(X=-2300.000000,Y=0.000000,Z=-700.000000),Scale3D=(X=3.500000,Y=3.500000,Z=3.500000))",
+      "mesh": "/Game/Aurelion/Environment/ValidatedMeshes/SM_KB3D_HTS_PathB_C_822a44c6840f.SM_KB3D_HTS_PathB_C_822a44c6840f",
+      "origin": [
+        -2300.0,
+        0.0,
+        285.2783317565918
+      ],
+      "extent": [
+        350.94594955444336,
+        350.94661712646473,
+        458.3125190734863
+      ],
+      "visible": true,
+      "hidden": false,
+      "actor_collision": false,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "profile": "Custom"
+    },
+    {
+      "actor": "Aurelion_Radiance_Z05_BridgeCanopy_270",
+      "actor_transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=0.000000,Y=-2300.000000,Z=-700.000000),Scale3D=(X=3.500000,Y=3.500000,Z=3.500000))",
+      "component_transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=0.000000,Y=-2300.000000,Z=-700.000000),Scale3D=(X=3.500000,Y=3.500000,Z=3.500000))",
+      "mesh": "/Game/Aurelion/Environment/ValidatedMeshes/SM_KB3D_HTS_PathB_C_822a44c6840f.SM_KB3D_HTS_PathB_C_822a44c6840f",
+      "origin": [
+        0.0,
+        -2300.0,
+        285.2783317565918
+      ],
+      "extent": [
+        350.946617126465,
+        350.9459495544435,
+        458.3125190734863
+      ],
+      "visible": true,
+      "hidden": false,
+      "actor_collision": false,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "profile": "Custom"
+    },
+    {
+      "actor": "Aurelion_CeramicCanopyPylon_04",
+      "actor_transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.707107,W=0.707107),Translation=(X=2632.500000,Y=332.500000,Z=-8.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "component_transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.707107,W=0.707107),Translation=(X=2632.500000,Y=332.500000,Z=-8.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "mesh": "/Game/Aurelion/Environment/Blender/SM_AurelionCanopyPylon.SM_AurelionCanopyPylon",
+      "origin": [
+        2632.4999990463257,
+        313.00000286102295,
+        315.2724914550781
+      ],
+      "extent": [
+        16.00000286102295,
+        35.499999046325684,
+        323.2724914550781
+      ],
+      "visible": true,
+      "hidden": false,
+      "actor_collision": false,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "profile": "BlockAll"
+    },
+    {
+      "actor": "Aurelion_CeramicCanopyPylon_05",
+      "actor_transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=2632.500000,Y=-332.500000,Z=-8.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "component_transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=2632.500000,Y=-332.500000,Z=-8.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "mesh": "/Game/Aurelion/Environment/Blender/SM_AurelionCanopyPylon.SM_AurelionCanopyPylon",
+      "origin": [
+        2632.5000009536743,
+        -313.00000286102295,
+        315.2724914550781
+      ],
+      "extent": [
+        16.00000286102295,
+        35.499999046325684,
+        323.2724914550781
+      ],
+      "visible": true,
+      "hidden": false,
+      "actor_collision": false,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "profile": "BlockAll"
+    },
+    {
+      "actor": "Aurelion_CeramicCanopyPylon_06",
+      "actor_transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.707107,W=0.707107),Translation=(X=1967.500000,Y=332.500000,Z=-8.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "component_transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.707107,W=0.707107),Translation=(X=1967.500000,Y=332.500000,Z=-8.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "mesh": "/Game/Aurelion/Environment/Blender/SM_AurelionCanopyPylon.SM_AurelionCanopyPylon",
+      "origin": [
+        1967.4999990463257,
+        313.00000286102295,
+        315.2724914550781
+      ],
+      "extent": [
+        16.00000286102295,
+        35.499999046325684,
+        323.2724914550781
+      ],
+      "visible": true,
+      "hidden": false,
+      "actor_collision": false,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "profile": "BlockAll"
+    },
+    {
+      "actor": "Aurelion_CeramicCanopyPylon_07",
+      "actor_transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=1967.500000,Y=-332.500000,Z=-8.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "component_transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=1967.500000,Y=-332.500000,Z=-8.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "mesh": "/Game/Aurelion/Environment/Blender/SM_AurelionCanopyPylon.SM_AurelionCanopyPylon",
+      "origin": [
+        1967.5000009536743,
+        -313.00000286102295,
+        315.2724914550781
+      ],
+      "extent": [
+        16.00000286102295,
+        35.499999046325684,
+        323.2724914550781
+      ],
+      "visible": true,
+      "hidden": false,
+      "actor_collision": false,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "profile": "BlockAll"
+    },
+    {
+      "actor": "Aurelion_CeramicCanopyPylon_08",
+      "actor_transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=1.000000,W=0.000000),Translation=(X=-332.500000,Y=2632.500000,Z=-8.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "component_transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=1.000000,W=0.000000),Translation=(X=-332.500000,Y=2632.500000,Z=-8.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "mesh": "/Game/Aurelion/Environment/Blender/SM_AurelionCanopyPylon.SM_AurelionCanopyPylon",
+      "origin": [
+        -313.00000286102323,
+        2632.4999990463257,
+        315.2724914550781
+      ],
+      "extent": [
+        35.499999046325684,
+        16.00000286102295,
+        323.2724914550781
+      ],
+      "visible": true,
+      "hidden": false,
+      "actor_collision": false,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "profile": "BlockAll"
+    },
+    {
+      "actor": "Aurelion_CeramicCanopyPylon_09",
+      "actor_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=332.500000,Y=2632.500000,Z=-8.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "component_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=332.500000,Y=2632.500000,Z=-8.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "mesh": "/Game/Aurelion/Environment/Blender/SM_AurelionCanopyPylon.SM_AurelionCanopyPylon",
+      "origin": [
+        313.0000028610229,
+        2632.5000009536748,
+        315.2724914550781
+      ],
+      "extent": [
+        35.499999046325684,
+        16.00000286102295,
+        323.2724914550781
+      ],
+      "visible": true,
+      "hidden": false,
+      "actor_collision": false,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "profile": "BlockAll"
+    },
+    {
+      "actor": "Aurelion_CeramicCanopyPylon_10",
+      "actor_transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=1.000000,W=0.000000),Translation=(X=-332.500000,Y=1967.500000,Z=-8.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "component_transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=1.000000,W=0.000000),Translation=(X=-332.500000,Y=1967.500000,Z=-8.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "mesh": "/Game/Aurelion/Environment/Blender/SM_AurelionCanopyPylon.SM_AurelionCanopyPylon",
+      "origin": [
+        -313.0000028610229,
+        1967.4999990463255,
+        315.2724914550781
+      ],
+      "extent": [
+        35.499999046325684,
+        16.00000286102295,
+        323.2724914550781
+      ],
+      "visible": true,
+      "hidden": false,
+      "actor_collision": false,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "profile": "BlockAll"
+    },
+    {
+      "actor": "Aurelion_CeramicCanopyPylon_11",
+      "actor_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=332.500000,Y=1967.500000,Z=-8.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "component_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=332.500000,Y=1967.500000,Z=-8.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "mesh": "/Game/Aurelion/Environment/Blender/SM_AurelionCanopyPylon.SM_AurelionCanopyPylon",
+      "origin": [
+        313.00000286102323,
+        1967.5000009536743,
+        315.2724914550781
+      ],
+      "extent": [
+        35.499999046325684,
+        16.00000286102295,
+        323.2724914550781
+      ],
+      "visible": true,
+      "hidden": false,
+      "actor_collision": false,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "profile": "BlockAll"
+    },
+    {
+      "actor": "Aurelion_CeramicCanopyPylon_12",
+      "actor_transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=-2632.500000,Y=-332.500000,Z=-8.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "component_transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=-2632.500000,Y=-332.500000,Z=-8.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "mesh": "/Game/Aurelion/Environment/Blender/SM_AurelionCanopyPylon.SM_AurelionCanopyPylon",
+      "origin": [
+        -2632.4999990463257,
+        -313.00000286102267,
+        315.2724914550781
+      ],
+      "extent": [
+        16.00000286102295,
+        35.499999046325684,
+        323.2724914550781
+      ],
+      "visible": true,
+      "hidden": false,
+      "actor_collision": false,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "profile": "BlockAll"
+    },
+    {
+      "actor": "Aurelion_CeramicCanopyPylon_13",
+      "actor_transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.707107,W=0.707107),Translation=(X=-2632.500000,Y=332.500000,Z=-8.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "component_transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.707107,W=0.707107),Translation=(X=-2632.500000,Y=332.500000,Z=-8.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "mesh": "/Game/Aurelion/Environment/Blender/SM_AurelionCanopyPylon.SM_AurelionCanopyPylon",
+      "origin": [
+        -2632.500000953674,
+        313.0000028610228,
+        315.2724914550781
+      ],
+      "extent": [
+        16.00000286102295,
+        35.499999046325684,
+        323.2724914550781
+      ],
+      "visible": true,
+      "hidden": false,
+      "actor_collision": false,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "profile": "BlockAll"
+    },
+    {
+      "actor": "Aurelion_CeramicCanopyPylon_14",
+      "actor_transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=-1967.500000,Y=-332.500000,Z=-8.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "component_transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=-1967.500000,Y=-332.500000,Z=-8.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "mesh": "/Game/Aurelion/Environment/Blender/SM_AurelionCanopyPylon.SM_AurelionCanopyPylon",
+      "origin": [
+        -1967.499999046326,
+        -313.0000028610228,
+        315.2724914550781
+      ],
+      "extent": [
+        16.00000286102295,
+        35.499999046325684,
+        323.2724914550781
+      ],
+      "visible": true,
+      "hidden": false,
+      "actor_collision": false,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "profile": "BlockAll"
+    },
+    {
+      "actor": "Aurelion_CeramicCanopyPylon_15",
+      "actor_transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.707107,W=0.707107),Translation=(X=-1967.500000,Y=332.500000,Z=-8.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "component_transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.707107,W=0.707107),Translation=(X=-1967.500000,Y=332.500000,Z=-8.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "mesh": "/Game/Aurelion/Environment/Blender/SM_AurelionCanopyPylon.SM_AurelionCanopyPylon",
+      "origin": [
+        -1967.5000009536745,
+        313.00000286102267,
+        315.2724914550781
+      ],
+      "extent": [
+        16.00000286102295,
+        35.499999046325684,
+        323.2724914550781
+      ],
+      "visible": true,
+      "hidden": false,
+      "actor_collision": false,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "profile": "BlockAll"
+    },
+    {
+      "actor": "Aurelion_CeramicCanopyPylon_16",
+      "actor_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=332.500000,Y=-2632.500000,Z=-8.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "component_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=332.500000,Y=-2632.500000,Z=-8.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "mesh": "/Game/Aurelion/Environment/Blender/SM_AurelionCanopyPylon.SM_AurelionCanopyPylon",
+      "origin": [
+        313.000002861023,
+        -2632.4999990463257,
+        315.2724914550781
+      ],
+      "extent": [
+        35.499999046325684,
+        16.00000286102295,
+        323.2724914550781
+      ],
+      "visible": true,
+      "hidden": false,
+      "actor_collision": false,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "profile": "BlockAll"
+    },
+    {
+      "actor": "Aurelion_CeramicCanopyPylon_17",
+      "actor_transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=1.000000,W=0.000000),Translation=(X=-332.500000,Y=-2632.500000,Z=-8.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "component_transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=1.000000,W=0.000000),Translation=(X=-332.500000,Y=-2632.500000,Z=-8.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "mesh": "/Game/Aurelion/Environment/Blender/SM_AurelionCanopyPylon.SM_AurelionCanopyPylon",
+      "origin": [
+        -313.0000028610231,
+        -2632.5000009536743,
+        315.2724914550781
+      ],
+      "extent": [
+        35.499999046325684,
+        16.00000286102295,
+        323.2724914550781
+      ],
+      "visible": true,
+      "hidden": false,
+      "actor_collision": false,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "profile": "BlockAll"
+    },
+    {
+      "actor": "Aurelion_CeramicCanopyPylon_18",
+      "actor_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=332.500000,Y=-1967.500000,Z=-8.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "component_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=332.500000,Y=-1967.500000,Z=-8.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "mesh": "/Game/Aurelion/Environment/Blender/SM_AurelionCanopyPylon.SM_AurelionCanopyPylon",
+      "origin": [
+        313.0000028610231,
+        -1967.4999990463257,
+        315.2724914550781
+      ],
+      "extent": [
+        35.499999046325684,
+        16.00000286102295,
+        323.2724914550781
+      ],
+      "visible": true,
+      "hidden": false,
+      "actor_collision": false,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "profile": "BlockAll"
+    },
+    {
+      "actor": "Aurelion_CeramicCanopyPylon_19",
+      "actor_transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=1.000000,W=0.000000),Translation=(X=-332.500000,Y=-1967.500000,Z=-8.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "component_transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=1.000000,W=0.000000),Translation=(X=-332.500000,Y=-1967.500000,Z=-8.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "mesh": "/Game/Aurelion/Environment/Blender/SM_AurelionCanopyPylon.SM_AurelionCanopyPylon",
+      "origin": [
+        -313.000002861023,
+        -1967.500000953674,
+        315.2724914550781
+      ],
+      "extent": [
+        35.499999046325684,
+        16.00000286102295,
+        323.2724914550781
+      ],
+      "visible": true,
+      "hidden": false,
+      "actor_collision": false,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "profile": "BlockAll"
+    },
+    {
+      "actor": "Z05_Bridge_0",
+      "actor_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=2300.000000,Y=0.000000,Z=-20.000000),Scale3D=(X=10.520000,Y=6.000000,Z=0.400000))",
+      "component_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=2300.000000,Y=0.000000,Z=-20.000000),Scale3D=(X=10.520000,Y=6.000000,Z=0.400000))",
+      "mesh": "/Engine/BasicShapes/Cube.Cube",
+      "origin": [
+        2300.0,
+        0.0,
+        -20.0
+      ],
+      "extent": [
+        526.0,
+        300.0,
+        20.0
+      ],
+      "visible": false,
+      "hidden": true,
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll"
+    },
+    {
+      "actor": "Z05_Bridge_90",
+      "actor_transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.707107,W=0.707107),Translation=(X=0.000000,Y=2300.000000,Z=-20.000000),Scale3D=(X=10.520000,Y=6.000000,Z=0.400000))",
+      "component_transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.707107,W=0.707107),Translation=(X=0.000000,Y=2300.000000,Z=-20.000000),Scale3D=(X=10.520000,Y=6.000000,Z=0.400000))",
+      "mesh": "/Engine/BasicShapes/Cube.Cube",
+      "origin": [
+        1.1368683772161603e-13,
+        2300.0,
+        -20.0
+      ],
+      "extent": [
+        300.0000000515993,
+        526.0000000294293,
+        20.0
+      ],
+      "visible": false,
+      "hidden": true,
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll"
+    },
+    {
+      "actor": "Z05_Bridge_180",
+      "actor_transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=1.000000,W=0.000000),Translation=(X=-2300.000000,Y=0.000000,Z=-20.000000),Scale3D=(X=10.520000,Y=6.000000,Z=0.400000))",
+      "component_transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=1.000000,W=0.000000),Translation=(X=-2300.000000,Y=0.000000,Z=-20.000000),Scale3D=(X=10.520000,Y=6.000000,Z=0.400000))",
+      "mesh": "/Engine/BasicShapes/Cube.Cube",
+      "origin": [
+        -2300.0,
+        2.8421709430404007e-13,
+        -20.0
+      ],
+      "extent": [
+        525.9999999999995,
+        299.99999999999994,
+        20.0
+      ],
+      "visible": false,
+      "hidden": true,
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll"
+    },
+    {
+      "actor": "Z05_Bridge_270",
+      "actor_transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=-0.000000,Y=-2300.000000,Z=-20.000000),Scale3D=(X=10.520000,Y=6.000000,Z=0.400000))",
+      "component_transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=-0.000000,Y=-2300.000000,Z=-20.000000),Scale3D=(X=10.520000,Y=6.000000,Z=0.400000))",
+      "mesh": "/Engine/BasicShapes/Cube.Cube",
+      "origin": [
+        -3.979039320256561e-13,
+        -2300.0,
+        -20.0
+      ],
+      "extent": [
+        300.0000000515993,
+        526.0000000294293,
+        20.0
+      ],
+      "visible": false,
+      "hidden": true,
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll"
+    }
+  ],
+  "lights": [
+    {
+      "actor": "ENVL_Z05_Key_00",
+      "component": "LightComponent0",
+      "type": "RectLightComponent",
+      "transform": "(Rotation=(X=-0.000000,Y=0.040100,Z=0.000000,W=0.999196),Translation=(X=-2860.918200,Y=-0.000000,Z=470.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "intensity": 1190.0,
+      "color": "(B=255,G=245,R=242,A=255)",
+      "visible": true
+    },
+    {
+      "actor": "ENVL_Z05_Key_01",
+      "component": "LightComponent0",
+      "type": "RectLightComponent",
+      "transform": "(Rotation=(X=-0.040100,Y=-0.000000,Z=0.999196,W=-0.000000),Translation=(X=2860.918200,Y=-0.000000,Z=470.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "intensity": 1190.0,
+      "color": "(B=133,G=214,R=255,A=255)",
+      "visible": true
+    },
+    {
+      "actor": "ENVL_Z05_Key_02",
+      "component": "LightComponent0",
+      "type": "RectLightComponent",
+      "transform": "(Rotation=(X=-0.028355,Y=0.028355,Z=0.706538,W=0.706538),Translation=(X=0.000000,Y=-2860.918200,Z=470.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "intensity": 1190.0,
+      "color": "(B=255,G=204,R=166,A=255)",
+      "visible": true
+    },
+    {
+      "actor": "ENVL_Z05_Key_03",
+      "component": "LightComponent0",
+      "type": "RectLightComponent",
+      "transform": "(Rotation=(X=0.028355,Y=0.028355,Z=-0.706538,W=0.706538),Translation=(X=0.000000,Y=2860.918200,Z=470.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "intensity": 1190.0,
+      "color": "(B=87,G=161,R=255,A=255)",
+      "visible": true
+    }
+  ],
+  "floor": {
+    "actor": "Aurelion_Art_M12_Z05_53_427254",
+    "component": "HierarchicalInstancedStaticMesh",
+    "mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Floor_04.SM_Scifi_Floor_04",
+    "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+    "instances": [
+      {
+        "index": 0,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=1774.000000,Y=-300.000000,Z=-4.623990),Scale3D=(X=0.876667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            1774.0000000000002,
+            -300.0,
+            -4.623989105224609
+          ],
+          [
+            2124.666666666667,
+            0.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 1,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=1774.000000,Y=0.000000,Z=-4.623990),Scale3D=(X=0.876667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            1774.0000000000002,
+            0.0,
+            -4.623989105224609
+          ],
+          [
+            2124.666666666667,
+            300.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 2,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=2124.666667,Y=-300.000000,Z=-4.623990),Scale3D=(X=0.876667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            2124.6666666666665,
+            -300.0,
+            -4.623989105224609
+          ],
+          [
+            2475.333333333333,
+            0.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 3,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=2124.666667,Y=0.000000,Z=-4.623990),Scale3D=(X=0.876667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            2124.6666666666665,
+            0.0,
+            -4.623989105224609
+          ],
+          [
+            2475.333333333333,
+            300.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 4,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=2475.333333,Y=-300.000000,Z=-4.623990),Scale3D=(X=0.876667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            2475.333333333333,
+            -300.0,
+            -4.623989105224609
+          ],
+          [
+            2825.9999999999995,
+            0.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 5,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=2475.333333,Y=0.000000,Z=-4.623990),Scale3D=(X=0.876667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            2475.333333333333,
+            0.0,
+            -4.623989105224609
+          ],
+          [
+            2825.9999999999995,
+            300.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 6,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=300.000000,Y=1774.000000,Z=-4.623990),Scale3D=(X=0.876667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -5.159921556696645e-08,
+            1773.9999999705708,
+            -4.623989105224609
+          ],
+          [
+            299.9999999828005,
+            2124.666666666667,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 7,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-0.000000,Y=1774.000000,Z=-4.623990),Scale3D=(X=0.876667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -300.0000000515993,
+            1774.0,
+            -4.623989105224609
+          ],
+          [
+            -1.7199539570356137e-08,
+            2124.666666696096,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 8,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=300.000000,Y=2124.666667,Z=-4.623990),Scale3D=(X=0.876667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -1.719973852232215e-08,
+            2124.6666666372375,
+            -4.623989105224609
+          ],
+          [
+            300.00000001719997,
+            2475.3333333333335,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 9,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-0.000000,Y=2124.666667,Z=-4.623990),Scale3D=(X=0.876667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -300.0000000171998,
+            2124.666666666667,
+            -4.623989105224609
+          ],
+          [
+            1.7199909052578732e-08,
+            2475.333333362763,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 10,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=300.000000,Y=2475.333333,Z=-4.623990),Scale3D=(X=0.876667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            1.719968167890329e-08,
+            2475.3333333039036,
+            -4.623989105224609
+          ],
+          [
+            300.0000000515994,
+            2825.9999999999995,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 11,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=0.000000,Y=2475.333333,Z=-4.623990),Scale3D=(X=0.876667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -299.9999999828003,
+            2475.333333333333,
+            -4.623989105224609
+          ],
+          [
+            5.159938609722303e-08,
+            2826.000000029429,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 12,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=1.000000,W=0.000000),Translation=(X=-1774.000000,Y=300.000000,Z=-4.623990),Scale3D=(X=0.876667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -2124.666666666667,
+            1.7053025658242404e-13,
+            -4.623989105224609
+          ],
+          [
+            -1774.0000000000005,
+            299.99999999999994,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 13,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=1.000000,W=0.000000),Translation=(X=-1774.000000,Y=0.000000,Z=-4.623990),Scale3D=(X=0.876667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -2124.666666666667,
+            -299.99999999999955,
+            -4.623989105224609
+          ],
+          [
+            -1774.0000000000005,
+            1.8505282824212052e-13,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 14,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=1.000000,W=0.000000),Translation=(X=-2124.666667,Y=300.000000,Z=-4.623990),Scale3D=(X=0.876667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -2475.333333333333,
+            2.8421709430404007e-13,
+            -4.623989105224609
+          ],
+          [
+            -2124.666666666667,
+            300.00000000000006,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 15,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=1.000000,W=0.000000),Translation=(X=-2124.666667,Y=0.000000,Z=-4.623990),Scale3D=(X=0.876667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -2475.333333333333,
+            -299.99999999999955,
+            -4.623989105224609
+          ],
+          [
+            -2124.666666666667,
+            2.418962471029285e-13,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 16,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=1.000000,W=0.000000),Translation=(X=-2475.333333,Y=300.000000,Z=-4.623990),Scale3D=(X=0.876667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -2825.999999999999,
+            2.8421709430404007e-13,
+            -4.623989105224609
+          ],
+          [
+            -2475.333333333333,
+            300.00000000000006,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 17,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=1.000000,W=0.000000),Translation=(X=-2475.333333,Y=0.000000,Z=-4.623990),Scale3D=(X=0.876667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -2825.999999999999,
+            -299.99999999999943,
+            -4.623989105224609
+          ],
+          [
+            -2475.333333333333,
+            2.9873966596373653e-13,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 18,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=-300.000000,Y=-1774.000000,Z=-4.623990),Scale3D=(X=0.876667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -300.00000005159967,
+            -2124.666666696096,
+            -4.623989105224609
+          ],
+          [
+            -1.7199965895997593e-08,
+            -1774.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 19,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=-0.000000,Y=-1774.000000,Z=-4.623990),Scale3D=(X=0.876667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -5.1599641892607906e-08,
+            -2124.666666666667,
+            -4.623989105224609
+          ],
+          [
+            299.9999999828001,
+            -1773.9999999705708,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 20,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=-300.000000,Y=-2124.666667,Z=-4.623990),Scale3D=(X=0.876667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -300.00000001720025,
+            -2475.3333333627625,
+            -4.623989105224609
+          ],
+          [
+            1.7199454305227846e-08,
+            -2124.666666666667,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 21,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=-0.000000,Y=-2124.666667,Z=-4.623990),Scale3D=(X=0.876667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -1.7200164847963606e-08,
+            -2475.333333333333,
+            -4.623989105224609
+          ],
+          [
+            300.00000001719957,
+            -2124.6666666372375,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 22,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=-300.000000,Y=-2475.333333,Z=-4.623990),Scale3D=(X=0.876667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -299.9999999828008,
+            -2826.0000000294294,
+            -4.623989105224609
+          ],
+          [
+            5.1598931349872146e-08,
+            -2475.333333333333,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 23,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=0.000000,Y=-2475.333333,Z=-4.623990),Scale3D=(X=0.876667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            1.7199283774971263e-08,
+            -2826.0,
+            -4.623989105224609
+          ],
+          [
+            300.000000051599,
+            -2475.3333333039036,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 24,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-6700.000000,Y=-8106.000000,Z=-4.623990),Scale3D=(X=0.968667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -7000.000000285071,
+            -8106.00000002943,
+            -4.623989105224609
+          ],
+          [
+            -6700.0000002470615,
+            -7718.533333333335,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 25,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-7000.000000,Y=-8106.000000,Z=-4.623990),Scale3D=(X=0.968667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -7300.000000285071,
+            -8106.000000000001,
+            -4.623989105224609
+          ],
+          [
+            -7000.0000002470615,
+            -7718.533333303905,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 26,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-6700.000000,Y=-7718.533333,Z=-4.623990),Scale3D=(X=0.968667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -7000.0000002470615,
+            -7718.533333362763,
+            -4.623989105224609
+          ],
+          [
+            -6700.000000209052,
+            -7331.0666666666675,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 27,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-7000.000000,Y=-7718.533333,Z=-4.623990),Scale3D=(X=0.968667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -7300.0000002470615,
+            -7718.533333333334,
+            -4.623989105224609
+          ],
+          [
+            -7000.000000209052,
+            -7331.066666637238,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 28,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-6700.000000,Y=-7331.066667,Z=-4.623990),Scale3D=(X=0.968667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -7000.000000209052,
+            -7331.066666696097,
+            -4.623989105224609
+          ],
+          [
+            -6700.000000171042,
+            -6943.6,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 29,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-7000.000000,Y=-7331.066667,Z=-4.623990),Scale3D=(X=0.968667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -7300.000000209052,
+            -7331.0666666666675,
+            -4.623989105224609
+          ],
+          [
+            -7000.000000171042,
+            -6943.599999970571,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 30,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-6700.000000,Y=-6943.600000,Z=-4.623990),Scale3D=(X=0.968667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -7000.000000171043,
+            -6943.60000002943,
+            -4.623989105224609
+          ],
+          [
+            -6700.000000133034,
+            -6556.133333333333,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 31,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-7000.000000,Y=-6943.600000,Z=-4.623990),Scale3D=(X=0.968667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -7300.000000171043,
+            -6943.6,
+            -4.623989105224609
+          ],
+          [
+            -7000.000000133034,
+            -6556.133333303904,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 32,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-6700.000000,Y=-6556.133333,Z=-4.623990),Scale3D=(X=0.968667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -7000.000000133034,
+            -6556.133333362764,
+            -4.623989105224609
+          ],
+          [
+            -6700.000000095024,
+            -6168.666666666668,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 33,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-7000.000000,Y=-6556.133333,Z=-4.623990),Scale3D=(X=0.968667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -7300.000000133034,
+            -6556.133333333334,
+            -4.623989105224609
+          ],
+          [
+            -7000.000000095024,
+            -6168.666666637238,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 34,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-6700.000000,Y=-6168.666667,Z=-4.623990),Scale3D=(X=0.968667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -7000.000000095024,
+            -6168.666666696096,
+            -4.623989105224609
+          ],
+          [
+            -6700.000000057014,
+            -5781.200000000001,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 35,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-7000.000000,Y=-6168.666667,Z=-4.623990),Scale3D=(X=0.968667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -7300.000000095024,
+            -6168.666666666667,
+            -4.623989105224609
+          ],
+          [
+            -7000.000000057014,
+            -5781.199999970571,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 36,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-6700.000000,Y=-5781.200000,Z=-4.623990),Scale3D=(X=0.968667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -7000.000000057014,
+            -5781.200000029429,
+            -4.623989105224609
+          ],
+          [
+            -6700.000000019005,
+            -5393.733333333334,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 37,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-7000.000000,Y=-5781.200000,Z=-4.623990),Scale3D=(X=0.968667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -7300.000000057014,
+            -5781.200000000001,
+            -4.623989105224609
+          ],
+          [
+            -7000.000000019005,
+            -5393.733333303904,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 38,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-6700.000000,Y=-5393.733333,Z=-4.623990),Scale3D=(X=0.968667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -7000.000000019005,
+            -5393.733333362763,
+            -4.623989105224609
+          ],
+          [
+            -6699.999999980995,
+            -5006.266666666666,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 39,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-7000.000000,Y=-5393.733333,Z=-4.623990),Scale3D=(X=0.968667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -7300.000000019005,
+            -5393.733333333334,
+            -4.623989105224609
+          ],
+          [
+            -6999.999999980995,
+            -5006.266666637237,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 40,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-6700.000000,Y=-5006.266667,Z=-4.623990),Scale3D=(X=0.968667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -6999.999999980995,
+            -5006.266666696097,
+            -4.623989105224609
+          ],
+          [
+            -6699.999999942986,
+            -4618.800000000001,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 41,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-7000.000000,Y=-5006.266667,Z=-4.623990),Scale3D=(X=0.968667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -7299.999999980995,
+            -5006.266666666667,
+            -4.623989105224609
+          ],
+          [
+            -6999.999999942986,
+            -4618.799999970572,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 42,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-6700.000000,Y=-4618.800000,Z=-4.623990),Scale3D=(X=0.968667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -6999.999999942986,
+            -4618.80000002943,
+            -4.623989105224609
+          ],
+          [
+            -6699.999999904976,
+            -4231.333333333334,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 43,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-7000.000000,Y=-4618.800000,Z=-4.623990),Scale3D=(X=0.968667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -7299.999999942986,
+            -4618.8,
+            -4.623989105224609
+          ],
+          [
+            -6999.999999904976,
+            -4231.3333333039045,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 44,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-6700.000000,Y=-4231.333333,Z=-4.623990),Scale3D=(X=0.968667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -6999.999999904976,
+            -4231.3333333627625,
+            -4.623989105224609
+          ],
+          [
+            -6699.999999866966,
+            -3843.8666666666663,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 45,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-7000.000000,Y=-4231.333333,Z=-4.623990),Scale3D=(X=0.968667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -7299.999999904976,
+            -4231.333333333334,
+            -4.623989105224609
+          ],
+          [
+            -6999.999999866966,
+            -3843.866666637238,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 46,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-6700.000000,Y=-3843.866667,Z=-4.623990),Scale3D=(X=0.968667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -6999.999999866966,
+            -3843.8666666960958,
+            -4.623989105224609
+          ],
+          [
+            -6699.999999828957,
+            -3456.3999999999996,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 47,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-7000.000000,Y=-3843.866667,Z=-4.623990),Scale3D=(X=0.968667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -7299.999999866966,
+            -3843.8666666666663,
+            -4.623989105224609
+          ],
+          [
+            -6999.999999828957,
+            -3456.39999997057,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 48,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-6700.000000,Y=-3456.400000,Z=-4.623990),Scale3D=(X=0.968667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -6999.999999828958,
+            -3456.400000029429,
+            -4.623989105224609
+          ],
+          [
+            -6699.999999790948,
+            -3068.933333333333,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 49,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-7000.000000,Y=-3456.400000,Z=-4.623990),Scale3D=(X=0.968667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -7299.999999828958,
+            -3456.4,
+            -4.623989105224609
+          ],
+          [
+            -6999.999999790948,
+            -3068.933333303904,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 50,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-6700.000000,Y=-3068.933333,Z=-4.623990),Scale3D=(X=0.968667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -6999.999999790948,
+            -3068.933333362763,
+            -4.623989105224609
+          ],
+          [
+            -6699.9999997529385,
+            -2681.4666666666667,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 51,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-7000.000000,Y=-3068.933333,Z=-4.623990),Scale3D=(X=0.968667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -7299.999999790948,
+            -3068.9333333333334,
+            -4.623989105224609
+          ],
+          [
+            -6999.9999997529385,
+            -2681.4666666372373,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 52,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-6700.000000,Y=-2681.466667,Z=-4.623990),Scale3D=(X=0.968667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -6999.999999752939,
+            -2681.4666666960957,
+            -4.623989105224609
+          ],
+          [
+            -6699.99999971493,
+            -2293.9999999999995,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 53,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-7000.000000,Y=-2681.466667,Z=-4.623990),Scale3D=(X=0.968667,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -7299.999999752939,
+            -2681.4666666666662,
+            -4.623989105224609
+          ],
+          [
+            -6999.99999971493,
+            -2293.99999997057,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 54,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-6706.000000,Y=-2300.000000,Z=-4.623990),Scale3D=(X=0.882500,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -6706.0,
+            -2300.0,
+            -4.623989105224609
+          ],
+          [
+            -6353.0,
+            -2000.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 55,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-6706.000000,Y=-2000.000000,Z=-4.623990),Scale3D=(X=0.882500,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -6706.0,
+            -2000.0,
+            -4.623989105224609
+          ],
+          [
+            -6353.0,
+            -1700.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 56,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-6353.000000,Y=-2300.000000,Z=-4.623990),Scale3D=(X=0.882500,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -6353.0,
+            -2300.0,
+            -4.623989105224609
+          ],
+          [
+            -6000.0,
+            -2000.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 57,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-6353.000000,Y=-2000.000000,Z=-4.623990),Scale3D=(X=0.882500,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -6353.0,
+            -2000.0,
+            -4.623989105224609
+          ],
+          [
+            -6000.0,
+            -1700.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 58,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-6000.000000,Y=-2300.000000,Z=-4.623990),Scale3D=(X=0.882500,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -6000.0,
+            -2300.0,
+            -4.623989105224609
+          ],
+          [
+            -5647.0,
+            -2000.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 59,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-6000.000000,Y=-2000.000000,Z=-4.623990),Scale3D=(X=0.882500,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -6000.0,
+            -2000.0,
+            -4.623989105224609
+          ],
+          [
+            -5647.0,
+            -1700.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 60,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-5647.000000,Y=-2300.000000,Z=-4.623990),Scale3D=(X=0.882500,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -5647.0,
+            -2300.0,
+            -4.623989105224609
+          ],
+          [
+            -5294.0,
+            -2000.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 61,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-5647.000000,Y=-2000.000000,Z=-4.623990),Scale3D=(X=0.882500,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -5647.0,
+            -2000.0,
+            -4.623989105224609
+          ],
+          [
+            -5294.0,
+            -1700.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 62,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-4700.000000,Y=-1706.000000,Z=-4.623990),Scale3D=(X=0.882500,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -5000.000000069256,
+            -1706.0000000294294,
+            -4.623989105224609
+          ],
+          [
+            -4700.000000034628,
+            -1353.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 63,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-5000.000000,Y=-1706.000000,Z=-4.623990),Scale3D=(X=0.882500,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -5300.000000069256,
+            -1706.0000000000002,
+            -4.623989105224609
+          ],
+          [
+            -5000.000000034628,
+            -1352.9999999705708,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 64,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-4700.000000,Y=-1353.000000,Z=-4.623990),Scale3D=(X=0.882500,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -5000.000000034628,
+            -1353.0000000294294,
+            -4.623989105224609
+          ],
+          [
+            -4700.0,
+            -1000.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 65,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-5000.000000,Y=-1353.000000,Z=-4.623990),Scale3D=(X=0.882500,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -5300.000000034628,
+            -1353.0000000000002,
+            -4.623989105224609
+          ],
+          [
+            -5000.0,
+            -999.9999999705708,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 66,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-4700.000000,Y=-1000.000000,Z=-4.623990),Scale3D=(X=0.882500,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -5000.0,
+            -1000.0000000294292,
+            -4.623989105224609
+          ],
+          [
+            -4699.999999965372,
+            -646.9999999999998,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 67,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-5000.000000,Y=-1000.000000,Z=-4.623990),Scale3D=(X=0.882500,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -5300.0,
+            -1000.0,
+            -4.623989105224609
+          ],
+          [
+            -4999.999999965372,
+            -646.9999999705706,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 68,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-4700.000000,Y=-647.000000,Z=-4.623990),Scale3D=(X=0.882500,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -4999.999999965372,
+            -647.0000000294292,
+            -4.623989105224609
+          ],
+          [
+            -4699.999999930744,
+            -293.9999999999998,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 69,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-5000.000000,Y=-647.000000,Z=-4.623990),Scale3D=(X=0.882500,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -5299.999999965372,
+            -647.0,
+            -4.623989105224609
+          ],
+          [
+            -4999.999999930744,
+            -293.99999997057057,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 70,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-4706.000000,Y=-300.000000,Z=-4.623990),Scale3D=(X=1.010000,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -4706.0,
+            -300.0,
+            -4.623989105224609
+          ],
+          [
+            -4302.0,
+            0.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 71,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-4706.000000,Y=0.000000,Z=-4.623990),Scale3D=(X=1.010000,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -4706.0,
+            0.0,
+            -4.623989105224609
+          ],
+          [
+            -4302.0,
+            300.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 72,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-4302.000000,Y=-300.000000,Z=-4.623990),Scale3D=(X=1.010000,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -4302.0,
+            -300.0,
+            -4.623989105224609
+          ],
+          [
+            -3898.0,
+            0.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 73,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-4302.000000,Y=0.000000,Z=-4.623990),Scale3D=(X=1.010000,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -4302.0,
+            0.0,
+            -4.623989105224609
+          ],
+          [
+            -3898.0,
+            300.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 74,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-3898.000000,Y=-300.000000,Z=-4.623990),Scale3D=(X=1.010000,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -3898.0,
+            -300.0,
+            -4.623989105224609
+          ],
+          [
+            -3494.0,
+            0.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 75,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-3898.000000,Y=0.000000,Z=-4.623990),Scale3D=(X=1.010000,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -3898.0,
+            0.0,
+            -4.623989105224609
+          ],
+          [
+            -3494.0,
+            300.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 76,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-7300.000000,Y=-2300.000000,Z=-4.623990),Scale3D=(X=0.750000,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -7300.0,
+            -2300.0,
+            -4.623989105224609
+          ],
+          [
+            -7000.0,
+            -2000.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 77,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-7300.000000,Y=-2000.000000,Z=-4.623990),Scale3D=(X=0.750000,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -7300.0,
+            -2000.0,
+            -4.623989105224609
+          ],
+          [
+            -7000.0,
+            -1700.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 78,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-7000.000000,Y=-2300.000000,Z=-4.623990),Scale3D=(X=0.750000,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -7000.0,
+            -2300.0,
+            -4.623989105224609
+          ],
+          [
+            -6700.0,
+            -2000.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 79,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-7000.000000,Y=-2000.000000,Z=-4.623990),Scale3D=(X=0.750000,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -7000.0,
+            -2000.0,
+            -4.623989105224609
+          ],
+          [
+            -6700.0,
+            -1700.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 80,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-5300.000000,Y=-2300.000000,Z=-4.623990),Scale3D=(X=0.750000,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -5300.0,
+            -2300.0,
+            -4.623989105224609
+          ],
+          [
+            -5000.0,
+            -2000.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 81,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-5300.000000,Y=-2000.000000,Z=-4.623990),Scale3D=(X=0.750000,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -5300.0,
+            -2000.0,
+            -4.623989105224609
+          ],
+          [
+            -5000.0,
+            -1700.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 82,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-5000.000000,Y=-2300.000000,Z=-4.623990),Scale3D=(X=0.750000,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -5000.0,
+            -2300.0,
+            -4.623989105224609
+          ],
+          [
+            -4700.0,
+            -2000.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 83,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-5000.000000,Y=-2000.000000,Z=-4.623990),Scale3D=(X=0.750000,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -5000.0,
+            -2000.0,
+            -4.623989105224609
+          ],
+          [
+            -4700.0,
+            -1700.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 84,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-5300.000000,Y=-300.000000,Z=-4.623990),Scale3D=(X=0.750000,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -5300.0,
+            -300.0,
+            -4.623989105224609
+          ],
+          [
+            -5000.0,
+            0.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 85,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-5300.000000,Y=0.000000,Z=-4.623990),Scale3D=(X=0.750000,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -5300.0,
+            0.0,
+            -4.623989105224609
+          ],
+          [
+            -5000.0,
+            300.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 86,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-5000.000000,Y=-300.000000,Z=-4.623990),Scale3D=(X=0.750000,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -5000.0,
+            -300.0,
+            -4.623989105224609
+          ],
+          [
+            -4700.0,
+            0.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 87,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-5000.000000,Y=0.000000,Z=-4.623990),Scale3D=(X=0.750000,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            -5000.0,
+            0.0,
+            -4.623989105224609
+          ],
+          [
+            -4700.0,
+            300.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 88,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=7300.000000,Y=-9106.000000,Z=-4.623990),Scale3D=(X=1.001765,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            6999.999999665881,
+            -9106.00000002943,
+            -4.623989105224609
+          ],
+          [
+            7299.999999705189,
+            -8705.29411764706,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 89,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=7000.000000,Y=-9106.000000,Z=-4.623990),Scale3D=(X=1.001765,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            6699.999999665881,
+            -9106.0,
+            -4.623989105224609
+          ],
+          [
+            6999.999999705189,
+            -8705.29411761763,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 90,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=7300.000000,Y=-8705.294118,Z=-4.623990),Scale3D=(X=1.001765,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            6999.999999705188,
+            -8705.294117676489,
+            -4.623989105224609
+          ],
+          [
+            7299.999999744497,
+            -8304.588235294119,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 91,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=7000.000000,Y=-8705.294118,Z=-4.623990),Scale3D=(X=1.001765,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            6699.999999705188,
+            -8705.29411764706,
+            -4.623989105224609
+          ],
+          [
+            6999.999999744497,
+            -8304.58823526469,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 92,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=7300.000000,Y=-8304.588235,Z=-4.623990),Scale3D=(X=1.001765,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            6999.999999744497,
+            -8304.588235323548,
+            -4.623989105224609
+          ],
+          [
+            7299.999999783805,
+            -7903.882352941178,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 93,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=7000.000000,Y=-8304.588235,Z=-4.623990),Scale3D=(X=1.001765,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            6699.999999744497,
+            -8304.588235294119,
+            -4.623989105224609
+          ],
+          [
+            6999.999999783805,
+            -7903.882352911749,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 94,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=7300.000000,Y=-7903.882353,Z=-4.623990),Scale3D=(X=1.001765,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            6999.999999783805,
+            -7903.882352970606,
+            -4.623989105224609
+          ],
+          [
+            7299.999999823113,
+            -7503.176470588236,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 95,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=7000.000000,Y=-7903.882353,Z=-4.623990),Scale3D=(X=1.001765,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            6699.999999783805,
+            -7903.882352941177,
+            -4.623989105224609
+          ],
+          [
+            6999.999999823113,
+            -7503.176470558807,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 96,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=7300.000000,Y=-7503.176471,Z=-4.623990),Scale3D=(X=1.001765,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            6999.999999823113,
+            -7503.176470617665,
+            -4.623989105224609
+          ],
+          [
+            7299.999999862422,
+            -7102.470588235294,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 97,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=7000.000000,Y=-7503.176471,Z=-4.623990),Scale3D=(X=1.001765,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            6699.999999823113,
+            -7503.176470588235,
+            -4.623989105224609
+          ],
+          [
+            6999.999999862422,
+            -7102.470588205864,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 98,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=7300.000000,Y=-7102.470588,Z=-4.623990),Scale3D=(X=1.001765,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            6999.999999862421,
+            -7102.470588264723,
+            -4.623989105224609
+          ],
+          [
+            7299.999999901729,
+            -6701.764705882353,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 99,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=7000.000000,Y=-7102.470588,Z=-4.623990),Scale3D=(X=1.001765,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            6699.999999862421,
+            -7102.470588235295,
+            -4.623989105224609
+          ],
+          [
+            6999.999999901729,
+            -6701.764705852924,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 100,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=7300.000000,Y=-6701.764706,Z=-4.623990),Scale3D=(X=1.001765,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            6999.999999901729,
+            -6701.764705911782,
+            -4.623989105224609
+          ],
+          [
+            7299.9999999410375,
+            -6301.058823529411,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 101,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=7000.000000,Y=-6701.764706,Z=-4.623990),Scale3D=(X=1.001765,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            6699.999999901729,
+            -6701.764705882353,
+            -4.623989105224609
+          ],
+          [
+            6999.9999999410375,
+            -6301.058823499983,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 102,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=7300.000000,Y=-6301.058824,Z=-4.623990),Scale3D=(X=1.001765,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            6999.9999999410375,
+            -6301.058823558841,
+            -4.623989105224609
+          ],
+          [
+            7299.999999980346,
+            -5900.35294117647,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 103,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=7000.000000,Y=-6301.058824,Z=-4.623990),Scale3D=(X=1.001765,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            6699.9999999410375,
+            -6301.058823529412,
+            -4.623989105224609
+          ],
+          [
+            6999.999999980346,
+            -5900.352941147041,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 104,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=7300.000000,Y=-5900.352941,Z=-4.623990),Scale3D=(X=1.001765,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            6999.999999980346,
+            -5900.3529412059,
+            -4.623989105224609
+          ],
+          [
+            7300.000000019654,
+            -5499.64705882353,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 105,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=7000.000000,Y=-5900.352941,Z=-4.623990),Scale3D=(X=1.001765,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            6699.999999980346,
+            -5900.35294117647,
+            -4.623989105224609
+          ],
+          [
+            7000.000000019654,
+            -5499.6470587941,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 106,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=7300.000000,Y=-5499.647059,Z=-4.623990),Scale3D=(X=1.001765,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            7000.000000019654,
+            -5499.647058852958,
+            -4.623989105224609
+          ],
+          [
+            7300.0000000589625,
+            -5098.941176470587,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 107,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=7000.000000,Y=-5499.647059,Z=-4.623990),Scale3D=(X=1.001765,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            6700.000000019654,
+            -5499.64705882353,
+            -4.623989105224609
+          ],
+          [
+            7000.0000000589625,
+            -5098.94117644116,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 108,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=7300.000000,Y=-5098.941177,Z=-4.623990),Scale3D=(X=1.001765,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            7000.0000000589625,
+            -5098.941176500018,
+            -4.623989105224609
+          ],
+          [
+            7300.000000098271,
+            -4698.235294117647,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 109,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=7000.000000,Y=-5098.941176,Z=-4.623990),Scale3D=(X=1.001765,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            6700.0000000589625,
+            -5098.941176470588,
+            -4.623989105224609
+          ],
+          [
+            7000.000000098271,
+            -4698.235294088217,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 110,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=7300.000000,Y=-4698.235294,Z=-4.623990),Scale3D=(X=1.001765,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            7000.000000098271,
+            -4698.235294147075,
+            -4.623989105224609
+          ],
+          [
+            7300.000000137579,
+            -4297.5294117647045,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 111,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=7000.000000,Y=-4698.235294,Z=-4.623990),Scale3D=(X=1.001765,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            6700.000000098271,
+            -4698.235294117647,
+            -4.623989105224609
+          ],
+          [
+            7000.000000137579,
+            -4297.529411735277,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 112,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=7300.000000,Y=-4297.529412,Z=-4.623990),Scale3D=(X=1.001765,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            7000.000000137578,
+            -4297.529411794135,
+            -4.623989105224609
+          ],
+          [
+            7300.000000176887,
+            -3896.8235294117644,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 113,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=7000.000000,Y=-4297.529412,Z=-4.623990),Scale3D=(X=1.001765,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            6700.000000137578,
+            -4297.529411764705,
+            -4.623989105224609
+          ],
+          [
+            7000.000000176887,
+            -3896.823529382335,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 114,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=7300.000000,Y=-3896.823529,Z=-4.623990),Scale3D=(X=1.001765,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            7000.000000176887,
+            -3896.8235294411943,
+            -4.623989105224609
+          ],
+          [
+            7300.000000216195,
+            -3496.117647058824,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 115,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=7000.000000,Y=-3896.823529,Z=-4.623990),Scale3D=(X=1.001765,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            6700.000000176887,
+            -3896.8235294117653,
+            -4.623989105224609
+          ],
+          [
+            7000.000000216195,
+            -3496.117647029395,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 116,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=7300.000000,Y=-3496.117647,Z=-4.623990),Scale3D=(X=1.001765,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            7000.000000216195,
+            -3496.117647088253,
+            -4.623989105224609
+          ],
+          [
+            7300.000000255503,
+            -3095.4117647058824,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 117,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=7000.000000,Y=-3496.117647,Z=-4.623990),Scale3D=(X=1.001765,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            6700.000000216195,
+            -3496.1176470588234,
+            -4.623989105224609
+          ],
+          [
+            7000.000000255503,
+            -3095.411764676453,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 118,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=7300.000000,Y=-3095.411765,Z=-4.623990),Scale3D=(X=1.001765,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            7000.000000255503,
+            -3095.4117647353114,
+            -4.623989105224609
+          ],
+          [
+            7300.000000294812,
+            -2694.705882352941,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 119,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=7000.000000,Y=-3095.411765,Z=-4.623990),Scale3D=(X=1.001765,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            6700.000000255503,
+            -3095.411764705882,
+            -4.623989105224609
+          ],
+          [
+            7000.000000294812,
+            -2694.7058823235116,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 120,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=7300.000000,Y=-2694.705882,Z=-4.623990),Scale3D=(X=1.001765,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            7000.000000294811,
+            -2694.705882382371,
+            -4.623989105224609
+          ],
+          [
+            7300.000000334119,
+            -2294.0000000000005,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 121,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=7000.000000,Y=-2694.705882,Z=-4.623990),Scale3D=(X=1.001765,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            6700.000000294811,
+            -2694.7058823529414,
+            -4.623989105224609
+          ],
+          [
+            7000.000000334119,
+            -2293.999999970571,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 122,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=1.000000,W=0.000000),Translation=(X=6706.000000,Y=-1700.000000,Z=-4.623990),Scale3D=(X=0.882500,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            6353.0,
+            -2000.0000000000002,
+            -4.623989105224609
+          ],
+          [
+            6706.0,
+            -1700.0000000000005,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 123,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=1.000000,W=0.000000),Translation=(X=6706.000000,Y=-2000.000000,Z=-4.623990),Scale3D=(X=0.882500,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            6353.0,
+            -2300.0,
+            -4.623989105224609
+          ],
+          [
+            6706.0,
+            -2000.0000000000002,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 124,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=1.000000,W=0.000000),Translation=(X=6353.000000,Y=-1700.000000,Z=-4.623990),Scale3D=(X=0.882500,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            6000.0,
+            -2000.0000000000002,
+            -4.623989105224609
+          ],
+          [
+            6353.0,
+            -1700.0000000000005,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 125,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=1.000000,W=0.000000),Translation=(X=6353.000000,Y=-2000.000000,Z=-4.623990),Scale3D=(X=0.882500,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            6000.0,
+            -2300.0,
+            -4.623989105224609
+          ],
+          [
+            6353.0,
+            -2000.0000000000002,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 126,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=1.000000,W=0.000000),Translation=(X=6000.000000,Y=-1700.000000,Z=-4.623990),Scale3D=(X=0.882500,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            5647.0,
+            -2000.0,
+            -4.623989105224609
+          ],
+          [
+            6000.0,
+            -1700.0000000000002,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 127,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=1.000000,W=0.000000),Translation=(X=6000.000000,Y=-2000.000000,Z=-4.623990),Scale3D=(X=0.882500,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            5647.0,
+            -2300.0,
+            -4.623989105224609
+          ],
+          [
+            6000.0,
+            -2000.0000000000002,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 128,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=1.000000,W=0.000000),Translation=(X=5647.000000,Y=-1700.000000,Z=-4.623990),Scale3D=(X=0.882500,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            5294.0,
+            -2000.0,
+            -4.623989105224609
+          ],
+          [
+            5647.0,
+            -1700.0000000000002,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 129,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=1.000000,W=0.000000),Translation=(X=5647.000000,Y=-2000.000000,Z=-4.623990),Scale3D=(X=0.882500,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            5294.0,
+            -2300.0,
+            -4.623989105224609
+          ],
+          [
+            5647.0,
+            -2000.0000000000002,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 130,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=5300.000000,Y=-1706.000000,Z=-4.623990),Scale3D=(X=0.882500,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            4999.999999930744,
+            -1706.0000000294294,
+            -4.623989105224609
+          ],
+          [
+            5299.999999965372,
+            -1353.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 131,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=5000.000000,Y=-1706.000000,Z=-4.623990),Scale3D=(X=0.882500,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            4699.999999930744,
+            -1706.0000000000002,
+            -4.623989105224609
+          ],
+          [
+            4999.999999965372,
+            -1352.9999999705708,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 132,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=5300.000000,Y=-1353.000000,Z=-4.623990),Scale3D=(X=0.882500,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            4999.999999965372,
+            -1353.0000000294294,
+            -4.623989105224609
+          ],
+          [
+            5300.0,
+            -1000.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 133,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=5000.000000,Y=-1353.000000,Z=-4.623990),Scale3D=(X=0.882500,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            4699.999999965372,
+            -1353.0000000000002,
+            -4.623989105224609
+          ],
+          [
+            5000.0,
+            -999.9999999705708,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 134,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=5300.000000,Y=-1000.000000,Z=-4.623990),Scale3D=(X=0.882500,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            5000.0,
+            -1000.0000000294292,
+            -4.623989105224609
+          ],
+          [
+            5300.000000034628,
+            -646.9999999999998,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 135,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=5000.000000,Y=-1000.000000,Z=-4.623990),Scale3D=(X=0.882500,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            4700.0,
+            -1000.0,
+            -4.623989105224609
+          ],
+          [
+            5000.000000034628,
+            -646.9999999705706,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 136,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=5300.000000,Y=-647.000000,Z=-4.623990),Scale3D=(X=0.882500,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            5000.000000034628,
+            -647.0000000294292,
+            -4.623989105224609
+          ],
+          [
+            5300.000000069256,
+            -293.9999999999998,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 137,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=5000.000000,Y=-647.000000,Z=-4.623990),Scale3D=(X=0.882500,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            4700.000000034628,
+            -647.0,
+            -4.623989105224609
+          ],
+          [
+            5000.000000069256,
+            -293.99999997057057,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 138,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=1.000000,W=0.000000),Translation=(X=4706.000000,Y=300.000000,Z=-4.623990),Scale3D=(X=1.010000,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            4302.0,
+            -5.684341886080802e-14,
+            -4.623989105224609
+          ],
+          [
+            4706.0,
+            299.9999999999997,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 139,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=1.000000,W=0.000000),Translation=(X=4706.000000,Y=-0.000000,Z=-4.623990),Scale3D=(X=1.010000,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            4302.0,
+            -299.9999999999999,
+            -4.623989105224609
+          ],
+          [
+            4706.0,
+            -9.2632816466467e-14,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 140,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=1.000000,W=0.000000),Translation=(X=4302.000000,Y=300.000000,Z=-4.623990),Scale3D=(X=1.010000,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            3898.0000000000005,
+            -5.684341886080802e-14,
+            -4.623989105224609
+          ],
+          [
+            4302.0,
+            299.9999999999997,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 141,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=1.000000,W=0.000000),Translation=(X=4302.000000,Y=-0.000000,Z=-4.623990),Scale3D=(X=1.010000,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            3898.0000000000005,
+            -299.9999999999998,
+            -4.623989105224609
+          ],
+          [
+            4302.0,
+            -3.5789397605658985e-14,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 142,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=1.000000,W=0.000000),Translation=(X=3898.000000,Y=300.000000,Z=-4.623990),Scale3D=(X=1.010000,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            3494.0000000000005,
+            5.684341886080802e-14,
+            -4.623989105224609
+          ],
+          [
+            3898.0,
+            299.99999999999983,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 143,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=1.000000,W=0.000000),Translation=(X=3898.000000,Y=-0.000000,Z=-4.623990),Scale3D=(X=1.010000,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            3494.0000000000005,
+            -299.9999999999998,
+            -4.623989105224609
+          ],
+          [
+            3898.0,
+            2.105402125514903e-14,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 144,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=6700.000000,Y=-2300.000000,Z=-4.623990),Scale3D=(X=0.750000,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            6700.0,
+            -2300.0,
+            -4.623989105224609
+          ],
+          [
+            7000.0,
+            -2000.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 145,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=6700.000000,Y=-2000.000000,Z=-4.623990),Scale3D=(X=0.750000,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            6700.0,
+            -2000.0,
+            -4.623989105224609
+          ],
+          [
+            7000.0,
+            -1700.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 146,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=7000.000000,Y=-2300.000000,Z=-4.623990),Scale3D=(X=0.750000,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            7000.0,
+            -2300.0,
+            -4.623989105224609
+          ],
+          [
+            7300.0,
+            -2000.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 147,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=7000.000000,Y=-2000.000000,Z=-4.623990),Scale3D=(X=0.750000,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            7000.0,
+            -2000.0,
+            -4.623989105224609
+          ],
+          [
+            7300.0,
+            -1700.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 148,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=4700.000000,Y=-2300.000000,Z=-4.623990),Scale3D=(X=0.750000,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            4700.0,
+            -2300.0,
+            -4.623989105224609
+          ],
+          [
+            5000.0,
+            -2000.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 149,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=4700.000000,Y=-2000.000000,Z=-4.623990),Scale3D=(X=0.750000,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            4700.0,
+            -2000.0,
+            -4.623989105224609
+          ],
+          [
+            5000.0,
+            -1700.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 150,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=5000.000000,Y=-2300.000000,Z=-4.623990),Scale3D=(X=0.750000,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            5000.0,
+            -2300.0,
+            -4.623989105224609
+          ],
+          [
+            5300.0,
+            -2000.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 151,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=5000.000000,Y=-2000.000000,Z=-4.623990),Scale3D=(X=0.750000,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            5000.0,
+            -2000.0,
+            -4.623989105224609
+          ],
+          [
+            5300.0,
+            -1700.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 152,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=4700.000000,Y=-300.000000,Z=-4.623990),Scale3D=(X=0.750000,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            4700.0,
+            -300.0,
+            -4.623989105224609
+          ],
+          [
+            5000.0,
+            0.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 153,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=4700.000000,Y=0.000000,Z=-4.623990),Scale3D=(X=0.750000,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            4700.0,
+            0.0,
+            -4.623989105224609
+          ],
+          [
+            5000.0,
+            300.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 154,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=5000.000000,Y=-300.000000,Z=-4.623990),Scale3D=(X=0.750000,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            5000.0,
+            -300.0,
+            -4.623989105224609
+          ],
+          [
+            5300.0,
+            0.0,
+            0.0
+          ]
+        ]
+      },
+      {
+        "index": 155,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=5000.000000,Y=0.000000,Z=-4.623990),Scale3D=(X=0.750000,Y=0.750000,Z=1.000000))",
+        "bounds": [
+          [
+            5000.0,
+            0.0,
+            -4.623989105224609
+          ],
+          [
+            5300.0,
+            300.0,
+            0.0
+          ]
+        ]
+      }
+    ]
+  }
+}

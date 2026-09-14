@@ -1,0 +1,41 @@
+{
+  "status": "Custom split-vault candidate; in-engine fit and lighting review required",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_AtriumCanopyFrame",
+      "triangles": 47696,
+      "nominal_dimensions_m": [
+        6.75,
+        7.140000343322754,
+        7.174999713897705
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_StoneGrout",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; replacement for noncolliding canopy art",
+      "walking_clearance_m": 3.5
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumCanopyVault",
+      "triangles": 5608,
+      "nominal_dimensions_m": [
+        6.260000228881836,
+        6.650000095367432,
+        1.9729394912719727
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; replacement for noncolliding canopy art",
+      "walking_clearance_m": 3.5
+    }
+  ]
+}
