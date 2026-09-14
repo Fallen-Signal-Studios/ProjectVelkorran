@@ -1,0 +1,22 @@
+{
+  "status": "Source candidate; Unreal fit and visual acceptance pending",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z06FallenMasonry",
+      "triangles": 16544,
+      "nominal_dimensions_m": [
+        10.0,
+        7.0,
+        2.4000000953674316
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; fitted to the retained 10 x 7 x 2.4 m physical slab, pending in-engine verification"
+    }
+  ]
+}
