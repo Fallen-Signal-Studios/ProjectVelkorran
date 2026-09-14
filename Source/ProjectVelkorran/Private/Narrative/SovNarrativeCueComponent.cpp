@@ -61,7 +61,7 @@ bool USovNarrativeCueComponent::IsCombatRequired() const
 	if (!P || !P->IsAlive() || !P->IsCharacterReady() || Controller->GetCampaignTransitionState() != ESovCampaignTransitionState::Idle) { return true; }
 	if (P->GetEchoComponent() && P->GetEchoComponent()->IsEncounterActive()) { return true; }
 	for (TActorIterator<ASovEncounterDirector> It(GetWorld()); It; ++It)
-	{ if (It->HasEncounterPlayer(P) && (It->GetEncounterState() == ESovEncounterState::Active || It->GetEncounterState() == ESovEncounterState::Restoring)) { return true; } }
+	{ if (It->IsEncounterCombatant(P) && (It->GetEncounterState() == ESovEncounterState::Active || It->GetEncounterState() == ESovEncounterState::Restoring)) { return true; } }
 	const auto* ASC = P->GetNarrativeAbilitySystemComponent();
 	return !ASC || ASC->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_Busy)
 		|| ASC->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_SequencerControlled);

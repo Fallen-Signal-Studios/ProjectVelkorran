@@ -117,8 +117,17 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Encounter|Recovery") bool bAllowCompanionRescue = true;
 
 	UFUNCTION(BlueprintPure, Category = "Encounter") ESovEncounterState GetEncounterState() const { return State; }
+	/** Whether Actor is the player that owns this encounter's entry checkpoint, snapshot and restore. */
 	UFUNCTION(BlueprintPure, Category = "Encounter") bool HasEncounterPlayer(const AActor* Actor) const;
 	ASovPlayerCharacterBase* GetEncounterPlayer() const { return EncounterPlayer; }
+	/**
+	 * Whether Actor is a player fighting in this encounter. Membership questions (fatal recovery, corruption
+	 * overwrite, sensing, "is combat active for this pawn") ask this rather than comparing with the checkpoint
+	 * owner, so they already hold for several players. The single-player campaign has exactly one combatant: the
+	 * encounter player.
+	 */
+	UFUNCTION(BlueprintPure, Category = "Encounter") bool IsEncounterCombatant(const AActor* Actor) const;
+	void GetEncounterCombatants(TArray<ASovPlayerCharacterBase*>& OutCombatants) const;
 	UFUNCTION(BlueprintPure, Category="Encounter") class USovEncounterCoordinationComponent* GetCoordinationComponent() const { return Coordination; }
 	/** Current native death receipt; arbitrary destruction is never a defeat. */
 	bool HasConfirmedParticipantDefeat(FName ParticipantId) const;
