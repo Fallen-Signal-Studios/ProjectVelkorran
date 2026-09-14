@@ -1,0 +1,15 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Parapet_4m",
+      "dimensions_m": [
+        4.0,
+        0.2199999988079071,
+        1.3000000715255737
+      ],
+      "triangles": 7992
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}
