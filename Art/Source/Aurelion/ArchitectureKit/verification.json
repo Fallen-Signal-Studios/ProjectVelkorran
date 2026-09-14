@@ -1,0 +1,42 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_WallBay_4x7",
+      "dimensions_m": [
+        4.0,
+        0.8689999580383301,
+        6.970000267028809
+      ],
+      "triangles": 26464
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Pier_1x7",
+      "dimensions_m": [
+        1.2000000476837158,
+        1.0399999618530273,
+        7.0
+      ],
+      "triangles": 3384
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Cornice_4m",
+      "dimensions_m": [
+        4.0,
+        0.7804999947547913,
+        0.5799999833106995
+      ],
+      "triangles": 4700
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Floor_4m",
+      "dimensions_m": [
+        3.98799991607666,
+        3.98799991607666,
+        0.13099999725818634
+      ],
+      "triangles": 1504
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}

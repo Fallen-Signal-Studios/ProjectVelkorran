@@ -1,0 +1,69 @@
+{
+  "status": "source prototype; quality and in-engine acceptance pending",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_WallBay_4x7",
+      "triangles": 26464,
+      "nominal_dimensions_m": [
+        4,
+        0.85,
+        7
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 1,
+      "collision": "Not authored; no gameplay placement until collision is verified"
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Pier_1x7",
+      "triangles": 3384,
+      "nominal_dimensions_m": [
+        1.2,
+        1.04,
+        7
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 1,
+      "collision": "Not authored; no gameplay placement until collision is verified"
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Cornice_4m",
+      "triangles": 4700,
+      "nominal_dimensions_m": [
+        4,
+        0.785,
+        0.58
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_ChannelShadow"
+      ],
+      "uv_layers": 1,
+      "collision": "Not authored; no gameplay placement until collision is verified"
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Floor_4m",
+      "triangles": 1504,
+      "nominal_dimensions_m": [
+        4,
+        4,
+        0.131
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 1,
+      "collision": "Not authored; no gameplay placement until collision is verified"
+    }
+  ]
+}
