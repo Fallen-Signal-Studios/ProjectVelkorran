@@ -20,9 +20,16 @@ def check_canopies(world,actors):
   replaced='BridgeCanopy' in row['actor'] or 'CeramicCanopyPylon' in row['actor']
   assert c.get_editor_property('visible')==(False if replaced else row['visible']) and c.get_editor_property('hidden_in_game')==(True if replaced else row['hidden'])
  light_measurements=[]
+ lighting_path=root/'Art/Source/Aurelion/AtriumCanopyKit/lighting-fit.json'
+ lighting={r['actor']:r for r in json.loads(lighting_path.read_text())['lights']} if lighting_path.exists() else {}
  for row in baseline['lights']:
   c=next(c for c in labels[row['actor']].get_components_by_class(unreal.LightComponent) if c.get_name()==row['component'])
-  assert c.get_world_transform().export_text()==row['transform'] and c.get_editor_property('intensity')==row['intensity'] and c.get_editor_property('light_color').export_text()==row['color'] and c.get_editor_property('visible')==row['visible']
+  expected=lighting[row['actor']]['after']['lumens'] if lighting else row['intensity']
+  assert c.get_world_transform().export_text()==row['transform'] and c.get_editor_property('intensity')==expected and c.get_editor_property('light_color').export_text()==row['color'] and c.get_editor_property('visible')==row['visible']
+  if lighting:
+   spec=lighting[row['actor']]
+   assert c.get_editor_property('intensity_units')==unreal.LightUnits.LUMENS and c.get_editor_property('attenuation_radius')==spec['after']['radius']
+   assert c.get_editor_property('source_width')==spec['source_width'] and c.get_editor_property('source_height')==spec['source_height']
   light_measurements.append(dict(actor=row['actor'],units=str(c.get_editor_property('intensity_units')),intensity=c.get_editor_property('intensity'),source_width=c.get_editor_property('source_width'),source_height=c.get_editor_property('source_height'),attenuation_radius=c.get_editor_property('attenuation_radius')))
  floor=baseline['floor'];c=next(c for c in labels[floor['actor']].get_components_by_class(unreal.InstancedStaticMeshComponent) if c.get_name()==floor['component'])
  assert c.static_mesh.get_path_name()==floor['mesh'] and str(c.get_collision_enabled())==floor['collision']
