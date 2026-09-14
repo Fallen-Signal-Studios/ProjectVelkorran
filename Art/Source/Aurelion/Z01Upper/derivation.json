@@ -1,0 +1,16 @@
+{
+  "source_asset": "/Game/Aurelion/Art/Props/aurelionwalls/StaticMeshes/aurelionwalls",
+  "operation": "Remove geometry below world Z695; retain upper enclosure at original actor transform",
+  "cut_local_metres": 2.3428930333333335,
+  "faces_before": 3090,
+  "faces_after": 2448,
+  "triangles": 2732,
+  "dimensions_metres": [
+    5.999998569488525,
+    14.001997947692871,
+    1.828671932220459
+  ],
+  "material_slots": 4,
+  "uv_channels": 1,
+  "scope": "Owned visual derivative; original collision asset remains unchanged"
+}
