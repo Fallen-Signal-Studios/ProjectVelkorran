@@ -84,7 +84,7 @@ bool UNarrativeAbilitySystemComponent::ConsumeCombatInputWindow(UNarrativeCombat
 	if (CombatInputOwner.Get() != Ability || CombatInputWindowId != WindowId || !WindowId.IsValid()) { return false; }
 	if (!IsCombatInputWindowValid()) { ClearCombatInputBuffer(); return false; }
 	if (!BufferedCombatInput.IsValid()) { return false; }
-	const auto* Settings = UNarrativeGameUserSettings::GetSovSettings();
+	const auto* Settings = UNarrativeGameUserSettings::GetSovPlayerSettings(GetAvatarActor());
 	const float Assist = Settings ? Settings->GetInputBufferAssistanceSeconds() : 0.f;
 	const double Lifetime = 0.22 + (FMath::IsFinite(Assist) ? FMath::Clamp(Assist, 0.f, 0.2f) : 0.f);
 	const double Now = GetWorld()->GetTimeSeconds();

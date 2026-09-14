@@ -28,7 +28,9 @@ bool SovAimAssist::FindVisibleTarget(AActor* Shooter, const FVector& Origin, con
 	OutTarget = nullptr; OutPoint = FVector::ZeroVector;
 	const APawn* Pawn = Cast<APawn>(Shooter);
 	const auto* PC = Pawn ? Cast<APlayerController>(Pawn->GetController()) : nullptr;
-	if (!IsValid(Shooter) || !Shooter->GetWorld() || !PC || !PC->IsLocalController() || PC->GetPawn() != Shooter
+	// Any player's possessed shooter qualifies, not only this machine's local controller: projectile lead is resolved
+	// by authority-side payload code, which for a remote player runs where that player's controller is not local.
+	if (!IsValid(Shooter) || !Shooter->GetWorld() || !PC || PC->GetPawn() != Shooter
 		|| Origin.ContainsNaN() || Direction.ContainsNaN() || Direction.IsNearlyZero() || !FMath::IsFinite(Range)
 		|| !FMath::IsFinite(ConeDegrees) || Range <= 0.f || ConeDegrees <= 0.f || ConeDegrees > 15.f) { return false; }
 	Range = FMath::Min(Range, 5000.f);
@@ -74,7 +76,7 @@ bool SovAimAssist::GetBallisticProjectileLead(AActor* Shooter, const FVector& Mu
 	const FProjectileLeadRequest& Request, FVector& OutVelocity)
 {
 	OutVelocity = Request.InitialVelocity;
-	const auto* Settings = UNarrativeGameUserSettings::GetSovSettings();
+	const auto* Settings = UNarrativeGameUserSettings::GetSovPlayerSettings(Shooter);
 	if (!Settings || !Settings->UseProjectileLead()) { return false; }
 	const float Speed = Request.InitialVelocity.Size();
 	if (Request.InitialVelocity.ContainsNaN() || Request.Gravity.ContainsNaN() || !FMath::IsFinite(Speed) || Speed <= 0.f

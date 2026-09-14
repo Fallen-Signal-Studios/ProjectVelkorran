@@ -147,7 +147,7 @@ void USovGameplayAbility_Evade::ActivateAbility(FGameplayAbilitySpecHandle Handl
 	if (Epoch != EvadeEpoch || !HasValidSource()) { PaidASC->RemoveActiveGameplayEffect(NewBusy); return; }
 	BusyHandle = NewBusy;
 	if (!BusyHandle.IsValid()) { EndAbility(Handle, ActorInfo, ActivationInfo, true, true); return; }
-	const auto* Settings = UNarrativeGameUserSettings::GetSovSettings();
+	const auto* Settings = UNarrativeGameUserSettings::GetSovPlayerSettings(ActorInfo ? ActorInfo->AvatarActor.Get() : nullptr);
 	const float WindowScale = Settings ? Settings->GetDefenseWindowScale() : 1.f;
 	const float Window = FMath::Min(Profile.EvadeInvulnerability * WindowScale, Profile.EvadeDuration);
 	const FActiveGameplayEffectHandle NewInvulnerability = GrantWindow(PaidASC,

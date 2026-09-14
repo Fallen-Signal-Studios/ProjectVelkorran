@@ -232,7 +232,7 @@ void USovGameplayAbility_Melee::ReleaseCharge()
 }
 void USovGameplayAbility_Melee::ApplyAimCorrection()
 {
-    const auto* Settings=UNarrativeGameUserSettings::GetSovSettings();
+    const auto* Settings=UNarrativeGameUserSettings::GetSovPlayerSettings(ActionAvatar.Get());
     const float Strength=Settings?Settings->GetMeleeAimAssistStrength():0.f;
     if (Strength<=0.f||!ContextValid()) { return; }
     const uint64 Epoch=MeleeActivationEpoch;

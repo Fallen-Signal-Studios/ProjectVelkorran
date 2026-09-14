@@ -14,9 +14,9 @@
 
 namespace
 {
-	float CostScale()
+	float CostScale(const AActor* Player)
 	{
-		const auto* Settings = UNarrativeGameUserSettings::GetSovSettings();
+		const auto* Settings = UNarrativeGameUserSettings::GetSovPlayerSettings(Player);
 		const float Scale = Settings ? Settings->GetExertionCostScale() : 1.f;
 		return FMath::IsFinite(Scale) ? FMath::Clamp(Scale, 0.1f, 1.f) : 1.f;
 	}
@@ -159,13 +159,13 @@ bool USovExertionComponent::CanMutate() const
 bool USovExertionComponent::CanSpendExertion(float Cost) const
 {
 	return !bChangingResource && CanMutate() && SovExertionPolicy::ValidCost(Cost)
-		&& SovExertionPolicy::CanPay(GetStamina(), Cost * CostScale());
+		&& SovExertionPolicy::CanPay(GetStamina(), Cost * CostScale(GetOwner()));
 }
 
 bool USovExertionComponent::TrySpendExertion(float Cost)
 {
 	if (!CanSpendExertion(Cost)) { return false; }
-	return TrySpendScaledCost(Cost * CostScale());
+	return TrySpendScaledCost(Cost * CostScale(GetOwner()));
 }
 
 bool USovExertionComponent::TrySpendScaledCost(float PaidCost)
@@ -235,7 +235,7 @@ void USovExertionComponent::UpdateExertion(float DeltaTime)
 	const bool bSprinting = Movement && Movement->bWantsSprint && Movement->IsMovingOnGround()
 		&& !Movement->IsCrouching() && (!Movement->Velocity.IsNearlyZero() || !Character->GetLastMovementInputVector().IsNearlyZero());
 	const FSovExertionProfile Profile = GetProfile();
-	const float Drain = static_cast<float>(SovExertionPolicy::SprintDrain(GetStamina(), Profile.CombatSprintDrain * CostScale(),
+	const float Drain = static_cast<float>(SovExertionPolicy::SprintDrain(GetStamina(), Profile.CombatSprintDrain * CostScale(GetOwner()),
 		DeltaTime, IsCombatActive(), bSprinting));
 	if (Drain > 0.f)
 	{

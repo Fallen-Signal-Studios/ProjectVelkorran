@@ -394,3 +394,18 @@ const UNarrativeGameUserSettings* UNarrativeGameUserSettings::GetSovSettings()
 {
 	return GEngine ? Cast<UNarrativeGameUserSettings>(GEngine->GetGameUserSettings()) : nullptr;
 }
+
+// Both scopes resolve to the local user while the campaign is single-player. A networked mode replaces these two
+// resolutions (per-player preferences from replicated player state, session difficulty from the game state) without
+// revisiting the gameplay call sites.
+const UNarrativeGameUserSettings* UNarrativeGameUserSettings::GetSovPlayerSettings(const UObject* PlayerContext)
+{
+	static_cast<void>(PlayerContext);
+	return GetSovSettings();
+}
+
+const UNarrativeGameUserSettings* UNarrativeGameUserSettings::GetSovSessionSettings(const UObject* WorldContext)
+{
+	static_cast<void>(WorldContext);
+	return GetSovSettings();
+}

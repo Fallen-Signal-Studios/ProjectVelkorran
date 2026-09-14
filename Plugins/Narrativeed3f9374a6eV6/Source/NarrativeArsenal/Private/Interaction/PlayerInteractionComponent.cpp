@@ -244,7 +244,7 @@ void UPlayerInteractionComponent::BeginInteract()
 	FText Error;
 	if (!IsInteractableInReach(Target.Get()) || !Target->CanInteract(Pawn, this, Error)
 		|| !Target.IsValid() || Target.Get() != ViewedInteractable || OwningController->GetPawn() != Pawn) { return; }
-	const UNarrativeGameUserSettings* Settings = UNarrativeGameUserSettings::GetSovSettings();
+	const UNarrativeGameUserSettings* Settings = UNarrativeGameUserSettings::GetSovPlayerSettings(Pawn);
 	const float Scale = Settings ? FMath::Clamp(Settings->GetInteractionHoldScale(), 0.1f, 1.f) : 1.f;
 	RemainingInteractTime = Settings && Settings->UseTapInteractions() ? 0.f : FMath::Max(0.f, Target->InteractionTime) * Scale;
 	bInteractHeld = true;

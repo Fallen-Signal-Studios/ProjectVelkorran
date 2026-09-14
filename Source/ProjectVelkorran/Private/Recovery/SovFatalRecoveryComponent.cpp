@@ -241,7 +241,7 @@ void USovFatalRecoveryComponent::ResolveFatal(uint64 ExpectedEpoch)
 	ASovEncounterDirector* Encounter = PendingEncounter;
 	const bool bActive = IsValid(Encounter) && Encounter->IsEncounterCombatant(P)
 		&& Encounter->GetEncounterState() == ESovEncounterState::Active && Encounter->GetAttemptId().IsValid();
-	const auto* Settings = UNarrativeGameUserSettings::GetSovSettings();
+	const auto* Settings = UNarrativeGameUserSettings::GetSovSessionSettings(P);
 	if (SovRecoveryPolicy::CanRescue(true, bActive, bActive && Encounter->bAllowCompanionRescue,
 		!Settings || Settings->IsCompanionRescueAllowed(), bActive && UsedRescueAttempt == Encounter->GetAttemptId(),
 		FatalTransaction.IsValid(), bExcludedFatal, true, IsSafeRecoveryPosition(P, P->GetActorLocation())))

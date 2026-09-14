@@ -354,8 +354,8 @@ bool UNarrativeAbilitySystemComponent::TryActivateBotAttack(AActor* Target, cons
 	++BotAttackSelectionSerial;
 	BotAttackLastUsed.Add(Handle, BotAttackSelectionSerial);
 	BotAttackNextAllowedTimes.Add(Handle, (GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0)
-		+ FMath::Max(Candidate.Frequency, 0.05f) * (UNarrativeGameUserSettings::GetSovSettings()
-		? UNarrativeGameUserSettings::GetSovSettings()->GetEnemyRecoveryScale() : 1.f));
+		+ FMath::Max(Candidate.Frequency, 0.05f) * (UNarrativeGameUserSettings::GetSovSessionSettings(this)
+		? UNarrativeGameUserSettings::GetSovSessionSettings(this)->GetEnemyRecoveryScale() : 1.f));
 	// Instant abilities may end inside TryActivateAbility; their end delegate has
 	// already released the lease. Removal during activation is equally safe.
 	const FGameplayAbilitySpec* ActiveSpec = FindAbilitySpecFromHandle(Handle);

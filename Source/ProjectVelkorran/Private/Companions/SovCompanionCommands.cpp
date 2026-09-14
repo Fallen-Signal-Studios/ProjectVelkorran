@@ -291,7 +291,7 @@ bool USovCompanionComponent::TryRecoverSeparation()
 bool USovCompanionComponent::CanProvideRescue(ASovPlayerCharacterBase* Player, FString& Reason) const
 {
 	Reason.Reset(); auto* NPC = Cast<ANarrativeNPCCharacter>(GetOwner()); auto* Abilities = CompanionASC(GetOwner());
-	const auto* Settings = UNarrativeGameUserSettings::GetSovSettings();
+	const auto* Settings = UNarrativeGameUserSettings::GetSovSessionSettings(GetOwner());
 	if (!bMayRescue || !Settings || !Settings->IsCompanionRescueAllowed() || !NPC || !NPC->HasAuthority() || !NPC->IsAlive()
 		|| !IsValid(Player) || !HasMissionPermission(Player) || !Abilities || Abilities->GetAvatarActor() != NPC
 		|| Abilities->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_SequencerControlled)
