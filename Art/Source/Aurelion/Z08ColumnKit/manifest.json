@@ -1,0 +1,22 @@
+{
+  "status": "Authored pier; engine fit and visual review pending",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z08EngagedPier",
+      "triangles": 21064,
+      "nominal_dimensions_m": [
+        1.2,
+        1.0,
+        7.0
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; retains six former visual-only column envelopes"
+    }
+  ]
+}
