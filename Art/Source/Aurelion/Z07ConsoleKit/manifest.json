@@ -1,0 +1,42 @@
+{
+  "status": "Gallery control source; placement and native interaction qualification pending",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z07PriorityConsole",
+      "triangles": 4700,
+      "nominal_dimensions_m": [
+        0.5,
+        0.699999988079071,
+        1.207898497581482
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_UplightLens"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; existing priority Body remains authoritative",
+      "bottom_m": -0.61
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z07ControlDesk",
+      "triangles": 7520,
+      "nominal_dimensions_m": [
+        2.0,
+        1.5,
+        1.212499976158142
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_UplightLens"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; original central desk cube remains authoritative"
+    }
+  ]
+}
