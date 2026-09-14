@@ -423,7 +423,11 @@ bool ASovPlayerController::StartPawnHandoff(USovCampaignDefinition* Destination,
 bool ASovPlayerController::StageCampaignLoad(USovCampaignDefinition* Mission, const FNarrativeSavePlayer* Records,
 	bool bFromTravel, FString& OutError)
 {
-	if (!HasAuthority() || GetNetMode() != NM_Standalone || !IsValid(Mission)) { return false; }
+	if (!HasAuthority() || !IsValid(Mission)) { return false; }
+	// Campaign missions, handoffs and saves are single-player. A networked session is refused with a reason at login
+	// instead of accepting a player whose campaign pawn can never finish initializing.
+	if (GetNetMode() != NM_Standalone)
+	{ OutError = TEXT("Campaign missions are single-player; a networked session cannot stage one."); return false; }
 	PendingProtagonist = Mission->Protagonist;
 	PendingHandoffBeat = NAME_None; PendingHandoffRequest.Invalidate();
 	if (Records && Records->IsValid() && !bFromTravel)
@@ -484,7 +488,7 @@ void ASovPlayerController::InitializeCampaignPawn(ASovPlayerCharacterBase* Campa
 
 void ASovPlayerController::PollCampaignInitialization(uint64 ExpectedEpoch)
 {
-	if (!IsValid(this) || IsActorBeingDestroyed() || TransitionEpoch != ExpectedEpoch) { return; }
+	if (!IsValid(this) || IsActorBeingDestroyed() || !HasAuthority() || TransitionEpoch != ExpectedEpoch) { return; }
 	if (!SovCampaignPolicy::MayCommitAsync(TransitionEpoch, ExpectedEpoch, IsValid(PendingPawn), GetPawn() == PendingPawn))
 	{
 		if (GetWorld()->GetTimeSeconds() >= InitializationDeadline) { FailCampaignInitialization(TEXT("Campaign possession did not complete.")); }
