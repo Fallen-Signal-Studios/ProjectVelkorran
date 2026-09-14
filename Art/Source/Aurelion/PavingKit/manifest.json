@@ -1,0 +1,62 @@
+{
+  "status": "Room-fit candidate; final surface and live traversal review required",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_PavingRoute_4m",
+      "triangles": 3196,
+      "nominal_dimensions_m": [
+        4.0,
+        4.0,
+        0.12000000476837158
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_Basalt",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_IvoryStone"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; deployed over the retained flat floor proxy with top at world Z0",
+      "surface_top_metres": 0.12000000476837158
+    },
+    {
+      "asset": "SM_Aurelion_KIT_PavingIvory_4m",
+      "triangles": 2444,
+      "nominal_dimensions_m": [
+        4.0,
+        4.0,
+        0.12000000476837158
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_Basalt",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; deployed over the retained flat floor proxy with top at world Z0",
+      "surface_top_metres": 0.12000000476837158
+    },
+    {
+      "asset": "SM_Aurelion_KIT_PavingEdge_3x4",
+      "triangles": 2444,
+      "nominal_dimensions_m": [
+        3.0,
+        4.0,
+        0.12000000476837158
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_Basalt",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; deployed over the retained flat floor proxy with top at world Z0",
+      "surface_top_metres": 0.12000000476837158
+    }
+  ]
+}
