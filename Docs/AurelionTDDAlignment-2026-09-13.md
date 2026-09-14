@@ -92,3 +92,8 @@ The security prompt was absent on the next editor check and editor access
 resumed. `AurelionCrucibleLighting-2026-09-13.md` records the saved ceiling material
 and lighting review, physical-geometry checks, and fresh-route validation. The
 recess-panel candidate is still unplaced; the 90% target remains unproven.
+
+`ProtagonistCastPairs-2026-09-13.md` records twenty cosmetic cast montages across
+the ten protagonist Echo abilities, independent alternating playback, and GAS
+regression checks. Dressed-character combat timing and companion playback remain
+live qualification items; this pass does not change the 63.75% estimate.

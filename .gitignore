@@ -72,6 +72,18 @@ Content/
 /Content/Abilities/Tarrik/*
 !/Content/Abilities/Tarrik/GE_CinderlineThermal.uasset
 !/Content/Abilities/Tarrik/GA_CinderlinePrimary.uasset
+!/Content/Abilities/Tarrik/GA_Tarrik_CinderStickyGrenade.uasset
+!/Content/Abilities/Tarrik/GA_Tarrik_VelkorransHunger.uasset
+!/Content/Abilities/Tarrik/GA_Tarrik_CinderSlam.uasset
+!/Content/Abilities/Tarrik/GA_Tarrik_CinderJudgement.uasset
+!/Content/Abilities/Tarrik/GA_Tarrik_CinderlineRequiem.uasset
+!/Content/Abilities/Selene/
+/Content/Abilities/Selene/*
+!/Content/Abilities/Selene/GA_Selene_StillpointGrenade.uasset
+!/Content/Abilities/Selene/GA_Selene_VeritysWake.uasset
+!/Content/Abilities/Selene/GA_Selene_StaccatoZero.uasset
+!/Content/Abilities/Selene/GA_Selene_AxiomNullPulse.uasset
+!/Content/Abilities/Selene/GA_Selene_Dispatch.uasset
 !/Content/Items/
 /Content/Items/*
 !/Content/Items/Weapons/
@@ -87,6 +99,8 @@ Content/
 !/Content/Characters/Animation/ABP_SovVerityOverlay.uasset
 !/Content/Characters/Animation/VerityTwinBlades/
 !/Content/Characters/Animation/VerityTwinBlades/**/*.uasset
+!/Content/Characters/Animation/ProtagonistCasts/
+!/Content/Characters/Animation/ProtagonistCasts/**/*.uasset
 !/Content/Weapons/
 /Content/Weapons/*
 !/Content/Weapons/Visuals/

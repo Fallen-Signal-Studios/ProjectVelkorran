@@ -3,6 +3,7 @@
 #include "Abilities/SovGameplayAbility_Echo.h"
 
 #include "Abilities/GameplayAbilityTargetTypes.h"
+#include "Animation/AnimMontage.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "Components/SovEchoComponent.h"
@@ -390,6 +391,8 @@ void USovGameplayAbility_EchoBase::ActivateAbility(
 
 	if (ActorInfo->IsLocallyControlled() || ActorInfo->IsNetAuthority())
 	{
+		PlayAlternatingCastMontage();
+		if (!ContinueActivation()) { return; }
 		ReceiveEchoAbilityStarted(ActorInfo->IsNetAuthority());
 	}
 	if (!ContinueActivation()) { return; }
@@ -402,6 +405,20 @@ void USovGameplayAbility_EchoBase::ActivateAbility(
 	{
 		ReceiveEchoAbilityAuthorityCommitted(GetEchoCost());
 		ContinueActivation();
+	}
+}
+
+void USovGameplayAbility_EchoBase::PlayAlternatingCastMontage()
+{
+	ActiveCastMontage = nullptr;
+	if (CastMontages.Num() != 2 || !CastMontages[0] || !CastMontages[1] ||
+		CastMontages[0] == CastMontages[1] || !CurrentActorInfo) { return; }
+	UAbilitySystemComponent* ASC = CurrentActorInfo->AbilitySystemComponent.Get();
+	UAnimMontage* Montage = CastMontages[NextCastMontageIndex];
+	if (ASC && ASC->PlayMontage(this, CurrentActivationInfo, Montage, 1.f) > 0.f)
+	{
+		ActiveCastMontage = Montage;
+		NextCastMontageIndex ^= 1;
 	}
 }
 
@@ -423,6 +440,15 @@ void USovGameplayAbility_EchoBase::EndAbility(
 	}
 	TStrongObjectPtr<USovGameplayAbility_EchoBase> ActionLifetime(this);
 	TGuardValue<bool> Ending(bEndingEcho, true);
+	// Instant payloads can finish before their cosmetic recovery. Let successful
+	// casts blend out, but never stop a montage now owned by a newer ability.
+	if (bWasCancelled && ActiveCastMontage && ActorInfo)
+	{
+		UAbilitySystemComponent* ASC = ActorInfo->AbilitySystemComponent.Get();
+		if (ASC && ASC->GetAnimatingAbility() == this && ASC->GetCurrentMontage() == ActiveCastMontage)
+		{ ASC->CurrentMontageStop(0.12f); }
+	}
+	ActiveCastMontage = nullptr;
 	UnbindCancellationTags();
 	if (UWorld* World = GetWorld())
 	{
