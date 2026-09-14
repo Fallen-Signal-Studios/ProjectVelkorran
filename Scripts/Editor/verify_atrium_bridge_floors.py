@@ -9,7 +9,7 @@ verify_canopies=verify
 del DEFER_CANOPY_AUTORUN
 def verify():
     verify_canopies()
-    assert len(actors)==2484+atrium_crown_count+atrium_crown_light_count+z06_paving_count+z06_ceiling_count+z06_side_count+z06_light_count+z06_end_count and atrium_bridge_floor_count==4
+    assert len(actors)==2484+atrium_crown_count+atrium_crown_light_count+z06_paving_count+z06_ceiling_count+z06_side_count+z06_light_count+z06_end_count+z06_slab_count and atrium_bridge_floor_count==4
     geometry=runpy.run_path(str(root/'Scripts/Editor/check_atrium_bridge_floors.py'))['check_bridge_floors'](world,actors)
     assert not unreal.EditorLoadingAndSavingUtils.get_dirty_map_packages()
     (out/'atrium-bridge-floor-verification.json').write_text(json.dumps(dict(status='passed',actor_count=len(actors),geometry=geometry),indent=2))

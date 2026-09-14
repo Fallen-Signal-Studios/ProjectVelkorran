@@ -29,7 +29,23 @@ for sign in (-1,1):
 box('Cap joint backing',(0,0,2.367),(10,7,.054),dark,.001)
 for x in (-10/3,0,10/3):
     for y in (-1.75,1.75):box('Heavy capstone',(x,y,2.355),(10/3-.024,3.476,.09),stone,.012)
+# Faceted spalling affects only the outer four centimetres of selected face/cornice edges.
+# The cap plane and structural core remain intact; no rubble is placed in the rescue lanes.
+damage=[]
+for sign in (-1,1):
+    for i,(x,z) in enumerate([(-4.6,.31),(-2.9,1.18),(-1.3,2.18),(.8,.44),(2.4,1.94),(4.7,2.13)]):
+        bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1,radius=1,location=(x,sign*3.54,z));cutter=bpy.context.object;cutter.name='Spall cutter';cutter.scale=(.23+.025*(i%3),.08,.12)
+        bpy.ops.object.transform_apply(location=False,rotation=False,scale=True)
+        bpy.context.view_layer.update()
+        for target in list(parts):
+            points=[target.matrix_world@Vector(v) for v in target.bound_box]
+            if not (min(v.x for v in points)<x+.30 and max(v.x for v in points)>x-.30 and min(v.z for v in points)<z+.12 and max(v.z for v in points)>z-.12):continue
+            bpy.context.view_layer.objects.active=target
+            mod=target.modifiers.new('Localized impact spall','BOOLEAN');mod.operation='DIFFERENCE';mod.solver='EXACT';mod.object=cutter
+            bpy.ops.object.modifier_apply(modifier=mod.name)
+        bpy.data.objects.remove(cutter,do_unlink=True);damage.append(dict(x=x,y=sign*3.54,z=z,max_depth_m=.04))
 o=export('SM_Aurelion_KIT_Z06FallenMasonry',[10,7,2.4]);manifest[-1]['nominal_dimensions_m']=list(o.dimensions);manifest[-1]['collision']='None; fitted to the retained 10 x 7 x 2.4 m physical slab, pending in-engine verification'
+manifest[-1]['localized_spalls']=damage
 (ROOT/'manifest.json').write_text(json.dumps(dict(status='Source candidate; Unreal fit and visual acceptance pending',modules=manifest),indent=2))
 scene.render.engine='CYCLES';scene.cycles.samples=48;scene.world=bpy.data.worlds.new('Slab studio');scene.world.color=(.2,.2,.2)
 for pos,power,size in [((2,-7,10),1800,7),((-7,3,7),1300,6)]:

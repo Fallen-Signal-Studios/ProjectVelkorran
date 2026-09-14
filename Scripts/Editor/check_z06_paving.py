@@ -25,7 +25,14 @@ def check_z06_paving(world, actors):
             asset_collision[m.get_name()]=dict(simple=sm.get_simple_collision_count(m),convex=sm.get_convex_collision_count(m))
             placements.append(a.get_actor_label())
     c=labels[fit['floor']['actor']].get_component_by_class(unreal.InstancedStaticMeshComponent)
-    assert sorted(c.get_instance_transform(i,world_space=True).export_text() for i in range(c.get_instance_count()))==sorted(fit['retained_transforms'])
+    expected=fit['retained_transforms']
+    if 'KIT_Z06_FallenMasonry' in labels:
+        slab=json.loads((Path(unreal.Paths.project_dir())/'Art/Source/Aurelion/Z06FallenSlabKit/slab-baseline.json').read_text())
+        source=next(r for r in slab['art'] if r['count']==48)
+        assert sorted(expected)==sorted(source['all_transforms'])
+        selected={r['index'] for r in source['selected']};expected=[t for i,t in enumerate(source['all_transforms']) if i not in selected]
+    assert sorted(c.get_instance_transform(i,world_space=True).export_text() for i in range(c.get_instance_count()))==sorted(expected)
+    retained_floor_count=c.get_instance_count()
     center=fit['centerline'];c=labels[center['actor']].get_component_by_class(unreal.InstancedStaticMeshComponent)
     assert [c.get_instance_transform(i,world_space=True).export_text() for i in range(c.get_instance_count())]==center['all_instance_transforms']
     assert not c.get_editor_property('visible') and c.get_editor_property('hidden_in_game')
@@ -46,4 +53,4 @@ def check_z06_paving(world, actors):
             assert hit and hit.to_tuple()[0],(x,y)
             t=hit.to_tuple();assert t[9]==floor and abs(t[5].z+600)<.01,(x,y,t[5])
             probes.append(dict(x=x,y=y,z=t[5].z))
-    return dict(placements=len(placements),shared_asset_collision=asset_collision,removed_floor_instances=126,retained_floor_instances=48,retained_centerline_instances=52,floor_queries=probes,guide_collision_change='Two 6cm-raised decorative guides retired; floor now consistently Z -600.',qualification='Stopped-editor fit and isolated collision checks; live traversal, navigation, combat and performance remain unqualified.')
+    return dict(placements=len(placements),shared_asset_collision=asset_collision,removed_floor_instances=126,retained_floor_instances=retained_floor_count,retained_centerline_instances=52,floor_queries=probes,guide_collision_change='Two 6cm-raised decorative guides retired; floor now consistently Z -600.',qualification='Stopped-editor fit and isolated collision checks; live traversal, navigation, combat and performance remain unqualified.')
