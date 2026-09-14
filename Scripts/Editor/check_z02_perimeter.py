@@ -21,6 +21,10 @@ def check_perimeter(world,actors):
         assert max(abs(v-w) for v,w in zip((p.x,p.y,p.z),pos))<.01
         assert all(abs(v-1)<.001 for v in (scale.x,scale.y,scale.z)) and abs(a.get_actor_rotation().yaw-yaw)<.01
         assert c.static_mesh.get_name()=='SM_Aurelion_KIT_'+suffix
+        if suffix.startswith('Z02Perimeter_'):
+            slots=c.static_mesh.get_editor_property('static_materials')
+            grout=[slot for slot in slots if str(slot.get_editor_property('imported_material_slot_name'))=='M_Aurelion_StoneGrout']
+            assert len(grout)==1 and grout[0].get_editor_property('material_interface').get_path_name()=='/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_StoneGrout.M_AurelionKit_StoneGrout'
         assert c.get_editor_property('visible') and not c.get_editor_property('hidden_in_game')
         assert not a.get_actor_enable_collision() and c.get_collision_enabled()==unreal.CollisionEnabled.NO_COLLISION
         assert sm.get_num_uv_channels(c.static_mesh,0)==2 and sm.get_nanite_settings(c.static_mesh).get_editor_property('enabled')

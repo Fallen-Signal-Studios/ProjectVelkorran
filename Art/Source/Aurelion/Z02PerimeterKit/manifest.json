@@ -3,15 +3,16 @@
   "modules": [
     {
       "asset": "SM_Aurelion_KIT_Z02Perimeter_4m",
-      "triangles": 15604,
+      "triangles": 12220,
       "nominal_dimensions_m": [
         4.0,
         0.41499999165534973,
         9.643940925598145
       ],
       "materials": [
-        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_StoneGrout",
         "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
         "M_Aurelion_AncientGold"
       ],
       "uv_layers": 2,
@@ -20,15 +21,16 @@
     },
     {
       "asset": "SM_Aurelion_KIT_Z02Perimeter_Closing",
-      "triangles": 14288,
+      "triangles": 10904,
       "nominal_dimensions_m": [
         3.3401997089385986,
         0.41499999165534973,
         9.643940925598145
       ],
       "materials": [
-        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_StoneGrout",
         "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
         "M_Aurelion_AncientGold"
       ],
       "uv_layers": 2,

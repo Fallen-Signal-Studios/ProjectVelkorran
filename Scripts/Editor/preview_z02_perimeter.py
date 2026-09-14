@@ -15,7 +15,7 @@ subsystem=unreal.get_editor_subsystem(unreal.EditorActorSubsystem);original=list
 assert len(original)==1987 and not any(a.get_actor_label().startswith('KIT_Z02_Perimeter_') for a in original)
 before=helpers['snapshot_actor_state'](original);source=root/'Art/Source/Aurelion/Z02PerimeterKit';fit=json.loads((source/'perimeter-fit.json').read_text())
 destination='/Game/Aurelion/Environment/ArchitectureKit'
-materials={key:destination+'/Materials/M_AurelionKit_'+value for key,value in {'M_Aurelion_IvoryStone':'PavingIvory','M_Aurelion_AncientGold':'Gold','M_Aurelion_ChannelShadow':'Reveal'}.items()}
+materials={key:destination+'/Materials/M_AurelionKit_'+value for key,value in {'M_Aurelion_IvoryStone':'PavingIvory','M_Aurelion_AncientGold':'Gold','M_Aurelion_ChannelShadow':'Reveal','M_Aurelion_StoneGrout':'StoneGrout'}.items()}
 meshes={s['asset'].removeprefix('SM_Aurelion_KIT_'):helpers['import_owned_mesh'](s,source,destination+'/Meshes',materials) for s in json.loads((source/'manifest.json').read_text())['modules']}
 for name,suffix,pos,yaw in checks['placements'](fit):
     a=subsystem.spawn_actor_from_class(unreal.StaticMeshActor,unreal.Vector(*pos),unreal.Rotator(yaw=yaw));a.set_actor_label('KIT_Z02_Perimeter_'+name);a.set_folder_path('Aurelion/CustomArchitecture/Z02/Perimeter')

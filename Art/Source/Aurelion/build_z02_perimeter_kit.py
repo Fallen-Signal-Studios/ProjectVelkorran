@@ -5,10 +5,11 @@ exec(compile(helpers.read_text().split('# Four metre bay:')[0],str(helpers),'exe
 ROOT=Path(__file__).resolve().parent/'Z02PerimeterKit'; ROOT.mkdir(exist_ok=True)
 fit=json.loads((ROOT/'perimeter-fit.json').read_text())
 h=fit['wall_height_m']
+grout=material('M_Aurelion_StoneGrout',(.30,.275,.23),0,.88)
 
 def wall(width,name):
     # Local -Y is the interior face; stone projects only 5 mm beyond the old wall.
-    box('Continuous masonry core',(0,.13,h/2),(width,.26,h),dark,.002)
+    box('Recessed stone grout core',(0,.15,h/2),(width,.22,h),grout,.002)
     rows=14; rh=h/rows
     for row in range(rows):
         edges=[-width/2]+[v for v in [-width/2+(.65 if row%2 else 1.3)+1.3*i for i in range(5)] if -width/2+.02<v<width/2-.02]+[width/2]
@@ -19,11 +20,7 @@ def wall(width,name):
     for z in (.37,h-.39):
         box('Recessed conductor bed',(0,-.014,z),(width-.02,.018,.042),dark,.002)
         box('Fine conductor inlay',(0,-.025,z),(width-.03,.008,.014),gold,.001)
-    # Sparse carved joints give the side wall detail without large metal sheets.
-    for x in (-width/2+.10,width/2-.10):
-        for z in (1.15,2.1,3.05,4,4.95,5.9,6.85,7.8,8.75):
-            if z<h-.6:
-                box('Mason registration inset',(x,-.010,z),(.027,.013,.18),dark,.001)
+    # Keep the construction joints legible without repeated decorative dash marks.
     obj=export(name,[width,.42,h]); manifest[-1]['nominal_dimensions_m']=list(obj.dimensions)
     manifest[-1]['collision']='None; original outer wall collision retained'
     obj.hide_render=True
