@@ -36,7 +36,11 @@ def check_z06_endwalls(world,actors):
                 if str(slot.get_editor_property('imported_material_slot_name'))=='M_Aurelion_IvoryStone':assert c.get_material(i).get_name()=='M_AurelionKit_PavingIvory'
             placed.append(a.get_actor_label())
     c=labels[fit['wall_actor']].get_component_by_class(unreal.InstancedStaticMeshComponent)
-    assert [c.get_instance_transform(i,world_space=True).export_text() for i in range(c.get_instance_count())]==fit['retained_transforms']
+    expected=fit['retained_transforms']
+    if c.static_mesh.get_name()=='SM_Aurelion_KIT_Z06ClimbPanel':
+        import runpy
+        expected=runpy.run_path(str(root/'Scripts/Editor/check_z06_climb.py'))['check_climb_instance'](c,expected)
+    assert [c.get_instance_transform(i,world_space=True).export_text() for i in range(c.get_instance_count())]==expected
     for row in fit['physical']+fit['bands']:
         a=labels[row['actor']];c=a.static_mesh_component
         assert a.get_actor_transform().export_text()==row['actor_transform'] and c.static_mesh.get_path_name()==row['mesh']

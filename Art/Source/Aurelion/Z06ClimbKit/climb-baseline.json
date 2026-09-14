@@ -1,0 +1,101 @@
+{
+  "art": {
+    "actor": "Aurelion_Art_M12_Z06_21_3485ae",
+    "actor_class": "Actor",
+    "component": "HierarchicalInstancedStaticMesh",
+    "mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Wall_01_4m.SM_Scifi_Wall_01_4m",
+    "actor_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+    "component_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+    "origin": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "extent": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "visible": true,
+    "hidden": false,
+    "actor_collision": true,
+    "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+    "profile": "Custom",
+    "instances": [
+      {
+        "index": 0,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-1374.647643,Y=9210.000034,Z=-599.999977),Scale3D=(X=1.100000,Y=0.905567,Z=0.750000))",
+        "bounds": [
+          [
+            -1394.0,
+            9210.0,
+            -600.0000000000001
+          ],
+          [
+            -1374.0,
+            9650.0,
+            -300.00000000000006
+          ]
+        ]
+      }
+    ],
+    "instance_count": 1,
+    "all_instance_transforms": [
+      "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-1374.647643,Y=9210.000034,Z=-599.999977),Scale3D=(X=1.100000,Y=0.905567,Z=0.750000))"
+    ]
+  },
+  "physical": [
+    {
+      "actor": "Aurelion_E3_ClimbWall",
+      "actor_class": "StaticMeshActor",
+      "component": "StaticMeshComponent0",
+      "mesh": "/Engine/BasicShapes/Cube.Cube",
+      "actor_transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.707107,W=0.707107),Translation=(X=-1384.000000,Y=9430.000000,Z=-450.000000),Scale3D=(X=4.400000,Y=0.200000,Z=3.000000))",
+      "component_transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.707107,W=0.707107),Translation=(X=-1384.000000,Y=9430.000000,Z=-450.000000),Scale3D=(X=4.400000,Y=0.200000,Z=3.000000))",
+      "origin": [
+        -1384.0,
+        9430.0,
+        -450.0
+      ],
+      "extent": [
+        10.000000000000053,
+        220.00000000000006,
+        150.0
+      ],
+      "visible": false,
+      "hidden": true,
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "instances": [],
+      "instance_count": null,
+      "all_instance_transforms": []
+    },
+    {
+      "actor": "Aurelion_E3_FlankLanding",
+      "actor_class": "StaticMeshActor",
+      "component": "StaticMeshComponent0",
+      "mesh": "/Engine/BasicShapes/Cube.Cube",
+      "actor_transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.707107,W=0.707107),Translation=(X=-1300.000000,Y=9580.000000,Z=-310.000000),Scale3D=(X=2.000000,Y=1.380000,Z=0.200000))",
+      "component_transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.707107,W=0.707107),Translation=(X=-1300.000000,Y=9580.000000,Z=-310.000000),Scale3D=(X=2.000000,Y=1.380000,Z=0.200000))",
+      "origin": [
+        -1300.0,
+        9580.0,
+        -310.0
+      ],
+      "extent": [
+        69.00000000000003,
+        100.00000000000004,
+        10.0
+      ],
+      "visible": false,
+      "hidden": true,
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "instances": [],
+      "instance_count": null,
+      "all_instance_transforms": []
+    }
+  ]
+}

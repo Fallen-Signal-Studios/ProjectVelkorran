@@ -24,6 +24,9 @@ def check_z06_walls(world,actors):
         end_fit=json.loads((root/'Art/Source/Aurelion/Z06EndwallFit/endwall-fit.json').read_text())
         assert sorted(expected)==sorted([r['transform'] for r in end_fit['selected']]+end_fit['retained_transforms'])
         expected=end_fit['retained_transforms']
+    if c.static_mesh.get_name()=='SM_Aurelion_KIT_Z06ClimbPanel':
+        import runpy
+        expected=runpy.run_path(str(root/'Scripts/Editor/check_z06_climb.py'))['check_climb_instance'](c,expected)
     assert sorted(c.get_instance_transform(i,world_space=True).export_text() for i in range(c.get_instance_count()))==sorted(expected)
     retained_wall_count=c.get_instance_count()
     row=fit['columns'];c=labels[row['actor']].get_component_by_class(unreal.InstancedStaticMeshComponent)
