@@ -1,5 +1,10 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "AI/SovAurelionEnemyRoles.h"
+#include "Presentation/SovBloodFeedbackComponent.h"
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Engine/SkeletalMesh.h"
 #include "AI/NarrativeNPCController.h"
 #include "ArsenalStatics.h"
 #include "Components/CapsuleComponent.h"
@@ -98,7 +103,7 @@ bool ASovAurelionWallRoute::ValidateRoute(FString& Error) const
 
 USovAurelionWallTraversalComponent::USovAurelionWallTraversalComponent()
 {
-    PrimaryComponentTick.bCanEverTick = false;
+    PrimaryComponentTick.bCanEverTick = true;
     SetIsReplicatedByDefault(true);
 }
 
@@ -106,6 +111,70 @@ void USovAurelionWallTraversalComponent::GetLifetimeReplicatedProps(TArray<FLife
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
     DOREPLIFETIME(USovAurelionWallTraversalComponent, bTraversing);
+    DOREPLIFETIME(USovAurelionWallTraversalComponent, bOnWall);
+    DOREPLIFETIME(USovAurelionWallTraversalComponent, WallNormal);
+    DOREPLIFETIME(USovAurelionWallTraversalComponent, WallTangent);
+    DOREPLIFETIME(USovAurelionWallTraversalComponent, WallPoint);
+}
+
+void USovAurelionWallTraversalComponent::UpdateWallSurface(const FVector& Direction)
+{
+    FHitResult Hit;
+    FCollisionQueryParams Query(SCENE_QUERY_STAT(WallPresentation), false, GetOwner());
+    Query.AddIgnoredActor(ActiveRoute.Get());
+    const FVector Start = GetOwner()->GetActorLocation();
+    const FVector Probe = ActiveRoute->GetActorTransform().TransformVectorNoScale(ActiveRoute->WallProbeDirection).GetSafeNormal();
+    bOnWall = PointIndex <= 2 && GetWorld()->LineTraceSingleByChannel(Hit, Start,
+        Start + Probe * ActiveRoute->WallProbeDistance, ECC_Visibility, Query)
+        && Hit.bBlockingHit && FMath::Abs(Hit.ImpactNormal.Z) < .3;
+    if (bOnWall)
+    {
+        WallNormal = Hit.ImpactNormal;
+        WallTangent = FVector::VectorPlaneProject(Direction, WallNormal).GetSafeNormal(SMALL_NUMBER, FVector::UpVector);
+        WallPoint = Hit.ImpactPoint;
+    }
+}
+
+void USovAurelionWallTraversalComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* TickFunction)
+{
+    Super::TickComponent(DeltaTime, TickType, TickFunction);
+    auto* NPC = Cast<ASovNPCCharacterBase>(GetOwner());
+    auto* Mesh = NPC ? NPC->GetMesh() : nullptr;
+    if (!Mesh || !Mesh->GetSkeletalMeshAsset() || Mesh->IsSimulatingPhysics() || !NPC->IsAlive()) { return; }
+    auto* Anim = Mesh->GetAnimInstance();
+    const bool OnWall = bTraversing && bOnWall;
+    if (OnWall && !bPresentingWall)
+    {
+        PresentedMesh = Mesh;
+        GroundMeshTransform = Mesh->GetRelativeTransform();
+        bPresentingWall = true;
+        if (Anim && WallRunMontage && Anim->Montage_Play(WallRunMontage, 1.15f) > 0.f)
+        {
+            const FName Section = WallRunMontage->GetSectionName(0);
+            Anim->Montage_SetNextSection(Section, Section, WallRunMontage);
+        }
+    }
+    if (!bPresentingWall || PresentedMesh.Get() != Mesh) { return; }
+    FTransform Target = GroundMeshTransform;
+    if (OnWall)
+    {
+        const FQuat Rotation = FRotationMatrix::MakeFromXZ(WallTangent, WallNormal).ToQuat() * GroundMeshTransform.GetRotation();
+        const FBoxSphereBounds Bounds = Mesh->GetSkeletalMeshAsset()->GetImportedBounds();
+        const double FootHeight = (Bounds.Origin.Z - Bounds.BoxExtent.Z) * Mesh->GetComponentScale().Z;
+        const FVector Origin = WallPoint + WallNormal * (2. - FootHeight);
+        Target.SetLocation(Mesh->GetAttachParent()->GetComponentTransform().InverseTransformPosition(Origin));
+        Target.SetRotation(Mesh->GetAttachParent()->GetComponentQuat().Inverse() * Rotation);
+    }
+    const float Alpha = 1.f - FMath::Exp(-DeltaTime * 14.f);
+    Mesh->SetRelativeLocationAndRotation(FMath::Lerp(Mesh->GetRelativeLocation(), Target.GetLocation(), Alpha),
+        FQuat::Slerp(Mesh->GetRelativeRotation().Quaternion(), Target.GetRotation(), Alpha));
+    if (!OnWall)
+    {
+        if (Anim && WallRunMontage && Anim->Montage_IsPlaying(WallRunMontage)) { Anim->Montage_Stop(.15f, WallRunMontage); }
+        if (Mesh->GetRelativeLocation().Equals(Target.GetLocation(), .5)
+            && Mesh->GetRelativeRotation().Quaternion().AngularDistance(Target.GetRotation()) < .01)
+        { Mesh->SetRelativeTransform(GroundMeshTransform); bPresentingWall = false; PresentedMesh.Reset(); }
+    }
 }
 
 bool USovAurelionWallTraversalComponent::HasReadyOwner(bool bContinuing, bool bMovementAcquired) const
@@ -242,6 +311,7 @@ ESovAurelionTraversalResult USovAurelionWallTraversalComponent::AdvanceTraversal
         if (!HasReadyOwner(true)) { FinishTraversal(Lease, ESovAurelionTraversalResult::Cancelled); return ESovAurelionTraversalResult::Cancelled; }
         if (Hit.bBlockingHit || Hit.bStartPenetrating) { FinishTraversal(Lease, ESovAurelionTraversalResult::Blocked); return ESovAurelionTraversalResult::Blocked; }
         Budget -= Step;
+        UpdateWallSurface(Offset / Distance);
     }
     if (PointIndex == ActivePoints.Num())
     {
@@ -286,7 +356,7 @@ void USovAurelionWallTraversalComponent::FinishTraversal(uint64 Lease, ESovAurel
     const bool OwnedMovement = bOwnsMovementMode;
     const uint8 SavedPriorMode = PriorMovementMode;
     const uint8 SavedPriorCustomMode = PriorCustomMode;
-    bTraversing = false; bOwnsBusy = false; bOwnsMovementMode = false; LastResult = Result;
+    bTraversing = false; bOnWall = false; bOwnsBusy = false; bOwnsMovementMode = false; LastResult = Result;
     LeaseOwner.Reset(); ActivePoints.Reset(); ActiveRoute.Reset(); ActiveASC.Reset(); ActiveCharacter.Reset(); ActiveController.Reset(); ActiveMovement.Reset();
     ActiveEncounter.Reset(); ActiveEncounterAttempt.Invalidate();
     // Retire the lease before outward movement/tag callbacks; never restore over a newer movement owner.
@@ -471,12 +541,14 @@ void USovAurelionEliteThermalFracture::Load_Implementation()
 ASovAurelionSecurityDrone::ASovAurelionSecurityDrone(const FObjectInitializer& Initializer) : Super(Initializer)
 { FormationLink = CreateDefaultSubobject<USovAurelionFreshCommandLink>(TEXT("AurelionFormation")); }
 
-ASovAurelionLinkbound::ASovAurelionLinkbound(const FObjectInitializer& Initializer) : Super(Initializer) {}
+ASovAurelionLinkbound::ASovAurelionLinkbound(const FObjectInitializer& Initializer) : Super(Initializer)
+{ if (auto* Blood = FindComponentByClass<USovBloodFeedbackComponent>()) { Blood->bBlackBlood = true; } }
 ASovAurelionWallRunner::ASovAurelionWallRunner(const FObjectInitializer& Initializer) : Super(Initializer)
 { WallTraversal = CreateDefaultSubobject<USovAurelionWallTraversalComponent>(TEXT("AurelionWallTraversal")); }
 ASovAurelionWeaver::ASovAurelionWeaver(const FObjectInitializer& Initializer) : Super(Initializer)
 {
     AnchorA = CreateDefaultSubobject<USovAurelionWeaverLink>(TEXT("AurelionAnchorA"));
+    if (auto* Blood = FindComponentByClass<USovBloodFeedbackComponent>()) { Blood->bBlackBlood = true; }
     AnchorB = CreateDefaultSubobject<USovAurelionWeaverLink>(TEXT("AurelionAnchorB"));
 }
 ASovAurelionElite::ASovAurelionElite(const FObjectInitializer& Initializer) : Super(Initializer)
@@ -503,6 +575,7 @@ bool ASovAurelionWeaver::InitializeFreshLinks()
     TGuardValue<bool> Updating(bUpdatingLinks, true);
     const auto* ExpectedASC = GetNarrativeAbilitySystemComponent();
     const uint64 ExpectedEpoch = ExpectedASC->GetCombatActorInfoEpoch();
+    bool bCreatedLink = false;
     for (auto* Link : {AnchorA.Get(), AnchorB.Get()})
     {
         if (!Link->HasValidCommandLinkConfiguration()) { return false; }
@@ -517,10 +590,19 @@ bool ASovAurelionWeaver::InitializeFreshLinks()
     {
         if (!HasReadySupportOwner() || GetNarrativeAbilitySystemComponent() != ExpectedASC || ExpectedASC->GetCombatActorInfoEpoch() != ExpectedEpoch) { return false; }
         if (Link->GetCommandLinkState() == ESovCommandLinkState::Inactive && !Link->GetLinkInstanceId().IsValid())
-        { if (!Link->InitializeFreshLink()) { return false; } }
+        { if (!Link->InitializeFreshLink()) { return false; } bCreatedLink = true; }
         // A Severed or death-deactivated instance belongs to its native lifecycle. Never call ResetCommandLink here.
     }
+    if (bCreatedLink && HasActiveSupportLink()) { MulticastSupportCast(); }
     return HasActiveSupportLink();
+}
+
+void ASovAurelionWeaver::MulticastSupportCast_Implementation()
+{
+    // A real fresh-link transition owns this cue; polling an existing tether never replays it.
+    if (GetNetMode() == NM_DedicatedServer || !IsAlive() || !SupportCastMontage || !GetMesh()) { return; }
+    if (auto* Anim = GetMesh()->GetAnimInstance(); Anim && !Anim->IsAnyMontagePlaying())
+    { Anim->Montage_Play(SupportCastMontage); }
 }
 
 bool ASovAurelionWeaver::ShareObservedThreatWithLinkedAllies()

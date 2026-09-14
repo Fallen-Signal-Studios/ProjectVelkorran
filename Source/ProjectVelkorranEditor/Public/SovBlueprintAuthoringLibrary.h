@@ -30,6 +30,9 @@ public:
     UFUNCTION(BlueprintCallable, Category="Velkorran|Editor")
     static FSovBlueprintAuthoringResult ConfigureProtagonistCastMontage(UObject* Asset, UObject* Sequence,
         float StartTime, float EndTime, float PlayRate);
+    UFUNCTION(BlueprintCallable, Category="Velkorran|Editor")
+    static FSovBlueprintAuthoringResult ConfigureEnemyCastMontage(UObject* Asset, UObject* Sequence,
+        float StartTime, float EndTime, float PlayRate, FName SlotName);
 
     /** Replace the copied melee overlay's third-person idle with a speed-driven stance blend. No save. */
     UFUNCTION(BlueprintCallable, Category="Velkorran|Editor")

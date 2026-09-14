@@ -97,3 +97,9 @@ recess-panel candidate is still unplaced; the 90% target remains unproven.
 the ten protagonist Echo abilities, independent alternating playback, and GAS
 regression checks. Dressed-character combat timing and companion playback remain
 live qualification items; this pass does not change the 63.75% estimate.
+
+`EnemyBloodAndWallPresentation-2026-09-13.md` records receipt-driven red/black
+Niagara blood, wall-surface orientation and gait, and missing enemy cast
+assignments. The 17 enemy-role tests, blood policy test and saved-asset checks
+pass; live visual quality and combat timing remain unqualified. The estimate
+remains 63.75%.

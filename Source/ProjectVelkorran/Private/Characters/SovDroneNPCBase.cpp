@@ -1,6 +1,7 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 
 #include "Characters/SovDroneNPCBase.h"
+#include "Presentation/SovBloodFeedbackComponent.h"
 
 #include "AIController.h"
 #include "AbilitySystemBlueprintLibrary.h"
@@ -39,6 +40,7 @@ ASovDroneNPCBase::ASovDroneNPCBase(const FObjectInitializer& ObjectInitializer)
 		USovDroneDismembermentComponent>(TEXT("SovDismembermentComponent")))
 {
 	PrimaryActorTick.bCanEverTick = true;
+    if (auto* Blood = FindComponentByClass<USovBloodFeedbackComponent>()) { Blood->bEnabled = false; }
 	DeathExplosionDamageEffectClass =
 		USovGameplayEffect_ReformationDroneDamage::StaticClass();
 	if (USovStatusComponent* Status = GetStatusComponent())

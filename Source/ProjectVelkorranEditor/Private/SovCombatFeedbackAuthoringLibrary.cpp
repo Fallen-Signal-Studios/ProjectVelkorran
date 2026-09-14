@@ -54,7 +54,8 @@ bool USovCombatFeedbackAuthoringLibrary::PrepareOwnedFeedbackSystem(UNiagaraSyst
     const TMap<FString, float>& FloatParameters, const TMap<FString, FLinearColor>& ColorParameters, FString& Error)
 {
     Error.Reset();
-    if (!IsValid(System) || !System->GetPathName().StartsWith(TEXT("/Game/Aurelion/VFX/NS_Aurelion_"))
+    if (!IsValid(System) || !(System->GetPathName().StartsWith(TEXT("/Game/Aurelion/VFX/NS_Aurelion_"))
+        || System->GetPathName().StartsWith(TEXT("/Game/Aurelion/VFX/Blood/NS_Aurelion_Blood")))
         || System->GetOutermost()->HasAnyPackageFlags(PKG_PlayInEditor) || RequiredSignalEmitterNames.IsEmpty())
     { Error = TEXT("Requires an owned editor system and explicitly reviewed primary signal emitters."); return false; }
     TSet<FString> Names;

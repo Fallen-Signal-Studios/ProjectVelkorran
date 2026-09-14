@@ -64,18 +64,17 @@ FSovBlueprintAuthoringResult USovBlueprintAuthoringLibrary::AuthorBracedCastClip
     return Result;
 }
 
-FSovBlueprintAuthoringResult USovBlueprintAuthoringLibrary::ConfigureProtagonistCastMontage(
-    UObject* Asset, UObject* Sequence, float StartTime, float EndTime, float PlayRate)
+static FSovBlueprintAuthoringResult ConfigureCast(
+    UObject* Asset, UObject* Sequence, float StartTime, float EndTime, float PlayRate, const FString& Root, FName SlotName)
 {
     FSovBlueprintAuthoringResult Result;
     auto* Montage = Cast<UAnimMontage>(Asset);
     auto* Clip = Cast<UAnimSequence>(Sequence);
-    const FString Root(TEXT("/Game/Characters/Animation/ProtagonistCasts/"));
     if (!GEditor || GEditor->PlayWorld || !Montage || !Clip ||
         !Montage->GetPathName().StartsWith(Root) || !Clip->GetPathName().StartsWith(Root) ||
         Montage->GetSkeleton() != Clip->GetSkeleton() || Clip->IsValidAdditive() ||
         StartTime < 0.f || EndTime <= StartTime || EndTime > Clip->GetPlayLength() ||
-        !FMath::IsFinite(PlayRate) || PlayRate <= 0.f)
+        !FMath::IsFinite(PlayRate) || PlayRate <= 0.f || (SlotName != TEXT("FullBody") && SlotName != TEXT("DefaultSlot")))
     { Result.Report = TEXT("Requires stopped PIE, matching project non-additive clips and valid range/rate."); return Result; }
     Clip->Modify();
     Clip->Notifies.Reset();
@@ -88,7 +87,7 @@ FSovBlueprintAuthoringResult USovBlueprintAuthoringLibrary::ConfigureProtagonist
     Montage->CompositeSections.Reset();
     Montage->SlotAnimTracks.Reset();
     FSlotAnimationTrack& Track = Montage->SlotAnimTracks.AddDefaulted_GetRef();
-    Track.SlotName = TEXT("FullBody");
+    Track.SlotName = SlotName;
     FAnimSegment& Segment = Track.AnimTrack.AnimSegments.AddDefaulted_GetRef();
     Segment.SetAnimReference(Clip);
     Segment.AnimStartTime = StartTime;
@@ -104,6 +103,14 @@ FSovBlueprintAuthoringResult USovBlueprintAuthoringLibrary::ConfigureProtagonist
     Montage->RefreshCacheData();
     Montage->PostEditChange();
     Result.bSucceeded = true;
-    Result.Report = TEXT("Single FullBody cast; sequence/montage notifies cleared; root locked; automatic blend out.");
+    Result.Report = TEXT("Single authored cast slot; sequence/montage notifies cleared; root locked; automatic blend out.");
     return Result;
 }
+
+FSovBlueprintAuthoringResult USovBlueprintAuthoringLibrary::ConfigureProtagonistCastMontage(
+    UObject* Asset, UObject* Sequence, float StartTime, float EndTime, float PlayRate)
+{ return ConfigureCast(Asset, Sequence, StartTime, EndTime, PlayRate, TEXT("/Game/Characters/Animation/ProtagonistCasts/"), TEXT("FullBody")); }
+
+FSovBlueprintAuthoringResult USovBlueprintAuthoringLibrary::ConfigureEnemyCastMontage(
+    UObject* Asset, UObject* Sequence, float StartTime, float EndTime, float PlayRate, FName SlotName)
+{ return ConfigureCast(Asset, Sequence, StartTime, EndTime, PlayRate, TEXT("/Game/Aurelion/Enemies/Animation/"), SlotName); }

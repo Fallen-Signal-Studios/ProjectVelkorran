@@ -5,6 +5,10 @@
 #include "AI/NarrativeNPCController.h"
 #include "AI/SovAurelionRoleActivities.h"
 #include "Components/BoxComponent.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
+#include "Engine/SkeletalMesh.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SovAurelionThermalFractureComponent.h"
 #include "Components/SovWeakPointComponent.h"
@@ -137,7 +141,8 @@ bool FSovAurelionRoleComponentsTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Weaver owns exactly two native link components"), Links.Num(), 2);
     TestTrue(TEXT("Two anchors are distinct native subobjects"), Weaver->GetAnchorA() != Weaver->GetAnchorB());
     TestFalse(TEXT("Missing authored membership cannot start support"), Weaver->HasActiveSupportLink());
-    TestFalse(TEXT("Traversal component has no autonomous tick"), Runner->GetWallTraversal()->PrimaryComponentTick.bCanEverTick);
+    TestTrue(TEXT("Traversal tick supports surface presentation"), Runner->GetWallTraversal()->PrimaryComponentTick.bCanEverTick);
+    TestFalse(TEXT("Presentation does not autonomously acquire traversal"), Runner->GetWallTraversal()->IsTraversing());
     TestTrue(TEXT("Traversal task has per-AI state"), GetDefault<UBTTask_SovAurelionTraverseWall>()->HasInstance());
     return true;
 }
@@ -176,6 +181,46 @@ bool FSovAurelionWallRoutePhysicalTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("Its busy contribution is released"), F.Runner->GetNarrativeAbilitySystemComponent()->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_Busy));
     TestFalse(TEXT("The same entry route is not repeatedly executed by the BT"), Traversal->CanBeginTraversal());
     TestFalse(TEXT("A delayed abort cannot cancel the completed lease"), Traversal->CancelTraversal(TaskOwner, Lease));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAurelionWallSurfacePresentationTest, "ProjectVelkorran.Campaign.Aurelion.EnemyRoles.WallSurfacePoseAndRecovery",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FSovAurelionWallSurfacePresentationTest::RunTest(const FString& Parameters)
+{
+    FRoleWorld F;
+    if (!F.Valid()) { return false; }
+    auto* Mesh = F.Runner->GetMesh();
+    auto* Asset = LoadObject<USkeletalMesh>(nullptr, TEXT("/Game/Parasites_Pack/Mesh/SK_Parasite_Spider.SK_Parasite_Spider"));
+    auto* Montage = LoadObject<UAnimMontage>(nullptr, TEXT("/Game/Aurelion/Enemies/Animation/AM_EclipseWallRun.AM_EclipseWallRun"));
+    if (!TestNotNull(TEXT("Authored spider mesh"), Asset) || !TestNotNull(TEXT("Authored wall gait"), Montage)) { return false; }
+    Mesh->SetSkeletalMesh(Asset);
+    Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    Mesh->SetRelativeLocation(FVector(0.,0.,-60.));
+    Mesh->SetAnimInstanceClass(UAnimInstance::StaticClass());
+    const FTransform Ground = Mesh->GetRelativeTransform();
+    auto* Traversal = F.Runner->GetWallTraversal();
+    Traversal->WallRunMontage = Montage;
+    const FVector BeforeTick = F.Runner->GetActorLocation();
+    Traversal->TickComponent(.05f, LEVELTICK_All, nullptr);
+    TestFalse(TEXT("Presentation tick does not acquire a movement lease"), Traversal->IsTraversing());
+    TestTrue(TEXT("Presentation tick cannot move the capsule"), F.Runner->GetActorLocation().Equals(BeforeTick));
+    UObject* Task = NewObject<USovRuntimeTestIdentity>(F.World);
+    const uint64 Lease = Traversal->BeginTraversal(Task);
+    if (!TestTrue(TEXT("Physical wall admits normal traversal"), Lease != 0)) { return false; }
+    double BestAlignment = 0.;
+    bool PlayedGait = false;
+    for (int32 Step=0; Step<100; ++Step)
+    {
+        if (Traversal->IsTraversing()) { Traversal->AdvanceTraversal(Task, Lease, .05f); }
+        Traversal->TickComponent(.05f, LEVELTICK_All, nullptr);
+        BestAlignment = FMath::Max(BestAlignment, FMath::Abs(Mesh->GetUpVector().Y));
+        PlayedGait |= Mesh->GetAnimInstance() && Mesh->GetAnimInstance()->Montage_IsPlaying(Montage);
+    }
+    TestTrue(TEXT("Spider body up follows the physical wall normal"), BestAlignment > .95);
+    TestTrue(TEXT("Traversal plays its authored gait"), PlayedGait);
+    TestTrue(TEXT("Landing restores the original mesh transform"), Mesh->GetRelativeTransform().Equals(Ground, .01));
+    TestFalse(TEXT("Landing stops only the wall gait"), Mesh->GetAnimInstance()->Montage_IsPlaying(Montage));
     return true;
 }
 

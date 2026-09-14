@@ -1,6 +1,7 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 
 #include "Characters/SovNPCCharacterBase.h"
+#include "Presentation/SovBloodFeedbackComponent.h"
 #include "UObject/StrongObjectPtr.h"
 #include "Character/NarrativeCharacterVisual.h"
 
@@ -16,6 +17,7 @@
 ASovNPCCharacterBase::ASovNPCCharacterBase(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
+    CreateDefaultSubobject<USovBloodFeedbackComponent>(TEXT("SovBloodFeedback"));
 	DismembermentComponent = CreateDefaultSubobject<USovDismembermentComponent>(
 		TEXT("SovDismembermentComponent"));
 	CombatSustainDropComponent = CreateDefaultSubobject<USovCombatSustainDropComponent>(
