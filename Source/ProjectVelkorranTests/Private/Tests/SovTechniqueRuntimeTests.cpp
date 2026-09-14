@@ -16,6 +16,7 @@
 #include "Progression/SovTechniqueSafePoint.h"
 #include "Sovereign/SovGameplayTags.h"
 #include "Subsystems/NarrativeSaveSubsystem.h"
+#include "UObject/Script.h"
 
 #if WITH_AUTOMATION_TESTS
 struct FSovTechniqueTestAccess
@@ -34,6 +35,8 @@ namespace
 {
 struct FTechniqueWorld
 {
+	// Actor save events (PrepareForSave, Load, GetActorGUID) go through AActor::ProcessEvent, which skips them in a world not initialized for play.
+	FEditorScriptExecutionGuard ScriptGuard;
 	UWorld* World = nullptr;
 	ASovPlayerState* Player = nullptr;
 	ASovHandoffRuntimeTestPawn* Pawn = nullptr;
