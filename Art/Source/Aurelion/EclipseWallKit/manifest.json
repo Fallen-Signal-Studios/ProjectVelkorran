@@ -1,0 +1,41 @@
+{
+  "status": "Source authored; in-engine fit and visual acceptance pending",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_EclipseWallScar_1",
+      "triangles": 16497,
+      "nominal_dimensions_m": [
+        0.92467200756073,
+        0.013000000268220901,
+        1.545510172843933
+      ],
+      "materials": [
+        "M_Eclipse_Intrusion",
+        "M_Aurelion_IvoryStone",
+        "M_Eclipse_Seam"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; shallow visual overlay only",
+      "position_precision": 10
+    },
+    {
+      "asset": "SM_Aurelion_KIT_EclipseWallScar_2",
+      "triangles": 16752,
+      "nominal_dimensions_m": [
+        0.9561808109283447,
+        0.013000000268220901,
+        1.5453336238861084
+      ],
+      "materials": [
+        "M_Eclipse_Intrusion",
+        "M_Aurelion_IvoryStone",
+        "M_Eclipse_Seam"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; shallow visual overlay only",
+      "position_precision": 10
+    }
+  ]
+}
