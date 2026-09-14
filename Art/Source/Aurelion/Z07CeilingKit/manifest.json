@@ -1,0 +1,24 @@
+{
+  "status": "Authored coffer candidate; in-engine lighting and gameplay review pending",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z07Coffer",
+      "triangles": 12972,
+      "nominal_dimensions_m": [
+        3.777777910232544,
+        4.400000095367432,
+        0.5499999523162842
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; ceiling relief stays above 5.45 m room clearance; no gameplay collision changed",
+      "minimum_z_m": 0.0,
+      "maximum_z_m": 0.5499999523162842
+    }
+  ]
+}
