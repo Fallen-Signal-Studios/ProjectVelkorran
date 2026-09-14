@@ -1,0 +1,43 @@
+{
+  "status": "Source candidate; interaction and scene fit pending",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_RequestConsole",
+      "triangles": 4700,
+      "nominal_dimensions_m": [
+        0.5,
+        0.4899999797344208,
+        0.9178984761238098
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_UplightLens"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; existing request Body remains authoritative",
+      "bottom_m": -0.47000000000000003
+    },
+    {
+      "asset": "SM_Aurelion_KIT_RequestConsoleRaisedBase",
+      "triangles": 4700,
+      "nominal_dimensions_m": [
+        0.5,
+        0.4899999797344208,
+        1.0978984832763672
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_UplightLens"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; existing request Body remains authoritative",
+      "bottom_m": -0.65
+    }
+  ]
+}

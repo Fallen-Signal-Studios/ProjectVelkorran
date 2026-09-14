@@ -1,0 +1,24 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_RequestConsole",
+      "dimensions_m": [
+        0.5,
+        0.4899999797344208,
+        0.9178984761238098
+      ],
+      "triangles": 4700
+    },
+    {
+      "asset": "SM_Aurelion_KIT_RequestConsoleRaisedBase",
+      "dimensions_m": [
+        0.5,
+        0.4899999797344208,
+        1.0978984832763672
+      ],
+      "triangles": 4700
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}
