@@ -19,7 +19,7 @@ route_before=checks['route_controls'](world,original,('bridge4','bridge5'))
 destination='/Game/Aurelion/Environment/ArchitectureKit'
 # Use the legacy FBX factory validated for the owned gallery's authored UCX sets.
 unreal.SystemLibrary.execute_console_command(world,'Interchange.FeatureFlags.Import.FBX 0')
-materials={key:destination+'/Materials/M_AurelionKit_'+value for key,value in {'M_Aurelion_IvoryStone':'PavingIvory','M_Aurelion_AncientGold':'Gold','M_Aurelion_ChannelShadow':'Reveal'}.items()}
+materials={key:destination+'/Materials/M_AurelionKit_'+value for key,value in {'M_Aurelion_IvoryStone':'PavingIvory','M_Aurelion_AncientGold':'Gold','M_Aurelion_ChannelShadow':'Reveal','M_Aurelion_StoneGrout':'StoneGrout'}.items()}
 meshes={s['asset'].removeprefix('SM_Aurelion_KIT_'):helpers['import_owned_mesh'](s,source/s['source_subdir'],destination+'/Meshes',materials) for s in json.loads((source/'manifest.json').read_text())['modules']}
 for b in json.loads((source/'bridge-fit.json').read_text())['baseline']:
     old_name=b['actor'];old=by_label[old_name]

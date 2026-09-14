@@ -32,6 +32,9 @@ def check_bridges(world,actors,kit='ApproachBridgeKit',actor_prefix='KIT_Z02_Bri
             assert c.static_mesh.get_name()=='SM_Aurelion_KIT_'+suffix and c.get_editor_property('visible') and not c.get_editor_property('hidden_in_game')
             assert a.get_actor_enable_collision() and c.get_collision_enabled()==unreal.CollisionEnabled.QUERY_AND_PHYSICS and str(c.get_collision_profile_name())=='BlockAll'
             spec=specs[c.static_mesh.get_name()]
+            if 'M_Aurelion_StoneGrout' in spec['materials']:
+                slots=c.static_mesh.get_editor_property('static_materials')
+                assert any(str(slot.get_editor_property('imported_material_slot_name'))=='M_Aurelion_StoneGrout' and slot.get_editor_property('material_interface').get_name()=='M_AurelionKit_StoneGrout' for slot in slots)
             assert sm.get_convex_collision_count(c.static_mesh)==spec['convex_hulls'] and sm.get_simple_collision_count(c.static_mesh)==0
             assert sm.get_num_uv_channels(c.static_mesh,0)==2 and sm.get_nanite_settings(c.static_mesh).get_editor_property('enabled')
             ignored=[other for other in actors if other!=a]

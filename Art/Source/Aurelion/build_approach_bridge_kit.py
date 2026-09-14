@@ -69,30 +69,70 @@ curve=sorted((v['y']*L/21.29522470,v['z']) for v in profile['underside'] if abs(
 assert len(curve)==41
 curve=[(-L/2,-49.14)]+curve+[(L/2,-49.14)]
 rib_x=(-6.45,-2.15,2.15,6.45)
-joint_vertices=[];joint_faces=[]
+# Course-sized ashlar faces sit 5 cm in front of a continuous nonmetal mortar core.
+# This removes the old fifty-metre open seams and near-coplanar line overlays.
+grout=material('M_Aurelion_StoneGrout',(.30,.275,.23),0,.88)
+def clip_polygon(poly,axis,value,above):
+    result=[]
+    for a,b in zip(poly,poly[1:]+poly[:1]):
+        ina=(a[axis]>=value) if above else (a[axis]<=value)
+        inb=(b[axis]>=value) if above else (b[axis]<=value)
+        if ina:result.append(a)
+        if ina!=inb:
+            t=(value-a[axis])/(b[axis]-a[axis]);result.append(tuple(a[k]+t*(b[k]-a[k]) for k in (0,1)))
+    return result
+
+def ashlar(name,x,poly):
+    # Remove duplicate/collinear clip vertices before beveling the extruded block.
+    clean=[]
+    for v in poly:
+        if not clean or math.dist(v,clean[-1])>.00001:clean.append(v)
+    if len(clean)>1 and math.dist(clean[0],clean[-1])<.00001:clean.pop()
+    changed=True
+    while changed and len(clean)>3:
+        changed=False
+        for i in range(len(clean)):
+            a=clean[i-1];b=clean[i];c=clean[(i+1)%len(clean)]
+            if abs((b[0]-a[0])*(c[1]-b[1])-(b[1]-a[1])*(c[0]-b[0]))<.000001:
+                clean.pop(i);changed=True;break
+    if len(clean)<3:return
+    area=abs(sum(a[0]*b[1]-b[0]*a[1] for a,b in zip(clean,clean[1:]+clean[:1])))/2
+    if area<.002 or min(max(v[k] for v in clean)-min(v[k] for v in clean) for k in (0,1))<.012:return
+    n=len(clean);verts=[(x+dx,y,z) for dx in (-.57,.57) for y,z in clean]
+    faces=[tuple(range(n-1,-1,-1)),tuple(range(n,n*2))]+[(i,(i+1)%n,(i+1)%n+n,i+n) for i in range(n)]
+    m=bpy.data.meshes.new(name);m.from_pydata(verts,[],faces);m.update()
+    o=bpy.data.objects.new(name,m);scene.collection.objects.link(o)
+    angles=[]
+    for i,b in enumerate(clean):
+        a=clean[i-1];c=clean[(i+1)%len(clean)];u=(a[0]-b[0],a[1]-b[1]);v=(c[0]-b[0],c[1]-b[1])
+        angles.append(math.acos(max(-1,min(1,(u[0]*v[0]+u[1]*v[1])/(math.hypot(*u)*math.hypot(*v))))))
+    min_edge=min(math.dist(a,b) for a,b in zip(clean,clean[1:]+clean[:1]))
+    finish(o,stone,.005 if min(angles)>math.radians(12) and min_edge>.02 and min(v[1] for v in clean)>-47.6 else 0)
+
 for x in rib_x:
-    for i,((y0,z0),(y1,z1)) in enumerate(zip(curve,curve[1:])):
-        # Independent voussoir segments give the full support an authored construction rhythm.
-        gap=.008;slope=(z1-z0)/(y1-y0)
-        a=y0+gap;b=y1-gap;za=min(z0+gap*slope,-.50);zb=min(z1-gap*slope,-.50)
-        prism('Arch rib voussoir',x,1.14,a,b,za,zb,TOP-.39,stone,.006)
-        # Narrow carved archivolt follows the underside on both visible rib faces.
+    for (y0,z0),(y1,z1) in zip(curve,curve[1:]):
+        prism('Continuous recessed mortar core',x,1.04,y0,y1,min(z0,-.50),min(z1,-.50),TOP-.39,grout,0)
+    # Split at the crown to keep clipped course polygons connected.
+    for side in (-1,1):
+        side_curve=[(y,min(z,-.50)) for y,z in curve if y*side>=-.000001]
+        profile_poly=side_curve+[(side_curve[-1][0],TOP-.39),(side_curve[0][0],TOP-.39)]
+        for row in range(33):
+            low=-49.14+row*1.5+.018;high=min(-49.14+(row+1)*1.5-.018,TOP-.39)
+            for tile in range(-7,7):
+                y0=tile*2+(row%2)*1+.018;y1=y0+1.964
+                poly=profile_poly
+                for axis,value,above in ((0,y0,True),(0,y1,False),(1,low,True),(1,high,False)):
+                    if poly:poly=clip_polygon(poly,axis,value,above)
+                ashlar('Staggered dressed ashlar course',x,poly)
+    for (y0,z0),(y1,z1) in zip(curve,curve[1:]):
         for face in (-1,1):
-            o=path('Archivolt edge',[(a,0,za+.13),(b,0,zb+.13)],.14,.045,stone,0)
-            o.rotation_euler[2]=math.pi/2;o.location.x=x+face*.59
-    # Horizontal coursing across the spandrels breaks up otherwise fifty-metre strips.
-    for z in (-1.5-1.5*j for j in range(31)):
-        for (y0,z0),(y1,z1) in zip(curve,curve[1:]):
-            if max(z0,z1)>z-.2:continue
-            for face in (-1,1):
-                j=len(joint_vertices);fx=x+face*.572
-                joint_vertices.extend([(fx,y0+.008,z-.006),(fx,y1-.008,z-.006),(fx,y1-.008,z+.006),(fx,y0+.008,z+.006)]);joint_faces.append((j,j+1,j+2,j+3))
+            o=path('Continuous carved archivolt',[(y0,0,min(z0,-.50)+.13),(y1,0,min(z1,-.50)+.13)],.14,.045,stone,0)
+            o.rotation_euler[2]=math.pi/2;o.location.x=x+face*.60
     for y in (-L/2+.40,L/2-.40):
         box('Abutment recessed face',(x,y,-24.9),(1.02,.80,47.4),stone,.015)
         for z in (-47,-39,-31,-23,-15,-7):box('Abutment collar',(x,y,z),(1.35,.85,.22),stone,.012)
 for y in (-L/2+.44,L/2-.44):
     for z in (-48.9,-.63):box('Cross-span tie beam',(0,y,z),(13.95,.88,.45),stone,.015)
-joint_mesh=bpy.data.meshes.new('Spandrel coursing');joint_mesh.from_pydata(joint_vertices,[],joint_faces);joint_mesh.update();joint_object=bpy.data.objects.new('Spandrel coursing',joint_mesh);scene.collection.objects.link(joint_object);finish(joint_object,dark,0)
 support=export('SM_Aurelion_KIT_'+mesh_prefix+'ArchSupports',[]);manifest[-1]['nominal_dimensions_m']=list(support.dimensions)
 support_hulls=[]
 for x in rib_x:

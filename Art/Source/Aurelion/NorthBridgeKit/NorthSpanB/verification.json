@@ -14,10 +14,10 @@
       "asset": "SM_Aurelion_KIT_NorthSpanBArchSupports",
       "dimensions_m": [
         14.25,
-        20.98615074157715,
-        48.84634017944336
+        21.002151489257812,
+        48.8613395690918
       ],
-      "triangles": 48672
+      "triangles": 155920
     }
   ],
   "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"

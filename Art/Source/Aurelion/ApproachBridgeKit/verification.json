@@ -14,10 +14,10 @@
       "asset": "SM_Aurelion_KIT_ApproachArchSupports",
       "dimensions_m": [
         14.25,
-        21.417919158935547,
-        48.84634017944336
+        21.433917999267578,
+        48.8613395690918
       ],
-      "triangles": 48672
+      "triangles": 153520
     }
   ],
   "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"

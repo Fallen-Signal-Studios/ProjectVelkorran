@@ -197,15 +197,15 @@
     },
     {
       "asset": "SM_Aurelion_KIT_NorthSpanBArchSupports",
-      "triangles": 48672,
+      "triangles": 155920,
       "nominal_dimensions_m": [
         14.25,
-        20.98615074157715,
-        48.84634017944336
+        21.002151489257812,
+        48.8613395690918
       ],
       "materials": [
-        "M_Aurelion_IvoryStone",
-        "M_Aurelion_ChannelShadow"
+        "M_Aurelion_StoneGrout",
+        "M_Aurelion_IvoryStone"
       ],
       "uv_layers": 2,
       "convex_hulls": 180,
