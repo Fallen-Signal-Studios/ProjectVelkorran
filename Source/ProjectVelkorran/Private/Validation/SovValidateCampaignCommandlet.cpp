@@ -203,7 +203,12 @@ namespace
 				}
 			}
 			TArray<FName> Dependencies;
-			Registry.GetDependencies(Package, Dependencies, UE::AssetRegistry::EDependencyCategory::Package);
+			// Mirror the cooker, which explores only game dependencies (CookGenerationHelper and CookRequestCluster
+			// query EDependencyQuery::Game): an editor-only reference never ships, so it must not raise a finding.
+			// World Partition external actors are game dependencies and are followed, because a real cook folds
+			// them into generated streaming cells.
+			Registry.GetDependencies(Package, Dependencies, UE::AssetRegistry::EDependencyCategory::Package,
+				UE::AssetRegistry::EDependencyQuery::Game);
             for (FName Dependency : Dependencies)
             {
                 if (!DependencyParents.Contains(Dependency)) { DependencyParents.Add(Dependency, Package); }

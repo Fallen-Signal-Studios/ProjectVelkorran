@@ -37,6 +37,15 @@ UnrealEditor-Cmd ProjectVelkorran.uproject -run=SovValidateCampaign -Missions=<a
 
 The commandlet validates declared native contracts and dependency closure. It cannot prove arbitrary Blueprint event semantics, correct cinematic causality, caption readability or asset playability.
 
+With `-ShippingValidation` the dependency walk also starts from every configured cook entry, not only the manifest: effective AlwaysCook Primary Assets, GameMapsSettings defaults, packaging `MapsToCook`/`AlwaysCookMaps` and `DirectoriesToAlwaysCook`, the input touch interface, and config soft paths and class references loaded at startup. Each prohibited-content finding names the route by which it enters the cook. To validate the cooker's own package set, add the log of a list-only cook of the shipping map set:
+
+```text
+UnrealEditor-Cmd ProjectVelkorran.uproject -run=cook -targetplatform=<platform> -map=<shipping maps> -CookList -cookshowinstigators -unattended -AbsLog=<cook.log>
+UnrealEditor-Cmd ProjectVelkorran.uproject -run=SovValidateCampaign -Missions=<manifest> -ShippingValidation -CookList=<cook.log>
+```
+
+`-CookList` only explores dependencies; it neither loads nor saves, so it does not show World Partition external actors or generated streaming cells. The validator follows those actors itself, so content reached only through a World Partition map is still reported even though the cook list omits it.
+
 ## Required engine regression matrix
 
 | Area | Required behavioral evidence |
