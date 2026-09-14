@@ -2,6 +2,8 @@
 
 
 #include "GAS/NarrativeAbilitySystemComponent.h"
+#include "Settings/SovCampaignModifiers.h"
+#include "UnrealFramework/NarrativeGameUserSettings.h"
 #include "AI/NarrativeAIStartupDiagnostics.h"
 #include "GAS/NarrativeAttributeSetBase.h"
 #include "UnrealFramework/NarrativeAnimInstance.h"
@@ -689,7 +691,10 @@ int32 UNarrativeAbilitySystemComponent::GetNumAttackTokens() const
 {
 	if (const UNarrativeCombatDeveloperSettings* CombatSettings = GetDefault<UNarrativeCombatDeveloperSettings>())
 	{
-		return CombatSettings->GetAttackTokensForDifficulty(UArsenalStatics::GetGameplayDifficultyLevel());
+        const int32 Base = CombatSettings->GetAttackTokensForDifficulty(UArsenalStatics::GetGameplayDifficultyLevel());
+        const auto* Settings = UNarrativeGameUserSettings::GetSovSettings();
+        return Settings && UNarrativeGameUserSettings::IsCampaignAlly(GetAvatarActor())
+            ? SovCampaignModifiers::AttackTokens(Settings->GetCampaignModifiers(), Base) : Base;
 	}
 	else
 	{

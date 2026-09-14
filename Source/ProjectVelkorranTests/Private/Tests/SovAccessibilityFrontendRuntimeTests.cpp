@@ -138,7 +138,7 @@ bool FSovAccessibilityTransaction::RunTest(const FString& Parameters)
 	if (!TestNotNull(TEXT("Reflected first-boot fixture field"), Completed)) { return false; }
 	Completed->SetPropertyValue_InContainer(Settings, false);
 	TestFalse(TEXT("Fixture begins before explicit setup completion"), Settings->HasCompletedAccessibilitySetup());
-	TestTrue(TEXT("Capture legacy eleven-byte gameplay payload"),Settings->CapturePortableSettings(Bytes)); TestEqual(TEXT("Schema unchanged"),Bytes.Num(),11);
+	TestTrue(TEXT("Capture bounded gameplay payload"),Settings->CapturePortableSettings(Bytes)); TestEqual(TEXT("Gameplay payload includes modifier mask only"),Bytes.Num(),12);
 	auto Value = Settings->GetSettingsSnapshot(); Value.UIScale=2; Value.SubtitleScale=2.5f; Value.bHighContrastHUD=true; Value.bMenuNarration=true;
 	Value.DialoguePressureMode=ESovDialoguePressureMode::Disabled; Value.bOverrideTeamColor=true; Value.TeamColor=FLinearColor::Green;
 	Value.ControllerAudioVolume=.35f;
@@ -170,6 +170,13 @@ bool FSovAccessibilityNativeControl::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Objective text can be hidden through native settings"),Settings->GetSettingsSnapshot().bShowObjectiveText);
 	Menu->Adjust(Row,1);
 	TestTrue(TEXT("Objective text can be restored through native settings"),Settings->GetSettingsSnapshot().bShowObjectiveText);
+    const ESovDifficultyPreset DifficultyBefore = Settings->GetSettingsSnapshot().Preset;
+    for (const FName Modifier : {FName("bModifierBlackout"),FName("bModifierFamine"),FName("bModifierFrenzy"),FName("bModifierAscendant"),FName("bModifierGlassCannon")})
+    {
+        Row=FSovAccessibilityFrontendTestAccess::Row(Menu,Settings,Modifier,0,1,1); Menu->Adjust(Row,1);
+    }
+    TestEqual(TEXT("Native challenge rows enable all five modifiers"),Settings->GetCampaignModifiers(),SovCampaignModifiers::All);
+    TestEqual(TEXT("Challenge controls preserve selected difficulty"),Settings->GetSettingsSnapshot().Preset,DifficultyBefore);
 	Row=FSovAccessibilityFrontendTestAccess::Row(Menu,Settings,"DialoguePressureMode",0,2,1); Menu->Adjust(Row,1);
 	TestEqual(TEXT("Reflected enum uses actual settings"),Settings->GetSettingsSnapshot().DialoguePressureMode,ESovDialoguePressureMode::Extended);
 	Row=FSovAccessibilityFrontendTestAccess::Row(Menu,Settings,"Cloud.Enabled",0,1,1);

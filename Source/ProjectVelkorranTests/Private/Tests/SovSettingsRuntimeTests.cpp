@@ -48,7 +48,7 @@ bool FSovSettingsPortable::RunTest(const FString& Parameters)
 	USovSettingsTestSettings* Settings = NewObject<USovSettingsTestSettings>(); FString Error;
 	Settings->ApplyDifficultyPreset(ESovDifficultyPreset::Story, Error);
 	TArray<uint8> Bytes; TestTrue(TEXT("Capture fixed schema"), Settings->CapturePortableSettings(Bytes));
-	TestEqual(TEXT("No unbounded strings or identity fields"), Bytes.Num(), 11);
+	TestEqual(TEXT("No unbounded strings or identity fields"), Bytes.Num(), 12);
 	FSovUserSettingsSnapshot Custom = Settings->GetSettingsSnapshot();
 	Custom.DefenseWindowScale = 2.f; Custom.ExertionCostScale = .25f; Custom.bReduceCorruptionEffects = true;
 	Custom.bAutomaticSprint = true; Custom.bAimSnap = true; Custom.bProjectileLead = true;

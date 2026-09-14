@@ -4,7 +4,7 @@
 #include <cstdint>
 namespace SovSettingsPolicy
 {
-constexpr std::uint8_t Schema = 1;
+constexpr std::uint8_t Schema = 2;
 inline bool InRange(float Value, float Min, float Max) { return std::isfinite(Value) && Value >= Min && Value <= Max; }
 inline bool ValidGameplay(std::uint8_t Preset, float Damage, float Recovery, bool Unlocked)
 {

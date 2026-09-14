@@ -214,7 +214,7 @@ bool FSovHapticSettingsRuntime::RunTest(const FString& Parameters)
 	FSovHapticSettings Value; Value.Combat = 0.f; Value.Master = .5f;
 	TestTrue(TEXT("Channel choice saved"), Settings->ApplyHapticSettings(Value, Error));
 	TArray<uint8> Bytes; TestTrue(TEXT("Gameplay snapshot still available"), Settings->CapturePortableSettings(Bytes));
-	TestEqual(TEXT("Existing portable byte schema unchanged"), Bytes.Num(), 11);
+	TestEqual(TEXT("Portable gameplay payload excludes local platform settings"), Bytes.Num(), 12);
 	TestTrue(TEXT("Gameplay import accepted"), Settings->RestorePortableSettings(Bytes, Error));
 	TestEqual(TEXT("Import preserves local muted combat channel"), Settings->GetHapticSettings().Combat, 0.f);
 	Value.UI = std::numeric_limits<float>::quiet_NaN();

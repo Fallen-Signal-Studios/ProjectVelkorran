@@ -470,7 +470,7 @@ void USovAccessibilityPresentation::NativeTick(const FGeometry& Geometry, float 
 	MarkerRefreshRemaining -= DeltaSeconds; if (MarkerRefreshRemaining > 0) { return; } MarkerRefreshRemaining = .25f; Markers.Reset();
 	APlayerController* PC = GetOwningPlayer(); if (!PC) { ObjectiveWaypoint = {}; return; }
     RefreshObjectiveWaypoint();
-	if (Settings.bWeakPointOutlines)
+	if (Settings.bWeakPointOutlines && !Settings.bModifierBlackout)
 	{
 		RefreshWeakPointMarkers(PC);
 	}
@@ -634,7 +634,7 @@ int32 USovAccessibilityPresentation::NativePaint(const FPaintArgs& Args, const F
 	};
     FSovCombatVitalsSnapshot CurrentVitals;
     const auto* SovPC = Cast<ASovPlayerController>(PC);
-    if (Settings.bShowObjectiveText && !IsCinematicControlled(SovPC) && SafeTextCanvas && USovCombatVitalsWidget::ReadCurrentVitals(SovPC, CurrentVitals)
+    if (!Settings.bModifierBlackout && Settings.bShowObjectiveText && !IsCinematicControlled(SovPC) && SafeTextCanvas && USovCombatVitalsWidget::ReadCurrentVitals(SovPC, CurrentVitals)
         && CurrentVitals.Values[0].Current > 0.f && SovObjectiveWaypoint::IsCurrent(SovPC, ObjectiveWaypoint))
     {
         const auto& SafeGeometry = SafeTextCanvas->GetPaintSpaceGeometry();
@@ -709,6 +709,7 @@ int32 USovAccessibilityPresentation::NativePaint(const FPaintArgs& Args, const F
 	}
 	for (const FMarker& Marker : Markers)
 	{
+        if (Settings.bModifierBlackout && (Marker.bThreat || Marker.bNavigation)) { continue; }
 		FVector2D Point; if (!Project(Marker.Location,Point)) { continue; }
 		const float Radius = (Marker.bThreat ? 13.f : 9.f) * Settings.UIScale;
 		FLinearColor Tint = Marker.bThreat ? ThreatTint(Settings) : TeamTint(Settings);

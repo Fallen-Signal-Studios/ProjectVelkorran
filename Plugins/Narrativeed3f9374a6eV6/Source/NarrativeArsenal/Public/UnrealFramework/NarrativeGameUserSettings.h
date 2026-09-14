@@ -48,6 +48,9 @@ public:
 	static const UNarrativeGameUserSettings* GetSovSettings();
 	virtual float GetIncomingDamageScale() const { return 1.f; }
 	virtual float GetEnemyRecoveryScale() const { return 1.f; }
+    virtual uint8 GetCampaignModifiers() const { return 0; }
+    static bool IsCampaignEnemy(const AActor* Actor);
+    static bool IsCampaignAlly(const AActor* Actor);
 	virtual float GetDefenseWindowScale() const { return 1.f; }
 	virtual float GetExertionCostScale() const { return 1.f; }
 	virtual float GetInputBufferAssistanceSeconds() const { return 0.f; }

@@ -2,6 +2,10 @@
 
 
 #include "UnrealFramework/NarrativeGameUserSettings.h"
+#include "ArsenalStatics.h"
+#include "Kismet/GameplayStatics.h"
+#include "GameFramework/Pawn.h"
+
 #include "AudioDevice.h"
 #include <Sound/AudioSettings.h>
 #include "ArsenalSettings.h"
@@ -17,6 +21,16 @@
 #include "HAL/PlatformProperties.h"
 #include "Widgets/SWindow.h"
 
+bool UNarrativeGameUserSettings::IsCampaignEnemy(const AActor* Actor)
+{
+    const APawn* Player = IsValid(Actor) ? UGameplayStatics::GetPlayerPawn(Actor, 0) : nullptr;
+    return IsValid(Player) && Actor != Player && UArsenalStatics::GetAttitude(Actor, Player) == ETeamAttitude::Hostile;
+}
+bool UNarrativeGameUserSettings::IsCampaignAlly(const AActor* Actor)
+{
+    const APawn* Player = IsValid(Actor) ? UGameplayStatics::GetPlayerPawn(Actor, 0) : nullptr;
+    return IsValid(Player) && (Actor == Player || UArsenalStatics::GetAttitude(Actor, Player) == ETeamAttitude::Friendly);
+}
 UNarrativeGameUserSettings::UNarrativeGameUserSettings()
 {
 	OverallAudioVolume = 1.f;
