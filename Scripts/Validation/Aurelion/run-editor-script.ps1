@@ -13,7 +13,7 @@ param(
     [switch]$ContinueE1,
     [switch]$ContinueRoute,
     [switch]$DisableAura,
-    [ValidateSet('/Game/Aurelion/Maps/L_Aurelion_M12', '/Game/Aurelion/Maps/L_Aurelion_M13')]
+    [ValidateSet('/Game/Aurelion/Maps/L_Aurelion_M12', '/Game/Aurelion/Maps/L_Aurelion_M13', '/Game/Aurelion/ArtReview/L_Aurelion_ArchitectureKit')]
     [string]$Map = '/Game/Aurelion/Maps/L_Aurelion_M12'
 )
 Set-StrictMode -Version Latest

@@ -13,7 +13,7 @@ for entry in manifest['modules']:
     assert len(objects)==1
     o=objects[0]
     assert o.name==entry['asset'] and o.location.length<.001
-    assert len(o.data.materials)==3 and len(o.data.uv_layers)==1
+    assert len(o.data.materials)==3 and len(o.data.uv_layers)==2
     assert all(abs(a-b)<.05 for a,b in zip(o.dimensions,entry['nominal_dimensions_m'])), (o.name,list(o.dimensions))
     assert all(math.isfinite(v) for vertex in o.data.vertices for v in vertex.co)
     assert all(poly.area>1e-12 for poly in o.data.polygons)

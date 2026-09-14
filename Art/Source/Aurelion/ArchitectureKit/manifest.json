@@ -14,7 +14,7 @@
         "M_Aurelion_ChannelShadow",
         "M_Aurelion_AncientGold"
       ],
-      "uv_layers": 1,
+      "uv_layers": 2,
       "collision": "Not authored; no gameplay placement until collision is verified"
     },
     {
@@ -30,7 +30,7 @@
         "M_Aurelion_ChannelShadow",
         "M_Aurelion_AncientGold"
       ],
-      "uv_layers": 1,
+      "uv_layers": 2,
       "collision": "Not authored; no gameplay placement until collision is verified"
     },
     {
@@ -46,7 +46,7 @@
         "M_Aurelion_AncientGold",
         "M_Aurelion_ChannelShadow"
       ],
-      "uv_layers": 1,
+      "uv_layers": 2,
       "collision": "Not authored; no gameplay placement until collision is verified"
     },
     {
@@ -62,7 +62,7 @@
         "M_Aurelion_ChannelShadow",
         "M_Aurelion_AncientGold"
       ],
-      "uv_layers": 1,
+      "uv_layers": 2,
       "collision": "Not authored; no gameplay placement until collision is verified"
     }
   ]

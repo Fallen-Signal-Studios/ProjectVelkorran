@@ -21,4 +21,18 @@ The kit must cover straight and corner wall bays; piers and buttresses; door/ope
 
 `Art/Source/Aurelion/build_architecture_kit.py` creates an editable assembly and separate FBX modules under `ArchitectureKit`: a four-metre/seven-metre wall bay, a seven-metre layered pier, a four-metre stepped cornice and a four-metre inlaid floor. The bay adds fitted masonry, deep oblique reveals, incised plaques, service louvers and a concentric mechanism register. This is a source prototype for reviewing the architectural language; it is not the completed kit or map replacement.
 
-Surface baking, production materials, collision, variants, in-engine review and deployment remain pending. The existing 63.75% slice estimate is unchanged.
+The existing 63.75% slice estimate is unchanged. Final surface authoring, module variants, campaign deployment and runtime qualification remain pending.
+
+## Unreal integration
+
+The first four modules are imported under `/Game/Aurelion/Environment/ArchitectureKit/Meshes`. UV0 now uses one texture tile per metre on dominant face planes; UV1 retains unique packed islands for lightmapping. The Blender FBX round-trip checks pass with two UV channels. Unreal import checks centimetre dimensions, three material slots, source-file identity and Nanite configuration. Solid bay, pier and floor assets have one generated box collision each; the ornamental cornice has none. These initial collision envelopes still need gameplay-context review before deployment.
+
+Owned material copies under `ArchitectureKit/Materials` provide ivory stone, gold and dark reveals without changing existing campaign materials. The stone uses retained base-color/normal/roughness textures, restrained base-color variation, a 0.2 normal blend and roughness of 0.34 plus 0.2 times its roughness texture. This is a material candidate, not final surface acceptance.
+
+`/Game/Aurelion/ArtReview/L_Aurelion_ArchitectureKit` contains a separate two-bay assembly and review camera. The imported detailed face is local +Y; review placement uses yaw 180 to face the camera. Initial backside captures were rejected and the orientation corrected. No M12/M13 actors or mission progression were changed by this import.
+
+Import evidence: `Saved/Validation/Aurelion/ArchitectureKitImport-20260913-181657-2f21bf4d/kit-import.json`. The initial multi-view capture suffered overlapping screenshot tasks and does not establish distinct player/detail review. The capture helper now waits for task completion, pilots the review camera and verifies both imported UV channels. The runner accepts the dedicated review map for subsequent art iterations; retained gameplay-route runs still require M12.
+
+The completed review is `Saved/Validation/Aurelion/ArchitectureKitThreeViews-20260913-182520-73516938`, with separate assembly, player-height and detail PNGs and `capture-complete.json`. A callback reentrancy guard was also required because screenshot preparation pumps editor ticks. All three images were inspected. Geometry and material assignments survive import, but prominent shadow noise remains in the offscreen captures. These images establish assembly/detail review, not final lighting or surface-quality acceptance.
+
+Next art requirements include plain and mechanism-bearing bay variants, deeper joints and focal construction, controlled surface wear, continuous ring joints, corner/portal assemblies, and fitting the family into the actual rooms. Repeating the same concentric register on every bay is not the intended final architectural language. Production-lighting review, collision fit, Nanite fallback/platform behavior and measured GPU cost remain unqualified.

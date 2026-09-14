@@ -70,6 +70,16 @@ def export(name,dimensions):
     bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT')
     bpy.ops.mesh.normals_make_consistent(inside=False)
     bpy.ops.uv.smart_project(island_margin=.008); bpy.ops.object.mode_set(mode='OBJECT')
+    # UV0 uses one tile per metre on every face. UV1 keeps unique packed islands.
+    uv=o.data.uv_layers.active; uv.name='Surface_1m'
+    packed=o.data.uv_layers.new(name='Lightmap_Unique',do_init=True)
+    for poly in o.data.polygons:
+        axis=max(range(3),key=lambda i: abs(poly.normal[i]))
+        axes=((1,2),(0,2),(0,1))[axis]
+        for loop in poly.loop_indices:
+            co=o.data.vertices[o.data.loops[loop].vertex_index].co
+            uv.data[loop].uv=(co[axes[0]],co[axes[1]])
+    o.data.uv_layers.active_index=0
     bpy.ops.export_scene.fbx(filepath=str(ROOT/(name+'.fbx')),use_selection=True,object_types={'MESH'},
         axis_forward='-Y',axis_up='Z',apply_unit_scale=True,bake_anim=False,add_leaf_bones=False,mesh_smooth_type='FACE')
     o.data.calc_loop_triangles()
