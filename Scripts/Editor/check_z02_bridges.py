@@ -50,6 +50,7 @@ def check_bridges(world,actors,kit='ApproachBridgeKit',actor_prefix='KIT_Z02_Bri
                 top=min(row[2] for row in spec['bridge_surface_samples'])
                 for y in (-900,0,900):
                     for dx,z,expected in ((800,93,True),(-800,93,True),(800,230,False),(-800,230,False),(0,93,False)):
+                        if dx==800 and b.get('east_north_opening_m',0)>0 and y>b['length_m']*50-b['east_north_opening_m']*100:expected=False
                         start=unreal.Vector(p.x,p.y+y,p.z+top*100+z);end=unreal.Vector(p.x+dx,start.y+100 if dx==0 else start.y,start.z)
                         hit=hit_result(unreal.SystemLibrary.capsule_trace_single_by_profile(world,start,end,42,88,'Pawn',False,ignored,unreal.DrawDebugTrace.NONE,True))
                         assert bool(hit and hit.to_tuple()[0])==expected,(a.get_actor_label(),y,dx,z,expected)

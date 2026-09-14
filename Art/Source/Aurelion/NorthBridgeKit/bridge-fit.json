@@ -46,12 +46,19 @@
       "world_y_bounds_cm": [
         -4021.174432,
         -1934.833897
-      ]
+      ],
+      "east_north_opening_m": 3.65166103
     }
   ],
   "seam_world_y_cm": [
     -6018.841969,
     -4021.174432
   ],
-  "qualification": "Fit between existing bridge3 deck north edge and bridge5 north edge; underside shape is refitted, requiring physics and visual checks."
+  "qualification": "Fit between existing bridge3 deck north edge and bridge5 north edge; underside shape is refitted, requiring physics and visual checks.",
+  "east_exit": {
+    "bridge": "bridge5",
+    "world_y_min_cm": -2300,
+    "world_y_max_cm": -1934.833897,
+    "qualification": "Opening aligned to existing eastbound corridor; live companion navigation and route acceptance pending."
+  }
 }

@@ -38,18 +38,20 @@ for x in (-2.72,2.72):
     box('Narrow route conductor',(x,0,TOP-.001),(.013,L-.05,.002),gold,0)
 for side in (-1,1):
     x=side*(W/2-.16)
+    guard_low=-L/2+(float(globals().get('EAST_NORTH_OPENING',0)) if side==1 else 0);guard_high=L/2
+    guard_length=guard_high-guard_low;guard_center=(guard_low+guard_high)/2
     # The solid guard deliberately makes collision visually legible along its full length.
-    box('Outer parapet core',(x,0,TOP+.65),(.19,L-.32,1.10),stone,.008)
+    box('Outer parapet core',(x,guard_center,TOP+.65),(.19,guard_length-.32,1.10),stone,.008)
     for z,width,height in ((.10,.32,.20),(1.19,.32,.22)):
-        box('Parapet dressed course',(x,0,TOP+z),(width,L-.32,height),stone,.01)
-    for y in (-L/2+.08,L/2-.08):
+        box('Parapet dressed course',(x,guard_center,TOP+z),(width,guard_length-.32,height),stone,.01)
+    for y in (guard_low+.08,guard_high-.08):
         box('Parapet terminal pier',(x,y,TOP+.65),(.32,.16,1.30),stone,.008)
     for i in range(12):
-        y=-L/2+(i+.5)*L/12
+        y=guard_low+(i+.5)*guard_length/12
         for face in (-1,1):
             fx=x+face*.106
-            box('Recessed parapet panel',(fx,y,TOP+.65),(.022,L/12-.20,.72),dark,.002)
-            box('Raised panel stone',(fx+face*.016,y,TOP+.65),(.016,L/12-.28,.64),stone,.003)
+            box('Recessed parapet panel',(fx,y,TOP+.65),(.022,guard_length/12-.20,.72),dark,.002)
+            box('Raised panel stone',(fx+face*.016,y,TOP+.65),(.016,guard_length/12-.28,.64),stone,.003)
             box('Panel axial inlay',(fx+face*.027,y,TOP+.65),(.004,.016,.29),gold,0)
     # Profiled deck edge and corbels remain below the walking surface.
     for z,width,height in ((-.10,.37,.13),(-.26,.29,.11),(-.40,.23,.12)):
@@ -59,8 +61,9 @@ for side in (-1,1):
         box('Fascia corbel',(side*(W/2-.22),y,TOP-.53),(.35,.24,.22),stone,.018)
 deck=export('SM_Aurelion_KIT_'+mesh_prefix+'Deck',[]);manifest[-1]['nominal_dimensions_m']=list(deck.dimensions)
 rail=W/2-.16
-specs=[((0,0,TOP-.20),(W,L,.40))]+[((x,0,TOP+.65),(.32,L,1.30)) for x in (-rail,rail)]
-samples=[(x,y,TOP if abs(x)<7 else TOP+1.30) for x in (-rail,-6,-2,0,2,6,rail) for y in (-min(10,L/2-.1),-5,0,5,min(10,L/2-.1))]
+opening=float(globals().get('EAST_NORTH_OPENING',0))
+specs=[((0,0,TOP-.20),(W,L,.40)),((-rail,0,TOP+.65),(.32,L,1.30)),((rail,opening/2,TOP+.65),(.32,L-opening,1.30))]
+samples=[(x,y,TOP if abs(x)<7 or (x>7 and y<-L/2+opening) else TOP+1.30) for x in (-rail,-6,-2,0,2,6,rail) for y in (-min(10,L/2-.1),-5,0,5,min(10,L/2-.1))]
 export_collision(deck,specs,samples)
 deck.hide_render=True
 
