@@ -12,7 +12,7 @@ def verify():
         routes=[a for a in actors if isinstance(a,unreal.SovAurelionWallRoute) and str(a.get_editor_property('route_id'))=='Aurelion.'+group+'.WallEntry'];assert len(routes)==1
         route=routes[0];surfaces=route.get_editor_property('presentation_surfaces');assert len(surfaces)==1
         c=surfaces[0];assert c.static_mesh.get_name()==name and c.get_editor_property('visible') and c.get_collision_enabled()==unreal.CollisionEnabled.NO_COLLISION
-        assert not route.get_components_by_class(unreal.PrimitiveComponent),'Runtime query proxies must not be serialized into the map'
+        assert not route.get_components_by_class(unreal.PrimitiveComponent),'Cosmetic contact must not add serialized physics components'
         bindings.append(dict(route=route.get_actor_label(),surface=c.get_path_name(),mesh=name))
     m=unreal.load_asset('/Game/Aurelion/Environment/ArchitectureKit/Meshes/SM_Aurelion_KIT_Z08WallAssembly');settings=unreal.get_editor_subsystem(unreal.StaticMeshEditorSubsystem).get_nanite_settings(m)
     assert settings.get_editor_property('fallback_percent_triangles')==1 and settings.get_editor_property('fallback_relative_error')==0

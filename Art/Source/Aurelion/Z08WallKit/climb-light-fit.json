@@ -1,0 +1,36 @@
+{
+  "light": {
+    "actor": "ENVL_Z08_Key_03",
+    "component": "LightComponent0",
+    "class_name": "RectLightComponent",
+    "transform": "(Rotation=(X=0.591672,Y=0.143229,Z=-0.771082,W=0.186659),Translation=(X=2100.000000,Y=21880.000000,Z=-730.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+    "forward": [
+      -0.23016462256050452,
+      -0.118370370572033,
+      -0.9659258262890689
+    ],
+    "linear_color": [
+      0.24228112399578094,
+      0.07421356439590454,
+      0.520995557308197,
+      1.0
+    ],
+    "properties": {
+      "intensity": "245.0",
+      "intensity_units": "<LightUnits.LUMENS: 2>",
+      "attenuation_radius": "5850.0",
+      "cast_shadows": "False",
+      "source_width": "240.0",
+      "source_height": "160.0",
+      "indirect_lighting_intensity": "0.699999988079071",
+      "volumetric_scattering_intensity": "0.0"
+    }
+  },
+  "selected_linear_color": [
+    0.8879231214523315,
+    0.9130986332893372,
+    1.0,
+    1.0
+  ],
+  "qualification": "Neutral key selected from fixed-camera comparison; broad live lighting acceptance remains open."
+}

@@ -27,6 +27,7 @@ for side in (-1,1):
             o=box('Crown direction chevron',(x+dx,side*.097,2.959),(.044,.006,.010),gold,.001)
             o.rotation_euler.y=math.radians(32 if dx<0 else -32)
 o=export('SM_Aurelion_KIT_Z06ClimbPanel',[4.4,.2,3]);manifest[-1].update(nominal_dimensions_m=list(o.dimensions),collision='None; existing climb wall and landing boxes remain authoritative')
+manifest[-1]['material_overrides']={'M_Aurelion_IvoryStone': '/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_ClimbIvory'}
 (ROOT/'manifest.json').write_text(json.dumps(dict(status='Source candidate; scene fit and live climb acceptance pending',modules=manifest),indent=2))
 scene.world=bpy.data.worlds.new('Climb panel studio');scene.world.color=(.2,.2,.2)
 for pos,power,size in [((2,-4,5),650,4),((-3,2,3),500,3)]:

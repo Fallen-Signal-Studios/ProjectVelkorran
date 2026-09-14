@@ -17,7 +17,10 @@
       ],
       "uv_layers": 2,
       "convex_hulls": 0,
-      "collision": "None; existing climb wall and landing boxes remain authoritative"
+      "collision": "None; existing climb wall and landing boxes remain authoritative",
+      "material_overrides": {
+        "M_Aurelion_IvoryStone": "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_ClimbIvory"
+      }
     }
   ]
 }

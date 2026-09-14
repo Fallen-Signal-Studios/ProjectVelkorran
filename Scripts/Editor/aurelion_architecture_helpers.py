@@ -32,7 +32,7 @@ def import_owned_mesh(spec,source,destination,materials):
     keys=[]
     for i,slot in enumerate(mesh.get_editor_property('static_materials')):
         key=str(slot.get_editor_property('imported_material_slot_name')); keys.append(key)
-        material=unreal.load_asset(materials[key]); assert material
+        material=unreal.load_asset(spec.get('material_overrides',{}).get(key,materials[key])); assert material
         mesh.set_material(i,material)
     assert set(keys)==set(spec['materials'])
     sm=unreal.get_editor_subsystem(unreal.StaticMeshEditorSubsystem)
