@@ -13,6 +13,7 @@ param(
     [switch]$ContinueE1,
     [switch]$ContinueRoute,
     [switch]$DisableAura,
+    [switch]$UseFileSystemCache,
     [ValidateSet('/Game/Aurelion/Maps/L_Aurelion_M12', '/Game/Aurelion/Maps/L_Aurelion_M13', '/Game/Aurelion/ArtReview/L_Aurelion_ArchitectureKit')]
     [string]$Map = '/Game/Aurelion/Maps/L_Aurelion_M12'
 )
@@ -60,6 +61,7 @@ $AurelionArgs = @($AurelionProject, $Map, '-unattended', '-nosound', '-nosplash'
     '-ini:Engine:[/Script/PythonScriptPlugin.PythonScriptPluginSettings]:bRunPipInstallOnStartup=false')
 if (-not $Visible) { $AurelionArgs += '-RenderOffscreen' }
 if ($DisableAura) { $AurelionArgs += '-DisablePlugins=Aura' }
+if ($UseFileSystemCache) { $AurelionArgs += '-ddc=InstalledNoZenLocalFallback' }
 foreach ($AurelionArg in $AurelionArgs) {
     if ($AurelionArg -match '["\r\n]' -or $AurelionArg.EndsWith('\')) { throw 'Unsupported argument quoting.' }
 }
@@ -70,6 +72,9 @@ $AurelionEnvironment = @{
     SOV_AURELION_ENTRY_CONTINUE_E1 = $(if ($ContinueE1) { '1' } else { '0' })
     SOV_AURELION_E1_CONTINUE_ROUTE = $(if ($ContinueRoute) { '1' } else { '0' })
     UE_PIPINSTALL_PATH = $(if ($PipInstallPath) { $PipInstallPath } else { $null })
+}
+if ($UseFileSystemCache) {
+    $AurelionEnvironment['UE-LocalDataCachePath'] = (Join-Path $AurelionProjectDirectory 'DerivedDataCache\ValidationFallback').Replace('\', '/')
 }
 $AurelionPreviousEnvironment = @{}
 try {

@@ -1,0 +1,33 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z02Perimeter_4m",
+      "dimensions_m": [
+        4.0,
+        0.41499999165534973,
+        9.643940925598145
+      ],
+      "triangles": 15604
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z02Perimeter_Closing",
+      "dimensions_m": [
+        3.3401997089385986,
+        0.41499999165534973,
+        9.643940925598145
+      ],
+      "triangles": 14288
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z02EndFrieze",
+      "dimensions_m": [
+        12.588116645812988,
+        0.945391058921814,
+        3.8524279594421387
+      ],
+      "triangles": 18508
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}

@@ -1,0 +1,56 @@
+{
+  "status": "Measured perimeter candidate; final art and live gameplay acceptance pending",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z02Perimeter_4m",
+      "triangles": 15604,
+      "nominal_dimensions_m": [
+        4.0,
+        0.41499999165534973,
+        9.643940925598145
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; original outer wall collision retained"
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z02Perimeter_Closing",
+      "triangles": 14288,
+      "nominal_dimensions_m": [
+        3.3401997089385986,
+        0.41499999165534973,
+        9.643940925598145
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; original outer wall collision retained"
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z02EndFrieze",
+      "triangles": 18508,
+      "nominal_dimensions_m": [
+        12.588116645812988,
+        0.945391058921814,
+        3.8524279594421387
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; original elevated end-panel collision retained"
+    }
+  ]
+}

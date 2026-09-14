@@ -3,7 +3,7 @@ from pathlib import Path
 import unreal
 root=Path(unreal.Paths.project_dir())
 exec(compile((root/'Scripts/Editor/verify_z01_vault.py').read_text(encoding='utf-8-sig'),'verify_z01_vault','exec'))
-assert len(actors)==1816+paving_count+bridge_count+endwall_count+z02_paving_count+z02_vault_count
+assert len(actors)==1816+paving_count+bridge_count+endwall_count+z02_paving_count+z02_vault_count+z02_perimeter_count
 checked=[]
 for side,face,yaw,direction in (('West',-8245.7608,-90,1),('East',-5774.1984,90,-1)):
     for i,y in enumerate((-16300,-14700,-13100)):
