@@ -1,0 +1,24 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z06Coffer_4m",
+      "dimensions_m": [
+        4.0,
+        4.0,
+        0.5499999523162842
+      ],
+      "triangles": 12972
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z06Coffer_3x4",
+      "dimensions_m": [
+        3.0,
+        4.0,
+        0.5499999523162842
+      ],
+      "triangles": 12972
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}

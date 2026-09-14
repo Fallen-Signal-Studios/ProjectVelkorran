@@ -1,0 +1,73 @@
+{
+  "status": "Fitted gallery wall kit; in-engine visual review required",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z07WallSide",
+      "triangles": 11296,
+      "nominal_dimensions_m": [
+        4.4,
+        0.85,
+        6
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; native gallery collision remains authoritative"
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z07WallEnd",
+      "triangles": 11296,
+      "nominal_dimensions_m": [
+        4.666666666666667,
+        0.85,
+        6
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; native gallery collision remains authoritative"
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z07Pier",
+      "triangles": 3384,
+      "nominal_dimensions_m": [
+        1.2,
+        1.04,
+        6
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; native gallery collision remains authoritative"
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z07Lintel",
+      "triangles": 4324,
+      "nominal_dimensions_m": [
+        6,
+        0.85,
+        1.5
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; native gallery collision remains authoritative"
+    }
+  ]
+}

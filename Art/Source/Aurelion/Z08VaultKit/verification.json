@@ -1,0 +1,33 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z08VaultShell",
+      "dimensions_m": [
+        71.39999389648438,
+        49.400001525878906,
+        15.399999618530273
+      ],
+      "triangles": 23424
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z08Coffer_10x8",
+      "dimensions_m": [
+        10.0,
+        8.0,
+        0.44999998807907104
+      ],
+      "triangles": 12972
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z08VaultAssembly",
+      "dimensions_m": [
+        71.39999389648438,
+        49.400001525878906,
+        15.399999618530273
+      ],
+      "triangles": 568248
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}

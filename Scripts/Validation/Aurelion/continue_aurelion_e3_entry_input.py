@@ -14,6 +14,7 @@ import re
 import time
 import traceback
 import unreal
+from aurelion_route_arrival import reached_projected_destination
 import continue_aurelion_e1_input as common
 from probe_aurelion_carrier_clearance_readonly import inspect as inspect_carrier_clearance
 
@@ -178,6 +179,16 @@ class Run(common.Run):
             if not reached:
                 break
             self.path_points.pop(0)
+        # Unreal may project the requested point slightly onto a nearby polygon.
+        # Once the full path is consumed, do not wait forever at that endpoint
+        # because the unreachable raw waypoint is outside the 40cm arrival test.
+        route=self.report.get('last_route_path',{})
+        if (not self.path_points and route.get('destination')==target
+                and reached_projected_destination(_xyz(current),target,route.get('points',[]),route.get('complete',False))):
+            self.report.setdefault('projected_arrivals',[]).append(dict(requested=target,
+                projected=route['points'][-1],actual=_xyz(current),elapsed=now-self.started))
+            self.waypoints.pop(0); self.path_target=None; self.last_motion_at=now
+            self.inject(); return
         self.inject(move=movement)
         if self.last_position is None or math.hypot(current.x-self.last_position[0], current.y-self.last_position[1]) > 35.:
             self.last_position, self.last_motion_at = _xyz(current), now

@@ -1,0 +1,26 @@
+{
+  "status": "Source candidate; scene fit and live climb acceptance pending",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z06ClimbPanel",
+      "triangles": 53580,
+      "nominal_dimensions_m": [
+        4.400000095367432,
+        0.20000000298023224,
+        3.0
+      ],
+      "materials": [
+        "M_Aurelion_StoneGrout",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_ChannelShadow"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; existing climb wall and landing boxes remain authoritative",
+      "material_overrides": {
+        "M_Aurelion_IvoryStone": "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_ClimbIvory"
+      }
+    }
+  ]
+}

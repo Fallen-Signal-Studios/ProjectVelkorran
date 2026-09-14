@@ -510,6 +510,12 @@ def _scene(ctx, row, cast, logical_positions, carrier):
     wide_position = _add(station, (460., -520., 220.))
     close_position = _add(station, (-340., -330., 145.))
     wide_target, wide_focal = target, 26.
+    close_focal = 32.
+    if beat == 'GrammarPropagation':
+        from aurelion_camera_profiles import grammar_propagation_shots
+        shots = grammar_propagation_shots(station)
+        wide_position, wide_target, wide_focal = shots['wide']
+        close_position, target, close_focal = shots['close']
     if beat == 'MeetingAndCarrierRescue':
         hull, start, ending = carrier
         binding = _existing_binding(sequence, 'Carrier')
@@ -525,7 +531,7 @@ def _scene(ctx, row, cast, logical_positions, carrier):
         # the unchanged meeting station remain inside the same establishing frame.
         wide_position, wide_target, wide_focal = (2500., -14000., 5000.), (7000., 500., 0.), 18.
     wide = _camera(ctx, sequence, 'CameraWide', frames, wide_position, wide_target, wide_focal)
-    close = _camera(ctx, sequence, 'CameraClose', frames, close_position, target, 32.)
+    close = _camera(ctx, sequence, 'CameraClose', frames, close_position, target, close_focal)
     cuts = sequence.add_track(unreal.MovieSceneCameraCutTrack)
     cut_frame = max(FPS, min(frames-FPS, round(plan[max(1, len(plan)//2)]['start']*FPS)))
     for camera, first, last in ((wide, 0, cut_frame), (close, cut_frame, frames)):

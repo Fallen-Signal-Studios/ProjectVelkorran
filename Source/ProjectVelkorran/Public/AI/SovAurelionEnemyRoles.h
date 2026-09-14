@@ -20,6 +20,7 @@ class UNarrativeAbilitySystemComponent;
 class USovWeakPointComponent;
 class USovAurelionThermalFractureComponent;
 class USovPoiseComponent;
+class UStaticMeshComponent;
 
 /** Capsule-centre route along a real wall and onto a landing, authored in local space.
  * No smart-link teleport or damage payload; the BT task owns continuous swept movement. */
@@ -40,18 +41,27 @@ public:
     /** Geometry-only validation, also used before saving authored routes. */
     UFUNCTION(BlueprintPure, Category="Aurelion|Traversal") bool ValidateRoute(FString& Error) const;
     TArray<FVector> GetWorldPoints() const;
+    /** Authored visual surfaces used only for the wall-contact pose, never movement. */
+    UPROPERTY(EditInstanceOnly, Category="Aurelion|Traversal") TArray<TObjectPtr<UStaticMeshComponent>> PresentationSurfaces;
+    void RebuildPresentationSurfaces();
+    bool ResolvePresentationContact(const FHitResult& PhysicalHit, const FVector& Probe, FHitResult& Contact) const;
+protected:
+    virtual void BeginPlay() override;
 };
 
 UENUM(BlueprintType)
 enum class ESovAurelionTraversalResult : uint8 { Unavailable, Running, Completed, Cancelled, Blocked };
 
-/** Passive component: no tick or independent decision loop. A selected Narrative activity's BT owns a lease. */
+/** Decisions remain passive: the BT owns movement leases; tick only presents the replicated wall pose. */
 UCLASS(ClassGroup=(Sovereign), BlueprintType, meta=(BlueprintSpawnableComponent))
 class PROJECTVELKORRAN_API USovAurelionWallTraversalComponent : public UActorComponent, public INarrativeSavableComponent
 {
     GENERATED_BODY()
 public:
     USovAurelionWallTraversalComponent();
+    /** Cosmetic gait; native swept capsule movement remains authoritative. */
+    UPROPERTY(EditDefaultsOnly, Category="Aurelion|Traversal") TObjectPtr<UAnimMontage> WallRunMontage;
+    virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* TickFunction) override;
     UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="Aurelion|Traversal") TObjectPtr<ASovAurelionWallRoute> Route;
     UFUNCTION(BlueprintPure, Category="Aurelion|Traversal") bool CanBeginTraversal() const;
     UFUNCTION(BlueprintPure, Category="Aurelion|Traversal") bool IsTraversing() const { return bTraversing; }
@@ -73,9 +83,17 @@ private:
     bool ValidatePhysicalRoute(TArray<FVector>& Points) const;
     bool HasWalkableLanding(const FVector& Point) const;
     void FinishTraversal(uint64 Lease, ESovAurelionTraversalResult Result);
+    void UpdateWallSurface(const FVector& Direction);
     void OnTraversalBusyChanged(FGameplayTag Tag, int32 NewCount,
         TWeakObjectPtr<UNarrativeAbilitySystemComponent> ExpectedASC, uint64 ExpectedLease);
     UPROPERTY(Replicated, Transient) bool bTraversing = false;
+    UPROPERTY(Replicated, Transient) bool bOnWall = false;
+    UPROPERTY(Replicated, Transient) FVector WallNormal = FVector::UpVector;
+    UPROPERTY(Replicated, Transient) FVector WallTangent = FVector::ForwardVector;
+    UPROPERTY(Replicated, Transient) FVector WallPoint = FVector::ZeroVector;
+    TWeakObjectPtr<USkeletalMeshComponent> PresentedMesh;
+    FTransform GroundMeshTransform;
+    bool bPresentingWall = false;
     UPROPERTY(Transient) ESovAurelionTraversalResult LastResult = ESovAurelionTraversalResult::Unavailable;
     TWeakObjectPtr<UObject> LeaseOwner;
     TWeakObjectPtr<ASovNPCCharacterBase> ActiveCharacter;
@@ -218,6 +236,7 @@ class PROJECTVELKORRAN_API ASovAurelionWeaver : public ASovNPCCharacterBase
     GENERATED_BODY()
 public:
     ASovAurelionWeaver(const FObjectInitializer& Initializer);
+    UPROPERTY(EditDefaultsOnly, Category="Aurelion|Weaver") TObjectPtr<UAnimMontage> SupportCastMontage;
     UFUNCTION(BlueprintPure, Category="Aurelion|Weaver") USovAurelionWeaverLink* GetAnchorA() const { return AnchorA; }
     UFUNCTION(BlueprintPure, Category="Aurelion|Weaver") USovAurelionWeaverLink* GetAnchorB() const { return AnchorB; }
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Aurelion|Weaver") bool InitializeFreshLinks();
@@ -229,6 +248,7 @@ protected:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Aurelion") TObjectPtr<USovAurelionWeaverLink> AnchorB;
 private:
     bool HasReadySupportOwner() const;
+    UFUNCTION(NetMulticast, Unreliable) void MulticastSupportCast();
     bool bUpdatingLinks = false;
 };
 

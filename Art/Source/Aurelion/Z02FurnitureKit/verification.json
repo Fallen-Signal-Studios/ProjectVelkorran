@@ -1,0 +1,24 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z02ServiceTable",
+      "dimensions_m": [
+        1.2564761638641357,
+        1.2564761638641357,
+        1.024999976158142
+      ],
+      "triangles": 7684
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z02StoneSeat",
+      "dimensions_m": [
+        0.47999998927116394,
+        0.5,
+        0.453000009059906
+      ],
+      "triangles": 1716
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}

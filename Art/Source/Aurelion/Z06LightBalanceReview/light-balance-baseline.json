@@ -1,0 +1,544 @@
+{
+  "status": "read_only",
+  "lights": [
+    {
+      "actor": "Graybox_Key",
+      "component": "LightComponent0",
+      "class_name": "DirectionalLightComponent",
+      "transform": "(Rotation=(X=0.127084,Y=0.403058,Z=-0.272532,W=0.864361),Translation=(X=0.000000,Y=10000.000000,Z=15000.000000),Scale3D=(X=2.500000,Y=2.500000,Z=2.500000))",
+      "properties": {
+        "intensity": "3.0",
+        "light_color": "<Struct 'Color' {b: 255, g: 255, r: 255, a: 255}>",
+        "temperature": "6500.0",
+        "use_temperature": "False",
+        "cast_shadows": "True",
+        "contact_shadow_length": "0.0",
+        "indirect_lighting_intensity": "1.0",
+        "volumetric_scattering_intensity": "1.0",
+        "mobility": "<ComponentMobility.MOVABLE: 2>",
+        "visible": "False"
+      }
+    },
+    {
+      "actor": "Graybox_Fill",
+      "component": "SkyLightComponent0",
+      "class_name": "SkyLightComponent",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=10000.000000,Z=10000.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "properties": {
+        "intensity": "1.0",
+        "light_color": "<Struct 'Color' {b: 255, g: 255, r: 255, a: 255}>",
+        "cast_shadows": "True",
+        "indirect_lighting_intensity": "1.0",
+        "volumetric_scattering_intensity": "1.0",
+        "mobility": "<ComponentMobility.MOVABLE: 2>",
+        "visible": "False"
+      }
+    },
+    {
+      "actor": "ENVL_Z06_Key_00",
+      "component": "LightComponent0",
+      "class_name": "RectLightComponent",
+      "transform": "(Rotation=(X=-0.329403,Y=0.511942,Z=0.429286,W=0.667175),Translation=(X=-765.000000,Y=7120.000000,Z=-130.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "properties": {
+        "intensity": "900.0",
+        "intensity_units": "<LightUnits.LUMENS: 2>",
+        "light_color": "<Struct 'Color' {b: 87, g: 161, r: 255, a: 255}>",
+        "temperature": "6500.0",
+        "use_temperature": "False",
+        "attenuation_radius": "4000.0",
+        "source_width": "240.0",
+        "source_height": "160.0",
+        "cast_shadows": "False",
+        "contact_shadow_length": "0.0",
+        "indirect_lighting_intensity": "0.699999988079071",
+        "volumetric_scattering_intensity": "0.0",
+        "mobility": "<ComponentMobility.MOVABLE: 2>",
+        "visible": "True"
+      }
+    },
+    {
+      "actor": "ENVL_Z06_Key_01",
+      "component": "LightComponent0",
+      "class_name": "RectLightComponent",
+      "transform": "(Rotation=(X=-0.608761,Y=-0.000000,Z=0.793353,W=-0.000000),Translation=(X=765.000000,Y=8800.000000,Z=-130.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "properties": {
+        "intensity": "350.0",
+        "intensity_units": "<LightUnits.LUMENS: 2>",
+        "light_color": "<Struct 'Color' {b: 255, g: 204, r: 166, a: 255}>",
+        "temperature": "6500.0",
+        "use_temperature": "False",
+        "attenuation_radius": "4000.0",
+        "source_width": "240.0",
+        "source_height": "160.0",
+        "cast_shadows": "False",
+        "contact_shadow_length": "0.0",
+        "indirect_lighting_intensity": "0.699999988079071",
+        "volumetric_scattering_intensity": "0.0",
+        "mobility": "<ComponentMobility.MOVABLE: 2>",
+        "visible": "True"
+      }
+    },
+    {
+      "actor": "ENVL_Z06_Key_02",
+      "component": "LightComponent0",
+      "class_name": "RectLightComponent",
+      "transform": "(Rotation=(X=0.329403,Y=0.511942,Z=-0.429286,W=0.667175),Translation=(X=-765.000000,Y=10480.000000,Z=-130.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "properties": {
+        "intensity": "900.0",
+        "intensity_units": "<LightUnits.LUMENS: 2>",
+        "light_color": "<Struct 'Color' {b: 87, g: 161, r: 255, a: 255}>",
+        "temperature": "6500.0",
+        "use_temperature": "False",
+        "attenuation_radius": "4000.0",
+        "source_width": "240.0",
+        "source_height": "160.0",
+        "cast_shadows": "False",
+        "contact_shadow_length": "0.0",
+        "indirect_lighting_intensity": "0.699999988079071",
+        "volumetric_scattering_intensity": "0.0",
+        "mobility": "<ComponentMobility.MOVABLE: 2>",
+        "visible": "True"
+      }
+    },
+    {
+      "actor": "ENVL_Z07_Key_00",
+      "component": "LightComponent0",
+      "class_name": "RectLightComponent",
+      "transform": "(Rotation=(X=-0.000000,Y=0.608761,Z=0.000000,W=0.793353),Translation=(X=-765.000000,Y=15000.000000,Z=-430.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "properties": {
+        "intensity": "1800.0",
+        "intensity_units": "<LightUnits.LUMENS: 2>",
+        "light_color": "<Struct 'Color' {b: 255, g: 245, r: 242, a: 255}>",
+        "temperature": "6500.0",
+        "use_temperature": "False",
+        "attenuation_radius": "4300.0",
+        "source_width": "240.0",
+        "source_height": "160.0",
+        "cast_shadows": "False",
+        "contact_shadow_length": "0.0",
+        "indirect_lighting_intensity": "0.699999988079071",
+        "volumetric_scattering_intensity": "0.0",
+        "mobility": "<ComponentMobility.MOVABLE: 2>",
+        "visible": "True"
+      }
+    },
+    {
+      "actor": "ENVL_Z07_Key_01",
+      "component": "LightComponent0",
+      "class_name": "RectLightComponent",
+      "transform": "(Rotation=(X=-0.608761,Y=-0.000000,Z=0.793353,W=-0.000000),Translation=(X=765.000000,Y=15000.000000,Z=-430.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "properties": {
+        "intensity": "1800.0",
+        "intensity_units": "<LightUnits.LUMENS: 2>",
+        "light_color": "<Struct 'Color' {b: 87, g: 161, r: 255, a: 255}>",
+        "temperature": "6500.0",
+        "use_temperature": "False",
+        "attenuation_radius": "4300.0",
+        "source_width": "240.0",
+        "source_height": "160.0",
+        "cast_shadows": "False",
+        "contact_shadow_length": "0.0",
+        "indirect_lighting_intensity": "0.699999988079071",
+        "volumetric_scattering_intensity": "0.0",
+        "mobility": "<ComponentMobility.MOVABLE: 2>",
+        "visible": "True"
+      }
+    },
+    {
+      "actor": "Aurelion_Atrium_Pier_Uplight_04",
+      "component": "LightComponent0",
+      "class_name": "SpotLightComponent",
+      "transform": "(Rotation=(X=0.193416,Y=-0.466948,Z=0.330207,W=0.797191),Translation=(X=9687.362902,Y=9687.362902,Z=60.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "properties": {
+        "intensity": "4000.0",
+        "intensity_units": "<LightUnits.LUMENS: 2>",
+        "light_color": "<Struct 'Color' {b: 201, g: 232, r: 255, a: 255}>",
+        "temperature": "6500.0",
+        "use_temperature": "False",
+        "attenuation_radius": "9000.0",
+        "source_radius": "0.0",
+        "cast_shadows": "False",
+        "contact_shadow_length": "0.0",
+        "indirect_lighting_intensity": "0.0",
+        "volumetric_scattering_intensity": "0.0",
+        "mobility": "<ComponentMobility.MOVABLE: 2>",
+        "visible": "True"
+      }
+    },
+    {
+      "actor": "Aurelion_Atrium_Pier_Uplight_05",
+      "component": "LightComponent0",
+      "class_name": "SpotLightComponent",
+      "transform": "(Rotation=(X=0.252710,Y=-0.437707,Z=0.431437,W=0.747270),Translation=(X=6850.000000,Y=11864.548032,Z=60.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "properties": {
+        "intensity": "4000.0",
+        "intensity_units": "<LightUnits.LUMENS: 2>",
+        "light_color": "<Struct 'Color' {b: 201, g: 232, r: 255, a: 255}>",
+        "temperature": "6500.0",
+        "use_temperature": "False",
+        "attenuation_radius": "9000.0",
+        "source_radius": "0.0",
+        "cast_shadows": "False",
+        "contact_shadow_length": "0.0",
+        "indirect_lighting_intensity": "0.0",
+        "volumetric_scattering_intensity": "0.0",
+        "mobility": "<ComponentMobility.MOVABLE: 2>",
+        "visible": "True"
+      }
+    },
+    {
+      "actor": "Aurelion_Atrium_Pier_Uplight_06",
+      "component": "LightComponent0",
+      "class_name": "SpotLightComponent",
+      "transform": "(Rotation=(X=0.307681,Y=-0.400977,Z=0.525284,W=0.684563),Translation=(X=3545.820918,Y=13233.183820,Z=60.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "properties": {
+        "intensity": "4000.0",
+        "intensity_units": "<LightUnits.LUMENS: 2>",
+        "light_color": "<Struct 'Color' {b: 201, g: 232, r: 255, a: 255}>",
+        "temperature": "6500.0",
+        "use_temperature": "False",
+        "attenuation_radius": "9000.0",
+        "source_radius": "0.0",
+        "cast_shadows": "False",
+        "contact_shadow_length": "0.0",
+        "indirect_lighting_intensity": "0.0",
+        "volumetric_scattering_intensity": "0.0",
+        "mobility": "<ComponentMobility.MOVABLE: 2>",
+        "visible": "True"
+      }
+    },
+    {
+      "actor": "Aurelion_Atrium_Pier_Uplight_07",
+      "component": "LightComponent0",
+      "class_name": "SpotLightComponent",
+      "transform": "(Rotation=(X=0.400977,Y=-0.307681,Z=0.684563,W=0.525284),Translation=(X=-3545.820918,Y=13233.183820,Z=60.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "properties": {
+        "intensity": "4000.0",
+        "intensity_units": "<LightUnits.LUMENS: 2>",
+        "light_color": "<Struct 'Color' {b: 201, g: 232, r: 255, a: 255}>",
+        "temperature": "6500.0",
+        "use_temperature": "False",
+        "attenuation_radius": "9000.0",
+        "source_radius": "0.0",
+        "cast_shadows": "False",
+        "contact_shadow_length": "0.0",
+        "indirect_lighting_intensity": "0.0",
+        "volumetric_scattering_intensity": "0.0",
+        "mobility": "<ComponentMobility.MOVABLE: 2>",
+        "visible": "True"
+      }
+    },
+    {
+      "actor": "Aurelion_Atrium_Pier_Uplight_08",
+      "component": "LightComponent0",
+      "class_name": "SpotLightComponent",
+      "transform": "(Rotation=(X=0.437707,Y=-0.252710,Z=0.747270,W=0.431437),Translation=(X=-6850.000000,Y=11864.548032,Z=60.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "properties": {
+        "intensity": "4000.0",
+        "intensity_units": "<LightUnits.LUMENS: 2>",
+        "light_color": "<Struct 'Color' {b: 201, g: 232, r: 255, a: 255}>",
+        "temperature": "6500.0",
+        "use_temperature": "False",
+        "attenuation_radius": "9000.0",
+        "source_radius": "0.0",
+        "cast_shadows": "False",
+        "contact_shadow_length": "0.0",
+        "indirect_lighting_intensity": "0.0",
+        "volumetric_scattering_intensity": "0.0",
+        "mobility": "<ComponentMobility.MOVABLE: 2>",
+        "visible": "True"
+      }
+    },
+    {
+      "actor": "Aurelion_Atrium_Pier_Uplight_09",
+      "component": "LightComponent0",
+      "class_name": "SpotLightComponent",
+      "transform": "(Rotation=(X=0.466948,Y=-0.193416,Z=0.797191,W=0.330207),Translation=(X=-9687.362902,Y=9687.362902,Z=60.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "properties": {
+        "intensity": "4000.0",
+        "intensity_units": "<LightUnits.LUMENS: 2>",
+        "light_color": "<Struct 'Color' {b: 201, g: 232, r: 255, a: 255}>",
+        "temperature": "6500.0",
+        "use_temperature": "False",
+        "attenuation_radius": "9000.0",
+        "source_radius": "0.0",
+        "cast_shadows": "False",
+        "contact_shadow_length": "0.0",
+        "indirect_lighting_intensity": "0.0",
+        "volumetric_scattering_intensity": "0.0",
+        "mobility": "<ComponentMobility.MOVABLE: 2>",
+        "visible": "True"
+      }
+    },
+    {
+      "actor": "DirectionalLight",
+      "component": "LightComponent0",
+      "class_name": "DirectionalLightComponent",
+      "transform": "(Rotation=(X=-0.422699,Y=0.001777,Z=0.906260,W=0.003810),Translation=(X=396800.000000,Y=0.000000,Z=0.000000),Scale3D=(X=2.500000,Y=2.500000,Z=2.500000))",
+      "properties": {
+        "intensity": "10.0",
+        "light_color": "<Struct 'Color' {b: 176, g: 225, r: 255, a: 255}>",
+        "temperature": "6500.0",
+        "use_temperature": "False",
+        "cast_shadows": "True",
+        "contact_shadow_length": "0.0",
+        "indirect_lighting_intensity": "1.0",
+        "volumetric_scattering_intensity": "1.0",
+        "mobility": "<ComponentMobility.STATIONARY: 1>",
+        "visible": "True"
+      }
+    },
+    {
+      "actor": "KIT_Z06_Uplight_West_00_Light",
+      "component": "LightComponent0",
+      "class_name": "SpotLightComponent",
+      "transform": "(Rotation=(X=0.707107,Y=-0.000000,Z=0.707107,W=0.000000),Translation=(X=-1546.500000,Y=7200.000000,Z=-371.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "properties": {
+        "intensity": "35.0",
+        "intensity_units": "<LightUnits.LUMENS: 2>",
+        "light_color": "<Struct 'Color' {b: 218, g: 237, r: 246, a: 255}>",
+        "temperature": "6500.0",
+        "use_temperature": "False",
+        "attenuation_radius": "1800.0",
+        "source_radius": "12.0",
+        "cast_shadows": "True",
+        "contact_shadow_length": "0.0",
+        "indirect_lighting_intensity": "1.0",
+        "volumetric_scattering_intensity": "1.0",
+        "mobility": "<ComponentMobility.MOVABLE: 2>",
+        "visible": "True"
+      }
+    },
+    {
+      "actor": "KIT_Z06_Uplight_West_01_Light",
+      "component": "LightComponent0",
+      "class_name": "SpotLightComponent",
+      "transform": "(Rotation=(X=0.707107,Y=-0.000000,Z=0.707107,W=0.000000),Translation=(X=-1546.500000,Y=8400.000000,Z=-371.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "properties": {
+        "intensity": "35.0",
+        "intensity_units": "<LightUnits.LUMENS: 2>",
+        "light_color": "<Struct 'Color' {b: 218, g: 237, r: 246, a: 255}>",
+        "temperature": "6500.0",
+        "use_temperature": "False",
+        "attenuation_radius": "1800.0",
+        "source_radius": "12.0",
+        "cast_shadows": "True",
+        "contact_shadow_length": "0.0",
+        "indirect_lighting_intensity": "1.0",
+        "volumetric_scattering_intensity": "1.0",
+        "mobility": "<ComponentMobility.MOVABLE: 2>",
+        "visible": "True"
+      }
+    },
+    {
+      "actor": "KIT_Z06_Uplight_West_02_Light",
+      "component": "LightComponent0",
+      "class_name": "SpotLightComponent",
+      "transform": "(Rotation=(X=0.707107,Y=-0.000000,Z=0.707107,W=0.000000),Translation=(X=-1546.500000,Y=9600.000000,Z=-371.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "properties": {
+        "intensity": "35.0",
+        "intensity_units": "<LightUnits.LUMENS: 2>",
+        "light_color": "<Struct 'Color' {b: 218, g: 237, r: 246, a: 255}>",
+        "temperature": "6500.0",
+        "use_temperature": "False",
+        "attenuation_radius": "1800.0",
+        "source_radius": "12.0",
+        "cast_shadows": "True",
+        "contact_shadow_length": "0.0",
+        "indirect_lighting_intensity": "1.0",
+        "volumetric_scattering_intensity": "1.0",
+        "mobility": "<ComponentMobility.MOVABLE: 2>",
+        "visible": "True"
+      }
+    },
+    {
+      "actor": "KIT_Z06_Uplight_West_03_Light",
+      "component": "LightComponent0",
+      "class_name": "SpotLightComponent",
+      "transform": "(Rotation=(X=0.707107,Y=-0.000000,Z=0.707107,W=0.000000),Translation=(X=-1546.500000,Y=10800.000000,Z=-371.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "properties": {
+        "intensity": "35.0",
+        "intensity_units": "<LightUnits.LUMENS: 2>",
+        "light_color": "<Struct 'Color' {b: 218, g: 237, r: 246, a: 255}>",
+        "temperature": "6500.0",
+        "use_temperature": "False",
+        "attenuation_radius": "1800.0",
+        "source_radius": "12.0",
+        "cast_shadows": "True",
+        "contact_shadow_length": "0.0",
+        "indirect_lighting_intensity": "1.0",
+        "volumetric_scattering_intensity": "1.0",
+        "mobility": "<ComponentMobility.MOVABLE: 2>",
+        "visible": "True"
+      }
+    },
+    {
+      "actor": "KIT_Z06_Uplight_East_00_Light",
+      "component": "LightComponent0",
+      "class_name": "SpotLightComponent",
+      "transform": "(Rotation=(X=0.707107,Y=-0.000000,Z=0.707107,W=0.000000),Translation=(X=1546.500000,Y=7200.000000,Z=-371.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "properties": {
+        "intensity": "35.0",
+        "intensity_units": "<LightUnits.LUMENS: 2>",
+        "light_color": "<Struct 'Color' {b: 218, g: 237, r: 246, a: 255}>",
+        "temperature": "6500.0",
+        "use_temperature": "False",
+        "attenuation_radius": "1800.0",
+        "source_radius": "12.0",
+        "cast_shadows": "True",
+        "contact_shadow_length": "0.0",
+        "indirect_lighting_intensity": "1.0",
+        "volumetric_scattering_intensity": "1.0",
+        "mobility": "<ComponentMobility.MOVABLE: 2>",
+        "visible": "True"
+      }
+    },
+    {
+      "actor": "KIT_Z06_Uplight_East_01_Light",
+      "component": "LightComponent0",
+      "class_name": "SpotLightComponent",
+      "transform": "(Rotation=(X=0.707107,Y=-0.000000,Z=0.707107,W=0.000000),Translation=(X=1546.500000,Y=8400.000000,Z=-371.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "properties": {
+        "intensity": "35.0",
+        "intensity_units": "<LightUnits.LUMENS: 2>",
+        "light_color": "<Struct 'Color' {b: 218, g: 237, r: 246, a: 255}>",
+        "temperature": "6500.0",
+        "use_temperature": "False",
+        "attenuation_radius": "1800.0",
+        "source_radius": "12.0",
+        "cast_shadows": "True",
+        "contact_shadow_length": "0.0",
+        "indirect_lighting_intensity": "1.0",
+        "volumetric_scattering_intensity": "1.0",
+        "mobility": "<ComponentMobility.MOVABLE: 2>",
+        "visible": "True"
+      }
+    },
+    {
+      "actor": "KIT_Z06_Uplight_East_02_Light",
+      "component": "LightComponent0",
+      "class_name": "SpotLightComponent",
+      "transform": "(Rotation=(X=0.707107,Y=-0.000000,Z=0.707107,W=0.000000),Translation=(X=1546.500000,Y=9600.000000,Z=-371.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "properties": {
+        "intensity": "35.0",
+        "intensity_units": "<LightUnits.LUMENS: 2>",
+        "light_color": "<Struct 'Color' {b: 218, g: 237, r: 246, a: 255}>",
+        "temperature": "6500.0",
+        "use_temperature": "False",
+        "attenuation_radius": "1800.0",
+        "source_radius": "12.0",
+        "cast_shadows": "True",
+        "contact_shadow_length": "0.0",
+        "indirect_lighting_intensity": "1.0",
+        "volumetric_scattering_intensity": "1.0",
+        "mobility": "<ComponentMobility.MOVABLE: 2>",
+        "visible": "True"
+      }
+    },
+    {
+      "actor": "KIT_Z06_Uplight_East_03_Light",
+      "component": "LightComponent0",
+      "class_name": "SpotLightComponent",
+      "transform": "(Rotation=(X=0.707107,Y=-0.000000,Z=0.707107,W=0.000000),Translation=(X=1546.500000,Y=10800.000000,Z=-371.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "properties": {
+        "intensity": "35.0",
+        "intensity_units": "<LightUnits.LUMENS: 2>",
+        "light_color": "<Struct 'Color' {b: 218, g: 237, r: 246, a: 255}>",
+        "temperature": "6500.0",
+        "use_temperature": "False",
+        "attenuation_radius": "1800.0",
+        "source_radius": "12.0",
+        "cast_shadows": "True",
+        "contact_shadow_length": "0.0",
+        "indirect_lighting_intensity": "1.0",
+        "volumetric_scattering_intensity": "1.0",
+        "mobility": "<ComponentMobility.MOVABLE: 2>",
+        "visible": "True"
+      }
+    },
+    {
+      "actor": "KIT_Z06_GateLantern_Front_Light",
+      "component": "LightComponent0",
+      "class_name": "RectLightComponent",
+      "transform": "(Rotation=(X=-0.500000,Y=0.500000,Z=0.500000,W=0.500000),Translation=(X=1100.000000,Y=8150.000000,Z=-10.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "properties": {
+        "intensity": "300.0",
+        "intensity_units": "<LightUnits.LUMENS: 2>",
+        "light_color": "<Struct 'Color' {b: 218, g: 237, r: 246, a: 255}>",
+        "temperature": "6500.0",
+        "use_temperature": "False",
+        "attenuation_radius": "1100.0",
+        "source_width": "200.0",
+        "source_height": "28.0",
+        "cast_shadows": "True",
+        "contact_shadow_length": "0.0",
+        "indirect_lighting_intensity": "1.0",
+        "volumetric_scattering_intensity": "1.0",
+        "mobility": "<ComponentMobility.MOVABLE: 2>",
+        "visible": "True"
+      }
+    },
+    {
+      "actor": "KIT_Z06_GateLantern_Rear_Light",
+      "component": "LightComponent0",
+      "class_name": "RectLightComponent",
+      "transform": "(Rotation=(X=-0.500000,Y=0.500000,Z=0.500000,W=0.500000),Translation=(X=1100.000000,Y=8750.000000,Z=-10.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "properties": {
+        "intensity": "120.0",
+        "intensity_units": "<LightUnits.LUMENS: 2>",
+        "light_color": "<Struct 'Color' {b: 218, g: 237, r: 246, a: 255}>",
+        "temperature": "6500.0",
+        "use_temperature": "False",
+        "attenuation_radius": "1100.0",
+        "source_width": "200.0",
+        "source_height": "28.0",
+        "cast_shadows": "True",
+        "contact_shadow_length": "0.0",
+        "indirect_lighting_intensity": "1.0",
+        "volumetric_scattering_intensity": "1.0",
+        "mobility": "<ComponentMobility.MOVABLE: 2>",
+        "visible": "True"
+      }
+    }
+  ],
+  "post_process": [
+    {
+      "actor": "ENVL_Exposure",
+      "object": "PostProcessVolume_0",
+      "properties": {
+        "enabled": "True",
+        "unbound": "True",
+        "priority": "50.0",
+        "blend_weight": "1.0",
+        "blend_radius": "100.0"
+      },
+      "settings": {
+        "white_temp": "6500.0",
+        "white_tint": "0.0",
+        "auto_exposure_bias": "0.0",
+        "auto_exposure_min_brightness": "-10.0",
+        "auto_exposure_max_brightness": "20.0",
+        "color_saturation": "<Struct 'Vector4' {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}>",
+        "color_contrast": "<Struct 'Vector4' {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}>",
+        "color_gamma": "<Struct 'Vector4' {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}>",
+        "color_gain": "<Struct 'Vector4' {x: 1.000000, y: 1.000000, z: 1.000000, w: 1.000000}>",
+        "scene_color_tint": "<Struct 'LinearColor' {r: 1.000000, g: 1.000000, b: 1.000000, a: 1.000000}>",
+        "bloom_intensity": "0.18000000715255737",
+        "vignette_intensity": "0.11999999731779099",
+        "override_white_temp": "False",
+        "override_white_tint": "False",
+        "override_auto_exposure_bias": "True",
+        "override_auto_exposure_min_brightness": "False",
+        "override_auto_exposure_max_brightness": "False",
+        "override_color_saturation": "False",
+        "override_color_contrast": "False",
+        "override_color_gamma": "False",
+        "override_color_gain": "False",
+        "override_scene_color_tint": "False",
+        "override_bloom_intensity": "True",
+        "override_vignette_intensity": "True"
+      }
+    }
+  ],
+  "qualification": "Potential influence by range; renderer contribution and visual cause require controlled comparisons."
+}

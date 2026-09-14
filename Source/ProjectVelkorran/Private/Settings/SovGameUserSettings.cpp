@@ -17,14 +17,22 @@ namespace
 {
 	bool ReadPortable(const TArray<uint8>& Data, FSovUserSettingsSnapshot& Out, FString& Error)
 	{
-		// Fixed schema: version, preset, two float32 scalars and one bool byte. No strings or allocations from input.
-		if (Data.Num() != 11) { Error = TEXT("Invalid portable settings size."); return false; }
+        // Version 2 appends a bounded modifier mask; legacy saves have all challenges disabled.
+        if (Data.Num() != 11 && Data.Num() != 12) { Error = TEXT("Invalid portable settings size."); return false; }
 		FMemoryReader Reader(Data, true);
 		uint8 Version = 0, Preset = 0, Rescue = 0;
 		Reader << Version << Preset << Out.IncomingDamageScale << Out.EnemyRecoveryScale << Rescue;
 		Out.Preset = static_cast<ESovDifficultyPreset>(Preset);
 		Out.bAllowCompanionRescue = Rescue != 0;
-		if (Reader.IsError() || Version != SovSettingsPolicy::Schema || Rescue > 1
+        uint8 Modifiers = 0;
+        if (Version == 2 && Data.Num() == 12) { Reader << Modifiers; }
+        else if (Version != 1 || Data.Num() != 11) { Error = TEXT("Invalid portable settings version/size."); return false; }
+        Out.bModifierBlackout = SovCampaignModifiers::Has(Modifiers, SovCampaignModifiers::Blackout);
+        Out.bModifierFamine = SovCampaignModifiers::Has(Modifiers, SovCampaignModifiers::Famine);
+        Out.bModifierFrenzy = SovCampaignModifiers::Has(Modifiers, SovCampaignModifiers::Frenzy);
+        Out.bModifierAscendant = SovCampaignModifiers::Has(Modifiers, SovCampaignModifiers::Ascendant);
+        Out.bModifierGlassCannon = SovCampaignModifiers::Has(Modifiers, SovCampaignModifiers::GlassCannon);
+		if (Reader.IsError() || (Modifiers & ~SovCampaignModifiers::All) != 0 || Rescue > 1
 			|| !SovSettingsPolicy::ValidGameplay(Preset, Out.IncomingDamageScale, Out.EnemyRecoveryScale, true))
 		{ Error = TEXT("Invalid portable settings schema or values."); return false; }
 		Error.Reset(); return true;
@@ -349,6 +357,7 @@ bool USovGameUserSettings::CapturePortableSettings(TArray<uint8>& OutData) const
 	uint8 SchemaVersion = SovSettingsPolicy::Schema, Preset = static_cast<uint8>(Settings.Preset), Rescue = Settings.bAllowCompanionRescue ? 1 : 0;
 	float Damage = Settings.IncomingDamageScale, Recovery = Settings.EnemyRecoveryScale;
 	Writer << SchemaVersion << Preset << Damage << Recovery << Rescue;
+    uint8 Modifiers = GetCampaignModifiers(); Writer << Modifiers;
 	if (Writer.IsError()) { return false; }
 	OutData = MoveTemp(Data); return true;
 }
@@ -366,6 +375,11 @@ bool USovGameUserSettings::RestorePortableSettings(const TArray<uint8>& Data, FS
 	Candidate.IncomingDamageScale = Portable.IncomingDamageScale;
 	Candidate.EnemyRecoveryScale = Portable.EnemyRecoveryScale;
 	Candidate.bAllowCompanionRescue = Portable.bAllowCompanionRescue;
+    Candidate.bModifierBlackout = Portable.bModifierBlackout;
+    Candidate.bModifierFamine = Portable.bModifierFamine;
+    Candidate.bModifierFrenzy = Portable.bModifierFrenzy;
+    Candidate.bModifierAscendant = Portable.bModifierAscendant;
+    Candidate.bModifierGlassCannon = Portable.bModifierGlassCannon;
 	return ApplySettingsSnapshot(Candidate, Error);
 }
 

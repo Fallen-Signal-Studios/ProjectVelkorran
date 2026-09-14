@@ -9,11 +9,13 @@ from pathlib import Path
 import unreal
 
 OUTPUT_DIR = Path(os.environ.get("VELKORRAN_SETUP_OUTPUT",
-    str(Path(unreal.Paths.project_saved_dir()).resolve() / "Validation" / "WorkPCSetup")))
+    os.environ.get("SOV_AURELION_RUN_DIRECTORY",
+    str(Path(unreal.Paths.project_saved_dir()).resolve() / "Validation" / "WorkPCSetup"))))
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 OUT = OUTPUT_DIR / "combat-hud-layout.json"
 TARGETS = ("SovCombatVitalsWidget", "WBP_DefaultGameplayHUD", "WBP_WeaponInfo",
-           "WBP_PlayerInfo_HUD", "WBP_CrosshairContainer", "WBP_Crosshair_Firearm")
+           "WBP_PlayerInfo_HUD", "WBP_CrosshairContainer", "WBP_Crosshair_Firearm",
+           "SovAccessibilityPresentation", "SovAurelionThreatWidget")
 
 
 def xy(value):
@@ -58,6 +60,8 @@ try:
         row = {"path": path, "name": widget.get_name(), "class": widget.get_class().get_path_name(),
                "outer": encode(widget.get_outer()), "parent": safe_call(widget, "get_parent"),
                "visibility": safe_call(widget, "get_visibility"),
+               "rendered": safe_call(widget, "is_rendered"),
+               "in_viewport": safe_call(widget, "is_in_viewport") if isinstance(widget, unreal.UserWidget) else None,
                "desired_size": safe_call(widget, "get_desired_size"),
                "render_transform": encode(widget.get_editor_property("RenderTransform")),
                "render_opacity": safe_call(widget, "get_render_opacity")}

@@ -1,0 +1,34 @@
+{
+  "status": "PASS",
+  "samples": [
+    {
+      "mesh": "SM_Aurelion_KIT_Z02Perimeter_4m",
+      "x": 0,
+      "z": 1.7221323785714284,
+      "y": -0.0050002336502075195,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "mesh": "SM_Aurelion_KIT_Z02Perimeter_4m",
+      "x": -0.7,
+      "z": 1.7221323785714284,
+      "y": 0.03999972343444824,
+      "material": "M_Aurelion_StoneGrout"
+    },
+    {
+      "mesh": "SM_Aurelion_KIT_Z02Perimeter_Closing",
+      "x": 0,
+      "z": 1.7221323785714284,
+      "y": -0.004999876022338867,
+      "material": "M_Aurelion_IvoryStone"
+    },
+    {
+      "mesh": "SM_Aurelion_KIT_Z02Perimeter_Closing",
+      "x": -0.3700998400000006,
+      "z": 1.7221323785714284,
+      "y": 0.039999961853027344,
+      "material": "M_Aurelion_StoneGrout"
+    }
+  ],
+  "scope": "Local source face and grout depths; not a render or live gameplay qualification."
+}

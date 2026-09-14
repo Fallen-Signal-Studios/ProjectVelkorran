@@ -1,0 +1,14 @@
+{
+  "stations": [[1674,14560],[1574,15100],[1674,15440]],
+  "fixture_z": -650,
+  "optical_offset": 27.5,
+  "light_z": -601,
+  "lumens": 35,
+  "attenuation_radius": 1100,
+  "inner_cone": 30,
+  "outer_cone": 55,
+  "source_radius": 2,
+  "key_source_width": 60,
+  "key_source_height": 40,
+  "color": [0.92,0.85,0.70]
+}

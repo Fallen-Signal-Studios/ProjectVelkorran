@@ -1,0 +1,91 @@
+{
+  "status": "Custom gallery source candidate; final art and live collision correspondence pending",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z02ReliefPanel",
+      "triangles": 4144,
+      "nominal_dimensions_m": [
+        3.539033889770508,
+        0.2337464988231659,
+        5.296617031097412
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; original relief mesh collision retained"
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z02BranchPier",
+      "triangles": 4724,
+      "nominal_dimensions_m": [
+        4.127336502075195,
+        0.8412829637527466,
+        9.812163352966309
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 14,
+      "collision": "Authored shaft, five collars and eight branch segments",
+      "pier_collision_samples": [
+        [
+          0,
+          0.1,
+          true
+        ],
+        [
+          0,
+          2.5,
+          true
+        ],
+        [
+          0,
+          5,
+          true
+        ],
+        [
+          0,
+          9.7,
+          true
+        ],
+        [
+          0.87,
+          8.16,
+          true
+        ],
+        [
+          -0.87,
+          8.16,
+          true
+        ],
+        [
+          1.65,
+          9.31,
+          true
+        ],
+        [
+          1,
+          1,
+          false
+        ],
+        [
+          0.7,
+          4,
+          false
+        ],
+        [
+          1.8,
+          7.2,
+          false
+        ]
+      ]
+    }
+  ]
+}

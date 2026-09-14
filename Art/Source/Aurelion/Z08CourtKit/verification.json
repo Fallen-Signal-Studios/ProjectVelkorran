@@ -1,0 +1,15 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z08IsolationCourt",
+      "dimensions_m": [
+        22.0,
+        16.0,
+        0.12200000137090683
+      ],
+      "triangles": 47564
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}

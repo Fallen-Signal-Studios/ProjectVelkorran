@@ -1,0 +1,24 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_EclipseWallScar_1",
+      "dimensions_m": [
+        0.92467200756073,
+        0.013000000268220901,
+        1.545510172843933
+      ],
+      "triangles": 16497
+    },
+    {
+      "asset": "SM_Aurelion_KIT_EclipseWallScar_2",
+      "dimensions_m": [
+        0.9561808109283447,
+        0.013000000268220901,
+        1.5453336238861084
+      ],
+      "triangles": 16752
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}

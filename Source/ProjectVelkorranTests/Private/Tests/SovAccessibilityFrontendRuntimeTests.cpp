@@ -12,10 +12,17 @@
 #include "Blueprint/WidgetNavigation.h"
 #include "Components/SafeZone.h"
 #include "Components/ScrollBox.h"
+#include "Components/TextBlock.h"
+#include "Input/HittestGrid.h"
+#include "Rendering/DrawElements.h"
+#include "Types/PaintArgs.h"
+#include "Widgets/SWindow.h"
 #include <limits>
 
 struct FSovAccessibilityFrontendTestAccess
 {
+	static TArray<UTextBlock*> DialogueText(USovAccessibilityPresentation* Presentation)
+	{ return {Presentation->SubtitleText, Presentation->CaptionText}; }
 	static bool Back(USovAccessibilitySettingsMenu* Menu) { return Menu->NativeOnHandleBackAction(); }
 	static UWidget* Navigate(USovAccessibilitySettingRow* Row, EUINavigation Direction) { return Row->NavigateValue(Direction); }
 	static UScrollBox* RecordScroll(USovAccessibleRecordMenu* Menu) { return Menu->RecordScroll; }
@@ -30,6 +37,36 @@ struct FSovAccessibilityFrontendTestAccess
 	}
 };
 #if WITH_DEV_AUTOMATION_TESTS
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovDialogueWidthRecoveryTest,"ProjectVelkorran.UI.Accessibility.DialogueWidthRecovery",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FSovDialogueWidthRecoveryTest::RunTest(const FString& Parameters)
+{
+	auto* Presentation = NewObject<USovAccessibilityPresentation>();
+	Presentation->Initialize(); Presentation->TakeWidget();
+	const auto Window = SNew(SWindow);
+	FHittestGrid Grid;
+	const FPaintArgs Args(&Window.Get(), Grid, FVector2D::ZeroVector, 0., 0.f);
+	for (auto* Text : FSovAccessibilityFrontendTestAccess::DialogueText(Presentation))
+	{
+		// Exercise the actual HUD text widgets after a short line has been painted
+		// into an auto-sized panel. The next line must recover its viewport budget.
+		Text->SetWrapTextAt(600.f);
+		Text->SetText(FText::FromString(TEXT("Yes.")));
+		const auto Slate = Text->TakeWidget();
+		Slate->SlatePrepass();
+		const FVector2D ShortSize = Slate->GetDesiredSize();
+		FSlateWindowElementList Elements(Window);
+		Slate->Paint(Args, FGeometry::MakeRoot(ShortSize, FSlateLayoutTransform()),
+			FSlateRect(0, 0, 800, 600), Elements, 0, FWidgetStyle(), true);
+		Text->SetText(FText::FromString(TEXT("Keep moving toward the evacuation point and protect the wounded.")));
+		Slate->SlatePrepass();
+		const FVector2D LongSize = Slate->GetDesiredSize();
+		TestTrue(TEXT("A longer line expands beyond the previously painted short line"), LongSize.X > ShortSize.X * 3.f);
+		TestTrue(TEXT("Dialogue remains inside its explicit safe-area width"), LongSize.X <= 601.f);
+		TestTrue(TEXT("Ordinary dialogue does not become a tall column"), LongSize.Y < 200.f);
+	}
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovConsoleMenuBackTest,"ProjectVelkorran.UI.Console.BackAndFirstBoot",EAutomationTestFlags_ApplicationContextMask|EAutomationTestFlags::EngineFilter)
 bool FSovConsoleMenuBackTest::RunTest(const FString& Parameters)
 {
@@ -101,7 +138,7 @@ bool FSovAccessibilityTransaction::RunTest(const FString& Parameters)
 	if (!TestNotNull(TEXT("Reflected first-boot fixture field"), Completed)) { return false; }
 	Completed->SetPropertyValue_InContainer(Settings, false);
 	TestFalse(TEXT("Fixture begins before explicit setup completion"), Settings->HasCompletedAccessibilitySetup());
-	TestTrue(TEXT("Capture legacy eleven-byte gameplay payload"),Settings->CapturePortableSettings(Bytes)); TestEqual(TEXT("Schema unchanged"),Bytes.Num(),11);
+	TestTrue(TEXT("Capture bounded gameplay payload"),Settings->CapturePortableSettings(Bytes)); TestEqual(TEXT("Gameplay payload includes modifier mask only"),Bytes.Num(),12);
 	auto Value = Settings->GetSettingsSnapshot(); Value.UIScale=2; Value.SubtitleScale=2.5f; Value.bHighContrastHUD=true; Value.bMenuNarration=true;
 	Value.DialoguePressureMode=ESovDialoguePressureMode::Disabled; Value.bOverrideTeamColor=true; Value.TeamColor=FLinearColor::Green;
 	Value.ControllerAudioVolume=.35f;
@@ -133,6 +170,13 @@ bool FSovAccessibilityNativeControl::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Objective text can be hidden through native settings"),Settings->GetSettingsSnapshot().bShowObjectiveText);
 	Menu->Adjust(Row,1);
 	TestTrue(TEXT("Objective text can be restored through native settings"),Settings->GetSettingsSnapshot().bShowObjectiveText);
+    const ESovDifficultyPreset DifficultyBefore = Settings->GetSettingsSnapshot().Preset;
+    for (const FName Modifier : {FName("bModifierBlackout"),FName("bModifierFamine"),FName("bModifierFrenzy"),FName("bModifierAscendant"),FName("bModifierGlassCannon")})
+    {
+        Row=FSovAccessibilityFrontendTestAccess::Row(Menu,Settings,Modifier,0,1,1); Menu->Adjust(Row,1);
+    }
+    TestEqual(TEXT("Native challenge rows enable all five modifiers"),Settings->GetCampaignModifiers(),SovCampaignModifiers::All);
+    TestEqual(TEXT("Challenge controls preserve selected difficulty"),Settings->GetSettingsSnapshot().Preset,DifficultyBefore);
 	Row=FSovAccessibilityFrontendTestAccess::Row(Menu,Settings,"DialoguePressureMode",0,2,1); Menu->Adjust(Row,1);
 	TestEqual(TEXT("Reflected enum uses actual settings"),Settings->GetSettingsSnapshot().DialoguePressureMode,ESovDialoguePressureMode::Extended);
 	Row=FSovAccessibilityFrontendTestAccess::Row(Menu,Settings,"Cloud.Enabled",0,1,1);
@@ -157,6 +201,17 @@ bool FSovAccessibilityTextPresentation::RunTest(const FString& Parameters)
 	TestEqual(TEXT("All text survives pagination"),Recovered,Original);
 	const auto Unicode=USovAccessibilityPresentation::PaginateText(TEXT("e\u0301e\u0301e\u0301"),1,1);
 	TestEqual(TEXT("Combining sequence is one grapheme"),Unicode.Num(),3); if(Unicode.Num()==3) { TestEqual(TEXT("No isolated combining mark"),Unicode[0],FString(TEXT("e\u0301"))); }
+	const FString Sentence=TEXT("Hold the evacuation corridor and wait.");
+	const auto Words=USovAccessibilityPresentation::PaginateText(Sentence,25,2);
+	TestEqual(TEXT("Ordinary sentence fits one two-line page"),Words.Num(),1);
+	if(Words.Num()==1)
+	{
+		TestEqual(TEXT("Wrapping preserves evacuation as a complete word"),Words[0],FString(TEXT("Hold the evacuation \ncorridor and wait.")));
+		TestEqual(TEXT("Soft wrapping preserves every original character"),Words[0].Replace(TEXT("\n"),TEXT("")),Sentence);
+	}
+	const auto Explicit=USovAccessibilityPresentation::PaginateText(TEXT("alpha\r\nbeta"),5,1);
+	TestEqual(TEXT("Hard break at exact width creates no extra blank page"),Explicit.Num(),2);
+	if(Explicit.Num()==2) { TestEqual(TEXT("First explicit line"),Explicit[0],FString(TEXT("alpha"))); TestEqual(TEXT("Second explicit line"),Explicit[1],FString(TEXT("beta"))); }
 	FSovUserSettingsSnapshot Settings; const auto Threat=USovAccessibilityPresentation::ThreatTint(Settings); Settings.bOverrideTeamColor=true; Settings.TeamColor=FLinearColor::Green;
 	TestTrue(TEXT("Team override affects team presentation"),USovAccessibilityPresentation::TeamTint(Settings).Equals(FLinearColor::Green));
 	TestTrue(TEXT("Team override cannot modify independent threat color"),USovAccessibilityPresentation::ThreatTint(Settings).Equals(Threat));

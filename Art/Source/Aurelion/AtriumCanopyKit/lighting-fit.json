@@ -1,0 +1,57 @@
+{
+  "status": "Saved candidate; entry and overview reviewed; final lighting acceptance remains open",
+  "lights": [
+    {
+      "actor": "ENVL_Z05_Key_00",
+      "before": {
+        "lumens": 1190.0,
+        "radius": 4900.0
+      },
+      "after": {
+        "lumens": 300,
+        "radius": 1400
+      },
+      "source_width": 240.0,
+      "source_height": 160.0
+    },
+    {
+      "actor": "ENVL_Z05_Key_01",
+      "before": {
+        "lumens": 1190.0,
+        "radius": 8600.0
+      },
+      "after": {
+        "lumens": 300,
+        "radius": 1400
+      },
+      "source_width": 240.0,
+      "source_height": 160.0
+    },
+    {
+      "actor": "ENVL_Z05_Key_02",
+      "before": {
+        "lumens": 1190.0,
+        "radius": 7350.0
+      },
+      "after": {
+        "lumens": 300,
+        "radius": 1400
+      },
+      "source_width": 240.0,
+      "source_height": 160.0
+    },
+    {
+      "actor": "ENVL_Z05_Key_03",
+      "before": {
+        "lumens": 1190.0,
+        "radius": 7350.0
+      },
+      "after": {
+        "lumens": 300,
+        "radius": 1400
+      },
+      "source_width": 240.0,
+      "source_height": 160.0
+    }
+  ]
+}

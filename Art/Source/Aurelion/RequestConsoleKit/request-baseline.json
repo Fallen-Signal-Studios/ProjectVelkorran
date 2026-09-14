@@ -1,0 +1,288 @@
+{
+  "status": "read_only",
+  "actors": [
+    {
+      "actor": "Aurelion_E3_RetryEncounter",
+      "class_name": "SovAurelionRequestActor",
+      "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=220.000000,Y=6650.000000,Z=-553.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "properties": {
+        "request_id": "Aurelion.E3.RetryEncounter",
+        "mission_id": "M12_FireAndFrost",
+        "beat_id": "BreachSharedJunction",
+        "operation": "<SovAurelionRequest.RETRY_ENCOUNTER: 7>",
+        "story": "None",
+        "handoff_anchor": "None",
+        "co_action_anchor": "None",
+        "thermal": "None",
+        "thermal_director": "None",
+        "thermal_participant_id": "None",
+        "destination_mission": "None",
+        "retry_objective": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovCampaignEncounterObjective_7",
+        "retry_director": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovEncounterDirector_5",
+        "action_text": "Retry encounter"
+      },
+      "components": [
+        {
+          "name": "SceneRoot",
+          "class_name": "SceneComponent",
+          "relative": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=220.000000,Y=6650.000000,Z=-553.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "world": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=220.000000,Y=6650.000000,Z=-553.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "parent": null
+        },
+        {
+          "name": "Body",
+          "class_name": "BoxComponent",
+          "relative": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "world": "(Rotation=(X=0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=220.000000,Y=6650.000000,Z=-553.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "parent": "SceneRoot",
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAllDynamic",
+          "visible": true,
+          "hidden": true,
+          "extent": [
+            25.0,
+            35.0,
+            45.0
+          ]
+        },
+        {
+          "name": "Visual",
+          "class_name": "StaticMeshComponent",
+          "relative": "(Rotation=(X=0.000000,Y=-0.000000,Z=1.000000,W=0.000000),Translation=(X=-0.000050,Y=12.068254,Z=-44.999998),Scale3D=(X=0.745364,Y=0.745364,Z=0.745364))",
+          "world": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=232.068254,Y=6650.000050,Z=-597.999998),Scale3D=(X=0.745364,Y=0.745364,Z=0.745364))",
+          "parent": "Body",
+          "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+          "profile": "Custom",
+          "visible": true,
+          "hidden": false,
+          "mesh": "/Game/Aurelion/Environment/KitBash/KB3D_CPI_PropConsoleLarge_A/KB3D_CPI_PropConsoleLarge_A/StaticMeshes/SM_KB3D_CPI_PropConsoleLarge_A.SM_KB3D_CPI_PropConsoleLarge_A",
+          "mesh_origin": [
+            -6.771087646484375e-05,
+            16.191088676452637,
+            60.37318673729908
+          ],
+          "mesh_extent": [
+            27.48100757598877,
+            26.191109657287598,
+            60.37318930029858
+          ],
+          "materials": [
+            "/Game/Aurelion/Environment/KitBash/KB3D_CPI_PropConsoleLarge_A/KB3D_CPI_PropConsoleLarge_A/Materials/M_KB3D_CPI_MetalsTrimA.M_KB3D_CPI_MetalsTrimA",
+            "/Game/Aurelion/Environment/KitBash/KB3D_CPI_PropConsoleLarge_A/KB3D_CPI_PropConsoleLarge_A/Materials/M_KB3D_CPI_ScreensGraphics.M_KB3D_CPI_ScreensGraphics",
+            "/Game/Aurelion/Environment/KitBash/KB3D_CPI_PropConsoleLarge_A/KB3D_CPI_PropConsoleLarge_A/Materials/M_KB3D_CPI_WireTrim.M_KB3D_CPI_WireTrim",
+            "/Game/Aurelion/Environment/KitBash/KB3D_CPI_PropConsoleLarge_A/KB3D_CPI_PropConsoleLarge_A/Materials/M_KB3D_CPI_WhiteMetalTrimA.M_KB3D_CPI_WhiteMetalTrimA"
+          ]
+        },
+        {
+          "name": "Label",
+          "class_name": "TextRenderComponent",
+          "relative": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=65.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "world": "(Rotation=(X=0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=220.000000,Y=6650.000000,Z=-488.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "parent": "SceneRoot",
+          "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+          "profile": "NoCollision",
+          "visible": true,
+          "hidden": true
+        },
+        {
+          "name": "StaticMesh",
+          "class_name": "StaticMeshComponent",
+          "relative": "(Rotation=(X=0.000000,Y=-0.000000,Z=1.000000,W=0.000000),Translation=(X=-0.000072,Y=44.365244,Z=76.975075),Scale3D=(X=0.056250,Y=0.056250,Z=0.056250))",
+          "world": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=-0.707107),Translation=(X=199.000000,Y=6649.999997,Z=-540.625551),Scale3D=(X=0.056250,Y=0.056250,Z=0.056250))",
+          "parent": "Visual",
+          "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+          "profile": "Custom",
+          "visible": true,
+          "hidden": false,
+          "mesh": "/Game/Aurelion/Environment/KitBashRadiance/KB3D_OAS_PropHologramWall_A/KB3D_OAS_PropHologramWall_A/StaticMeshes/SM_KB3D_OAS_PropHologramWall_A.SM_KB3D_OAS_PropHologramWall_A",
+          "mesh_origin": [
+            -6.103515625e-05,
+            0.0,
+            100.00979614257812
+          ],
+          "mesh_extent": [
+            400.0,
+            127.24999237060547,
+            100.00979614257812
+          ],
+          "materials": [
+            "/Game/Aurelion/Environment/RadianceMaterials/M_Radiance_NativeDisplay.M_Radiance_NativeDisplay",
+            "/Game/Aurelion/Environment/RadianceMaterials/M_Radiance_dark_trim.M_Radiance_dark_trim",
+            "/Game/Aurelion/Environment/RadianceMaterials/M_Radiance_wall.M_Radiance_wall"
+          ]
+        }
+      ]
+    },
+    {
+      "actor": "Aurelion_FreeTrappedMarine_<SovAurelionRequest.PLAY_SCENE: 0>",
+      "class_name": "SovAurelionRequestActor",
+      "transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.707107,W=0.707107),Translation=(X=830.000000,Y=8480.000000,Z=-535.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "properties": {
+        "request_id": "Aurelion_FreeTrappedMarine_PLAY_SCENE: 0>",
+        "mission_id": "M12_FireAndFrost",
+        "beat_id": "FreeTrappedMarine",
+        "operation": "<SovAurelionRequest.PLAY_SCENE: 0>",
+        "story": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionStorySequenceActor_1",
+        "handoff_anchor": "None",
+        "co_action_anchor": "None",
+        "thermal": "None",
+        "thermal_director": "None",
+        "thermal_participant_id": "None",
+        "destination_mission": "None",
+        "retry_objective": "None",
+        "retry_director": "None",
+        "action_text": "Continue: Trapped marine"
+      },
+      "components": [
+        {
+          "name": "SceneRoot",
+          "class_name": "SceneComponent",
+          "relative": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.707107,W=0.707107),Translation=(X=830.000000,Y=8480.000000,Z=-535.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "world": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.707107,W=0.707107),Translation=(X=830.000000,Y=8480.000000,Z=-535.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "parent": null
+        },
+        {
+          "name": "Body",
+          "class_name": "BoxComponent",
+          "relative": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "world": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=830.000000,Y=8480.000000,Z=-535.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "parent": "SceneRoot",
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAllDynamic",
+          "visible": true,
+          "hidden": true,
+          "extent": [
+            25.0,
+            35.0,
+            45.0
+          ]
+        },
+        {
+          "name": "Visual",
+          "class_name": "StaticMeshComponent",
+          "relative": "(Rotation=(X=0.000000,Y=-0.000000,Z=1.000000,W=0.000000),Translation=(X=-0.000050,Y=12.068254,Z=-44.999998),Scale3D=(X=0.745364,Y=0.745364,Z=0.745364))",
+          "world": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=-0.707107),Translation=(X=817.931746,Y=8479.999950,Z=-579.999998),Scale3D=(X=0.745364,Y=0.745364,Z=0.745364))",
+          "parent": "Body",
+          "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+          "profile": "Custom",
+          "visible": true,
+          "hidden": false,
+          "mesh": "/Game/Aurelion/Environment/KitBash/KB3D_CPI_PropConsoleLarge_A/KB3D_CPI_PropConsoleLarge_A/StaticMeshes/SM_KB3D_CPI_PropConsoleLarge_A.SM_KB3D_CPI_PropConsoleLarge_A",
+          "mesh_origin": [
+            -6.771087646484375e-05,
+            16.191088676452637,
+            60.37318673729908
+          ],
+          "mesh_extent": [
+            27.48100757598877,
+            26.191109657287598,
+            60.37318930029858
+          ],
+          "materials": [
+            "/Game/Aurelion/Environment/KitBash/KB3D_CPI_PropConsoleLarge_A/KB3D_CPI_PropConsoleLarge_A/Materials/M_KB3D_CPI_MetalsTrimA.M_KB3D_CPI_MetalsTrimA",
+            "/Game/Aurelion/Environment/KitBash/KB3D_CPI_PropConsoleLarge_A/KB3D_CPI_PropConsoleLarge_A/Materials/M_KB3D_CPI_ScreensGraphics.M_KB3D_CPI_ScreensGraphics",
+            "/Game/Aurelion/Environment/KitBash/KB3D_CPI_PropConsoleLarge_A/KB3D_CPI_PropConsoleLarge_A/Materials/M_KB3D_CPI_WireTrim.M_KB3D_CPI_WireTrim",
+            "/Game/Aurelion/Environment/KitBash/KB3D_CPI_PropConsoleLarge_A/KB3D_CPI_PropConsoleLarge_A/Materials/M_KB3D_CPI_WhiteMetalTrimA.M_KB3D_CPI_WhiteMetalTrimA"
+          ]
+        },
+        {
+          "name": "Label",
+          "class_name": "TextRenderComponent",
+          "relative": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.457582,W=0.889168),Translation=(X=0.000000,Y=0.000000,Z=65.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "world": "(Rotation=(X=0.000000,Y=0.000000,Z=0.952296,W=0.305177),Translation=(X=830.000000,Y=8480.000000,Z=-470.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "parent": "SceneRoot",
+          "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+          "profile": "NoCollision",
+          "visible": true,
+          "hidden": true
+        }
+      ]
+    },
+    {
+      "actor": "Aurelion_GroundLyric_<SovAurelionRequest.PLAY_SCENE: 0>",
+      "class_name": "SovAurelionRequestActor",
+      "transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.707107,W=0.707107),Translation=(X=1080.000000,Y=9330.000000,Z=-435.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "properties": {
+        "request_id": "Aurelion_GroundLyric_PLAY_SCENE: 0>",
+        "mission_id": "M12_FireAndFrost",
+        "beat_id": "GroundLyric",
+        "operation": "<SovAurelionRequest.PLAY_SCENE: 0>",
+        "story": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionStorySequenceActor_2",
+        "handoff_anchor": "None",
+        "co_action_anchor": "None",
+        "thermal": "None",
+        "thermal_director": "None",
+        "thermal_participant_id": "None",
+        "destination_mission": "None",
+        "retry_objective": "None",
+        "retry_director": "None",
+        "action_text": "Continue: Selene"
+      },
+      "components": [
+        {
+          "name": "SceneRoot",
+          "class_name": "SceneComponent",
+          "relative": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.707107,W=0.707107),Translation=(X=1080.000000,Y=9330.000000,Z=-435.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "world": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.707107,W=0.707107),Translation=(X=1080.000000,Y=9330.000000,Z=-435.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "parent": null
+        },
+        {
+          "name": "Body",
+          "class_name": "BoxComponent",
+          "relative": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "world": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=1080.000000,Y=9330.000000,Z=-435.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "parent": "SceneRoot",
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAllDynamic",
+          "visible": true,
+          "hidden": true,
+          "extent": [
+            25.0,
+            35.0,
+            45.0
+          ]
+        },
+        {
+          "name": "Visual",
+          "class_name": "StaticMeshComponent",
+          "relative": "(Rotation=(X=0.000000,Y=-0.000000,Z=1.000000,W=0.000000),Translation=(X=-0.000050,Y=12.068254,Z=-44.999998),Scale3D=(X=0.745364,Y=0.745364,Z=0.745364))",
+          "world": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=-0.707107),Translation=(X=1067.931746,Y=9329.999950,Z=-479.999998),Scale3D=(X=0.745364,Y=0.745364,Z=0.745364))",
+          "parent": "Body",
+          "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+          "profile": "Custom",
+          "visible": true,
+          "hidden": false,
+          "mesh": "/Game/Aurelion/Environment/KitBash/KB3D_CPI_PropConsoleLarge_A/KB3D_CPI_PropConsoleLarge_A/StaticMeshes/SM_KB3D_CPI_PropConsoleLarge_A.SM_KB3D_CPI_PropConsoleLarge_A",
+          "mesh_origin": [
+            -6.771087646484375e-05,
+            16.191088676452637,
+            60.37318673729908
+          ],
+          "mesh_extent": [
+            27.48100757598877,
+            26.191109657287598,
+            60.37318930029858
+          ],
+          "materials": [
+            "/Game/Aurelion/Environment/KitBash/KB3D_CPI_PropConsoleLarge_A/KB3D_CPI_PropConsoleLarge_A/Materials/M_KB3D_CPI_MetalsTrimA.M_KB3D_CPI_MetalsTrimA",
+            "/Game/Aurelion/Environment/KitBash/KB3D_CPI_PropConsoleLarge_A/KB3D_CPI_PropConsoleLarge_A/Materials/M_KB3D_CPI_ScreensGraphics.M_KB3D_CPI_ScreensGraphics",
+            "/Game/Aurelion/Environment/KitBash/KB3D_CPI_PropConsoleLarge_A/KB3D_CPI_PropConsoleLarge_A/Materials/M_KB3D_CPI_WireTrim.M_KB3D_CPI_WireTrim",
+            "/Game/Aurelion/Environment/KitBash/KB3D_CPI_PropConsoleLarge_A/KB3D_CPI_PropConsoleLarge_A/Materials/M_KB3D_CPI_WhiteMetalTrimA.M_KB3D_CPI_WhiteMetalTrimA"
+          ]
+        },
+        {
+          "name": "Label",
+          "class_name": "TextRenderComponent",
+          "relative": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.457582,W=0.889168),Translation=(X=0.000000,Y=0.000000,Z=65.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "world": "(Rotation=(X=0.000000,Y=0.000000,Z=0.952296,W=0.305177),Translation=(X=1080.000000,Y=9330.000000,Z=-370.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "parent": "SceneRoot",
+          "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+          "profile": "NoCollision",
+          "visible": true,
+          "hidden": true
+        }
+      ]
+    }
+  ],
+  "qualification": "Saved editor inventory; no interaction invoked or state changed."
+}

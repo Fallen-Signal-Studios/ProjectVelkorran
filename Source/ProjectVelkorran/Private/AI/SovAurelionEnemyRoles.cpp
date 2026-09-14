@@ -1,14 +1,23 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "AI/SovAurelionEnemyRoles.h"
+#include "Presentation/SovBloodFeedbackComponent.h"
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Engine/SkeletalMesh.h"
 #include "AI/NarrativeNPCController.h"
 #include "ArsenalStatics.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SceneComponent.h"
+#include "Components/InstancedStaticMeshComponent.h"
 #include "Components/SovAurelionThermalFractureComponent.h"
 #include "Components/SovWeakPointComponent.h"
 #include "Components/SovPoiseComponent.h"
 #include "Campaign/SovEncounterDirector.h"
 #include "Engine/World.h"
+#include "Engine/StaticMesh.h"
+#include "PhysicsEngine/BodySetup.h"
+#include "Chaos/TriangleMeshImplicitObject.h"
 #include "EngineUtils.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
@@ -67,6 +76,65 @@ TArray<FVector> ASovAurelionWallRoute::GetWorldPoints() const
     return Result;
 }
 
+void ASovAurelionWallRoute::BeginPlay()
+{
+    Super::BeginPlay();
+    if (HasAuthority()) { RebuildPresentationSurfaces(); }
+}
+
+void ASovAurelionWallRoute::RebuildPresentationSurfaces()
+{
+    for (auto Source : PresentationSurfaces)
+    {
+        if (IsValid(Source) && Source->GetStaticMesh())
+        {
+            if (auto* Body = Source->GetStaticMesh()->GetBodySetup()) { Body->CreatePhysicsMeshes(); }
+        }
+    }
+}
+
+bool ASovAurelionWallRoute::ResolvePresentationContact(const FHitResult& PhysicalHit, const FVector& Probe, FHitResult& Contact) const
+{
+    if (!PhysicalHit.bBlockingHit || !Probe.IsNormalized()) { return false; }
+    const FVector Start = PhysicalHit.ImpactPoint - Probe * 150.;
+    const FVector End = PhysicalHit.ImpactPoint + Probe * 50.;
+    bool Found = false;
+    for (auto Source : PresentationSurfaces)
+    {
+        if (!IsValid(Source) || !Source->IsRegistered() || !Source->IsVisible() || !Source->GetStaticMesh()) { continue; }
+        const auto* Body = Source->GetStaticMesh()->GetBodySetup();
+        if (!Body) { continue; }
+        const auto* Instances = Cast<UInstancedStaticMeshComponent>(Source);
+        const int32 Count = Instances ? Instances->GetInstanceCount() : 1;
+        for (int32 Index = 0; Index < Count; ++Index)
+        {
+            FTransform Transform = Source->GetComponentTransform();
+            if (Instances && !Instances->GetInstanceTransform(Index, Transform, true)) { continue; }
+            const FVector Scale = Transform.GetScale3D();
+            if (Transform.ContainsNaN() || FMath::Min3(FMath::Abs(Scale.X), FMath::Abs(Scale.Y), FMath::Abs(Scale.Z)) < SMALL_NUMBER) { continue; }
+            const FVector LocalStart = Transform.InverseTransformPosition(Start);
+            const FVector Delta = Transform.InverseTransformPosition(End) - LocalStart;
+            const double Length = Delta.Size();
+            if (Length < SMALL_NUMBER) { continue; }
+            // Read cooked geometry directly. No physics body is registered, so
+            // neither channel traces nor object-type queries gain cosmetic hits.
+            for (const auto& Geometry : Body->TriMeshGeometries)
+            {
+                if (!Geometry) { continue; }
+                Chaos::FReal Time; Chaos::FVec3 Position, Normal; int32 FaceIndex;
+                if (!Geometry->Raycast(LocalStart, Delta / Length, Length, 0., Time, Position, Normal, FaceIndex)) { continue; }
+                const FVector Point = Transform.TransformPosition(Position);
+                const FVector WorldNormal = Transform.TransformVectorNoScale(FVector(Normal) / Scale).GetSafeNormal();
+                if (FVector::DotProduct(WorldNormal, PhysicalHit.ImpactNormal) <= .9
+                    || (Found && FVector::DistSquared(Start, Point) >= FVector::DistSquared(Start, Contact.ImpactPoint))) { continue; }
+                Contact = PhysicalHit; Contact.ImpactPoint = Point; Contact.ImpactNormal = WorldNormal;
+                Found = true;
+            }
+        }
+    }
+    return Found;
+}
+
 bool ASovAurelionWallRoute::ValidateRoute(FString& Error) const
 {
     Error.Reset();
@@ -98,7 +166,7 @@ bool ASovAurelionWallRoute::ValidateRoute(FString& Error) const
 
 USovAurelionWallTraversalComponent::USovAurelionWallTraversalComponent()
 {
-    PrimaryComponentTick.bCanEverTick = false;
+    PrimaryComponentTick.bCanEverTick = true;
     SetIsReplicatedByDefault(true);
 }
 
@@ -106,6 +174,72 @@ void USovAurelionWallTraversalComponent::GetLifetimeReplicatedProps(TArray<FLife
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
     DOREPLIFETIME(USovAurelionWallTraversalComponent, bTraversing);
+    DOREPLIFETIME(USovAurelionWallTraversalComponent, bOnWall);
+    DOREPLIFETIME(USovAurelionWallTraversalComponent, WallNormal);
+    DOREPLIFETIME(USovAurelionWallTraversalComponent, WallTangent);
+    DOREPLIFETIME(USovAurelionWallTraversalComponent, WallPoint);
+}
+
+void USovAurelionWallTraversalComponent::UpdateWallSurface(const FVector& Direction)
+{
+    FHitResult Hit;
+    FCollisionQueryParams Query(SCENE_QUERY_STAT(WallPresentation), false, GetOwner());
+    Query.AddIgnoredActor(ActiveRoute.Get());
+    const FVector Start = GetOwner()->GetActorLocation();
+    const FVector Probe = ActiveRoute->GetActorTransform().TransformVectorNoScale(ActiveRoute->WallProbeDirection).GetSafeNormal();
+    bOnWall = PointIndex <= 2 && GetWorld()->LineTraceSingleByChannel(Hit, Start,
+        Start + Probe * ActiveRoute->WallProbeDistance, ECC_Visibility, Query)
+        && Hit.bBlockingHit && FMath::Abs(Hit.ImpactNormal.Z) < .3;
+    if (bOnWall)
+    {
+        FHitResult VisualHit;
+        if (ActiveRoute->ResolvePresentationContact(Hit, Probe, VisualHit)) { Hit = VisualHit; }
+        WallNormal = Hit.ImpactNormal;
+        WallTangent = FVector::VectorPlaneProject(Direction, WallNormal).GetSafeNormal(SMALL_NUMBER, FVector::UpVector);
+        WallPoint = Hit.ImpactPoint;
+    }
+}
+
+void USovAurelionWallTraversalComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* TickFunction)
+{
+    Super::TickComponent(DeltaTime, TickType, TickFunction);
+    auto* NPC = Cast<ASovNPCCharacterBase>(GetOwner());
+    auto* Mesh = NPC ? NPC->GetMesh() : nullptr;
+    if (!Mesh || !Mesh->GetSkeletalMeshAsset() || Mesh->IsSimulatingPhysics() || !NPC->IsAlive()) { return; }
+    auto* Anim = Mesh->GetAnimInstance();
+    const bool OnWall = bTraversing && bOnWall;
+    if (OnWall && !bPresentingWall)
+    {
+        PresentedMesh = Mesh;
+        GroundMeshTransform = Mesh->GetRelativeTransform();
+        bPresentingWall = true;
+        if (Anim && WallRunMontage && Anim->Montage_Play(WallRunMontage, 1.15f) > 0.f)
+        {
+            const FName Section = WallRunMontage->GetSectionName(0);
+            Anim->Montage_SetNextSection(Section, Section, WallRunMontage);
+        }
+    }
+    if (!bPresentingWall || PresentedMesh.Get() != Mesh) { return; }
+    FTransform Target = GroundMeshTransform;
+    if (OnWall)
+    {
+        const FQuat Rotation = FRotationMatrix::MakeFromXZ(WallTangent, WallNormal).ToQuat() * GroundMeshTransform.GetRotation();
+        const FBoxSphereBounds Bounds = Mesh->GetSkeletalMeshAsset()->GetImportedBounds();
+        const double FootHeight = (Bounds.Origin.Z - Bounds.BoxExtent.Z) * Mesh->GetComponentScale().Z;
+        const FVector Origin = WallPoint + WallNormal * (2. - FootHeight);
+        Target.SetLocation(Mesh->GetAttachParent()->GetComponentTransform().InverseTransformPosition(Origin));
+        Target.SetRotation(Mesh->GetAttachParent()->GetComponentQuat().Inverse() * Rotation);
+    }
+    const float Alpha = 1.f - FMath::Exp(-DeltaTime * 14.f);
+    Mesh->SetRelativeLocationAndRotation(FMath::Lerp(Mesh->GetRelativeLocation(), Target.GetLocation(), Alpha),
+        FQuat::Slerp(Mesh->GetRelativeRotation().Quaternion(), Target.GetRotation(), Alpha));
+    if (!OnWall)
+    {
+        if (Anim && WallRunMontage && Anim->Montage_IsPlaying(WallRunMontage)) { Anim->Montage_Stop(.15f, WallRunMontage); }
+        if (Mesh->GetRelativeLocation().Equals(Target.GetLocation(), .5)
+            && Mesh->GetRelativeRotation().Quaternion().AngularDistance(Target.GetRotation()) < .01)
+        { Mesh->SetRelativeTransform(GroundMeshTransform); bPresentingWall = false; PresentedMesh.Reset(); }
+    }
 }
 
 bool USovAurelionWallTraversalComponent::HasReadyOwner(bool bContinuing, bool bMovementAcquired) const
@@ -242,6 +376,7 @@ ESovAurelionTraversalResult USovAurelionWallTraversalComponent::AdvanceTraversal
         if (!HasReadyOwner(true)) { FinishTraversal(Lease, ESovAurelionTraversalResult::Cancelled); return ESovAurelionTraversalResult::Cancelled; }
         if (Hit.bBlockingHit || Hit.bStartPenetrating) { FinishTraversal(Lease, ESovAurelionTraversalResult::Blocked); return ESovAurelionTraversalResult::Blocked; }
         Budget -= Step;
+        UpdateWallSurface(Offset / Distance);
     }
     if (PointIndex == ActivePoints.Num())
     {
@@ -286,7 +421,7 @@ void USovAurelionWallTraversalComponent::FinishTraversal(uint64 Lease, ESovAurel
     const bool OwnedMovement = bOwnsMovementMode;
     const uint8 SavedPriorMode = PriorMovementMode;
     const uint8 SavedPriorCustomMode = PriorCustomMode;
-    bTraversing = false; bOwnsBusy = false; bOwnsMovementMode = false; LastResult = Result;
+    bTraversing = false; bOnWall = false; bOwnsBusy = false; bOwnsMovementMode = false; LastResult = Result;
     LeaseOwner.Reset(); ActivePoints.Reset(); ActiveRoute.Reset(); ActiveASC.Reset(); ActiveCharacter.Reset(); ActiveController.Reset(); ActiveMovement.Reset();
     ActiveEncounter.Reset(); ActiveEncounterAttempt.Invalidate();
     // Retire the lease before outward movement/tag callbacks; never restore over a newer movement owner.
@@ -401,7 +536,9 @@ void USovAurelionFreshCommandLink::BeginPlay()
 {
     Super::BeginPlay();
     if (!bAutoInitializeFreshLink || !GetOwner() || !GetOwner()->HasAuthority() || !GetWorld() || GetLinkId().IsNone()) { return; }
-    BootstrapDeadline = GetWorld()->GetTimeSeconds() + 30.;
+    // Cold appearance/weapon streaming can exceed 30 game seconds on the authored
+    // roster. Keep startup bounded without abandoning a still-loading formation.
+    BootstrapDeadline = GetWorld()->GetTimeSeconds() + 180.;
     PollReadiness();
     if (!GetLinkInstanceId().IsValid())
     { GetWorld()->GetTimerManager().SetTimer(ReadinessTimer, this, &ThisClass::PollReadiness, .1f, true); }
@@ -469,12 +606,14 @@ void USovAurelionEliteThermalFracture::Load_Implementation()
 ASovAurelionSecurityDrone::ASovAurelionSecurityDrone(const FObjectInitializer& Initializer) : Super(Initializer)
 { FormationLink = CreateDefaultSubobject<USovAurelionFreshCommandLink>(TEXT("AurelionFormation")); }
 
-ASovAurelionLinkbound::ASovAurelionLinkbound(const FObjectInitializer& Initializer) : Super(Initializer) {}
+ASovAurelionLinkbound::ASovAurelionLinkbound(const FObjectInitializer& Initializer) : Super(Initializer)
+{ if (auto* Blood = FindComponentByClass<USovBloodFeedbackComponent>()) { Blood->bBlackBlood = true; } }
 ASovAurelionWallRunner::ASovAurelionWallRunner(const FObjectInitializer& Initializer) : Super(Initializer)
 { WallTraversal = CreateDefaultSubobject<USovAurelionWallTraversalComponent>(TEXT("AurelionWallTraversal")); }
 ASovAurelionWeaver::ASovAurelionWeaver(const FObjectInitializer& Initializer) : Super(Initializer)
 {
     AnchorA = CreateDefaultSubobject<USovAurelionWeaverLink>(TEXT("AurelionAnchorA"));
+    if (auto* Blood = FindComponentByClass<USovBloodFeedbackComponent>()) { Blood->bBlackBlood = true; }
     AnchorB = CreateDefaultSubobject<USovAurelionWeaverLink>(TEXT("AurelionAnchorB"));
 }
 ASovAurelionElite::ASovAurelionElite(const FObjectInitializer& Initializer) : Super(Initializer)
@@ -501,6 +640,7 @@ bool ASovAurelionWeaver::InitializeFreshLinks()
     TGuardValue<bool> Updating(bUpdatingLinks, true);
     const auto* ExpectedASC = GetNarrativeAbilitySystemComponent();
     const uint64 ExpectedEpoch = ExpectedASC->GetCombatActorInfoEpoch();
+    bool bCreatedLink = false;
     for (auto* Link : {AnchorA.Get(), AnchorB.Get()})
     {
         if (!Link->HasValidCommandLinkConfiguration()) { return false; }
@@ -515,10 +655,19 @@ bool ASovAurelionWeaver::InitializeFreshLinks()
     {
         if (!HasReadySupportOwner() || GetNarrativeAbilitySystemComponent() != ExpectedASC || ExpectedASC->GetCombatActorInfoEpoch() != ExpectedEpoch) { return false; }
         if (Link->GetCommandLinkState() == ESovCommandLinkState::Inactive && !Link->GetLinkInstanceId().IsValid())
-        { if (!Link->InitializeFreshLink()) { return false; } }
+        { if (!Link->InitializeFreshLink()) { return false; } bCreatedLink = true; }
         // A Severed or death-deactivated instance belongs to its native lifecycle. Never call ResetCommandLink here.
     }
+    if (bCreatedLink && HasActiveSupportLink()) { MulticastSupportCast(); }
     return HasActiveSupportLink();
+}
+
+void ASovAurelionWeaver::MulticastSupportCast_Implementation()
+{
+    // A real fresh-link transition owns this cue; polling an existing tether never replays it.
+    if (GetNetMode() == NM_DedicatedServer || !IsAlive() || !SupportCastMontage || !GetMesh()) { return; }
+    if (auto* Anim = GetMesh()->GetAnimInstance(); Anim && !Anim->IsAnyMontagePlaying())
+    { Anim->Montage_Play(SupportCastMontage); }
 }
 
 bool ASovAurelionWeaver::ShareObservedThreatWithLinkedAllies()

@@ -3,6 +3,16 @@
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Sovereign/SovGameplayTags.h"
+#include "GAS/NarrativeAbilitySystemComponent.h"
+void ASovCampaignRuntimeTestPawn::InitializePresentationTestASC()
+{
+    if (!AbilitySystemComponent)
+    {
+        AbilitySystemComponent = NewObject<UNarrativeAbilitySystemComponent>(this);
+        AddInstanceComponent(AbilitySystemComponent); AbilitySystemComponent->RegisterComponent();
+        AbilitySystemComponent->InitAbilityActorInfo(this, this);
+    }
+}
 ASovCampaignRuntimeTestPawn::ASovCampaignRuntimeTestPawn(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {

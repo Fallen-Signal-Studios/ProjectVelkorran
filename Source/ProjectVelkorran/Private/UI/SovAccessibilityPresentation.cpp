@@ -35,6 +35,18 @@
 #include "Layout/Clipping.h"
 #include "Styling/CoreStyle.h"
 #include "UnrealFramework/NarrativeCharacter.h"
+#include "GAS/NarrativeAbilitySystemComponent.h"
+#include "NarrativeGameplayTags.h"
+
+namespace
+{
+bool IsCinematicControlled(const APlayerController* PC)
+{
+    const auto* Player = PC ? Cast<ASovPlayerCharacterBase>(PC->GetPawn()) : nullptr;
+    const auto* ASC = Player ? Player->GetNarrativeAbilitySystemComponent() : nullptr;
+    return ASC && ASC->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_SequencerControlled);
+}
+}
 
 #define LOCTEXT_NAMESPACE "SovAccessibilityPresentation"
 USovAccessibilityPresentation::USovAccessibilityPresentation(const FObjectInitializer& Initializer) : Super(Initializer)
@@ -44,23 +56,36 @@ TArray<FString> USovAccessibilityPresentation::PaginateText(const FString& Text,
 	TArray<FString> Pages;
 	if (Text.IsEmpty()) { return Pages; }
 	CharactersPerLine = FMath::Clamp(CharactersPerLine, 1, 64); MaximumLines = FMath::Clamp(MaximumLines, 1, 4);
-	// Unicode character boundaries preserve combining sequences/surrogates; UMG shapes the final localized lines.
-	auto Iterator = FBreakIterator::CreateCharacterBoundaryIterator(); Iterator->SetString(Text);
-	FString Page; int32 LineLength = 0, Lines = 1, Start = Iterator->ResetToBeginning();
-	for (int32 End = Iterator->MoveToNext(); End != INDEX_NONE; Start = End, End = Iterator->MoveToNext())
+	const FString Normalized = Text.Replace(TEXT("\r"), TEXT(""));
+	// Prefer Unicode soft-wrap opportunities so ordinary words survive intact.
+	// Oversized tokens still fall back to grapheme boundaries, never UTF-16 units.
+	auto Characters = FBreakIterator::CreateCharacterBoundaryIterator(); Characters->SetString(Normalized);
+	TArray<int32> Offsets; Offsets.Add(Characters->ResetToBeginning());
+	for (int32 End = Characters->MoveToNext(); End != INDEX_NONE; End = Characters->MoveToNext()) { Offsets.Add(End); }
+	auto Breaks = FBreakIterator::CreateLineBreakIterator(); Breaks->SetString(Normalized);
+	Breaks->ResetToBeginning();
+	TSet<int32> SoftBreaks;
+	for (int32 End = Breaks->MoveToNext(); End != INDEX_NONE; End = Breaks->MoveToNext()) { SoftBreaks.Add(End); }
+	FString Page; int32 Lines = 0, Start = 0;
+	const int32 Count = Offsets.Num() - 1;
+	while (Start < Count)
 	{
-		const FString Character = Text.Mid(Start, End - Start);
-		if (Character == TEXT("\r")) { continue; }
-		const bool bNewLine = Character.Contains(TEXT("\n"));
-		if (LineLength >= CharactersPerLine || bNewLine)
+		int32 End = Start;
+		while (End < Count && End - Start < CharactersPerLine && Normalized[Offsets[End]] != TEXT('\n')) { ++End; }
+		const bool bHardBreak = End < Count && Normalized[Offsets[End]] == TEXT('\n');
+		if (!bHardBreak && End < Count)
 		{
-			if (Lines >= MaximumLines) { Pages.Add(MoveTemp(Page)); Page.Reset(); Lines = 1; }
-			else { Page += TEXT("\n"); ++Lines; }
-			LineLength = 0;
+			for (int32 Candidate = End; Candidate > Start; --Candidate)
+			{
+				if (SoftBreaks.Contains(Offsets[Candidate])) { End = Candidate; break; }
+			}
 		}
-		if (!bNewLine) { Page += Character; ++LineLength; }
+		if (Lines > 0) { Page += TEXT("\n"); }
+		Page += Normalized.Mid(Offsets[Start], Offsets[End] - Offsets[Start]);
+		Start = End + (bHardBreak ? 1 : 0);
+		if (++Lines == MaximumLines) { Pages.Add(MoveTemp(Page)); Page.Reset(); Lines = 0; }
 	}
-	if (!Page.IsEmpty()) { Pages.Add(MoveTemp(Page)); }
+	if (Lines > 0) { Pages.Add(MoveTemp(Page)); }
 	return Pages;
 }
 FLinearColor USovAccessibilityPresentation::TeamTint(const FSovUserSettingsSnapshot& Value)
@@ -83,11 +108,13 @@ TSharedRef<SWidget> USovAccessibilityPresentation::RebuildWidget()
 		USafeZone* Safe = WidgetTree->ConstructWidget<USafeZone>();
 		SafeTextCanvas = WidgetTree->ConstructWidget<UCanvasPanel>(); Safe->AddChild(SafeTextCanvas); WidgetTree->RootWidget = Safe;
 		SubtitleBackground = WidgetTree->ConstructWidget<UBorder>(); SubtitleBackground->SetPadding(FMargin(18,10));
-		SubtitleText = WidgetTree->ConstructWidget<UTextBlock>(); SubtitleText->SetJustification(ETextJustify::Center); SubtitleText->SetAutoWrapText(true);
+		// RefreshText supplies the safe-area wrap width. Auto-wrap also clamps to
+		// the last painted width, trapping auto-sized dialogue panels at short lines.
+		SubtitleText = WidgetTree->ConstructWidget<UTextBlock>(); SubtitleText->SetJustification(ETextJustify::Center); SubtitleText->SetAutoWrapText(false);
 		SubtitleBackground->AddChild(SubtitleText); SubtitleSlot = SafeTextCanvas->AddChildToCanvas(SubtitleBackground);
 		SubtitleSlot->SetAnchors(FAnchors(.5f,.88f)); SubtitleSlot->SetAlignment(FVector2D(.5f,1)); SubtitleSlot->SetAutoSize(true);
 		CaptionBackground = WidgetTree->ConstructWidget<UBorder>(); CaptionBackground->SetPadding(FMargin(14,8));
-		CaptionText = WidgetTree->ConstructWidget<UTextBlock>(); CaptionText->SetJustification(ETextJustify::Center); CaptionText->SetAutoWrapText(true);
+		CaptionText = WidgetTree->ConstructWidget<UTextBlock>(); CaptionText->SetJustification(ETextJustify::Center); CaptionText->SetAutoWrapText(false);
 		CaptionBackground->AddChild(CaptionText); UCanvasPanelSlot* CanvasSlot = SafeTextCanvas->AddChildToCanvas(CaptionBackground);
 		CanvasSlot->SetAnchors(FAnchors(.5f,.13f)); CanvasSlot->SetAlignment(FVector2D(.5f,0)); CanvasSlot->SetAutoSize(true);
 		ObjectiveBackground = WidgetTree->ConstructWidget<UBorder>(); ObjectiveBackground->SetPadding(FMargin(12, 8));
@@ -97,6 +124,7 @@ TSharedRef<SWidget> USovAccessibilityPresentation::RebuildWidget()
 		for (int32 Index = 0; Index < MaximumObjectiveRows; ++Index)
 		{
 			auto* Row = WidgetTree->ConstructWidget<UTextBlock>(); Row->SetAutoWrapText(false); Row->SetJustification(ETextJustify::Left);
+			Row->SetShadowOffset(FVector2D(1.f)); Row->SetShadowColorAndOpacity(FLinearColor::Black);
 			Rows->AddChildToVerticalBox(Row)->SetPadding(FMargin(0, 0, 0, 8)); ObjectiveRows.Add(Row);
 		}
 		ObjectiveText = ObjectiveRows[0];
@@ -268,7 +296,7 @@ void USovAccessibilityPresentation::RefreshObjectiveText()
     const auto* Player = GetOwningPlayer() ? Cast<ASovPlayerCharacterBase>(GetOwningPlayer()->GetPawn()) : nullptr;
     const auto Theme = SovHUDStyle::ForProtagonist(Player ? Player->GetProtagonistIdentityTag() : FGameplayTag(), Settings.bHighContrastHUD);
     FLinearColor ObjectiveFill = Theme.Background;
-    ObjectiveFill.A = Settings.bHighContrastHUD ? 1.f : .32f;
+    ObjectiveFill.A = Settings.bHighContrastHUD ? 1.f : .20f;
     ObjectiveBackground->SetBrushColor(ObjectiveFill);
 	const FVector2D Size = SafeTextCanvas ? SafeTextCanvas->GetCachedGeometry().GetLocalSize() : GetCachedGeometry().GetLocalSize();
 	LayoutObjectives(Size.X > 0.f ? float(Size.X) : 1280.f, Size.Y > 0.f ? float(Size.Y) : 720.f);
@@ -353,7 +381,7 @@ void USovAccessibilityPresentation::LayoutObjectives(float SafeWidth, float Safe
 	ObjectiveOverflow->SetVisibility(bFitsContent && Remaining > 0 ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
 	ObjectiveSize->SetMaxDesiredHeight(Budget);
 	ObjectiveSize->SetHeightOverride(ContentHeight);
-	ObjectiveBackground->SetVisibility(Settings.bShowObjectiveText && !Objectives.IsEmpty() && Budget > 0.f && bFitsContent
+	ObjectiveBackground->SetVisibility(Settings.bShowObjectiveText && !IsCinematicControlled(GetOwningPlayer()) && !Objectives.IsEmpty() && Budget > 0.f && bFitsContent
 		? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
 	if (auto* CanvasSlot = Cast<UCanvasPanelSlot>(ObjectiveBackground->Slot))
 	{
@@ -442,7 +470,7 @@ void USovAccessibilityPresentation::NativeTick(const FGeometry& Geometry, float 
 	MarkerRefreshRemaining -= DeltaSeconds; if (MarkerRefreshRemaining > 0) { return; } MarkerRefreshRemaining = .25f; Markers.Reset();
 	APlayerController* PC = GetOwningPlayer(); if (!PC) { ObjectiveWaypoint = {}; return; }
     RefreshObjectiveWaypoint();
-	if (Settings.bWeakPointOutlines)
+	if (Settings.bWeakPointOutlines && !Settings.bModifierBlackout)
 	{
 		RefreshWeakPointMarkers(PC);
 	}
@@ -472,7 +500,7 @@ void USovAccessibilityPresentation::RefreshObjectiveWaypoint()
     ObjectiveWaypoint = {};
     auto* PC = Cast<ASovPlayerController>(GetOwningPlayer());
     FSovCombatVitalsSnapshot Current;
-    if (!Settings.bShowObjectiveText || Objectives.IsEmpty() || !GetWorld()
+    if (!Settings.bShowObjectiveText || IsCinematicControlled(PC) || Objectives.IsEmpty() || !GetWorld()
         || !USovCombatVitalsWidget::ReadCurrentVitals(PC, Current) || Current.Values[0].Current <= 0.f) { return; }
     if (WaypointWorld.Get() != GetWorld())
     {
@@ -606,7 +634,7 @@ int32 USovAccessibilityPresentation::NativePaint(const FPaintArgs& Args, const F
 	};
     FSovCombatVitalsSnapshot CurrentVitals;
     const auto* SovPC = Cast<ASovPlayerController>(PC);
-    if (Settings.bShowObjectiveText && SafeTextCanvas && USovCombatVitalsWidget::ReadCurrentVitals(SovPC, CurrentVitals)
+    if (!Settings.bModifierBlackout && Settings.bShowObjectiveText && !IsCinematicControlled(SovPC) && SafeTextCanvas && USovCombatVitalsWidget::ReadCurrentVitals(SovPC, CurrentVitals)
         && CurrentVitals.Values[0].Current > 0.f && SovObjectiveWaypoint::IsCurrent(SovPC, ObjectiveWaypoint))
     {
         const auto& SafeGeometry = SafeTextCanvas->GetPaintSpaceGeometry();
@@ -681,6 +709,7 @@ int32 USovAccessibilityPresentation::NativePaint(const FPaintArgs& Args, const F
 	}
 	for (const FMarker& Marker : Markers)
 	{
+        if (Settings.bModifierBlackout && (Marker.bThreat || Marker.bNavigation)) { continue; }
 		FVector2D Point; if (!Project(Marker.Location,Point)) { continue; }
 		const float Radius = (Marker.bThreat ? 13.f : 9.f) * Settings.UIScale;
 		FLinearColor Tint = Marker.bThreat ? ThreatTint(Settings) : TeamTint(Settings);

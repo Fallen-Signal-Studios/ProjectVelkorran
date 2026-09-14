@@ -1,0 +1,45 @@
+{
+  "status": "Source candidate; Unreal placement and visual acceptance pending",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z06RefugeLanding",
+      "triangles": 8460,
+      "nominal_dimensions_m": [
+        6.0,
+        10.0,
+        0.4000000059604645
+      ],
+      "materials": [
+        "M_Aurelion_StoneGrout",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; visual surface fitted to retained surveyed physical proxy",
+      "physical_top_local_m": 0.2,
+      "physical_bottom_local_m": -0.2,
+      "pivot": "Physical proxy centre; apply its rotation with unit scale"
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z06RefugeRamp",
+      "triangles": 6392,
+      "nominal_dimensions_m": [
+        4.243106365203857,
+        4.0,
+        0.4000000059604645
+      ],
+      "materials": [
+        "M_Aurelion_StoneGrout",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; visual surface fitted to retained surveyed physical proxy",
+      "physical_top_local_m": 0.2,
+      "physical_bottom_local_m": -0.2,
+      "pivot": "Physical proxy centre; apply its rotation with unit scale"
+    }
+  ]
+}

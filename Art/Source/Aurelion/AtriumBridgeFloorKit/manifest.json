@@ -1,0 +1,28 @@
+{
+  "status": "Candidate fitted paving; in-engine review pending",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_AtriumBridgeFloor",
+      "triangles": 12504,
+      "nominal_dimensions_m": [
+        10.295474210071493,
+        6,
+        1.32
+      ],
+      "materials": [
+        "M_Aurelion_StoneGrout",
+        "M_Aurelion_Basalt",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_IvoryStone"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; original bridge slabs remain physical",
+      "top_m": 0,
+      "inner_radius_m": 18,
+      "outer_radius_m": 28,
+      "half_sector_degrees": 5.625,
+      "radial_pivot_m": 23
+    }
+  ]
+}

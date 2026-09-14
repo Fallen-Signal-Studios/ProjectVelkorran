@@ -1,0 +1,24 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z06RefugeLanding",
+      "dimensions_m": [
+        6.0,
+        10.0,
+        0.4000000059604645
+      ],
+      "triangles": 8460
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z06RefugeRamp",
+      "dimensions_m": [
+        4.243106365203857,
+        4.0,
+        0.4000000059604645
+      ],
+      "triangles": 6392
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}

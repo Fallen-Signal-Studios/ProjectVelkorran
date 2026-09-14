@@ -1,5 +1,7 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Tests/SovFrontendRuntimeTestFixtures.h"
+#include "GAS/NarrativeAbilitySystemComponent.h"
+#include "NarrativeGameplayTags.h"
 #include "Campaign/SovCampaignInteractionTerminal.h"
 #include "Campaign/SovCampaignEncounterObjective.h"
 #include "Campaign/SovAurelionRequestActor.h"
@@ -265,6 +267,18 @@ bool FSovObjectivePresentationSettingsTest::RunTest(const FString&)
 	TestEqual(TEXT("Hiding text never changes campaign state"), F.State->GetObjectiveState(Mission->MissionId, TEXT("ReachSurvivors")), ESovObjectiveState::Available);
 	Settings.bShowObjectiveText = true; FSovObjectivePresentationTestAccess::Settings(*F.Presentation, Settings);
 	TestTrue(TEXT("Showing text restores current view"), FSovObjectivePresentationTestAccess::Visible(*F.Presentation));
+    F.Pawn->InitializePresentationTestASC();
+    auto* ASC = F.Pawn->GetNarrativeAbilitySystemComponent();
+    if (!TestNotNull(TEXT("Presentation fixture has a real ASC"), ASC)) { return false; }
+    const auto CinematicTag = FNarrativeGameplayTags::Get().State_SequencerControlled;
+    const int32 ReviewCount = F.Presentation->GetObjectiveReviewEntries().Num();
+    ASC->AddLooseGameplayTag(CinematicTag);
+    FSovObjectivePresentationTestAccess::Settings(*F.Presentation, Settings);
+    TestFalse(TEXT("Cinematic ownership hides the objective overlay"), FSovObjectivePresentationTestAccess::Visible(*F.Presentation));
+    TestEqual(TEXT("Cinematic presentation preserves authorized objective review"), F.Presentation->GetObjectiveReviewEntries().Num(), ReviewCount);
+    ASC->RemoveLooseGameplayTag(CinematicTag);
+    FSovObjectivePresentationTestAccess::Settings(*F.Presentation, Settings);
+    TestTrue(TEXT("Releasing cinematic ownership restores current objectives"), FSovObjectivePresentationTestAccess::Visible(*F.Presentation));
 	return true;
 }
 

@@ -1,0 +1,15 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_GateLantern",
+      "dimensions_m": [
+        2.4000000953674316,
+        0.4399999976158142,
+        1.0410000085830688
+      ],
+      "triangles": 8084
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}

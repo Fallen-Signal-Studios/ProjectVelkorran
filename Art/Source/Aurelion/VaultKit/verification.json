@@ -1,0 +1,24 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Vault_25x4",
+      "dimensions_m": [
+        25.051259994506836,
+        4.0,
+        4.959125995635986
+      ],
+      "triangles": 32148
+    },
+    {
+      "asset": "SM_Aurelion_KIT_VaultTympanum_25m",
+      "dimensions_m": [
+        24.966459274291992,
+        0.5,
+        4.515649795532227
+      ],
+      "triangles": 5452
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}

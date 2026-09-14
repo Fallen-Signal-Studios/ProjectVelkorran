@@ -199,6 +199,11 @@ TSharedRef<SWidget> USovAccessibilitySettingsMenu::RebuildWidget()
 		AddRow("DialogueMinimumReadSeconds", LOCTEXT("ReadTime", "Minimum dialogue reading seconds"), 2, 30, 1);
 		AddRow("DialoguePressureExtension", LOCTEXT("PressureExtension", "Extended dialogue timer multiplier"), 1, 5, .5f);
 		AddRow("Difficulty",LOCTEXT("Difficulty","Difficulty preset"),0,4,1);
+        AddRow("bModifierBlackout", LOCTEXT("ModifierBlackout", "Blackout — no navigation or threat markers"));
+        AddRow("bModifierFamine", LOCTEXT("ModifierFamine", "Famine — enemies drop no ammunition"));
+        AddRow("bModifierFrenzy", LOCTEXT("ModifierFrenzy", "Frenzy — +2 attackers, 35% shorter attack cooldowns"));
+        AddRow("bModifierAscendant", LOCTEXT("ModifierAscendant", "Ascendant — enemies have 50% more effective toughness"));
+        AddRow("bModifierGlassCannon", LOCTEXT("ModifierGlassCannon", "Glass Cannon — double damage dealt and received"));
 		AddRow("IncomingDamageScale",LOCTEXT("IncomingDamage","Incoming damage multiplier"),.1f,2,.1f);
 		AddRow("EnemyRecoveryScale",LOCTEXT("EnemyRecovery","Enemy recovery multiplier"),.5f,2,.1f);
 		AddRow("bAllowCompanionRescue",LOCTEXT("CompanionRescue","Allow companion rescue"));

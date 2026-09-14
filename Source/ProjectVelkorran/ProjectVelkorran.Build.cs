@@ -38,7 +38,7 @@ public class ProjectVelkorran : ModuleRules
 			}
 		);
 
-		PrivateDependencyModuleNames.AddRange(new string[] { "AnimGraphRuntime", "MassLOD", "AssetRegistry", "MovieSceneTracks", "Slate", "SlateCore", "OnlineSubsystem", "OnlineSubsystemUtils" });
+		PrivateDependencyModuleNames.AddRange(new string[] { "Chaos", "AnimGraphRuntime", "MassLOD", "AssetRegistry", "MovieSceneTracks", "Slate", "SlateCore", "OnlineSubsystem", "OnlineSubsystemUtils" });
 		if (Target.Platform == UnrealTargetPlatform.Win64)
 		{
 			PrivateDependencyModuleNames.Add("TextToSpeech");

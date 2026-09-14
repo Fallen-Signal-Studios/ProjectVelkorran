@@ -239,7 +239,12 @@ class Run(entry.Run):
         in_range = distance < min(2400., max(500., weapon.get_attack_range()*.8))
         movement = self.approach(self.world, pc, pawn, target) if (not clear or not in_range) and distance > 450. else (0.,0.)
         clip, reserve = weapon.get_ammo_in_clip(), weapon.get_spare_ammo()
-        assert clip > 0 or reserve > 0, 'Existing Cinderline ammunition exhausted; no grant/equip/resource reset was issued'
+        # The same bounded ordinary pickup approach used in E1. Enemy-authored
+        # native drops must actually exist, match Cinderline and have a full path.
+        pickup_move = self.ammo_movement(self.world, pc, pawn, weapon)
+        assert clip > 0 or reserve > 0 or pickup_move is not None, 'Existing Cinderline ammunition exhausted with no reachable matching pickup; no grant/equip/resource reset was issued'
+        if pickup_move is not None:
+            movement = pickup_move
         seconds = unreal.GameplayStatics.get_time_seconds(self.world)
         reloading = clip <= 0
         reload_input = 1. if reloading and seconds % 1.2 < .15 else 0.
@@ -250,7 +255,8 @@ class Run(entry.Run):
         assert time.monotonic()-self.last_combat_progress < 75., 'Combat made no measured hostile-health/defeat progress for 75 seconds; inspect last trace/path and native defenses'
         self.report['last_combat'] = dict(target=str(self.e3.find_participant_id(target)), distance=distance,
             angle_error=error, clip=clip, reserve=reserve, visible_line=clear, in_range=in_range,
-            primary_pressed=bool(attack), target_health=target.get_health(), wave=current_wave)
+            primary_pressed=bool(attack), target_health=target.get_health(), wave=current_wave,
+            seeking_ammo=pickup_move is not None)
         self.inject(move=movement, look=look, aim=0. if reloading else 1., attack=attack, reload=reload_input)
 
     def select_scene(self, beat):

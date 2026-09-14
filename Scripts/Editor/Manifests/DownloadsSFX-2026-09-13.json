@@ -1,0 +1,253 @@
+{
+  "destination": "/Game/Aurelion/Audio/DownloadsSFX",
+  "status": "candidate library; audition and mix pending",
+  "packs": [
+    {
+      "pack": "Blockbuster Sound FX",
+      "wav_count": 245,
+      "bytes": 540205016
+    },
+    {
+      "pack": "Combat & Warfare Sound FX",
+      "wav_count": 248,
+      "bytes": 537719578
+    },
+    {
+      "pack": "Complete Elements Sound FX",
+      "wav_count": 255,
+      "bytes": 414453372
+    },
+    {
+      "pack": "Dark Horror Sound FX",
+      "wav_count": 225,
+      "bytes": 932771208
+    },
+    {
+      "pack": "Drones & Atmospheres Sound FX",
+      "wav_count": 104,
+      "bytes": 2194186432
+    },
+    {
+      "pack": "Heavy Braams Sound FX",
+      "wav_count": 261,
+      "bytes": 626328460
+    },
+    {
+      "pack": "Industrial Sound FX",
+      "wav_count": 99,
+      "bytes": 731234910
+    },
+    {
+      "pack": "Risers Sound FX",
+      "wav_count": 267,
+      "bytes": 666485956
+    },
+    {
+      "pack": "Science Fiction Sound FX",
+      "wav_count": 237,
+      "bytes": 613909212
+    }
+  ],
+  "sounds": [
+    {
+      "source": "Science Fiction Sound FX/Science Fiction Sound FX/Weapons/Deep Sci-Fi Shot.wav",
+      "category": "Weapons",
+      "asset_name": "SW_DL_Deep_Sci_Fi_Shot",
+      "sha256": "4d8df81a1bcf7ca51619182e77d6ff3d4fe0f299d3583c326e741283b8f888a7",
+      "duration_seconds": 1.06774,
+      "channels": 2,
+      "sample_rate": 96000,
+      "bits_per_sample": 24
+    },
+    {
+      "source": "Science Fiction Sound FX/Science Fiction Sound FX/Weapons/Small Weapon Shot.wav",
+      "category": "Weapons",
+      "asset_name": "SW_DL_Small_Weapon_Shot",
+      "sha256": "d6a145a6b945a2de730fc39bc7e1255c4f158e2b36ffd6082f7bbf0e0e710852",
+      "duration_seconds": 1.06774,
+      "channels": 2,
+      "sample_rate": 96000,
+      "bits_per_sample": 24
+    },
+    {
+      "source": "Science Fiction Sound FX/Science Fiction Sound FX/Weapons/Reload Laser Weapon.wav",
+      "category": "Weapons",
+      "asset_name": "SW_DL_Reload_Laser_Weapon",
+      "sha256": "54246c35f244acd7609bfecf11a863775a8227b537ee3bdbdf96f081a07eda80",
+      "duration_seconds": 0.667333,
+      "channels": 2,
+      "sample_rate": 96000,
+      "bits_per_sample": 24
+    },
+    {
+      "source": "Science Fiction Sound FX/Science Fiction Sound FX/Weapons/Weapon Ready.wav",
+      "category": "Weapons",
+      "asset_name": "SW_DL_Weapon_Ready",
+      "sha256": "3334672f4cc386a04fa91d363b6b293f16fca344a0500da396cb7087527b5f56",
+      "duration_seconds": 0.367042,
+      "channels": 2,
+      "sample_rate": 96000,
+      "bits_per_sample": 24
+    },
+    {
+      "source": "Science Fiction Sound FX/Science Fiction Sound FX/Weapons/Target Locked.wav",
+      "category": "Weapons",
+      "asset_name": "SW_DL_Target_Locked",
+      "sha256": "a05050961f16ff3247c35f7efa8b9607698319244133a035d6fef0bb6e5d454e",
+      "duration_seconds": 1.56824,
+      "channels": 2,
+      "sample_rate": 96000,
+      "bits_per_sample": 24
+    },
+    {
+      "source": "Science Fiction Sound FX/Science Fiction Sound FX/Weapons/Laser Boomerang Fast.wav",
+      "category": "Weapons",
+      "asset_name": "SW_DL_Laser_Boomerang_Fast",
+      "sha256": "8d16180b314fa0371332cb64b30ccec44997d17a14aa9c05fd4fa50fc4565bcd",
+      "duration_seconds": 3.336667,
+      "channels": 2,
+      "sample_rate": 96000,
+      "bits_per_sample": 24
+    },
+    {
+      "source": "Science Fiction Sound FX/Science Fiction Sound FX/Machines/Robo Movement.wav",
+      "category": "Machines",
+      "asset_name": "SW_DL_Robo_Movement",
+      "sha256": "f9a2c87a1f48097fbb28337c01d00495f72a72d743c83e4afa6bd147340253c2",
+      "duration_seconds": 1.56824,
+      "channels": 2,
+      "sample_rate": 96000,
+      "bits_per_sample": 24
+    },
+    {
+      "source": "Science Fiction Sound FX/Science Fiction Sound FX/Machines/Robot Swing.wav",
+      "category": "Machines",
+      "asset_name": "SW_DL_Robot_Swing",
+      "sha256": "45fcb45a0d425c9e1a97ed1d52dfde57b1ea5df8d5a36ce21e77b9fd27b2689e",
+      "duration_seconds": 1.468135,
+      "channels": 2,
+      "sample_rate": 96000,
+      "bits_per_sample": 24
+    },
+    {
+      "source": "Science Fiction Sound FX/Science Fiction Sound FX/Machines/Machine Startup.wav",
+      "category": "Machines",
+      "asset_name": "SW_DL_Machine_Startup",
+      "sha256": "bd9b9b513f4045113bed7af38656308b91f4ce3219deaaa638dd7e4ff64afd82",
+      "duration_seconds": 0.56724,
+      "channels": 2,
+      "sample_rate": 96000,
+      "bits_per_sample": 24
+    },
+    {
+      "source": "Science Fiction Sound FX/Science Fiction Sound FX/Machines/Energy Pulse.wav",
+      "category": "Machines",
+      "asset_name": "SW_DL_Energy_Pulse",
+      "sha256": "0044e9f5243827830ceb8631ae12ce5d6a98debc1120c1a2cb363789bfceb5f9",
+      "duration_seconds": 1.06774,
+      "channels": 2,
+      "sample_rate": 96000,
+      "bits_per_sample": 24
+    },
+    {
+      "source": "Science Fiction Sound FX/Science Fiction Sound FX/Whooshes/Classic Soft Whoosh.wav",
+      "category": "Verity",
+      "asset_name": "SW_DL_Classic_Soft_Whoosh",
+      "sha256": "a5eef2c0ba463b9ff1d864036cd7d99484a685b7a7ad74f1b101f220574df4e5",
+      "duration_seconds": 1.06774,
+      "channels": 2,
+      "sample_rate": 96000,
+      "bits_per_sample": 24
+    },
+    {
+      "source": "Science Fiction Sound FX/Science Fiction Sound FX/Whooshes/Electric Whoosh.wav",
+      "category": "Verity",
+      "asset_name": "SW_DL_Electric_Whoosh",
+      "sha256": "be01b898897a0245bb80c58bd24f24aa9d0da307929923ff9aceb18ad8277319",
+      "duration_seconds": 1.666667,
+      "channels": 2,
+      "sample_rate": 96000,
+      "bits_per_sample": 24
+    },
+    {
+      "source": "Science Fiction Sound FX/Science Fiction Sound FX/Whooshes/Kinetic Whoosh.wav",
+      "category": "Verity",
+      "asset_name": "SW_DL_Kinetic_Whoosh",
+      "sha256": "632c8e85a71031bc6abfe2648abb1926add1e384e1f469df34c1506eb5cfebd8",
+      "duration_seconds": 2.902906,
+      "channels": 2,
+      "sample_rate": 96000,
+      "bits_per_sample": 24
+    },
+    {
+      "source": "Science Fiction Sound FX/Science Fiction Sound FX/Glitches/Light Glitch.wav",
+      "category": "Holographic",
+      "asset_name": "SW_DL_Light_Glitch",
+      "sha256": "0544aa9450f3e855fa20f929bf31467f541de261e1966bfe5ad4c4d5f995411e",
+      "duration_seconds": 1.768438,
+      "channels": 2,
+      "sample_rate": 96000,
+      "bits_per_sample": 24
+    },
+    {
+      "source": "Science Fiction Sound FX/Science Fiction Sound FX/Glitches/Short Glitch.wav",
+      "category": "Holographic",
+      "asset_name": "SW_DL_Short_Glitch",
+      "sha256": "059196db7ebffc364fe9e808d85c59098e4243397f4358865e4255115d6b09a9",
+      "duration_seconds": 1.134469,
+      "channels": 2,
+      "sample_rate": 96000,
+      "bits_per_sample": 24
+    },
+    {
+      "source": "Science Fiction Sound FX/Science Fiction Sound FX/Ambiences/Spaceship Ambience.wav",
+      "category": "Ambience",
+      "asset_name": "SW_DL_Spaceship_Ambience",
+      "sha256": "2cfab29f797cc889dd9388179f677d3b4bee455c4f41f5a22b7fe3b1364af3d4",
+      "duration_seconds": 28.294937,
+      "channels": 2,
+      "sample_rate": 96000,
+      "bits_per_sample": 24
+    },
+    {
+      "source": "Science Fiction Sound FX/Science Fiction Sound FX/Ambiences/Inside Broken Ship Ambience.wav",
+      "category": "Ambience",
+      "asset_name": "SW_DL_Inside_Broken_Ship_Ambience",
+      "sha256": "01290cd97c1406cb72b1fb82c29737caad3b7632caf0f6202766ce5382a287d0",
+      "duration_seconds": 84.717969,
+      "channels": 2,
+      "sample_rate": 96000,
+      "bits_per_sample": 24
+    },
+    {
+      "source": "Industrial Sound FX/Industrial Sound FX/Factory Halls/Center/Deep Ambience Factory.wav",
+      "category": "Ambience",
+      "asset_name": "SW_DL_Deep_Ambience_Factory",
+      "sha256": "a0e645748e014863d893e0dee0454acfb2dc498793993f4afc67869e84d442ac",
+      "duration_seconds": 21.6,
+      "channels": 2,
+      "sample_rate": 96000,
+      "bits_per_sample": 24
+    },
+    {
+      "source": "Complete Elements Sound FX/Complete Elements Sound FX/Fire/Flame Bursts/Deep Metal Flame Burst.wav",
+      "category": "Elemental",
+      "asset_name": "SW_DL_Deep_Metal_Flame_Burst",
+      "sha256": "664ee3f293dfedfa7b49a91afb7ebd6fee2df965773061bfa91aeafeaa47f8f7",
+      "duration_seconds": 1.668333,
+      "channels": 2,
+      "sample_rate": 96000,
+      "bits_per_sample": 24
+    },
+    {
+      "source": "Complete Elements Sound FX/Complete Elements Sound FX/Whooshes/Soft Fire Whooshes/Electric Fire Whoosh.wav",
+      "category": "Elemental",
+      "asset_name": "SW_DL_Electric_Fire_Whoosh",
+      "sha256": "5c098d3232b562a8852898c13f60ae1316df07dbf5800b58b3cddeb750b3ff78",
+      "duration_seconds": 1.710896,
+      "channels": 2,
+      "sample_rate": 96000,
+      "bits_per_sample": 24
+    }
+  ]
+}

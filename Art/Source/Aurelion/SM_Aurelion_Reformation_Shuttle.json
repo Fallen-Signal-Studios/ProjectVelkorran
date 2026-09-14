@@ -1,0 +1,65 @@
+{
+  "asset": "SM_Aurelion_Reformation_Shuttle",
+  "triangles": 5532,
+  "dimensions_metres": [
+    15.388686180114746,
+    13.600000381469727,
+    4.625
+  ],
+  "pivot": "bottom centre",
+  "nose": "-Y",
+  "collision": "none; static off-route dressing",
+  "materials": {
+    "M_Reformation_Armor": {
+      "rgb": [
+        0.032,
+        0.065,
+        0.105
+      ],
+      "metal": 0.65,
+      "rough": 0.32,
+      "emission": 0
+    },
+    "M_Reformation_Trim": {
+      "rgb": [
+        0.26,
+        0.32,
+        0.37
+      ],
+      "metal": 0.82,
+      "rough": 0.28,
+      "emission": 0
+    },
+    "M_Reformation_Structure": {
+      "rgb": [
+        0.025,
+        0.031,
+        0.038
+      ],
+      "metal": 0.65,
+      "rough": 0.42,
+      "emission": 0
+    },
+    "M_Reformation_Glass": {
+      "rgb": [
+        0.012,
+        0.028,
+        0.039
+      ],
+      "metal": 0.78,
+      "rough": 0.16,
+      "emission": 0
+    },
+    "M_Reformation_Signal": {
+      "rgb": [
+        0.33,
+        0.7,
+        1
+      ],
+      "metal": 0.2,
+      "rough": 0.3,
+      "emission": 2
+    }
+  },
+  "fbx_sha256": "23d8a7746641537220b61c0a9910aff493d6d97bf8828187b221eb948266b287"
+}

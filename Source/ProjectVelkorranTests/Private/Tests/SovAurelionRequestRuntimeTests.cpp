@@ -2,6 +2,8 @@
 #include "Tests/SovCampaignTerminalRuntimeTestFixtures.h"
 #include "Tests/SovAurelionRequestRuntimeTestFixtures.h"
 #include "Tests/SovCoActionRuntimeTestFixtures.h"
+#include "Tests/SovCompanionCommandTestFixtures.h"
+#include "NarrativeGameplayTags.h"
 #include "Companions/SovCompanionCommandActivity.h"
 #include "Tests/SovAurelionThermalTestFixtures.h"
 #include "Tests/SovAxiomRuntimeTestFixtures.h"
@@ -286,6 +288,61 @@ bool FSovAurelionOrdinaryHoldTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Neither arrival intent nor departure intent awards proof"), F.PC->GetCampaignState()->GetJournal().Num(), 0);
     return true;
 }
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCompanionDefenseCadenceTest,
+    "ProjectVelkorran.Campaign.Companion.DefenseDoesNotStarveOrdinaryAttack",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCompanionDefenseCadenceTest::RunTest(const FString& Parameters)
+{
+    FTerminalWorld F; if (!TestNotNull(TEXT("Ready managed player"), F.ASC)) { return false; }
+    F.Mission->AllowedCompanionIds.Add(TEXT("Tarrik"));
+    auto* NPC = F.World->SpawnActor<ASovCompanionCommandTestProxy>(); NPC->InitializeCommandCombat();
+    NPC->SetActorLocation(F.Player->GetActorLocation() + FVector(0, -500, 0));
+    auto* AI = F.World->SpawnActor<ASovCoActionTestNPCController>(); AI->Possess(NPC);
+    CastChecked<USovCoActionTestActivities>(AI->GetActivityComponent())->InitializeForCoAction();
+    auto* Target = F.World->SpawnActor<ASovCoActionTestNPC>(); Target->InitializeTestCombat(1);
+    Target->SetActorLocation(NPC->GetActorLocation() + FVector(300, 0, 0));
+    Target->GetNarrativeAbilitySystemComponent()->AddLooseGameplayTag(FNarrativeGameplayTags::Get().State_NPC_Activity_Attacking);
+    auto* Component = NPC->GetCompanionComponent(); Component->CompanionId = TEXT("Tarrik");
+    Component->CuratedAbilities = {USovCompanionCommandTestDefense::StaticClass(), USovBotTestAttackAlpha::StaticClass()};
+    auto* ASC = NPC->GetNarrativeAbilitySystemComponent();
+    const auto DefenseHandle = ASC->GiveAbility(FGameplayAbilitySpec(USovCompanionCommandTestDefense::StaticClass(), 1));
+    const auto AttackHandle = ASC->GiveAbility(FGameplayAbilitySpec(USovBotTestAttackAlpha::StaticClass(), 1));
+    auto* Defense = CastChecked<USovCompanionCommandTestDefense>(ASC->FindAbilitySpecFromHandle(DefenseHandle)->GetPrimaryInstance());
+    auto* Attack = CastChecked<USovBotTestAttackAlpha>(ASC->FindAbilitySpecFromHandle(AttackHandle)->GetPrimaryInstance());
+    FString Reason;
+    if (!TestTrue(TEXT("Native companion command accepted"), Component->SetLeader(F.Player, Reason))) { AddError(Reason); return false; }
+    // Publish a resolved player hit through the same delegate used by combat.
+    // No production health or mission state is changed by the scheduler fixture.
+    FSovDamageResult Hit; Hit.SourceActor = F.Player; Hit.TargetActor = Target; Hit.AppliedHealthDamage = 40.f;
+    F.ASC->DamageResolvedAsSource(Hit);
+    float Shield = 0.f, Health = 10.f, Poise = 0.f;
+    TestTrue(TEXT("Resolved player hit supplies the native contribution budget"),
+        Component->LimitSovDamage(Target, FGameplayEffectContextHandle(), Shield, Health, Poise));
+    FNarrativeBotAttackCandidate Candidate;
+    TestTrue(TEXT("Ordinary attack is initially eligible"), ASC->SelectBotAttack(Target, FGameplayTag(), Candidate));
+    auto* Goal = Cast<USovCompanionCommandGoal>(AI->GetActivityComponent()->GetCurrentActivityGoal());
+    if (!TestNotNull(TEXT("Native activity owns command"), Goal)) { return false; }
+    Component->TickContextCommand(Goal);
+    TestEqual(TEXT("Threat first triggers curated defense"), Defense->ActivationCount, 1);
+    TestFalse(TEXT("Defense completed synchronously"), ASC->FindAbilitySpecFromHandle(DefenseHandle)->IsActive());
+    TestTrue(TEXT("Completed defense retains ordinary attack eligibility"), ASC->SelectBotAttack(Target, FGameplayTag(), Candidate));
+    Component->TickContextCommand(Goal);
+    TestEqual(TEXT("Sustained enemy attack cannot repeat defense during its cadence"), Defense->ActivationCount, 1);
+    TestEqual(TEXT("Completed defense leaves ordinary attack available immediately"), Attack->ActivationCount, 1);
+    TestEqual(TEXT("A command attack exposes its actual target without a legacy Goal_Attack"),
+        USovCompanionComponent::ResolveCommandAttackTarget(NPC), static_cast<ANarrativeCharacter*>(Target));
+    AI->SetFocus(F.Player);
+    TestNull(TEXT("Changed controller focus cannot retarget the owned swing"), USovCompanionComponent::ResolveCommandAttackTarget(NPC));
+    AI->SetFocus(Target);
+    TestEqual(TEXT("Restored exact attack focus remains valid"),
+        USovCompanionComponent::ResolveCommandAttackTarget(NPC), static_cast<ANarrativeCharacter*>(Target));
+    Attack->FinishTestAttack();
+    TestNull(TEXT("Completed attack leaves no stale melee target"), USovCompanionComponent::ResolveCommandAttackTarget(NPC));
+    Component->TickContextCommand(Goal);
+    TestEqual(TEXT("Ordinary attack still respects its own cadence"), Attack->ActivationCount, 1);
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAurelionPendingHoldTest,
     "ProjectVelkorran.Campaign.Aurelion.Request.AcceptedHoldSurvivesSuspendedActivitySelection",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)

@@ -1,0 +1,1403 @@
+{
+  "baseline": [
+    {
+      "actor": "A_Connectors_Tarrik_to_Atrium_Guard_1_-1",
+      "component": "StaticMeshComponent0",
+      "mesh": "/Engine/BasicShapes/Cube.Cube",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-6000.000000,Y=-2288.000000,Z=65.000000),Scale3D=(X=14.000000,Y=0.220000,Z=1.300000))",
+      "visible": false,
+      "hidden_in_game": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "origin": "(X=-6000.000000,Y=-2288.000000,Z=65.000000)",
+      "extent": "(X=700.000000,Y=11.000000,Z=65.000000)",
+      "instances": [],
+      "visual_run_cm": [
+        -6700.0,
+        -5300.0
+      ],
+      "axis": 0
+    },
+    {
+      "actor": "A_Connectors_Tarrik_to_Atrium_Guard_1_1",
+      "component": "StaticMeshComponent0",
+      "mesh": "/Engine/BasicShapes/Cube.Cube",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-6000.000000,Y=-1712.000000,Z=65.000000),Scale3D=(X=14.000000,Y=0.220000,Z=1.300000))",
+      "visible": false,
+      "hidden_in_game": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "origin": "(X=-6000.000000,Y=-1712.000000,Z=65.000000)",
+      "extent": "(X=700.000000,Y=11.000000,Z=65.000000)",
+      "instances": [],
+      "visual_run_cm": [
+        -6700.0,
+        -5300.0
+      ],
+      "axis": 0
+    },
+    {
+      "actor": "A_Connectors_Tarrik_to_Atrium_Guard_2_-1",
+      "component": "StaticMeshComponent0",
+      "mesh": "/Engine/BasicShapes/Cube.Cube",
+      "transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.707107,W=0.707107),Translation=(X=-4712.000000,Y=-1000.000000,Z=65.000000),Scale3D=(X=14.000000,Y=0.220000,Z=1.300000))",
+      "visible": false,
+      "hidden_in_game": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "origin": "(X=-4712.000000,Y=-1000.000000,Z=65.000000)",
+      "extent": "(X=11.000000,Y=700.000000,Z=65.000000)",
+      "instances": [],
+      "visual_run_cm": [
+        -1700.0,
+        -300.0
+      ],
+      "axis": 1
+    },
+    {
+      "actor": "A_Connectors_Tarrik_to_Atrium_Guard_2_1",
+      "component": "StaticMeshComponent0",
+      "mesh": "/Engine/BasicShapes/Cube.Cube",
+      "transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.707107,W=0.707107),Translation=(X=-5288.000000,Y=-1000.000000,Z=65.000000),Scale3D=(X=14.000000,Y=0.220000,Z=1.300000))",
+      "visible": false,
+      "hidden_in_game": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "origin": "(X=-5288.000000,Y=-1000.000000,Z=65.000000)",
+      "extent": "(X=11.000000,Y=700.000000,Z=65.000000)",
+      "instances": [],
+      "visual_run_cm": [
+        -1700.0,
+        -300.0
+      ],
+      "axis": 1
+    },
+    {
+      "actor": "A_Connectors_Tarrik_to_Atrium_Guard_3_-1",
+      "component": "StaticMeshComponent0",
+      "mesh": "/Engine/BasicShapes/Cube.Cube",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-4100.000000,Y=-288.000000,Z=65.000000),Scale3D=(X=12.000000,Y=0.220000,Z=1.300000))",
+      "visible": false,
+      "hidden_in_game": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "origin": "(X=-4100.000000,Y=-288.000000,Z=65.000000)",
+      "extent": "(X=600.000000,Y=11.000000,Z=65.000000)",
+      "instances": [],
+      "visual_run_cm": [
+        -4700.0,
+        -3500.0
+      ],
+      "axis": 0
+    },
+    {
+      "actor": "A_Connectors_Tarrik_to_Atrium_Guard_3_1",
+      "component": "StaticMeshComponent0",
+      "mesh": "/Engine/BasicShapes/Cube.Cube",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-4100.000000,Y=288.000000,Z=65.000000),Scale3D=(X=12.000000,Y=0.220000,Z=1.300000))",
+      "visible": false,
+      "hidden_in_game": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "origin": "(X=-4100.000000,Y=288.000000,Z=65.000000)",
+      "extent": "(X=600.000000,Y=11.000000,Z=65.000000)",
+      "instances": [],
+      "visual_run_cm": [
+        -4700.0,
+        -3500.0
+      ],
+      "axis": 0
+    },
+    {
+      "actor": "A_Connectors_Tarrik_to_Atrium_Landing_Guard_1_N",
+      "component": "StaticMeshComponent0",
+      "mesh": "/Engine/BasicShapes/Cube.Cube",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-7000.000000,Y=-1712.000000,Z=65.000000),Scale3D=(X=6.000000,Y=0.220000,Z=1.300000))",
+      "visible": false,
+      "hidden_in_game": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "origin": "(X=-7000.000000,Y=-1712.000000,Z=65.000000)",
+      "extent": "(X=300.000000,Y=11.000000,Z=65.000000)",
+      "instances": [],
+      "visual_run_cm": [
+        -7300.0,
+        -6700.0
+      ],
+      "axis": 0
+    },
+    {
+      "actor": "A_Connectors_Tarrik_to_Atrium_Landing_Guard_1_W",
+      "component": "StaticMeshComponent0",
+      "mesh": "/Engine/BasicShapes/Cube.Cube",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-7288.000000,Y=-2000.000000,Z=65.000000),Scale3D=(X=0.220000,Y=6.000000,Z=1.300000))",
+      "visible": false,
+      "hidden_in_game": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "origin": "(X=-7288.000000,Y=-2000.000000,Z=65.000000)",
+      "extent": "(X=11.000000,Y=300.000000,Z=65.000000)",
+      "instances": [],
+      "visual_run_cm": [
+        -2300.0,
+        -1723.0
+      ],
+      "axis": 1
+    },
+    {
+      "actor": "A_Connectors_Tarrik_to_Atrium_Landing_Guard_2_E",
+      "component": "StaticMeshComponent0",
+      "mesh": "/Engine/BasicShapes/Cube.Cube",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-4712.000000,Y=-2000.000000,Z=65.000000),Scale3D=(X=0.220000,Y=6.000000,Z=1.300000))",
+      "visible": false,
+      "hidden_in_game": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "origin": "(X=-4712.000000,Y=-2000.000000,Z=65.000000)",
+      "extent": "(X=11.000000,Y=300.000000,Z=65.000000)",
+      "instances": [],
+      "visual_run_cm": [
+        -2277.0,
+        -1700.0
+      ],
+      "axis": 1
+    },
+    {
+      "actor": "A_Connectors_Tarrik_to_Atrium_Landing_Guard_2_S",
+      "component": "StaticMeshComponent0",
+      "mesh": "/Engine/BasicShapes/Cube.Cube",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-5000.000000,Y=-2288.000000,Z=65.000000),Scale3D=(X=6.000000,Y=0.220000,Z=1.300000))",
+      "visible": false,
+      "hidden_in_game": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "origin": "(X=-5000.000000,Y=-2288.000000,Z=65.000000)",
+      "extent": "(X=300.000000,Y=11.000000,Z=65.000000)",
+      "instances": [],
+      "visual_run_cm": [
+        -5300.0,
+        -4700.0
+      ],
+      "axis": 0
+    },
+    {
+      "actor": "A_Connectors_Tarrik_to_Atrium_Landing_Guard_3_N",
+      "component": "StaticMeshComponent0",
+      "mesh": "/Engine/BasicShapes/Cube.Cube",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-5000.000000,Y=288.000000,Z=65.000000),Scale3D=(X=6.000000,Y=0.220000,Z=1.300000))",
+      "visible": false,
+      "hidden_in_game": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "origin": "(X=-5000.000000,Y=288.000000,Z=65.000000)",
+      "extent": "(X=300.000000,Y=11.000000,Z=65.000000)",
+      "instances": [],
+      "visual_run_cm": [
+        -5300.0,
+        -4700.0
+      ],
+      "axis": 0
+    },
+    {
+      "actor": "A_Connectors_Tarrik_to_Atrium_Landing_Guard_3_W",
+      "component": "StaticMeshComponent0",
+      "mesh": "/Engine/BasicShapes/Cube.Cube",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-5288.000000,Y=0.000000,Z=65.000000),Scale3D=(X=0.220000,Y=6.000000,Z=1.300000))",
+      "visible": false,
+      "hidden_in_game": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "origin": "(X=-5288.000000,Y=0.000000,Z=65.000000)",
+      "extent": "(X=11.000000,Y=300.000000,Z=65.000000)",
+      "instances": [],
+      "visual_run_cm": [
+        -300.0,
+        277.0
+      ],
+      "axis": 1
+    }
+  ],
+  "railing_actor": "Aurelion_Art_M12_Z05_51_94dfdd",
+  "railing_component": "HierarchicalInstancedStaticMesh",
+  "railing_mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Railing_4m.SM_Scifi_Railing_4m",
+  "removed_instances": [
+    {
+      "index": 620,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-6466.526960,Y=-2293.500001,Z=0.000042),Scale3D=(X=1.165750,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -6700.0,
+          -2299.0,
+          6.322741809283716e-15
+        ],
+        [
+          -6233.333333333334,
+          -2288.0,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 621,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-6466.526960,Y=-2282.500001,Z=0.000042),Scale3D=(X=1.165750,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -6700.0,
+          -2288.0,
+          6.322741809283716e-15
+        ],
+        [
+          -6233.333333333334,
+          -2277.0,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 622,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-5999.860294,Y=-2293.500001,Z=0.000042),Scale3D=(X=1.165750,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -6233.333333333333,
+          -2299.0,
+          6.322741809283716e-15
+        ],
+        [
+          -5766.666666666667,
+          -2288.0,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 623,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-5999.860294,Y=-2282.500001,Z=0.000042),Scale3D=(X=1.165750,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -6233.333333333333,
+          -2288.0,
+          6.322741809283716e-15
+        ],
+        [
+          -5766.666666666667,
+          -2277.0,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 624,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-5533.193627,Y=-2293.500001,Z=0.000042),Scale3D=(X=1.165750,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -5766.666666666666,
+          -2299.0,
+          6.322741809283716e-15
+        ],
+        [
+          -5300.0,
+          -2288.0,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 625,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-5533.193627,Y=-2282.500001,Z=0.000042),Scale3D=(X=1.165750,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -5766.666666666666,
+          -2288.0,
+          6.322741809283716e-15
+        ],
+        [
+          -5300.0,
+          -2277.0,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 626,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-6466.526960,Y=-1717.500001,Z=0.000042),Scale3D=(X=1.165750,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -6700.0,
+          -1723.0,
+          6.322741809283716e-15
+        ],
+        [
+          -6233.333333333334,
+          -1712.0,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 627,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-6466.526960,Y=-1706.500001,Z=0.000042),Scale3D=(X=1.165750,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -6700.0,
+          -1712.0,
+          6.322741809283716e-15
+        ],
+        [
+          -6233.333333333334,
+          -1701.0,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 628,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-5999.860294,Y=-1717.500001,Z=0.000042),Scale3D=(X=1.165750,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -6233.333333333333,
+          -1723.0,
+          6.322741809283716e-15
+        ],
+        [
+          -5766.666666666667,
+          -1712.0,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 629,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-5999.860294,Y=-1706.500001,Z=0.000042),Scale3D=(X=1.165750,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -6233.333333333333,
+          -1712.0,
+          6.322741809283716e-15
+        ],
+        [
+          -5766.666666666667,
+          -1701.0,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 630,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-5533.193627,Y=-1717.500001,Z=0.000042),Scale3D=(X=1.165750,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -5766.666666666666,
+          -1723.0,
+          6.322741809283716e-15
+        ],
+        [
+          -5300.0,
+          -1712.0,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 631,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-5533.193627,Y=-1706.500001,Z=0.000042),Scale3D=(X=1.165750,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -5766.666666666666,
+          -1712.0,
+          6.322741809283716e-15
+        ],
+        [
+          -5300.0,
+          -1701.0,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 632,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-4706.499999,Y=-1466.526960,Z=0.000042),Scale3D=(X=1.165750,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -4712.000000068669,
+          -1700.0000000010791,
+          6.322741809283716e-15
+        ],
+        [
+          -4701.000000022889,
+          -1233.3333333333333,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 633,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-4717.499999,Y=-1466.526960,Z=0.000042),Scale3D=(X=1.165750,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -4723.000000068669,
+          -1700.0,
+          6.322741809283716e-15
+        ],
+        [
+          -4712.000000022889,
+          -1233.3333333322541,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 634,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-4706.499999,Y=-999.860294,Z=0.000042),Scale3D=(X=1.165750,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -4712.00000002289,
+          -1233.3333333344126,
+          6.322741809283716e-15
+        ],
+        [
+          -4700.999999977111,
+          -766.6666666666666,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 635,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-4717.499999,Y=-999.860294,Z=0.000042),Scale3D=(X=1.165750,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -4723.00000002289,
+          -1233.3333333333335,
+          6.322741809283716e-15
+        ],
+        [
+          -4711.999999977111,
+          -766.6666666655875,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 636,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-4706.499999,Y=-533.193627,Z=0.000042),Scale3D=(X=1.165750,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -4711.999999977112,
+          -766.6666666677459,
+          6.322741809283716e-15
+        ],
+        [
+          -4700.999999931332,
+          -299.9999999999999,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 637,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-4717.499999,Y=-533.193627,Z=0.000042),Scale3D=(X=1.165750,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -4722.999999977112,
+          -766.6666666666667,
+          6.322741809283716e-15
+        ],
+        [
+          -4711.999999931332,
+          -299.99999999892077,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 638,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-5282.499999,Y=-1466.526960,Z=0.000042),Scale3D=(X=1.165750,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -5288.000000068669,
+          -1700.0000000010791,
+          6.322741809283716e-15
+        ],
+        [
+          -5277.000000022889,
+          -1233.3333333333333,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 639,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-5293.499999,Y=-1466.526960,Z=0.000042),Scale3D=(X=1.165750,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -5299.000000068669,
+          -1700.0,
+          6.322741809283716e-15
+        ],
+        [
+          -5288.000000022889,
+          -1233.3333333322541,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 640,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-5282.499999,Y=-999.860294,Z=0.000042),Scale3D=(X=1.165750,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -5288.00000002289,
+          -1233.3333333344126,
+          6.322741809283716e-15
+        ],
+        [
+          -5276.999999977111,
+          -766.6666666666666,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 641,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-5293.499999,Y=-999.860294,Z=0.000042),Scale3D=(X=1.165750,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -5299.00000002289,
+          -1233.3333333333335,
+          6.322741809283716e-15
+        ],
+        [
+          -5287.999999977111,
+          -766.6666666655875,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 642,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-5282.499999,Y=-533.193627,Z=0.000042),Scale3D=(X=1.165750,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -5287.999999977112,
+          -766.6666666677459,
+          6.322741809283716e-15
+        ],
+        [
+          -5276.999999931332,
+          -299.9999999999999,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 643,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-5293.499999,Y=-533.193627,Z=0.000042),Scale3D=(X=1.165750,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -5298.999999977112,
+          -766.6666666666667,
+          6.322741809283716e-15
+        ],
+        [
+          -5287.999999931332,
+          -299.99999999892077,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 644,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-4499.880252,Y=-293.500001,Z=0.000042),Scale3D=(X=0.999215,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -4700.0,
+          -299.0,
+          6.322741809283716e-15
+        ],
+        [
+          -4300.0,
+          -288.0,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 645,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-4499.880252,Y=-282.500001,Z=0.000042),Scale3D=(X=0.999215,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -4700.0,
+          -288.0,
+          6.322741809283716e-15
+        ],
+        [
+          -4300.0,
+          -277.0,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 646,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-4099.880252,Y=-293.500001,Z=0.000042),Scale3D=(X=0.999215,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -4300.0,
+          -299.0,
+          6.322741809283716e-15
+        ],
+        [
+          -3899.9999999999995,
+          -288.0,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 647,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-4099.880252,Y=-282.500001,Z=0.000042),Scale3D=(X=0.999215,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -4300.0,
+          -288.0,
+          6.322741809283716e-15
+        ],
+        [
+          -3899.9999999999995,
+          -277.0,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 648,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-3699.880252,Y=-293.500001,Z=0.000042),Scale3D=(X=0.999215,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -3900.0,
+          -299.0,
+          6.322741809283716e-15
+        ],
+        [
+          -3500.0,
+          -288.0,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 649,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-3699.880252,Y=-282.500001,Z=0.000042),Scale3D=(X=0.999215,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -3900.0,
+          -288.0,
+          6.322741809283716e-15
+        ],
+        [
+          -3500.0,
+          -277.0,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 650,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-4499.880252,Y=282.499999,Z=0.000042),Scale3D=(X=0.999215,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -4700.0,
+          277.0,
+          6.322741809283716e-15
+        ],
+        [
+          -4300.0,
+          288.0,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 651,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-4499.880252,Y=293.499999,Z=0.000042),Scale3D=(X=0.999215,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -4700.0,
+          288.0,
+          6.322741809283716e-15
+        ],
+        [
+          -4300.0,
+          299.0,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 652,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-4099.880252,Y=282.499999,Z=0.000042),Scale3D=(X=0.999215,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -4300.0,
+          277.0,
+          6.322741809283716e-15
+        ],
+        [
+          -3899.9999999999995,
+          288.0,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 653,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-4099.880252,Y=293.499999,Z=0.000042),Scale3D=(X=0.999215,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -4300.0,
+          288.0,
+          6.322741809283716e-15
+        ],
+        [
+          -3899.9999999999995,
+          299.0,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 654,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-3699.880252,Y=282.499999,Z=0.000042),Scale3D=(X=0.999215,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -3900.0,
+          277.0,
+          6.322741809283716e-15
+        ],
+        [
+          -3500.0,
+          288.0,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 655,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-3699.880252,Y=293.499999,Z=0.000042),Scale3D=(X=0.999215,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -3900.0,
+          288.0,
+          6.322741809283716e-15
+        ],
+        [
+          -3500.0,
+          299.0,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 656,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-6999.820377,Y=-1717.500001,Z=0.000042),Scale3D=(X=1.498822,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -7300.0,
+          -1723.0,
+          6.322741809283716e-15
+        ],
+        [
+          -6700.0,
+          -1712.0,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 657,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-6999.820377,Y=-1706.500001,Z=0.000042),Scale3D=(X=1.498822,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -7300.0,
+          -1712.0,
+          6.322741809283716e-15
+        ],
+        [
+          -6700.0,
+          -1701.0,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 658,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-7282.499999,Y=-1999.820377,Z=0.000042),Scale3D=(X=1.498822,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -7288.000000000001,
+          -2300.0,
+          6.322741809283716e-15
+        ],
+        [
+          -7277.0,
+          -1700.0,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 659,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-7293.499999,Y=-1999.820377,Z=0.000042),Scale3D=(X=1.498822,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -7299.000000000001,
+          -2300.0,
+          6.322741809283716e-15
+        ],
+        [
+          -7288.0,
+          -1700.0,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 660,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-4706.499999,Y=-1999.820377,Z=0.000042),Scale3D=(X=1.498822,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -4712.000000000001,
+          -2300.0,
+          6.322741809283716e-15
+        ],
+        [
+          -4701.0,
+          -1700.0,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 661,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-4717.499999,Y=-1999.820377,Z=0.000042),Scale3D=(X=1.498822,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -4723.000000000001,
+          -2300.0,
+          6.322741809283716e-15
+        ],
+        [
+          -4712.0,
+          -1700.0,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 662,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-4999.820377,Y=-2293.500001,Z=0.000042),Scale3D=(X=1.498822,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -5300.0,
+          -2299.0,
+          6.322741809283716e-15
+        ],
+        [
+          -4700.0,
+          -2288.0,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 663,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-4999.820377,Y=-2282.500001,Z=0.000042),Scale3D=(X=1.498822,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -5300.0,
+          -2288.0,
+          6.322741809283716e-15
+        ],
+        [
+          -4700.0,
+          -2277.0,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 664,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-4999.820377,Y=282.499999,Z=0.000042),Scale3D=(X=1.498822,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -5300.0,
+          277.0,
+          6.322741809283716e-15
+        ],
+        [
+          -4700.0,
+          288.0,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 665,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-4999.820377,Y=293.499999,Z=0.000042),Scale3D=(X=1.498822,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -5300.0,
+          288.0,
+          6.322741809283716e-15
+        ],
+        [
+          -4700.0,
+          299.0,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 666,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-5282.499999,Y=0.179623,Z=0.000042),Scale3D=(X=1.498822,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -5288.000000000001,
+          -300.00000000000006,
+          6.322741809283716e-15
+        ],
+        [
+          -5277.0,
+          300.0,
+          130.0
+        ]
+      ]
+    },
+    {
+      "index": 667,
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-5293.499999,Y=0.179623,Z=0.000042),Scale3D=(X=1.498822,Y=0.814220,Z=1.232044))",
+      "bounds": [
+        [
+          -5299.000000000001,
+          -300.00000000000006,
+          6.322741809283716e-15
+        ],
+        [
+          -5288.0,
+          300.0,
+          130.0
+        ]
+      ]
+    }
+  ],
+  "placements": [
+    {
+      "name": "Guard_1_-1_0",
+      "position": [
+        -6500.0,
+        -2288.0,
+        0
+      ],
+      "yaw": 0,
+      "mesh": "SM_Aurelion_KIT_Parapet_4m",
+      "length_cm": 400,
+      "guard": "A_Connectors_Tarrik_to_Atrium_Guard_1_-1"
+    },
+    {
+      "name": "Guard_1_-1_1",
+      "position": [
+        -6100.0,
+        -2288.0,
+        0
+      ],
+      "yaw": 0,
+      "mesh": "SM_Aurelion_KIT_Parapet_4m",
+      "length_cm": 400,
+      "guard": "A_Connectors_Tarrik_to_Atrium_Guard_1_-1"
+    },
+    {
+      "name": "Guard_1_-1_2",
+      "position": [
+        -5700.0,
+        -2288.0,
+        0
+      ],
+      "yaw": 0,
+      "mesh": "SM_Aurelion_KIT_Parapet_4m",
+      "length_cm": 400,
+      "guard": "A_Connectors_Tarrik_to_Atrium_Guard_1_-1"
+    },
+    {
+      "name": "Guard_1_-1_3",
+      "position": [
+        -5400.0,
+        -2288.0,
+        0
+      ],
+      "yaw": 0,
+      "mesh": "SM_Aurelion_KIT_Parapet_2m",
+      "length_cm": 200.0,
+      "guard": "A_Connectors_Tarrik_to_Atrium_Guard_1_-1"
+    },
+    {
+      "name": "Guard_1_1_0",
+      "position": [
+        -6500.0,
+        -1712.0,
+        0
+      ],
+      "yaw": 0,
+      "mesh": "SM_Aurelion_KIT_Parapet_4m",
+      "length_cm": 400,
+      "guard": "A_Connectors_Tarrik_to_Atrium_Guard_1_1"
+    },
+    {
+      "name": "Guard_1_1_1",
+      "position": [
+        -6100.0,
+        -1712.0,
+        0
+      ],
+      "yaw": 0,
+      "mesh": "SM_Aurelion_KIT_Parapet_4m",
+      "length_cm": 400,
+      "guard": "A_Connectors_Tarrik_to_Atrium_Guard_1_1"
+    },
+    {
+      "name": "Guard_1_1_2",
+      "position": [
+        -5700.0,
+        -1712.0,
+        0
+      ],
+      "yaw": 0,
+      "mesh": "SM_Aurelion_KIT_Parapet_4m",
+      "length_cm": 400,
+      "guard": "A_Connectors_Tarrik_to_Atrium_Guard_1_1"
+    },
+    {
+      "name": "Guard_1_1_3",
+      "position": [
+        -5400.0,
+        -1712.0,
+        0
+      ],
+      "yaw": 0,
+      "mesh": "SM_Aurelion_KIT_Parapet_2m",
+      "length_cm": 200.0,
+      "guard": "A_Connectors_Tarrik_to_Atrium_Guard_1_1"
+    },
+    {
+      "name": "Guard_2_-1_0",
+      "position": [
+        -4712.0,
+        -1500.0,
+        0
+      ],
+      "yaw": 90,
+      "mesh": "SM_Aurelion_KIT_Parapet_4m",
+      "length_cm": 400,
+      "guard": "A_Connectors_Tarrik_to_Atrium_Guard_2_-1"
+    },
+    {
+      "name": "Guard_2_-1_1",
+      "position": [
+        -4712.0,
+        -1100.0,
+        0
+      ],
+      "yaw": 90,
+      "mesh": "SM_Aurelion_KIT_Parapet_4m",
+      "length_cm": 400,
+      "guard": "A_Connectors_Tarrik_to_Atrium_Guard_2_-1"
+    },
+    {
+      "name": "Guard_2_-1_2",
+      "position": [
+        -4712.0,
+        -700.0,
+        0
+      ],
+      "yaw": 90,
+      "mesh": "SM_Aurelion_KIT_Parapet_4m",
+      "length_cm": 400,
+      "guard": "A_Connectors_Tarrik_to_Atrium_Guard_2_-1"
+    },
+    {
+      "name": "Guard_2_-1_3",
+      "position": [
+        -4712.0,
+        -400.0,
+        0
+      ],
+      "yaw": 90,
+      "mesh": "SM_Aurelion_KIT_Parapet_2m",
+      "length_cm": 200.0,
+      "guard": "A_Connectors_Tarrik_to_Atrium_Guard_2_-1"
+    },
+    {
+      "name": "Guard_2_1_0",
+      "position": [
+        -5288.0,
+        -1500.0,
+        0
+      ],
+      "yaw": 90,
+      "mesh": "SM_Aurelion_KIT_Parapet_4m",
+      "length_cm": 400,
+      "guard": "A_Connectors_Tarrik_to_Atrium_Guard_2_1"
+    },
+    {
+      "name": "Guard_2_1_1",
+      "position": [
+        -5288.0,
+        -1100.0,
+        0
+      ],
+      "yaw": 90,
+      "mesh": "SM_Aurelion_KIT_Parapet_4m",
+      "length_cm": 400,
+      "guard": "A_Connectors_Tarrik_to_Atrium_Guard_2_1"
+    },
+    {
+      "name": "Guard_2_1_2",
+      "position": [
+        -5288.0,
+        -700.0,
+        0
+      ],
+      "yaw": 90,
+      "mesh": "SM_Aurelion_KIT_Parapet_4m",
+      "length_cm": 400,
+      "guard": "A_Connectors_Tarrik_to_Atrium_Guard_2_1"
+    },
+    {
+      "name": "Guard_2_1_3",
+      "position": [
+        -5288.0,
+        -400.0,
+        0
+      ],
+      "yaw": 90,
+      "mesh": "SM_Aurelion_KIT_Parapet_2m",
+      "length_cm": 200.0,
+      "guard": "A_Connectors_Tarrik_to_Atrium_Guard_2_1"
+    },
+    {
+      "name": "Guard_3_-1_0",
+      "position": [
+        -4500.0,
+        -288.0,
+        0
+      ],
+      "yaw": 0,
+      "mesh": "SM_Aurelion_KIT_Parapet_4m",
+      "length_cm": 400,
+      "guard": "A_Connectors_Tarrik_to_Atrium_Guard_3_-1"
+    },
+    {
+      "name": "Guard_3_-1_1",
+      "position": [
+        -4100.0,
+        -288.0,
+        0
+      ],
+      "yaw": 0,
+      "mesh": "SM_Aurelion_KIT_Parapet_4m",
+      "length_cm": 400,
+      "guard": "A_Connectors_Tarrik_to_Atrium_Guard_3_-1"
+    },
+    {
+      "name": "Guard_3_-1_2",
+      "position": [
+        -3700.0,
+        -288.0,
+        0
+      ],
+      "yaw": 0,
+      "mesh": "SM_Aurelion_KIT_Parapet_4m",
+      "length_cm": 400,
+      "guard": "A_Connectors_Tarrik_to_Atrium_Guard_3_-1"
+    },
+    {
+      "name": "Guard_3_1_0",
+      "position": [
+        -4500.0,
+        288.0,
+        0
+      ],
+      "yaw": 0,
+      "mesh": "SM_Aurelion_KIT_Parapet_4m",
+      "length_cm": 400,
+      "guard": "A_Connectors_Tarrik_to_Atrium_Guard_3_1"
+    },
+    {
+      "name": "Guard_3_1_1",
+      "position": [
+        -4100.0,
+        288.0,
+        0
+      ],
+      "yaw": 0,
+      "mesh": "SM_Aurelion_KIT_Parapet_4m",
+      "length_cm": 400,
+      "guard": "A_Connectors_Tarrik_to_Atrium_Guard_3_1"
+    },
+    {
+      "name": "Guard_3_1_2",
+      "position": [
+        -3700.0,
+        288.0,
+        0
+      ],
+      "yaw": 0,
+      "mesh": "SM_Aurelion_KIT_Parapet_4m",
+      "length_cm": 400,
+      "guard": "A_Connectors_Tarrik_to_Atrium_Guard_3_1"
+    },
+    {
+      "name": "Landing_Guard_1_N_0",
+      "position": [
+        -7100.0,
+        -1712.0,
+        0
+      ],
+      "yaw": 0,
+      "mesh": "SM_Aurelion_KIT_Parapet_4m",
+      "length_cm": 400,
+      "guard": "A_Connectors_Tarrik_to_Atrium_Landing_Guard_1_N"
+    },
+    {
+      "name": "Landing_Guard_1_N_1",
+      "position": [
+        -6800.0,
+        -1712.0,
+        0
+      ],
+      "yaw": 0,
+      "mesh": "SM_Aurelion_KIT_Parapet_2m",
+      "length_cm": 200.0,
+      "guard": "A_Connectors_Tarrik_to_Atrium_Landing_Guard_1_N"
+    },
+    {
+      "name": "Landing_Guard_1_W_0",
+      "position": [
+        -7288.0,
+        -2100.0,
+        0
+      ],
+      "yaw": 90,
+      "mesh": "SM_Aurelion_KIT_Parapet_4m",
+      "length_cm": 400,
+      "guard": "A_Connectors_Tarrik_to_Atrium_Landing_Guard_1_W"
+    },
+    {
+      "name": "Landing_Guard_1_W_1",
+      "position": [
+        -7288.0,
+        -1811.5,
+        0
+      ],
+      "yaw": 90,
+      "mesh": "SM_Aurelion_KIT_ParapetCornerClosing_177cm",
+      "length_cm": 177.0,
+      "guard": "A_Connectors_Tarrik_to_Atrium_Landing_Guard_1_W"
+    },
+    {
+      "name": "Landing_Guard_2_E_0",
+      "position": [
+        -4712.0,
+        -2077.0,
+        0
+      ],
+      "yaw": 90,
+      "mesh": "SM_Aurelion_KIT_Parapet_4m",
+      "length_cm": 400,
+      "guard": "A_Connectors_Tarrik_to_Atrium_Landing_Guard_2_E"
+    },
+    {
+      "name": "Landing_Guard_2_E_1",
+      "position": [
+        -4712.0,
+        -1788.5,
+        0
+      ],
+      "yaw": 90,
+      "mesh": "SM_Aurelion_KIT_ParapetCornerClosing_177cm",
+      "length_cm": 177.0,
+      "guard": "A_Connectors_Tarrik_to_Atrium_Landing_Guard_2_E"
+    },
+    {
+      "name": "Landing_Guard_2_S_0",
+      "position": [
+        -5100.0,
+        -2288.0,
+        0
+      ],
+      "yaw": 0,
+      "mesh": "SM_Aurelion_KIT_Parapet_4m",
+      "length_cm": 400,
+      "guard": "A_Connectors_Tarrik_to_Atrium_Landing_Guard_2_S"
+    },
+    {
+      "name": "Landing_Guard_2_S_1",
+      "position": [
+        -4800.0,
+        -2288.0,
+        0
+      ],
+      "yaw": 0,
+      "mesh": "SM_Aurelion_KIT_Parapet_2m",
+      "length_cm": 200.0,
+      "guard": "A_Connectors_Tarrik_to_Atrium_Landing_Guard_2_S"
+    },
+    {
+      "name": "Landing_Guard_3_N_0",
+      "position": [
+        -5100.0,
+        288.0,
+        0
+      ],
+      "yaw": 0,
+      "mesh": "SM_Aurelion_KIT_Parapet_4m",
+      "length_cm": 400,
+      "guard": "A_Connectors_Tarrik_to_Atrium_Landing_Guard_3_N"
+    },
+    {
+      "name": "Landing_Guard_3_N_1",
+      "position": [
+        -4800.0,
+        288.0,
+        0
+      ],
+      "yaw": 0,
+      "mesh": "SM_Aurelion_KIT_Parapet_2m",
+      "length_cm": 200.0,
+      "guard": "A_Connectors_Tarrik_to_Atrium_Landing_Guard_3_N"
+    },
+    {
+      "name": "Landing_Guard_3_W_0",
+      "position": [
+        -5288.0,
+        -100.0,
+        0
+      ],
+      "yaw": 90,
+      "mesh": "SM_Aurelion_KIT_Parapet_4m",
+      "length_cm": 400,
+      "guard": "A_Connectors_Tarrik_to_Atrium_Landing_Guard_3_W"
+    },
+    {
+      "name": "Landing_Guard_3_W_1",
+      "position": [
+        -5288.0,
+        188.5,
+        0
+      ],
+      "yaw": 90,
+      "mesh": "SM_Aurelion_KIT_ParapetCornerClosing_177cm",
+      "length_cm": 177.0,
+      "guard": "A_Connectors_Tarrik_to_Atrium_Landing_Guard_3_W"
+    }
+  ]
+}

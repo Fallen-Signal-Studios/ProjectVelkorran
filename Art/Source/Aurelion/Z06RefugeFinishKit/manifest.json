@@ -1,0 +1,50 @@
+{
+  "status": "Source candidate; in-engine fit and final art acceptance pending",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z06RefugePlinth",
+      "triangles": 4700,
+      "nominal_dimensions_m": [
+        6,
+        10,
+        0.6
+      ],
+      "materials": [
+        "M_Aurelion_StoneGrout",
+        "M_Aurelion_IvoryStone"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 1,
+      "collision": "Single solid plinth hull; new collision requires Unreal passage validation",
+      "solid_bounds_m": [
+        [
+          -3,
+          -5,
+          0
+        ],
+        [
+          3,
+          5,
+          0.6
+        ]
+      ]
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z06RefugeGuard",
+      "triangles": 7992,
+      "nominal_dimensions_m": [
+        4.123106,
+        0.22,
+        1.3
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_StoneGrout",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; exact retained ramp guard envelope"
+    }
+  ]
+}

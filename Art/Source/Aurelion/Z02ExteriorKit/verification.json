@@ -1,0 +1,33 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z02Exterior_4m",
+      "dimensions_m": [
+        4.0,
+        0.5049999952316284,
+        9.829999923706055
+      ],
+      "triangles": 8832
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z02Exterior_Closing",
+      "dimensions_m": [
+        0.36970001459121704,
+        0.5,
+        9.829999923706055
+      ],
+      "triangles": 1328
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z02RoofFinish",
+      "dimensions_m": [
+        29.413799285888672,
+        19.382143020629883,
+        0.34999996423721313
+      ],
+      "triangles": 17508
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}

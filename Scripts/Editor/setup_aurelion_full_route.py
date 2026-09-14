@@ -323,6 +323,8 @@ def make_profiles():
              activity_configuration=required('/NarrativePro/Pro/Core/AI/Configs/AC_Pacifist'),
              default_item_loadout=[],trading_item_loadout=[],dialogue=None,tagged_dialogue_set=None)
         retain_aurelion_npc(npc)
+        from configure_aurelion_companion_equipment import configure as configure_companion_equipment, curated_combat_classes
+        configure_companion_equipment(hero, npc)
         save(npc)
         disable_unconfigured_companion_talk(companion_bp,npc,hero)
         defense=required('/Game/Abilities/'+hero+'/GA_'+hero+('_Guard' if hero=='Tarrik' else '_Deflection')).generated_class()
@@ -330,7 +332,7 @@ def make_profiles():
         # The native proxy copies only these classes already present in the outgoing actual kit.
         # The NPC baseline does not independently grant player attacks, inventory or ammunition.
         heroes[hero]={'player':player,'pawn':pawn,'companion_bp':companion_bp,'companion_npc':npc,
-                      'companion_configuration':configuration,'curated':[defense,punch]}
+                      'companion_configuration':configuration,'curated':curated_combat_classes(hero)}
     return heroes
 
 def make_evidence():

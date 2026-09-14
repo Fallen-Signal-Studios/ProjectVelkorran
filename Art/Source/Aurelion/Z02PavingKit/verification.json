@@ -1,0 +1,60 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z02PavingWest_4m",
+      "dimensions_m": [
+        1.5385336875915527,
+        4.0,
+        0.12000000476837158
+      ],
+      "triangles": 2444
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z02PavingWest_Short",
+      "dimensions_m": [
+        1.5385336875915527,
+        2.261695384979248,
+        0.12000000476837158
+      ],
+      "triangles": 2444
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z02PavingEast_4m",
+      "dimensions_m": [
+        1.2193650007247925,
+        4.0,
+        0.12000000476837158
+      ],
+      "triangles": 2444
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z02PavingEast_Short",
+      "dimensions_m": [
+        1.2193650007247925,
+        2.261695384979248,
+        0.12000000476837158
+      ],
+      "triangles": 2444
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z02PavingIvory_Short",
+      "dimensions_m": [
+        4.0,
+        2.261695384979248,
+        0.12000000476837158
+      ],
+      "triangles": 2444
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z02PavingRoute_Short",
+      "dimensions_m": [
+        4.0,
+        2.261695384979248,
+        0.12000000476837158
+      ],
+      "triangles": 3196
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}

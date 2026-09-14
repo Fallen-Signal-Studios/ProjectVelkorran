@@ -65,6 +65,48 @@ Content/
 !/Content/Cues/
 !/Content/Cues/**/*.uasset
 
+# Project-owned Cinderline correction; retain the surrounding pack/template exclusions.
+!/Content/Abilities/
+/Content/Abilities/*
+!/Content/Abilities/Tarrik/
+/Content/Abilities/Tarrik/*
+!/Content/Abilities/Tarrik/GE_CinderlineThermal.uasset
+!/Content/Abilities/Tarrik/GA_CinderlinePrimary.uasset
+!/Content/Abilities/Tarrik/GA_Tarrik_CinderStickyGrenade.uasset
+!/Content/Abilities/Tarrik/GA_Tarrik_VelkorransHunger.uasset
+!/Content/Abilities/Tarrik/GA_Tarrik_CinderSlam.uasset
+!/Content/Abilities/Tarrik/GA_Tarrik_CinderJudgement.uasset
+!/Content/Abilities/Tarrik/GA_Tarrik_CinderlineRequiem.uasset
+!/Content/Abilities/Selene/
+/Content/Abilities/Selene/*
+!/Content/Abilities/Selene/GA_Selene_StillpointGrenade.uasset
+!/Content/Abilities/Selene/GA_Selene_VeritysWake.uasset
+!/Content/Abilities/Selene/GA_Selene_StaccatoZero.uasset
+!/Content/Abilities/Selene/GA_Selene_AxiomNullPulse.uasset
+!/Content/Abilities/Selene/GA_Selene_Dispatch.uasset
+!/Content/Items/
+/Content/Items/*
+!/Content/Items/Weapons/
+/Content/Items/Weapons/*
+!/Content/Items/Weapons/WI_Cinderline.uasset
+!/Content/Items/Weapons/WI_Verity.uasset
+
+# Project-owned Verity presentation and retargeted Twin Blade animation.
+!/Content/Characters/
+/Content/Characters/*
+!/Content/Characters/Animation/
+/Content/Characters/Animation/*
+!/Content/Characters/Animation/ABP_SovVerityOverlay.uasset
+!/Content/Characters/Animation/VerityTwinBlades/
+!/Content/Characters/Animation/VerityTwinBlades/**/*.uasset
+!/Content/Characters/Animation/ProtagonistCasts/
+!/Content/Characters/Animation/ProtagonistCasts/**/*.uasset
+!/Content/Weapons/
+/Content/Weapons/*
+!/Content/Weapons/Visuals/
+/Content/Weapons/Visuals/*
+!/Content/Weapons/Visuals/BP_SovVerityWeaponVisual.uasset
+
 # Raw source assets that normally belong in LFS
 SourceArt/
 *.blend

@@ -1,0 +1,244 @@
+{
+  "labels": [
+    {
+      "actor": "Z08_Zone_Sign_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_14.NewTextRenderComponent",
+      "text": "Z08  QUARANTINE COURT\n70 x 48 m",
+      "location": [
+        0.0,
+        18500.0,
+        -720.0
+      ]
+    },
+    {
+      "actor": "Z08_Entry_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_15.NewTextRenderComponent",
+      "text": "Z08 ENTRY",
+      "location": [
+        0.0,
+        18800.0,
+        -950.0
+      ]
+    },
+    {
+      "actor": "Z08_West_StretcherCase_1_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_53.NewTextRenderComponent",
+      "text": "W | protected stretcher case 1",
+      "location": [
+        -2850.0,
+        22500.0,
+        -890.0
+      ]
+    },
+    {
+      "actor": "Z08_West_StretcherCase_2_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_54.NewTextRenderComponent",
+      "text": "W | protected stretcher case 2",
+      "location": [
+        -2350.0,
+        22500.0,
+        -890.0
+      ]
+    },
+    {
+      "actor": "Z08_East_WalkingWounded_1_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_55.NewTextRenderComponent",
+      "text": "E | walking wounded staging 1",
+      "location": [
+        2900.0,
+        22300.0,
+        -950.0
+      ]
+    },
+    {
+      "actor": "Z08_East_WalkingWounded_2_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_56.NewTextRenderComponent",
+      "text": "E | walking wounded staging 2",
+      "location": [
+        3150.0,
+        22500.0,
+        -950.0
+      ]
+    },
+    {
+      "actor": "Z08_East_WalkingWounded_3_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_57.NewTextRenderComponent",
+      "text": "E | walking wounded staging 3",
+      "location": [
+        2900.0,
+        22700.0,
+        -950.0
+      ]
+    },
+    {
+      "actor": "Z08_Support_West_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_58.NewTextRenderComponent",
+      "text": "S-W | west priority: Lyessa / medic cache support",
+      "location": [
+        -2600.0,
+        21800.0,
+        -950.0
+      ]
+    },
+    {
+      "actor": "Z08_Support_East_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_59.NewTextRenderComponent",
+      "text": "S-E | east priority: early manual shutter support",
+      "location": [
+        3050.0,
+        21800.0,
+        -950.0
+      ]
+    },
+    {
+      "actor": "Z08_East_ManualShutterControl_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_60.NewTextRenderComponent",
+      "text": "East support shutter control placeholder",
+      "location": [
+        3279.9999999999995,
+        22050.0,
+        -950.0
+      ]
+    },
+    {
+      "actor": "Z08_Companion_Tarrik_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_61.NewTextRenderComponent",
+      "text": "Tarrik | protected entry staging",
+      "location": [
+        -500.0,
+        18950.0,
+        -950.0
+      ]
+    },
+    {
+      "actor": "Z08_Companion_Lyessa_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_62.NewTextRenderComponent",
+      "text": "Lyessa | protected entry staging",
+      "location": [
+        -100.0,
+        18950.0,
+        -950.0
+      ]
+    },
+    {
+      "actor": "Z08_Companion_Tharne_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_63.NewTextRenderComponent",
+      "text": "Tharne | protected entry staging",
+      "location": [
+        300.0,
+        18950.0,
+        -950.0
+      ]
+    },
+    {
+      "actor": "Z08_Companion_Lyric_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_64.NewTextRenderComponent",
+      "text": "Lyric | protected entry staging",
+      "location": [
+        600.0,
+        18950.0,
+        -950.0
+      ]
+    },
+    {
+      "actor": "Z08_CP5_SouthEntry_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_65.NewTextRenderComponent",
+      "text": "CP5 | priority committed; Selene controlled",
+      "location": [
+        0.0,
+        18600.0,
+        -950.0
+      ]
+    },
+    {
+      "actor": "Z08_CP5b_PhaseB_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_66.NewTextRenderComponent",
+      "text": "CP5b | links severed; Tarrik controlled",
+      "location": [
+        0.0,
+        19750.0,
+        -950.0
+      ]
+    },
+    {
+      "actor": "Z08_Selene_FrostAnchor_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_67.NewTextRenderComponent",
+      "text": "Selene | visible phase-B frost / recovery anchor",
+      "location": [
+        1450.0,
+        20700.0,
+        -950.0
+      ]
+    },
+    {
+      "actor": "Z08_E4_Elite_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_68.NewTextRenderComponent",
+      "text": "E4 | elite staging; five hostiles maximum including elite",
+      "location": [
+        0.0,
+        21800.0,
+        -950.0
+      ]
+    },
+    {
+      "actor": "Z08_E4_Linkbound_01_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_69.NewTextRenderComponent",
+      "text": "E4 | Linkbound 1 | initial",
+      "location": [
+        -700.0,
+        20800.0,
+        -950.0
+      ]
+    },
+    {
+      "actor": "Z08_E4_Linkbound_02_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_70.NewTextRenderComponent",
+      "text": "E4 | Linkbound 2 | initial",
+      "location": [
+        700.0,
+        20800.0,
+        -950.0
+      ]
+    },
+    {
+      "actor": "Z08_E4_Weaver_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_71.NewTextRenderComponent",
+      "text": "E4 | Weaver | initial linked source",
+      "location": [
+        300.0,
+        21700.0,
+        -950.0
+      ]
+    },
+    {
+      "actor": "Z08_E4_WallRunner_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_72.NewTextRenderComponent",
+      "text": "E4 | Wall-runner | joins after first anchor falls",
+      "location": [
+        1500.0,
+        22000.0,
+        -950.0
+      ]
+    },
+    {
+      "actor": "Z08_QuarantineSeparation_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_73.NewTextRenderComponent",
+      "text": "Survivors clear before quarantine; two bearers continue to Z09",
+      "location": [
+        0.0,
+        22800.0,
+        -950.0
+      ]
+    }
+  ],
+  "preserved": [
+    "Aurelion_WestMedicalCache",
+    "Aurelion_CrucibleEvacuationAccess",
+    "Aurelion_QuarantineSealed",
+    "Aurelion_E4_LinksHint",
+    "Aurelion_E4_FrostHint",
+    "ART_Crucible_WoundGallerySign",
+    "ART_RefugeBaffle_WestSign",
+    "ART_RefugeBaffle_EastSign"
+  ]
+}

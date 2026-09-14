@@ -1,0 +1,18 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_AtriumCanopyFrame",
+      "passage_rays": 15,
+      "oculus_rays": 0,
+      "solid_controls": 1
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumCanopyVault",
+      "passage_rays": 15,
+      "oculus_rays": 3,
+      "solid_controls": 8
+    }
+  ],
+  "scope": "Visual export geometry only; live traversal and rendering acceptance separate"
+}

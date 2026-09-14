@@ -1,0 +1,83 @@
+{
+  "status": "Candidate open crown; editor fit and collision qualification pending",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_AtriumCrownPier",
+      "triangles": 4372,
+      "nominal_dimensions_m": [
+        1.4,
+        1.4,
+        8
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_StoneGrout",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 3,
+      "collision": "Authored plinth, shaft and capital hulls",
+      "pier_collision_samples": [
+        [
+          0,
+          0.5,
+          true
+        ],
+        [
+          0.58,
+          0.5,
+          true
+        ],
+        [
+          0.65,
+          0.5,
+          false
+        ],
+        [
+          0.4,
+          3,
+          true
+        ],
+        [
+          0.5,
+          3,
+          false
+        ],
+        [
+          0.68,
+          7.6,
+          true
+        ],
+        [
+          0.75,
+          7.6,
+          false
+        ],
+        [
+          0,
+          8.1,
+          false
+        ]
+      ]
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumOpenCrown",
+      "triangles": 122144,
+      "nominal_dimensions_m": [
+        60.85403633117676,
+        60.85403633117676,
+        6.6105451583862305
+      ],
+      "materials": [
+        "M_Aurelion_StoneGrout",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; overhead scenic ribs, separate physical piers",
+      "clear_oculus_diameter_m": 18,
+      "minimum_height_m": 7.97945499420166
+    }
+  ]
+}

@@ -1,0 +1,92 @@
+{
+  "status": "Fitted exterior candidate; level and live traversal acceptance pending",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z02Exterior_4m",
+      "triangles": 8832,
+      "nominal_dimensions_m": [
+        4.0,
+        0.5049999952316284,
+        9.829999923706055
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 1,
+      "collision": "Authored solid core; shallow mouldings remain decorative",
+      "solid_bounds_m": [
+        [
+          -2.0,
+          -0.06,
+          0
+        ],
+        [
+          2.0,
+          0.19,
+          9.83
+        ]
+      ]
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z02Exterior_Closing",
+      "triangles": 1328,
+      "nominal_dimensions_m": [
+        0.36970001459121704,
+        0.5,
+        9.829999923706055
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 1,
+      "collision": "Authored solid core; shallow mouldings remain decorative",
+      "solid_bounds_m": [
+        [
+          -0.18485000000000085,
+          -0.06,
+          0
+        ],
+        [
+          0.18485000000000085,
+          0.19,
+          9.83
+        ]
+      ]
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z02RoofFinish",
+      "triangles": 17508,
+      "nominal_dimensions_m": [
+        29.413799285888672,
+        19.382143020629883,
+        0.34999996423721313
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 1,
+      "collision": "Authored solid core; shallow mouldings remain decorative",
+      "solid_bounds_m": [
+        [
+          -14.696900000000001,
+          -9.6810712,
+          0
+        ],
+        [
+          14.696900000000001,
+          9.6810712,
+          0.12
+        ]
+      ],
+      "preserve_fallback_geometry": true
+    }
+  ]
+}

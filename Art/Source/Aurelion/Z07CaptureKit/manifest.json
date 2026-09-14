@@ -1,0 +1,39 @@
+{
+  "status": "Capture frame source; scene binding and in-engine review pending",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z07DominionCapture",
+      "triangles": 23736,
+      "nominal_dimensions_m": [
+        5.0,
+        4.007999897003174,
+        4.0
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; original platform and four spine proxies retained"
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z07ReformationCapture",
+      "triangles": 19928,
+      "nominal_dimensions_m": [
+        5.0,
+        4.007999897003174,
+        4.0
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; original platform and four spine proxies retained"
+    }
+  ]
+}

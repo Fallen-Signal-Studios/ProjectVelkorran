@@ -1,0 +1,18 @@
+{
+  "status": "500-lumen candidate reviewed; final lighting and performance acceptance remain open",
+  "count": 8,
+  "start_angle": 22.5,
+  "angle_step": 45,
+  "fixture_radius": 3190,
+  "fixture_z": 660,
+  "light_radius": 3162.5,
+  "light_z": 709,
+  "target_radius": 2300,
+  "target_z": 1350,
+  "lumens": 500,
+  "attenuation_radius": 3000,
+  "inner_cone": 20,
+  "outer_cone": 35,
+  "source_radius": 12,
+  "color": [0.92, 0.85, 0.70]
+}

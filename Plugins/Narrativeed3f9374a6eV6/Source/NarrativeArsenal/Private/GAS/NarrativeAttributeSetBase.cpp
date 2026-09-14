@@ -1,6 +1,7 @@
 // Copyright Narrative Tools 2024.
 
 #include "GAS/NarrativeAttributeSetBase.h"
+#include "Settings/SovCampaignModifiers.h"
 
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemGlobals.h"
@@ -462,6 +463,21 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 		}
 
 
+        if (const auto* Settings = UNarrativeGameUserSettings::GetSovSettings())
+        {
+            const uint8 Mask = Settings->GetCampaignModifiers();
+            if (Mask & (SovCampaignModifiers::Ascendant | SovCampaignModifiers::GlassCannon))
+            {
+                const bool EnemyToAlly = UNarrativeGameUserSettings::IsCampaignEnemy(SourceActor)
+                    && UNarrativeGameUserSettings::IsCampaignAlly(TargetActor);
+                const bool AllyToEnemy = UNarrativeGameUserSettings::IsCampaignAlly(SourceActor)
+                    && UNarrativeGameUserSettings::IsCampaignEnemy(TargetActor);
+                const float Scale = SovCampaignModifiers::BodyDamage(Mask, EnemyToAlly, AllyToEnemy,
+                    EffectAssetTags.HasTagExact(Tags.Damage_Fatal));
+                RoutedDamage = SovCombatTransaction::BoundedProduct(RoutedDamage, Scale);
+                Result.ResolvedDamage = RoutedDamage;
+            }
+        }
 		// Action-state defenses are evaluated after mathematical mitigation and
 		// before Shield/Health routing. Deflection is a short all-or-nothing
 		// precision window; it never enters Tarrik's sustained Guard policy.

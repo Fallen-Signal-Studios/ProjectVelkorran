@@ -1,0 +1,13 @@
+{
+  "status": "PASS",
+  "mesh": "SM_Aurelion_RecessPanel_2m",
+  "dimensions_metres": [
+    2.0,
+    0.4000000059604645,
+    3.0
+  ],
+  "triangles": 1728,
+  "material_slots": 4,
+  "collision_vertices": 8,
+  "limitation": "Blender FBX round-trip only; Unreal import and gameplay pending"
+}

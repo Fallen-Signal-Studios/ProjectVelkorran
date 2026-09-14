@@ -1,0 +1,283 @@
+{
+  "status": "Authored kit; in-engine visual and runtime acceptance pending",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z08VaultShell",
+      "triangles": 23424,
+      "nominal_dimensions_m": [
+        71.39999389648438,
+        49.400001525878906,
+        15.399999618530273
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold",
+        "M_Vault_Inlay"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "Not authored; no gameplay placement until collision is verified"
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z08Coffer_10x8",
+      "triangles": 12972,
+      "nominal_dimensions_m": [
+        10.0,
+        8.0,
+        0.44999998807907104
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; visual soffit remains 12.5 cm above existing portal ribs",
+      "minimum_z_m": -0.45000001788139343,
+      "maximum_z_m": -1.5239823625279314e-08
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z08VaultAssembly",
+      "triangles": 568248,
+      "nominal_dimensions_m": [
+        71.39999389648438,
+        49.400001525878906,
+        15.399999618530273
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold",
+        "M_Vault_Inlay"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; native room collision retained"
+    }
+  ],
+  "coffer_placements_m": [
+    [
+      -30,
+      -20,
+      15
+    ],
+    [
+      -30,
+      -12,
+      15
+    ],
+    [
+      -30,
+      -4,
+      15
+    ],
+    [
+      -30,
+      4,
+      15
+    ],
+    [
+      -30,
+      12,
+      15
+    ],
+    [
+      -30,
+      20,
+      15
+    ],
+    [
+      -20,
+      -20,
+      15
+    ],
+    [
+      -20,
+      -12,
+      15
+    ],
+    [
+      -20,
+      -4,
+      15
+    ],
+    [
+      -20,
+      4,
+      15
+    ],
+    [
+      -20,
+      12,
+      15
+    ],
+    [
+      -20,
+      20,
+      15
+    ],
+    [
+      -10,
+      -20,
+      15
+    ],
+    [
+      -10,
+      -12,
+      15
+    ],
+    [
+      -10,
+      -4,
+      15
+    ],
+    [
+      -10,
+      4,
+      15
+    ],
+    [
+      -10,
+      12,
+      15
+    ],
+    [
+      -10,
+      20,
+      15
+    ],
+    [
+      0,
+      -20,
+      15
+    ],
+    [
+      0,
+      -12,
+      15
+    ],
+    [
+      0,
+      -4,
+      15
+    ],
+    [
+      0,
+      4,
+      15
+    ],
+    [
+      0,
+      12,
+      15
+    ],
+    [
+      0,
+      20,
+      15
+    ],
+    [
+      10,
+      -20,
+      15
+    ],
+    [
+      10,
+      -12,
+      15
+    ],
+    [
+      10,
+      -4,
+      15
+    ],
+    [
+      10,
+      4,
+      15
+    ],
+    [
+      10,
+      12,
+      15
+    ],
+    [
+      10,
+      20,
+      15
+    ],
+    [
+      20,
+      -20,
+      15
+    ],
+    [
+      20,
+      -12,
+      15
+    ],
+    [
+      20,
+      -4,
+      15
+    ],
+    [
+      20,
+      4,
+      15
+    ],
+    [
+      20,
+      12,
+      15
+    ],
+    [
+      20,
+      20,
+      15
+    ],
+    [
+      30,
+      -20,
+      15
+    ],
+    [
+      30,
+      -12,
+      15
+    ],
+    [
+      30,
+      -4,
+      15
+    ],
+    [
+      30,
+      4,
+      15
+    ],
+    [
+      30,
+      12,
+      15
+    ],
+    [
+      30,
+      20,
+      15
+    ]
+  ],
+  "removed_longitudinal_parts": [
+    "Coffer longitudinal",
+    "Coffer gold line",
+    "Coffer longitudinal.001",
+    "Coffer gold line.001",
+    "Coffer longitudinal.002",
+    "Coffer gold line.002",
+    "Coffer longitudinal.003",
+    "Coffer gold line.003"
+  ],
+  "retained_shell_parts": 228
+}

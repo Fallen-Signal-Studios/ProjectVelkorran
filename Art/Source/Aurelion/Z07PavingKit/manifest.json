@@ -1,0 +1,62 @@
+{
+  "status": "Measured perimeter cuts; visual and live traversal qualification pending",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z07PavingIvory_4x3",
+      "triangles": 2444,
+      "nominal_dimensions_m": [
+        4,
+        3,
+        0.12
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_Basalt",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; fitted over retained Z07 floor collision",
+      "surface_top_metres": 0.12
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z07PavingRoute_4x3",
+      "triangles": 3196,
+      "nominal_dimensions_m": [
+        4,
+        3,
+        0.12
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_Basalt",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_IvoryStone"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; fitted over retained Z07 floor collision",
+      "surface_top_metres": 0.12
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z07PavingCorner_3x3",
+      "triangles": 2444,
+      "nominal_dimensions_m": [
+        3,
+        3,
+        0.12
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_Basalt",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; fitted over retained Z07 floor collision",
+      "surface_top_metres": 0.12
+    }
+  ]
+}

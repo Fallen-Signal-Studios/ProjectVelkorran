@@ -1,0 +1,271 @@
+{
+  "immediate": [
+    {
+      "actor": "Z05__AtriumPylon_01",
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "responses": {
+        "Pawn": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Visibility": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Camera": "<CollisionResponseType.ECR_BLOCK: 2>"
+      }
+    },
+    {
+      "actor": "Z05__AtriumPylon_02",
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "responses": {
+        "Pawn": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Visibility": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Camera": "<CollisionResponseType.ECR_BLOCK: 2>"
+      }
+    },
+    {
+      "actor": "Z05__AtriumPylon_03",
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "responses": {
+        "Pawn": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Visibility": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Camera": "<CollisionResponseType.ECR_BLOCK: 2>"
+      }
+    },
+    {
+      "actor": "Z05__AtriumPylon_04",
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "responses": {
+        "Pawn": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Visibility": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Camera": "<CollisionResponseType.ECR_BLOCK: 2>"
+      }
+    },
+    {
+      "actor": "Z05__AtriumPylon_05",
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "responses": {
+        "Pawn": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Visibility": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Camera": "<CollisionResponseType.ECR_BLOCK: 2>"
+      }
+    },
+    {
+      "actor": "Z05__AtriumPylon_06",
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "responses": {
+        "Pawn": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Visibility": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Camera": "<CollisionResponseType.ECR_BLOCK: 2>"
+      }
+    },
+    {
+      "actor": "Z05__AtriumPylon_07",
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "responses": {
+        "Pawn": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Visibility": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Camera": "<CollisionResponseType.ECR_BLOCK: 2>"
+      }
+    },
+    {
+      "actor": "Z05__AtriumPylon_08",
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "responses": {
+        "Pawn": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Visibility": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Camera": "<CollisionResponseType.ECR_BLOCK: 2>"
+      }
+    },
+    {
+      "actor": "Z05__UpperSpan_01",
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "Custom",
+      "responses": {
+        "Pawn": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Visibility": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Camera": "<CollisionResponseType.ECR_BLOCK: 2>"
+      }
+    },
+    {
+      "actor": "Z05__UpperSpan_02",
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "Custom",
+      "responses": {
+        "Pawn": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Visibility": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Camera": "<CollisionResponseType.ECR_BLOCK: 2>"
+      }
+    },
+    {
+      "actor": "Z05__UpperSpan_03",
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "Custom",
+      "responses": {
+        "Pawn": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Visibility": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Camera": "<CollisionResponseType.ECR_BLOCK: 2>"
+      }
+    },
+    {
+      "actor": "Z05__UpperSpan_04",
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "Custom",
+      "responses": {
+        "Pawn": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Visibility": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Camera": "<CollisionResponseType.ECR_BLOCK: 2>"
+      }
+    }
+  ],
+  "settled": [
+    {
+      "actor": "Z05__AtriumPylon_01",
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "responses": {
+        "Pawn": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Visibility": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Camera": "<CollisionResponseType.ECR_BLOCK: 2>"
+      }
+    },
+    {
+      "actor": "Z05__AtriumPylon_02",
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "responses": {
+        "Pawn": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Visibility": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Camera": "<CollisionResponseType.ECR_BLOCK: 2>"
+      }
+    },
+    {
+      "actor": "Z05__AtriumPylon_03",
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "responses": {
+        "Pawn": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Visibility": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Camera": "<CollisionResponseType.ECR_BLOCK: 2>"
+      }
+    },
+    {
+      "actor": "Z05__AtriumPylon_04",
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "responses": {
+        "Pawn": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Visibility": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Camera": "<CollisionResponseType.ECR_BLOCK: 2>"
+      }
+    },
+    {
+      "actor": "Z05__AtriumPylon_05",
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "responses": {
+        "Pawn": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Visibility": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Camera": "<CollisionResponseType.ECR_BLOCK: 2>"
+      }
+    },
+    {
+      "actor": "Z05__AtriumPylon_06",
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "responses": {
+        "Pawn": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Visibility": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Camera": "<CollisionResponseType.ECR_BLOCK: 2>"
+      }
+    },
+    {
+      "actor": "Z05__AtriumPylon_07",
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "responses": {
+        "Pawn": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Visibility": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Camera": "<CollisionResponseType.ECR_BLOCK: 2>"
+      }
+    },
+    {
+      "actor": "Z05__AtriumPylon_08",
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "responses": {
+        "Pawn": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Visibility": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Camera": "<CollisionResponseType.ECR_BLOCK: 2>"
+      }
+    },
+    {
+      "actor": "Z05__UpperSpan_01",
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "responses": {
+        "Pawn": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Visibility": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Camera": "<CollisionResponseType.ECR_BLOCK: 2>"
+      }
+    },
+    {
+      "actor": "Z05__UpperSpan_02",
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "responses": {
+        "Pawn": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Visibility": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Camera": "<CollisionResponseType.ECR_BLOCK: 2>"
+      }
+    },
+    {
+      "actor": "Z05__UpperSpan_03",
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "responses": {
+        "Pawn": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Visibility": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Camera": "<CollisionResponseType.ECR_BLOCK: 2>"
+      }
+    },
+    {
+      "actor": "Z05__UpperSpan_04",
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "responses": {
+        "Pawn": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Visibility": "<CollisionResponseType.ECR_BLOCK: 2>",
+        "Camera": "<CollisionResponseType.ECR_BLOCK: 2>"
+      }
+    }
+  ],
+  "status": "measured_without_edits"
+}

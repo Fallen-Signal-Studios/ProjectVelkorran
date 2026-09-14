@@ -1,0 +1,212 @@
+{
+  "status": "read_only",
+  "materials": {
+    "Ivory": {
+      "base_color": {
+        "path": "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_Ivory.M_AurelionKit_Ivory:MaterialExpressionLinearInterpolate_0",
+        "type": "MaterialExpressionLinearInterpolate",
+        "const_a": "0.0",
+        "const_b": "1.0",
+        "const_alpha": "0.2199999988079071",
+        "inputs": [
+          {
+            "path": "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_Ivory.M_AurelionKit_Ivory:MaterialExpressionConstant3Vector_1",
+            "type": "MaterialExpressionConstant3Vector",
+            "constant": "<Struct 'LinearColor' (0x0000027E3BE58868) {r: 0.620000, g: 0.590000, b: 0.520000, a: 1.000000}>",
+            "inputs": []
+          },
+          {
+            "path": "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_Ivory.M_AurelionKit_Ivory:MaterialExpressionMultiply_0",
+            "type": "MaterialExpressionMultiply",
+            "const_a": "0.0",
+            "const_b": "1.0",
+            "inputs": [
+              {
+                "path": "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_Ivory.M_AurelionKit_Ivory:MaterialExpressionTextureSample_0",
+                "type": "MaterialExpressionTextureSample",
+                "texture": "/Game/Aurelion/Environment/RadianceMaterials/T_Aurelion_IvoryStone_BaseColor.T_Aurelion_IvoryStone_BaseColor",
+                "inputs": [
+                  null,
+                  null,
+                  null
+                ]
+              },
+              {
+                "path": "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_Ivory.M_AurelionKit_Ivory:MaterialExpressionConstant3Vector_0",
+                "type": "MaterialExpressionConstant3Vector",
+                "constant": "<Struct 'LinearColor' (0x0000027E3BE58788) {r: 0.850000, g: 0.860000, b: 0.880000, a: 1.000000}>",
+                "inputs": []
+              }
+            ]
+          },
+          null
+        ]
+      },
+      "normal": {
+        "path": "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_Ivory.M_AurelionKit_Ivory:MaterialExpressionLinearInterpolate_1",
+        "type": "MaterialExpressionLinearInterpolate",
+        "const_a": "0.0",
+        "const_b": "1.0",
+        "const_alpha": "0.20000000298023224",
+        "inputs": [
+          {
+            "path": "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_Ivory.M_AurelionKit_Ivory:MaterialExpressionConstant3Vector_2",
+            "type": "MaterialExpressionConstant3Vector",
+            "constant": "<Struct 'LinearColor' (0x0000027E3BE58948) {r: 0.000000, g: 0.000000, b: 1.000000, a: 1.000000}>",
+            "inputs": []
+          },
+          {
+            "path": "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_Ivory.M_AurelionKit_Ivory:MaterialExpressionTextureSample_2",
+            "type": "MaterialExpressionTextureSample",
+            "texture": "/Game/Aurelion/Environment/KitBashRadiance/KB3D_UTP_BldgMD_I/KB3D_UTP_BldgMD_I/Textures/T_KB3D_UTP_ConcreteMix_normal_jpg.T_KB3D_UTP_ConcreteMix_normal_jpg",
+            "inputs": [
+              null,
+              null,
+              null
+            ]
+          },
+          null
+        ]
+      },
+      "roughness": {
+        "path": "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_Ivory.M_AurelionKit_Ivory:MaterialExpressionAdd_0",
+        "type": "MaterialExpressionAdd",
+        "const_a": "0.0",
+        "const_b": "0.3400000035762787",
+        "inputs": [
+          {
+            "path": "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_Ivory.M_AurelionKit_Ivory:MaterialExpressionMultiply_1",
+            "type": "MaterialExpressionMultiply",
+            "const_a": "0.0",
+            "const_b": "0.20000000298023224",
+            "inputs": [
+              {
+                "path": "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_Ivory.M_AurelionKit_Ivory:MaterialExpressionTextureSample_1",
+                "type": "MaterialExpressionTextureSample",
+                "texture": "/Game/Aurelion/Environment/KitBashRadiance/KB3D_UTP_BldgMD_I/KB3D_UTP_BldgMD_I/Textures/T_KB3D_UTP_ConcreteMix_roughness_jpg.T_KB3D_UTP_ConcreteMix_roughness_jpg",
+                "inputs": [
+                  null,
+                  null,
+                  null
+                ]
+              },
+              null
+            ]
+          },
+          null
+        ]
+      }
+    },
+    "PavingIvory": {
+      "base_color": {
+        "path": "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_PavingIvory.M_AurelionKit_PavingIvory:MaterialExpressionLinearInterpolate_0",
+        "type": "MaterialExpressionLinearInterpolate",
+        "const_a": "0.0",
+        "const_b": "1.0",
+        "const_alpha": "0.11999999731779099",
+        "inputs": [
+          {
+            "path": "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_PavingIvory.M_AurelionKit_PavingIvory:MaterialExpressionConstant3Vector_1",
+            "type": "MaterialExpressionConstant3Vector",
+            "constant": "<Struct 'LinearColor' (0x0000027E3BAEAE08) {r: 0.420000, g: 0.400000, b: 0.350000, a: 1.000000}>",
+            "inputs": []
+          },
+          {
+            "path": "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_PavingIvory.M_AurelionKit_PavingIvory:MaterialExpressionMultiply_0",
+            "type": "MaterialExpressionMultiply",
+            "const_a": "0.0",
+            "const_b": "1.0",
+            "inputs": [
+              {
+                "path": "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_PavingIvory.M_AurelionKit_PavingIvory:MaterialExpressionTextureSample_0",
+                "type": "MaterialExpressionTextureSample",
+                "texture": "/Game/Aurelion/Environment/RadianceMaterials/T_Aurelion_IvoryStone_BaseColor.T_Aurelion_IvoryStone_BaseColor",
+                "inputs": [
+                  null,
+                  null,
+                  null
+                ]
+              },
+              {
+                "path": "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_PavingIvory.M_AurelionKit_PavingIvory:MaterialExpressionConstant3Vector_0",
+                "type": "MaterialExpressionConstant3Vector",
+                "constant": "<Struct 'LinearColor' (0x0000027E3BAEBB28) {r: 0.850000, g: 0.860000, b: 0.880000, a: 1.000000}>",
+                "inputs": []
+              }
+            ]
+          },
+          null
+        ]
+      },
+      "normal": {
+        "path": "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_PavingIvory.M_AurelionKit_PavingIvory:MaterialExpressionLinearInterpolate_1",
+        "type": "MaterialExpressionLinearInterpolate",
+        "const_a": "0.0",
+        "const_b": "1.0",
+        "const_alpha": "0.11999999731779099",
+        "inputs": [
+          {
+            "path": "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_PavingIvory.M_AurelionKit_PavingIvory:MaterialExpressionConstant3Vector_2",
+            "type": "MaterialExpressionConstant3Vector",
+            "constant": "<Struct 'LinearColor' (0x0000027E3BAEB268) {r: 0.000000, g: 0.000000, b: 1.000000, a: 1.000000}>",
+            "inputs": []
+          },
+          {
+            "path": "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_PavingIvory.M_AurelionKit_PavingIvory:MaterialExpressionTextureSample_2",
+            "type": "MaterialExpressionTextureSample",
+            "texture": "/Game/Aurelion/Environment/KitBashRadiance/KB3D_UTP_BldgMD_I/KB3D_UTP_BldgMD_I/Textures/T_KB3D_UTP_ConcreteMix_normal_jpg.T_KB3D_UTP_ConcreteMix_normal_jpg",
+            "inputs": [
+              null,
+              null,
+              null
+            ]
+          },
+          null
+        ]
+      },
+      "roughness": {
+        "path": "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_PavingIvory.M_AurelionKit_PavingIvory:MaterialExpressionAdd_0",
+        "type": "MaterialExpressionAdd",
+        "const_a": "0.0",
+        "const_b": "0.6000000238418579",
+        "inputs": [
+          {
+            "path": "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_PavingIvory.M_AurelionKit_PavingIvory:MaterialExpressionMultiply_1",
+            "type": "MaterialExpressionMultiply",
+            "const_a": "0.0",
+            "const_b": "0.10000000149011612",
+            "inputs": [
+              {
+                "path": "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_PavingIvory.M_AurelionKit_PavingIvory:MaterialExpressionTextureSample_1",
+                "type": "MaterialExpressionTextureSample",
+                "texture": "/Game/Aurelion/Environment/KitBashRadiance/KB3D_UTP_BldgMD_I/KB3D_UTP_BldgMD_I/Textures/T_KB3D_UTP_ConcreteMix_roughness_jpg.T_KB3D_UTP_ConcreteMix_roughness_jpg",
+                "inputs": [
+                  null,
+                  null,
+                  null
+                ]
+              },
+              null
+            ]
+          },
+          null
+        ]
+      }
+    },
+    "StoneGrout": {
+      "base_color": {
+        "path": "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_StoneGrout.M_AurelionKit_StoneGrout:MaterialExpressionConstant3Vector_0",
+        "type": "MaterialExpressionConstant3Vector",
+        "constant": "<Struct 'LinearColor' (0x0000027E3BBEEAC8) {r: 0.300000, g: 0.275000, b: 0.230000, a: 1.000000}>",
+        "inputs": []
+      },
+      "normal": null,
+      "roughness": {
+        "path": "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_StoneGrout.M_AurelionKit_StoneGrout:MaterialExpressionConstant_0",
+        "type": "MaterialExpressionConstant",
+        "r": "0.8799999952316284",
+        "inputs": []
+      }
+    }
+  }
+}

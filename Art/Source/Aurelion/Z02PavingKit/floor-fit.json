@@ -1,0 +1,103 @@
+{
+  "source": {
+    "actor": "Cube2",
+    "mesh": "/Game/Aurelion/Art/Props/StartingRoomTarrik/Cube.Cube",
+    "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-1.000000,W=0.000000),Translation=(X=-7015.958438,Y=-8998.656833,Z=0.000110),Scale3D=(X=2.196993,Y=1.826169,Z=1.926214))",
+    "bounds_origin": "(X=-7015.958438,Y=-8998.656833,Z=0.000110)",
+    "bounds_extent": "(X=1537.894934,Y=913.084772,Z=7.091546)"
+  },
+  "bounds_min": [
+    -8553.853372,
+    -9911.741605,
+    -7.091436
+  ],
+  "bounds_max": [
+    -5478.063504,
+    -8085.572060999999,
+    7.091656
+  ],
+  "surface_z": 7.091656,
+  "columns": [
+    {
+      "suffix": "Z02PavingWest_4m",
+      "x": -8476.926685999999,
+      "width": 1.5385337199999958,
+      "kind": "west"
+    },
+    {
+      "suffix": "PavingIvory_4m",
+      "x": -8200,
+      "width": 4,
+      "kind": "ivory"
+    },
+    {
+      "suffix": "PavingIvory_4m",
+      "x": -7800,
+      "width": 4,
+      "kind": "ivory"
+    },
+    {
+      "suffix": "PavingIvory_4m",
+      "x": -7400,
+      "width": 4,
+      "kind": "ivory"
+    },
+    {
+      "suffix": "PavingRoute_4m",
+      "x": -7000,
+      "width": 4,
+      "kind": "route"
+    },
+    {
+      "suffix": "PavingIvory_4m",
+      "x": -6600,
+      "width": 4,
+      "kind": "ivory"
+    },
+    {
+      "suffix": "PavingIvory_4m",
+      "x": -6200,
+      "width": 4,
+      "kind": "ivory"
+    },
+    {
+      "suffix": "PavingIvory_4m",
+      "x": -5800,
+      "width": 4,
+      "kind": "ivory"
+    },
+    {
+      "suffix": "Z02PavingEast_4m",
+      "x": -5539.031752,
+      "width": 1.2193649600000027,
+      "kind": "east"
+    }
+  ],
+  "rows": [
+    {
+      "y": -9711.741605,
+      "length": 4,
+      "short": false
+    },
+    {
+      "y": -9311.741605,
+      "length": 4,
+      "short": false
+    },
+    {
+      "y": -8911.741605,
+      "length": 4,
+      "short": false
+    },
+    {
+      "y": -8511.741605,
+      "length": 4,
+      "short": false
+    },
+    {
+      "y": -8198.656833,
+      "length": 2.261695440000003,
+      "short": true
+    }
+  ]
+}

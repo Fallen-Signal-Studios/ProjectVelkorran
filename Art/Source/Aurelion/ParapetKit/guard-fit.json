@@ -1,0 +1,30 @@
+{
+  "baseline": [
+    {
+      "actor": "A_Connectors_Pressure_to_Bend_Guard_0_-1",
+      "component": "StaticMeshComponent0",
+      "mesh": "/Engine/BasicShapes/Cube.Cube",
+      "transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.707107,W=0.707107),Translation=(X=-6712.000000,Y=-10900.000000,Z=65.000000),Scale3D=(X=20.000000,Y=0.220000,Z=1.300000))",
+      "visible": false,
+      "hidden_in_game": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "origin": "(X=-6712.000000,Y=-10900.000000,Z=65.000000)",
+      "extent": "(X=11.000000,Y=1000.000000,Z=65.000000)",
+      "instances": []
+    },
+    {
+      "actor": "A_Connectors_Pressure_to_Bend_Guard_0_1",
+      "component": "StaticMeshComponent0",
+      "mesh": "/Engine/BasicShapes/Cube.Cube",
+      "transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.707107,W=0.707107),Translation=(X=-7288.000000,Y=-10900.000000,Z=65.000000),Scale3D=(X=20.000000,Y=0.220000,Z=1.300000))",
+      "visible": false,
+      "hidden_in_game": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "origin": "(X=-7288.000000,Y=-10900.000000,Z=65.000000)",
+      "extent": "(X=11.000000,Y=1000.000000,Z=65.000000)",
+      "instances": []
+    }
+  ]
+}

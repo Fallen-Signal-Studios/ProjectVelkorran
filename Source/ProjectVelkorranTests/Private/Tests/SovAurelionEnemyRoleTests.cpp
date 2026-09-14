@@ -5,6 +5,15 @@
 #include "AI/NarrativeNPCController.h"
 #include "AI/SovAurelionRoleActivities.h"
 #include "Components/BoxComponent.h"
+#include "Components/InstancedStaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
+#if WITH_EDITOR
+#include "StaticMeshCompiler.h"
+#endif
+#include "Components/SkeletalMeshComponent.h"
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
+#include "Engine/SkeletalMesh.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SovAurelionThermalFractureComponent.h"
 #include "Components/SovWeakPointComponent.h"
@@ -20,6 +29,7 @@
 #include "Serialization/MemoryReader.h"
 #include "Serialization/MemoryWriter.h"
 #include "Serialization/ObjectAndNameAsStringProxyArchive.h"
+#include "TimerManager.h"
 #include "UObject/Script.h"
 
 namespace
@@ -115,6 +125,74 @@ struct FRoleWorld
 };
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAurelionVisualWallContactTest, "ProjectVelkorran.Campaign.Aurelion.EnemyRoles.VisualContactDoesNotChangeMovementCollision",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FSovAurelionVisualWallContactTest::RunTest(const FString& Parameters)
+{
+    FRoleWorld F; if (!TestTrue(TEXT("Fixture ready"), F.Valid())) { return false; }
+    auto* Mesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+    if (!TestNotNull(TEXT("Contact test mesh"), Mesh)) { return false; }
+    auto* Owner = F.World->SpawnActor<AActor>();
+    auto* Surface = NewObject<UInstancedStaticMeshComponent>(Owner);
+    Owner->SetRootComponent(Surface); Owner->AddInstanceComponent(Surface);
+    Surface->SetStaticMesh(Mesh); Surface->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    Surface->AddInstance(FTransform(FRotator::ZeroRotator, FVector(0.,80.,200.), FVector(3.,.2,3.)));
+    Surface->RegisterComponent();
+    F.Route->PresentationSurfaces.Add(Surface); F.Route->RebuildPresentationSurfaces();
+    FCollisionQueryParams Query(SCENE_QUERY_STAT(VisualContactTest), false, F.Runner);
+    FHitResult Physical;
+    TestTrue(TEXT("Native wall remains the visibility hit"), F.World->LineTraceSingleByChannel(Physical, FVector(0.,0.,200.), FVector(0.,180.,200.), ECC_Visibility, Query));
+    TestTrue(TEXT("Cosmetic contact never replaces world collision"), Physical.GetComponent()==F.Wall);
+    FHitResult ObjectHit;
+    TestTrue(TEXT("Object-type traces also retain native collision"), F.World->LineTraceSingleByObjectType(ObjectHit,
+        FVector(0.,0.,200.), FVector(0.,180.,200.), FCollisionObjectQueryParams::AllObjects, Query)
+        && ObjectHit.GetComponent()==F.Wall);
+    TArray<UPrimitiveComponent*> RoutePrimitives;
+    F.Route->GetComponents(RoutePrimitives);
+    TestEqual(TEXT("Contact preparation creates no world physics components"), RoutePrimitives.Num(), 0);
+    FHitResult Contact;
+    TestTrue(TEXT("Authored projecting face supplies cosmetic contact"), F.Route->ResolvePresentationContact(Physical,FVector(0.,1.,0.),Contact));
+    TestTrue(TEXT("Contact reaches visible face, not native plane"), FMath::Abs(Contact.ImpactPoint.Y-70.)<.1);
+    TestTrue(TEXT("Visual source remains noncolliding"), Surface->GetCollisionEnabled()==ECollisionEnabled::NoCollision);
+    Surface->UpdateInstanceTransform(0,FTransform(FRotator::ZeroRotator,FVector(0.,120.,200.),FVector(3.,.2,3.)),false,true,true);
+    TestTrue(TEXT("Changed instances immediately supply current contact"), F.Route->ResolvePresentationContact(Physical,FVector(0.,1.,0.),Contact));
+    F.Route->RebuildPresentationSurfaces();
+    TestTrue(TEXT("Recessed visual surface also supplies contact"), F.Route->ResolvePresentationContact(Physical,FVector(0.,1.,0.),Contact));
+    TestTrue(TEXT("Recess lies behind native plane"), FMath::Abs(Contact.ImpactPoint.Y-110.)<.1);
+    Surface->SetVisibility(false);
+    TestFalse(TEXT("Hidden source cannot retain cosmetic contact"), F.Route->ResolvePresentationContact(Physical,FVector(0.,1.,0.),Contact));
+    F.Route->PresentationSurfaces.Reset(); F.Route->RebuildPresentationSurfaces();
+    TestFalse(TEXT("Unbound route retains physical fallback"), F.Route->ResolvePresentationContact(Physical,FVector(0.,1.,0.),Contact));
+    TestTrue(TEXT("Native collision remains intact after rebuild"), F.World->LineTraceSingleByChannel(Physical,FVector(0.,0.,200.),FVector(0.,180.,200.),ECC_Visibility,Query) && Physical.GetComponent()==F.Wall);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAurelionAuthoredContactTest, "ProjectVelkorran.Campaign.Aurelion.EnemyRoles.AuthoredCrucibleClimbSurfaceContact",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FSovAurelionAuthoredContactTest::RunTest(const FString& Parameters)
+{
+    FRoleWorld F; if (!TestTrue(TEXT("Fixture ready"),F.Valid())) { return false; }
+    auto* Mesh=LoadObject<UStaticMesh>(nullptr,TEXT("/Game/Aurelion/Environment/ArchitectureKit/Meshes/SM_Aurelion_KIT_Z08WallAssembly.SM_Aurelion_KIT_Z08WallAssembly"));
+    if (!TestNotNull(TEXT("Saved Crucible assembly"),Mesh)) { return false; }
+#if WITH_EDITOR
+    TArray<UStaticMesh*> PendingMeshes{Mesh};
+    FStaticMeshCompilingManager::Get().FinishCompilation(PendingMeshes);
+#endif
+    auto* Wall=F.Box(FVector(1416.,21930.,-1050.),FVector(10.,220.,150.));
+    auto* Owner=F.World->SpawnActor<AActor>();
+    auto* Surface=NewObject<UInstancedStaticMeshComponent>(Owner);
+    Owner->SetRootComponent(Surface);Owner->AddInstanceComponent(Surface);
+    Surface->SetStaticMesh(Mesh);Surface->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    Surface->AddInstance(FTransform(FVector(0.,20800.,-1200.)));Surface->RegisterComponent();
+    F.Route->PresentationSurfaces.Add(Surface);F.Route->RebuildPresentationSurfaces();
+    FCollisionQueryParams Query(SCENE_QUERY_STAT(AuthoredContactTest),false,F.Runner);FHitResult Physical,Contact;
+    TestTrue(TEXT("Actual climb wall's native plane is preserved"),F.World->LineTraceSingleByChannel(Physical,FVector(1600.,21930.,-1033.),FVector(1350.,21930.,-1033.),ECC_Visibility,Query) && Physical.GetComponent()==Wall);
+    TestTrue(TEXT("Saved production mesh supplies climb contact"),F.Route->ResolvePresentationContact(Physical,FVector(-1.,0.,0.),Contact));
+    TestTrue(TEXT("Feet reach the restored stone face"),FMath::Abs(Contact.ImpactPoint.X-1426.)<.2);
+    TestTrue(TEXT("Stone normal faces the approaching runner"),Contact.ImpactNormal.X>.99);
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAurelionRoleComponentsTest, "ProjectVelkorran.Campaign.Aurelion.EnemyRoles.NativeComponentOwnership",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FSovAurelionRoleComponentsTest::RunTest(const FString& Parameters)
@@ -136,7 +214,8 @@ bool FSovAurelionRoleComponentsTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Weaver owns exactly two native link components"), Links.Num(), 2);
     TestTrue(TEXT("Two anchors are distinct native subobjects"), Weaver->GetAnchorA() != Weaver->GetAnchorB());
     TestFalse(TEXT("Missing authored membership cannot start support"), Weaver->HasActiveSupportLink());
-    TestFalse(TEXT("Traversal component has no autonomous tick"), Runner->GetWallTraversal()->PrimaryComponentTick.bCanEverTick);
+    TestTrue(TEXT("Traversal tick supports surface presentation"), Runner->GetWallTraversal()->PrimaryComponentTick.bCanEverTick);
+    TestFalse(TEXT("Presentation does not autonomously acquire traversal"), Runner->GetWallTraversal()->IsTraversing());
     TestTrue(TEXT("Traversal task has per-AI state"), GetDefault<UBTTask_SovAurelionTraverseWall>()->HasInstance());
     return true;
 }
@@ -175,6 +254,46 @@ bool FSovAurelionWallRoutePhysicalTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("Its busy contribution is released"), F.Runner->GetNarrativeAbilitySystemComponent()->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_Busy));
     TestFalse(TEXT("The same entry route is not repeatedly executed by the BT"), Traversal->CanBeginTraversal());
     TestFalse(TEXT("A delayed abort cannot cancel the completed lease"), Traversal->CancelTraversal(TaskOwner, Lease));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAurelionWallSurfacePresentationTest, "ProjectVelkorran.Campaign.Aurelion.EnemyRoles.WallSurfacePoseAndRecovery",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FSovAurelionWallSurfacePresentationTest::RunTest(const FString& Parameters)
+{
+    FRoleWorld F;
+    if (!F.Valid()) { return false; }
+    auto* Mesh = F.Runner->GetMesh();
+    auto* Asset = LoadObject<USkeletalMesh>(nullptr, TEXT("/Game/Parasites_Pack/Mesh/SK_Parasite_Spider.SK_Parasite_Spider"));
+    auto* Montage = LoadObject<UAnimMontage>(nullptr, TEXT("/Game/Aurelion/Enemies/Animation/AM_EclipseWallRun.AM_EclipseWallRun"));
+    if (!TestNotNull(TEXT("Authored spider mesh"), Asset) || !TestNotNull(TEXT("Authored wall gait"), Montage)) { return false; }
+    Mesh->SetSkeletalMesh(Asset);
+    Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    Mesh->SetRelativeLocation(FVector(0.,0.,-60.));
+    Mesh->SetAnimInstanceClass(UAnimInstance::StaticClass());
+    const FTransform Ground = Mesh->GetRelativeTransform();
+    auto* Traversal = F.Runner->GetWallTraversal();
+    Traversal->WallRunMontage = Montage;
+    const FVector BeforeTick = F.Runner->GetActorLocation();
+    Traversal->TickComponent(.05f, LEVELTICK_All, nullptr);
+    TestFalse(TEXT("Presentation tick does not acquire a movement lease"), Traversal->IsTraversing());
+    TestTrue(TEXT("Presentation tick cannot move the capsule"), F.Runner->GetActorLocation().Equals(BeforeTick));
+    UObject* Task = NewObject<USovRuntimeTestIdentity>(F.World);
+    const uint64 Lease = Traversal->BeginTraversal(Task);
+    if (!TestTrue(TEXT("Physical wall admits normal traversal"), Lease != 0)) { return false; }
+    double BestAlignment = 0.;
+    bool PlayedGait = false;
+    for (int32 Step=0; Step<100; ++Step)
+    {
+        if (Traversal->IsTraversing()) { Traversal->AdvanceTraversal(Task, Lease, .05f); }
+        Traversal->TickComponent(.05f, LEVELTICK_All, nullptr);
+        BestAlignment = FMath::Max(BestAlignment, FMath::Abs(Mesh->GetUpVector().Y));
+        PlayedGait |= Mesh->GetAnimInstance() && Mesh->GetAnimInstance()->Montage_IsPlaying(Montage);
+    }
+    TestTrue(TEXT("Spider body up follows the physical wall normal"), BestAlignment > .95);
+    TestTrue(TEXT("Traversal plays its authored gait"), PlayedGait);
+    TestTrue(TEXT("Landing restores the original mesh transform"), Mesh->GetRelativeTransform().Equals(Ground, .01));
+    TestFalse(TEXT("Landing stops only the wall gait"), Mesh->GetAnimInstance()->Montage_IsPlaying(Montage));
     return true;
 }
 
@@ -432,6 +551,50 @@ bool FSovAurelionFormationReadinessTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Formation can be severed through the real link API"), Link->TrySeverCommandLink(Severer, Sever) == ESovCommandLinkSeverResolution::NewlySevered);
     TestFalse(TEXT("Readiness cannot rearm the severed instance"), Link->InitializeFreshLink());
     TestTrue(TEXT("Severed instance remains exact and retired"), Link->GetLinkInstanceId() == Instance && Link->GetCommandLinkState() == ESovCommandLinkState::Severed);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAurelionSlowFormationBootstrapTest, "ProjectVelkorran.Campaign.Aurelion.EnemyRoles.FormationBootstrapSurvivesSlowMemberReadiness",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FSovAurelionSlowFormationBootstrapTest::RunTest(const FString& Parameters)
+{
+    FRoleWorld F;
+    if (!F.Valid()) { return false; }
+    FActorSpawnParameters Spawn; Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+    auto* Member = F.World->SpawnActor<ASovAurelionTestWeaver>(ASovAurelionTestWeaver::StaticClass(), FVector(700.,0.,60.), FRotator::ZeroRotator, Spawn);
+    if (!Member) { return false; }
+    F.Runner->GetCharacterMovement()->DisableMovement();
+    Member->GetCharacterMovement()->DisableMovement();
+    auto* Link = NewObject<USovAurelionBootstrapTestLink>(F.Runner);
+    Link->bAutoInitializeFreshLink = true;
+    F.Runner->AddInstanceComponent(Link); Link->RegisterComponent();
+    Link->ConfigureLinkId(TEXT("Test.SlowFormation"));
+    Link->RegisterLinkedActor(Member);
+    Link->StartBootstrapForTest();
+    const double Started = F.World->GetTimeSeconds();
+    int32 TimerTicks = 0;
+    FTimerHandle ClockProbe;
+    F.World->GetTimerManager().SetTimer(ClockProbe, FTimerDelegate::CreateLambda([&TimerTicks]() { ++TimerTicks; }), .1f, true);
+    uint64 Frame = GFrameCounter;
+    const auto TickFrame = [&F, &Frame]()
+    {
+        // TimerManager runs once per engine frame, even if an isolated test
+        // advances UWorld repeatedly within one automation callback.
+        TGuardValue<uint64> ScopedFrame(GFrameCounter, ++Frame);
+        F.World->Tick(LEVELTICK_TimeOnly, .1f);
+        // TimeOnly deliberately skips timers and actor simulation in UWorld.
+        F.World->GetTimerManager().Tick(.1f);
+    };
+    for (int32 Index=0; Index<320; ++Index) { TickFrame(); }
+    F.World->GetTimerManager().ClearTimer(ClockProbe);
+    if (!TestTrue(TEXT("Fixture delivered at least 310 actual timer ticks"), TimerTicks >= 310)) { return false; }
+    TestTrue(TEXT("The real game clock passed the old 30-second bootstrap cutoff"), F.World->GetTimeSeconds()-Started > 31.);
+    TestFalse(TEXT("An unready member cannot create an active formation"), Link->GetLinkInstanceId().IsValid());
+    Member->InitializeTestRole();
+    Member->GetCharacterMovement()->DisableMovement();
+    for (int32 Index=0; Index<3; ++Index) { TickFrame(); }
+    TestTrue(TEXT("Native polling activates when the late member becomes ready, without a manual activation call"), Link->IsCommandLinkActive());
+    TestTrue(TEXT("The initialized command source is the real owner"), Link->GetCommandSource()==F.Runner);
     return true;
 }
 

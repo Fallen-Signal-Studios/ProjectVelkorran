@@ -15,6 +15,7 @@ class USovCombatActionTransactionEchoAbility : public USovGameplayAbility_EchoBa
     GENERATED_BODY()
 public:
     USovCombatActionTransactionEchoAbility();
+    void SetCastPairForTest(UAnimMontage* A, UAnimMontage* B) { CastMontages = {A, B}; }
     int32 StartedCount=0;
     int32 CommittedCount=0;
     int32 EndedCount=0;

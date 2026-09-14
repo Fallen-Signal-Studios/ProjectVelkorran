@@ -1,0 +1,210 @@
+[
+  {
+    "label": "Aurelion_TarrikArrivalGate",
+    "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-6999.999991,Y=-17421.803429,Z=-18.368943),Scale3D=(X=4.500000,Y=4.000684,Z=5.039468))",
+    "components": [
+      {
+        "name": "GateBody",
+        "kind": "BoxComponent",
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-6999.999991,Y=-17421.803429,Z=-18.368943),Scale3D=(X=4.500000,Y=4.000684,Z=5.039468))",
+        "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+        "profile": "BlockAll",
+        "visible": false,
+        "bounds": [
+          "(X=-6999.999991,Y=-17421.803429,Z=-18.368943)",
+          "(X=2700.000000,Y=140.023940,Z=907.104150)",
+          2851.744140625
+        ],
+        "unscaled_extent": "(X=600.000000,Y=35.000000,Z=180.000000)"
+      },
+      {
+        "name": "GateVisual",
+        "kind": "StaticMeshComponent",
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-6999.999991,Y=-17421.803506,Z=-18.368943),Scale3D=(X=2.847197,Y=4.120454,Z=3.020431))",
+        "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+        "profile": "Custom",
+        "visible": true,
+        "bounds": [
+          "(X=-6999.999913,Y=-17457.270606,Z=359.096125)",
+          "(X=487.318223,Y=28.925536,Z=361.081770)",
+          607.2032470703125
+        ],
+        "mesh": "/Game/Aurelion/Art/Props/aureliondoors/StaticMeshes/door/door.door"
+      },
+      {
+        "name": "GateSign",
+        "kind": "TextRenderComponent",
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-7359.999991,Y=-17421.803429,Z=485.577807),Scale3D=(X=4.500000,Y=4.000684,Z=5.039468))",
+        "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+        "profile": "NoCollision",
+        "visible": true,
+        "bounds": [
+          "(X=-7359.999991,Y=-17421.803429,Z=546.051422)",
+          "(X=0.000000,Y=79.398195,Z=60.473615)",
+          99.80546569824219
+        ]
+      }
+    ],
+    "contract": {
+      "mission_id": "M12_FireAndFrost",
+      "beat_id": "TarrikArrival",
+      "block_after_completion": "False",
+      "use_gate_body": "True"
+    },
+    "bound_visual_actors": []
+  },
+  {
+    "label": "Aurelion_PressureHallExit",
+    "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-7000.000000,Y=-11886.978265,Z=-30.063708),Scale3D=(X=4.500000,Y=4.000684,Z=5.039468))",
+    "components": [
+      {
+        "name": "GateBody",
+        "kind": "BoxComponent",
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-7000.000000,Y=-11886.978265,Z=-30.063708),Scale3D=(X=4.500000,Y=4.000684,Z=5.039468))",
+        "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+        "profile": "BlockAll",
+        "visible": false,
+        "bounds": [
+          "(X=-7000.000000,Y=-11886.978265,Z=-30.063708)",
+          "(X=4050.000000,Y=140.023940,Z=907.104240)",
+          4152.703125
+        ],
+        "unscaled_extent": "(X=900.000000,Y=35.000000,Z=180.000000)"
+      },
+      {
+        "name": "GateVisual",
+        "kind": "StaticMeshComponent",
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=-7000.000000,Y=-11886.978342,Z=-30.063708),Scale3D=(X=2.847195,Y=4.120452,Z=3.020430))",
+        "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+        "profile": "Custom",
+        "visible": true,
+        "bounds": [
+          "(X=-6999.999921,Y=-11922.445419,Z=347.401242)",
+          "(X=487.317994,Y=28.925518,Z=361.081657)",
+          607.2030029296875
+        ],
+        "mesh": "/Game/Aurelion/Art/Props/aureliondoors/StaticMeshes/door/door.door"
+      },
+      {
+        "name": "GateSign",
+        "kind": "TextRenderComponent",
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-7360.000000,Y=-11886.978265,Z=473.883092),Scale3D=(X=4.500000,Y=4.000684,Z=5.039468))",
+        "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+        "profile": "NoCollision",
+        "visible": true,
+        "bounds": [
+          "(X=-7360.000000,Y=-11886.978265,Z=534.356712)",
+          "(X=0.000000,Y=79.398195,Z=60.473621)",
+          99.80547332763672
+        ]
+      }
+    ],
+    "contract": {
+      "mission_id": "M12_FireAndFrost",
+      "beat_id": "PressureHall",
+      "block_after_completion": "False",
+      "use_gate_body": "True"
+    },
+    "bound_visual_actors": []
+  },
+  {
+    "label": "aureliondoors",
+    "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-7010.000000,Y=-12310.000000,Z=-7.867910),Scale3D=(X=4.500000,Y=4.000684,Z=3.000000))",
+    "components": [
+      {
+        "name": "StaticMeshComponent0",
+        "kind": "StaticMeshComponent",
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-7010.000000,Y=-12310.000000,Z=-7.867910),Scale3D=(X=4.500000,Y=4.000684,Z=3.000000))",
+        "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+        "profile": "BlockAll",
+        "visible": true,
+        "bounds": [
+          "(X=-7010.000000,Y=-14710.410156,Z=627.703311)",
+          "(X=1350.737595,Y=2800.478556,Z=619.298438)",
+          3170.284423828125
+        ],
+        "mesh": "/Game/Aurelion/Art/Props/aureliondoors/StaticMeshes/aureliondoors.aureliondoors"
+      }
+    ]
+  },
+  {
+    "label": "Z01_Lintel_S",
+    "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-7000.000000,Y=-17500.000000,Z=525.000000),Scale3D=(X=6.000000,Y=0.500000,Z=1.500000))",
+    "components": [
+      {
+        "name": "StaticMeshComponent0",
+        "kind": "StaticMeshComponent",
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-7000.000000,Y=-17500.000000,Z=525.000000),Scale3D=(X=6.000000,Y=0.500000,Z=1.500000))",
+        "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+        "profile": "BlockAll",
+        "visible": false,
+        "bounds": [
+          "(X=-7000.000000,Y=-17500.000000,Z=525.000000)",
+          "(X=300.000000,Y=25.000000,Z=75.000000)",
+          310.2418518066406
+        ],
+        "mesh": "/Engine/BasicShapes/Cube.Cube"
+      }
+    ]
+  },
+  {
+    "label": "Z01_Lintel_N",
+    "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-7000.000000,Y=-11900.000000,Z=525.000000),Scale3D=(X=6.000000,Y=0.500000,Z=1.500000))",
+    "components": [
+      {
+        "name": "StaticMeshComponent0",
+        "kind": "StaticMeshComponent",
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-7000.000000,Y=-11900.000000,Z=525.000000),Scale3D=(X=6.000000,Y=0.500000,Z=1.500000))",
+        "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+        "profile": "BlockAll",
+        "visible": false,
+        "bounds": [
+          "(X=-7000.000000,Y=-11900.000000,Z=525.000000)",
+          "(X=300.000000,Y=25.000000,Z=75.000000)",
+          310.2418518066406
+        ],
+        "mesh": "/Engine/BasicShapes/Cube.Cube"
+      }
+    ]
+  },
+  {
+    "label": "Z01__UpperSpan_01",
+    "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-7000.000000,Y=-17320.000000,Z=520.000000),Scale3D=(X=3.250000,Y=1.000000,Z=1.000000))",
+    "components": [
+      {
+        "name": "StaticMeshComponent0",
+        "kind": "StaticMeshComponent",
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-7000.000000,Y=-17320.000000,Z=520.000000),Scale3D=(X=3.250000,Y=1.000000,Z=1.000000))",
+        "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+        "profile": "BlockAll",
+        "visible": true,
+        "bounds": [
+          "(X=-7000.000000,Y=-17320.000000,Z=572.757832)",
+          "(X=1294.889343,Y=6.754932,Z=52.757866)",
+          1295.9813232421875
+        ],
+        "mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Railing_8m.SM_Scifi_Railing_8m"
+      }
+    ]
+  },
+  {
+    "label": "Z01__UpperSpan_02",
+    "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-7000.000000,Y=-12080.000000,Z=520.000000),Scale3D=(X=3.250000,Y=1.000000,Z=1.000000))",
+    "components": [
+      {
+        "name": "StaticMeshComponent0",
+        "kind": "StaticMeshComponent",
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-7000.000000,Y=-12080.000000,Z=520.000000),Scale3D=(X=3.250000,Y=1.000000,Z=1.000000))",
+        "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+        "profile": "BlockAll",
+        "visible": true,
+        "bounds": [
+          "(X=-7000.000000,Y=-12080.000000,Z=572.757832)",
+          "(X=1294.889343,Y=6.754932,Z=52.757866)",
+          1295.9813232421875
+        ],
+        "mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Railing_8m.SM_Scifi_Railing_8m"
+      }
+    ]
+  }
+]

@@ -31,6 +31,9 @@
 #include "UnrealFramework/NarrativeGameUserSettings.h"
 #include "UnrealFramework/NarrativeNPCCharacter.h"
 #include "UnrealFramework/NarrativeTeamAgentInterface.h"
+#include "Components/EquipmentComponent.h"
+#include "Items/WeaponItem.h"
+#include "GAS/NarrativeGameplayAbility.h"
 
 namespace
 {
@@ -185,6 +188,20 @@ void USovCompanionComponent::ObserveContribution(const FSovDamageResult& Result)
 }
 void USovCompanionComponent::ResetContribution(bool bStarted)
 { PlayerContribution = 0.f; CompanionContribution = 0.f; }
+ANarrativeCharacter* USovCompanionComponent::ResolveCommandAttackTarget(ANarrativeCharacter* Character)
+{
+	if (!IsValid(Character)) { return nullptr; }
+	auto* Component = Character->FindComponentByClass<USovCompanionComponent>();
+	auto* Controller = Cast<ANarrativeNPCController>(Character->GetController());
+	auto* Abilities = CompanionASC(Character);
+	if (!Component || !Controller || !Abilities || !Component->IsCommandCurrent(Component->CommandGoal)
+		|| !IsValid(Component->Activities) || Component->Activities->GetCurrentActivityGoal() != Component->CommandGoal
+		|| !IsValid(Component->Leader) || !Component->Leader->IsAlive()
+		|| !Component->HasMissionPermission(Component->Leader)) { return nullptr; }
+	auto* Target = Cast<ANarrativeCharacter>(Component->OwnedFocus.Get());
+	return IsValid(Target) && Controller->GetFocusActor() == Target && HostileCompanionTarget(Character, Target)
+		&& Abilities->IsBotAttackExecutionValid(Target, Component->OwnedCommandAttack) ? Target : nullptr;
+}
 void USovCompanionComponent::TickContextCommand(USovCompanionCommandGoal* Goal)
 {
 	if (IsValid(Goal) && Goal == CommandGoal && Goal->bExplicitHoldTarget && !IsCommandCurrent(Goal))
@@ -199,6 +216,9 @@ void USovCompanionComponent::TickContextCommand(USovCompanionCommandGoal* Goal)
 	if (OwnedCommandAttack.IsValid())
 	{
 		const auto* Spec = Abilities->FindAbilitySpecFromHandle(OwnedCommandAttack);
+		const bool bDefense = Spec && Spec->Ability && (Spec->Ability->IsA<USovGameplayAbility_TarrikGuard>()
+			|| Spec->Ability->IsA<USovGameplayAbility_SeleneDeflection>());
+		if (Spec && Spec->IsActive() && !bDefense) { return; } // Let native attack/montage completion own its lifetime.
 		if (Spec && Spec->IsActive() && GetWorld()->GetTimeSeconds() - CommandAttackStarted < 1.5f) { return; }
 		if (Spec && Spec->IsActive()) { Abilities->CancelAbilityHandle(OwnedCommandAttack); }
 		OwnedCommandAttack = {};
@@ -208,7 +228,7 @@ void USovCompanionComponent::TickContextCommand(USovCompanionCommandGoal* Goal)
 	// Never use hidden recovery to teleport it away from that mark.
 	if (!Goal->bExplicitHoldTarget && TryRecoverSeparation()) { return; }
 	AActor* Focus = Goal->Command == ESovCompanionCommand::FocusTarget ? Goal->Target.Get() : nullptr;
-	const FVector Destination = Goal->Command == ESovCompanionCommand::HoldPosition ? Goal->HoldLocation
+	FVector Destination = Goal->Command == ESovCompanionCommand::HoldPosition ? Goal->HoldLocation
 		: Goal->Command == ESovCompanionCommand::DefendPerson && IsValid(Goal->Target) ? Goal->Target->GetActorLocation() : Leader->GetActorLocation();
 	if (!Focus && Goal->Command != ESovCompanionCommand::HoldPosition)
 	{
@@ -219,17 +239,40 @@ void USovCompanionComponent::TickContextCommand(USovCompanionCommandGoal* Goal)
 			if (Dist < Best && HostileCompanionTarget(NPC, *It) && Controller->LineOfSightTo(*It)) { Best = Dist; Focus = *It; }
 		}
 	}
+	bool bCombatApproach = false;
 	if (IsValid(Focus) && HostileCompanionTarget(NPC, Focus))
 	{
 		if (!OwnedFocus.IsValid()) { PreviousFocus = Controller->GetFocusActor(); }
 		Controller->SetFocus(Focus); OwnedFocus = Focus;
+		// Use the normal replicated wield contract: it owns weapon attachment,
+		// animation layers and item ability grants. Never manufacture an attack grant.
+		if (NPC->IsA<ASovProtagonistCompanionCharacter>() && !NPC->GetWeapon()
+			&& NPC->GetWeaponWieldState().WieldSlots.IsEmpty() && NPC->GetEquipmentComponent()
+			&& !Abilities->HasMatchingGameplayTag(N.State_Weapon_Equipping))
+		{
+			TArray<UEquippableItem*> Equipped;
+			NPC->GetEquipmentComponent()->GetEquippedItemsOfClass(UWeaponItem::StaticClass(), Equipped);
+			for (auto* Item : Equipped)
+			{
+				auto* Weapon = Cast<UWeaponItem>(Item);
+				if (!IsValid(Weapon) || !Weapon->GetEquippedSlot().IsValid()) { continue; }
+				bool bPermitted = false;
+				for (const auto& Class : Weapon->GetWeaponAbilities())
+				{ if (CuratedAbilities.Contains(Class.Get())) { bPermitted = true; break; } }
+				if (!bPermitted) { continue; }
+				FWeaponWieldState Wield;
+				Wield.EquipSlots.AddTag(Weapon->GetEquippedSlot()); Wield.WieldSlots.AddTag(N.Weapon_WieldSlot_Mainhand);
+				NPC->SetWieldState(Wield);
+				return; // Grant/visual callbacks may replace command ownership; revalidate next tick.
+			}
+		}
 		auto* TargetASC = CompanionASC(Focus);
 		// Curated AI may neither finish a protected interaction target nor spend an unlisted ability.
 		const auto* Context = Focus->FindComponentByClass<USovResonanceTargetComponent>();
 		const bool bProtected = TargetASC->HasMatchingGameplayTag(Tags.State_Resonance_ProtectedTarget)
 			|| TargetASC->HasMatchingGameplayTag(Tags.Character_Enemy_Boss) || (Context && Context->bRequiresPlayerFinish);
 		// Only the protagonist proxy gets its copied defense kit. Ordinary allies do not become guard/deflect clones.
-		if (NPC->IsA<ASovProtagonistCompanionCharacter>() && GetWorld()->GetTimeSeconds() >= NextCommandAttack
+		if (NPC->IsA<ASovProtagonistCompanionCharacter>() && GetWorld()->GetTimeSeconds() >= NextCommandDefense
 			&& TargetASC->HasMatchingGameplayTag(N.State_NPC_Activity_Attacking) && Controller->LineOfSightTo(Focus))
 		{
 			for (const auto& Class : CuratedAbilities)
@@ -237,9 +280,15 @@ void USovCompanionComponent::TickContextCommand(USovCompanionCommandGoal* Goal)
 				if (!Class || (!Class->IsChildOf(USovGameplayAbility_TarrikGuard::StaticClass()) && !Class->IsChildOf(USovGameplayAbility_SeleneDeflection::StaticClass()))) { continue; }
 				const auto* Spec = Abilities->FindAbilitySpecFromClass(Class);
 				if (!Spec) { continue; }
-				OwnedCommandAttack = Spec->Handle; CommandAttackStarted = GetWorld()->GetTimeSeconds() - 1.f; NextCommandAttack = GetWorld()->GetTimeSeconds() + 4.f;
-				if (!Abilities->TryActivateAbility(OwnedCommandAttack)) { OwnedCommandAttack = {}; }
-				return;
+				OwnedCommandAttack = Spec->Handle; CommandAttackStarted = GetWorld()->GetTimeSeconds() - 1.f;
+				if (Abilities->TryActivateAbility(OwnedCommandAttack))
+				{
+					// Defense has its own cadence. An enemy's sustained attacking tag
+					// must not repeatedly postpone our next ordinary weapon attack.
+					NextCommandDefense = GetWorld()->GetTimeSeconds() + 4.f;
+					return;
+				}
+				OwnedCommandAttack = {}; // An unavailable defense must not starve ordinary attacks.
 			}
 		}
 		if (!bProtected && GetWorld()->GetTimeSeconds() >= NextCommandAttack
@@ -248,19 +297,45 @@ void USovCompanionComponent::TickContextCommand(USovCompanionCommandGoal* Goal)
 			for (const auto& Candidate : Abilities->GetBotAttackCandidates(Focus, FGameplayTag()))
 			{
 				const auto* Spec = Abilities->FindAbilitySpecFromHandle(Candidate.Handle);
-				if (!Candidate.bAvailable || !Spec || !Spec->Ability || !CuratedAbilities.Contains(Spec->Ability->GetClass())) { continue; }
+				if (!Spec || !Spec->Ability || !CuratedAbilities.Contains(Spec->Ability->GetClass())) { continue; }
+				if (!Candidate.bAvailable)
+				{
+					// Respect explicit holds and the existing ten-metre defense area.
+					// Native attack ranges determine approach; range checks remain authoritative.
+					if (!bCombatApproach && Goal->Command != ESovCompanionCommand::HoldPosition
+						&& Candidate.bHasLineOfSight && !Candidate.bInRange
+						&& FVector::DistSquared(Focus->GetActorLocation(), Destination) <= FMath::Square(1000.f)
+						&& FVector::Dist(NPC->GetActorLocation(), Focus->GetActorLocation()) > Candidate.MaximumRange)
+					{
+						const FVector TowardCompanion = (NPC->GetActorLocation() - Focus->GetActorLocation()).GetSafeNormal2D();
+						const float ApproachRange = FMath::Clamp(Candidate.PreferredRange,
+							Candidate.MinimumRange, FMath::Lerp(Candidate.MinimumRange, Candidate.MaximumRange, .75f));
+						Destination = Focus->GetActorLocation() + TowardCompanion * ApproachRange;
+						bCombatApproach = true;
+					}
+					continue;
+				}
 				OwnedCommandAttack = Candidate.Handle; CommandAttackStarted = GetWorld()->GetTimeSeconds(); NextCommandAttack = CommandAttackStarted + 2.f;
+				if (Controller->GetPathFollowingComponent() && Controller->GetPathFollowingComponent()->GetCurrentRequestId() == CommandMoveId)
+				{ Controller->StopMovement(); }
 				if (!Abilities->TryActivateBotAttack(Focus, Candidate.Handle)) { OwnedCommandAttack = {}; }
 				return;
 			}
 		}
 	}
-	const float MovementThreshold = Goal->bExplicitHoldTarget ? 75.f : 250.f;
+	else if (OwnedFocus.IsValid())
+	{
+		if (Controller->GetFocusActor() == OwnedFocus.Get())
+		{ Controller->ClearFocus(EAIFocusPriority::Gameplay); if (PreviousFocus.IsValid()) { Controller->SetFocus(PreviousFocus.Get()); } }
+		OwnedFocus.Reset(); PreviousFocus.Reset();
+	}
+	const float MovementThreshold = bCombatApproach ? 25.f : Goal->bExplicitHoldTarget ? 75.f : 250.f;
 	if (FVector::DistSquared(NPC->GetActorLocation(), Destination) > FMath::Square(MovementThreshold)
 		&& Controller->GetMoveStatus() != EPathFollowingStatus::Moving && GetWorld()->GetTimeSeconds() >= NextMoveAttempt)
 	{
 		NextMoveAttempt = GetWorld()->GetTimeSeconds() + 1.f;
-		FAIMoveRequest Request(Destination); Request.SetAcceptanceRadius(Goal->bExplicitHoldTarget ? 25.f : 150.f);
+		FAIMoveRequest Request(Destination); Request.SetAcceptanceRadius(bCombatApproach ? 10.f : Goal->bExplicitHoldTarget ? 25.f : 150.f);
+		if (bCombatApproach) { Request.SetReachTestIncludesAgentRadius(false); Request.SetReachTestIncludesGoalRadius(false); }
 		Request.SetAllowPartialPath(false); Request.SetUsePathfinding(true);
 		const auto Move = Controller->MoveTo(Request); CommandMoveId = Move.MoveId;
 		// Retain authored intent and retry at a bounded cadence. Hidden recovery has its own stricter gate.

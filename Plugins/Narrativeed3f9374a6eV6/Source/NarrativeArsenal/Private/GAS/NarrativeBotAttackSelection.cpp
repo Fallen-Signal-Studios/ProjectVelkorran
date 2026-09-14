@@ -1,6 +1,7 @@
 // Copyright Narrative Tools. All Rights Reserved.
 #include "GAS/NarrativeBotAttackSelection.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
+#include "Settings/SovCampaignModifiers.h"
 
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AIController.h"
@@ -353,8 +354,11 @@ bool UNarrativeAbilitySystemComponent::TryActivateBotAttack(AActor* Target, cons
 	}
 	++BotAttackSelectionSerial;
 	BotAttackLastUsed.Add(Handle, BotAttackSelectionSerial);
+    const auto* ModifierSettings = UNarrativeGameUserSettings::GetSovSettings();
+    const float ChallengeCooldown = ModifierSettings && UNarrativeGameUserSettings::IsCampaignEnemy(GetAvatarActor())
+        ? SovCampaignModifiers::AttackCooldown(ModifierSettings->GetCampaignModifiers()) : 1.f;
 	BotAttackNextAllowedTimes.Add(Handle, (GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0)
-		+ FMath::Max(Candidate.Frequency, 0.05f) * (UNarrativeGameUserSettings::GetSovSessionSettings(this)
+		+ FMath::Max(Candidate.Frequency, 0.05f) * ChallengeCooldown * (UNarrativeGameUserSettings::GetSovSessionSettings(this)
 		? UNarrativeGameUserSettings::GetSovSessionSettings(this)->GetEnemyRecoveryScale() : 1.f));
 	// Instant abilities may end inside TryActivateAbility; their end delegate has
 	// already released the lease. Removal during activation is equally safe.

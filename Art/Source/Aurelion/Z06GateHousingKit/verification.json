@@ -1,0 +1,15 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z06GateHousing",
+      "dimensions_m": [
+        0.8680000305175781,
+        5.100000381469727,
+        6.25
+      ],
+      "triangles": 12220
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}

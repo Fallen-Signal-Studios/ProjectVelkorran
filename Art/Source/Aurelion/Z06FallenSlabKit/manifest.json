@@ -1,0 +1,96 @@
+{
+  "status": "Source candidate; Unreal fit and visual acceptance pending",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z06FallenMasonry",
+      "triangles": 17240,
+      "nominal_dimensions_m": [
+        10.0,
+        7.0,
+        2.4000000953674316
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; fitted to the retained 10 x 7 x 2.4 m physical slab, pending in-engine verification",
+      "localized_spalls": [
+        {
+          "x": -4.6,
+          "y": -3.54,
+          "z": 0.31,
+          "max_depth_m": 0.04
+        },
+        {
+          "x": -2.9,
+          "y": -3.54,
+          "z": 1.18,
+          "max_depth_m": 0.04
+        },
+        {
+          "x": -1.3,
+          "y": -3.54,
+          "z": 2.18,
+          "max_depth_m": 0.04
+        },
+        {
+          "x": 0.8,
+          "y": -3.54,
+          "z": 0.44,
+          "max_depth_m": 0.04
+        },
+        {
+          "x": 2.4,
+          "y": -3.54,
+          "z": 1.94,
+          "max_depth_m": 0.04
+        },
+        {
+          "x": 4.7,
+          "y": -3.54,
+          "z": 2.13,
+          "max_depth_m": 0.04
+        },
+        {
+          "x": -4.6,
+          "y": 3.54,
+          "z": 0.31,
+          "max_depth_m": 0.04
+        },
+        {
+          "x": -2.9,
+          "y": 3.54,
+          "z": 1.18,
+          "max_depth_m": 0.04
+        },
+        {
+          "x": -1.3,
+          "y": 3.54,
+          "z": 2.18,
+          "max_depth_m": 0.04
+        },
+        {
+          "x": 0.8,
+          "y": 3.54,
+          "z": 0.44,
+          "max_depth_m": 0.04
+        },
+        {
+          "x": 2.4,
+          "y": 3.54,
+          "z": 1.94,
+          "max_depth_m": 0.04
+        },
+        {
+          "x": 4.7,
+          "y": 3.54,
+          "z": 2.13,
+          "max_depth_m": 0.04
+        }
+      ]
+    }
+  ]
+}

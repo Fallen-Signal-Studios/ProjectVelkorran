@@ -4,6 +4,7 @@
 #include "UnrealFramework/NarrativeGameUserSettings.h"
 #include "Containers/Ticker.h"
 #include "Feedback/SovPlatformOutputTypes.h"
+#include "Settings/SovCampaignModifiers.h"
 #include "SovGameUserSettings.generated.h"
 
 class USovCampaignStateComponent;
@@ -22,6 +23,11 @@ struct PROJECTVELKORRAN_API FSovUserSettingsSnapshot
 {
 	GENERATED_BODY()
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) ESovDifficultyPreset Preset = ESovDifficultyPreset::Standard;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bModifierBlackout = false;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bModifierFamine = false;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bModifierFrenzy = false;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bModifierAscendant = false;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bModifierGlassCannon = false;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) float IncomingDamageScale = 1.f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) float EnemyRecoveryScale = 1.f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bAllowCompanionRescue = true;
@@ -43,7 +49,7 @@ struct PROJECTVELKORRAN_API FSovUserSettingsSnapshot
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bDisableCameraShake = false;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bReduceLensEffects = false;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bReduceCorruptionEffects = false;
-	// Local accessibility preferences: never part of the eleven-byte gameplay export.
+	// Local accessibility preferences: never part of the portable gameplay export.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bReduceCombatEffects = false;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) float UIScale = 1.f;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bShowObjectiveText = true;
@@ -118,6 +124,13 @@ public:
 	UPROPERTY(BlueprintAssignable, Category="Sovereign|Settings") FSovUserSettingsChanged OnUserSettingsChanged;
 	virtual float GetIncomingDamageScale() const override { return Settings.IncomingDamageScale; }
 	virtual float GetEnemyRecoveryScale() const override { return Settings.EnemyRecoveryScale; }
+    virtual uint8 GetCampaignModifiers() const override
+    {
+        using namespace SovCampaignModifiers;
+        return (Settings.bModifierBlackout ? Blackout : 0) | (Settings.bModifierFamine ? Famine : 0)
+            | (Settings.bModifierFrenzy ? Frenzy : 0) | (Settings.bModifierAscendant ? Ascendant : 0)
+            | (Settings.bModifierGlassCannon ? GlassCannon : 0);
+    }
 	virtual float GetDefenseWindowScale() const override { return Settings.DefenseWindowScale; }
 	virtual float GetExertionCostScale() const override { return Settings.ExertionCostScale; }
 	virtual float GetInputBufferAssistanceSeconds() const override { return Settings.InputBufferAssistanceSeconds; }

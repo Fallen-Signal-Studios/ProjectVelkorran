@@ -1,0 +1,33 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Portal_6x4p5",
+      "dimensions_m": [
+        8.0,
+        1.3849999904632568,
+        7.0
+      ],
+      "triangles": 32780
+    },
+    {
+      "asset": "SM_Aurelion_KIT_EndReturn_1x7",
+      "dimensions_m": [
+        1.0,
+        0.8500000238418579,
+        7.0
+      ],
+      "triangles": 3008
+    },
+    {
+      "asset": "SM_Aurelion_KIT_JournalDoor_6x4p5",
+      "dimensions_m": [
+        6.0360002517700195,
+        0.550000011920929,
+        4.539999961853027
+      ],
+      "triangles": 21480
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}

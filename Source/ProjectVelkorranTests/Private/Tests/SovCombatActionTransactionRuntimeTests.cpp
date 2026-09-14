@@ -2,6 +2,10 @@
 #include "Tests/SovCombatActionTransactionTestFixtures.h"
 #include "Tests/SovAxiomRuntimeTestFixtures.h"
 #include "Tests/SovSettingsTestFixtures.h"
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Engine/SkeletalMesh.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SovEchoComponent.h"
 #include "Engine/Engine.h"
@@ -323,6 +327,55 @@ bool FSovCombatActionMeleeAimReentryTest::RunTest(const FString& Parameters)
             ASC->CancelAbilityHandle(Source->Handle);
         }
     }
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovEchoCastPlaybackTest,
+    "ProjectVelkorran.Campaign.Transactions.Actions.EchoCastPlayback",
+    EAutomationTestFlags::EditorContext|EAutomationTestFlags::ProductFilter)
+bool FSovEchoCastPlaybackTest::RunTest(const FString& Parameters)
+{
+    // Isolated GAS test world, not a mission progression or live gameplay receipt.
+    FCombatActionTransactionWorld F; auto* Source=F.Character(); if (!Source) { return false; }
+    auto* Mesh=LoadObject<USkeletalMesh>(nullptr,TEXT("/NarrativePro/Pro/Core/Character/Biped/Art/Mannequin/Meshes/SKM_Quinn.SKM_Quinn"));
+    auto* A=LoadObject<UAnimMontage>(nullptr,TEXT("/Game/Characters/Animation/ProtagonistCasts/AM_Selene_AxiomNullPulse_A.AM_Selene_AxiomNullPulse_A"));
+    auto* B=LoadObject<UAnimMontage>(nullptr,TEXT("/Game/Characters/Animation/ProtagonistCasts/AM_Selene_AxiomNullPulse_B.AM_Selene_AxiomNullPulse_B"));
+    if (!TestNotNull(TEXT("Production mannequin"),Mesh) || !TestNotNull(TEXT("Cast A"),A) || !TestNotNull(TEXT("Cast B"),B)) { return false; }
+    Source->GetMesh()->SetSkeletalMesh(Mesh);
+    Source->GetMesh()->SetAnimInstanceClass(UAnimInstance::StaticClass());
+    Source->GetMesh()->InitAnim(true);
+    auto* Anim=Source->GetMesh()->GetAnimInstance();
+    if (!TestNotNull(TEXT("Real montage playback instance"),Anim)) { return false; }
+    auto* ASC=Source->GetNarrativeAbilitySystemComponent();
+    ASC->InitAbilityActorInfo(Source,Source);
+    const auto Handle=ASC->GiveAbility(FGameplayAbilitySpec(USovCombatActionTransactionEchoAbility::StaticClass(),1));
+    auto* Ability=GetTransactionEcho(ASC,Handle);
+    if (!Ability) { return false; }
+    Ability->SetCastPairForTest(A,B);
+    TestTrue(TEXT("Paid cast A activates"),ASC->TryActivateAbility(Handle,false));
+    TestTrue(TEXT("First cast plays A"),Anim->Montage_IsPlaying(A));
+    Ability->FinishEchoAbility(false);
+    TestTrue(TEXT("Instant successful payload retains cosmetic recovery"),Anim->Montage_IsPlaying(A));
+    TestTrue(TEXT("Paid cast B activates"),ASC->TryActivateAbility(Handle,false));
+    TestTrue(TEXT("Second cast plays B"),Anim->Montage_IsPlaying(B));
+    Ability->FinishEchoAbility(true);
+    TestFalse(TEXT("Cancellation stops its own cast"),Anim->Montage_IsPlaying(B));
+    ASC->AddLooseGameplayTag(FNarrativeGameplayTags::Get().State_Busy);
+    TestFalse(TEXT("Rejected input does not activate"),ASC->TryActivateAbility(Handle,false));
+    ASC->RemoveLooseGameplayTag(FNarrativeGameplayTags::Get().State_Busy);
+    TestTrue(TEXT("Third accepted cast activates"),ASC->TryActivateAbility(Handle,false));
+    TestTrue(TEXT("Rejected input did not consume A"),Anim->Montage_IsPlaying(A));
+    Ability->FinishEchoAbility(false);
+    const auto OtherHandle=ASC->GiveAbility(FGameplayAbilitySpec(USovCombatActionTransactionEchoAbility::StaticClass(),1));
+    auto* Other=GetTransactionEcho(ASC,OtherHandle);
+    if (!Other) { return false; }
+    Other->SetCastPairForTest(A,B);
+    TestTrue(TEXT("Another ability activates"),ASC->TryActivateAbility(OtherHandle,false));
+    TestTrue(TEXT("Another ability starts with its own A"),Anim->Montage_IsPlaying(A));
+    Other->FinishEchoAbility(false);
+    TestTrue(TEXT("Original ability activates again"),ASC->TryActivateAbility(Handle,false));
+    TestTrue(TEXT("Original ability retains its own B"),Anim->Montage_IsPlaying(B));
+    Ability->FinishEchoAbility(true);
+    TestEqual(TEXT("Five real activations pay five costs"),Source->TestEcho->GetEcho(),0.f);
     return true;
 }
 #endif

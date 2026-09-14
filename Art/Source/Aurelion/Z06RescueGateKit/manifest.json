@@ -1,0 +1,22 @@
+{
+  "status": "Source candidate; current-world fit and native motion validation pending",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z06RescueGate",
+      "triangles": 11092,
+      "nominal_dimensions_m": [
+        0.44,
+        4.3,
+        2.58
+      ],
+      "materials": [
+        "M_Aurelion_StoneGrout",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; visual attaches to the existing authoritative moving box"
+    }
+  ]
+}

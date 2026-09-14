@@ -1,6 +1,8 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 
 #include "Components/SovCombatSustainDropComponent.h"
+#include "Settings/SovCampaignModifiers.h"
+#include "UnrealFramework/NarrativeGameUserSettings.h"
 
 #include "AbilitySystemBlueprintLibrary.h"
 #include "ArsenalStatics.h"
@@ -229,7 +231,10 @@ void USovCombatSustainDropComponent::SpawnConfiguredDrops(const FSovDamageResult
 		return;
 	}
 
-	if (bDropAmmo
+    const auto* Settings = UNarrativeGameUserSettings::GetSovSettings();
+    const bool Famine = Settings && SovCampaignModifiers::Has(Settings->GetCampaignModifiers(), SovCampaignModifiers::Famine)
+        && UNarrativeGameUserSettings::IsCampaignEnemy(GetOwner());
+	if (bDropAmmo && !Famine
 		&& AmmoPickupClass
 		&& AmmoItemClass
 		&& AmmoAmount > 0)

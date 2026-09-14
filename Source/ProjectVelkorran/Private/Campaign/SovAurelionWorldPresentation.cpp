@@ -13,6 +13,7 @@
 #include "Styling/CoreStyle.h"
 #include "Settings/SovGameUserSettings.h"
 #include "UI/SovThreatCueLayout.h"
+#include "UI/SovWidgetGeometry.h"
 #include "UI/SovFrontendComponent.h"
 #include "UI/SovCombatVitalsWidget.h"
 #include "UI/SovAccessibilityPresentation.h"
@@ -122,8 +123,10 @@ int32 USovAurelionThreatWidget::NativePaint(const FPaintArgs& Args, const FGeome
         if (!IsValid(Owner) || Owner->GetOwningPlayer() != GetOwningPlayer()
             || Owner->GetWorld() != GetWorld() || !Owner->IsInViewport() || !Owner->IsRendered()
             || !IsValid(Panel) || !Panel->IsRendered() || Panel->GetRenderOpacity() <= .01f) { return; }
-        // Cached geometry includes the actual DPI, SafeZone and accessibility render scale.
-        const auto Bounds = Panel->GetCachedGeometry().GetRenderBoundingRect();
+        // Native UMG panels can render with empty geometry caches. Resolve their
+        // arranged Slate path in that case, retaining DPI/SafeZone transforms.
+        FSlateRect Bounds;
+        if (!SovWidgetGeometry::FindRenderedBounds(Panel, Bounds)) { return; }
         const FVector2D Min = Geometry.AbsoluteToLocal(FVector2D(Bounds.Left, Bounds.Top));
         const FVector2D Max = Geometry.AbsoluteToLocal(FVector2D(Bounds.Right, Bounds.Bottom));
         if (!Min.ContainsNaN() && !Max.ContainsNaN() && Max.X > Min.X && Max.Y > Min.Y)
@@ -154,7 +157,19 @@ int32 USovAurelionThreatWidget::NativePaint(const FPaintArgs& Args, const FGeome
             FVector2D(CullingRect.Left, CullingRect.Top), FVector2D(CullingRect.Right, CullingRect.Bottom))) { continue; }
         const auto BoxGeometry = Geometry.ToPaintGeometry(FVector2f(Size), FSlateLayoutTransform(FVector2f(Position)));
         FSlateDrawElement::MakeBox(Elements, BaseLayer + 1, BoxGeometry, FCoreStyle::Get().GetBrush("WhiteBrush"),
-            ESlateDrawEffect::None, FLinearColor(.012f, .017f, .027f, Settings.bHighContrastHUD ? 1.f : .96f));
+            ESlateDrawEffect::None, FLinearColor(.012f, .017f, .027f, Settings.bHighContrastHUD ? 1.f : .24f));
+        // Static corner marks carry the holographic frame without a heavy slab
+        // or animated flashing. High contrast retains its opaque backing.
+        for (int32 Corner = 0; Corner < 4; ++Corner)
+        {
+            const float X = Corner & 1 ? -1.f : 1.f;
+            const float Y = Corner & 2 ? -1.f : 1.f;
+            const FVector2D Point = Position + FVector2D(Corner & 1 ? Size.X : 0., Corner & 2 ? Size.Y : 0.);
+            TArray<FVector2f> Mark = { FVector2f(Point + FVector2D(0., Y * 10.f * Scale)),
+                FVector2f(Point), FVector2f(Point + FVector2D(X * 10.f * Scale, 0.)) };
+            FSlateDrawElement::MakeLines(Elements, BaseLayer + 2, Geometry.ToPaintGeometry(), Mark,
+                ESlateDrawEffect::None, Accent, true, Scale);
+        }
         // A static directional chevron and explicit words remain legible without flashes or color discrimination.
         const FVector2D Center = Position + FVector2D(23.f, 33.f) * Scale;
         const FVector2D Direction = Index == 0 ? FVector2D(0, -1) : Index == 1 ? FVector2D(1, 0)
@@ -168,6 +183,11 @@ int32 USovAurelionThreatWidget::NativePaint(const FPaintArgs& Args, const FGeome
         const FText Label = FText::Format(LOCTEXT("IncomingGrouped", "INCOMING FIRE  {0}"), FText::AsNumber(Groups[Index].Num()));
         const auto DrawLabel = [&](const FText& Text, const float Y, const int32 FontSize, const FLinearColor Color)
         {
+            FSlateDrawElement::MakeText(Elements, BaseLayer + 2,
+                Geometry.ToPaintGeometry(FVector2f(Size.X - 48.f * Scale, 27.f * Scale),
+                    FSlateLayoutTransform(FVector2f(Position + FVector2D(47.f, Y + 1.f) * Scale))),
+                Text, FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), FMath::RoundToInt(FontSize * Scale)),
+                ESlateDrawEffect::None, FLinearColor::Black);
             FSlateDrawElement::MakeText(Elements, BaseLayer + 3,
                 Geometry.ToPaintGeometry(FVector2f(Size.X - 48.f * Scale, 27.f * Scale),
                     FSlateLayoutTransform(FVector2f(Position + FVector2D(46.f, Y) * Scale))),

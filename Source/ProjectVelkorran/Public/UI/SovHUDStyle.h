@@ -10,8 +10,9 @@ namespace SovHUDStyle
     struct FTheme
     {
         FLinearColor Accent = FLinearColor(.65f, .8f, .9f);
-        // Neutral graphite keeps the scene readable; faction identity stays in the edge and label.
-        FLinearColor Background = FLinearColor(.008f, .011f, .016f, .86f);
+        // A light optical veil keeps the scene visible behind projected information.
+        // High-contrast mode supplies its own opaque backing in ForProtagonist.
+        FLinearColor Background = FLinearColor(.008f, .018f, .028f, .30f);
         EFrame Frame = EFrame::Neutral;
         FText Identity;
     };

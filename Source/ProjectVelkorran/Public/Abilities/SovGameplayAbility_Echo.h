@@ -11,6 +11,7 @@ class USovEchoComponent;
 class UAbilitySystemComponent;
 class UNarrativeAttributeSetBase;
 class UWeaponItem;
+class UAnimMontage;
 
 /** How an Echo ability validates the weapon classes authored on its child. */
 UENUM(BlueprintType)
@@ -174,11 +175,21 @@ protected:
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Animation", meta = (Categories = "Narrative.Anim.AnimSets"))
 	FGameplayTag AbilityAnimSetTag;
 
+	/** Cosmetic A/B casts. Exactly two distinct montages; no payload notifies or root motion. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Animation")
+	TArray<TObjectPtr<UAnimMontage>> CastMontages;
+
 	/** Failsafe for a Blueprint child that never ends its montage/task flow. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Lifecycle", meta = (ClampMin = "0.0"))
 	float MaximumActiveDuration = 5.0f;
 
 private:
+	void PlayAlternatingCastMontage();
+	uint8 NextCastMontageIndex = 0;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimMontage> ActiveCastMontage;
+
 	bool IsEchoActivationCurrent(uint64 Epoch) const;
 	USovEchoComponent* ResolveEchoComponent(const FGameplayAbilityActorInfo* ActorInfo) const;
 	bool MeetsCharacterRequirement(const FGameplayAbilityActorInfo* ActorInfo) const;

@@ -18,6 +18,9 @@
 #include "GAS/NarrativeAttributeSetBase.h"
 #include "Sovereign/SovGameplayTags.h"
 #include "Framework/SovPlayerController.h"
+#include "Items/InventoryComponent.h"
+#include "Items/WeaponItem.h"
+#include "GAS/NarrativeGameplayAbility.h"
 
 ASovProtagonistCompanionCharacter::ASovProtagonistCompanionCharacter(const FObjectInitializer& Initializer) : Super(Initializer)
 {
@@ -81,8 +84,25 @@ bool ASovProtagonistCompanionCharacter::PrepareProxy(FGameplayTag Identity, FNam
 		{ Reason = TEXT("Curated companion classes must be concrete and unique."); return false; }
 		Seen.Add(Class.Get());
 		const auto* Spec = const_cast<UNarrativeAbilitySystemComponent*>(OutgoingASC)->FindAbilitySpecFromClass(Class);
-		if (!Spec || !Spec->Ability) { continue; } // Locked player choices are never silently unlocked for AI.
-		FSovCompanionKitGrant Grant; Grant.Ability = Class; Grant.Level = Spec->Level; CopiedGrants.Add(Grant);
+		// Holstering removes item grants from the ASC, not ownership of that weapon's kit.
+		// Consult only the real outgoing inventory and the explicit mission allowlist.
+		bool bOwnedWeaponGrant = false;
+		const auto* OutgoingCharacter = Cast<ANarrativeCharacter>(OutgoingASC->GetAvatarActor());
+		if (OutgoingCharacter && OutgoingCharacter->GetInventoryComponent())
+		{
+			for (auto* Item : OutgoingCharacter->GetInventoryComponent()->GetItems())
+			{
+				const auto* Weapon = Cast<UWeaponItem>(Item);
+				if (!IsValid(Weapon)) { continue; }
+				for (const auto& WeaponAbility : Weapon->GetWeaponAbilities())
+				{ if (WeaponAbility.Get() == Class.Get()) { bOwnedWeaponGrant = true; break; } }
+				if (bOwnedWeaponGrant) { break; }
+			}
+		}
+		if ((!Spec || !Spec->Ability) && !bOwnedWeaponGrant) { continue; }
+		FSovCompanionKitGrant Grant; Grant.Ability = Class; Grant.Level = Spec ? Spec->Level : 1;
+		Grant.bWeaponGrant = bOwnedWeaponGrant && (!Spec || Cast<UWeaponItem>(Spec->SourceObject.Get()));
+		CopiedGrants.Add(Grant);
 	}
 	SavedMaxHealth = OutgoingASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetMaxHealthAttribute());
 	SavedHealth = OutgoingASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute());
@@ -129,6 +149,7 @@ bool ASovProtagonistCompanionCharacter::CompleteProxyInitialization()
 	// Replace only grants duplicated by this explicit curated copy; unrelated default kit stays available but AI cannot select it.
 	for (const auto& Grant : CopiedGrants)
 	{
+		if (Grant.bWeaponGrant) { continue; } // Native weapon draw owns grant/source/lifetime.
 		if (auto* Existing = ASC->FindAbilitySpecFromClass(Grant.Ability))
 		{ Existing->Level = Grant.Level; ASC->MarkAbilitySpecDirty(*Existing); continue; }
 		OwnedKitHandles.Add(ASC->GiveAbility(FGameplayAbilitySpec(Grant.Ability, Grant.Level, INDEX_NONE, this)));

@@ -1,0 +1,15 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z06FallenMasonry",
+      "dimensions_m": [
+        10.0,
+        7.0,
+        2.4000000953674316
+      ],
+      "triangles": 17240
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}

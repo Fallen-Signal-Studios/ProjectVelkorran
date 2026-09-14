@@ -1,0 +1,19 @@
+{
+  "asset": "SM_Aurelion_CrucibleVault",
+  "triangles": 25488,
+  "dimensions_metres": [
+    71.39999389648438,
+    49.400001525878906,
+    15.399999618530273
+  ],
+  "placement_z_cm": -500,
+  "collision": "none; above playable wall head",
+  "materials": [
+    "M_Vault_Stone",
+    "M_Vault_Shadow",
+    "M_Vault_Gold",
+    "M_Vault_Inlay"
+  ],
+  "status": "architectural proposal requiring Unreal review",
+  "fbx_sha256": "ae3300fe77fbed890862ad2235e825bed44d19a6a5aa3aa6399cd44b9109d926"
+}

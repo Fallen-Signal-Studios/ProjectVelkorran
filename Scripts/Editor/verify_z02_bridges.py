@@ -1,0 +1,13 @@
+from pathlib import Path
+import runpy
+import unreal
+root=Path(unreal.Paths.project_dir())
+exec(compile((root/'Scripts/Editor/verify_z02_approach_guards.py').read_text(encoding='utf-8-sig'),'verify_z02_approach_guards','exec'))
+assert len(actors)==2049+z02_exterior_count+z02_facade_light_count+north_guard_count+north_bridge_count+atrium_guard_count+atrium_ring_count+atrium_parapet_count+atrium_canopy_count+atrium_bridge_floor_count+atrium_crown_count+atrium_crown_light_count+z06_paving_count+z06_ceiling_count+z06_side_count+z06_light_count+z06_end_count+z06_slab_count+z06_refuge_count+z06_refuge_finish_count+z06_gate_assembly_count+z06_flank_landing_count+z07_paving_count+z07_wall_count+z07_light_count+z08_paving_count+z08_court_count and z02_bridges_count==4
+checks=runpy.run_path(str(root/'Scripts/Editor/check_z02_bridges.py'))
+geometry=checks['check_bridges'](world,actors)
+geometry['route_controls']=checks['route_controls'](world,actors)
+for row in geometry['route_controls']:
+    assert row['blocker']==('Aurelion_PressureHallExit' if row['bridge']=='bridge2' else None),row
+assert not unreal.EditorLoadingAndSavingUtils.get_dirty_map_packages()
+(out/'z02-bridges-reload-verification.json').write_text(json.dumps(dict(status='passed',actor_count=len(actors),geometry=geometry),indent=2))

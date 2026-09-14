@@ -3,6 +3,8 @@
 #include "Tests/SovAxiomRuntimeTestFixtures.h"
 #include "Tests/SovCampaignMassRoundTripFixtures.h"
 #include "Tests/SovCombatRoutingTestFixtures.h"
+#include "Tests/SovCoActionRuntimeTestFixtures.h"
+#include "Companions/SovCompanionCommandActivity.h"
 #include "Components/SovAurelionThermalFractureComponent.h"
 #include "Components/SovPoiseComponent.h"
 #include "Components/BoxComponent.h"
@@ -154,6 +156,60 @@ bool FSovAurelionThermalNativePayoffTest::RunTest(const FString& Parameters)
     F.Hit(); F.NextFrame(); TestEqual(TEXT("Repeated heat cannot mint another payoff"), F.Fracture->GetFractureReceipt().PayoffTransactionId, Receipt.PayoffTransactionId);
     F.Fracture->PrepareForSave_Implementation(); F.Fracture->Load_Implementation();
     TestFalse(TEXT("Actor/component load never manufactures live fracture proof"), F.Complete());
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAurelionThermalCompletedActionTest,
+    "ProjectVelkorran.Campaign.Aurelion.ThermalFracture.CompletedProofSurvivesCombatActions",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovAurelionThermalCompletedActionTest::RunTest(const FString& Parameters)
+{
+    FThermalWorld F; if (!TestTrue(TEXT("Ready thermal fixture"), F.bReady)) { return false; }
+    F.Frost(); F.Hit(); F.NextFrame();
+    if (!TestTrue(TEXT("Native fracture completed before combat resumes"), F.Complete())) { return false; }
+    const auto Payoff = F.Fracture->GetFractureReceipt().PayoffTransactionId;
+    const auto& N = FNarrativeGameplayTags::Get();
+    for (auto* ASC : {F.Player->GetNarrativeAbilitySystemComponent(), F.Selene->GetNarrativeAbilitySystemComponent()})
+    {
+        for (const auto Tag : {N.State_Busy, N.State_Interacting, N.State_Movement_Lock, FSovGameplayTags::Get().State_Poise_Broken})
+        {
+            ASC->AddLooseGameplayTag(Tag);
+            TestTrue(TEXT("Subsequent action or stagger does not erase an earned payoff"), F.Complete());
+            TestEqual(TEXT("Existing native transaction is retained"), F.Fracture->GetFractureReceipt().PayoffTransactionId, Payoff);
+            ASC->RemoveLooseGameplayTag(Tag);
+        }
+    }
+    F.Fracture->Load_Implementation();
+    TestFalse(TEXT("Reload still retires live proof"), F.Complete());
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAurelionThermalReleaseHoldTest,
+    "ProjectVelkorran.Campaign.Aurelion.ThermalFracture.ReleaseOnlyCompletedFrostHold",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovAurelionThermalReleaseHoldTest::RunTest(const FString& Parameters)
+{
+    for (bool bNewerHold : {false, true})
+    {
+        FThermalWorld F; if (!TestTrue(TEXT("Ready thermal fixture"), F.bReady)) { return false; }
+        auto* AI = F.World->SpawnActor<ASovCoActionTestNPCController>();
+        AI->Possess(F.Selene); F.Selene->InitializeTestCombat();
+        auto* Activities = CastChecked<USovCoActionTestActivities>(AI->GetActivityComponent());
+        Activities->InitializeForCoAction();
+        auto* Companion = F.Selene->GetCompanionComponent(); FString Error;
+        if (!TestTrue(TEXT("Real command owner accepts leader"), Companion->SetLeader(F.Player, Error))) { AddError(Error); return false; }
+        if (!TestTrue(TEXT("Real frost hold accepted"), Companion->RequestCommand(F.Player, ESovCompanionCommand::HoldPosition, F.Fracture->FrostAnchor, Error))) { AddError(Error); return false; }
+        F.Frost(); F.Hit();
+        TestTrue(TEXT("Hold remains until native payoff"), Companion->HasAcceptedHoldPosition(F.Fracture->FrostAnchor));
+        if (bNewerHold)
+        { TestTrue(TEXT("Newer hold accepted before deferred payoff"), Companion->RequestCommand(F.Player, ESovCompanionCommand::HoldPosition, F.Selene, Error)); }
+        F.NextFrame();
+        if (!TestTrue(TEXT("Actual payoff completes"), F.Complete())) { AddError(F.Fracture->LastError); return false; }
+        bool bFound = false;
+        const auto* Goal = Cast<USovCompanionCommandGoal>(Activities->GetGoalByKey(USovCompanionCommandGoal::StaticClass(), Companion, bFound));
+        if (!TestTrue(TEXT("Accepted command remains owned"), bFound && Goal && Companion->IsCommandCurrent(Goal))) { return false; }
+        TestEqual(TEXT("Completed frost hold regroups; newer hold is preserved"), Goal->Command,
+            bNewerHold ? ESovCompanionCommand::HoldPosition : ESovCompanionCommand::Regroup);
+        if (bNewerHold) { TestTrue(TEXT("Newer target is unchanged"), Companion->HasAcceptedHoldPosition(F.Selene)); }
+    }
     return true;
 }
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAurelionThermalRetirementTest,

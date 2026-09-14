@@ -1,0 +1,28 @@
+{
+  "status": "Architectural luminaire candidate; room lighting and performance review required",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_PierUplight",
+      "triangles": 15484,
+      "nominal_dimensions_m": [
+        0.7599999904632568,
+        0.6730000376701355,
+        0.7200000286102295
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_UplightLens"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; pier-mounted visual fixture above player height",
+      "optical_center_local_m": [
+        0,
+        -0.275,
+        0.46
+      ]
+    }
+  ]
+}

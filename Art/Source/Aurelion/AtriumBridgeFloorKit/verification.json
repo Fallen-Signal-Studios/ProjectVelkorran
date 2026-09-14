@@ -1,0 +1,15 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_AtriumBridgeFloor",
+      "dimensions_m": [
+        10.2954740524292,
+        6.0,
+        1.3200000524520874
+      ],
+      "triangles": 12504
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}

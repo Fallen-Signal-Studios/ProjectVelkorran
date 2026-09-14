@@ -20,6 +20,7 @@ class USovCoActionActivity;
 class USovCompanionCommandGoal;
 class UGameplayAbility;
 class UPrimitiveComponent;
+class ANarrativeCharacter;
 struct FSovDamageResult;
 
 UENUM(BlueprintType)
@@ -57,6 +58,9 @@ public:
 	/** Includes a real accepted goal awaiting a suspended Narrative activity's selection. */
 	bool HasAcceptedHoldPosition(const AActor* Target) const;
 	void TickContextCommand(USovCompanionCommandGoal* Goal);
+	/** Target of the currently owned native command attack; no fallback to arbitrary controller focus. */
+	UFUNCTION(BlueprintPure, Category="Companion|Combat")
+	static ANarrativeCharacter* ResolveCommandAttackTarget(ANarrativeCharacter* Character);
 	void NotifyCommandInterrupted(USovCompanionCommandGoal* Goal);
 	/** Defeat during a required action fails this active encounter; no resurrection or damage immunity is invented. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Companion") TObjectPtr<ASovEncounterDirector> RequiredEncounter;
@@ -97,6 +101,7 @@ private:
 	float CompanionContribution = 0.f;
 	float CommandAttackStarted = 0.f;
 	float NextCommandAttack = 0.f;
+	float NextCommandDefense = 0.f;
 	bool bCommandInterrupted = false;
 	FAIRequestID CommandMoveId;
 	TWeakObjectPtr<AActor> OwnedFocus;
