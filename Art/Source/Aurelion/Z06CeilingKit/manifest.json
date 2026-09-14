@@ -1,0 +1,43 @@
+{
+  "status": "Authored coffer candidate; in-engine lighting and gameplay review pending",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z06Coffer_4m",
+      "triangles": 12972,
+      "nominal_dimensions_m": [
+        4.0,
+        4.0,
+        0.5499999523162842
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; ceiling relief stays above 6.45 m room clearance; no gameplay collision changed",
+      "minimum_z_m": 0.0,
+      "maximum_z_m": 0.5499999523162842
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z06Coffer_3x4",
+      "triangles": 12972,
+      "nominal_dimensions_m": [
+        3.0,
+        4.0,
+        0.5499999523162842
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; ceiling relief stays above 6.45 m room clearance; no gameplay collision changed",
+      "minimum_z_m": 0.0,
+      "maximum_z_m": 0.5499999523162842
+    }
+  ]
+}
