@@ -220,7 +220,10 @@ private:
 	UFUNCTION()
 	void OnRep_SeveredRegionMask();
 
-	UFUNCTION(NetMulticast, Reliable)
+	/** One-shot sever cosmetics. Unreliable: the severed state itself replicates through SeveredRegionMask, whose
+	 * OnRep rebuilds the region visuals for lost packets and late joiners, so a burst of kills cannot saturate the
+	 * reliable channel. */
+	UFUNCTION(NetMulticast, Unreliable)
 	void MulticastPlaySever(
 		ESovDismembermentRegion Region,
 		FName HitBone,
