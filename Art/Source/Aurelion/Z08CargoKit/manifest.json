@@ -1,0 +1,24 @@
+{
+  "status": "Authored cargo; engine fit and visual acceptance pending",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z08SealedStores",
+      "triangles": 24388,
+      "nominal_dimensions_m": [
+        2.000000305175781,
+        1.9999998474121095,
+        2.0
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; replaces decorative cargo instances; native cover unchanged",
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    }
+  ]
+}
