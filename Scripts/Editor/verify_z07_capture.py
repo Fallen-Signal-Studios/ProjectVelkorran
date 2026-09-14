@@ -9,7 +9,7 @@ del DEFER_Z07_WALL_AUTORUN
 def verify():
     verify_z07_walls_stage()
     geometry=runpy.run_path(str(root/'Scripts/Editor/check_z07_capture.py'))['check_z07_capture'](world,actors)
-    assert len(actors)==2923 and not unreal.EditorLoadingAndSavingUtils.get_dirty_map_packages()
+    assert len(actors)==2923+z07_light_count and not unreal.EditorLoadingAndSavingUtils.get_dirty_map_packages()
     (out/'z07-capture-verification.json').write_text(json.dumps(dict(status='passed',actor_count=len(actors),geometry=geometry),indent=2))
 if not globals().get('DEFER_Z07_CAPTURE_AUTORUN',False):
     unreal.EditorPythonScripting.set_keep_python_script_alive(True);started=time.monotonic()

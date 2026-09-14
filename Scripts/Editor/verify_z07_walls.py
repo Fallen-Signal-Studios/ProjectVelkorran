@@ -9,7 +9,7 @@ del DEFER_Z07_CEILING_AUTORUN
 def verify():
     verify_z07_ceiling_stage()
     geometry=runpy.run_path(str(root/'Scripts/Editor/check_z07_walls.py'))['check_z07_walls'](world,actors)
-    assert len(actors)==2923 and z07_wall_count==26 and not unreal.EditorLoadingAndSavingUtils.get_dirty_map_packages()
+    assert len(actors)==2923+z07_light_count and z07_wall_count==26 and not unreal.EditorLoadingAndSavingUtils.get_dirty_map_packages()
     (out/'z07-walls-verification.json').write_text(json.dumps(dict(status='passed',actor_count=len(actors),geometry=geometry),indent=2))
 if not globals().get('DEFER_Z07_WALL_AUTORUN',False):
     unreal.EditorPythonScripting.set_keep_python_script_alive(True);started=time.monotonic()

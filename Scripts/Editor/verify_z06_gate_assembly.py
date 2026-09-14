@@ -8,7 +8,7 @@ verify_stone_material_stage=verify
 del DEFER_KIT_STONE_NORMAL_AUTORUN
 def verify():
     verify_stone_material_stage()
-    assert len(actors)==2842+z06_flank_landing_count+z07_paving_count+z07_wall_count and z06_gate_assembly_count==5
+    assert len(actors)==2842+z06_flank_landing_count+z07_paving_count+z07_wall_count+z07_light_count and z06_gate_assembly_count==5
     geometry=runpy.run_path(str(root/'Scripts/Editor/check_z06_gate_assembly.py'))['check_z06_gate_assembly'](world,actors)
     assert not unreal.EditorLoadingAndSavingUtils.get_dirty_map_packages()
     (out/'z06-gate-assembly-verification.json').write_text(json.dumps(dict(status='passed',actor_count=len(actors),geometry=geometry),indent=2))

@@ -46,6 +46,10 @@ def check_z07_ceiling(world,actors):
         c=labels[row['actor']].get_component_by_class(unreal.RectLightComponent);color=c.get_light_color()
         assert max(abs(v-w) for v,w in zip((color.r,color.g,color.b,color.a),row['after_linear']))<.005
         assert abs(c.intensity-row['after_intensity'])<.01 and c.get_world_transform().export_text()==row['transform']
-        assert {k:str(c.get_editor_property(k)) for k in row['properties']}==row['properties']
+        expected=dict(row['properties'])
+        if 'KIT_Z07_Uplight_West_00' in labels:
+            light_fit=json.loads((root/'Art/Source/Aurelion/Z07Lighting/lighting-fit.json').read_text())
+            expected.update(cast_shadows='True',source_width=str(float(light_fit['key_source_width'])),source_height=str(float(light_fit['key_source_height'])))
+        assert {k:str(c.get_editor_property(k)) for k in expected}==expected
         lights.append(dict(actor=row['actor'],lumens=c.intensity))
     return dict(instances=placed,retired_bands=2,doorway_capsules=probes,lights=lights,qualification='Stopped-editor geometric fit and isolated doorway collision; live traversal, cinematics, wall-running and GPU performance remain unqualified.')
