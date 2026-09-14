@@ -1,0 +1,22 @@
+{
+  "status": "Custom parapet source; full bridge and live route qualification pending",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Parapet_2m",
+      "triangles": 3432,
+      "nominal_dimensions_m": [
+        2,
+        0.22,
+        1.3
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; intended to visualize retained solid connector guard volumes"
+    }
+  ]
+}
