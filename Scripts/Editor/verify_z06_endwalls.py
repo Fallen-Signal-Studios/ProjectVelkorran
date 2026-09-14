@@ -9,7 +9,7 @@ del DEFER_Z06_LIGHTING_AUTORUN
 
 def verify():
     verify_z06_lighting_stage()
-    assert len(actors)==2831+z06_slab_count and z06_end_count==18
+    assert len(actors)==2831+z06_slab_count+z06_refuge_count and z06_end_count==18
     geometry=runpy.run_path(str(root/'Scripts/Editor/check_z06_endwalls.py'))['check_z06_endwalls'](world,actors)
     assert not unreal.EditorLoadingAndSavingUtils.get_dirty_map_packages()
     (out/'z06-endwall-verification.json').write_text(json.dumps(dict(status='passed',actor_count=len(actors),geometry=geometry),indent=2))

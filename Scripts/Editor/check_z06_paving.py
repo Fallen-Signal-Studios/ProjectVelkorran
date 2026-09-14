@@ -1,5 +1,5 @@
 """Measured paving fit and retained Z06 floor collision, excluding gameplay claims."""
-import json
+import json,runpy
 from pathlib import Path
 import unreal
 
@@ -31,6 +31,9 @@ def check_z06_paving(world, actors):
         source=next(r for r in slab['art'] if r['count']==48)
         assert sorted(expected)==sorted(source['all_transforms'])
         selected={r['index'] for r in source['selected']};expected=[t for i,t in enumerate(source['all_transforms']) if i not in selected]
+    if 'KIT_Z06_Refuge_Landing' in labels:
+        root=Path(unreal.Paths.project_dir())
+        expected=runpy.run_path(str(root/'Scripts/Editor/check_z06_refuge.py'))['remaining_refuge_art'](root,expected)
     assert sorted(c.get_instance_transform(i,world_space=True).export_text() for i in range(c.get_instance_count()))==sorted(expected)
     retained_floor_count=c.get_instance_count()
     center=fit['centerline'];c=labels[center['actor']].get_component_by_class(unreal.InstancedStaticMeshComponent)

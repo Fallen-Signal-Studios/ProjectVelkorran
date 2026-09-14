@@ -1,5 +1,5 @@
 """Fallen masonry fit, retained art ownership and surrounding passage baseline."""
-import json,math
+import json,math,runpy
 from pathlib import Path
 import unreal
 
@@ -16,6 +16,9 @@ def check_z06_slab(world,actors):
     sm=unreal.get_editor_subsystem(unreal.StaticMeshEditorSubsystem);assert sm.get_num_uv_channels(m,0)==2 and sm.get_nanite_settings(m).get_editor_property('enabled') and sm.get_convex_collision_count(m)==0 and sm.get_simple_collision_count(m)==0
     row=next(r for r in fit['art'] if r['count']==48);selected={r['index'] for r in row['selected']};expected=[t for i,t in enumerate(row['all_transforms']) if i not in selected]
     c=labels[row['actor']].get_component_by_class(unreal.InstancedStaticMeshComponent)
+    if 'KIT_Z06_Refuge_Landing' in labels:
+        expected=runpy.run_path(str(root/'Scripts/Editor/check_z06_refuge.py'))['remaining_refuge_art'](root,expected)
+    retained_count=len(expected)
     assert sorted(c.get_instance_transform(i,world_space=True).export_text() for i in range(c.get_instance_count()))==sorted(expected)
     probes=[]
     for row in fit['passage_probes']:
@@ -31,4 +34,4 @@ def check_z06_slab(world,actors):
             raw=unreal.SystemLibrary.line_trace_single(world,unreal.Vector(wx,wy,-200),unreal.Vector(wx,wy,-700),unreal.TraceTypeQuery.TRACE_TYPE_QUERY1,False,ignored,unreal.DrawDebugTrace.NONE,True)
             h=next(v for v in raw if isinstance(v,unreal.HitResult)) if isinstance(raw,tuple) else raw
             assert h and h.to_tuple()[0] and abs(h.to_tuple()[5].z+360)<.01;tops.append(h.to_tuple()[5].z)
-    return dict(placements=1,removed_slab_instances=22,retained_floor_instances=26,passage_probes=probes,physical_top_probes=tops,qualification='Editor bounds and physical controls; local visual spalling is cosmetic. Live traversal, combat and performance remain unqualified.')
+    return dict(placements=1,removed_slab_instances=22,retained_floor_instances=retained_count,passage_probes=probes,physical_top_probes=tops,qualification='Editor bounds and physical controls; local visual spalling is cosmetic. Live traversal, combat and performance remain unqualified.')
