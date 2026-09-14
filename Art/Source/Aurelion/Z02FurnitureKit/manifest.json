@@ -1,0 +1,78 @@
+{
+  "status": "Custom modular furniture candidate; live navigation and final art pending",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z02ServiceTable",
+      "triangles": 7684,
+      "nominal_dimensions_m": [
+        1.2564761638641357,
+        1.2564761638641357,
+        1.024999976158142
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 3,
+      "collision": "Authored base, support and top; tabletop service items are cosmetic",
+      "furniture_surface_samples": [
+        [
+          0,
+          0,
+          0.81
+        ],
+        [
+          0.4,
+          0,
+          0.81
+        ],
+        [
+          0,
+          0.4,
+          0.81
+        ],
+        [
+          0.9,
+          0,
+          null
+        ]
+      ]
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z02StoneSeat",
+      "triangles": 1716,
+      "nominal_dimensions_m": [
+        0.47999998927116394,
+        0.5,
+        0.453000009059906
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 3,
+      "collision": "Authored base, support and top; tabletop service items are cosmetic",
+      "furniture_surface_samples": [
+        [
+          0,
+          0,
+          0.453
+        ],
+        [
+          0.15,
+          0.15,
+          0.453
+        ],
+        [
+          0.4,
+          0,
+          null
+        ]
+      ]
+    }
+  ]
+}
