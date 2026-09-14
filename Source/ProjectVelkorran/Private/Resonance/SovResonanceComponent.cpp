@@ -90,6 +90,29 @@ USovResonanceComponent* USovResonanceComponent::FindActive(UWorld* World)
 	}
 	return nullptr;
 }
+USovResonanceComponent* USovResonanceComponent::FindForActor(UWorld* World, const AActor* Context)
+{
+	if (!World || World->GetNetMode() != NM_Standalone) { return nullptr; }
+	// The same test FindActive applies: a player controller that currently possesses the pawn. A PlayerState alone
+	// does not qualify, so a protagonist companion proxy never resolves to its own coordinator.
+	const auto PossessedByPlayer = [World](const APawn* Pawn)
+	{
+		const auto* PC = IsValid(Pawn) && Pawn->GetWorld() == World ? Cast<APlayerController>(Pawn->GetController()) : nullptr;
+		return PC && PC->GetPawn() == Pawn;
+	};
+	const auto* Pawn = Cast<APawn>(Context);
+	if (PossessedByPlayer(Pawn))
+	{
+		if (auto* Own = Pawn->FindComponentByClass<USovResonanceComponent>()) { return Own; }
+	}
+	const auto* Companion = IsValid(Context) ? Context->FindComponentByClass<USovCompanionComponent>() : nullptr;
+	const APawn* Leader = Companion ? Companion->GetCurrentLeader() : nullptr;
+	if (PossessedByPlayer(Leader))
+	{
+		if (auto* Led = Leader->FindComponentByClass<USovResonanceComponent>()) { return Led; }
+	}
+	return FindActive(World);
+}
 void USovResonanceComponent::BindASCs()
 {
 	auto* NewPlayer = ASC(GetOwner());
