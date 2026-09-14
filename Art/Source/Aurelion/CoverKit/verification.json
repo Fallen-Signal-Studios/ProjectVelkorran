@@ -1,0 +1,33 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_CoverCoffer",
+      "dimensions_m": [
+        1.4340040683746338,
+        2.7959580421447754,
+        1.1228870153427124
+      ],
+      "triangles": 4964
+    },
+    {
+      "asset": "SM_Aurelion_KIT_CoverCofferStack",
+      "dimensions_m": [
+        1.4340040683746338,
+        2.7959580421447754,
+        1.1650450229644775
+      ],
+      "triangles": 5152
+    },
+    {
+      "asset": "SM_Aurelion_KIT_CoverButtress",
+      "dimensions_m": [
+        1.4340040683746338,
+        2.7959580421447754,
+        5.441920757293701
+      ],
+      "triangles": 14700
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}

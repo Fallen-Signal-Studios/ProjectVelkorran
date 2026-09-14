@@ -1,0 +1,242 @@
+[
+  {
+    "actor": "SM_KB3D_CPI_PropSmallCrate_A",
+    "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1116",
+    "component": "StaticMeshComponent0",
+    "mesh": "/Game/Cargo/kb3d_cyberpunkinteriors/StaticMeshes/SM_KB3D_CPI_PropSmallCrate_A.SM_KB3D_CPI_PropSmallCrate_A",
+    "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.500000,W=0.866025),Translation=(X=-7489.776904,Y=-15151.665548,Z=0.000023),Scale3D=(X=5.000000,Y=5.000000,Z=3.705855))",
+    "bounds_origin": "(X=-7489.776908,Y=-15151.665542,Z=56.144345)",
+    "bounds_extent": "(X=156.918611,Y=131.993129,Z=56.144333)",
+    "hidden": false,
+    "visible": true,
+    "hidden_in_game": false,
+    "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+    "materials": [
+      "/Game/Aurelion/Environment/KitBashRadiance/KB3D_HTS_PathB_E/KB3D_HTS_PathB_E/Materials/M_KB3D_HTS_MetalWhite.M_KB3D_HTS_MetalWhite",
+      "/Game/Cargo/kb3d_cyberpunkinteriors/Materials/MI_KB3D_CPI_MetalWeaponTrim.MI_KB3D_CPI_MetalWeaponTrim",
+      "/Game/Aurelion/Art/Props/aURELION_pILLAR/Materials/M_GoldEmmissive.M_GoldEmmissive",
+      "/Game/Aurelion/Art/Props/aURELION_pILLAR/Materials/M_GoldEmmissive.M_GoldEmmissive"
+    ],
+    "instances": []
+  },
+  {
+    "actor": "SM_KB3D_CPI_PropSmallCrate_A2",
+    "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1118",
+    "component": "StaticMeshComponent0",
+    "mesh": "/Game/Cargo/kb3d_cyberpunkinteriors/StaticMeshes/SM_KB3D_CPI_PropSmallCrate_A.SM_KB3D_CPI_PropSmallCrate_A",
+    "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.866025,W=0.500000),Translation=(X=-7729.942492,Y=-15290.325206,Z=0.000023),Scale3D=(X=5.000000,Y=5.000000,Z=3.705855))",
+    "bounds_origin": "(X=-7729.942488,Y=-15290.325200,Z=56.144344)",
+    "bounds_extent": "(X=156.918611,Y=131.993127,Z=56.144333)",
+    "hidden": false,
+    "visible": true,
+    "hidden_in_game": false,
+    "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+    "materials": [
+      "/Game/Aurelion/Environment/KitBashRadiance/KB3D_HTS_PathB_E/KB3D_HTS_PathB_E/Materials/M_KB3D_HTS_MetalWhite.M_KB3D_HTS_MetalWhite",
+      "/Game/Cargo/kb3d_cyberpunkinteriors/Materials/MI_KB3D_CPI_MetalWeaponTrim.MI_KB3D_CPI_MetalWeaponTrim",
+      "/Game/Aurelion/Art/Props/aURELION_pILLAR/Materials/M_GoldEmmissive.M_GoldEmmissive",
+      "/Game/Aurelion/Art/Props/aURELION_pILLAR/Materials/M_GoldEmmissive.M_GoldEmmissive"
+    ],
+    "instances": []
+  },
+  {
+    "actor": "SM_KB3D_CPI_PropSmallCrate_A3",
+    "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1119",
+    "component": "StaticMeshComponent0",
+    "mesh": "/Game/Cargo/kb3d_cyberpunkinteriors/StaticMeshes/SM_KB3D_CPI_PropSmallCrate_A.SM_KB3D_CPI_PropSmallCrate_A",
+    "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=-7729.942489,Y=-13699.256653,Z=0.000023),Scale3D=(X=5.000000,Y=5.000000,Z=3.705855))",
+    "bounds_origin": "(X=-7729.942489,Y=-13699.256646,Z=56.144344)",
+    "bounds_extent": "(X=139.797880,Y=71.700196,Z=56.144333)",
+    "hidden": false,
+    "visible": true,
+    "hidden_in_game": false,
+    "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+    "materials": [
+      "/Game/Aurelion/Environment/KitBashRadiance/KB3D_HTS_PathB_E/KB3D_HTS_PathB_E/Materials/M_KB3D_HTS_MetalWhite.M_KB3D_HTS_MetalWhite",
+      "/Game/Cargo/kb3d_cyberpunkinteriors/Materials/MI_KB3D_CPI_MetalWeaponTrim.MI_KB3D_CPI_MetalWeaponTrim",
+      "/Game/Aurelion/Art/Props/aURELION_pILLAR/Materials/M_GoldEmmissive.M_GoldEmmissive",
+      "/Game/Aurelion/Art/Props/aURELION_pILLAR/Materials/M_GoldEmmissive.M_GoldEmmissive"
+    ],
+    "instances": []
+  },
+  {
+    "actor": "SM_KB3D_CPI_PropSmallCrate_A4",
+    "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1121",
+    "component": "StaticMeshComponent0",
+    "mesh": "/Game/Cargo/kb3d_cyberpunkinteriors/StaticMeshes/SM_KB3D_CPI_PropSmallCrate_A.SM_KB3D_CPI_PropSmallCrate_A",
+    "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=-7452.623160,Y=-13699.256659,Z=0.000023),Scale3D=(X=5.000000,Y=5.000000,Z=3.705855))",
+    "bounds_origin": "(X=-7452.623160,Y=-13699.256652,Z=56.144344)",
+    "bounds_extent": "(X=139.797880,Y=71.700196,Z=56.144333)",
+    "hidden": false,
+    "visible": true,
+    "hidden_in_game": false,
+    "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+    "materials": [
+      "/Game/Aurelion/Environment/KitBashRadiance/KB3D_HTS_PathB_E/KB3D_HTS_PathB_E/Materials/M_KB3D_HTS_MetalWhite.M_KB3D_HTS_MetalWhite",
+      "/Game/Cargo/kb3d_cyberpunkinteriors/Materials/MI_KB3D_CPI_MetalWeaponTrim.MI_KB3D_CPI_MetalWeaponTrim",
+      "/Game/Aurelion/Art/Props/aURELION_pILLAR/Materials/M_GoldEmmissive.M_GoldEmmissive",
+      "/Game/Aurelion/Art/Props/aURELION_pILLAR/Materials/M_GoldEmmissive.M_GoldEmmissive"
+    ],
+    "instances": []
+  },
+  {
+    "actor": "SM_KB3D_CPI_PropSmallCrate_A5",
+    "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1122",
+    "component": "StaticMeshComponent0",
+    "mesh": "/Game/Cargo/kb3d_cyberpunkinteriors/StaticMeshes/SM_KB3D_CPI_PropSmallCrate_A.SM_KB3D_CPI_PropSmallCrate_A",
+    "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.939693,W=0.342020),Translation=(X=-6654.483922,Y=-13699.256653,Z=116.504610),Scale3D=(X=5.000000,Y=5.000000,Z=3.705855))",
+    "bounds_origin": "(X=-6654.483916,Y=-13699.256648,Z=172.648931)",
+    "bounds_extent": "(X=144.785881,Y=153.179383,Z=56.144333)",
+    "hidden": false,
+    "visible": true,
+    "hidden_in_game": false,
+    "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+    "materials": [
+      "/Game/Aurelion/Environment/KitBashRadiance/KB3D_HTS_PathB_E/KB3D_HTS_PathB_E/Materials/M_KB3D_HTS_MetalWhite.M_KB3D_HTS_MetalWhite",
+      "/Game/Cargo/kb3d_cyberpunkinteriors/Materials/MI_KB3D_CPI_MetalWeaponTrim.MI_KB3D_CPI_MetalWeaponTrim",
+      "/Game/Aurelion/Art/Props/aURELION_pILLAR/Materials/M_GoldEmmissive.M_GoldEmmissive",
+      "/Game/Aurelion/Art/Props/aURELION_pILLAR/Materials/M_GoldEmmissive.M_GoldEmmissive"
+    ],
+    "instances": []
+  },
+  {
+    "actor": "SM_KB3D_CPI_PropSmallCrate_A6",
+    "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1123",
+    "component": "StaticMeshComponent0",
+    "mesh": "/Game/Cargo/kb3d_cyberpunkinteriors/StaticMeshes/SM_KB3D_CPI_PropSmallCrate_A.SM_KB3D_CPI_PropSmallCrate_A",
+    "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=-6656.019935,Y=-13699.256659,Z=0.000015),Scale3D=(X=5.000000,Y=5.000000,Z=3.705855))",
+    "bounds_origin": "(X=-6656.019935,Y=-13699.256652,Z=56.144337)",
+    "bounds_extent": "(X=139.797880,Y=71.700196,Z=56.144333)",
+    "hidden": false,
+    "visible": true,
+    "hidden_in_game": false,
+    "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+    "materials": [
+      "/Game/Aurelion/Environment/KitBashRadiance/KB3D_HTS_PathB_E/KB3D_HTS_PathB_E/Materials/M_KB3D_HTS_MetalWhite.M_KB3D_HTS_MetalWhite",
+      "/Game/Cargo/kb3d_cyberpunkinteriors/Materials/MI_KB3D_CPI_MetalWeaponTrim.MI_KB3D_CPI_MetalWeaponTrim",
+      "/Game/Aurelion/Art/Props/aURELION_pILLAR/Materials/M_GoldEmmissive.M_GoldEmmissive",
+      "/Game/Aurelion/Art/Props/aURELION_pILLAR/Materials/M_GoldEmmissive.M_GoldEmmissive"
+    ],
+    "instances": []
+  },
+  {
+    "actor": "SM_KB3D_CPI_PropSmallCrate_A7",
+    "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1124",
+    "component": "StaticMeshComponent0",
+    "mesh": "/Game/Cargo/kb3d_cyberpunkinteriors/StaticMeshes/SM_KB3D_CPI_PropSmallCrate_A.SM_KB3D_CPI_PropSmallCrate_A",
+    "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=-6696.259085,Y=-15579.804504,Z=0.000013),Scale3D=(X=5.000000,Y=5.000000,Z=3.705855))",
+    "bounds_origin": "(X=-6696.259085,Y=-15579.804497,Z=56.144334)",
+    "bounds_extent": "(X=139.797880,Y=71.700196,Z=56.144333)",
+    "hidden": false,
+    "visible": true,
+    "hidden_in_game": false,
+    "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+    "materials": [
+      "/Game/Aurelion/Environment/KitBashRadiance/KB3D_HTS_PathB_E/KB3D_HTS_PathB_E/Materials/M_KB3D_HTS_MetalWhite.M_KB3D_HTS_MetalWhite",
+      "/Game/Cargo/kb3d_cyberpunkinteriors/Materials/MI_KB3D_CPI_MetalWeaponTrim.MI_KB3D_CPI_MetalWeaponTrim",
+      "/Game/Aurelion/Art/Props/aURELION_pILLAR/Materials/M_GoldEmmissive.M_GoldEmmissive",
+      "/Game/Aurelion/Art/Props/aURELION_pILLAR/Materials/M_GoldEmmissive.M_GoldEmmissive"
+    ],
+    "instances": []
+  },
+  {
+    "actor": "SM_KB3D_CPI_PropSmallCrate_A8",
+    "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1125",
+    "component": "StaticMeshComponent0",
+    "mesh": "/Game/Cargo/kb3d_cyberpunkinteriors/StaticMeshes/SM_KB3D_CPI_PropSmallCrate_A.SM_KB3D_CPI_PropSmallCrate_A",
+    "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.939693,W=0.342020),Translation=(X=-6518.001658,Y=-15792.243436,Z=0.000013),Scale3D=(X=5.000000,Y=5.000000,Z=3.705855))",
+    "bounds_origin": "(X=-6518.001653,Y=-15792.243432,Z=56.144334)",
+    "bounds_extent": "(X=144.785881,Y=153.179383,Z=56.144333)",
+    "hidden": false,
+    "visible": true,
+    "hidden_in_game": false,
+    "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+    "materials": [
+      "/Game/Aurelion/Environment/KitBashRadiance/KB3D_HTS_PathB_E/KB3D_HTS_PathB_E/Materials/M_KB3D_HTS_MetalWhite.M_KB3D_HTS_MetalWhite",
+      "/Game/Cargo/kb3d_cyberpunkinteriors/Materials/MI_KB3D_CPI_MetalWeaponTrim.MI_KB3D_CPI_MetalWeaponTrim",
+      "/Game/Aurelion/Art/Props/aURELION_pILLAR/Materials/M_GoldEmmissive.M_GoldEmmissive",
+      "/Game/Aurelion/Art/Props/aURELION_pILLAR/Materials/M_GoldEmmissive.M_GoldEmmissive"
+    ],
+    "instances": []
+  },
+  {
+    "actor": "SM_KB3D_CPI_PropSmallCrate_A9",
+    "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1126",
+    "component": "StaticMeshComponent0",
+    "mesh": "/Game/Cargo/kb3d_cyberpunkinteriors/StaticMeshes/SM_KB3D_CPI_PropSmallCrate_A.SM_KB3D_CPI_PropSmallCrate_A",
+    "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=-7702.069954,Y=-16523.766922,Z=0.000005),Scale3D=(X=5.000000,Y=5.000000,Z=3.705855))",
+    "bounds_origin": "(X=-7702.069954,Y=-16523.766915,Z=56.144326)",
+    "bounds_extent": "(X=139.797880,Y=71.700196,Z=56.144333)",
+    "hidden": false,
+    "visible": true,
+    "hidden_in_game": false,
+    "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+    "materials": [
+      "/Game/Aurelion/Environment/KitBashRadiance/KB3D_HTS_PathB_E/KB3D_HTS_PathB_E/Materials/M_KB3D_HTS_MetalWhite.M_KB3D_HTS_MetalWhite",
+      "/Game/Cargo/kb3d_cyberpunkinteriors/Materials/MI_KB3D_CPI_MetalWeaponTrim.MI_KB3D_CPI_MetalWeaponTrim",
+      "/Game/Aurelion/Art/Props/aURELION_pILLAR/Materials/M_GoldEmmissive.M_GoldEmmissive",
+      "/Game/Aurelion/Art/Props/aURELION_pILLAR/Materials/M_GoldEmmissive.M_GoldEmmissive"
+    ],
+    "instances": []
+  },
+  {
+    "actor": "SM_KB3D_CPI_PropSmallCrate_A10",
+    "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1127",
+    "component": "StaticMeshComponent0",
+    "mesh": "/Game/Cargo/kb3d_cyberpunkinteriors/StaticMeshes/SM_KB3D_CPI_PropSmallCrate_A.SM_KB3D_CPI_PropSmallCrate_A",
+    "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.906308,W=0.422618),Translation=(X=-7424.750625,Y=-16523.766928,Z=0.000005),Scale3D=(X=5.000000,Y=5.000000,Z=3.705855))",
+    "bounds_origin": "(X=-7424.750620,Y=-16523.766923,Z=56.144326)",
+    "bounds_extent": "(X=153.179385,Y=144.785878,Z=56.144333)",
+    "hidden": false,
+    "visible": true,
+    "hidden_in_game": false,
+    "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+    "materials": [
+      "/Game/Aurelion/Environment/KitBashRadiance/KB3D_HTS_PathB_E/KB3D_HTS_PathB_E/Materials/M_KB3D_HTS_MetalWhite.M_KB3D_HTS_MetalWhite",
+      "/Game/Cargo/kb3d_cyberpunkinteriors/Materials/MI_KB3D_CPI_MetalWeaponTrim.MI_KB3D_CPI_MetalWeaponTrim",
+      "/Game/Aurelion/Art/Props/aURELION_pILLAR/Materials/M_GoldEmmissive.M_GoldEmmissive",
+      "/Game/Aurelion/Art/Props/aURELION_pILLAR/Materials/M_GoldEmmissive.M_GoldEmmissive"
+    ],
+    "instances": []
+  },
+  {
+    "actor": "SM_KB3D_CPI_PropSmallCrate_A11",
+    "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1130",
+    "component": "StaticMeshComponent0",
+    "mesh": "/Game/Cargo/kb3d_cyberpunkinteriors/StaticMeshes/SM_KB3D_CPI_PropSmallCrate_A.SM_KB3D_CPI_PropSmallCrate_A",
+    "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-1.000000,W=0.000000),Translation=(X=-8104.764133,Y=-16313.791966,Z=0.000006),Scale3D=(X=5.000000,Y=5.000000,Z=17.959935))",
+    "bounds_origin": "(X=-8104.764126,Y=-16313.791966,Z=272.096001)",
+    "bounds_extent": "(X=71.700198,Y=139.797880,Z=272.096052)",
+    "hidden": false,
+    "visible": true,
+    "hidden_in_game": false,
+    "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+    "materials": [
+      "/Game/Aurelion/Environment/KitBashRadiance/KB3D_HTS_PathB_E/KB3D_HTS_PathB_E/Materials/M_KB3D_HTS_MetalWhite.M_KB3D_HTS_MetalWhite",
+      "/Game/Cargo/kb3d_cyberpunkinteriors/Materials/MI_KB3D_CPI_MetalWeaponTrim.MI_KB3D_CPI_MetalWeaponTrim",
+      "/Game/Aurelion/Art/Props/aURELION_pILLAR/Materials/M_GoldEmmissive.M_GoldEmmissive",
+      "/Game/Aurelion/Art/Props/aURELION_pILLAR/Materials/M_GoldEmmissive.M_GoldEmmissive"
+    ],
+    "instances": []
+  },
+  {
+    "actor": "SM_KB3D_CPI_PropSmallCrate_A12",
+    "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1131",
+    "component": "StaticMeshComponent0",
+    "mesh": "/Game/Cargo/kb3d_cyberpunkinteriors/StaticMeshes/SM_KB3D_CPI_PropSmallCrate_A.SM_KB3D_CPI_PropSmallCrate_A",
+    "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-1.000000,W=0.000000),Translation=(X=-8104.764133,Y=-13113.358264,Z=0.000014),Scale3D=(X=5.000000,Y=5.000000,Z=17.959935))",
+    "bounds_origin": "(X=-8104.764126,Y=-13113.358264,Z=272.096008)",
+    "bounds_extent": "(X=71.700199,Y=139.797881,Z=272.096052)",
+    "hidden": false,
+    "visible": true,
+    "hidden_in_game": false,
+    "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+    "materials": [
+      "/Game/Aurelion/Environment/KitBashRadiance/KB3D_HTS_PathB_E/KB3D_HTS_PathB_E/Materials/M_KB3D_HTS_MetalWhite.M_KB3D_HTS_MetalWhite",
+      "/Game/Cargo/kb3d_cyberpunkinteriors/Materials/MI_KB3D_CPI_MetalWeaponTrim.MI_KB3D_CPI_MetalWeaponTrim",
+      "/Game/Aurelion/Art/Props/aURELION_pILLAR/Materials/M_GoldEmmissive.M_GoldEmmissive",
+      "/Game/Aurelion/Art/Props/aURELION_pILLAR/Materials/M_GoldEmmissive.M_GoldEmmissive"
+    ],
+    "instances": []
+  }
+]

@@ -1,0 +1,92 @@
+{
+  "status": "Fitted source candidate; combat and surface acceptance pending",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_CoverCoffer",
+      "triangles": 4964,
+      "nominal_dimensions_m": [
+        1.434004,
+        2.795958,
+        1.122887
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 1,
+      "collision": "Authored solid convex envelope for combat cover",
+      "solid_bounds_m": [
+        [
+          -0.717002,
+          -1.397979,
+          0
+        ],
+        [
+          0.717002,
+          1.397979,
+          1.122887
+        ]
+      ]
+    },
+    {
+      "asset": "SM_Aurelion_KIT_CoverCofferStack",
+      "triangles": 5152,
+      "nominal_dimensions_m": [
+        1.434004,
+        2.795958,
+        1.1650449999999999
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 1,
+      "collision": "Authored solid convex envelope for combat cover",
+      "solid_bounds_m": [
+        [
+          -0.717002,
+          -1.397979,
+          -0.042158
+        ],
+        [
+          0.717002,
+          1.397979,
+          1.122887
+        ]
+      ]
+    },
+    {
+      "asset": "SM_Aurelion_KIT_CoverButtress",
+      "triangles": 14700,
+      "nominal_dimensions_m": [
+        1.434004,
+        2.795958,
+        5.441921
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 1,
+      "collision": "Authored solid convex envelope for combat cover",
+      "solid_bounds_m": [
+        [
+          -0.717002,
+          -1.397979,
+          0
+        ],
+        [
+          0.717002,
+          1.397979,
+          5.441921
+        ]
+      ]
+    }
+  ]
+}
