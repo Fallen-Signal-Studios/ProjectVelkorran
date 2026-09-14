@@ -1,0 +1,15 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_ParapetCornerClosing_177cm",
+      "dimensions_m": [
+        1.7699999809265137,
+        0.2199999988079071,
+        1.3000000715255737
+      ],
+      "triangles": 3432
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}

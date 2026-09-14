@@ -1,0 +1,16 @@
+"""Fresh-load complete architecture chain plus zigzag approach geometry and instance preservation."""
+from pathlib import Path
+import runpy
+import unreal
+root=Path(unreal.Paths.project_dir())
+exec(compile((root/'Scripts/Editor/verify_atrium_bridge_exit.py').read_text(),'verify_atrium_bridge_exit','exec'))
+assert len(actors)==2142 and atrium_guard_count==34
+geometry=runpy.run_path(str(root/'Scripts/Editor/check_atrium_guards.py'))['check_guards'](world,actors)
+fit=json.loads((root/'Art/Source/Aurelion/AtriumApproachKit/guard-fit.json').read_text())
+expected=json.loads((root/'Art/Source/Aurelion/AtriumApproachKit/atrium-railing-retained.json').read_text())
+rail=next(c for c in labels[fit['railing_actor']].get_components_by_class(unreal.InstancedStaticMeshComponent) if c.get_name()==fit['railing_component'])
+actual=sorted(rail.get_instance_transform(i,world_space=True).export_text() for i in range(rail.get_instance_count()))
+assert actual==expected['transforms'] and len(actual)==680
+assert rail.get_collision_enabled()==unreal.CollisionEnabled.NO_COLLISION
+assert not unreal.EditorLoadingAndSavingUtils.get_dirty_map_packages()
+(out/'atrium-guard-verification.json').write_text(json.dumps(dict(status='passed',actor_count=len(actors),retained_railing_instances=len(actual),geometry=geometry),indent=2))
