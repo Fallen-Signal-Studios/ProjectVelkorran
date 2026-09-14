@@ -31,7 +31,15 @@ for entry in manifest['modules']:
                 assert not o.ray_cast(Vector((x,-5,z)),Vector((0,1,0)),distance=10)[0], 'Visual portal aperture obstructed'
         for x,z in ((-width/2-.5,2),(width/2+.5,2),(0,height+.5)):
             assert o.ray_cast(Vector((x,-5,z)),Vector((0,1,0)),distance=10)[0], 'Visual frame missing'
-    if hulls and 'solid_bounds_m' in entry:
+    if hulls and 'box_collision_bounds_m' in entry:
+        expected=entry['box_collision_bounds_m'];assert len(hulls)==len(expected)
+        for h,(lo,hi) in zip(sorted(hulls,key=lambda h:h.name),expected):
+            assert len(h.data.vertices)==8
+            coords=[h.matrix_world@v.co for v in h.data.vertices]
+            for axis in range(3):
+                assert abs(min(v[axis] for v in coords)-lo[axis])<.001
+                assert abs(max(v[axis] for v in coords)-hi[axis])<.001
+    elif hulls and 'solid_bounds_m' in entry:
         assert len(hulls)==1 and len(hulls[0].data.vertices)==8
         lo,hi=entry['solid_bounds_m']; h=hulls[0]
         coords=[h.matrix_world@v.co for v in h.data.vertices]

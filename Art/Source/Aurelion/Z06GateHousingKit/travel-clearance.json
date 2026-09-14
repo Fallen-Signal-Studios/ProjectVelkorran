@@ -1,0 +1,98 @@
+{
+  "status": "passed",
+  "objects": [
+    {
+      "object": "SM_Aurelion_KIT_Z06GateHousing",
+      "checked_groups": 6370,
+      "minimum_separation_m": 0.04999980926513681
+    },
+    {
+      "object": "UCX_SM_Aurelion_KIT_Z06GateHousing_00",
+      "checked_groups": 1,
+      "minimum_separation_m": 0.05000004768371591
+    },
+    {
+      "object": "UCX_SM_Aurelion_KIT_Z06GateHousing_01",
+      "checked_groups": 1,
+      "minimum_separation_m": 0.05000004768371591
+    },
+    {
+      "object": "UCX_SM_Aurelion_KIT_Z06GateHousing_02",
+      "checked_groups": 1,
+      "minimum_separation_m": 0.21000038146972688
+    },
+    {
+      "object": "UCX_SM_Aurelion_KIT_Z06GateHousing_03",
+      "checked_groups": 1,
+      "minimum_separation_m": 0.04999983191490173
+    },
+    {
+      "object": "UCX_SM_Aurelion_KIT_Z06GateHousing_04",
+      "checked_groups": 1,
+      "minimum_separation_m": 0.04999983191490173
+    }
+  ],
+  "aperture_rays": [
+    [
+      -2.1,
+      0.1
+    ],
+    [
+      -2.1,
+      1.5
+    ],
+    [
+      -2.1,
+      3.0
+    ],
+    [
+      -1,
+      0.1
+    ],
+    [
+      -1,
+      1.5
+    ],
+    [
+      -1,
+      3.0
+    ],
+    [
+      0,
+      0.1
+    ],
+    [
+      0,
+      1.5
+    ],
+    [
+      0,
+      3.0
+    ],
+    [
+      1,
+      0.1
+    ],
+    [
+      1,
+      1.5
+    ],
+    [
+      1,
+      3.0
+    ],
+    [
+      2.1,
+      0.1
+    ],
+    [
+      2.1,
+      1.5
+    ],
+    [
+      2.1,
+      3.0
+    ]
+  ],
+  "qualification": "Conservative polygon/hull bounds separation from swept leaf volume plus source aperture rays; Unreal scene fit and native transit remain pending."
+}

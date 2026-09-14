@@ -1,0 +1,96 @@
+{
+  "status": "Source candidate; Unreal fit and live transit acceptance pending",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z06GateHousing",
+      "triangles": 12220,
+      "nominal_dimensions_m": [
+        0.8680000305175781,
+        5.100000381469727,
+        6.25
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_StoneGrout",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 5,
+      "collision": "Five separate guide/pocket hulls, leaving the full leaf travel volume open",
+      "box_collision_bounds_m": [
+        [
+          [
+            -0.39,
+            -2.55,
+            0
+          ],
+          [
+            0.39,
+            -2.2,
+            6.25
+          ]
+        ],
+        [
+          [
+            -0.39,
+            2.2,
+            0
+          ],
+          [
+            0.39,
+            2.55,
+            6.25
+          ]
+        ],
+        [
+          [
+            -0.39,
+            -2.2,
+            6.1
+          ],
+          [
+            0.39,
+            2.2,
+            6.25
+          ]
+        ],
+        [
+          [
+            -0.39,
+            -2.2,
+            3.15
+          ],
+          [
+            -0.27,
+            2.2,
+            6.2
+          ]
+        ],
+        [
+          [
+            0.27,
+            -2.2,
+            3.15
+          ],
+          [
+            0.39,
+            2.2,
+            6.2
+          ]
+        ]
+      ],
+      "moving_leaf_swept_bounds_m": [
+        [
+          -0.22,
+          -2.15,
+          0.01
+        ],
+        [
+          0.22,
+          2.15,
+          5.89
+        ]
+      ]
+    }
+  ]
+}
