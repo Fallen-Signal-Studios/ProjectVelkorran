@@ -1,0 +1,76 @@
+{
+  "status": "PASS",
+  "profiles": [
+    {
+      "asset": "SM_Aurelion_KIT_AtriumParapet_00",
+      "vertices": 2912,
+      "contained": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumParapet_01",
+      "vertices": 2912,
+      "contained": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumParapet_02",
+      "vertices": 2912,
+      "contained": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumParapet_03",
+      "vertices": 2912,
+      "contained": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumParapet_04",
+      "vertices": 2912,
+      "contained": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumParapet_05",
+      "vertices": 2912,
+      "contained": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumParapet_06",
+      "vertices": 2912,
+      "contained": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumParapet_07",
+      "vertices": 2912,
+      "contained": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumParapet_08",
+      "vertices": 2912,
+      "contained": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumParapet_09",
+      "vertices": 1744,
+      "contained": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumParapet_10",
+      "vertices": 1744,
+      "contained": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumParapet_11",
+      "vertices": 1744,
+      "contained": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumParapet_12",
+      "vertices": 1744,
+      "contained": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumParapet_13",
+      "vertices": 8752,
+      "contained": true
+    }
+  ],
+  "scope": "Export vertices remain within miter planes and original guard envelope"
+}

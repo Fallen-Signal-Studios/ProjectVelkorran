@@ -1,0 +1,62 @@
+[
+  {
+    "angle": 0,
+    "offset": -170,
+    "blocker": null
+  },
+  {
+    "angle": 0,
+    "offset": 0,
+    "blocker": null
+  },
+  {
+    "angle": 0,
+    "offset": 170,
+    "blocker": null
+  },
+  {
+    "angle": 90,
+    "offset": -170,
+    "blocker": "Aurelion_SharedRouteAccess"
+  },
+  {
+    "angle": 90,
+    "offset": 0,
+    "blocker": "Aurelion_SharedRouteAccess"
+  },
+  {
+    "angle": 90,
+    "offset": 170,
+    "blocker": "Aurelion_SharedRouteAccess"
+  },
+  {
+    "angle": 180,
+    "offset": -170,
+    "blocker": null
+  },
+  {
+    "angle": 180,
+    "offset": 0,
+    "blocker": null
+  },
+  {
+    "angle": 180,
+    "offset": 170,
+    "blocker": null
+  },
+  {
+    "angle": 270,
+    "offset": -170,
+    "blocker": null
+  },
+  {
+    "angle": 270,
+    "offset": 0,
+    "blocker": null
+  },
+  {
+    "angle": 270,
+    "offset": 170,
+    "blocker": null
+  }
+]

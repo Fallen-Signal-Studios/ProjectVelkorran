@@ -1,0 +1,341 @@
+{
+  "status": "Mitered custom parapet candidate; runtime assembly review required",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_AtriumParapet_00",
+      "triangles": 5688,
+      "nominal_dimensions_m": [
+        3.156396985054016,
+        0.2199999988079071,
+        1.2999999523162842
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; original solid guard collision retained",
+      "miter_profile": [
+        3.170323,
+        -1.5851615,
+        0,
+        1.5666533443096902,
+        0.043638255809546986
+      ]
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumParapet_01",
+      "triangles": 5688,
+      "nominal_dimensions_m": [
+        3.142452836036682,
+        0.2199999988079071,
+        1.2999999523162842
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; original solid guard collision retained",
+      "miter_profile": [
+        3.170323,
+        -1.5666484842370605,
+        -0.04363825580954698,
+        1.5666398608089998,
+        0.04363997070749145
+      ]
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumParapet_02",
+      "triangles": 5688,
+      "nominal_dimensions_m": [
+        3.156390428543091,
+        0.2199999988079071,
+        1.2999999523162842
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; original solid guard collision retained",
+      "miter_profile": [
+        3.170323,
+        -1.5666467964717676,
+        -0.04363861037514178,
+        1.5851615,
+        0
+      ]
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumParapet_03",
+      "triangles": 5688,
+      "nominal_dimensions_m": [
+        3.1571847200393677,
+        0.2199999988079071,
+        1.2999999523162842
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; original solid guard collision retained",
+      "miter_profile": [
+        3.171143,
+        -1.5855715,
+        0,
+        1.5670296123056964,
+        0.04365057830847945
+      ]
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumParapet_04",
+      "triangles": 5688,
+      "nominal_dimensions_m": [
+        3.143292546272278,
+        0.2199999988079071,
+        1.2999999523162842
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; original solid guard collision retained",
+      "miter_profile": [
+        3.171143,
+        -1.5670948982299615,
+        -0.043650578308479474,
+        1.567030599538449,
+        0.04365097119477242
+      ]
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumParapet_05",
+      "triangles": 5688,
+      "nominal_dimensions_m": [
+        3.1571847200393677,
+        0.2199999988079071,
+        1.2999999523162842
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; original solid guard collision retained",
+      "miter_profile": [
+        3.171143,
+        -1.5670296123056964,
+        -0.04365057830847945,
+        1.5855715,
+        0
+      ]
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumParapet_06",
+      "triangles": 5688,
+      "nominal_dimensions_m": [
+        2.3875045776367188,
+        0.2199999988079071,
+        1.2999999523162842
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; original solid guard collision retained",
+      "miter_profile": [
+        2.402021,
+        -1.2010105,
+        0,
+        1.1820770570479509,
+        0.04206590635493278
+      ]
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumParapet_07",
+      "triangles": 5688,
+      "nominal_dimensions_m": [
+        2.372922897338867,
+        0.2199999988079071,
+        1.2999999523162842
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; original solid guard collision retained",
+      "miter_profile": [
+        2.402021,
+        -1.1820324051758768,
+        -0.04206590635493278,
+        1.1820564009433052,
+        0.04206536594988545
+      ]
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumParapet_08",
+      "triangles": 5688,
+      "nominal_dimensions_m": [
+        2.3874731063842773,
+        0.2199999988079071,
+        1.2999999523162842
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; original solid guard collision retained",
+      "miter_profile": [
+        2.402021,
+        -1.1820456541177764,
+        -0.04206517169780763,
+        1.2010105,
+        0
+      ]
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumParapet_09",
+      "triangles": 3408,
+      "nominal_dimensions_m": [
+        1.5833624005317688,
+        0.2199999988079071,
+        1.2999999523162842
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; original solid guard collision retained",
+      "miter_profile": [
+        1.598067,
+        -0.7990335,
+        0,
+        0.7797546087953857,
+        0.04356241061807763
+      ]
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumParapet_10",
+      "triangles": 3408,
+      "nominal_dimensions_m": [
+        1.5687084794044495,
+        0.2199999988079071,
+        1.2999999523162842
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; original solid guard collision retained",
+      "miter_profile": [
+        1.598067,
+        -0.7797899049883903,
+        -0.0435624106180776,
+        0.7797699296217927,
+        0.04356383296748491
+      ]
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumParapet_11",
+      "triangles": 3408,
+      "nominal_dimensions_m": [
+        1.5833662152290344,
+        0.2199999988079071,
+        1.2999999523162842
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; original solid guard collision retained",
+      "miter_profile": [
+        1.598067,
+        -0.7797583818320599,
+        -0.043562972744332525,
+        0.7990335,
+        0
+      ]
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumParapet_12",
+      "triangles": 3408,
+      "nominal_dimensions_m": [
+        0.803801417350769,
+        0.2199999988079071,
+        1.2999999523162842
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; original solid guard collision retained",
+      "miter_profile": [
+        0.833873,
+        -0.3973147908103381,
+        -0.04366107622471942,
+        0.39731735347960523,
+        0.04366114020885274
+      ]
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumParapet_13",
+      "triangles": 17088,
+      "nominal_dimensions_m": [
+        10.399999618530273,
+        0.2199999988079071,
+        1.2999999523162842
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; original solid guard collision retained",
+      "miter_profile": [
+        10.4,
+        -5.2,
+        0,
+        5.2,
+        0
+      ]
+    }
+  ]
+}

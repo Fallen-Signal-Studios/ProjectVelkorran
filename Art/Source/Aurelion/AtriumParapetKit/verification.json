@@ -1,0 +1,132 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_AtriumParapet_00",
+      "dimensions_m": [
+        3.1563968658447266,
+        0.2199999988079071,
+        1.2999999523162842
+      ],
+      "triangles": 5688
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumParapet_01",
+      "dimensions_m": [
+        3.1424527168273926,
+        0.2199999988079071,
+        1.2999999523162842
+      ],
+      "triangles": 5688
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumParapet_02",
+      "dimensions_m": [
+        3.156390428543091,
+        0.2199999988079071,
+        1.2999999523162842
+      ],
+      "triangles": 5688
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumParapet_03",
+      "dimensions_m": [
+        3.157184600830078,
+        0.2199999988079071,
+        1.2999999523162842
+      ],
+      "triangles": 5688
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumParapet_04",
+      "dimensions_m": [
+        3.1432924270629883,
+        0.2199999988079071,
+        1.2999999523162842
+      ],
+      "triangles": 5688
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumParapet_05",
+      "dimensions_m": [
+        3.157184600830078,
+        0.2199999988079071,
+        1.2999999523162842
+      ],
+      "triangles": 5688
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumParapet_06",
+      "dimensions_m": [
+        2.3875045776367188,
+        0.2199999988079071,
+        1.2999999523162842
+      ],
+      "triangles": 5688
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumParapet_07",
+      "dimensions_m": [
+        2.372922897338867,
+        0.2199999988079071,
+        1.2999999523162842
+      ],
+      "triangles": 5688
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumParapet_08",
+      "dimensions_m": [
+        2.3874731063842773,
+        0.2199999988079071,
+        1.2999999523162842
+      ],
+      "triangles": 5688
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumParapet_09",
+      "dimensions_m": [
+        1.583362340927124,
+        0.2199999988079071,
+        1.2999999523162842
+      ],
+      "triangles": 3408
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumParapet_10",
+      "dimensions_m": [
+        1.5687084197998047,
+        0.2199999988079071,
+        1.2999999523162842
+      ],
+      "triangles": 3408
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumParapet_11",
+      "dimensions_m": [
+        1.5833661556243896,
+        0.2199999988079071,
+        1.2999999523162842
+      ],
+      "triangles": 3408
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumParapet_12",
+      "dimensions_m": [
+        0.803801417350769,
+        0.2199999988079071,
+        1.2999999523162842
+      ],
+      "triangles": 3408
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumParapet_13",
+      "dimensions_m": [
+        10.399999618530273,
+        0.2199999988079071,
+        1.2999999523162842
+      ],
+      "triangles": 17088
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}
