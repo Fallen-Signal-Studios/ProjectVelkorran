@@ -2,9 +2,10 @@
 import bpy
 import json
 import math
+import sys
 from mathutils import Vector
 from pathlib import Path
-root=Path(__file__).resolve().parent/'ArchitectureKit'
+root=Path(sys.argv[sys.argv.index('--')+1]).resolve() if '--' in sys.argv else Path(__file__).resolve().parent/'ArchitectureKit'
 manifest=json.loads((root/'manifest.json').read_text())
 rows=[]
 for entry in manifest['modules']:
