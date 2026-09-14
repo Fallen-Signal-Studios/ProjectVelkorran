@@ -3,7 +3,7 @@ from pathlib import Path
 import unreal
 root=Path(unreal.Paths.project_dir())
 exec(compile((root/'Scripts/Editor/verify_z01_uplights.py').read_text(encoding='utf-8-sig'),'verify_z01_uplights','exec'))
-assert len(actors)==1914+bridge_count+endwall_count+z02_paving_count+z02_vault_count+z02_perimeter_count+z02_gallery_count+z02_furniture_count+z02_guard_count+z02_bridges_count+z02_exterior_count
+assert len(actors)==1914+bridge_count+endwall_count+z02_paving_count+z02_vault_count+z02_perimeter_count+z02_gallery_count+z02_furniture_count+z02_guard_count+z02_bridges_count+z02_exterior_count+z02_facade_light_count
 legacy=labels['Aurelion_Art_M12_Z01_7_e31eb0'].get_component_by_class(unreal.InstancedStaticMeshComponent)
 assert legacy.get_instance_count()==52
 assert not legacy.get_editor_property('visible') and legacy.get_editor_property('hidden_in_game')

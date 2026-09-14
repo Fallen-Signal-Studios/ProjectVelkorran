@@ -1,0 +1,79 @@
+{
+  "status": "Facade lighting candidate; live exposure and GPU acceptance pending",
+  "fixtures": [
+    {
+      "name": "West_0",
+      "position": [
+        -8280.648779,
+        -9996.9812,
+        210
+      ],
+      "lumens": 120,
+      "target_z": 690,
+      "radius": 1150
+    },
+    {
+      "name": "West_1",
+      "position": [
+        -7880.648778999999,
+        -9996.9812,
+        210
+      ],
+      "lumens": 120,
+      "target_z": 690,
+      "radius": 1150
+    },
+    {
+      "name": "East_0",
+      "position": [
+        -5751.268779,
+        -9996.9812,
+        210
+      ],
+      "lumens": 120,
+      "target_z": 690,
+      "radius": 1150
+    },
+    {
+      "name": "East_1",
+      "position": [
+        -6151.268779,
+        -9996.9812,
+        210
+      ],
+      "lumens": 120,
+      "target_z": 690,
+      "radius": 1150
+    },
+    {
+      "name": "Frieze_0",
+      "position": [
+        -7315.958779,
+        -9988,
+        610
+      ],
+      "lumens": 45,
+      "target_z": 870,
+      "radius": 650
+    },
+    {
+      "name": "Frieze_1",
+      "position": [
+        -6715.958779,
+        -9988,
+        610
+      ],
+      "lumens": 45,
+      "target_z": 870,
+      "radius": 650
+    }
+  ],
+  "color": [
+    1,
+    0.94,
+    0.84
+  ],
+  "fixture_yaw": 180,
+  "source_width": 45,
+  "source_height": 28
+}

@@ -37,7 +37,9 @@ z02_bridges_count = sum(a.get_actor_label().startswith('KIT_Z02_Bridge_') for a 
 assert z02_bridges_count in (0, 4), 'Partial or duplicate Z02 bridge assembly'
 z02_exterior_count = sum(a.get_actor_label().startswith('KIT_Z02_Exterior_') for a in actors)
 assert z02_exterior_count in (0, 13), 'Partial or duplicate Z02 exterior assembly'
-assert len(actors) == 1788 + vault_count + uplight_count + paving_count + bridge_count + endwall_count + z02_paving_count + z02_vault_count + z02_perimeter_count + z02_gallery_count + z02_furniture_count + z02_guard_count + z02_bridges_count + z02_exterior_count, 'Unexpected actor additions or removals'
+z02_facade_light_count = sum(a.get_actor_label().startswith('KIT_Z02_FacadeLight_') for a in actors)
+assert z02_facade_light_count in (0, 12), 'Partial or duplicate Z02 facade lighting'
+assert len(actors) == 1788 + vault_count + uplight_count + paving_count + bridge_count + endwall_count + z02_paving_count + z02_vault_count + z02_perimeter_count + z02_gallery_count + z02_furniture_count + z02_guard_count + z02_bridges_count + z02_exterior_count + z02_facade_light_count, 'Unexpected actor additions or removals'
 shell = labels['aurelionwalls']
 assert shell.get_actor_enable_collision()
 assert not shell.static_mesh_component.get_editor_property('visible')
