@@ -41,6 +41,7 @@ protected:
 private:
 	friend class USovGameplayAbility_FieldRecovery;
 	friend struct FSovFieldRecoveryTestAccess;
+	friend struct FSovReplicationReadinessTestAccess;
 	/** The owning client's HUD follows the authoritative count; charges are never spent or refilled here. */
 	UFUNCTION() void OnRep_Charges();
 	bool ValidProfile() const;

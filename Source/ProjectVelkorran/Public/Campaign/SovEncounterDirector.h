@@ -194,6 +194,7 @@ private:
 	friend struct FSovCampaignMassTestAccess;
 	friend struct FSovEncounterCallbackTestAccess;
 	friend struct FSovCoordinationTestAccess;
+	friend struct FSovReplicationReadinessTestAccess;
 	friend struct FSovObjectivePresentationTestAccess;
 	friend struct FSovCrucibleRuntimeTestAccess;
 	friend struct FSovRelayRuntimeTestAccess;
