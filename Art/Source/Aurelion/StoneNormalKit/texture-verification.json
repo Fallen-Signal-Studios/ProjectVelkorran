@@ -1,0 +1,15 @@
+{
+  "status": "passed",
+  "rgb_min": [
+    126,
+    126,
+    255
+  ],
+  "rgb_max": [
+    129,
+    129,
+    255
+  ],
+  "maximum_edge_difference_8bit": 2,
+  "qualification": "Image dimensions, tangent normal length and periodic seam only; engine material preview pending."
+}

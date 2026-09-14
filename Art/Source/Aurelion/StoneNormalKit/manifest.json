@@ -1,0 +1,51 @@
+{
+  "status": "Baked source; Unreal material comparison pending",
+  "texture": "T_AurelionKit_StoneFine_N",
+  "resolution": [
+    1024,
+    1024
+  ],
+  "space": "Tangent, Blender OpenGL +Y; flip green on Unreal import",
+  "tile_metres": 1,
+  "source_grid": 256,
+  "max_absolute_height_bound_m": 0.00017600000000000002,
+  "periodic_wave_parameters": [
+    [
+      3,
+      5,
+      8e-05,
+      0.3
+    ],
+    [
+      7,
+      -11,
+      5e-05,
+      1.1
+    ],
+    [
+      17,
+      13,
+      2.5e-05,
+      2.7
+    ],
+    [
+      31,
+      -23,
+      1.2e-05,
+      0.7
+    ],
+    [
+      53,
+      41,
+      6e-06,
+      1.9
+    ],
+    [
+      83,
+      -67,
+      3e-06,
+      2.2
+    ]
+  ],
+  "qualification": "Deterministic shallow microrelief; not a scanned material or final AAA surface."
+}
