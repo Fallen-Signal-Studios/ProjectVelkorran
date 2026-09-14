@@ -14,6 +14,8 @@ def check_z08_walls(world,actors):
     sm=unreal.get_editor_subsystem(unreal.StaticMeshEditorSubsystem);assert sm.get_num_uv_channels(m,0)==2 and sm.get_nanite_settings(m).get_editor_property('enabled')
     assert sm.get_convex_collision_count(m)==0 and sm.get_simple_collision_count(m)==0
     b=m.get_bounds();assert abs(b.origin.z-b.box_extent.z)<.01 and abs(b.origin.z+b.box_extent.z-700)<.01
+    manifest=json.loads((root/'Art/Source/Aurelion/Z08WallKit/manifest.json').read_text())
+    assert [r['original_index'] for r in manifest['interior_coverage']]==list(range(228,266))
     contacts=[]
     assert len(fit['physical'])==8
     for row in fit['physical']:
@@ -29,4 +31,4 @@ def check_z08_walls(world,actors):
             contacts.append(dict(actor=row['actor'],z=z))
     doors=runpy.run_path(str(root/'Scripts/Editor/check_z08_vault.py'))['check_z08_vault'](world,actors)['doorway_capsules']
     assert len(actors)==3140
-    return dict(wall_bays=56,lintels=2,physical_contacts=contacts,doorway_capsules=doors,qualification='Stopped-editor asset fit and native collision; live wall-running, routes and performance remain unqualified.')
+    return dict(wall_bays=56,lintels=2,interior_panels=38,physical_contacts=contacts,doorway_capsules=doors,qualification='Stopped-editor asset fit and native collision; live wall-running, routes and performance remain unqualified.')

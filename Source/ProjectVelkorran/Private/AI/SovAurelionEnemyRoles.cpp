@@ -9,11 +9,15 @@
 #include "ArsenalStatics.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SceneComponent.h"
+#include "Components/InstancedStaticMeshComponent.h"
 #include "Components/SovAurelionThermalFractureComponent.h"
 #include "Components/SovWeakPointComponent.h"
 #include "Components/SovPoiseComponent.h"
 #include "Campaign/SovEncounterDirector.h"
 #include "Engine/World.h"
+#include "Engine/StaticMesh.h"
+#include "PhysicsEngine/BodySetup.h"
+#include "Chaos/TriangleMeshImplicitObject.h"
 #include "EngineUtils.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
@@ -70,6 +74,65 @@ TArray<FVector> ASovAurelionWallRoute::GetWorldPoints() const
     TArray<FVector> Result;
     for (const FVector& Point : LocalPoints) { Result.Add(GetActorTransform().TransformPosition(Point)); }
     return Result;
+}
+
+void ASovAurelionWallRoute::BeginPlay()
+{
+    Super::BeginPlay();
+    if (HasAuthority()) { RebuildPresentationSurfaces(); }
+}
+
+void ASovAurelionWallRoute::RebuildPresentationSurfaces()
+{
+    for (auto Source : PresentationSurfaces)
+    {
+        if (IsValid(Source) && Source->GetStaticMesh())
+        {
+            if (auto* Body = Source->GetStaticMesh()->GetBodySetup()) { Body->CreatePhysicsMeshes(); }
+        }
+    }
+}
+
+bool ASovAurelionWallRoute::ResolvePresentationContact(const FHitResult& PhysicalHit, const FVector& Probe, FHitResult& Contact) const
+{
+    if (!PhysicalHit.bBlockingHit || !Probe.IsNormalized()) { return false; }
+    const FVector Start = PhysicalHit.ImpactPoint - Probe * 150.;
+    const FVector End = PhysicalHit.ImpactPoint + Probe * 50.;
+    bool Found = false;
+    for (auto Source : PresentationSurfaces)
+    {
+        if (!IsValid(Source) || !Source->IsRegistered() || !Source->IsVisible() || !Source->GetStaticMesh()) { continue; }
+        const auto* Body = Source->GetStaticMesh()->GetBodySetup();
+        if (!Body) { continue; }
+        const auto* Instances = Cast<UInstancedStaticMeshComponent>(Source);
+        const int32 Count = Instances ? Instances->GetInstanceCount() : 1;
+        for (int32 Index = 0; Index < Count; ++Index)
+        {
+            FTransform Transform = Source->GetComponentTransform();
+            if (Instances && !Instances->GetInstanceTransform(Index, Transform, true)) { continue; }
+            const FVector Scale = Transform.GetScale3D();
+            if (Transform.ContainsNaN() || FMath::Min3(FMath::Abs(Scale.X), FMath::Abs(Scale.Y), FMath::Abs(Scale.Z)) < SMALL_NUMBER) { continue; }
+            const FVector LocalStart = Transform.InverseTransformPosition(Start);
+            const FVector Delta = Transform.InverseTransformPosition(End) - LocalStart;
+            const double Length = Delta.Size();
+            if (Length < SMALL_NUMBER) { continue; }
+            // Read cooked geometry directly. No physics body is registered, so
+            // neither channel traces nor object-type queries gain cosmetic hits.
+            for (const auto& Geometry : Body->TriMeshGeometries)
+            {
+                if (!Geometry) { continue; }
+                Chaos::FReal Time; Chaos::FVec3 Position, Normal; int32 FaceIndex;
+                if (!Geometry->Raycast(LocalStart, Delta / Length, Length, 0., Time, Position, Normal, FaceIndex)) { continue; }
+                const FVector Point = Transform.TransformPosition(Position);
+                const FVector WorldNormal = Transform.TransformVectorNoScale(FVector(Normal) / Scale).GetSafeNormal();
+                if (FVector::DotProduct(WorldNormal, PhysicalHit.ImpactNormal) <= .9
+                    || (Found && FVector::DistSquared(Start, Point) >= FVector::DistSquared(Start, Contact.ImpactPoint))) { continue; }
+                Contact = PhysicalHit; Contact.ImpactPoint = Point; Contact.ImpactNormal = WorldNormal;
+                Found = true;
+            }
+        }
+    }
+    return Found;
 }
 
 bool ASovAurelionWallRoute::ValidateRoute(FString& Error) const
@@ -129,6 +192,8 @@ void USovAurelionWallTraversalComponent::UpdateWallSurface(const FVector& Direct
         && Hit.bBlockingHit && FMath::Abs(Hit.ImpactNormal.Z) < .3;
     if (bOnWall)
     {
+        FHitResult VisualHit;
+        if (ActiveRoute->ResolvePresentationContact(Hit, Probe, VisualHit)) { Hit = VisualHit; }
         WallNormal = Hit.ImpactNormal;
         WallTangent = FVector::VectorPlaneProject(Direction, WallNormal).GetSafeNormal(SMALL_NUMBER, FVector::UpVector);
         WallPoint = Hit.ImpactPoint;

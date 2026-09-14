@@ -43,25 +43,25 @@
       "axis": "x",
       "side": -1,
       "along": -22,
-      "recess_from_native_m": 0.08500289916992188
+      "recess_from_native_m": 0.08499908447265625
     },
     {
       "axis": "x",
       "side": -1,
       "along": -18,
-      "recess_from_native_m": 0.08500289916992188
+      "recess_from_native_m": 0.08499908447265625
     },
     {
       "axis": "x",
       "side": -1,
       "along": -14,
-      "recess_from_native_m": 0.08500289916992188
+      "recess_from_native_m": 0.08499908447265625
     },
     {
       "axis": "x",
       "side": -1,
       "along": -10,
-      "recess_from_native_m": 0.08500289916992188
+      "recess_from_native_m": 0.08499908447265625
     },
     {
       "axis": "x",
@@ -91,91 +91,91 @@
       "axis": "x",
       "side": -1,
       "along": 10,
-      "recess_from_native_m": 0.08500289916992188
+      "recess_from_native_m": 0.08499908447265625
     },
     {
       "axis": "x",
       "side": -1,
       "along": 14,
-      "recess_from_native_m": 0.08500289916992188
+      "recess_from_native_m": 0.08499908447265625
     },
     {
       "axis": "x",
       "side": -1,
       "along": 18,
-      "recess_from_native_m": 0.08500289916992188
+      "recess_from_native_m": 0.08499908447265625
     },
     {
       "axis": "x",
       "side": -1,
       "along": 22,
-      "recess_from_native_m": 0.08500289916992188
+      "recess_from_native_m": 0.08499908447265625
     },
     {
       "axis": "y",
       "side": -1,
       "along": -33,
-      "recess_from_native_m": 0.08500289916992188
+      "recess_from_native_m": 0.08499908447265625
     },
     {
       "axis": "y",
       "side": -1,
       "along": -29,
-      "recess_from_native_m": 0.08500289916992188
+      "recess_from_native_m": 0.08499908447265625
     },
     {
       "axis": "y",
       "side": -1,
       "along": -25,
-      "recess_from_native_m": 0.08500289916992188
+      "recess_from_native_m": 0.08499908447265625
     },
     {
       "axis": "y",
       "side": -1,
       "along": -21,
-      "recess_from_native_m": 0.08499908447265625
+      "recess_from_native_m": 0.08499717712402344
     },
     {
       "axis": "y",
       "side": -1,
       "along": -17,
-      "recess_from_native_m": 0.08499908447265625
+      "recess_from_native_m": 0.08499717712402344
     },
     {
       "axis": "y",
       "side": -1,
       "along": -13,
-      "recess_from_native_m": 0.08499908447265625
+      "recess_from_native_m": 0.08499717712402344
     },
     {
       "axis": "y",
       "side": -1,
       "along": -9,
-      "recess_from_native_m": 0.08499908447265625
+      "recess_from_native_m": 0.08499717712402344
     },
     {
       "axis": "y",
       "side": -1,
       "along": -5,
-      "recess_from_native_m": 0.08499908447265625
+      "recess_from_native_m": 0.08499717712402344
     },
     {
       "axis": "y",
       "side": -1,
       "along": 5,
-      "recess_from_native_m": 0.08499908447265625
+      "recess_from_native_m": 0.08499717712402344
     },
     {
       "axis": "y",
       "side": -1,
       "along": 9,
-      "recess_from_native_m": 0.08499908447265625
+      "recess_from_native_m": 0.08499717712402344
     },
     {
       "axis": "y",
       "side": -1,
       "along": 13,
-      "recess_from_native_m": 0.08499908447265625
+      "recess_from_native_m": 0.08499717712402344
     },
     {
       "axis": "y",
@@ -205,31 +205,31 @@
       "axis": "y",
       "side": -1,
       "along": 33,
-      "recess_from_native_m": 0.08500289916992188
+      "recess_from_native_m": 0.08499908447265625
     },
     {
       "axis": "x",
       "side": 1,
       "along": -22,
-      "recess_from_native_m": 0.08500289916992188
+      "recess_from_native_m": 0.08499908447265625
     },
     {
       "axis": "x",
       "side": 1,
       "along": -18,
-      "recess_from_native_m": 0.08500289916992188
+      "recess_from_native_m": 0.08499908447265625
     },
     {
       "axis": "x",
       "side": 1,
       "along": -14,
-      "recess_from_native_m": 0.08500289916992188
+      "recess_from_native_m": 0.08499908447265625
     },
     {
       "axis": "x",
       "side": 1,
       "along": -10,
-      "recess_from_native_m": 0.08500289916992188
+      "recess_from_native_m": 0.08499908447265625
     },
     {
       "axis": "x",
@@ -259,122 +259,162 @@
       "axis": "x",
       "side": 1,
       "along": 10,
-      "recess_from_native_m": 0.08500289916992188
+      "recess_from_native_m": 0.08499908447265625
     },
     {
       "axis": "x",
       "side": 1,
       "along": 14,
-      "recess_from_native_m": 0.08500289916992188
+      "recess_from_native_m": 0.08499908447265625
     },
     {
       "axis": "x",
       "side": 1,
       "along": 18,
-      "recess_from_native_m": 0.08500289916992188
+      "recess_from_native_m": 0.08499908447265625
     },
     {
       "axis": "x",
       "side": 1,
       "along": 22,
-      "recess_from_native_m": 0.08500289916992188
+      "recess_from_native_m": 0.08499908447265625
     },
     {
       "axis": "y",
       "side": 1,
       "along": -33,
-      "recess_from_native_m": 0.08500289916992188
+      "recess_from_native_m": 0.08500099182128906
     },
     {
       "axis": "y",
       "side": 1,
       "along": -29,
-      "recess_from_native_m": 0.08500289916992188
+      "recess_from_native_m": 0.08500099182128906
     },
     {
       "axis": "y",
       "side": 1,
       "along": -25,
-      "recess_from_native_m": 0.08500289916992188
+      "recess_from_native_m": 0.08500099182128906
     },
     {
       "axis": "y",
       "side": 1,
       "along": -21,
-      "recess_from_native_m": 0.08500289916992188
+      "recess_from_native_m": 0.08500099182128906
     },
     {
       "axis": "y",
       "side": 1,
       "along": -17,
-      "recess_from_native_m": 0.08500289916992188
+      "recess_from_native_m": 0.08500099182128906
     },
     {
       "axis": "y",
       "side": 1,
       "along": -13,
-      "recess_from_native_m": 0.08500289916992188
+      "recess_from_native_m": 0.08500099182128906
     },
     {
       "axis": "y",
       "side": 1,
       "along": -9,
-      "recess_from_native_m": 0.08500289916992188
+      "recess_from_native_m": 0.08500099182128906
     },
     {
       "axis": "y",
       "side": 1,
       "along": -5,
-      "recess_from_native_m": 0.08500289916992188
+      "recess_from_native_m": 0.08500099182128906
     },
     {
       "axis": "y",
       "side": 1,
       "along": 5,
-      "recess_from_native_m": 0.08500289916992188
+      "recess_from_native_m": 0.08500099182128906
     },
     {
       "axis": "y",
       "side": 1,
       "along": 9,
-      "recess_from_native_m": 0.08500289916992188
+      "recess_from_native_m": 0.08500099182128906
     },
     {
       "axis": "y",
       "side": 1,
       "along": 13,
-      "recess_from_native_m": 0.08500289916992188
+      "recess_from_native_m": 0.08500099182128906
     },
     {
       "axis": "y",
       "side": 1,
       "along": 17,
-      "recess_from_native_m": 0.08499908447265625
+      "recess_from_native_m": 0.08500099182128906
     },
     {
       "axis": "y",
       "side": 1,
       "along": 21,
-      "recess_from_native_m": 0.08499908447265625
+      "recess_from_native_m": 0.08500099182128906
     },
     {
       "axis": "y",
       "side": 1,
       "along": 25,
-      "recess_from_native_m": 0.08499908447265625
+      "recess_from_native_m": 0.08500099182128906
     },
     {
       "axis": "y",
       "side": 1,
       "along": 29,
-      "recess_from_native_m": 0.08499908447265625
+      "recess_from_native_m": 0.08500099182128906
     },
     {
       "axis": "y",
       "side": 1,
       "along": 33,
-      "recess_from_native_m": 0.08500289916992188
+      "recess_from_native_m": 0.08500099182128906
     }
   ],
-  "qualification": "FBX visible openings and sampled wall-face recess only; native collision and live wall-running must be checked separately."
+  "interior_indices": [
+    228,
+    229,
+    230,
+    231,
+    232,
+    233,
+    234,
+    235,
+    236,
+    237,
+    238,
+    239,
+    240,
+    241,
+    242,
+    243,
+    244,
+    245,
+    246,
+    247,
+    248,
+    249,
+    250,
+    251,
+    252,
+    253,
+    254,
+    255,
+    256,
+    257,
+    258,
+    259,
+    260,
+    261,
+    262,
+    263,
+    264,
+    265
+  ],
+  "qualification": "FBX visible openings, perimeter recess and all 38 partition envelopes; native collision and live wall-running must be checked separately."
 }

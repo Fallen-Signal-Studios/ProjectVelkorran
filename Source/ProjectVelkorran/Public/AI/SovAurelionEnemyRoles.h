@@ -20,6 +20,7 @@ class UNarrativeAbilitySystemComponent;
 class USovWeakPointComponent;
 class USovAurelionThermalFractureComponent;
 class USovPoiseComponent;
+class UStaticMeshComponent;
 
 /** Capsule-centre route along a real wall and onto a landing, authored in local space.
  * No smart-link teleport or damage payload; the BT task owns continuous swept movement. */
@@ -40,6 +41,12 @@ public:
     /** Geometry-only validation, also used before saving authored routes. */
     UFUNCTION(BlueprintPure, Category="Aurelion|Traversal") bool ValidateRoute(FString& Error) const;
     TArray<FVector> GetWorldPoints() const;
+    /** Authored visual surfaces used only for the wall-contact pose, never movement. */
+    UPROPERTY(EditInstanceOnly, Category="Aurelion|Traversal") TArray<TObjectPtr<UStaticMeshComponent>> PresentationSurfaces;
+    void RebuildPresentationSurfaces();
+    bool ResolvePresentationContact(const FHitResult& PhysicalHit, const FVector& Probe, FHitResult& Contact) const;
+protected:
+    virtual void BeginPlay() override;
 };
 
 UENUM(BlueprintType)

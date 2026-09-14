@@ -21,7 +21,8 @@ param(
     [switch] $BuildOnly,
     [switch] $SkipBuild,
     [switch] $BuildGame,
-    [switch] $NonUnity
+    [switch] $NonUnity,
+    [switch] $DisableAura
 )
 
 Set-StrictMode -Version Latest
@@ -221,12 +222,14 @@ try {
 
     $reportDirectory = Join-Path $script:RunDirectory 'AutomationReport'
     $editorLog = Join-Path $script:RunDirectory 'UnrealEditor.log'
-    $editorExit = Invoke-LoggedProcess -Executable $editorExecutable -LogName 'Automation' `
-        -TimeoutSeconds $AutomationTimeoutSeconds -Arguments @(
+    $automationArguments = @(
             $ProjectPath, '-unattended', '-nop4', '-NullRHI', '-nosplash', '-stdout', '-FullStdOutLogOutput',
             "-ExecCmds=Automation RunTests $TestFilter", '-TestExit=Automation Test Queue Empty',
             "-ReportExportPath=$reportDirectory", "-AbsLog=$editorLog"
         )
+    if ($DisableAura) { $automationArguments += '-DisablePlugins=Aura' }
+    $editorExit = Invoke-LoggedProcess -Executable $editorExecutable -LogName 'Automation' `
+        -TimeoutSeconds $AutomationTimeoutSeconds -Arguments $automationArguments
     $summary.automation = "process exit $editorExit; report not yet validated"
     $summary | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $script:RunDirectory 'summary.json') -Encoding UTF8
     if ($editorExit -ne 0) { Write-Warning "Unreal automation process failed with exit code $editorExit."; exit $editorExit }

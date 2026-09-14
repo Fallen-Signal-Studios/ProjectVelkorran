@@ -5,6 +5,11 @@
 #include "AI/NarrativeNPCController.h"
 #include "AI/SovAurelionRoleActivities.h"
 #include "Components/BoxComponent.h"
+#include "Components/InstancedStaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
+#if WITH_EDITOR
+#include "StaticMeshCompiler.h"
+#endif
 #include "Components/SkeletalMeshComponent.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
@@ -118,6 +123,74 @@ struct FRoleWorld
     }
     ~FRoleWorld() { if (World) { World->DestroyWorld(false); if (GEngine) { GEngine->DestroyWorldContext(World); } } }
 };
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAurelionVisualWallContactTest, "ProjectVelkorran.Campaign.Aurelion.EnemyRoles.VisualContactDoesNotChangeMovementCollision",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FSovAurelionVisualWallContactTest::RunTest(const FString& Parameters)
+{
+    FRoleWorld F; if (!TestTrue(TEXT("Fixture ready"), F.Valid())) { return false; }
+    auto* Mesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+    if (!TestNotNull(TEXT("Contact test mesh"), Mesh)) { return false; }
+    auto* Owner = F.World->SpawnActor<AActor>();
+    auto* Surface = NewObject<UInstancedStaticMeshComponent>(Owner);
+    Owner->SetRootComponent(Surface); Owner->AddInstanceComponent(Surface);
+    Surface->SetStaticMesh(Mesh); Surface->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    Surface->AddInstance(FTransform(FRotator::ZeroRotator, FVector(0.,80.,200.), FVector(3.,.2,3.)));
+    Surface->RegisterComponent();
+    F.Route->PresentationSurfaces.Add(Surface); F.Route->RebuildPresentationSurfaces();
+    FCollisionQueryParams Query(SCENE_QUERY_STAT(VisualContactTest), false, F.Runner);
+    FHitResult Physical;
+    TestTrue(TEXT("Native wall remains the visibility hit"), F.World->LineTraceSingleByChannel(Physical, FVector(0.,0.,200.), FVector(0.,180.,200.), ECC_Visibility, Query));
+    TestTrue(TEXT("Cosmetic contact never replaces world collision"), Physical.GetComponent()==F.Wall);
+    FHitResult ObjectHit;
+    TestTrue(TEXT("Object-type traces also retain native collision"), F.World->LineTraceSingleByObjectType(ObjectHit,
+        FVector(0.,0.,200.), FVector(0.,180.,200.), FCollisionObjectQueryParams::AllObjects, Query)
+        && ObjectHit.GetComponent()==F.Wall);
+    TArray<UPrimitiveComponent*> RoutePrimitives;
+    F.Route->GetComponents(RoutePrimitives);
+    TestEqual(TEXT("Contact preparation creates no world physics components"), RoutePrimitives.Num(), 0);
+    FHitResult Contact;
+    TestTrue(TEXT("Authored projecting face supplies cosmetic contact"), F.Route->ResolvePresentationContact(Physical,FVector(0.,1.,0.),Contact));
+    TestTrue(TEXT("Contact reaches visible face, not native plane"), FMath::Abs(Contact.ImpactPoint.Y-70.)<.1);
+    TestTrue(TEXT("Visual source remains noncolliding"), Surface->GetCollisionEnabled()==ECollisionEnabled::NoCollision);
+    Surface->UpdateInstanceTransform(0,FTransform(FRotator::ZeroRotator,FVector(0.,120.,200.),FVector(3.,.2,3.)),false,true,true);
+    TestTrue(TEXT("Changed instances immediately supply current contact"), F.Route->ResolvePresentationContact(Physical,FVector(0.,1.,0.),Contact));
+    F.Route->RebuildPresentationSurfaces();
+    TestTrue(TEXT("Recessed visual surface also supplies contact"), F.Route->ResolvePresentationContact(Physical,FVector(0.,1.,0.),Contact));
+    TestTrue(TEXT("Recess lies behind native plane"), FMath::Abs(Contact.ImpactPoint.Y-110.)<.1);
+    Surface->SetVisibility(false);
+    TestFalse(TEXT("Hidden source cannot retain cosmetic contact"), F.Route->ResolvePresentationContact(Physical,FVector(0.,1.,0.),Contact));
+    F.Route->PresentationSurfaces.Reset(); F.Route->RebuildPresentationSurfaces();
+    TestFalse(TEXT("Unbound route retains physical fallback"), F.Route->ResolvePresentationContact(Physical,FVector(0.,1.,0.),Contact));
+    TestTrue(TEXT("Native collision remains intact after rebuild"), F.World->LineTraceSingleByChannel(Physical,FVector(0.,0.,200.),FVector(0.,180.,200.),ECC_Visibility,Query) && Physical.GetComponent()==F.Wall);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAurelionAuthoredContactTest, "ProjectVelkorran.Campaign.Aurelion.EnemyRoles.AuthoredCrucibleClimbSurfaceContact",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FSovAurelionAuthoredContactTest::RunTest(const FString& Parameters)
+{
+    FRoleWorld F; if (!TestTrue(TEXT("Fixture ready"),F.Valid())) { return false; }
+    auto* Mesh=LoadObject<UStaticMesh>(nullptr,TEXT("/Game/Aurelion/Environment/ArchitectureKit/Meshes/SM_Aurelion_KIT_Z08WallAssembly.SM_Aurelion_KIT_Z08WallAssembly"));
+    if (!TestNotNull(TEXT("Saved Crucible assembly"),Mesh)) { return false; }
+#if WITH_EDITOR
+    TArray<UStaticMesh*> PendingMeshes{Mesh};
+    FStaticMeshCompilingManager::Get().FinishCompilation(PendingMeshes);
+#endif
+    auto* Wall=F.Box(FVector(1416.,21930.,-1050.),FVector(10.,220.,150.));
+    auto* Owner=F.World->SpawnActor<AActor>();
+    auto* Surface=NewObject<UInstancedStaticMeshComponent>(Owner);
+    Owner->SetRootComponent(Surface);Owner->AddInstanceComponent(Surface);
+    Surface->SetStaticMesh(Mesh);Surface->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    Surface->AddInstance(FTransform(FVector(0.,20800.,-1200.)));Surface->RegisterComponent();
+    F.Route->PresentationSurfaces.Add(Surface);F.Route->RebuildPresentationSurfaces();
+    FCollisionQueryParams Query(SCENE_QUERY_STAT(AuthoredContactTest),false,F.Runner);FHitResult Physical,Contact;
+    TestTrue(TEXT("Actual climb wall's native plane is preserved"),F.World->LineTraceSingleByChannel(Physical,FVector(1600.,21930.,-1033.),FVector(1350.,21930.,-1033.),ECC_Visibility,Query) && Physical.GetComponent()==Wall);
+    TestTrue(TEXT("Saved production mesh supplies climb contact"),F.Route->ResolvePresentationContact(Physical,FVector(-1.,0.,0.),Contact));
+    TestTrue(TEXT("Feet reach the restored stone face"),FMath::Abs(Contact.ImpactPoint.X-1426.)<.2);
+    TestTrue(TEXT("Stone normal faces the approaching runner"),Contact.ImpactNormal.X>.99);
+    return true;
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAurelionRoleComponentsTest, "ProjectVelkorran.Campaign.Aurelion.EnemyRoles.NativeComponentOwnership",
