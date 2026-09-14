@@ -1,0 +1,24 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z07DominionCapture",
+      "dimensions_m": [
+        5.0,
+        4.007999897003174,
+        4.0
+      ],
+      "triangles": 23736
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z07ReformationCapture",
+      "dimensions_m": [
+        5.0,
+        4.007999897003174,
+        4.0
+      ],
+      "triangles": 19928
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}

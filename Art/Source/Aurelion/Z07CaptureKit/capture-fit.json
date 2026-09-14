@@ -1,0 +1,750 @@
+{
+  "components": [
+    {
+      "actor": "Z07_Cage_Base_DOMINION",
+      "actor_class": "StaticMeshActor",
+      "component": "StaticMeshComponent0",
+      "mesh": "/Engine/BasicShapes/Cube.Cube",
+      "actor_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-1000.000000,Y=15300.000000,Z=-865.000000),Scale3D=(X=5.000000,Y=4.000000,Z=0.700000))",
+      "component_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-1000.000000,Y=15300.000000,Z=-865.000000),Scale3D=(X=5.000000,Y=4.000000,Z=0.700000))",
+      "origin": [
+        -1000.0,
+        15300.0,
+        -865.0
+      ],
+      "extent": [
+        250.0,
+        200.0,
+        35.0
+      ],
+      "visible": false,
+      "hidden": true,
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "instances": [],
+      "instance_count": null,
+      "all_instance_transforms": []
+    },
+    {
+      "actor": "Z07_Cage_Base_DOMINION",
+      "actor_class": "StaticMeshActor",
+      "component": "HierarchicalInstancedStaticMesh",
+      "mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Floor_04.SM_Scifi_Floor_04",
+      "actor_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-1000.000000,Y=15300.000000,Z=-865.000000),Scale3D=(X=5.000000,Y=4.000000,Z=0.700000))",
+      "component_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-1000.000000,Y=15300.000000,Z=-865.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "origin": [
+        -1000.0,
+        15300.0,
+        -832.3119945526123
+      ],
+      "extent": [
+        250.0,
+        200.0,
+        2.3119945526123047
+      ],
+      "visible": true,
+      "hidden": false,
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "profile": "Custom",
+      "instances": [
+        {
+          "index": 0,
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-1250.000000,Y=15100.000000,Z=-834.623990),Scale3D=(X=1.250000,Y=1.000000,Z=1.000000))",
+          "bounds": [
+            [
+              -1250.0,
+              15100.0,
+              -834.6239891052246
+            ],
+            [
+              -750.0000000000001,
+              15500.0,
+              -830.0
+            ]
+          ]
+        }
+      ],
+      "instance_count": 1,
+      "all_instance_transforms": [
+        "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-1250.000000,Y=15100.000000,Z=-834.623990),Scale3D=(X=1.250000,Y=1.000000,Z=1.000000))"
+      ]
+    },
+    {
+      "actor": "Z07_Cage_Post_DOMINION_-2.4_-1.9",
+      "actor_class": "StaticMeshActor",
+      "component": "StaticMeshComponent0",
+      "mesh": "/Engine/BasicShapes/Cube.Cube",
+      "actor_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-1240.000000,Y=15110.000000,Z=-700.000000),Scale3D=(X=0.150000,Y=0.150000,Z=4.000000))",
+      "component_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-1240.000000,Y=15110.000000,Z=-700.000000),Scale3D=(X=0.150000,Y=0.150000,Z=4.000000))",
+      "origin": [
+        -1240.0,
+        15110.0,
+        -700.0
+      ],
+      "extent": [
+        7.5,
+        7.5,
+        200.0
+      ],
+      "visible": false,
+      "hidden": true,
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "instances": [],
+      "instance_count": null,
+      "all_instance_transforms": []
+    },
+    {
+      "actor": "Z07_Cage_Post_DOMINION_-2.4_-1.9",
+      "actor_class": "StaticMeshActor",
+      "component": "HierarchicalInstancedStaticMesh",
+      "mesh": "/Game/Underground_Base/Meshes/SM_wall_column.SM_wall_column",
+      "actor_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-1240.000000,Y=15110.000000,Z=-700.000000),Scale3D=(X=0.150000,Y=0.150000,Z=4.000000))",
+      "component_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-1240.000000,Y=15110.000000,Z=-700.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "origin": [
+        -1240.0,
+        15110.0,
+        -700.0
+      ],
+      "extent": [
+        7.5,
+        7.5,
+        200.0
+      ],
+      "visible": true,
+      "hidden": false,
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "profile": "Custom",
+      "instances": [
+        {
+          "index": 0,
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-1232.499971,Y=15109.999993,Z=-899.999998),Scale3D=(X=0.600000,Y=0.272727,Z=1.000000))",
+          "bounds": [
+            [
+              -1247.5,
+              15102.5,
+              -900.0
+            ],
+            [
+              -1232.5,
+              15117.5,
+              -500.0
+            ]
+          ]
+        }
+      ],
+      "instance_count": 1,
+      "all_instance_transforms": [
+        "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-1232.499971,Y=15109.999993,Z=-899.999998),Scale3D=(X=0.600000,Y=0.272727,Z=1.000000))"
+      ]
+    },
+    {
+      "actor": "Z07_Cage_Post_DOMINION_-2.4_1.9",
+      "actor_class": "StaticMeshActor",
+      "component": "StaticMeshComponent0",
+      "mesh": "/Engine/BasicShapes/Cube.Cube",
+      "actor_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-1240.000000,Y=15490.000000,Z=-700.000000),Scale3D=(X=0.150000,Y=0.150000,Z=4.000000))",
+      "component_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-1240.000000,Y=15490.000000,Z=-700.000000),Scale3D=(X=0.150000,Y=0.150000,Z=4.000000))",
+      "origin": [
+        -1240.0,
+        15490.0,
+        -700.0
+      ],
+      "extent": [
+        7.5,
+        7.5,
+        200.0
+      ],
+      "visible": false,
+      "hidden": true,
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "instances": [],
+      "instance_count": null,
+      "all_instance_transforms": []
+    },
+    {
+      "actor": "Z07_Cage_Post_DOMINION_-2.4_1.9",
+      "actor_class": "StaticMeshActor",
+      "component": "HierarchicalInstancedStaticMesh",
+      "mesh": "/Game/Underground_Base/Meshes/SM_wall_column.SM_wall_column",
+      "actor_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-1240.000000,Y=15490.000000,Z=-700.000000),Scale3D=(X=0.150000,Y=0.150000,Z=4.000000))",
+      "component_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-1240.000000,Y=15490.000000,Z=-700.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "origin": [
+        -1240.0,
+        15490.0,
+        -700.0
+      ],
+      "extent": [
+        7.5,
+        7.5,
+        200.0
+      ],
+      "visible": true,
+      "hidden": false,
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "profile": "Custom",
+      "instances": [
+        {
+          "index": 0,
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-1232.499971,Y=15489.999993,Z=-899.999998),Scale3D=(X=0.600000,Y=0.272727,Z=1.000000))",
+          "bounds": [
+            [
+              -1247.5,
+              15482.5,
+              -900.0
+            ],
+            [
+              -1232.5,
+              15497.5,
+              -500.0
+            ]
+          ]
+        }
+      ],
+      "instance_count": 1,
+      "all_instance_transforms": [
+        "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-1232.499971,Y=15489.999993,Z=-899.999998),Scale3D=(X=0.600000,Y=0.272727,Z=1.000000))"
+      ]
+    },
+    {
+      "actor": "Z07_Cage_Post_DOMINION_2.4_-1.9",
+      "actor_class": "StaticMeshActor",
+      "component": "StaticMeshComponent0",
+      "mesh": "/Engine/BasicShapes/Cube.Cube",
+      "actor_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-760.000000,Y=15110.000000,Z=-700.000000),Scale3D=(X=0.150000,Y=0.150000,Z=4.000000))",
+      "component_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-760.000000,Y=15110.000000,Z=-700.000000),Scale3D=(X=0.150000,Y=0.150000,Z=4.000000))",
+      "origin": [
+        -760.0,
+        15110.0,
+        -700.0
+      ],
+      "extent": [
+        7.5,
+        7.5,
+        200.0
+      ],
+      "visible": false,
+      "hidden": true,
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "instances": [],
+      "instance_count": null,
+      "all_instance_transforms": []
+    },
+    {
+      "actor": "Z07_Cage_Post_DOMINION_2.4_-1.9",
+      "actor_class": "StaticMeshActor",
+      "component": "HierarchicalInstancedStaticMesh",
+      "mesh": "/Game/Underground_Base/Meshes/SM_wall_column.SM_wall_column",
+      "actor_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-760.000000,Y=15110.000000,Z=-700.000000),Scale3D=(X=0.150000,Y=0.150000,Z=4.000000))",
+      "component_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-760.000000,Y=15110.000000,Z=-700.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "origin": [
+        -760.0,
+        15110.0,
+        -700.0
+      ],
+      "extent": [
+        7.5,
+        7.5,
+        200.0
+      ],
+      "visible": true,
+      "hidden": false,
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "profile": "Custom",
+      "instances": [
+        {
+          "index": 0,
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-752.499971,Y=15109.999993,Z=-899.999998),Scale3D=(X=0.600000,Y=0.272727,Z=1.000000))",
+          "bounds": [
+            [
+              -767.5,
+              15102.5,
+              -900.0
+            ],
+            [
+              -752.5,
+              15117.5,
+              -500.0
+            ]
+          ]
+        }
+      ],
+      "instance_count": 1,
+      "all_instance_transforms": [
+        "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-752.499971,Y=15109.999993,Z=-899.999998),Scale3D=(X=0.600000,Y=0.272727,Z=1.000000))"
+      ]
+    },
+    {
+      "actor": "Z07_Cage_Post_DOMINION_2.4_1.9",
+      "actor_class": "StaticMeshActor",
+      "component": "StaticMeshComponent0",
+      "mesh": "/Engine/BasicShapes/Cube.Cube",
+      "actor_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-760.000000,Y=15490.000000,Z=-700.000000),Scale3D=(X=0.150000,Y=0.150000,Z=4.000000))",
+      "component_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-760.000000,Y=15490.000000,Z=-700.000000),Scale3D=(X=0.150000,Y=0.150000,Z=4.000000))",
+      "origin": [
+        -760.0,
+        15490.0,
+        -700.0
+      ],
+      "extent": [
+        7.5,
+        7.5,
+        200.0
+      ],
+      "visible": false,
+      "hidden": true,
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "instances": [],
+      "instance_count": null,
+      "all_instance_transforms": []
+    },
+    {
+      "actor": "Z07_Cage_Post_DOMINION_2.4_1.9",
+      "actor_class": "StaticMeshActor",
+      "component": "HierarchicalInstancedStaticMesh",
+      "mesh": "/Game/Underground_Base/Meshes/SM_wall_column.SM_wall_column",
+      "actor_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-760.000000,Y=15490.000000,Z=-700.000000),Scale3D=(X=0.150000,Y=0.150000,Z=4.000000))",
+      "component_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-760.000000,Y=15490.000000,Z=-700.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "origin": [
+        -760.0,
+        15490.0,
+        -700.0
+      ],
+      "extent": [
+        7.5,
+        7.5,
+        200.0
+      ],
+      "visible": true,
+      "hidden": false,
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "profile": "Custom",
+      "instances": [
+        {
+          "index": 0,
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-752.499971,Y=15489.999993,Z=-899.999998),Scale3D=(X=0.600000,Y=0.272727,Z=1.000000))",
+          "bounds": [
+            [
+              -767.5,
+              15482.5,
+              -900.0
+            ],
+            [
+              -752.5,
+              15497.5,
+              -500.0
+            ]
+          ]
+        }
+      ],
+      "instance_count": 1,
+      "all_instance_transforms": [
+        "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-752.499971,Y=15489.999993,Z=-899.999998),Scale3D=(X=0.600000,Y=0.272727,Z=1.000000))"
+      ]
+    },
+    {
+      "actor": "Z07_Cage_Base_REFORMATION",
+      "actor_class": "StaticMeshActor",
+      "component": "StaticMeshComponent0",
+      "mesh": "/Engine/BasicShapes/Cube.Cube",
+      "actor_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=1000.000000,Y=15300.000000,Z=-865.000000),Scale3D=(X=5.000000,Y=4.000000,Z=0.700000))",
+      "component_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=1000.000000,Y=15300.000000,Z=-865.000000),Scale3D=(X=5.000000,Y=4.000000,Z=0.700000))",
+      "origin": [
+        1000.0,
+        15300.0,
+        -865.0
+      ],
+      "extent": [
+        250.0,
+        200.0,
+        35.0
+      ],
+      "visible": false,
+      "hidden": true,
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "instances": [],
+      "instance_count": null,
+      "all_instance_transforms": []
+    },
+    {
+      "actor": "Z07_Cage_Base_REFORMATION",
+      "actor_class": "StaticMeshActor",
+      "component": "HierarchicalInstancedStaticMesh",
+      "mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Floor_04.SM_Scifi_Floor_04",
+      "actor_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=1000.000000,Y=15300.000000,Z=-865.000000),Scale3D=(X=5.000000,Y=4.000000,Z=0.700000))",
+      "component_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=1000.000000,Y=15300.000000,Z=-865.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "origin": [
+        1000.0,
+        15300.0,
+        -832.3119945526123
+      ],
+      "extent": [
+        250.0,
+        200.0,
+        2.3119945526123047
+      ],
+      "visible": true,
+      "hidden": false,
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "profile": "Custom",
+      "instances": [
+        {
+          "index": 0,
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=750.000000,Y=15100.000000,Z=-834.623990),Scale3D=(X=1.250000,Y=1.000000,Z=1.000000))",
+          "bounds": [
+            [
+              750.0,
+              15100.0,
+              -834.6239891052246
+            ],
+            [
+              1250.0,
+              15500.0,
+              -830.0
+            ]
+          ]
+        }
+      ],
+      "instance_count": 1,
+      "all_instance_transforms": [
+        "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=750.000000,Y=15100.000000,Z=-834.623990),Scale3D=(X=1.250000,Y=1.000000,Z=1.000000))"
+      ]
+    },
+    {
+      "actor": "Z07_Cage_Post_REFORMATION_-2.4_-1.9",
+      "actor_class": "StaticMeshActor",
+      "component": "StaticMeshComponent0",
+      "mesh": "/Engine/BasicShapes/Cube.Cube",
+      "actor_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=760.000000,Y=15110.000000,Z=-700.000000),Scale3D=(X=0.150000,Y=0.150000,Z=4.000000))",
+      "component_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=760.000000,Y=15110.000000,Z=-700.000000),Scale3D=(X=0.150000,Y=0.150000,Z=4.000000))",
+      "origin": [
+        760.0000000000001,
+        15110.0,
+        -700.0
+      ],
+      "extent": [
+        7.5,
+        7.5,
+        200.0
+      ],
+      "visible": false,
+      "hidden": true,
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "instances": [],
+      "instance_count": null,
+      "all_instance_transforms": []
+    },
+    {
+      "actor": "Z07_Cage_Post_REFORMATION_-2.4_-1.9",
+      "actor_class": "StaticMeshActor",
+      "component": "HierarchicalInstancedStaticMesh",
+      "mesh": "/Game/Underground_Base/Meshes/SM_wall_column.SM_wall_column",
+      "actor_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=760.000000,Y=15110.000000,Z=-700.000000),Scale3D=(X=0.150000,Y=0.150000,Z=4.000000))",
+      "component_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=760.000000,Y=15110.000000,Z=-700.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "origin": [
+        760.0000000000001,
+        15110.0,
+        -700.0
+      ],
+      "extent": [
+        7.5,
+        7.5,
+        200.0
+      ],
+      "visible": true,
+      "hidden": false,
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "profile": "Custom",
+      "instances": [
+        {
+          "index": 0,
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=767.500029,Y=15109.999993,Z=-899.999998),Scale3D=(X=0.600000,Y=0.272727,Z=1.000000))",
+          "bounds": [
+            [
+              752.5000000000001,
+              15102.5,
+              -900.0
+            ],
+            [
+              767.5000000000001,
+              15117.5,
+              -500.0
+            ]
+          ]
+        }
+      ],
+      "instance_count": 1,
+      "all_instance_transforms": [
+        "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=767.500029,Y=15109.999993,Z=-899.999998),Scale3D=(X=0.600000,Y=0.272727,Z=1.000000))"
+      ]
+    },
+    {
+      "actor": "Z07_Cage_Post_REFORMATION_-2.4_1.9",
+      "actor_class": "StaticMeshActor",
+      "component": "StaticMeshComponent0",
+      "mesh": "/Engine/BasicShapes/Cube.Cube",
+      "actor_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=760.000000,Y=15490.000000,Z=-700.000000),Scale3D=(X=0.150000,Y=0.150000,Z=4.000000))",
+      "component_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=760.000000,Y=15490.000000,Z=-700.000000),Scale3D=(X=0.150000,Y=0.150000,Z=4.000000))",
+      "origin": [
+        760.0000000000001,
+        15490.0,
+        -700.0
+      ],
+      "extent": [
+        7.5,
+        7.5,
+        200.0
+      ],
+      "visible": false,
+      "hidden": true,
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "instances": [],
+      "instance_count": null,
+      "all_instance_transforms": []
+    },
+    {
+      "actor": "Z07_Cage_Post_REFORMATION_-2.4_1.9",
+      "actor_class": "StaticMeshActor",
+      "component": "HierarchicalInstancedStaticMesh",
+      "mesh": "/Game/Underground_Base/Meshes/SM_wall_column.SM_wall_column",
+      "actor_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=760.000000,Y=15490.000000,Z=-700.000000),Scale3D=(X=0.150000,Y=0.150000,Z=4.000000))",
+      "component_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=760.000000,Y=15490.000000,Z=-700.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "origin": [
+        760.0000000000001,
+        15490.0,
+        -700.0
+      ],
+      "extent": [
+        7.5,
+        7.5,
+        200.0
+      ],
+      "visible": true,
+      "hidden": false,
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "profile": "Custom",
+      "instances": [
+        {
+          "index": 0,
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=767.500029,Y=15489.999993,Z=-899.999998),Scale3D=(X=0.600000,Y=0.272727,Z=1.000000))",
+          "bounds": [
+            [
+              752.5000000000001,
+              15482.5,
+              -900.0
+            ],
+            [
+              767.5000000000001,
+              15497.5,
+              -500.0
+            ]
+          ]
+        }
+      ],
+      "instance_count": 1,
+      "all_instance_transforms": [
+        "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=767.500029,Y=15489.999993,Z=-899.999998),Scale3D=(X=0.600000,Y=0.272727,Z=1.000000))"
+      ]
+    },
+    {
+      "actor": "Z07_Cage_Post_REFORMATION_2.4_-1.9",
+      "actor_class": "StaticMeshActor",
+      "component": "StaticMeshComponent0",
+      "mesh": "/Engine/BasicShapes/Cube.Cube",
+      "actor_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=1240.000000,Y=15110.000000,Z=-700.000000),Scale3D=(X=0.150000,Y=0.150000,Z=4.000000))",
+      "component_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=1240.000000,Y=15110.000000,Z=-700.000000),Scale3D=(X=0.150000,Y=0.150000,Z=4.000000))",
+      "origin": [
+        1239.9999999999998,
+        15110.0,
+        -700.0
+      ],
+      "extent": [
+        7.5,
+        7.5,
+        200.0
+      ],
+      "visible": false,
+      "hidden": true,
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "instances": [],
+      "instance_count": null,
+      "all_instance_transforms": []
+    },
+    {
+      "actor": "Z07_Cage_Post_REFORMATION_2.4_-1.9",
+      "actor_class": "StaticMeshActor",
+      "component": "HierarchicalInstancedStaticMesh",
+      "mesh": "/Game/Underground_Base/Meshes/SM_wall_column.SM_wall_column",
+      "actor_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=1240.000000,Y=15110.000000,Z=-700.000000),Scale3D=(X=0.150000,Y=0.150000,Z=4.000000))",
+      "component_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=1240.000000,Y=15110.000000,Z=-700.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "origin": [
+        1239.9999999999998,
+        15110.0,
+        -700.0
+      ],
+      "extent": [
+        7.5,
+        7.5,
+        200.0
+      ],
+      "visible": true,
+      "hidden": false,
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "profile": "Custom",
+      "instances": [
+        {
+          "index": 0,
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=1247.500029,Y=15109.999993,Z=-899.999998),Scale3D=(X=0.600000,Y=0.272727,Z=1.000000))",
+          "bounds": [
+            [
+              1232.4999999999998,
+              15102.5,
+              -900.0
+            ],
+            [
+              1247.4999999999998,
+              15117.5,
+              -500.0
+            ]
+          ]
+        }
+      ],
+      "instance_count": 1,
+      "all_instance_transforms": [
+        "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=1247.500029,Y=15109.999993,Z=-899.999998),Scale3D=(X=0.600000,Y=0.272727,Z=1.000000))"
+      ]
+    },
+    {
+      "actor": "Z07_Cage_Post_REFORMATION_2.4_1.9",
+      "actor_class": "StaticMeshActor",
+      "component": "StaticMeshComponent0",
+      "mesh": "/Engine/BasicShapes/Cube.Cube",
+      "actor_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=1240.000000,Y=15490.000000,Z=-700.000000),Scale3D=(X=0.150000,Y=0.150000,Z=4.000000))",
+      "component_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=1240.000000,Y=15490.000000,Z=-700.000000),Scale3D=(X=0.150000,Y=0.150000,Z=4.000000))",
+      "origin": [
+        1239.9999999999998,
+        15490.0,
+        -700.0
+      ],
+      "extent": [
+        7.5,
+        7.5,
+        200.0
+      ],
+      "visible": false,
+      "hidden": true,
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "instances": [],
+      "instance_count": null,
+      "all_instance_transforms": []
+    },
+    {
+      "actor": "Z07_Cage_Post_REFORMATION_2.4_1.9",
+      "actor_class": "StaticMeshActor",
+      "component": "HierarchicalInstancedStaticMesh",
+      "mesh": "/Game/Underground_Base/Meshes/SM_wall_column.SM_wall_column",
+      "actor_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=1240.000000,Y=15490.000000,Z=-700.000000),Scale3D=(X=0.150000,Y=0.150000,Z=4.000000))",
+      "component_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=1240.000000,Y=15490.000000,Z=-700.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "origin": [
+        1239.9999999999998,
+        15490.0,
+        -700.0
+      ],
+      "extent": [
+        7.5,
+        7.5,
+        200.0
+      ],
+      "visible": true,
+      "hidden": false,
+      "actor_collision": true,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "profile": "Custom",
+      "instances": [
+        {
+          "index": 0,
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=1247.500029,Y=15489.999993,Z=-899.999998),Scale3D=(X=0.600000,Y=0.272727,Z=1.000000))",
+          "bounds": [
+            [
+              1232.4999999999998,
+              15482.5,
+              -900.0
+            ],
+            [
+              1247.4999999999998,
+              15497.5,
+              -500.0
+            ]
+          ]
+        }
+      ],
+      "instance_count": 1,
+      "all_instance_transforms": [
+        "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=1247.500029,Y=15489.999993,Z=-899.999998),Scale3D=(X=0.600000,Y=0.272727,Z=1.000000))"
+      ]
+    }
+  ],
+  "gates": [
+    {
+      "actor": "Aurelion_DestroyDominionResonator_PhysicalFrame",
+      "class_name": "SovAurelionJournalGate",
+      "beat": "DestroyDominionResonator",
+      "mission": "M12_FireAndFrost",
+      "targets": [
+        "Z07_Cage_Base_DOMINION",
+        "Z07_Cage_Post_DOMINION_-2.4_-1.9",
+        "Z07_Cage_Post_DOMINION_-2.4_1.9",
+        "Z07_Cage_Post_DOMINION_2.4_-1.9",
+        "Z07_Cage_Post_DOMINION_2.4_1.9",
+        "Z07_Cage_DOMINION_Label",
+        "Z07_Cage_DOMINION_StandIn"
+      ],
+      "use_body": false,
+      "block_after": false
+    },
+    {
+      "actor": "Aurelion_DestroyReformationCage_PhysicalFrame",
+      "class_name": "SovAurelionJournalGate",
+      "beat": "DestroyReformationCage",
+      "mission": "M12_FireAndFrost",
+      "targets": [
+        "Z07_Cage_Base_REFORMATION",
+        "Z07_Cage_Post_REFORMATION_-2.4_-1.9",
+        "Z07_Cage_Post_REFORMATION_-2.4_1.9",
+        "Z07_Cage_Post_REFORMATION_2.4_-1.9",
+        "Z07_Cage_Post_REFORMATION_2.4_1.9",
+        "Z07_Cage_REFORMATION_Label",
+        "Z07_Cage_REFORMATION_StandIn"
+      ],
+      "use_body": false,
+      "block_after": false
+    }
+  ]
+}
