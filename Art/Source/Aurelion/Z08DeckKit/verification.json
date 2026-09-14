@@ -1,0 +1,87 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z08Deck_1",
+      "dimensions_m": [
+        3.0,
+        3.0,
+        0.046239886432886124
+      ],
+      "triangles": 6956
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z08Deck_2",
+      "dimensions_m": [
+        2.0,
+        1.3799999952316284,
+        0.046239886432886124
+      ],
+      "triangles": 5076
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z08Deck_3",
+      "dimensions_m": [
+        2.799999952316284,
+        2.9000000953674316,
+        0.046239886432886124
+      ],
+      "triangles": 6956
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z08Deck_4",
+      "dimensions_m": [
+        4.5,
+        3.5,
+        0.046239886432886124
+      ],
+      "triangles": 9588
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z08Deck_5",
+      "dimensions_m": [
+        3.5201022624969482,
+        3.0,
+        0.046239886432886124
+      ],
+      "triangles": 7708
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z08Deck_6",
+      "dimensions_m": [
+        4.0,
+        0.10000000149011612,
+        0.046239886432886124
+      ],
+      "triangles": 752
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z08Deck_7",
+      "dimensions_m": [
+        5.0,
+        0.10000000149011612,
+        0.046239886432886124
+      ],
+      "triangles": 752
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z08Deck_8",
+      "dimensions_m": [
+        4.163105487823486,
+        3.0,
+        0.046239886432886124
+      ],
+      "triangles": 7708
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z08DeckAssembly",
+      "dimensions_m": [
+        59.900001525878906,
+        60.04999923706055,
+        6.076308250427246
+      ],
+      "triangles": 262824
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}

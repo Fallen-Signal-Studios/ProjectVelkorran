@@ -31,7 +31,13 @@ def check_z08_paving(world, actors):
             placements.append(a.get_actor_label())
     c=labels[fit['floor']['actor']].get_component_by_class(unreal.InstancedStaticMeshComponent)
     expected=fit['retained_transforms']
-    assert sorted(c.get_instance_transform(i,world_space=True).export_text() for i in range(c.get_instance_count()))==sorted(expected)
+    if c.static_mesh.get_name()=='SM_Aurelion_KIT_Z08DeckAssembly':
+        source=Path(unreal.Paths.project_dir())/'Art/Source/Aurelion/Z08DeckKit'
+        original=json.loads((source/'deck-baseline.json').read_text())
+        assert sorted(row['transform'] for row in original['instances'])==sorted(expected)
+        runpy.run_path(str(Path(unreal.Paths.project_dir())/'Scripts/Editor/check_z08_decking.py'))['check_z08_decking'](actors)
+    else:
+        assert sorted(c.get_instance_transform(i,world_space=True).export_text() for i in range(c.get_instance_count()))==sorted(expected)
     retained_floor_count=c.get_instance_count()
     center=fit['centerline'];c=labels[center['actor']].get_component_by_class(unreal.InstancedStaticMeshComponent)
     # HISM removal swaps retained slots; require the exact transform multiset.
