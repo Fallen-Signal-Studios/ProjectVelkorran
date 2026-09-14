@@ -8,7 +8,7 @@ verify_z06_endwall_stage=verify
 del DEFER_Z06_ENDWALLS_AUTORUN
 def verify():
     verify_z06_endwall_stage()
-    assert len(actors)==2832+z06_refuge_count+z06_refuge_finish_count and z06_slab_count==1
+    assert len(actors)==2832+z06_refuge_count+z06_refuge_finish_count+z06_gate_assembly_count and z06_slab_count==1
     geometry=runpy.run_path(str(root/'Scripts/Editor/check_z06_slab.py'))['check_z06_slab'](world,actors)
     assert not unreal.EditorLoadingAndSavingUtils.get_dirty_map_packages()
     (out/'z06-slab-verification.json').write_text(json.dumps(dict(status='passed',actor_count=len(actors),geometry=geometry),indent=2))

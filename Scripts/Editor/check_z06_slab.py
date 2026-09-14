@@ -25,7 +25,15 @@ def check_z06_slab(world,actors):
         raw=unreal.SystemLibrary.capsule_trace_single_by_profile(world,unreal.Vector(row['x'],row['start_y'],row['z']),unreal.Vector(row['x'],row['end_y'],row['z']),42,88,'Pawn',False,[],unreal.DrawDebugTrace.NONE,True)
         h=next(v for v in raw if isinstance(v,unreal.HitResult)) if isinstance(raw,tuple) else raw
         blocked=bool(h and h.to_tuple()[0]);actor=h.to_tuple()[9].get_actor_label() if blocked and h.to_tuple()[9] else None
-        assert blocked==row['blocked'] and actor==row['actor'],(row,blocked,actor)
+        expected_actor=row['actor']
+        if 'KIT_Z06_GateHousing' in labels and row['x']==900:
+            # This already-blocked lane meets the new west jamb before the closed leaf.
+            assert row['blocked'] and row['actor']=='Aurelion_E3_RescueAccess'
+            expected_actor='KIT_Z06_GateHousing'
+            control=unreal.SystemLibrary.capsule_trace_single_by_profile(world,unreal.Vector(row['x'],row['start_y'],row['z']),unreal.Vector(row['x'],row['end_y'],row['z']),42,88,'Pawn',False,[labels['KIT_Z06_GateHousing']],unreal.DrawDebugTrace.NONE,True)
+            control=next(v for v in control if isinstance(v,unreal.HitResult)) if isinstance(control,tuple) else control
+            assert control and control.to_tuple()[0] and control.to_tuple()[9].get_actor_label()==row['actor']
+        assert blocked==row['blocked'] and actor==expected_actor,(row,blocked,actor)
         probes.append(dict(x=row['x'],blocked=blocked,actor=actor))
     ignored=[a for a in actors if a!=old];tops=[];yaw=math.radians(old.get_actor_rotation().yaw)
     for x in (-450,0,450):

@@ -1,0 +1,23 @@
+{
+  "status": "Source candidate; scene fit pending",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_GateLantern",
+      "triangles": 8084,
+      "nominal_dimensions_m": [
+        2.4000000953674316,
+        0.4399999976158142,
+        1.0410000085830688
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_UplightLens"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "Visual fixture only; deployed NoCollision above the route"
+    }
+  ]
+}

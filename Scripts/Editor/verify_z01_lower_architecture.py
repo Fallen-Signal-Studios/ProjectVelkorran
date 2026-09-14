@@ -73,7 +73,9 @@ z06_refuge_count = sum(a.get_actor_label().startswith('KIT_Z06_Refuge_') for a i
 assert z06_refuge_count in (0, 2), 'Partial or duplicate Z06 refuge surfaces'
 z06_refuge_finish_count = sum(a.get_actor_label().startswith('KIT_Z06_RefugeFinish_') for a in actors)
 assert z06_refuge_finish_count in (0, 3), 'Partial or duplicate Z06 refuge finish'
-assert len(actors) == 1788 + vault_count + uplight_count + paving_count + bridge_count + endwall_count + z02_paving_count + z02_vault_count + z02_perimeter_count + z02_gallery_count + z02_furniture_count + z02_guard_count + z02_bridges_count + z02_exterior_count + z02_facade_light_count + north_guard_count + north_bridge_count + atrium_guard_count + atrium_ring_count + atrium_parapet_count + atrium_canopy_count+atrium_bridge_floor_count+atrium_crown_count+atrium_crown_light_count+z06_paving_count+z06_ceiling_count+z06_side_count+z06_light_count+z06_end_count+z06_slab_count+z06_refuge_count+z06_refuge_finish_count, 'Unexpected actor additions or removals'
+z06_gate_assembly_count = sum(a.get_actor_label()=="KIT_Z06_GateHousing" or a.get_actor_label().startswith("KIT_Z06_GateLantern_") for a in actors)
+assert z06_gate_assembly_count in (0, 5), "Partial or duplicate Z06 gate assembly"
+assert len(actors) == 1788 + vault_count + uplight_count + paving_count + bridge_count + endwall_count + z02_paving_count + z02_vault_count + z02_perimeter_count + z02_gallery_count + z02_furniture_count + z02_guard_count + z02_bridges_count + z02_exterior_count + z02_facade_light_count + north_guard_count + north_bridge_count + atrium_guard_count + atrium_ring_count + atrium_parapet_count + atrium_canopy_count+atrium_bridge_floor_count+atrium_crown_count+atrium_crown_light_count+z06_paving_count+z06_ceiling_count+z06_side_count+z06_light_count+z06_end_count+z06_slab_count+z06_refuge_count+z06_refuge_finish_count+z06_gate_assembly_count, 'Unexpected actor additions or removals'
 shell = labels['aurelionwalls']
 assert shell.get_actor_enable_collision()
 assert not shell.static_mesh_component.get_editor_property('visible')

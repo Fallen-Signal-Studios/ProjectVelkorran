@@ -25,10 +25,11 @@ def verify():
         rows.append(dict(material=name,normal_strength=strength,base_color_and_roughness_retained=True))
     assert not unreal.EditorLoadingAndSavingUtils.get_dirty_map_packages()
     (out/'kit-stone-normal-verification.json').write_text(json.dumps(dict(status='passed',actor_count=len(actors),materials=rows,qualification='Saved material inputs and prior architecture; shadow artifacts and final visual/performance acceptance remain open.'),indent=2))
-unreal.EditorPythonScripting.set_keep_python_script_alive(True);started=time.monotonic()
-def tick(delta):
-    if time.monotonic()-started<15:return
-    unreal.unregister_slate_post_tick_callback(handle)
-    try:verify()
-    finally:unreal.EditorPythonScripting.set_keep_python_script_alive(False)
-handle=unreal.register_slate_post_tick_callback(tick)
+if not globals().get("DEFER_KIT_STONE_NORMAL_AUTORUN",False):
+    unreal.EditorPythonScripting.set_keep_python_script_alive(True);started=time.monotonic()
+    def tick(delta):
+        if time.monotonic()-started<15:return
+        unreal.unregister_slate_post_tick_callback(handle)
+        try:verify()
+        finally:unreal.EditorPythonScripting.set_keep_python_script_alive(False)
+    handle=unreal.register_slate_post_tick_callback(tick)

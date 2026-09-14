@@ -1,0 +1,14 @@
+{
+  "uplight_target_x": 1546.5,
+  "uplight_lumens": 35,
+  "key_01_lumens": 350,
+  "lanterns": [
+    {"name": "Front", "location": [1100, 8150, 0], "lumens": 300},
+    {"name": "Rear", "location": [1100, 8750, 0], "lumens": 120}
+  ],
+  "light_offset_z": -10,
+  "radius": 1100,
+  "source_width": 200,
+  "source_height": 28,
+  "color": [0.92, 0.85, 0.70]
+}
