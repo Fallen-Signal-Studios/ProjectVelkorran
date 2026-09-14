@@ -4,7 +4,7 @@ import runpy
 import unreal
 root=Path(unreal.Paths.project_dir())
 exec(compile((root/'Scripts/Editor/verify_atrium_bridge_exit.py').read_text(),'verify_atrium_bridge_exit','exec'))
-assert len(actors)==2142+atrium_ring_count+atrium_parapet_count+atrium_canopy_count+atrium_bridge_floor_count+atrium_crown_count+atrium_crown_light_count+z06_paving_count+z06_ceiling_count+z06_side_count+z06_light_count+z06_end_count+z06_slab_count+z06_refuge_count+z06_refuge_finish_count+z06_gate_assembly_count+z06_flank_landing_count+z07_paving_count+z07_wall_count+z07_light_count and atrium_guard_count==34
+assert len(actors)==2142+atrium_ring_count+atrium_parapet_count+atrium_canopy_count+atrium_bridge_floor_count+atrium_crown_count+atrium_crown_light_count+z06_paving_count+z06_ceiling_count+z06_side_count+z06_light_count+z06_end_count+z06_slab_count+z06_refuge_count+z06_refuge_finish_count+z06_gate_assembly_count+z06_flank_landing_count+z07_paving_count+z07_wall_count+z07_light_count+z08_paving_count and atrium_guard_count==34
 geometry=runpy.run_path(str(root/'Scripts/Editor/check_atrium_guards.py'))['check_guards'](world,actors)
 fit=json.loads((root/'Art/Source/Aurelion/AtriumApproachKit/guard-fit.json').read_text())
 expected=json.loads((root/'Art/Source/Aurelion/AtriumApproachKit/atrium-railing-retained.json').read_text())

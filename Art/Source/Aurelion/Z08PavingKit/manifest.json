@@ -1,0 +1,24 @@
+{
+  "status": "Fitted six-metre route source; room and live qualification pending",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z08PavingRoute_6x4",
+      "triangles": 3196,
+      "nominal_dimensions_m": [
+        6,
+        4,
+        0.12
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_Basalt",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_IvoryStone"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; fitted over retained Z08 floor collision",
+      "surface_top_metres": 0.12
+    }
+  ]
+}

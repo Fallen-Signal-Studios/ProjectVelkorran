@@ -1,0 +1,15 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z08PavingRoute_6x4",
+      "dimensions_m": [
+        6.0,
+        4.0,
+        0.12000000476837158
+      ],
+      "triangles": 3196
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}
