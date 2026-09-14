@@ -1,0 +1,51 @@
+{
+  "status": "Candidate fitted ring floors; in-engine review pending",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_AtriumOuterRingSector",
+      "triangles": 11364,
+      "nominal_dimensions_m": [
+        8.538012148709548,
+        7.023251592580617,
+        2.4
+      ],
+      "materials": [
+        "M_Aurelion_StoneGrout",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_Basalt",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; retained original ring collision remains authoritative",
+      "inner_radius_m": 28,
+      "outer_radius_m": 36,
+      "sector_degrees": 11.25,
+      "top_m": 0,
+      "perimeter": "Straight chord boundary, not circular interpolation"
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumInnerRingSector",
+      "triangles": 8356,
+      "nominal_dimensions_m": [
+        9.172932476370926,
+        3.5116257962903084,
+        2.4
+      ],
+      "materials": [
+        "M_Aurelion_StoneGrout",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_Basalt",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; retained original ring collision remains authoritative",
+      "inner_radius_m": 9,
+      "outer_radius_m": 18,
+      "sector_degrees": 11.25,
+      "top_m": 0,
+      "perimeter": "Straight chord boundary, not circular interpolation"
+    }
+  ]
+}

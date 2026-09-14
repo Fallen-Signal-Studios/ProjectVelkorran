@@ -1,0 +1,24 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_AtriumOuterRingSector",
+      "dimensions_m": [
+        8.53801155090332,
+        7.023251533508301,
+        2.4000000953674316
+      ],
+      "triangles": 11364
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumInnerRingSector",
+      "dimensions_m": [
+        9.172932624816895,
+        3.5116257667541504,
+        2.4000000953674316
+      ],
+      "triangles": 8356
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}

@@ -4,7 +4,7 @@ import runpy
 import unreal
 root=Path(unreal.Paths.project_dir())
 exec(compile((root/'Scripts/Editor/verify_atrium_bridge_exit.py').read_text(),'verify_atrium_bridge_exit','exec'))
-assert len(actors)==2142 and atrium_guard_count==34
+assert len(actors)==2142+atrium_ring_count and atrium_guard_count==34
 geometry=runpy.run_path(str(root/'Scripts/Editor/check_atrium_guards.py'))['check_guards'](world,actors)
 fit=json.loads((root/'Art/Source/Aurelion/AtriumApproachKit/guard-fit.json').read_text())
 expected=json.loads((root/'Art/Source/Aurelion/AtriumApproachKit/atrium-railing-retained.json').read_text())

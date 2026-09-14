@@ -4,7 +4,7 @@ import runpy
 import unreal
 root=Path(unreal.Paths.project_dir())
 exec(compile((root/'Scripts/Editor/verify_z02_facade_lighting.py').read_text(encoding='utf-8-sig'),'verify_z02_facade_lighting','exec'))
-assert len(actors)==2104+north_bridge_count+atrium_guard_count and north_guard_count==30
+assert len(actors)==2104+north_bridge_count+atrium_guard_count+atrium_ring_count and north_guard_count==30
 geometry=runpy.run_path(str(root/'Scripts/Editor/check_north_guards.py'))['check_guards'](world,actors)
 fit=json.loads((root/'Art/Source/Aurelion/ParapetClosingKit/north-guard-fit.json').read_text())
 expected=json.loads((root/'Art/Source/Aurelion/ParapetClosingKit/north-railing-retained.json').read_text())

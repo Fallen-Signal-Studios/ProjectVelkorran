@@ -1,0 +1,973 @@
+{
+  "meshes": [
+    {
+      "mesh": "/Game/Aurelion/Meshes/SM_RingSector_28_36_0p6",
+      "users": [
+        {
+          "actor": "Z05_Outer_Walk_00",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Outer_Walk_01",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.098017,W=0.995185),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Outer_Walk_02",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.195090,W=0.980785),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Outer_Walk_03",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.290285,W=0.956940),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Outer_Walk_04",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.382683,W=0.923880),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Outer_Walk_05",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.471397,W=0.881921),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Outer_Walk_06",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.555570,W=0.831470),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Outer_Walk_07",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.634393,W=0.773010),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Outer_Walk_08",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.707107,W=0.707107),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Outer_Walk_09",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.773010,W=0.634393),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Outer_Walk_10",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.831470,W=0.555570),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Outer_Walk_11",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.881921,W=0.471397),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Outer_Walk_12",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.923880,W=0.382683),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Outer_Walk_13",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.956940,W=0.290285),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Outer_Walk_14",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.980785,W=0.195090),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Outer_Walk_15",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.995185,W=0.098017),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Outer_Walk_16",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=1.000000,W=0.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Outer_Walk_17",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.995185,W=0.098017),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Outer_Walk_18",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.980785,W=0.195090),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Outer_Walk_19",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.956940,W=0.290285),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Outer_Walk_20",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.923880,W=0.382683),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Outer_Walk_21",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.881921,W=0.471397),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Outer_Walk_22",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.831470,W=0.555570),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Outer_Walk_23",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.773010,W=0.634393),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Outer_Walk_24",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Outer_Walk_25",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.634393,W=0.773010),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Outer_Walk_26",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.555570,W=0.831470),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Outer_Walk_27",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.471397,W=0.881921),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Outer_Walk_28",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.382683,W=0.923880),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Outer_Walk_29",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.290285,W=0.956940),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Outer_Walk_30",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.195090,W=0.980785),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Outer_Walk_31",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.098017,W=0.995185),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Aurelion_Art_M12_Z05_50_d70434",
+          "component": "HierarchicalInstancedStaticMesh",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": true,
+          "hidden": false,
+          "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+          "instances": [
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.098017,W=0.995185),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.195090,W=0.980785),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.290285,W=0.956940),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.382683,W=0.923880),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.471397,W=0.881921),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.555570,W=0.831470),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.634393,W=0.773010),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.773010,W=0.634393),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.831470,W=0.555570),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.881921,W=0.471397),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.923880,W=0.382683),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.956940,W=0.290285),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.980785,W=0.195090),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.995185,W=0.098017),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=1.000000,W=0.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.995185,W=-0.098017),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.980785,W=-0.195090),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.956940,W=-0.290285),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.923880,W=-0.382683),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.881921,W=-0.471397),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=-0.831470,W=0.555570),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=-0.773010,W=0.634393),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=-0.634393,W=0.773010),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=-0.555570,W=0.831470),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=-0.471397,W=0.881921),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=-0.382683,W=0.923880),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=-0.290285,W=0.956940),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=-0.195090,W=0.980785),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=-0.098017,W=0.995185),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))"
+          ]
+        }
+      ]
+    },
+    {
+      "mesh": "/Game/Aurelion/Meshes/SM_RingSector_9_18_0p6",
+      "users": [
+        {
+          "actor": "Z05_Control_Platform_00",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Control_Platform_01",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.098017,W=0.995185),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Control_Platform_02",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.195090,W=0.980785),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Control_Platform_03",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.290285,W=0.956940),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Control_Platform_04",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.382683,W=0.923880),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Control_Platform_05",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.471397,W=0.881921),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Control_Platform_06",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.555570,W=0.831470),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Control_Platform_07",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.634393,W=0.773010),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Control_Platform_08",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.707107,W=0.707107),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Control_Platform_09",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.773010,W=0.634393),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Control_Platform_10",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.831470,W=0.555570),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Control_Platform_11",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.881921,W=0.471397),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Control_Platform_12",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.923880,W=0.382683),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Control_Platform_13",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.956940,W=0.290285),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Control_Platform_14",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.980785,W=0.195090),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Control_Platform_15",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.995185,W=0.098017),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Control_Platform_16",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=1.000000,W=0.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Control_Platform_17",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.995185,W=0.098017),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Control_Platform_18",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.980785,W=0.195090),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Control_Platform_19",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.956940,W=0.290285),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Control_Platform_20",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.923880,W=0.382683),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Control_Platform_21",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.881921,W=0.471397),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Control_Platform_22",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.831470,W=0.555570),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Control_Platform_23",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.773010,W=0.634393),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Control_Platform_24",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Control_Platform_25",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.634393,W=0.773010),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Control_Platform_26",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.555570,W=0.831470),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Control_Platform_27",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.471397,W=0.881921),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Control_Platform_28",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.382683,W=0.923880),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Control_Platform_29",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.290285,W=0.956940),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Control_Platform_30",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.195090,W=0.980785),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Z05_Control_Platform_31",
+          "component": "StaticMeshComponent0",
+          "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.098017,W=0.995185),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": false,
+          "hidden": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": []
+        },
+        {
+          "actor": "Aurelion_Art_M12_Z05_52_810eb5",
+          "component": "HierarchicalInstancedStaticMesh",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "visible": true,
+          "hidden": false,
+          "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+          "instances": [
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.098017,W=0.995185),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.195090,W=0.980785),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.290285,W=0.956940),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.382683,W=0.923880),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.471397,W=0.881921),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.555570,W=0.831470),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.634393,W=0.773010),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.773010,W=0.634393),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.831470,W=0.555570),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.881921,W=0.471397),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.923880,W=0.382683),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.956940,W=0.290285),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.980785,W=0.195090),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.995185,W=0.098017),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=1.000000,W=0.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.995185,W=-0.098017),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.980785,W=-0.195090),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.956940,W=-0.290285),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.923880,W=-0.382683),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.881921,W=-0.471397),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=-0.831470,W=0.555570),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=-0.773010,W=0.634393),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=-0.634393,W=0.773010),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=-0.555570,W=0.831470),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=-0.471397,W=0.881921),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=-0.382683,W=0.923880),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=-0.290285,W=0.956940),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=-0.195090,W=0.980785),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=-0.098017,W=0.995185),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))"
+          ]
+        }
+      ]
+    }
+  ],
+  "seam_probes": [
+    {
+      "angle": 224.9,
+      "radius": 1200,
+      "hit": {
+        "actor": "Z05_Control_Platform_19",
+        "point": "(X=-850.007883,Y=-847.045962,Z=0.000000)"
+      }
+    },
+    {
+      "angle": 224.9,
+      "radius": 1750,
+      "hit": {
+        "actor": "Z05_Control_Platform_19",
+        "point": "(X=-1239.594829,Y=-1235.275361,Z=0.000000)"
+      }
+    },
+    {
+      "angle": 224.9,
+      "radius": 3200,
+      "hit": {
+        "actor": "Z05_Outer_Walk_19",
+        "point": "(X=-2266.687687,Y=-2258.789232,Z=0.000000)"
+      }
+    },
+    {
+      "angle": 224.9,
+      "radius": 3580,
+      "hit": {
+        "actor": "Z05_Outer_Walk_19",
+        "point": "(X=-2535.856850,Y=-2527.020453,Z=0.000000)"
+      }
+    },
+    {
+      "angle": 224.99,
+      "radius": 1200,
+      "hit": {
+        "actor": "Z05_Control_Platform_19",
+        "point": "(X=-848.676298,Y=-848.380106,Z=0.000000)"
+      }
+    },
+    {
+      "angle": 224.99,
+      "radius": 1750,
+      "hit": {
+        "actor": "Z05_Control_Platform_19",
+        "point": "(X=-1237.652934,Y=-1237.220987,Z=0.000000)"
+      }
+    },
+    {
+      "angle": 224.99,
+      "radius": 3200,
+      "hit": {
+        "actor": "Z05_Outer_Walk_19",
+        "point": "(X=-2263.136794,Y=-2262.346948,Z=0.000000)"
+      }
+    },
+    {
+      "angle": 224.99,
+      "radius": 3580,
+      "hit": {
+        "actor": "Z05_Outer_Walk_19",
+        "point": "(X=-2531.884289,Y=-2531.000649,Z=0.000000)"
+      }
+    },
+    {
+      "angle": 225,
+      "radius": 1200,
+      "hit": null
+    },
+    {
+      "angle": 225,
+      "radius": 1750,
+      "hit": null
+    },
+    {
+      "angle": 225,
+      "radius": 3200,
+      "hit": null
+    },
+    {
+      "angle": 225,
+      "radius": 3580,
+      "hit": null
+    },
+    {
+      "angle": 225.01,
+      "radius": 1200,
+      "hit": {
+        "actor": "Z05_Control_Platform_20",
+        "point": "(X=-848.379863,Y=-848.676055,Z=0.000000)"
+      }
+    },
+    {
+      "angle": 225.01,
+      "radius": 1750,
+      "hit": {
+        "actor": "Z05_Control_Platform_20",
+        "point": "(X=-1237.220634,Y=-1237.652581,Z=0.000000)"
+      }
+    },
+    {
+      "angle": 225.01,
+      "radius": 3200,
+      "hit": {
+        "actor": "Z05_Outer_Walk_20",
+        "point": "(X=-2262.346302,Y=-2263.136147,Z=0.000000)"
+      }
+    },
+    {
+      "angle": 225.01,
+      "radius": 3580,
+      "hit": {
+        "actor": "Z05_Outer_Walk_20",
+        "point": "(X=-2530.999925,Y=-2531.883565,Z=0.000000)"
+      }
+    },
+    {
+      "angle": 225.1,
+      "radius": 1200,
+      "hit": {
+        "actor": "Z05_Control_Platform_20",
+        "point": "(X=-847.045720,Y=-850.007640,Z=0.000000)"
+      }
+    },
+    {
+      "angle": 225.1,
+      "radius": 1750,
+      "hit": {
+        "actor": "Z05_Control_Platform_20",
+        "point": "(X=-1235.275008,Y=-1239.594474,Z=0.000000)"
+      }
+    },
+    {
+      "angle": 225.1,
+      "radius": 3200,
+      "hit": {
+        "actor": "Z05_Outer_Walk_20",
+        "point": "(X=-2258.788586,Y=-2266.687039,Z=0.000000)"
+      }
+    },
+    {
+      "angle": 225.1,
+      "radius": 3580,
+      "hit": {
+        "actor": "Z05_Outer_Walk_20",
+        "point": "(X=-2527.019731,Y=-2535.856125,Z=0.000000)"
+      }
+    },
+    {
+      "angle": 314.9,
+      "radius": 1200,
+      "hit": {
+        "actor": "Z05_Control_Platform_27",
+        "point": "(X=847.045926,Y=-850.007847,Z=0.000000)"
+      }
+    },
+    {
+      "angle": 314.9,
+      "radius": 1750,
+      "hit": {
+        "actor": "Z05_Control_Platform_27",
+        "point": "(X=1235.275309,Y=-1239.594776,Z=0.000000)"
+      }
+    },
+    {
+      "angle": 314.9,
+      "radius": 3200,
+      "hit": {
+        "actor": "Z05_Outer_Walk_27",
+        "point": "(X=2258.789136,Y=-2266.687591,Z=0.000000)"
+      }
+    },
+    {
+      "angle": 314.9,
+      "radius": 3580,
+      "hit": {
+        "actor": "Z05_Outer_Walk_27",
+        "point": "(X=2527.020346,Y=-2535.856742,Z=0.000000)"
+      }
+    },
+    {
+      "angle": 314.99,
+      "radius": 1200,
+      "hit": {
+        "actor": "Z05_Control_Platform_27",
+        "point": "(X=848.380070,Y=-848.676262,Z=0.000000)"
+      }
+    },
+    {
+      "angle": 314.99,
+      "radius": 1750,
+      "hit": {
+        "actor": "Z05_Control_Platform_27",
+        "point": "(X=1237.220935,Y=-1237.652882,Z=0.000000)"
+      }
+    },
+    {
+      "angle": 314.99,
+      "radius": 3200,
+      "hit": {
+        "actor": "Z05_Outer_Walk_27",
+        "point": "(X=2262.346852,Y=-2263.136698,Z=0.000000)"
+      }
+    },
+    {
+      "angle": 314.99,
+      "radius": 3580,
+      "hit": {
+        "actor": "Z05_Outer_Walk_27",
+        "point": "(X=2531.000541,Y=-2531.884181,Z=0.000000)"
+      }
+    },
+    {
+      "angle": 315,
+      "radius": 1200,
+      "hit": null
+    },
+    {
+      "angle": 315,
+      "radius": 1750,
+      "hit": null
+    },
+    {
+      "angle": 315,
+      "radius": 3200,
+      "hit": null
+    },
+    {
+      "angle": 315,
+      "radius": 3580,
+      "hit": null
+    },
+    {
+      "angle": 315.01,
+      "radius": 1200,
+      "hit": {
+        "actor": "Z05_Control_Platform_28",
+        "point": "(X=848.676192,Y=-848.380000,Z=0.000000)"
+      }
+    },
+    {
+      "angle": 315.01,
+      "radius": 1750,
+      "hit": {
+        "actor": "Z05_Control_Platform_28",
+        "point": "(X=1237.652780,Y=-1237.220833,Z=0.000000)"
+      }
+    },
+    {
+      "angle": 315.01,
+      "radius": 3200,
+      "hit": {
+        "actor": "Z05_Outer_Walk_28",
+        "point": "(X=2263.136513,Y=-2262.346667,Z=0.000000)"
+      }
+    },
+    {
+      "angle": 315.01,
+      "radius": 3580,
+      "hit": {
+        "actor": "Z05_Outer_Walk_28",
+        "point": "(X=2531.883973,Y=-2531.000333,Z=0.000000)"
+      }
+    },
+    {
+      "angle": 315.1,
+      "radius": 1200,
+      "hit": {
+        "actor": "Z05_Control_Platform_28",
+        "point": "(X=850.007777,Y=-847.045856,Z=0.000000)"
+      }
+    },
+    {
+      "angle": 315.1,
+      "radius": 1750,
+      "hit": {
+        "actor": "Z05_Control_Platform_28",
+        "point": "(X=1239.594675,Y=-1235.275207,Z=0.000000)"
+      }
+    },
+    {
+      "angle": 315.1,
+      "radius": 3200,
+      "hit": {
+        "actor": "Z05_Outer_Walk_28",
+        "point": "(X=2266.687405,Y=-2258.788951,Z=0.000000)"
+      }
+    },
+    {
+      "angle": 315.1,
+      "radius": 3580,
+      "hit": {
+        "actor": "Z05_Outer_Walk_28",
+        "point": "(X=2535.856534,Y=-2527.020139,Z=0.000000)"
+      }
+    }
+  ],
+  "scope": "Read-only source geometry; ray seam diagnostics are not player fall-through acceptance"
+}

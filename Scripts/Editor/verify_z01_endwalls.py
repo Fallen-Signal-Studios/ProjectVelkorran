@@ -4,7 +4,7 @@ import runpy
 import unreal
 root=Path(unreal.Paths.project_dir())
 exec(compile((root/'Scripts/Editor/verify_z01_bridge.py').read_text(encoding='utf-8-sig'),'verify_z01_bridge','exec'))
-assert len(actors)==1929+z02_paving_count+z02_vault_count+z02_perimeter_count+z02_gallery_count+z02_furniture_count+z02_guard_count+z02_bridges_count+z02_exterior_count+z02_facade_light_count+north_guard_count+north_bridge_count+atrium_guard_count and endwall_count==14
+assert len(actors)==1929+z02_paving_count+z02_vault_count+z02_perimeter_count+z02_gallery_count+z02_furniture_count+z02_guard_count+z02_bridges_count+z02_exterior_count+z02_facade_light_count+north_guard_count+north_bridge_count+atrium_guard_count+atrium_ring_count and endwall_count==14
 for spec in json.loads((root/'Art/Source/Aurelion/EndwallKit/manifest.json').read_text())['modules']:
     mesh=unreal.load_asset('/Game/Aurelion/Environment/ArchitectureKit/Meshes/'+spec['asset'])
     assert sm.get_num_uv_channels(mesh,0)==2 and sm.get_nanite_settings(mesh).get_editor_property('enabled')
