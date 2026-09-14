@@ -1,0 +1,15 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z08MedicalSideboard",
+      "dimensions_m": [
+        1.2000000476837158,
+        1.0,
+        0.800000011920929
+      ],
+      "triangles": 19192
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}

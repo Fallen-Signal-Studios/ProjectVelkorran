@@ -1,0 +1,25 @@
+{
+  "status": "Source round-trip and saved engine placement passed; full art, live gameplay and performance qualification pending",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z08MedicalSideboard",
+      "triangles": 19192,
+      "nominal_dimensions_m": [
+        1.2000000000000004,
+        1.0000000000000002,
+        0.8
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_MedicalUpholstery"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "One engine-authored bounds box added after import; source FBX has no collision hulls",
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    }
+  ]
+}

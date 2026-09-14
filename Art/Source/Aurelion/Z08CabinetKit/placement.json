@@ -1,0 +1,22 @@
+{
+  "location_cm": [
+    -2600,
+    22780,
+    -1200
+  ],
+  "yaw_degrees": 180,
+  "bounds_cm": [
+    [
+      -2660,
+      22730,
+      -1200
+    ],
+    [
+      -2540,
+      22830,
+      -1120
+    ]
+  ],
+  "reason": "Original cabinet was buried behind south refuge partition. Relocated inside bay, in front of measured north recess wall at Y22900 and its decorative panels, facing treatment area.",
+  "collision": "One engine-authored bounds box; BlockAll, QueryAndPhysics; source FBX has no collision hulls."
+}
