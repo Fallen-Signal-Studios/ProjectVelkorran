@@ -5,6 +5,30 @@
 
 class UAssetManager;
 
+/** A package that enters a cook without any mission referencing it, with the configured route that adds it. */
+struct FSovCookRoot
+{
+    FName Package;
+    FString Route;
+};
+
+/** Configured cook entry points other than Asset Manager rules. Read from config by ReadConfiguredCookInputs,
+ * or supplied directly so the gathering rules can be exercised without changing project settings. */
+struct FSovConfiguredCookInputs
+{
+    /** GameMapsSettings keys that UE 5.7 GetGameDefaultObjects cooks, paired with their object paths. */
+    TArray<TPair<FString, FString>> GameDefaults;
+    /** Packaging MapsToCook and the editor AlwaysCookMaps list, as package or object paths. */
+    TArray<FString> Maps;
+    /** Packaging DirectoriesToAlwaysCook, as long package paths. */
+    TArray<FString> Directories;
+    /** InputSettings DefaultTouchInterface, which CollectFilesToCook adds unless empty or None. */
+    FString TouchInterface;
+    /** Native config classes. Their default objects' config references are what the cooker collects at
+     * startup: soft paths become StartupSoftObjectPath roots, loaded classes become startup packages. */
+    TArray<const UClass*> ConfigClasses;
+};
+
 namespace SovCampaignContentValidation
 {
 /** Parse a comma-separated asset list without truncating at the first comma.
@@ -38,6 +62,19 @@ PROJECTVELKORRAN_API FString DemoTaleContentReason(const UObject* Asset);
 /** Read effective production AlwaysCook rules, including bundle packages, without changing cook settings.
  * The existing dependency walker must traverse these roots as well as explicit mission roots. */
 PROJECTVELKORRAN_API bool GatherAlwaysCookPackages(UAssetManager& Manager, TArray<FName>& OutPackages, FString& Error);
+
+/** Read the current editor process's configured cook inputs for the host platform. */
+PROJECTVELKORRAN_API FSovConfiguredCookInputs ReadConfiguredCookInputs();
+
+/** Every package the configured inputs place in a cook, deduplicated with the first route that adds it.
+ * Mirrors UE 5.7: soft references on editor-only config properties and properties marked Untracked are not
+ * collected, native /Script packages are not content, and ServerDefaultMap is excluded because a default cook
+ * does not include server maps. Directories expand through the asset registry. */
+PROJECTVELKORRAN_API void GatherConfiguredCookRoots(const FSovConfiguredCookInputs& Inputs, TArray<FSovCookRoot>& OutRoots);
+
+/** The cooked packages named by a `-run=cook -CookList` log. Rejected packages are excluded: they were discovered
+ * but do not ship. False when the text names no cooked package. */
+PROJECTVELKORRAN_API bool ReadCookListRoots(const FString& CookListText, TArray<FName>& OutPackages);
 
 /** Parent map uses NAME_None for roots. Bounded even if diagnostic input contains a cycle. */
 PROJECTVELKORRAN_API FString DescribeDependencyChain(FName Package, const TMap<FName, FName>& Parents);

@@ -2,6 +2,14 @@
 #include "Validation/SovCampaignContentValidation.h"
 
 #include "Validation/SovCampaignContentPolicy.h"
+#include "Validation/SovCampaignCookRootPolicy.h"
+#include "AssetRegistry/AssetRegistryModule.h"
+#include "Misc/ConfigCacheIni.h"
+#include "Misc/PackageName.h"
+#include "Modules/ModuleManager.h"
+#include "UObject/SoftObjectPath.h"
+#include "UObject/UObjectIterator.h"
+#include "UObject/UnrealType.h"
 #include "Tales/Dialogue.h"
 #include "Tales/Quest.h"
 #include "AssetRegistry/AssetBundleData.h"
@@ -246,6 +254,180 @@ bool SovCampaignContentValidation::GatherAlwaysCookPackages(UAssetManager& Manag
     Error = TEXT("Effective AlwaysCook validation requires the Editor asset-management database.");
     return false;
 #endif
+}
+
+namespace
+{
+    std::basic_string<TCHAR> ToStd(const FString& Text) { return std::basic_string<TCHAR>(*Text, Text.Len()); }
+
+    /** Long package name of a config object path, including the Class'/Path.Object' export-text form. */
+    FName PackageOfConfigPath(const FString& Value)
+    {
+        FString Path = Value.TrimStartAndEnd();
+        if (Path.IsEmpty() || Path.Equals(TEXT("None"), ESearchCase::IgnoreCase)) { return NAME_None; }
+        Path = FPackageName::ExportTextPathToObjectPath(Path);
+        return FSoftObjectPath(Path).GetLongPackageFName();
+    }
+
+    struct FCookRootCollector
+    {
+        TArray<FSovCookRoot>& Roots;
+        TSet<FName> Seen;
+
+        void Add(FName Package, const FString& Route)
+        {
+            if (Package.IsNone()) { return; }
+            const FString Name = Package.ToString();
+            // Native script packages hold class defaults, not cooked content; the transient package never cooks.
+            if (Name.StartsWith(TEXT("/Script/")) || Package == GetTransientPackage()->GetFName()) { return; }
+            if (!Seen.Contains(Package)) { Seen.Add(Package); Roots.Add({ Package, Route }); }
+        }
+
+        void AddConfigValue(const FProperty* Property, const void* Value, const FString& Route, bool bCollectSoft)
+        {
+            if (const FArrayProperty* Array = CastField<FArrayProperty>(Property))
+            {
+                FScriptArrayHelper Helper(Array, Value);
+                for (int32 Index = 0; Index < Helper.Num(); ++Index)
+                { AddConfigValue(Array->Inner, Helper.GetRawPtr(Index), Route, bCollectSoft); }
+                return;
+            }
+            // Soft object and soft class properties first: both also derive from FObjectPropertyBase.
+            if (const FSoftObjectProperty* Soft = CastField<FSoftObjectProperty>(Property))
+            {
+                if (bCollectSoft) { Add(Soft->GetPropertyValue(Value).ToSoftObjectPath().GetLongPackageFName(), Route); }
+                return;
+            }
+            if (const FObjectPropertyBase* Object = CastField<FObjectPropertyBase>(Property))
+            {
+                // Config holds class references rather than object instances. The class is loaded when the default
+                // object reads config, so the cooker sees its package as a startup package whether or not the
+                // property is editor-only.
+                if (const UObject* Referenced = Object->GetObjectPropertyValue(Value))
+                { Add(Referenced->GetOutermost()->GetFName(), Route); }
+                return;
+            }
+            if (const FStructProperty* Struct = CastField<FStructProperty>(Property))
+            {
+                if (bCollectSoft && (Struct->Struct == TBaseStructure<FSoftObjectPath>::Get()
+                    || Struct->Struct == TBaseStructure<FSoftClassPath>::Get()))
+                { Add(static_cast<const FSoftObjectPath*>(Value)->GetLongPackageFName(), Route); }
+            }
+        }
+    };
+}
+
+FSovConfiguredCookInputs SovCampaignContentValidation::ReadConfiguredCookInputs()
+{
+    FSovConfiguredCookInputs Inputs;
+#if WITH_EDITOR
+    if (!GConfig) { return Inputs; }
+    const TCHAR* MapsSection = TEXT("/Script/EngineSettings.GameMapsSettings");
+    for (const TCHAR* Key : { TEXT("GameDefaultMap"), TEXT("GlobalDefaultGameMode"), TEXT("GlobalDefaultServerGameMode"), TEXT("GameInstanceClass") })
+    {
+        FString Value;
+        if (GConfig->GetString(MapsSection, Key, Value, GEngineIni)) { Inputs.GameDefaults.Emplace(Key, Value); }
+    }
+    const TCHAR* PackagingSection = TEXT("/Script/UnrealEd.ProjectPackagingSettings");
+    TArray<FString> Raw;
+    GConfig->GetArray(PackagingSection, TEXT("MapsToCook"), Raw, GGameIni);
+    for (const FString& Entry : Raw)
+    {
+        std::basic_string<TCHAR> Path;
+        if (SovCampaignCookRootPolicy::PathFromConfigStruct(ToStd(Entry), "FilePath", Path)) { Inputs.Maps.Add(FString(Path.c_str())); }
+    }
+    // UEditorEngine::LoadMapListFromIni: Map= entries, and Section= entries naming further map-list sections.
+    TArray<FString> MapSections = { TEXT("AlwaysCookMaps") };
+    TSet<FString> VisitedSections;
+    while (!MapSections.IsEmpty())
+    {
+        const FString Section = MapSections.Pop();
+        if (VisitedSections.Contains(Section)) { continue; }
+        VisitedSections.Add(Section);
+        if (const FConfigSection* Entries = GConfig->GetSection(*Section, false, GEditorIni))
+        {
+            for (FConfigSectionMap::TConstIterator Entry(*Entries); Entry; ++Entry)
+            {
+                if (Entry.Key() == NAME_Map) { Inputs.Maps.AddUnique(Entry.Value().GetValue()); }
+                else if (Entry.Key() == FName(TEXT("Section"))) { MapSections.Add(Entry.Value().GetValue()); }
+            }
+        }
+    }
+    Raw.Reset();
+    GConfig->GetArray(PackagingSection, TEXT("DirectoriesToAlwaysCook"), Raw, GGameIni);
+    for (const FString& Entry : Raw)
+    {
+        std::basic_string<TCHAR> Path;
+        if (SovCampaignCookRootPolicy::PathFromConfigStruct(ToStd(Entry), "Path", Path)) { Inputs.Directories.Add(FString(Path.c_str())); }
+    }
+    GConfig->GetString(TEXT("/Script/Engine.InputSettings"), TEXT("DefaultTouchInterface"), Inputs.TouchInterface, GInputIni);
+    for (TObjectIterator<UClass> It; It; ++It)
+    {
+        if (It->HasAllClassFlags(CLASS_Config | CLASS_Native) && !It->HasAnyClassFlags(CLASS_Deprecated | CLASS_NewerVersionExists))
+        { Inputs.ConfigClasses.Add(*It); }
+    }
+#endif
+    return Inputs;
+}
+
+void SovCampaignContentValidation::GatherConfiguredCookRoots(const FSovConfiguredCookInputs& Inputs, TArray<FSovCookRoot>& OutRoots)
+{
+    OutRoots.Reset();
+    FCookRootCollector Collector{ OutRoots };
+    for (const TPair<FString, FString>& Default : Inputs.GameDefaults)
+    {
+        if (Default.Key == TEXT("ServerDefaultMap")) { continue; }
+        Collector.Add(PackageOfConfigPath(Default.Value), TEXT("GameMapsSettings ") + Default.Key);
+    }
+    for (const FString& Map : Inputs.Maps) { Collector.Add(PackageOfConfigPath(Map), TEXT("packaging MapsToCook/AlwaysCookMaps")); }
+    Collector.Add(PackageOfConfigPath(Inputs.TouchInterface), TEXT("InputSettings DefaultTouchInterface"));
+    if (!Inputs.Directories.IsEmpty())
+    {
+        IAssetRegistry& Registry = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry")).Get();
+        for (const FString& Directory : Inputs.Directories)
+        {
+            FString Path = Directory.TrimStartAndEnd();
+            Path.RemoveFromEnd(TEXT("/"));
+            if (!Path.StartsWith(TEXT("/"))) { continue; }
+            TArray<FAssetData> Assets;
+            Registry.GetAssetsByPath(FName(*Path), Assets, true, true);
+            Assets.Sort([](const FAssetData& A, const FAssetData& B) { return A.PackageName.LexicalLess(B.PackageName); });
+            for (const FAssetData& Asset : Assets) { Collector.Add(Asset.PackageName, TEXT("packaging DirectoriesToAlwaysCook ") + Path); }
+        }
+    }
+    for (const UClass* Class : Inputs.ConfigClasses)
+    {
+        const UObject* Defaults = Class ? Class->GetDefaultObject(false) : nullptr;
+        if (!Defaults) { continue; }
+        for (TFieldIterator<FProperty> It(Class); It; ++It)
+        {
+            const FProperty* Property = *It;
+            if (!Property->HasAnyPropertyFlags(CPF_Config)) { continue; }
+#if WITH_EDITORONLY_DATA
+            const bool bUntracked = Property->HasMetaData(FSoftObjectPath::NAME_Untracked);
+#else
+            const bool bUntracked = false;
+#endif
+            const bool bCollectSoft = !bUntracked && !Property->IsEditorOnlyProperty();
+            const FString Route = FString::Printf(TEXT("config reference %s.%s"), *Class->GetName(), *Property->GetName());
+            for (int32 Index = 0; Index < Property->ArrayDim; ++Index)
+            { Collector.AddConfigValue(Property, Property->ContainerPtrToValuePtr<void>(Defaults, Index), Route, bCollectSoft); }
+        }
+    }
+}
+
+bool SovCampaignContentValidation::ReadCookListRoots(const FString& CookListText, TArray<FName>& OutPackages)
+{
+    OutPackages.Reset();
+    TArray<FString> Lines;
+    CookListText.ParseIntoArrayLines(Lines, true);
+    for (const FString& Line : Lines)
+    {
+        std::basic_string<TCHAR> Package;
+        if (SovCampaignCookRootPolicy::CookedPackageFromCookListLine(ToStd(Line), Package))
+        { OutPackages.AddUnique(FName(Package.c_str())); }
+    }
+    return !OutPackages.IsEmpty();
 }
 
 FString SovCampaignContentValidation::DescribeDependencyChain(FName Package, const TMap<FName, FName>& Parents)
