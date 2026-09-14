@@ -41,7 +41,7 @@ def box(name,loc,size,mat=stone,bevel=.008):
     bpy.ops.mesh.primitive_cube_add(size=1,location=loc); o=bpy.context.object; o.name=name; o.dimensions=size
     bpy.ops.object.transform_apply(location=False,rotation=False,scale=True)
     return finish(o,mat,bevel)
-def path(name,points,width,depth,mat):
+def path(name,points,width,depth,mat,bevel=None):
     # Joined mitered polygonal moulding in X/Z, extruded along Y.
     closed=(Vector(points[0])-Vector(points[-1])).length<1e-6
     if closed: points=points[:-1]
@@ -61,7 +61,7 @@ def path(name,points,width,depth,mat):
     if not closed: faces += [(0,1,count+1,count),(count-2,2*count-2,2*count-1,count-1)]
     mesh=bpy.data.meshes.new(name); mesh.from_pydata(vertices,[],faces); mesh.update()
     o=bpy.data.objects.new(name,mesh); scene.collection.objects.link(o)
-    return finish(o,mat,min(width*.15,.006))
+    return finish(o,mat,min(width*.15,.006) if bevel is None else bevel)
 def ring(name,x,y,z,radius,width,mat):
     points=[(x+math.sin(a)*radius,y,z+math.cos(a)*radius) for a in [i*2*math.pi/96 for i in range(97)]]
     path(name,points,width,.024,mat)

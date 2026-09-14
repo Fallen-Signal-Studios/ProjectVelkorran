@@ -42,7 +42,7 @@ def import_owned_mesh(spec,source,destination,materials):
     if expected_hulls==0 and (sm.get_convex_collision_count(mesh) or sm.get_simple_collision_count(mesh)):
         unreal.log_warning('Removing reimport collision from visual-only owned mesh '+name)
         assert sm.remove_collisions(mesh)
-    assert sm.get_convex_collision_count(mesh)==expected_hulls
+    assert sm.get_convex_collision_count(mesh)==expected_hulls,(name,'convex hull count',sm.get_convex_collision_count(mesh),'expected',expected_hulls)
     # This API counts boxes/spheres/capsules separately from convex hulls.
     assert sm.get_simple_collision_count(mesh)==0 and sm.get_num_uv_channels(mesh,0)==2
     extent=mesh.get_bounds().box_extent

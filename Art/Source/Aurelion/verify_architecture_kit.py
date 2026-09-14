@@ -49,6 +49,11 @@ for entry in manifest['modules']:
                 assert heights and abs(max(heights)-expected)<.016,(x,y,expected,heights)
         center=min(entry['deck_samples'],key=lambda p:abs(p[0]))[1]
         assert not any(h.ray_cast(Vector((-3,0,center+.75)),Vector((1,0,0)),distance=6)[0] for h in hulls), 'Balustrade opening blocked by a solid collider'
+    elif hulls and 'pier_collision_samples' in entry:
+        assert all(len(h.data.vertices)==8 and h.location.length<.001 for h in hulls)
+        for x,z,expected in entry['pier_collision_samples']:
+            blocked=any(h.ray_cast(Vector((x,-5,z)),Vector((0,1,0)),distance=10)[0] for h in hulls)
+            assert blocked==expected,(x,z,expected,blocked)
     elif hulls:
         assert all(len(h.data.vertices)==8 for h in hulls)
         for x in (-2.9,0,2.9):

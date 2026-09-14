@@ -1,0 +1,24 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z02ReliefPanel",
+      "dimensions_m": [
+        3.539033889770508,
+        0.2337464988231659,
+        5.296617031097412
+      ],
+      "triangles": 4144
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z02BranchPier",
+      "dimensions_m": [
+        4.127336502075195,
+        0.8412829637527466,
+        9.812163352966309
+      ],
+      "triangles": 4724
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}
