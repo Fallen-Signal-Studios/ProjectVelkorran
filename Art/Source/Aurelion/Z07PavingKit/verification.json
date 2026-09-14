@@ -1,0 +1,33 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z07PavingIvory_4x3",
+      "dimensions_m": [
+        4.0,
+        3.0,
+        0.12000000476837158
+      ],
+      "triangles": 2444
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z07PavingRoute_4x3",
+      "dimensions_m": [
+        4.0,
+        3.0,
+        0.12000000476837158
+      ],
+      "triangles": 3196
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z07PavingCorner_3x3",
+      "dimensions_m": [
+        3.0,
+        3.0,
+        0.12000000476837158
+      ],
+      "triangles": 2444
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}
