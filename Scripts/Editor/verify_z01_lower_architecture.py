@@ -85,7 +85,9 @@ z07_light_count = sum(a.get_actor_label().startswith('KIT_Z07_Uplight_') for a i
 assert z07_light_count in (0,12), 'Partial or duplicate Z07 lighting'
 z08_paving_count = sum(a.get_actor_label().startswith('KIT_Z08_Paving_') for a in actors)
 assert z08_paving_count in (0,204), 'Partial or duplicate Z08 paving'
-assert len(actors) == 1788 + vault_count + uplight_count + paving_count + bridge_count + endwall_count + z02_paving_count + z02_vault_count + z02_perimeter_count + z02_gallery_count + z02_furniture_count + z02_guard_count + z02_bridges_count + z02_exterior_count + z02_facade_light_count + north_guard_count + north_bridge_count + atrium_guard_count + atrium_ring_count + atrium_parapet_count + atrium_canopy_count+atrium_bridge_floor_count+atrium_crown_count+atrium_crown_light_count+z06_paving_count+z06_ceiling_count+z06_side_count+z06_light_count+z06_end_count+z06_slab_count+z06_refuge_count+z06_refuge_finish_count+z06_gate_assembly_count+z06_flank_landing_count+z07_paving_count+z07_wall_count+z07_light_count+z08_paving_count, 'Unexpected actor additions or removals'
+z08_court_count = sum(a.get_actor_label()=='KIT_Z08_IsolationCourt' for a in actors)
+assert z08_court_count in (0,1), 'Duplicate Z08 court'
+assert len(actors) == 1788 + vault_count + uplight_count + paving_count + bridge_count + endwall_count + z02_paving_count + z02_vault_count + z02_perimeter_count + z02_gallery_count + z02_furniture_count + z02_guard_count + z02_bridges_count + z02_exterior_count + z02_facade_light_count + north_guard_count + north_bridge_count + atrium_guard_count + atrium_ring_count + atrium_parapet_count + atrium_canopy_count+atrium_bridge_floor_count+atrium_crown_count+atrium_crown_light_count+z06_paving_count+z06_ceiling_count+z06_side_count+z06_light_count+z06_end_count+z06_slab_count+z06_refuge_count+z06_refuge_finish_count+z06_gate_assembly_count+z06_flank_landing_count+z07_paving_count+z07_wall_count+z07_light_count+z08_paving_count+z08_court_count, 'Unexpected actor additions or removals'
 shell = labels['aurelionwalls']
 assert shell.get_actor_enable_collision()
 assert not shell.static_mesh_component.get_editor_property('visible')

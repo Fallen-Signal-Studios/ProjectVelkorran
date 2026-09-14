@@ -6,6 +6,8 @@ import unreal
 def check_z08_paving(world, actors):
     labels={a.get_actor_label():a for a in actors}
     fit=json.loads((Path(unreal.Paths.project_dir())/'Art/Source/Aurelion/Z08PavingKit/floor-fit.json').read_text())
+    court_fit=json.loads((Path(unreal.Paths.project_dir())/'Art/Source/Aurelion/Z08CourtKit/court-fit.json').read_text()) if 'KIT_Z08_IsolationCourt' in labels else None
+    hidden_underlay={r['actor'] for r in court_fit['underlay']} if court_fit else set()
     sm=unreal.get_editor_subsystem(unreal.StaticMeshEditorSubsystem)
     placements=[];asset_collision={}
     for ci,col in enumerate(fit['columns']):
@@ -19,7 +21,8 @@ def check_z08_paving(world, actors):
             r=a.get_actor_rotation()
             assert max(abs(v-1) for v in (s.x,s.y,s.z))<.001 and max(abs(v) for v in (r.pitch,r.yaw,r.roll))<.001
             assert m.get_name()=='SM_Aurelion_KIT_'+suffix
-            assert c.get_editor_property('visible') and not c.get_editor_property('hidden_in_game')
+            hidden=a.get_actor_label() in hidden_underlay
+            assert c.get_editor_property('visible')== (not hidden) and c.get_editor_property('hidden_in_game')==hidden
             assert not a.get_actor_enable_collision() and c.get_collision_enabled()==unreal.CollisionEnabled.NO_COLLISION
             assert sm.get_num_uv_channels(m,0)==2 and sm.get_nanite_settings(m).get_editor_property('enabled')
             # These shared, previously imported paving assets may retain import-generated hulls.
@@ -32,7 +35,8 @@ def check_z08_paving(world, actors):
     retained_floor_count=c.get_instance_count()
     center=fit['centerline'];c=labels[center['actor']].get_component_by_class(unreal.InstancedStaticMeshComponent)
     # HISM removal swaps retained slots; require the exact transform multiset.
-    assert sorted(c.get_instance_transform(i,world_space=True).export_text() for i in range(c.get_instance_count()))==sorted(fit['retained_centerline'])
+    retained_centerline=court_fit['retained_transforms'] if court_fit else fit['retained_centerline']
+    assert sorted(c.get_instance_transform(i,world_space=True).export_text() for i in range(c.get_instance_count()))==sorted(retained_centerline)
     assert c.get_editor_property('visible') and not c.get_editor_property('hidden_in_game')
     for row in fit['guides']:
         a=labels[row['actor']];c=a.static_mesh_component
@@ -52,4 +56,4 @@ def check_z08_paving(world, actors):
             assert hit and hit.to_tuple()[0],(x,y)
             t=hit.to_tuple();assert t[9]==floor and abs(t[5].z+1200)<.01,(x,y,t[5])
             probes.append(dict(x=x,y=y,z=t[5].z))
-    return dict(placements=len(placements),shared_asset_collision=asset_collision,removed_floor_instances=216,retained_floor_instances=retained_floor_count,retained_centerline_instances=len(fit['retained_centerline']),floor_queries=probes,guide_collision_change='Two 6cm-raised decorative guides retired; floor now consistently Z -1200.',qualification='Stopped-editor fit and isolated collision checks; live traversal, navigation, combat and performance remain unqualified.')
+    return dict(placements=len(placements),hidden_court_underlay=len(hidden_underlay),shared_asset_collision=asset_collision,removed_floor_instances=216,retained_floor_instances=retained_floor_count,retained_centerline_instances=len(retained_centerline),floor_queries=probes,guide_collision_change='Two 6cm-raised decorative guides retired; floor now consistently Z -1200.',qualification='Stopped-editor fit and isolated collision checks; live traversal, navigation, combat and performance remain unqualified.')

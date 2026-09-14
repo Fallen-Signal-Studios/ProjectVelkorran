@@ -9,7 +9,7 @@ verify_floors=verify
 del DEFER_BRIDGE_FLOOR_AUTORUN
 def verify():
     verify_floors()
-    assert len(actors)==2493+atrium_crown_light_count+z06_paving_count+z06_ceiling_count+z06_side_count+z06_light_count+z06_end_count+z06_slab_count+z06_refuge_count+z06_refuge_finish_count+z06_gate_assembly_count+z06_flank_landing_count+z07_paving_count+z07_wall_count+z07_light_count+z08_paving_count and atrium_crown_count==9
+    assert len(actors)==2493+atrium_crown_light_count+z06_paving_count+z06_ceiling_count+z06_side_count+z06_light_count+z06_end_count+z06_slab_count+z06_refuge_count+z06_refuge_finish_count+z06_gate_assembly_count+z06_flank_landing_count+z07_paving_count+z07_wall_count+z07_light_count+z08_paving_count+z08_court_count and atrium_crown_count==9
     geometry=runpy.run_path(str(root/'Scripts/Editor/check_atrium_crown.py'))['check_crown'](world,actors)
     assert not unreal.EditorLoadingAndSavingUtils.get_dirty_map_packages()
     (out/'atrium-crown-verification.json').write_text(json.dumps(dict(status='passed',actor_count=len(actors),geometry=geometry),indent=2))
