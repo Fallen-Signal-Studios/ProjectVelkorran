@@ -1,0 +1,582 @@
+{
+  "status": "measured",
+  "overlaps": [
+    {
+      "axis": 0,
+      "plane_m": -0.219,
+      "normal_sign": -1,
+      "faces": [
+        975,
+        1171
+      ],
+      "materials": [
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.00024000049590711114,
+      "projected_centroid": [
+        -1.559999942779541,
+        -0.632999986410141
+      ]
+    },
+    {
+      "axis": 0,
+      "plane_m": -0.219,
+      "normal_sign": -1,
+      "faces": [
+        975,
+        1269
+      ],
+      "materials": [
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.00024000109195654318,
+      "projected_centroid": [
+        -0.4399999976158142,
+        -0.632999986410141
+      ]
+    },
+    {
+      "axis": 0,
+      "plane_m": -0.219,
+      "normal_sign": -1,
+      "faces": [
+        1073,
+        1171
+      ],
+      "materials": [
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.00024000049590711114,
+      "projected_centroid": [
+        -1.559999942779541,
+        0.632999986410141
+      ]
+    },
+    {
+      "axis": 0,
+      "plane_m": -0.219,
+      "normal_sign": -1,
+      "faces": [
+        1073,
+        1269
+      ],
+      "materials": [
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.00024000109195654318,
+      "projected_centroid": [
+        -0.4399999976158142,
+        0.632999986410141
+      ]
+    },
+    {
+      "axis": 0,
+      "plane_m": -0.219,
+      "normal_sign": -1,
+      "faces": [
+        2249,
+        2445
+      ],
+      "materials": [
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.00024000109195654318,
+      "projected_centroid": [
+        0.4399999976158142,
+        -0.632999986410141
+      ]
+    },
+    {
+      "axis": 0,
+      "plane_m": -0.219,
+      "normal_sign": -1,
+      "faces": [
+        2249,
+        2543
+      ],
+      "materials": [
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.00024000049590711114,
+      "projected_centroid": [
+        1.559999942779541,
+        -0.632999986410141
+      ]
+    },
+    {
+      "axis": 0,
+      "plane_m": -0.219,
+      "normal_sign": -1,
+      "faces": [
+        2347,
+        2445
+      ],
+      "materials": [
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.00024000109195654318,
+      "projected_centroid": [
+        0.4399999976158142,
+        0.632999986410141
+      ]
+    },
+    {
+      "axis": 0,
+      "plane_m": -0.219,
+      "normal_sign": -1,
+      "faces": [
+        2347,
+        2543
+      ],
+      "materials": [
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.00024000049590711114,
+      "projected_centroid": [
+        1.559999942779541,
+        0.632999986410141
+      ]
+    },
+    {
+      "axis": 0,
+      "plane_m": -0.207,
+      "normal_sign": 1,
+      "faces": [
+        979,
+        1175
+      ],
+      "materials": [
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.00024000049590711114,
+      "projected_centroid": [
+        -1.559999942779541,
+        -0.632999986410141
+      ]
+    },
+    {
+      "axis": 0,
+      "plane_m": -0.207,
+      "normal_sign": 1,
+      "faces": [
+        979,
+        1273
+      ],
+      "materials": [
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.00024000109195654318,
+      "projected_centroid": [
+        -0.4399999976158142,
+        -0.632999986410141
+      ]
+    },
+    {
+      "axis": 0,
+      "plane_m": -0.207,
+      "normal_sign": 1,
+      "faces": [
+        1077,
+        1175
+      ],
+      "materials": [
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.00024000049590711114,
+      "projected_centroid": [
+        -1.559999942779541,
+        0.632999986410141
+      ]
+    },
+    {
+      "axis": 0,
+      "plane_m": -0.207,
+      "normal_sign": 1,
+      "faces": [
+        1077,
+        1273
+      ],
+      "materials": [
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.00024000109195654318,
+      "projected_centroid": [
+        -0.4399999976158142,
+        0.632999986410141
+      ]
+    },
+    {
+      "axis": 0,
+      "plane_m": -0.207,
+      "normal_sign": 1,
+      "faces": [
+        2253,
+        2449
+      ],
+      "materials": [
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.00024000109195654318,
+      "projected_centroid": [
+        0.4399999976158142,
+        -0.632999986410141
+      ]
+    },
+    {
+      "axis": 0,
+      "plane_m": -0.207,
+      "normal_sign": 1,
+      "faces": [
+        2253,
+        2547
+      ],
+      "materials": [
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.00024000049590711114,
+      "projected_centroid": [
+        1.559999942779541,
+        -0.632999986410141
+      ]
+    },
+    {
+      "axis": 0,
+      "plane_m": -0.207,
+      "normal_sign": 1,
+      "faces": [
+        2351,
+        2449
+      ],
+      "materials": [
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.00024000109195654318,
+      "projected_centroid": [
+        0.4399999976158142,
+        0.632999986410141
+      ]
+    },
+    {
+      "axis": 0,
+      "plane_m": -0.207,
+      "normal_sign": 1,
+      "faces": [
+        2351,
+        2547
+      ],
+      "materials": [
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.00024000049590711114,
+      "projected_centroid": [
+        1.559999942779541,
+        0.632999986410141
+      ]
+    },
+    {
+      "axis": 0,
+      "plane_m": 0.207,
+      "normal_sign": -1,
+      "faces": [
+        3817,
+        4013
+      ],
+      "materials": [
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.00024000049590711114,
+      "projected_centroid": [
+        -1.559999942779541,
+        -0.632999986410141
+      ]
+    },
+    {
+      "axis": 0,
+      "plane_m": 0.207,
+      "normal_sign": -1,
+      "faces": [
+        3817,
+        4111
+      ],
+      "materials": [
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.00024000109195654318,
+      "projected_centroid": [
+        -0.4399999976158142,
+        -0.632999986410141
+      ]
+    },
+    {
+      "axis": 0,
+      "plane_m": 0.207,
+      "normal_sign": -1,
+      "faces": [
+        3915,
+        4013
+      ],
+      "materials": [
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.00024000049590711114,
+      "projected_centroid": [
+        -1.559999942779541,
+        0.632999986410141
+      ]
+    },
+    {
+      "axis": 0,
+      "plane_m": 0.207,
+      "normal_sign": -1,
+      "faces": [
+        3915,
+        4111
+      ],
+      "materials": [
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.00024000109195654318,
+      "projected_centroid": [
+        -0.4399999976158142,
+        0.632999986410141
+      ]
+    },
+    {
+      "axis": 0,
+      "plane_m": 0.207,
+      "normal_sign": -1,
+      "faces": [
+        5091,
+        5287
+      ],
+      "materials": [
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.00024000109195654318,
+      "projected_centroid": [
+        0.4399999976158142,
+        -0.632999986410141
+      ]
+    },
+    {
+      "axis": 0,
+      "plane_m": 0.207,
+      "normal_sign": -1,
+      "faces": [
+        5091,
+        5385
+      ],
+      "materials": [
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.00024000049590711114,
+      "projected_centroid": [
+        1.559999942779541,
+        -0.632999986410141
+      ]
+    },
+    {
+      "axis": 0,
+      "plane_m": 0.207,
+      "normal_sign": -1,
+      "faces": [
+        5189,
+        5287
+      ],
+      "materials": [
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.00024000109195654318,
+      "projected_centroid": [
+        0.4399999976158142,
+        0.632999986410141
+      ]
+    },
+    {
+      "axis": 0,
+      "plane_m": 0.207,
+      "normal_sign": -1,
+      "faces": [
+        5189,
+        5385
+      ],
+      "materials": [
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.00024000049590711114,
+      "projected_centroid": [
+        1.559999942779541,
+        0.632999986410141
+      ]
+    },
+    {
+      "axis": 0,
+      "plane_m": 0.219,
+      "normal_sign": 1,
+      "faces": [
+        3821,
+        4017
+      ],
+      "materials": [
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.00024000049590711114,
+      "projected_centroid": [
+        -1.559999942779541,
+        -0.632999986410141
+      ]
+    },
+    {
+      "axis": 0,
+      "plane_m": 0.219,
+      "normal_sign": 1,
+      "faces": [
+        3821,
+        4115
+      ],
+      "materials": [
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.00024000109195654318,
+      "projected_centroid": [
+        -0.4399999976158142,
+        -0.632999986410141
+      ]
+    },
+    {
+      "axis": 0,
+      "plane_m": 0.219,
+      "normal_sign": 1,
+      "faces": [
+        3919,
+        4017
+      ],
+      "materials": [
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.00024000049590711114,
+      "projected_centroid": [
+        -1.559999942779541,
+        0.632999986410141
+      ]
+    },
+    {
+      "axis": 0,
+      "plane_m": 0.219,
+      "normal_sign": 1,
+      "faces": [
+        3919,
+        4115
+      ],
+      "materials": [
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.00024000109195654318,
+      "projected_centroid": [
+        -0.4399999976158142,
+        0.632999986410141
+      ]
+    },
+    {
+      "axis": 0,
+      "plane_m": 0.219,
+      "normal_sign": 1,
+      "faces": [
+        5095,
+        5291
+      ],
+      "materials": [
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.00024000109195654318,
+      "projected_centroid": [
+        0.4399999976158142,
+        -0.632999986410141
+      ]
+    },
+    {
+      "axis": 0,
+      "plane_m": 0.219,
+      "normal_sign": 1,
+      "faces": [
+        5095,
+        5389
+      ],
+      "materials": [
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.00024000049590711114,
+      "projected_centroid": [
+        1.559999942779541,
+        -0.632999986410141
+      ]
+    },
+    {
+      "axis": 0,
+      "plane_m": 0.219,
+      "normal_sign": 1,
+      "faces": [
+        5193,
+        5291
+      ],
+      "materials": [
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.00024000109195654318,
+      "projected_centroid": [
+        0.4399999976158142,
+        0.632999986410141
+      ]
+    },
+    {
+      "axis": 0,
+      "plane_m": 0.219,
+      "normal_sign": 1,
+      "faces": [
+        5193,
+        5389
+      ],
+      "materials": [
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.00024000049590711114,
+      "projected_centroid": [
+        1.559999942779541,
+        0.632999986410141
+      ]
+    }
+  ],
+  "scope": "Same-facing axis-aligned convex source faces within one micrometre; visibility and non-axis overlaps are not inferred."
+}

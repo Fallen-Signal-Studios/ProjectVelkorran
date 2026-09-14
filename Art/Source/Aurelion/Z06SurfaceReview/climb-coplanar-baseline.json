@@ -1,0 +1,222 @@
+{
+  "status": "measured",
+  "overlaps": [
+    {
+      "axis": 1,
+      "plane_m": -0.1,
+      "normal_sign": -1,
+      "faces": [
+        486,
+        13716
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.0003360034579600324,
+      "projected_centroid": [
+        -0.8510000109672546,
+        2.9590001106262207
+      ]
+    },
+    {
+      "axis": 1,
+      "plane_m": -0.1,
+      "normal_sign": -1,
+      "faces": [
+        486,
+        13814
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.0003360034579600324,
+      "projected_centroid": [
+        -0.796999990940094,
+        2.9590001106262207
+      ]
+    },
+    {
+      "axis": 1,
+      "plane_m": -0.1,
+      "normal_sign": -1,
+      "faces": [
+        486,
+        13912
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.0003360029948460408,
+      "projected_centroid": [
+        -0.027000000700354562,
+        2.9590001106262207
+      ]
+    },
+    {
+      "axis": 1,
+      "plane_m": -0.1,
+      "normal_sign": -1,
+      "faces": [
+        486,
+        14010
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.0003360029948460408,
+      "projected_centroid": [
+        0.027000000700354545,
+        2.9590001106262207
+      ]
+    },
+    {
+      "axis": 1,
+      "plane_m": -0.1,
+      "normal_sign": -1,
+      "faces": [
+        486,
+        14108
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.0003360034579600324,
+      "projected_centroid": [
+        0.796999990940094,
+        2.9590001106262207
+      ]
+    },
+    {
+      "axis": 1,
+      "plane_m": -0.1,
+      "normal_sign": -1,
+      "faces": [
+        486,
+        14206
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.0003360034579600324,
+      "projected_centroid": [
+        0.8510000109672546,
+        2.9590001106262207
+      ]
+    },
+    {
+      "axis": 1,
+      "plane_m": 0.1,
+      "normal_sign": 1,
+      "faces": [
+        488,
+        27438
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.0003360034579600324,
+      "projected_centroid": [
+        -0.8510000109672546,
+        2.9590001106262207
+      ]
+    },
+    {
+      "axis": 1,
+      "plane_m": 0.1,
+      "normal_sign": 1,
+      "faces": [
+        488,
+        27536
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.0003360034579600324,
+      "projected_centroid": [
+        -0.796999990940094,
+        2.9590001106262207
+      ]
+    },
+    {
+      "axis": 1,
+      "plane_m": 0.1,
+      "normal_sign": 1,
+      "faces": [
+        488,
+        27634
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.0003360029948460408,
+      "projected_centroid": [
+        -0.027000000700354562,
+        2.9590001106262207
+      ]
+    },
+    {
+      "axis": 1,
+      "plane_m": 0.1,
+      "normal_sign": 1,
+      "faces": [
+        488,
+        27732
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.0003360029948460408,
+      "projected_centroid": [
+        0.027000000700354545,
+        2.9590001106262207
+      ]
+    },
+    {
+      "axis": 1,
+      "plane_m": 0.1,
+      "normal_sign": 1,
+      "faces": [
+        488,
+        27830
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.0003360034579600324,
+      "projected_centroid": [
+        0.796999990940094,
+        2.9590001106262207
+      ]
+    },
+    {
+      "axis": 1,
+      "plane_m": 0.1,
+      "normal_sign": 1,
+      "faces": [
+        488,
+        27928
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold"
+      ],
+      "overlap_m2": 0.0003360034579600324,
+      "projected_centroid": [
+        0.8510000109672546,
+        2.9590001106262207
+      ]
+    }
+  ],
+  "scope": "Same-facing axis-aligned convex source faces within one micrometre; visibility and non-axis overlaps are not inferred."
+}

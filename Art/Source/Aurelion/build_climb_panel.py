@@ -7,7 +7,7 @@ grout=material('M_Aurelion_StoneGrout',(.30,.275,.23),0,.88)
 # All relief stays inside the 20 cm thickness. Continuous backing closes joints.
 box('Structural stone web',(0,0,1.5),(4.38,.10,2.98),grout,.006)
 for x in (-2.15,2.15):box('Dressed end stile',(x,0,1.5),(.10,.20,3),stone,.006)
-for z in (.04,2.96):box('Continuous foot and graspable crown',(0,0,z),(4.2,.20,.08),stone,.009)
+for z in (.04,2.96):box('Continuous foot and graspable crown',(0,0,z),(4.2,.196,.08),stone,.009)
 for side in (-1,1):
     for row in range(6):
         z=.31+row*.475
@@ -15,7 +15,7 @@ for side in (-1,1):
             x=(column-2)*.824
             box('Fitted ascent ashlar',(x,side*.066,z),(.808,.046,.422),stone,.009)
             # Upper arris makes the gripping edge legible without false protrusions.
-            box('Grip overhang',(x,side*.082,z+.185),(.728,.036,.044),stone,.006)
+            box('Grip overhang',(x,side*.080,z+.185),(.728,.032,.044),stone,.006)
             for xx in (x-.315,x+.315):
                 box('Grip terminal inset',(xx,side*.093,z+.175),(.018,.010,.022),gold,.002)
     for x in (-2.062,2.062):
