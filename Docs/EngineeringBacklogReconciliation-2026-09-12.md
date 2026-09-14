@@ -53,7 +53,8 @@ These are kept distinct throughout and never collapsed into "passed":
 | PC11 | Stamina, movement, combos, weapon transitions | **CONTENT/EDITOR GATE** |
 | PC12 | Coverage proves construction more than combat behaviour | **SUPERSEDED** |
 | T1 | `InitialMission` unset on campaign GameModes | **CONTENT/EDITOR GATE** |
-| T2 | Cook exclusion incomplete | **PARTIAL** |
+| T2 | Cook exclusion incomplete | **CLOSED** (source/config/validation, 14 Sep, see updates) |
+| T2-B | Template boot config still ships MP menu, loot UI, XP events and demo world | **CONTENT/EDITOR GATE** |
 | T3 | Campaign UI carries template behaviour | **PARTIAL** |
 | T4 | Intermittent hostile AI startup | **CLOSED** |
 | T5 | Packaged Win64 Game target unverified | **OPEN (Windows gate)** |
@@ -63,10 +64,10 @@ These are kept distinct throughout and never collapsed into "passed":
 | X1 | `/Game/Cues` absent from version control | **EXTERNAL CONTENT GATE** (see below) |
 | X2 | `SciFi_Drone_1` marketplace pack absent | **EXTERNAL CONTENT GATE** (see below) |
 
-Closed: 17. Partial: 3. Open: 1. Content/editor gated: 10. Superseded: 2. External gates: 2.
+Closed: 18. Partial: 2. Open: 1. Content/editor gated: 11. Superseded: 2. External gates: 2.
 
-_Recounted from the table above on 12 September after C1 closed, and again after C3, E6 and PC09 closed. The earlier totals line did not
-reconcile with its own rows. K1–K4 count as four gated items; PC09-C counts as one; PC06 counts as superseded, its small
+_Recounted from the table above on 12 September after C1 closed, and again after C3, E6, PC09 and T2 closed. The earlier totals line did not
+reconcile with its own rows. K1–K4 count as four gated items; PC09-C and T2-B count as one each; PC06 counts as superseded, its small
 remaining part recorded under its own heading._
 
 The single remaining OPEN item is T5, the packaged Win64 Game target, which is a Windows
@@ -390,13 +391,71 @@ Work done in the isolated worktree `ProjectVelkorran-c3`, branch `engineering/pc
 Echo persistence is carried by `AttributesToSave`. What is still unevidenced is a native caller that
 begins/ends an encounter boundary for resource purposes. Source-only; low priority given C2.
 
-### T2 — Cook exclusion (PARTIAL)
+### T2 — Cook exclusion (source, config and validation CLOSED 14 September; template boot remainder is T2-B)
 
-Narrowed on 12 September: demo tale content (the SecretMerchant quest and dialogue) is now rejected,
-portable- and automation-verified. Remaining: implicit AlwaysCook roots beyond
-`GatherAlwaysCookPackages`, and confirmation that no campaign manifest still reaches XP/currency
-assets. Note from that work: tracked content contains **no** vendor, crafting, rarity, morality or
-approval assets, so rules for those categories would be dead code.
+Work done in the isolated worktree `ProjectVelkorran-c3`, branch `engineering/t2-cook-integrity`
+(stacked on PC09), not the shared checkout. Shipping-build integrity audit: what actually enters a
+packaged campaign cook, not what exists in the repository or is reachable in the editor.
+
+1. **Question.** Can campaign packaging or cook discovery still pull in systems or assets that the campaign
+   does not permit — XP, currency, loot, multiplayer or template UI, or other demo content — and does
+   validation catch that without rejecting legitimate Narrative dependencies?
+2. **Authority.** TDD v2 §1 (launch multiplayer: None, LOCKED), §15 content management (mission manifests
+   enumerate dependencies; unused December-system assets excluded from cook), Appendix F (no obsolete class,
+   loot, XP, rarity, vendor, crafting, morality or approval system in the campaign cook).
+3. **Method.** The UE 5.7 cooker itself, `-run=cook -targetplatform=Mac -CookList -cookshowinstigators`, for the
+   packaging stage's map set (`L_Aurelion_M12`, `L_Aurelion_M13`) and for no map. It lists every package a cook
+   would include, with the instigator that added it, without saving. The first runs used
+   `r.AreShaderErrorsFatal=0` because this host's Metal toolchain was broken; package discovery does not
+   depend on compiled shaders. The host was later repaired (Xcode 26.6 system resources, Metal toolchain).
+4. **Campaign cook-entry architecture, as measured.**
+   - *Command-line maps:* the packaging stage passes `-map=`, so the cooker's all-maps fallback never runs; a
+     no-map CookList confirmed the same roots minus the two maps.
+   - *GameMapsSettings defaults:* `GameDefaultMap` (Narrative `MainMenuMap`), `GlobalDefaultGameMode`
+     (`BP_NarrativeGameMode`), `GameInstanceClass` (`BP_NarrativeGameInstance`). `ServerDefaultMap` is excluded
+     from a default cook.
+   - *Asset Manager `ModifyCook`:* Primary Asset rules. Before the fix, NPCDefinition and PlayerDefinition were
+     type-level AlwaysCook over `/NarrativePro` and `/Game`: 114 roots, 72 of them Narrative definitions no
+     campaign content references.
+   - *Startup soft object paths:* every non-editor config soft path loaded at startup, including
+     `ArsenalSettings.GameEntryMap` (Narrative's demo open world) and `CharacterCreatorMap`.
+   - *Startup packages:* classes loaded from config at startup (Narrative GameplayEffect classes, input actions,
+     demo impact/footstep VFX, editor Tales node widgets).
+   - *DirectoriesToAlwaysCook:* `/Game/Aurelion/VFX` and engine-plugin content directories.
+   - *Input:* `DefaultTouchInterface=/Game/Input/TIS_MobileControls` names a missing asset.
+   - *Dependencies:* game (non-editor-only) hard and soft package references from all of the above.
+5. **Prohibited content found in the actual pre-fix cook (4,228 packages).** Six prohibited identities
+   (`GE_GiveXP`, `NE_GiveXP`, `W_NarrativeMenu_Looting`, `WBP_Loot_TheirInventory`, `WBP_Loot_YourInventory`,
+   `W_NarrativeMenu_MPMainMenu`), 494 Narrative demo packages and 173 demo quest/dialogue packages including
+   the SecretMerchant vendor quest. Campaign content itself references none of it: the campaign GameModes,
+   `BP_AurelionPlayerController` and both mission maps name no Narrative framework, template menu or demo package.
+6. **Fixes.**
+   - *Primary Asset rule (`c2b322d8`).* Definition types stay registered under `/NarrativePro` for runtime
+     primary-asset-ID resolution, but the type rule is `Unknown` and a `/Game`-filtered `CustomPrimaryAssetRules`
+     entry restores AlwaysCook for campaign-owned definitions. A custom override cannot lower a type rule.
+   - *Validation cook-entry coverage (`011ad12a`).* `GatherConfiguredCookRoots` reads game defaults, packaging
+     maps and directories, the touch interface and startup config references the way the cooker does;
+     `-CookList=<log>` makes the cooker's own package list the root set; each finding names its cook-entry route.
+   - *Validation dependency walk.* (`9f71fd09`) The walk now uses the cooker's game-only dependency query, so an editor-only reference never raises a finding; it changed no finding in this graph. Validation from configured roots and validation rooted at the cooker's post-fix package list flag the identical 64 prohibited identities, so no cook-entry route is missed. 23 of those 64 are absent from the CookList because `-CookList` only explores requests: it never loads or saves, so World Partition external actors are never folded into generated streaming cells, and the listing deliberately omits external-actor packages. Every one of the 23 is reached through the demo open world's external actors (e.g. `LS_Robbery` → `BPE_AddCurrency`, a `BP_LootableChest` actor, `DA_Crowd_Bandit` → `NPC_Mass_Ped_Bandit`) and ships in a real cook; validation reports them correctly. The campaign maps have no tracked external actors, so the CookList is faithful for campaign content.
+   No asset was deleted and no prohibited-content rule was loosened.
+7. **Post-fix cook (3,985 packages).** AlwaysCook roots 114 → 45; Narrative AlwaysCook roots 72 → 3, and those
+   three (`AC_Pacifist`, `Appearance_Selene`, `Appearance_Tarrik_FullSuit`) are bundle references from campaign
+   definitions, i.e. legitimate dependencies. Demo packages 494 → 434 and demo quest/dialogue 173 → 152: the
+   content the demo definitions used to root is still reachable through the demo open world. The remaining six
+   prohibited identities enter only through `GameDefaultMap`, `GlobalDefaultGameMode` and
+   `ArsenalSettings.GameEntryMap`/`CharacterCreatorMap`.
+8. **Negative controls.** Each control was applied to the fixed configuration, validated, and restored from a copy (`DefaultGame.ini` verified identical afterwards). NC1 — a config soft reference (`ArsenalSettings.DefaultMusicSet` → `BPE_AddCurrency`) and a game-default class (`GlobalDefaultServerGameMode` → `NE_GiveXP_C`), injected by command-line ini override: caught, with the XP and currency findings naming exactly those two routes. NC2 — `+DirectoriesToAlwaysCook` for Narrative's Luca dialogue folder: 18 new findings through that route, including the transitive `DBP_Luca` → `QBP_Demo_Narrative_SecretMerchant` and `NE_GiveXP` → `GE_GiveXP` chains. NC3 — the Primary Asset rule reverted to type-level AlwaysCook: effective AlwaysCook roots rose 45 → 114 and 56 findings named the Asset Manager rule, including the loot UI and demo dialogue it re-roots. NC4 — the pre-fix cooker list through `-CookList`: 68 findings against 64 after the fix, the four extra being content only the removed demo definitions carried. Non-overreach: the only Narrative AlwaysCook roots left are campaign bundle references (`AC_Pacifist`, `Appearance_Selene`, `Appearance_Tarrik_FullSuit`), which raise no finding, and the existing identity, demo-tale and loadout non-overreach suites pass.
+9. **Suites.** Portable-tested: `Tests/Portable/SovCampaignCookRootPolicyTests.cpp` (32 checks) and `SovCampaignContentPolicyTests.cpp` (83 checks), clang `-Werror -pedantic` with UBSan. Automation-verified on Mac: `Campaign.Validation` 14/15, including the new `ConfiguredCookRoots`, `ProductionCookInputs` and `CookListRoots` and the existing identity, XP-modifier, AlwaysCook-root, demo-loadout and demo-tale non-overreach suites; the one failure is `GameplayCuesStillResolve` (X1). Affected suites (Validation, PlacedNPC, Encounter, AI, Aurelion) 124/125, same X1 failure. Full suite 633 passed, 2 failed of 635: `GameplayCuesStillResolve` (X1) and `PlacedNPC.OwnedEditorAssignmentPreservesMetadataAndRefusesForeignIdentity`, whose only error was the `BS_Drone` missing-animation log from the absent `SciFi_Drone_1` pack (X2 spillover); that test passes 1/1 alone.
+10. **Reclassified as T2-B (content/editor and product decision).** The template boot configuration —
+    `GameDefaultMap`, `GlobalDefaultGameMode`, `GameInstanceClass`, `ArsenalSettings.GameEntryMap` and
+    `CharacterCreatorMap` — is the only remaining route for the multiplayer menu, loot UI, XP events and demo
+    world. Replacing it means deciding what a packaged build boots into, which needs an authored campaign front
+    end (T3). Shipping validation fails on it and names each route.
+11. **Outside T2, recorded.** `NPC_AurelionEnforcer` still grants the Narrative demo pistol (existing gate K4).
+    The M12/M13 manifest is rejected by the commandlet ("Curated companion abilities must be concrete and
+    unique"), and the manifest check still expects `M01_Mantle`/`M02_OneDegree`; 387 referenced MetaHuman,
+    UltraDynamicSky and overlay-material packages are absent from the checkout. `/Game/Cues` (X1),
+    `SciFi_Drone_1` (X2), Windows/MSVC, and a full packaged cook remain outside.
 
 ### T5 — Packaged Win64 Game target (OPEN, Windows gate)
 
@@ -465,6 +524,8 @@ note below; that is recorded for its own slice rather than folded into C3.
 **12 September — E6 closed, no source defect.** Every tracked hostile — the Aurelion roster and both Dominion Hound Blueprints — acquires the player only through its authored perception and threat memory. The Hound world scan is a gated combat-state fallback, not a stealth bypass. The latent legacy nonperception path is unreachable for the authored roster and is now pinned by automation. Detail, negative controls and the PC04 signal recommendation are under E6 above.
 
 **12 September — PC09 source closed, no source defect; authoring reclassified as PC09-C.** Native Guard admission, Stamina, perfect defence, interruption, re-entrant start, cancellation, counter survival and cleanup are automation-verified across eight suites with negative controls. The audit's cancellation complaint no longer describes the source. No authored asset grants, maps, presents or counter-classifies Guard yet; that remainder is PC09-C. Detail under PC09 above.
+
+**14 September — T2 closed for source, config and validation; boot remainder reclassified as T2-B.** The UE 5.7 cooker's own CookList showed every Narrative demo definition cooked through an AlwaysCook Primary Asset rule, and shipping validation blind to game defaults, packaging settings and startup config references. Both are fixed, and validation now follows only the dependencies the cooker follows. What still ships prohibited content is the template boot configuration, which needs an authored campaign front end (T3). Detail under T2 above.
 
 ## X2 — `SciFi_Drone_1` marketplace pack, an external content gate
 
