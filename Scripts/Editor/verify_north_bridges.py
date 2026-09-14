@@ -4,7 +4,7 @@ import runpy
 import unreal
 root=Path(unreal.Paths.project_dir())
 exec(compile((root/'Scripts/Editor/verify_north_guards.py').read_text(),'verify_north_guards','exec'))
-assert len(actors)==2108+atrium_guard_count+atrium_ring_count+atrium_parapet_count+atrium_canopy_count+atrium_bridge_floor_count+atrium_crown_count+atrium_crown_light_count and north_bridge_count==4
+assert len(actors)==2108+atrium_guard_count+atrium_ring_count+atrium_parapet_count+atrium_canopy_count+atrium_bridge_floor_count+atrium_crown_count+atrium_crown_light_count+z06_paving_count and north_bridge_count==4
 checks=runpy.run_path(str(root/'Scripts/Editor/check_z02_bridges.py'))
 geometry=checks['check_bridges'](world,actors,'NorthBridgeKit','KIT_North_Bridge_')
 geometry['route_controls']=checks['route_controls'](world,actors,('bridge4','bridge5'))
