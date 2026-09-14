@@ -14,8 +14,8 @@ for side in (-1,1):
         for dy in (-.82,.82):box('Leaf vertical frame',(side*.193,y+dy,0),(.030,.075,1.94),stone,.004)
         for z in (-.93,.93):box('Leaf horizontal frame',(side*.193,y,z),(.030,1.565,.075),stone,.004)
         box('Inset central field',(side*.193,y,0),(.032,1.42,1.64),stone,.005)
-        for z in (-.64,.64):box('Recessed conductor crossbar',(side*.213,y,z),(.012,1.15,.028),gold,.002)
-        for dy in (-.56,.56):box('Recessed conductor upright',(side*.213,y+dy,0),(.012,.028,1.28),gold,.002)
+        for z in (-.64,.64):box('Recessed conductor crossbar',(side*.213,y,z),(.012,1.148,.028),gold,.002)
+        for dy in (-.56,.56):box('Recessed conductor upright',(side*.213,y+dy,0),(.012,.028,1.252),gold,.002)
         # Small registers have a clear mechanical rhythm without dense repeated microgeometry.
         for z in (-.18,0,.18):box('Power register',(side*.214,y,z),(.010,.16,.065),gold,.002)
     box('Central closing seam',(side*.175,0,0),(.018,.06,2.20),grout,.002)
