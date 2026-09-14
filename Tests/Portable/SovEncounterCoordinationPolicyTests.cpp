@@ -29,5 +29,21 @@ int main()
 	assert(!LowResources(10., 100., -1., 100., 0., 100.)); ++Checks;
 	assert(!WarningReady(false, true, true, 2., .5, std::numeric_limits<double>::infinity())); ++Checks;
 	assert(Slots(2, false) == 2 && Slots(2, true) == 1 && Slots(1, true) == 1); ++Checks;
+	// A 90 degree horizontal frame at 16:9 spans +/-1 horizontally and +/-0.5625 vertically per unit of depth.
+	const double Aspect = RemoteViewAspectRatio;
+	const double HalfWidth = std::tan(90. * std::acos(-1.) / 360.);
+	for (int Step = -200; Step <= 200; ++Step)
+	{
+		const double Offset = Step / 100.;
+		assert(WithinViewFrame(1., Offset, 0., 90., Aspect) == (std::abs(Offset) <= HalfWidth)); ++Checks;
+		assert(WithinViewFrame(2., Offset, 0., 90., Aspect) == (std::abs(Offset) <= 2. * HalfWidth)); ++Checks;
+		assert(WithinViewFrame(1., 0., Offset, 90., Aspect) == (std::abs(Offset) <= HalfWidth / Aspect)); ++Checks;
+		assert(!WithinViewFrame(-1., 0., Offset, 90., Aspect)); ++Checks;
+	}
+	assert(WithinViewFrame(500., 0., 0., 90., Aspect) && !WithinViewFrame(0., 0., 0., 90., Aspect)); ++Checks;
+	assert(!WithinViewFrame(1., 0., 0., 0., Aspect) && !WithinViewFrame(1., 0., 0., 180., Aspect) && !WithinViewFrame(1., 0., 0., 90., 0.)); ++Checks;
+	assert(!WithinViewFrame(std::numeric_limits<double>::quiet_NaN(), 0., 0., 90., Aspect)); ++Checks;
+	assert(!WithinViewFrame(1., std::numeric_limits<double>::infinity(), 0., 90., Aspect)); ++Checks;
+	assert(WithinViewFrame(1., .99, .55, 90., Aspect) && !WithinViewFrame(1., .99, .57, 90., Aspect)); ++Checks;
 	std::cout << "Encounter coordination: " << Checks << " budget, warning timing and relief boundary checks passed\n";
 }

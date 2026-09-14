@@ -12,6 +12,7 @@
 #include "AIController.h"
 #include "AbilitySystemGlobals.h"
 #include "BrainComponent.h"
+#include "Camera/PlayerCameraManager.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -519,8 +520,19 @@ bool USovEncounterCoordinationComponent::IsSourceOnscreen(const AActor* Source, 
 {
 	const auto* Player = Cast<APawn>(Target);
 	const auto* PC = Player ? Cast<APlayerController>(Player->GetController()) : nullptr;
-	if (!IsValid(Source) || !PC || !PC->IsLocalController()) { return false; }
+	if (!IsValid(Source) || !PC) { return false; }
 	FVector Eye; FRotator Rotation; PC->GetPlayerViewPoint(Eye, Rotation);
+	if (!PC->IsLocalController())
+	{
+		// A remote player's viewport is not on this machine, so an admission decision cannot wait on it. Use the
+		// view that player's client reports to the server and its camera field of view.
+		const FVector Offset = Source->GetActorLocation() - Eye;
+		const FRotationMatrix View(Rotation);
+		const float Fov = PC->PlayerCameraManager ? PC->PlayerCameraManager->GetFOVAngle() : 90.f;
+		return SovEncounterCoordinationPolicy::WithinViewFrame(FVector::DotProduct(Offset, View.GetUnitAxis(EAxis::X)),
+			FVector::DotProduct(Offset, View.GetUnitAxis(EAxis::Y)), FVector::DotProduct(Offset, View.GetUnitAxis(EAxis::Z)),
+			Fov, SovEncounterCoordinationPolicy::RemoteViewAspectRatio);
+	}
 	if (FVector::DotProduct(Rotation.Vector(), Source->GetActorLocation() - Eye) <= 0.f) { return false; }
 	FVector2D Screen; int32 Width = 0, Height = 0; PC->GetViewportSize(Width, Height);
 	return Width > 0 && Height > 0 && PC->ProjectWorldLocationToScreen(Source->GetActorLocation(), Screen, true)
