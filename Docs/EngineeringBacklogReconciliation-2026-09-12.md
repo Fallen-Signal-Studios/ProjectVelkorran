@@ -55,7 +55,7 @@ These are kept distinct throughout and never collapsed into "passed":
 | T1 | `InitialMission` unset on campaign GameModes | **CONTENT/EDITOR GATE** |
 | T2 | Cook exclusion incomplete | **CLOSED** (source/config/validation, 14 Sep, see updates) |
 | T2-B | Template boot config still ships MP menu, loot UI, XP events and demo world | **CONTENT/EDITOR GATE** |
-| T3 | Campaign UI carries template behaviour | **PARTIAL** |
+| T3 | Campaign UI carries template behaviour | **CONTENT/EDITOR GATE** (14 Sep, see updates) |
 | T4 | Intermittent hostile AI startup | **CLOSED** |
 | T5 | Packaged Win64 Game target unverified | **OPEN (Windows gate)** |
 | T6 | `ProjectVelkorranTests` sets `bUseUnity = false` | **CLOSED** |
@@ -64,9 +64,9 @@ These are kept distinct throughout and never collapsed into "passed":
 | X1 | `/Game/Cues` absent from version control | **EXTERNAL CONTENT GATE** (see below) |
 | X2 | `SciFi_Drone_1` marketplace pack absent | **EXTERNAL CONTENT GATE** (see below) |
 
-Closed: 18. Partial: 2. Open: 1. Content/editor gated: 11. Superseded: 2. External gates: 2.
+Closed: 18. Partial: 1. Open: 1. Content/editor gated: 12. Superseded: 2. External gates: 2.
 
-_Recounted from the table above on 12 September after C1 closed, and again after C3, E6, PC09 and T2 closed. The earlier totals line did not
+_Recounted from the table above on 12 September after C1 closed, again after C3, E6, PC09 and T2 closed, and after T3 was gated. The earlier totals line did not
 reconcile with its own rows. K1–K4 count as four gated items; PC09-C and T2-B count as one each; PC06 counts as superseded, its small
 remaining part recorded under its own heading._
 
@@ -457,6 +457,49 @@ packaged campaign cook, not what exists in the repository or is reachable in the
     UltraDynamicSky and overlay-material packages are absent from the checkout. `/Game/Cues` (X1),
     `SciFi_Drone_1` (X2), Windows/MSVC, and a full packaged cook remain outside.
 
+### T3 — Campaign UI template behaviour (CONTENT/EDITOR GATE, 14 September)
+
+Work done read-only in the isolated worktree `ProjectVelkorran-c3`, branch `engineering/t3-campaign-ui`
+(stacked on T2). No source or content changed.
+
+1. **Question.** Can a player in the campaign open Narrative template screens that the campaign does not permit:
+   a general inventory grid, character creation, loot, multiplayer menus, or other template UI?
+2. **Authority.** TDD v2 §10.7 ("The campaign has no general grid/list inventory"), §13.6 (pause menu: Resume,
+   Current Mission, Techniques, Equipment, Evidence & Records, Map, Tutorials, Settings, Save/Load, Return to
+   Main Menu; Equipment has no comparison columns or rarity), §19.4 (remove inventory grids and item stacks and
+   multiplayer authority assumptions embedded in campaign UI).
+3. **Native layer, source-verified.** `ASovPlayerController` uses `USovNativeGameplayHUD`, an asset-free layer
+   shell, and opens only project menus: `USovAurelionPauseMenu` (Resume, checkpoint load, Settings, Quit),
+   accessibility settings, records, application interruption, fatal recovery and dialogue choice.
+   `ASovPlayerCharacterBase::GetCharacterCreatorData` returns nothing for campaign-managed initialization, and
+   `bLoadCharacterCreatorOnNewGame` is false. No native code opens a template inventory, character-creator, loot
+   or multiplayer menu, and none handles menu input: `ANarrativePlayerController` natively binds only look and
+   the ability inputs from `DA_DefaultAbilityInputs`.
+4. **Where template behaviour is decided: content absent from the repository.** Narrative's menu inputs
+   (`IA_OpenInventory`, `IA_OpenMap`, `IA_PauseGame`, `IA_QuickUseItems`, `IA_Quicksave`, `IA_Wait`,
+   `IA_WeaponWheel`) are bound in `IMC_Default` and handled only in the template `BP_NarrativePlayerController`.
+   The campaign controller `BP_AurelionPlayerController` derives from `/Game/Framework/BP_SovPlayerController`,
+   which per [CampaignFoundation.md](CampaignFoundation.md) owns input mappings, HUD classes and menu behaviour and
+   points `PauseMenuClass` at the copied `W_NarrativeMenu_Pause`; the campaign controller overrides that with
+   `USovAurelionPauseMenu`. That parent Blueprint and the project copies under `/Game/Framework`, `/Game/Input`,
+   `/Game/Items/Weapons`, `/Game/Abilities` and `/Game/UI/Narrative` were authored on the Windows work PC. They are
+   excluded by `.gitignore` (`/Content/*`), have never been committed on any branch, and shipping validation reports
+   them missing. Which screens the campaign player can open, and how the campaign pause menu is reached, therefore
+   cannot be established or tested from this repository.
+5. **Template UI reach found without that content.** The campaign HUD `WBP_AurelionGameplayHUD` reuses Narrative HUD
+   pieces (game HUD, compass, minimap, screen-space markers, player-info HUD, crosshairs, interaction, notifications,
+   Tales overlay), not menu screens. Template inventory grid widgets reach the cook through `NPC_AurelionEnforcer`'s
+   demo pistol (K4), and the vehicle HUD through Narrative's DriveToDestination activity in
+   `AC_AurelionSecurityDrone`. The template main menu, loot controller and character creator enter only through the
+   boot configuration (T2-B).
+6. **Decisions (14 September, creator).** T3 is gated as content rather than implemented natively: a native menu
+   guard written without the authored Blueprints could conflict with wiring that cannot be inspected. Packaged
+   builds will boot into an authored Sovereign front end; the template boot stays flagged by shipping validation
+   (T2-B) until then.
+7. **To reopen.** Commit the project-authored copies from the work PC, adjusting `.gitignore` as was done for
+   `Content/Cues`; audit which screens the campaign controller opens against §10.7 and §13.6 with runtime tests; author
+   the campaign front end map, GameMode and menu, which also resolves T2-B.
+
 ### T5 — Packaged Win64 Game target (OPEN, Windows gate)
 
 Mac compiles and links the Game target, which proves the runtime module carries no editor-only
@@ -526,6 +569,8 @@ note below; that is recorded for its own slice rather than folded into C3.
 **12 September — PC09 source closed, no source defect; authoring reclassified as PC09-C.** Native Guard admission, Stamina, perfect defence, interruption, re-entrant start, cancellation, counter survival and cleanup are automation-verified across eight suites with negative controls. The audit's cancellation complaint no longer describes the source. No authored asset grants, maps, presents or counter-classifies Guard yet; that remainder is PC09-C. Detail under PC09 above.
 
 **14 September — T2 closed for source, config and validation; boot remainder reclassified as T2-B.** The UE 5.7 cooker's own CookList showed every Narrative demo definition cooked through an AlwaysCook Primary Asset rule, and shipping validation blind to game defaults, packaging settings and startup config references. Both are fixed, and validation now follows only the dependencies the cooker follows. What still ships prohibited content is the template boot configuration, which needs an authored campaign front end (T3). Detail under T2 above.
+
+**14 September — T3 gated as content; front-end decision recorded.** The native campaign layer opens only project menus and loads no character-creator data, but the campaign's input and menu wiring lives in `/Game/Framework/BP_SovPlayerController` and the project UI copies, which were authored on the work PC and never committed. T3 is gated until that content is committed. Packaged builds will boot into an authored Sovereign front end, so T2-B stays flagged until one exists. Detail under T3 above.
 
 ## X2 — `SciFi_Drone_1` marketplace pack, an external content gate
 
