@@ -6,9 +6,9 @@ import unreal
 def hit_result(raw):
     return next(v for v in raw if isinstance(v,unreal.HitResult)) if isinstance(raw,tuple) else raw
 
-def route_controls(world,actors):
+def route_controls(world,actors,names=('bridge2','bridge3')):
     labels={a.get_actor_label():a for a in actors};rows=[]
-    for name in ('bridge2','bridge3'):
+    for name in names:
         p=labels[name].get_actor_location()
         for x in (-180,0,180):
             start=unreal.Vector(p.x+x,p.y-900,p.z+104.133914);end=unreal.Vector(start.x,p.y+900,start.z)
@@ -16,8 +16,8 @@ def route_controls(world,actors):
             rows.append(dict(bridge=name,x=x,blocker=hit.to_tuple()[9].get_actor_label() if hit and hit.to_tuple()[0] else None))
     return rows
 
-def check_bridges(world,actors):
-    root=Path(unreal.Paths.project_dir());source=root/'Art/Source/Aurelion/ApproachBridgeKit'
+def check_bridges(world,actors,kit='ApproachBridgeKit',actor_prefix='KIT_Z02_Bridge_'):
+    root=Path(unreal.Paths.project_dir());source=root/'Art/Source/Aurelion'/kit
     fit=json.loads((source/'bridge-fit.json').read_text());specs={s['asset']:s for s in json.loads((source/'manifest.json').read_text())['modules']}
     labels={a.get_actor_label():a for a in actors};sm=unreal.get_editor_subsystem(unreal.StaticMeshEditorSubsystem);probes=[];arch_controls=[];pawn_controls=[]
     for b in fit['baseline']:
@@ -25,8 +25,8 @@ def check_bridges(world,actors):
         assert c.get_world_transform().export_text()==b['transform'] and c.static_mesh.get_path_name()==b['mesh']
         assert not c.get_editor_property('visible') and c.get_editor_property('hidden_in_game')
         assert not old.get_actor_enable_collision() and c.get_collision_enabled()==unreal.CollisionEnabled.NO_COLLISION and str(c.get_collision_profile_name())=='NoCollision'
-        for suffix in ('ApproachDeck','ApproachArchSupports'):
-            a=labels['KIT_Z02_Bridge_'+b['actor']+'_'+suffix];c=a.static_mesh_component;s=a.get_actor_scale3d();p=a.get_actor_location();base=old.get_actor_location()
+        for suffix in (b.get('asset_prefix','Approach')+'Deck',b.get('asset_prefix','Approach')+'ArchSupports'):
+            a=labels[actor_prefix+b['actor']+'_'+suffix];c=a.static_mesh_component;s=a.get_actor_scale3d();p=a.get_actor_location();base=unreal.Vector(*b['placement_cm']) if 'placement_cm' in b else old.get_actor_location()
             assert (p-base).length()<.01 and all(abs(v-1)<.001 for v in (s.x,s.y,s.z))
             rotation=a.get_actor_rotation();assert max(abs(rotation.pitch),abs(rotation.yaw),abs(rotation.roll))<.01
             assert c.static_mesh.get_name()=='SM_Aurelion_KIT_'+suffix and c.get_editor_property('visible') and not c.get_editor_property('hidden_in_game')
@@ -35,7 +35,7 @@ def check_bridges(world,actors):
             assert sm.get_convex_collision_count(c.static_mesh)==spec['convex_hulls'] and sm.get_simple_collision_count(c.static_mesh)==0
             assert sm.get_num_uv_channels(c.static_mesh,0)==2 and sm.get_nanite_settings(c.static_mesh).get_editor_property('enabled')
             ignored=[other for other in actors if other!=a]
-            if suffix=='ApproachDeck':
+            if suffix.endswith('Deck'):
                 for x,y,z in spec['bridge_surface_samples']:
                     start=unreal.Vector(p.x+x*100,p.y-y*100,p.z+500);end=unreal.Vector(start.x,start.y,p.z-100)
                     for complex_trace in (False,True):

@@ -1,0 +1,24 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_NorthSpanBDeck",
+      "dimensions_m": [
+        14.529634475708008,
+        20.863405227661133,
+        1.940000057220459
+      ],
+      "triangles": 44804
+    },
+    {
+      "asset": "SM_Aurelion_KIT_NorthSpanBArchSupports",
+      "dimensions_m": [
+        14.25,
+        20.98615074157715,
+        48.84634017944336
+      ],
+      "triangles": 48672
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}

@@ -2,9 +2,10 @@
 from pathlib import Path
 helpers=Path(__file__).with_name('build_architecture_kit.py')
 exec(compile(helpers.read_text().split('# Four metre bay:')[0],str(helpers),'exec'))
-ROOT=Path(__file__).resolve().parent/'ApproachBridgeKit';ROOT.mkdir(exist_ok=True)
-profile=json.loads((ROOT/'measured-profile.json').read_text())
-W=14.52963488;L=21.29522470;TOP=.11133914
+ROOT=Path(globals().get('KIT_ROOT',Path(__file__).resolve().parent/'ApproachBridgeKit'));ROOT.mkdir(parents=True,exist_ok=True)
+profile=json.loads((Path(__file__).resolve().parent/'ApproachBridgeKit/measured-profile.json').read_text())
+W=14.52963488;L=float(globals().get('SPAN_LENGTH',21.29522470));TOP=.11133914
+mesh_prefix=globals().get('MESH_PREFIX','Approach')
 hulls=[]
 
 def prism(name,x,width,y0,y1,z0,z1,top,mat=stone,bevel=.006):
@@ -56,15 +57,15 @@ for side in (-1,1):
     for i in range(13):
         y=-L/2+(i+.5)*L/13
         box('Fascia corbel',(side*(W/2-.22),y,TOP-.53),(.35,.24,.22),stone,.018)
-deck=export('SM_Aurelion_KIT_ApproachDeck',[]);manifest[-1]['nominal_dimensions_m']=list(deck.dimensions)
+deck=export('SM_Aurelion_KIT_'+mesh_prefix+'Deck',[]);manifest[-1]['nominal_dimensions_m']=list(deck.dimensions)
 rail=W/2-.16
 specs=[((0,0,TOP-.20),(W,L,.40))]+[((x,0,TOP+.65),(.32,L,1.30)) for x in (-rail,rail)]
-samples=[(x,y,TOP if abs(x)<7 else TOP+1.30) for x in (-rail,-6,-2,0,2,6,rail) for y in (-10,-5,0,5,10)]
+samples=[(x,y,TOP if abs(x)<7 else TOP+1.30) for x in (-rail,-6,-2,0,2,6,rail) for y in (-min(10,L/2-.1),-5,0,5,min(10,L/2-.1))]
 export_collision(deck,specs,samples)
 deck.hide_render=True
 
 # Use the sampled original arch curve, extending measured ends to the deck footprint.
-curve=sorted((v['y'],v['z']) for v in profile['underside'] if abs(v['x'])<.01)
+curve=sorted((v['y']*L/21.29522470,v['z']) for v in profile['underside'] if abs(v['x'])<.01)
 assert len(curve)==41
 curve=[(-L/2,-49.14)]+curve+[(L/2,-49.14)]
 rib_x=(-6.45,-2.15,2.15,6.45)
@@ -92,7 +93,7 @@ for x in rib_x:
 for y in (-L/2+.44,L/2-.44):
     for z in (-48.9,-.63):box('Cross-span tie beam',(0,y,z),(13.95,.88,.45),stone,.015)
 joint_mesh=bpy.data.meshes.new('Spandrel coursing');joint_mesh.from_pydata(joint_vertices,[],joint_faces);joint_mesh.update();joint_object=bpy.data.objects.new('Spandrel coursing',joint_mesh);scene.collection.objects.link(joint_object);finish(joint_object,dark,0)
-support=export('SM_Aurelion_KIT_ApproachArchSupports',[]);manifest[-1]['nominal_dimensions_m']=list(support.dimensions)
+support=export('SM_Aurelion_KIT_'+mesh_prefix+'ArchSupports',[]);manifest[-1]['nominal_dimensions_m']=list(support.dimensions)
 support_hulls=[]
 for x in rib_x:
     for (y0,z0),(y1,z1) in zip(curve,curve[1:]):
@@ -119,5 +120,5 @@ d=bpy.data.cameras.new('Approach bridge review');camera=bpy.data.objects.new('Ap
 scene.render.engine='CYCLES';scene.cycles.samples=32;scene.cycles.use_denoising=True;scene.render.resolution_x=1600;scene.render.resolution_y=1000;scene.render.resolution_percentage=100
 for name,pos,target,lens in [('Bridge', (60,-70,8),(0,0,-24),40),('Deck',(18,-23,11),(0,0,0),36)]:
     camera.location=pos;camera.rotation_euler=(Vector(target)-camera.location).to_track_quat('-Z','Y').to_euler();d.lens=lens;scene.render.filepath=str(ROOT/(name+'.png'));bpy.ops.render.render(write_still=True)
-bpy.ops.wm.save_as_mainfile(filepath=str(ROOT/'Aurelion_ApproachBridgeKit.blend'))
+bpy.ops.wm.save_as_mainfile(filepath=str(ROOT/('Aurelion_'+mesh_prefix+'BridgeKit.blend')))
 (ROOT/'manifest.json').write_text(json.dumps(dict(status='Full-scale source candidate; Unreal fit, underbridge collision and live route acceptance pending',modules=manifest),indent=2))
