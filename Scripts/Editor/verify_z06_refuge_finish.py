@@ -12,10 +12,11 @@ def verify():
     geometry=runpy.run_path(str(root/'Scripts/Editor/check_z06_refuge_finish.py'))['check_z06_refuge_finish'](world,actors)
     assert not unreal.EditorLoadingAndSavingUtils.get_dirty_map_packages()
     (out/'z06-refuge-finish-verification.json').write_text(json.dumps(dict(status='passed',actor_count=len(actors),geometry=geometry),indent=2))
-unreal.EditorPythonScripting.set_keep_python_script_alive(True);started=time.monotonic()
-def tick(delta):
-    if time.monotonic()-started<15:return
-    unreal.unregister_slate_post_tick_callback(handle)
-    try:verify()
-    finally:unreal.EditorPythonScripting.set_keep_python_script_alive(False)
-handle=unreal.register_slate_post_tick_callback(tick)
+if not globals().get('DEFER_Z06_REFUGE_FINISH_AUTORUN',False):
+    unreal.EditorPythonScripting.set_keep_python_script_alive(True);started=time.monotonic()
+    def tick(delta):
+        if time.monotonic()-started<15:return
+        unreal.unregister_slate_post_tick_callback(handle)
+        try:verify()
+        finally:unreal.EditorPythonScripting.set_keep_python_script_alive(False)
+    handle=unreal.register_slate_post_tick_callback(tick)

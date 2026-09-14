@@ -1,0 +1,15 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z06RescueGate",
+      "dimensions_m": [
+        0.4399999976158142,
+        4.300000190734863,
+        2.580000162124634
+      ],
+      "triangles": 11092
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}
