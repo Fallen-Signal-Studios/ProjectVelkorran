@@ -14,15 +14,12 @@
 #include "SkillTrees/SkillTreeComponent.h"
 #include "Subsystems/NarrativeSaveSubsystem.h"
 #include "Sovereign/SovGameplayTags.h"
-#include "UObject/Script.h"
 
 #if WITH_AUTOMATION_TESTS
 namespace
 {
 	struct FHandoffWorld
 	{
-		// Actor save events (PrepareForSave, Load, GetActorGUID) go through AActor::ProcessEvent, which skips them in a world not initialized for play.
-		FEditorScriptExecutionGuard ScriptGuard;
 		UWorld* World = nullptr;
 		FHandoffWorld()
 		{
