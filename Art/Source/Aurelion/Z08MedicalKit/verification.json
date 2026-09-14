@@ -1,0 +1,15 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z08TreatmentTrolley",
+      "dimensions_m": [
+        2.1999998092651367,
+        0.8500000834465027,
+        0.9000000357627869
+      ],
+      "triangles": 29504
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}
