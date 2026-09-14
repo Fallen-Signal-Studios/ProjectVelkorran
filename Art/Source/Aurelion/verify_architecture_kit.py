@@ -24,6 +24,13 @@ for entry in manifest['modules']:
     assert all(poly.area>1e-12 for poly in o.data.polygons)
     o.data.calc_loop_triangles()
     assert len(o.data.loop_triangles)==entry['triangles']
+    if 'aperture_m' in entry:
+        width,height=entry['aperture_m']
+        for x in (-width/2+.06,0,width/2-.06):
+            for z in (.1,height/2,height-.06):
+                assert not o.ray_cast(Vector((x,-5,z)),Vector((0,1,0)),distance=10)[0], 'Visual portal aperture obstructed'
+        for x,z in ((-width/2-.5,2),(width/2+.5,2),(0,height+.5)):
+            assert o.ray_cast(Vector((x,-5,z)),Vector((0,1,0)),distance=10)[0], 'Visual frame missing'
     if hulls and 'deck_samples' in entry:
         assert all(len(h.data.vertices)==8 for h in hulls)
         for y,z in entry['deck_samples']:

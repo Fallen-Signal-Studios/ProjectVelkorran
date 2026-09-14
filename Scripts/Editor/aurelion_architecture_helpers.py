@@ -20,7 +20,7 @@ def import_owned_mesh(spec,source,destination,materials):
         old=unreal.load_asset(asset)
         assert Path(old.get_editor_property('asset_import_data').get_first_filename()).resolve()==filename
     task=unreal.AssetImportTask(); task.filename=str(filename); task.destination_path=destination
-    task.destination_name=name; task.automated=True; task.save=False; task.replace_existing=True; task.factory=unreal.FbxFactory()
+    task.destination_name=name; task.automated=True; task.save=False; task.replace_existing=True; task.replace_existing_settings=True; task.factory=unreal.FbxFactory()
     options=unreal.FbxImportUI(); options.import_mesh=True; options.import_as_skeletal=False
     options.import_materials=False; options.import_textures=False; options.automated_import_should_detect_type=False
     options.mesh_type_to_import=unreal.FBXImportType.FBXIT_STATIC_MESH
@@ -37,6 +37,11 @@ def import_owned_mesh(spec,source,destination,materials):
     assert set(keys)==set(spec['materials'])
     sm=unreal.get_editor_subsystem(unreal.StaticMeshEditorSubsystem)
     expected_hulls=spec.get('convex_hulls',0)
+    # Atomic FBX reimport can retain or generate collision despite the import flag.
+    # These owned visual-only specs explicitly require none. Never strip authored hulls.
+    if expected_hulls==0 and (sm.get_convex_collision_count(mesh) or sm.get_simple_collision_count(mesh)):
+        unreal.log_warning('Removing reimport collision from visual-only owned mesh '+name)
+        assert sm.remove_collisions(mesh)
     assert sm.get_convex_collision_count(mesh)==expected_hulls
     # This API counts boxes/spheres/capsules separately from convex hulls.
     assert sm.get_simple_collision_count(mesh)==0 and sm.get_num_uv_channels(mesh,0)==2

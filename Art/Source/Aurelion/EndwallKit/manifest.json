@@ -1,0 +1,64 @@
+{
+  "status": "Fitted source candidate; in-engine end-wall review required",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Portal_6x4p5",
+      "triangles": 32780,
+      "nominal_dimensions_m": [
+        8.0,
+        1.3849999904632568,
+        7.0
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "Visual only; existing six-metre end-wall proxies and mission gate body retained",
+      "aperture_m": [
+        6,
+        4.2
+      ],
+      "nominal_proxy_aperture_m": [
+        6,
+        4.5
+      ]
+    },
+    {
+      "asset": "SM_Aurelion_KIT_EndReturn_1x7",
+      "triangles": 3008,
+      "nominal_dimensions_m": [
+        1.0,
+        0.8500000238418579,
+        7.0
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "Visual only; retained end-wall proxy"
+    },
+    {
+      "asset": "SM_Aurelion_KIT_JournalDoor_6x4p5",
+      "triangles": 21480,
+      "nominal_dimensions_m": [
+        6.0360002517700195,
+        0.550000011920929,
+        4.539999961853027
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "Visual only; journal gate Body remains authoritative"
+    }
+  ]
+}
