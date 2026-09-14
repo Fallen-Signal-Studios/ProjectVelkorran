@@ -93,6 +93,11 @@ bool USovExertionComponent::InitializeWithAbilitySystem(UAbilitySystemComponent*
 		if (!IsValid(ASC) || ASC->GetAvatarActor() != GetOwner()) { Uninitialize(); return false; }
 		ASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetStaminaRegenRateAttribute(), FMath::Max(Profile.IdleRegenRate, 0.f));
 		if (!IsValid(ASC) || ASC->GetAvatarActor() != GetOwner()) { Uninitialize(); return false; }
+	}
+	// Movement speeds are not replicated. An owning client predicts with them, so every role applies the profile;
+	// only the attribute bases above are authoritative writes.
+	if (bApplyPrototypeDefaults)
+	{
 		if (auto* Character = Cast<ACharacter>(GetOwner()))
 		{
 			if (auto* Movement = Cast<UNarrativeCharacterMovement>(Character->GetCharacterMovement()))
@@ -117,7 +122,8 @@ void USovExertionComponent::Uninitialize()
 	if (IsValid(OldASC))
 	{
 		OldASC->GetGameplayAttributeValueChangeDelegate(UNarrativeAttributeSetBase::GetStaminaAttribute()).Remove(StaminaChangedHandle);
-		if (bOwnsExhaustedTag) { OldASC->RemoveLooseGameplayTag(FSovGameplayTags::Get().State_Exertion_Exhausted); }
+		if (bOwnsExhaustedTag)
+		{ OldASC->RemoveLooseGameplayTag(FSovGameplayTags::Get().State_Exertion_Exhausted, 1, EGameplayTagReplicationState::TagAndCountToAll); }
 	}
 	bOwnsExhaustedTag = false;
 	StaminaChangedHandle.Reset();
@@ -265,8 +271,10 @@ void USovExertionComponent::RefreshExhaustionTag()
 	const bool bExhausted = IsExhausted();
 	if (bExhausted == bOwnsExhaustedTag) { return; }
 	bOwnsExhaustedTag = bExhausted;
-	if (bExhausted) { ASC->AddLooseGameplayTag(FSovGameplayTags::Get().State_Exertion_Exhausted); }
-	else { ASC->RemoveLooseGameplayTag(FSovGameplayTags::Get().State_Exertion_Exhausted); }
+	// Authored HUD, animation and Blueprint readers observe Exhausted on the owning client and simulated proxies.
+	const FGameplayTag Exhausted = FSovGameplayTags::Get().State_Exertion_Exhausted;
+	if (bExhausted) { ASC->AddLooseGameplayTag(Exhausted, 1, EGameplayTagReplicationState::TagAndCountToAll); }
+	else { ASC->RemoveLooseGameplayTag(Exhausted, 1, EGameplayTagReplicationState::TagAndCountToAll); }
 }
 
 void USovExertionComponent::HandleStaminaChanged(const FOnAttributeChangeData& Data)

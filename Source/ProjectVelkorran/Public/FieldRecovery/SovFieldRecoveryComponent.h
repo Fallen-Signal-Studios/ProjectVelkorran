@@ -37,9 +37,12 @@ public:
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 private:
 	friend class USovGameplayAbility_FieldRecovery;
 	friend struct FSovFieldRecoveryTestAccess;
+	/** The owning client's HUD follows the authoritative count; charges are never spent or refilled here. */
+	UFUNCTION() void OnRep_Charges();
 	bool ValidProfile() const;
 	bool HasLiveOwner() const;
 	FGuid BeginUse(USovGameplayAbility_FieldRecovery* Ability);
@@ -47,7 +50,7 @@ private:
 	void CancelUse(USovGameplayAbility_FieldRecovery* Ability, FGuid Id);
 	bool IsCurrentUse(const USovGameplayAbility_FieldRecovery* Ability, FGuid Id) const;
 	UPROPERTY(SaveGame) int32 SavedSchemaVersion = 1;
-	UPROPERTY(SaveGame) int32 Charges = 2;
+	UPROPERTY(SaveGame, ReplicatedUsing=OnRep_Charges) int32 Charges = 2;
 	UPROPERTY(SaveGame) FGameplayTag SavedProtagonist;
 	TWeakObjectPtr<UNarrativeAbilitySystemComponent> ASC;
 	TWeakObjectPtr<USovGameplayAbility_FieldRecovery> UsingAbility;

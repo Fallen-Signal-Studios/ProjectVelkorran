@@ -8,10 +8,21 @@
 #include "GameFramework/Controller.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
 #include "GAS/NarrativeAttributeSetBase.h"
+#include "Net/UnrealNetwork.h"
 #include "Progression/SovTechniqueSafePoint.h"
 #include "Sovereign/SovGameplayTags.h"
 
-USovFieldRecoveryComponent::USovFieldRecoveryComponent() { PrimaryComponentTick.bCanEverTick = false; }
+USovFieldRecoveryComponent::USovFieldRecoveryComponent()
+{
+	PrimaryComponentTick.bCanEverTick = false;
+	SetIsReplicatedByDefault(true);
+}
+void USovFieldRecoveryComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME_CONDITION(USovFieldRecoveryComponent, Charges, COND_OwnerOnly);
+}
+void USovFieldRecoveryComponent::OnRep_Charges() { OnChargesChanged.Broadcast(Charges, Capacity); }
 void USovFieldRecoveryComponent::BeginPlay()
 {
 	Super::BeginPlay();

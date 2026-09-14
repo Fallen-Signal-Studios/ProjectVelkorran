@@ -923,7 +923,9 @@ void USovShieldComponent::RefreshShieldBrokenState(
 	if (bShieldBroken)
 	{
 		ApplyShieldBrokenTag();
-		if (IsCurrentOperation(Generation) && CanWriteShield() && bBroadcastBreak)
+		// A client learns of the break from the replicated Shield attribute and cannot write it, but it still
+		// presents the break; the authority keeps its existing live-owner requirement.
+		if (IsCurrentOperation(Generation) && (CanWriteShield() || !GetOwner()->HasAuthority()) && bBroadcastBreak)
 		{
 			SpawnShieldBreakSystem();
 			OnShieldBroken.Broadcast();
