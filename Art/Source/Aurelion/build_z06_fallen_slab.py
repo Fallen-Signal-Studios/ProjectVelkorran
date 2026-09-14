@@ -1,4 +1,4 @@
-"""Fitted fallen masonry section: dressed courses, layered cornice and worn stone cap."""
+"""Fitted fallen masonry section: dressed courses, layered cornice and fitted stone cap."""
 from pathlib import Path
 helpers=Path(__file__).with_name('build_architecture_kit.py')
 exec(compile(helpers.read_text().split('# Four metre bay:')[0],str(helpers),'exec'))
@@ -38,4 +38,3 @@ bpy.ops.object.camera_add(location=(12,-15,10));camera=bpy.context.object;camera
 scene.render.resolution_x=1400;scene.render.resolution_y=1000;scene.render.resolution_percentage=100;scene.render.filepath=str(ROOT/'fallen-masonry.png')
 bpy.ops.wm.save_as_mainfile(filepath=str(ROOT/'Aurelion-Z06-FallenMasonry.blend'));bpy.ops.render.render(write_still=True)
 print('Z06_FALLEN_MASONRY_BUILD_PASS')
-

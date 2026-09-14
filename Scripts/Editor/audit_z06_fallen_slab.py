@@ -33,4 +33,3 @@ editor.editor_set_game_view(True)
 capture=(root/'Scripts/Editor/fit_z01_lower_architecture.py').read_text(encoding='utf-8-sig').split("p=by_label['Z01_Entry_StandIn']",1)[1]
 capture=capture.replace("('entry',unreal.Vector(p.x,p.y,p.z+165),unreal.Rotator(yaw=90),90)","('slab-front',unreal.Vector(-750,7550,-300),unreal.Rotator(pitch=-5,yaw=55),90)").replace("('west-wall',unreal.Vector(-7600,-14900,165),unreal.Rotator(pitch=12,yaw=180),75)","('slab-top',unreal.Vector(200,9700,-40),unreal.Rotator(pitch=-30,yaw=-100),90)").replace('z01-','z06-')
 exec(compile("p=by_label['Z06_Entry_StandIn']"+capture,'slab_survey_capture','exec'))
-
