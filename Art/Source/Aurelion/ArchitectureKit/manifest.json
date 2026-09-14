@@ -2,8 +2,8 @@
   "status": "source prototype; quality and in-engine acceptance pending",
   "modules": [
     {
-      "asset": "SM_Aurelion_KIT_WallBay_4x7",
-      "triangles": 26464,
+      "asset": "SM_Aurelion_KIT_WallPlain_4x7",
+      "triangles": 11296,
       "nominal_dimensions_m": [
         4,
         0.85,
@@ -15,6 +15,24 @@
         "M_Aurelion_AncientGold"
       ],
       "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "Not authored; no gameplay placement until collision is verified"
+    },
+    {
+      "asset": "SM_Aurelion_KIT_WallBay_4x7",
+      "triangles": 25840,
+      "nominal_dimensions_m": [
+        4,
+        0.85,
+        7
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
       "collision": "Not authored; no gameplay placement until collision is verified"
     },
     {
@@ -31,6 +49,7 @@
         "M_Aurelion_AncientGold"
       ],
       "uv_layers": 2,
+      "convex_hulls": 0,
       "collision": "Not authored; no gameplay placement until collision is verified"
     },
     {
@@ -47,6 +66,7 @@
         "M_Aurelion_ChannelShadow"
       ],
       "uv_layers": 2,
+      "convex_hulls": 0,
       "collision": "Not authored; no gameplay placement until collision is verified"
     },
     {
@@ -63,7 +83,25 @@
         "M_Aurelion_AncientGold"
       ],
       "uv_layers": 2,
+      "convex_hulls": 0,
       "collision": "Not authored; no gameplay placement until collision is verified"
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Portal_6m",
+      "triangles": 4252,
+      "nominal_dimensions_m": [
+        8,
+        1.3,
+        7.8
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 6,
+      "collision": "Segmented frame hulls"
     }
   ]
 }
