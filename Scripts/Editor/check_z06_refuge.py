@@ -31,7 +31,9 @@ def check_z06_refuge(world,actors):
     floor=next(r for r in fit['nearby_art'] if r['count']==26);c=labels[floor['actor']].get_component_by_class(unreal.InstancedStaticMeshComponent)
     assert sorted(c.get_instance_transform(i,world_space=True).export_text() for i in range(c.get_instance_count()))==sorted(remaining_refuge_art(root,floor['all_transforms']))
     railing=next(r for r in fit['nearby_art'] if r['count']==40);c=labels[railing['actor']].get_component_by_class(unreal.InstancedStaticMeshComponent)
-    assert [c.get_instance_transform(i,world_space=True).export_text() for i in range(c.get_instance_count())]==railing['all_transforms']
+    expected_rails=railing['all_transforms'][4:] if 'KIT_Z06_RefugeFinish_Plinth' in labels else railing['all_transforms']
+    assert sorted(c.get_instance_transform(i,world_space=True).export_text() for i in range(c.get_instance_count()))==sorted(expected_rails)
+    retained_rails=len(expected_rails)
     targets=[labels['Z06_Refuge'],labels['Z06_Refuge_Ramp']];ignored=[a for a in actors if a not in targets];probes=[]
     for row in fit['surface_probes']:
         raw=unreal.SystemLibrary.line_trace_single(world,unreal.Vector(row['x'],row['y'],-350),unreal.Vector(row['x'],row['y'],-700),unreal.TraceTypeQuery.TRACE_TYPE_QUERY1,False,ignored,unreal.DrawDebugTrace.NONE,True)
@@ -40,4 +42,4 @@ def check_z06_refuge(world,actors):
         if blocked:
             t=h.to_tuple();assert abs(t[5].z-row['z'])<.01 and t[9].get_actor_label()==row['actor'] and (t[6]-unreal.Vector(*row['normal'])).length()<.001
         probes.append(dict(x=row['x'],y=row['y'],blocked=blocked))
-    return dict(placements=2,removed_floor_instances=7,retained_floor_instances=19,retained_railing_instances=40,surface_probes=probes,qualification='Stopped-editor fit and 50 isolated physical probes; live traversal, rescue interaction and visual/performance acceptance remain open.')
+    return dict(placements=2,removed_floor_instances=7,retained_floor_instances=19,retained_railing_instances=retained_rails,surface_probes=probes,qualification='Stopped-editor fit and 50 isolated physical probes; live traversal, rescue interaction and visual/performance acceptance remain open.')
