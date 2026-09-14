@@ -53,7 +53,9 @@ atrium_canopy_count = sum(a.get_actor_label().startswith('KIT_Atrium_Canopy_') f
 assert atrium_canopy_count in (0, 8), 'Partial or duplicate atrium canopies'
 atrium_bridge_floor_count = sum(a.get_actor_label().startswith('KIT_Atrium_BridgeFloor_') for a in actors)
 assert atrium_bridge_floor_count in (0, 4), 'Partial or duplicate atrium bridge floors'
-assert len(actors) == 1788 + vault_count + uplight_count + paving_count + bridge_count + endwall_count + z02_paving_count + z02_vault_count + z02_perimeter_count + z02_gallery_count + z02_furniture_count + z02_guard_count + z02_bridges_count + z02_exterior_count + z02_facade_light_count + north_guard_count + north_bridge_count + atrium_guard_count + atrium_ring_count + atrium_parapet_count + atrium_canopy_count+atrium_bridge_floor_count, 'Unexpected actor additions or removals'
+atrium_crown_count = sum(a.get_actor_label().startswith('KIT_Atrium_Crown_') for a in actors)
+assert atrium_crown_count in (0, 9), 'Partial or duplicate atrium crown'
+assert len(actors) == 1788 + vault_count + uplight_count + paving_count + bridge_count + endwall_count + z02_paving_count + z02_vault_count + z02_perimeter_count + z02_gallery_count + z02_furniture_count + z02_guard_count + z02_bridges_count + z02_exterior_count + z02_facade_light_count + north_guard_count + north_bridge_count + atrium_guard_count + atrium_ring_count + atrium_parapet_count + atrium_canopy_count+atrium_bridge_floor_count+atrium_crown_count, 'Unexpected actor additions or removals'
 shell = labels['aurelionwalls']
 assert shell.get_actor_enable_collision()
 assert not shell.static_mesh_component.get_editor_property('visible')

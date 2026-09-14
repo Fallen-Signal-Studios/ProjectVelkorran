@@ -1,0 +1,24 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_AtriumCrownPier",
+      "dimensions_m": [
+        1.399999976158142,
+        1.399999976158142,
+        8.0
+      ],
+      "triangles": 4372
+    },
+    {
+      "asset": "SM_Aurelion_KIT_AtriumOpenCrown",
+      "dimensions_m": [
+        60.85403823852539,
+        60.854034423828125,
+        6.6105451583862305
+      ],
+      "triangles": 122144
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}
