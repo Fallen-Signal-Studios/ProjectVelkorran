@@ -49,6 +49,22 @@ for entry in manifest['modules']:
                 assert heights and abs(max(heights)-expected)<.016,(x,y,expected,heights)
         center=min(entry['deck_samples'],key=lambda p:abs(p[0]))[1]
         assert not any(h.ray_cast(Vector((-3,0,center+.75)),Vector((1,0,0)),distance=6)[0] for h in hulls), 'Balustrade opening blocked by a solid collider'
+    elif hulls and 'support_lateral_samples' in entry:
+        assert all(len(h.data.vertices)==8 and h.location.length<.001 for h in hulls)
+        for y,z,expected in entry['support_lateral_samples']:
+            # Off the voussoir boundary so the visual's fine expansion gaps do not bias the control.
+            start=Vector((-10,y+.05,z));direction=Vector((1,0,0))
+            physical=any(h.ray_cast(start,direction,distance=20)[0] for h in hulls)
+            visual=o.ray_cast(start,direction,distance=20)[0]
+            assert physical==expected and visual==expected,(y,z,expected,physical,visual)
+    elif hulls and 'bridge_surface_samples' in entry:
+        assert all(len(h.data.vertices)==8 and h.location.length<.001 for h in hulls)
+        for x,y,z in entry['bridge_surface_samples']:
+            hits=[h.ray_cast(Vector((x,y,5)),Vector((0,0,-1)),distance=10) for h in hulls]
+            heights=[p.z for hit,p,n,index in hits if hit]
+            assert heights and abs(max(heights)-z)<.001,(x,y,z,heights)
+            visual=o.ray_cast(Vector((x,y,5)),Vector((0,0,-1)),distance=10)
+            assert visual[0] and abs(visual[1].z-z)<.005,(x,y,z,'visual surface mismatch')
     elif hulls and 'furniture_surface_samples' in entry:
         for x,y,z in entry['furniture_surface_samples']:
             hits=[h.ray_cast(Vector((x,y,3)),Vector((0,0,-1)),distance=5) for h in hulls]

@@ -1,0 +1,4 @@
+from pathlib import Path
+import unreal
+PERSIST=True
+exec(compile((Path(unreal.Paths.project_dir())/'Scripts/Editor/preview_z02_bridges.py').read_text(encoding='utf-8-sig'),'preview_z02_bridges','exec'))
