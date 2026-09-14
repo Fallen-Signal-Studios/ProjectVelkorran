@@ -1,0 +1,22 @@
+{
+  "status": "Authored rail; engine fit and visual acceptance pending",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z08Guardrail",
+      "triangles": 18236,
+      "nominal_dimensions_m": [
+        4.003143787384033,
+        0.1350986510515213,
+        1.0551573038101196
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; native barriers retained"
+    }
+  ]
+}
