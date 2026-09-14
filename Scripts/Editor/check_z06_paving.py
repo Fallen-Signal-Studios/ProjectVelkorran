@@ -34,6 +34,8 @@ def check_z06_paving(world, actors):
     if 'KIT_Z06_Refuge_Landing' in labels:
         root=Path(unreal.Paths.project_dir())
         expected=runpy.run_path(str(root/'Scripts/Editor/check_z06_refuge.py'))['remaining_refuge_art'](root,expected)
+    if 'KIT_Z06_FlankLanding' in labels:
+        expected=runpy.run_path(str(root/'Scripts/Editor/check_z06_flank_landing.py'))['remaining_flank_art'](root,expected)
     assert sorted(c.get_instance_transform(i,world_space=True).export_text() for i in range(c.get_instance_count()))==sorted(expected)
     retained_floor_count=c.get_instance_count()
     center=fit['centerline'];c=labels[center['actor']].get_component_by_class(unreal.InstancedStaticMeshComponent)

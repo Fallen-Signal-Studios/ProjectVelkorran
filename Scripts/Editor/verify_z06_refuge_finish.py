@@ -8,7 +8,7 @@ verify_z06_refuge_surface_stage=verify
 del DEFER_Z06_REFUGE_AUTORUN
 def verify():
     verify_z06_refuge_surface_stage()
-    assert len(actors)==2837+z06_gate_assembly_count and z06_refuge_finish_count==3
+    assert len(actors)==2837+z06_gate_assembly_count+z06_flank_landing_count and z06_refuge_finish_count==3
     geometry=runpy.run_path(str(root/'Scripts/Editor/check_z06_refuge_finish.py'))['check_z06_refuge_finish'](world,actors)
     assert not unreal.EditorLoadingAndSavingUtils.get_dirty_map_packages()
     (out/'z06-refuge-finish-verification.json').write_text(json.dumps(dict(status='passed',actor_count=len(actors),geometry=geometry),indent=2))

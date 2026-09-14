@@ -18,8 +18,10 @@ def check_z06_slab(world,actors):
     c=labels[row['actor']].get_component_by_class(unreal.InstancedStaticMeshComponent)
     if 'KIT_Z06_Refuge_Landing' in labels:
         expected=runpy.run_path(str(root/'Scripts/Editor/check_z06_refuge.py'))['remaining_refuge_art'](root,expected)
-    retained_count=len(expected)
+    if 'KIT_Z06_FlankLanding' in labels:
+        expected=runpy.run_path(str(root/'Scripts/Editor/check_z06_flank_landing.py'))['remaining_flank_art'](root,expected)
     assert sorted(c.get_instance_transform(i,world_space=True).export_text() for i in range(c.get_instance_count()))==sorted(expected)
+    retained_count=len(expected)
     probes=[]
     for row in fit['passage_probes']:
         raw=unreal.SystemLibrary.capsule_trace_single_by_profile(world,unreal.Vector(row['x'],row['start_y'],row['z']),unreal.Vector(row['x'],row['end_y'],row['z']),42,88,'Pawn',False,[],unreal.DrawDebugTrace.NONE,True)

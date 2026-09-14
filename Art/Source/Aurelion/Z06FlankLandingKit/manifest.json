@@ -1,0 +1,23 @@
+{
+  "status": "Source candidate; scene and traversal acceptance pending",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z06FlankLanding",
+      "triangles": 14288,
+      "nominal_dimensions_m": [
+        2.0,
+        1.4299999475479126,
+        0.20000000298023224
+      ],
+      "materials": [
+        "M_Aurelion_StoneGrout",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; existing flank landing Cube remains authoritative"
+    }
+  ]
+}

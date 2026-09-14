@@ -1,0 +1,15 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z06FlankLanding",
+      "dimensions_m": [
+        2.0,
+        1.4299999475479126,
+        0.20000000298023224
+      ],
+      "triangles": 14288
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}

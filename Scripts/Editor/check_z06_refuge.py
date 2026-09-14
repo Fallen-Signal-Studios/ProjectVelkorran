@@ -1,5 +1,5 @@
 """Refuge visual fit, retained shared art and physical surface correspondence."""
-import json
+import json,runpy
 from pathlib import Path
 import unreal
 
@@ -29,7 +29,10 @@ def check_z06_refuge(world,actors):
         assert a.get_actor_enable_collision() and c.get_collision_enabled()==unreal.CollisionEnabled.QUERY_AND_PHYSICS and str(c.get_collision_profile_name())=='BlockAll'
         assert not c.get_editor_property('visible') and c.get_editor_property('hidden_in_game')
     floor=next(r for r in fit['nearby_art'] if r['count']==26);c=labels[floor['actor']].get_component_by_class(unreal.InstancedStaticMeshComponent)
-    assert sorted(c.get_instance_transform(i,world_space=True).export_text() for i in range(c.get_instance_count()))==sorted(remaining_refuge_art(root,floor['all_transforms']))
+    expected=remaining_refuge_art(root,floor['all_transforms'])
+    if 'KIT_Z06_FlankLanding' in labels:
+        expected=runpy.run_path(str(root/'Scripts/Editor/check_z06_flank_landing.py'))['remaining_flank_art'](root,expected)
+    assert sorted(c.get_instance_transform(i,world_space=True).export_text() for i in range(c.get_instance_count()))==sorted(expected)
     railing=next(r for r in fit['nearby_art'] if r['count']==40);c=labels[railing['actor']].get_component_by_class(unreal.InstancedStaticMeshComponent)
     expected_rails=railing['all_transforms'][4:] if 'KIT_Z06_RefugeFinish_Plinth' in labels else railing['all_transforms']
     assert sorted(c.get_instance_transform(i,world_space=True).export_text() for i in range(c.get_instance_count()))==sorted(expected_rails)
@@ -42,4 +45,4 @@ def check_z06_refuge(world,actors):
         if blocked:
             t=h.to_tuple();assert abs(t[5].z-row['z'])<.01 and t[9].get_actor_label()==row['actor'] and (t[6]-unreal.Vector(*row['normal'])).length()<.001
         probes.append(dict(x=row['x'],y=row['y'],blocked=blocked))
-    return dict(placements=2,removed_floor_instances=7,retained_floor_instances=19,retained_railing_instances=retained_rails,surface_probes=probes,qualification='Stopped-editor fit and 50 isolated physical probes; live traversal, rescue interaction and visual/performance acceptance remain open.')
+    return dict(placements=2,removed_floor_instances=7,retained_floor_instances=len(expected),retained_railing_instances=retained_rails,surface_probes=probes,qualification='Stopped-editor fit and 50 isolated physical probes; live traversal, rescue interaction and visual/performance acceptance remain open.')
