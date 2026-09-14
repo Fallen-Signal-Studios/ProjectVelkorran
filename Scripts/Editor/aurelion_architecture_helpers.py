@@ -36,6 +36,9 @@ def import_owned_mesh(spec,source,destination,materials):
         mesh.set_material(i,material)
     assert set(keys)==set(spec['materials'])
     sm=unreal.get_editor_subsystem(unreal.StaticMeshEditorSubsystem)
+    expected_hulls=spec.get('convex_hulls',0)
+    assert sm.get_convex_collision_count(mesh)==expected_hulls
+    # This API counts boxes/spheres/capsules separately from convex hulls.
     assert sm.get_simple_collision_count(mesh)==0 and sm.get_num_uv_channels(mesh,0)==2
     extent=mesh.get_bounds().box_extent
     assert all(abs(a-b*100)<1 for a,b in zip((extent.x*2,extent.y*2,extent.z*2),spec['nominal_dimensions_m']))

@@ -1,0 +1,15 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z01_StoneBridge",
+      "dimensions_m": [
+        4.570000171661377,
+        33.16999816894531,
+        3.4501733779907227
+      ],
+      "triangles": 102648
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}

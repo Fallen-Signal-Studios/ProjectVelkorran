@@ -24,7 +24,18 @@ for entry in manifest['modules']:
     assert all(poly.area>1e-12 for poly in o.data.polygons)
     o.data.calc_loop_triangles()
     assert len(o.data.loop_triangles)==entry['triangles']
-    if hulls:
+    if hulls and 'deck_samples' in entry:
+        assert all(len(h.data.vertices)==8 for h in hulls)
+        for y,z in entry['deck_samples']:
+            # Sample 1 mm inside terminal faces to avoid float-rounded FBX boundaries.
+            sample_y=min(max(y,entry['deck_samples'][0][0]+.001),entry['deck_samples'][-1][0]-.001)
+            for x,expected in ((0,z),(entry['rail_x'],z+entry['rail_height'])):
+                hits=[h.ray_cast(Vector((x,sample_y,10)),Vector((0,0,-1)),distance=15) for h in hulls]
+                heights=[result[1].z for result in hits if result[0]]
+                assert heights and abs(max(heights)-expected)<.016,(x,y,expected,heights)
+        center=min(entry['deck_samples'],key=lambda p:abs(p[0]))[1]
+        assert not any(h.ray_cast(Vector((-3,0,center+.75)),Vector((1,0,0)),distance=6)[0] for h in hulls), 'Balustrade opening blocked by a solid collider'
+    elif hulls:
         assert all(len(h.data.vertices)==8 for h in hulls)
         for x in (-2.9,0,2.9):
             for z in (.5,2.5,4.5):
