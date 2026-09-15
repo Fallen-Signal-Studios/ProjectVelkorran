@@ -1,0 +1,24 @@
+{
+  "project": "F:\\ProjectVelkorran\\ProjectVelkorran.uproject",
+  "engine": "C:\\Program Files\\Epic Games\\UE_5.7",
+  "testFilter": "ProjectVelkorran.Campaign.Drone.Continuation",
+  "build": "not run",
+  "gameBuild": "not run",
+  "automation": "passed 16 matching tests; warnings=1",
+  "logs": "F:\\ProjectVelkorran\\Saved\\Validation\\20260915-112808-d7e0f73f",
+  "engineVersion": {
+    "MajorVersion": 5,
+    "MinorVersion": 7,
+    "PatchVersion": 4,
+    "Changelist": 51494982,
+    "CompatibleChangelist": 47537391,
+    "IsLicenseeVersion": 0,
+    "IsPromotedBuild": 1,
+    "BranchName": "++UE5+Release-5.7"
+  },
+  "nonUnity": false,
+  "sourceIntegrity": "unchanged during automation; binary freshness unverified",
+  "binariesBuiltThisRun": false,
+  "packagedBuild": "not run",
+  "sourceManifest": "source-before.json"
+}

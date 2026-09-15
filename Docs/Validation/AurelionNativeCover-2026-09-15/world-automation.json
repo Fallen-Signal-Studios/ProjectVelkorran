@@ -1,0 +1,217 @@
+﻿{
+	"devices": [
+		{
+			"deviceName": "WORK-PC",
+			"instance": "F2FD555542A7DA4021516B9C09E62A2B",
+			"instanceName": "WORK-PC-29864",
+			"platform": "WindowsEditor",
+			"oSVersion": "Windows 11 (25H2) [10.0.26200.9457] ",
+			"model": "Default",
+			"gPU": "NVIDIA GeForce RTX 5070",
+			"cPUModel": "AMD Ryzen 9 7900X 12-Core Processor            ",
+			"rAMInGB": 64,
+			"renderMode": "SM6",
+			"rHI": "",
+			"appInstanceLog": ""
+		}
+	],
+	"reportCreatedOn": "2026.09.15-18.27.33",
+	"succeeded": 8,
+	"succeededWithWarnings": 2,
+	"failed": 0,
+	"notRun": 0,
+	"inProcess": 0,
+	"totalDuration": 0.12211599200963974,
+	"comparisonExported": false,
+	"comparisonExportDirectory": "",
+	"tests": [
+		{
+			"testDisplayName": "OwnershipReleaseAndSave",
+			"fullTestPath": "ProjectVelkorran.World.Carry.OwnershipReleaseAndSave",
+			"tags": [],
+			"state": "Success",
+			"deviceInstance": [
+				"F2FD555542A7DA4021516B9C09E62A2B"
+			],
+			"duration": 0.018355302512645721,
+			"dateTime": "2026.09.15-18.27.32",
+			"entries": [
+				{
+					"event":
+					{
+						"type": "Warning",
+						"message": "LogAbilitySystem: Trying to change existing tag \"Narrative.State.Busy\" replication state from \"Count to Owner\" to \"None\"",
+						"context": "log",
+						"artifact": "00000000000000000000000000000000"
+					},
+					"filename": "",
+					"lineNumber": -1,
+					"timestamp": "2026.09.15-18.27.32"
+				}
+			],
+			"warnings": 1,
+			"errors": 0,
+			"artifacts": []
+		},
+		{
+			"testDisplayName": "ReentrantLeaseRetirement",
+			"fullTestPath": "ProjectVelkorran.World.Carry.ReentrantLeaseRetirement",
+			"tags": [],
+			"state": "Success",
+			"deviceInstance": [
+				"F2FD555542A7DA4021516B9C09E62A2B"
+			],
+			"duration": 0.0081975013017654419,
+			"dateTime": "2026.09.15-18.27.32",
+			"entries": [],
+			"warnings": 0,
+			"errors": 0,
+			"artifacts": []
+		},
+		{
+			"testDisplayName": "RescueRequiresDestination",
+			"fullTestPath": "ProjectVelkorran.World.Carry.RescueRequiresDestination",
+			"tags": [],
+			"state": "Success",
+			"deviceInstance": [
+				"F2FD555542A7DA4021516B9C09E62A2B"
+			],
+			"duration": 0.0089436993002891541,
+			"dateTime": "2026.09.15-18.27.32",
+			"entries": [],
+			"warnings": 0,
+			"errors": 0,
+			"artifacts": []
+		},
+		{
+			"testDisplayName": "DamageAndSavedObstruction",
+			"fullTestPath": "ProjectVelkorran.World.Destruction.DamageAndSavedObstruction",
+			"tags": [],
+			"state": "Success",
+			"deviceInstance": [
+				"F2FD555542A7DA4021516B9C09E62A2B"
+			],
+			"duration": 0.0077401995658874512,
+			"dateTime": "2026.09.15-18.27.32",
+			"entries": [],
+			"warnings": 0,
+			"errors": 0,
+			"artifacts": []
+		},
+		{
+			"testDisplayName": "DroneTraceRetiresCover",
+			"fullTestPath": "ProjectVelkorran.World.Destruction.DroneTraceRetiresCover",
+			"tags": [],
+			"state": "Success",
+			"deviceInstance": [
+				"F2FD555542A7DA4021516B9C09E62A2B"
+			],
+			"duration": 0.0089903995394706726,
+			"dateTime": "2026.09.15-18.27.32",
+			"entries": [],
+			"warnings": 0,
+			"errors": 0,
+			"artifacts": []
+		},
+		{
+			"testDisplayName": "LiftDockedNavigationUsesRealRecastAndRetiresBeforeMovement",
+			"fullTestPath": "ProjectVelkorran.World.Transit.LiftDockedNavigationUsesRealRecastAndRetiresBeforeMovement",
+			"tags": [],
+			"state": "Success",
+			"deviceInstance": [
+				"F2FD555542A7DA4021516B9C09E62A2B"
+			],
+			"duration": 0.014684200286865234,
+			"dateTime": "2026.09.15-18.27.32",
+			"entries": [
+				{
+					"event":
+					{
+						"type": "Info",
+						"message": "Native box after post-registration authored resize projects at boarding point: false",
+						"context": "",
+						"artifact": "00000000000000000000000000000000"
+					},
+					"filename": "",
+					"lineNumber": -1,
+					"timestamp": "2026.09.15-18.27.32"
+				},
+				{
+					"event":
+					{
+						"type": "Warning",
+						"message": "LogCrowdFollowing: Unable to find RecastNavMesh instance while trying to create UCrowdManager instance",
+						"context": "log",
+						"artifact": "00000000000000000000000000000000"
+					},
+					"filename": "",
+					"lineNumber": -1,
+					"timestamp": "2026.09.15-18.27.32"
+				}
+			],
+			"warnings": 1,
+			"errors": 0,
+			"artifacts": []
+		},
+		{
+			"testDisplayName": "RequiredMissionCompanionBoardsBeforeDeparture",
+			"fullTestPath": "ProjectVelkorran.World.Transit.RequiredMissionCompanionBoardsBeforeDeparture",
+			"tags": [],
+			"state": "Success",
+			"deviceInstance": [
+				"F2FD555542A7DA4021516B9C09E62A2B"
+			],
+			"duration": 0.0092900991439819336,
+			"dateTime": "2026.09.15-18.27.33",
+			"entries": [],
+			"warnings": 0,
+			"errors": 0,
+			"artifacts": []
+		},
+		{
+			"testDisplayName": "StableEndpointSave",
+			"fullTestPath": "ProjectVelkorran.World.Transit.StableEndpointSave",
+			"tags": [],
+			"state": "Success",
+			"deviceInstance": [
+				"F2FD555542A7DA4021516B9C09E62A2B"
+			],
+			"duration": 0.0090551972389221191,
+			"dateTime": "2026.09.15-18.27.33",
+			"entries": [],
+			"warnings": 0,
+			"errors": 0,
+			"artifacts": []
+		},
+		{
+			"testDisplayName": "ObstructionAndSlowFrame",
+			"fullTestPath": "ProjectVelkorran.World.Traversal.ObstructionAndSlowFrame",
+			"tags": [],
+			"state": "Success",
+			"deviceInstance": [
+				"F2FD555542A7DA4021516B9C09E62A2B"
+			],
+			"duration": 0.0082424990832805634,
+			"dateTime": "2026.09.15-18.27.33",
+			"entries": [],
+			"warnings": 0,
+			"errors": 0,
+			"artifacts": []
+		},
+		{
+			"testDisplayName": "RepeatedEntry30And60",
+			"fullTestPath": "ProjectVelkorran.World.Traversal.RepeatedEntry30And60",
+			"tags": [],
+			"state": "Success",
+			"deviceInstance": [
+				"F2FD555542A7DA4021516B9C09E62A2B"
+			],
+			"duration": 0.028616897761821747,
+			"dateTime": "2026.09.15-18.27.33",
+			"entries": [],
+			"warnings": 0,
+			"errors": 0,
+			"artifacts": []
+		}
+	]
+}

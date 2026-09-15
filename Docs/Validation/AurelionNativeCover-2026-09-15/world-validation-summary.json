@@ -1,0 +1,24 @@
+{
+  "project": "F:\\ProjectVelkorran\\ProjectVelkorran.uproject",
+  "engine": "C:\\Program Files\\Epic Games\\UE_5.7",
+  "testFilter": "ProjectVelkorran.World",
+  "build": "exit 0",
+  "gameBuild": "not run",
+  "automation": "passed 10 matching tests; warnings=2",
+  "logs": "F:\\ProjectVelkorran\\Saved\\Validation\\20260915-112522-6e163d77",
+  "engineVersion": {
+    "MajorVersion": 5,
+    "MinorVersion": 7,
+    "PatchVersion": 4,
+    "Changelist": 51494982,
+    "CompatibleChangelist": 47537391,
+    "IsLicenseeVersion": 0,
+    "IsPromotedBuild": 1,
+    "BranchName": "++UE5+Release-5.7"
+  },
+  "nonUnity": false,
+  "sourceIntegrity": "unchanged during build and automation",
+  "binariesBuiltThisRun": true,
+  "packagedBuild": "not run",
+  "sourceManifest": "source-before.json"
+}

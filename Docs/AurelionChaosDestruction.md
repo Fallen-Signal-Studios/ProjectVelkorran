@@ -16,7 +16,7 @@ The user requested Chaos destruction for appropriate cover and nonstructural wal
 
 ## Repository findings
 
-- The runtime module already depends on Chaos, but neither project module definition currently declares Geometry Collection dependencies. The source search found no dedicated environmental fracture integration.
+- The initial survey found a Chaos dependency but no Geometry Collection dependency or dedicated environmental fracture integration. The native cover implementation below adds these dependencies.
 - Much of the custom art sits over separate native collision actors. Breaking only the visible mesh would leave invisible cover. Every selected placement needs an explicit mapping between visible assembly, intact obstruction and broken-state collision.
 - The nineteen custom Z08 cargo instances use a shared noncolliding HISM, recorded in `Art/Source/Aurelion/Z08CargoKit/cargo-baseline.json`. Selected destructible instances need separation without removing unrelated instances or duplicating geometry.
 - Refuge shells now own both presentation and original collision envelopes. Their protection, survivor-clearance and access checks remain requirements; non-load-bearing appearance alone does not make them safe to destroy during the rescue sequence.
@@ -48,7 +48,7 @@ The architecture checks establish static fit only. They do not qualify Chaos des
 
 An overlapping bounding box does not prove that a collider belongs to the cargo: floors, shared barriers, triggers and unrelated geometry can overlap. These rows are review evidence, not automatic removal instructions. HISM instance indices are source references, not stable checkpoint identities. None of these candidates is approved for campaign destruction until its actual obstruction ownership, stable identity and gameplay role are qualified.
 
-The inspected drone point-damage path (`USovGameplayAbility_ReformationDroneWeaponBase::ApplyPointDamage`) rejects targets without a valid hostile ability system. A Geometry Collection alone therefore does not supply the required damage integration for this attack. This source finding is not a live combat qualification or evidence that every weapon shares that path.
+Before the native cover change, the inspected drone point-damage path (`USovGameplayAbility_ReformationDroneWeaponBase::ApplyPointDamage`) rejected targets without a valid hostile ability system. A Geometry Collection alone still does not supply damage admission; the new typed cover owner is the explicit exception. This does not imply that every weapon shares that path.
 
 Verified run: `DestructionOwnershipVerified-20260914-202435-08e54112`, terminal exit 0, no Python errors, 3140 actors and clean map. Full measured output is `Docs/AurelionDestructionCandidates-2026-09-14.json`.
 
@@ -97,5 +97,9 @@ Runtime component registration must precede explicit simulation startup. The ini
 `NativeCoverRendered-20260915-112203-601c1fd2` completed with exit 0 and no Python errors. All twelve fragments moved 12.1-211.5 cm, the control stayed intact, and debris cleared within the authored lifetime. Intact/fractured/cleared captures were taken from the piloted simulation view. Earlier captures without a piloted viewport were stale and are excluded from visual evidence. The three cargo materials now persist Geometry Collection usage flags. The fractured object visibly collapses into large chunks; flat interior faces and material-specific fracture detail still need art work.
 
 The two new native automation tests cover protected defaults, invalid damage, accumulation, repeated hits, both saved states, collision/navigation flags, and the real drone muzzle trace with a character behind the cover. Build and test reports are recorded alongside the isolated simulation evidence. No M12/M13 map or cargo HISM was changed. Campaign enablement still requires replacing the entire reviewed obstruction group, real protagonist attacks, traversal/navigation checks, full checkpoint reload, effects/audio and performance qualification.
+
+After merging `origin/main` at `ac3cc446` into this content branch (`4e30965a`), the Windows editor build and all ten `ProjectVelkorran.World` tests passed in `20260915-112522-6e163d77`. All sixteen drone continuation tests passed in `20260915-112808-d7e0f73f`, with source integrity unchanged during each validation. Existing test warnings concerned Busy-tag replication, a crowd-manager/Recast fixture, and ordinary drone-death logging; there were no failed tests. Packaged/game-target builds were not run.
+
+Fresh merged-build simulation `NativeCoverMerged-20260915-112919-bcf7c07d` exited 0 with no Python errors or missing Geometry Collection material-usage warnings. All twelve fragments moved 12.1-211.6 cm; control preservation and cleanup passed again. Its inspected images and reports replace the earlier evidence in `Docs/Validation/AurelionNativeCover-2026-09-15`. The overall 90% TDD goal is not qualified by these checks.
 
 Fresh editor run `DestructionGroups-20260915-103551-a06a2876` completed with exit 0, no Python errors, 3140 actors and a clean map. The grouping validator passed against that fresh survey: member bounds tile each obstruction envelope within 0.1 cm and all reviewed components block Pawn and Visibility. Fault injection correctly rejected a missing collider, a collider spanning an extra visual, a gap in the visual envelope, and duplicated instance identities. This is static ownership validation, not combat, traversal, checkpoint or destruction-performance qualification.

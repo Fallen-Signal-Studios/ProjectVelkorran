@@ -1,0 +1,294 @@
+﻿{
+	"devices": [
+		{
+			"deviceName": "WORK-PC",
+			"instance": "BF7B7A614BACCA4BC57E1E86BD1CA45E",
+			"instanceName": "WORK-PC-31372",
+			"platform": "WindowsEditor",
+			"oSVersion": "Windows 11 (25H2) [10.0.26200.9457] ",
+			"model": "Default",
+			"gPU": "NVIDIA GeForce RTX 5070",
+			"cPUModel": "AMD Ryzen 9 7900X 12-Core Processor            ",
+			"rAMInGB": 64,
+			"renderMode": "SM6",
+			"rHI": "",
+			"appInstanceLog": ""
+		}
+	],
+	"reportCreatedOn": "2026.09.15-18.28.58",
+	"succeeded": 15,
+	"succeededWithWarnings": 1,
+	"failed": 0,
+	"notRun": 0,
+	"inProcess": 0,
+	"totalDuration": 0.15012741088867188,
+	"comparisonExported": false,
+	"comparisonExportDirectory": "",
+	"tests": [
+		{
+			"testDisplayName": "BlastAndFatalSpecConstructionOwnership",
+			"fullTestPath": "ProjectVelkorran.Campaign.Drone.Continuation.BlastAndFatalSpecConstructionOwnership",
+			"tags": [],
+			"state": "Success",
+			"deviceInstance": [
+				"BF7B7A614BACCA4BC57E1E86BD1CA45E"
+			],
+			"duration": 0.018847599625587463,
+			"dateTime": "2026.09.15-18.28.58",
+			"entries": [],
+			"warnings": 0,
+			"errors": 0,
+			"artifacts": []
+		},
+		{
+			"testDisplayName": "BurstPresentationInterrupt",
+			"fullTestPath": "ProjectVelkorran.Campaign.Drone.Continuation.BurstPresentationInterrupt",
+			"tags": [],
+			"state": "Success",
+			"deviceInstance": [
+				"BF7B7A614BACCA4BC57E1E86BD1CA45E"
+			],
+			"duration": 0.0086891017854213715,
+			"dateTime": "2026.09.15-18.28.58",
+			"entries": [],
+			"warnings": 0,
+			"errors": 0,
+			"artifacts": []
+		},
+		{
+			"testDisplayName": "BurstPresentationRestart",
+			"fullTestPath": "ProjectVelkorran.Campaign.Drone.Continuation.BurstPresentationRestart",
+			"tags": [],
+			"state": "Success",
+			"deviceInstance": [
+				"BF7B7A614BACCA4BC57E1E86BD1CA45E"
+			],
+			"duration": 0.0080936998128890991,
+			"dateTime": "2026.09.15-18.28.58",
+			"entries": [],
+			"warnings": 0,
+			"errors": 0,
+			"artifacts": []
+		},
+		{
+			"testDisplayName": "CommittedBlastAndArmedTargetLoss",
+			"fullTestPath": "ProjectVelkorran.Campaign.Drone.Continuation.CommittedBlastAndArmedTargetLoss",
+			"tags": [],
+			"state": "Success",
+			"deviceInstance": [
+				"BF7B7A614BACCA4BC57E1E86BD1CA45E"
+			],
+			"duration": 0.0083697028458118439,
+			"dateTime": "2026.09.15-18.28.58",
+			"entries": [],
+			"warnings": 0,
+			"errors": 0,
+			"artifacts": []
+		},
+		{
+			"testDisplayName": "CommittedBlastCannotKillRestoredSource",
+			"fullTestPath": "ProjectVelkorran.Campaign.Drone.Continuation.CommittedBlastCannotKillRestoredSource",
+			"tags": [],
+			"state": "Success",
+			"deviceInstance": [
+				"BF7B7A614BACCA4BC57E1E86BD1CA45E"
+			],
+			"duration": 0.0087585002183914185,
+			"dateTime": "2026.09.15-18.28.58",
+			"entries": [],
+			"warnings": 0,
+			"errors": 0,
+			"artifacts": []
+		},
+		{
+			"testDisplayName": "FatalConfigurationSurvivesPresentationMutation",
+			"fullTestPath": "ProjectVelkorran.Campaign.Drone.Continuation.FatalConfigurationSurvivesPresentationMutation",
+			"tags": [],
+			"state": "Success",
+			"deviceInstance": [
+				"BF7B7A614BACCA4BC57E1E86BD1CA45E"
+			],
+			"duration": 0.0080101974308490753,
+			"dateTime": "2026.09.15-18.28.58",
+			"entries": [],
+			"warnings": 0,
+			"errors": 0,
+			"artifacts": []
+		},
+		{
+			"testDisplayName": "ImmediateInterruptionsAndExternalTags",
+			"fullTestPath": "ProjectVelkorran.Campaign.Drone.Continuation.ImmediateInterruptionsAndExternalTags",
+			"tags": [],
+			"state": "Success",
+			"deviceInstance": [
+				"BF7B7A614BACCA4BC57E1E86BD1CA45E"
+			],
+			"duration": 0.0083080977201461792,
+			"dateTime": "2026.09.15-18.28.58",
+			"entries": [],
+			"warnings": 0,
+			"errors": 0,
+			"artifacts": []
+		},
+		{
+			"testDisplayName": "InvalidAndScopeLockedEnd",
+			"fullTestPath": "ProjectVelkorran.Campaign.Drone.Continuation.InvalidAndScopeLockedEnd",
+			"tags": [],
+			"state": "Success",
+			"deviceInstance": [
+				"BF7B7A614BACCA4BC57E1E86BD1CA45E"
+			],
+			"duration": 0.0081239007413387299,
+			"dateTime": "2026.09.15-18.28.58",
+			"entries": [],
+			"warnings": 0,
+			"errors": 0,
+			"artifacts": []
+		},
+		{
+			"testDisplayName": "PointSpecConstructionInterruption",
+			"fullTestPath": "ProjectVelkorran.Campaign.Drone.Continuation.PointSpecConstructionInterruption",
+			"tags": [],
+			"state": "Success",
+			"deviceInstance": [
+				"BF7B7A614BACCA4BC57E1E86BD1CA45E"
+			],
+			"duration": 0.0088519975543022156,
+			"dateTime": "2026.09.15-18.28.58",
+			"entries": [],
+			"warnings": 0,
+			"errors": 0,
+			"artifacts": []
+		},
+		{
+			"testDisplayName": "RejectedFatalPreservesOrdinaryDeathExplosion",
+			"fullTestPath": "ProjectVelkorran.Campaign.Drone.Continuation.RejectedFatalPreservesOrdinaryDeathExplosion",
+			"tags": [],
+			"state": "Success",
+			"deviceInstance": [
+				"BF7B7A614BACCA4BC57E1E86BD1CA45E"
+			],
+			"duration": 0.0086570009589195251,
+			"dateTime": "2026.09.15-18.28.58",
+			"entries": [
+				{
+					"event":
+					{
+						"type": "Warning",
+						"message": "LogNarrativeNet: : Message, death state is now: dead",
+						"context": "log",
+						"artifact": "00000000000000000000000000000000"
+					},
+					"filename": "",
+					"lineNumber": -1,
+					"timestamp": "2026.09.15-18.28.58"
+				},
+				{
+					"event":
+					{
+						"type": "Warning",
+						"message": "LogNarrativeNet: : Message, death state is now: dead",
+						"context": "log",
+						"artifact": "00000000000000000000000000000000"
+					},
+					"filename": "",
+					"lineNumber": -1,
+					"timestamp": "2026.09.15-18.28.58"
+				}
+			],
+			"warnings": 2,
+			"errors": 0,
+			"artifacts": []
+		},
+		{
+			"testDisplayName": "ReleaseHookDeviceDisabled",
+			"fullTestPath": "ProjectVelkorran.Campaign.Drone.Continuation.ReleaseHookDeviceDisabled",
+			"tags": [],
+			"state": "Success",
+			"deviceInstance": [
+				"BF7B7A614BACCA4BC57E1E86BD1CA45E"
+			],
+			"duration": 0.0093697011470794678,
+			"dateTime": "2026.09.15-18.28.58",
+			"entries": [],
+			"warnings": 0,
+			"errors": 0,
+			"artifacts": []
+		},
+		{
+			"testDisplayName": "ReleaseHookOwnerAndLifeReplacement",
+			"fullTestPath": "ProjectVelkorran.Campaign.Drone.Continuation.ReleaseHookOwnerAndLifeReplacement",
+			"tags": [],
+			"state": "Success",
+			"deviceInstance": [
+				"BF7B7A614BACCA4BC57E1E86BD1CA45E"
+			],
+			"duration": 0.0094802007079124451,
+			"dateTime": "2026.09.15-18.28.58",
+			"entries": [],
+			"warnings": 0,
+			"errors": 0,
+			"artifacts": []
+		},
+		{
+			"testDisplayName": "ReleaseHookRestart",
+			"fullTestPath": "ProjectVelkorran.Campaign.Drone.Continuation.ReleaseHookRestart",
+			"tags": [],
+			"state": "Success",
+			"deviceInstance": [
+				"BF7B7A614BACCA4BC57E1E86BD1CA45E"
+			],
+			"duration": 0.0097970999777317047,
+			"dateTime": "2026.09.15-18.28.58",
+			"entries": [],
+			"warnings": 0,
+			"errors": 0,
+			"artifacts": []
+		},
+		{
+			"testDisplayName": "RocketCommitDoesNotFinishReplacement",
+			"fullTestPath": "ProjectVelkorran.Campaign.Drone.Continuation.RocketCommitDoesNotFinishReplacement",
+			"tags": [],
+			"state": "Success",
+			"deviceInstance": [
+				"BF7B7A614BACCA4BC57E1E86BD1CA45E"
+			],
+			"duration": 0.0085946992039680481,
+			"dateTime": "2026.09.15-18.28.58",
+			"entries": [],
+			"warnings": 0,
+			"errors": 0,
+			"artifacts": []
+		},
+		{
+			"testDisplayName": "WarningInterruptionAndRestart",
+			"fullTestPath": "ProjectVelkorran.Campaign.Drone.Continuation.WarningInterruptionAndRestart",
+			"tags": [],
+			"state": "Success",
+			"deviceInstance": [
+				"BF7B7A614BACCA4BC57E1E86BD1CA45E"
+			],
+			"duration": 0.009446900337934494,
+			"dateTime": "2026.09.15-18.28.58",
+			"entries": [],
+			"warnings": 0,
+			"errors": 0,
+			"artifacts": []
+		},
+		{
+			"testDisplayName": "WindupTimerRejectsAvatarABA",
+			"fullTestPath": "ProjectVelkorran.Campaign.Drone.Continuation.WindupTimerRejectsAvatarABA",
+			"tags": [],
+			"state": "Success",
+			"deviceInstance": [
+				"BF7B7A614BACCA4BC57E1E86BD1CA45E"
+			],
+			"duration": 0.0087289996445178986,
+			"dateTime": "2026.09.15-18.28.58",
+			"entries": [],
+			"warnings": 0,
+			"errors": 0,
+			"artifacts": []
+		}
+	]
+}
