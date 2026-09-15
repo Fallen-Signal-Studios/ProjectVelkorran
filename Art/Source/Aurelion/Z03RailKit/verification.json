@@ -1,0 +1,33 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z03SlopeRail",
+      "dimensions_m": [
+        12.0,
+        0.2199999988079071,
+        4.279272556304932
+      ],
+      "triangles": 54896
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03DeckRail",
+      "dimensions_m": [
+        12.0,
+        0.20000000298023224,
+        1.2999999523162842
+      ],
+      "triangles": 54896
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03BridgeRail",
+      "dimensions_m": [
+        4.199999809265137,
+        0.2199999988079071,
+        1.2999999523162842
+      ],
+      "triangles": 21056
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}

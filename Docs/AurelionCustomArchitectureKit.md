@@ -1081,3 +1081,8 @@ See Docs/AurelionZ03Walls-2026-09-14.md. Replaced 68 vendor panels with 34 full-
 ## Z03 piers and rib cover - 2026-09-14
 
 See Docs/AurelionZ03Ribs-2026-09-14.md. Replaced the full 51-column batch with six custom piers and three complete cover assemblies, with the original nine visual envelopes and native collision retained. Z03RibsFresh-20260914-210257-61fa778e completed with 75 passing static architecture reports, twelve native cover contacts, 3140 actors and a clean map. Saved approach, middle and close views were inspected. Live scanner concealment, complete room art, Chaos destruction and 90 percent alignment remain unqualified; supported slice estimate stays 63.75 percent.
+
+
+## Z03 continuous service-route rails - 2026-09-14
+
+See Docs/AurelionZ03Rails-2026-09-14.md. Replaced all fifty vendor rail instances with sixteen fitted custom runs covering the ramps, landing and outgoing bridge. Ramp posts are upright; continuous grips follow the three-metre rise. Native guards remain intact. Clean FBX geometry and 75 handrail profile probes pass; all four saved views were inspected. Z03RailsFresh-20260914-212228-ad730cf7 completed with 76 passing static architecture reports, 3140 actors and a clean map. Live movement, final room art, Chaos destruction and 90 percent alignment remain unqualified; supported slice estimate stays 63.75 percent.
