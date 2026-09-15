@@ -1,0 +1,69 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z04SlopeRail",
+      "dimensions_m": [
+        12.0,
+        0.2199999988079071,
+        4.298544883728027
+      ],
+      "triangles": 54896
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04EastRail",
+      "dimensions_m": [
+        10.900799751281738,
+        0.15999998152256012,
+        1.100000023841858
+      ],
+      "triangles": 50760
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04NorthRail",
+      "dimensions_m": [
+        14.0,
+        0.15999998152256012,
+        1.100000023841858
+      ],
+      "triangles": 63356
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04SouthRail",
+      "dimensions_m": [
+        7.0,
+        0.15999998152256012,
+        1.100000023841858
+      ],
+      "triangles": 33464
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04CornerRail",
+      "dimensions_m": [
+        1.0,
+        0.15999998152256012,
+        1.100000023841858
+      ],
+      "triangles": 8084
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04WestRail",
+      "dimensions_m": [
+        3.950399875640869,
+        0.15999998152256012,
+        1.100000023841858
+      ],
+      "triangles": 20116
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04ReturnRail",
+      "dimensions_m": [
+        0.9503999948501587,
+        0.15999998152256012,
+        1.100000023841858
+      ],
+      "triangles": 7144
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}

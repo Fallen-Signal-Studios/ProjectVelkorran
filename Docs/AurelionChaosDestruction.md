@@ -40,7 +40,7 @@ The user requested Chaos destruction for appropriate cover and nonstructural wal
 - Checkpoint reload before and after destruction restores the correct state without resetting unrelated mission progress.
 - Worst-case nearby destruction meets measured campaign performance and debris budgets before broad rollout.
 
-The existing 80 architecture checks establish static fit only. They do not qualify Chaos destruction, live combat or save/load behavior for this phase.
+The architecture checks establish static fit only. They do not qualify Chaos destruction, live combat or save/load behavior for this phase.
 
 ## Collision ownership survey
 
@@ -69,3 +69,9 @@ Fresh saved-scene run `ChaosPrototypeMotion-20260914-232645-e6bee05f` completed 
 SceneCapture2D images were inspected for the final run. The target visibly separates into large pieces while the control remains assembled. Fracture interiors are currently flat and large; material-specific ceramic and metal breakage, smaller cosmetic chips, dust and audio are unfinished. The initial high-resolution viewport captures were black and are excluded from visual evidence.
 
 Review evidence is retained in `Docs/Validation/AurelionChaosPrototype-2026-09-14/` (intact/fractured images, recipe, solver and fragment-motion reports). Run `Scripts/Editor/verify_aurelion_chaos_saved.py` through `Scripts/Validation/Aurelion/run-editor-script.ps1` with the existing architecture review startup map to repeat the isolated test. The validator loads the dedicated Chaos map without rebuilding it, creates temporary capture actors, enters simulation and exits without saving those temporary actors or simulated state.
+
+## Existing save integration, 2026-09-15
+
+The absence of the interface names proposed in the TDD does not mean the project lacks world saving. `USovSaveSubsystem` wraps the configured Narrative serializer; `USovCampaignSaveGame` explicitly stores its payload rather than maintaining a second actor snapshot. The installed Narrative save system exposes `INarrativeSavableActor` and `INarrativeSavableComponent`, stable actor GUIDs, `PrepareForSave` and `Load` events, and ordered restoration. Its serializer sets `ArIsSaveGame` for actors and eligible components. Component serialization requires a savable owner.
+
+Destruction should use that existing authority: a stable placed owner with authored intact/broken state marked for saving, restoring the corresponding presentation and obstruction in its load event. Do not add a parallel world-state subsystem merely to reproduce the TDD's interface names. A collection's transient solver positions are not a suitable replacement for that state. This is a source-verified integration direction, not an implemented or tested destruction save record.
