@@ -1,0 +1,141 @@
+{
+  "lights": [
+    {
+      "actor": "Aurelion_Z03_SweepScanner1",
+      "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionSweepScanner_2",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionSweepScanner_2.ScanCone",
+      "class_name": "SpotLightComponent",
+      "transform": "(Rotation=(X=0.000000,Y=0.104528,Z=0.000000,W=0.994522),Translation=(X=6200.000000,Y=-18100.000000,Z=200.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "location": [
+        6200.0,
+        -18100.0,
+        200.0
+      ],
+      "color": [
+        0.09989872574806213,
+        0.6514056324958801,
+        1.0,
+        1.0
+      ],
+      "properties": {
+        "intensity": "18000.0",
+        "intensity_units": "<LightUnits.UNITLESS: 0>",
+        "attenuation_radius": "2400.0",
+        "cast_shadows": "True",
+        "indirect_lighting_intensity": "1.0",
+        "volumetric_scattering_intensity": "2.0"
+      }
+    },
+    {
+      "actor": "Aurelion_Z03_SweepScanner2",
+      "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionSweepScanner_3",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionSweepScanner_3.ScanCone",
+      "class_name": "SpotLightComponent",
+      "transform": "(Rotation=(X=-0.000000,Y=0.104528,Z=0.000000,W=0.994522),Translation=(X=6200.000000,Y=-16600.000000,Z=200.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "location": [
+        6200.0,
+        -16600.0,
+        200.0
+      ],
+      "color": [
+        0.09989872574806213,
+        0.6514056324958801,
+        1.0,
+        1.0
+      ],
+      "properties": {
+        "intensity": "18000.0",
+        "intensity_units": "<LightUnits.UNITLESS: 0>",
+        "attenuation_radius": "2400.0",
+        "cast_shadows": "True",
+        "indirect_lighting_intensity": "1.0",
+        "volumetric_scattering_intensity": "2.0"
+      }
+    },
+    {
+      "actor": "ENVL_Z03_Key_00",
+      "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.RectLight_8",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.RectLight_8.LightComponent0",
+      "class_name": "RectLightComponent",
+      "transform": "(Rotation=(X=-0.370723,Y=0.482861,Z=0.483136,W=0.629277),Translation=(X=6615.000000,Y=-18840.000000,Z=470.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "location": [
+        6615.0,
+        -18840.0,
+        470.0
+      ],
+      "color": [
+        0.38132601976394653,
+        0.6038273572921753,
+        1.0,
+        1.0
+      ],
+      "properties": {
+        "intensity": "595.0",
+        "intensity_units": "<LightUnits.LUMENS: 2>",
+        "attenuation_radius": "6600.0",
+        "cast_shadows": "False",
+        "source_width": "240.0",
+        "source_height": "160.0",
+        "indirect_lighting_intensity": "0.699999988079071",
+        "volumetric_scattering_intensity": "0.0"
+      }
+    },
+    {
+      "actor": "ENVL_Z03_Key_01",
+      "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.RectLight_9",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.RectLight_9.LightComponent0",
+      "class_name": "RectLightComponent",
+      "transform": "(Rotation=(X=-0.608761,Y=-0.000000,Z=0.793353,W=-0.000000),Translation=(X=7385.000000,Y=-17400.000000,Z=470.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "location": [
+        7385.0,
+        -17400.0,
+        470.0
+      ],
+      "color": [
+        0.8879231214523315,
+        0.9130986332893372,
+        1.0,
+        1.0
+      ],
+      "properties": {
+        "intensity": "595.0",
+        "intensity_units": "<LightUnits.LUMENS: 2>",
+        "attenuation_radius": "4400.0",
+        "cast_shadows": "False",
+        "source_width": "240.0",
+        "source_height": "160.0",
+        "indirect_lighting_intensity": "0.699999988079071",
+        "volumetric_scattering_intensity": "0.0"
+      }
+    },
+    {
+      "actor": "ENVL_Z03_Key_02",
+      "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.RectLight_10",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.RectLight_10.LightComponent0",
+      "class_name": "RectLightComponent",
+      "transform": "(Rotation=(X=0.370723,Y=0.482861,Z=-0.483136,W=0.629277),Translation=(X=6615.000000,Y=-15960.000000,Z=470.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "location": [
+        6615.0,
+        -15960.0,
+        470.0
+      ],
+      "color": [
+        0.38132601976394653,
+        0.6038273572921753,
+        1.0,
+        1.0
+      ],
+      "properties": {
+        "intensity": "595.0",
+        "intensity_units": "<LightUnits.LUMENS: 2>",
+        "attenuation_radius": "6600.0",
+        "cast_shadows": "False",
+        "source_width": "240.0",
+        "source_height": "160.0",
+        "indirect_lighting_intensity": "0.699999988079071",
+        "volumetric_scattering_intensity": "0.0"
+      }
+    }
+  ],
+  "qualification": "Spatial light candidates; rendered comparison required to establish contribution."
+}

@@ -1055,3 +1055,19 @@ Z03CeilingSaved-20260914-194413-f790e0d9 saved the reviewed whole-room ceiling a
 
 
 Z03CeilingFresh-20260914-194713-57ff0fb8 passed all 72 architecture receipts after reopening, with 3,140 actors, clean map packages and no Python errors. The ceiling gate verifies all 72 distinct unit-scale placements, exact room-area coverage, 600 cm lower envelope, UV/Nanite/fallback settings and original named room transforms/static collision. The preceding architecture chain passed. Supported alignment remains 63.75%; the Z03 room is not visually complete, particularly its underlit ceiling, vendor walls/ribs and floor/service-route presentation. The broader map, cast, live gameplay, destruction and performance goal remains active.
+
+
+## Z03 ceiling illumination
+
+Z03LightingAudit-20260914-195103-dc475057 measured three downward-facing room keys and two gameplay scanner lights. No dedicated upward ceiling source was present. The original light identities, transforms, colors and measured properties are retained in Z03CeilingKit/light-baseline.json. Z03CeilingLightCompare-20260914-195356-22e29c26 compared baseline, 300 and 900 lumen upward fills from the existing key heights. Both intensities produced overly concentrated bright ceiling patches, so neither configuration was accepted.
+
+Z03WideFillCompare-20260914-195758-75865aa6 compared larger 600 x 600 cm area sources at (7000, -18840/-17400/-15960, 300), aimed upward, with 2,500 cm radius. The 300 lumen setting improves coffer readability with more even illumination; the 900 lumen setting washes out too much stone detail. Both approach and middle views were inspected. The selected three CofferWash components use movable, shadow-casting rect lights, neutral-cool color (0.8879231, 0.9130986, 1), zero volumetric scattering and 300 lumens each. They are added to the existing key actors without changing the original keys or scanner lights. These are fill sources; visible fixture art, live scanner-cue acceptance and measured packaged cost remain pending. Both comparison runs completed without Python errors and did not save the map.
+
+
+Z03CeilingLightSaved-20260914-200214-ca0c403e stopped before saving because the new-light color check compared the SetLightColor input directly with GetLightColor output. Engine LightComponent.cpp and Color.h show that SetLightColor(..., false) quantizes to byte color, while GetLightColor converts stored sRGB bytes back to linear. The reviewed input above stores (226, 233, 255, 255); the checker now verifies those exact bytes and their linear conversion. The source light setting and reviewed appearance were not changed to accommodate the test. All original-light checks passed before this assertion.
+
+
+Z03CeilingLightSavedVerified-20260914-200618-8f112068 passed the exact stored-color and all five original-light checks, saved the reviewed three fills after backing up the map, and completed without Python errors. Both saved views were inspected and match the selected broad 300-lumen configuration. The ceiling is now readable from those views, while final room lighting, visible fixtures, live scanner cues and performance remain separate acceptance work. Capture settings were restored and the temporary camera removed.
+
+
+Z03CeilingLightFresh-20260914-200845-591d53af passed all 73 architecture receipts after reopening, with 3,140 actors, clean map packages and no Python errors. The three CofferWash components persist at the reviewed poses and 300-lumen settings; all original room/scanner light transforms, colors and measured properties remain unchanged. The entire preceding architecture chain passed. Supported alignment remains 63.75%; this resolves the reviewed ceiling-readability gap, not final room, live scanner, cast, destruction or packaged-performance acceptance.
