@@ -1,0 +1,189 @@
+{
+  "status": "measured",
+  "run": "RemainingEnvironmentAudit-20260914-193105-57b30f38",
+  "actor_count": 3140,
+  "visible_nonkit_components": 491,
+  "architectural_batches": [
+    {
+      "actor": "Aurelion_Art_M12_Z00_3_4fde4f",
+      "mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Floor_04_Small.SM_Scifi_Floor_04_Small",
+      "instances": 18,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>"
+    },
+    {
+      "actor": "Aurelion_Art_M12_Z03_12_cbcbb3",
+      "mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Floor_04.SM_Scifi_Floor_04",
+      "instances": 91,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>"
+    },
+    {
+      "actor": "Aurelion_Art_M12_Z03_13_9b1ee2",
+      "mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Wall_01_4m.SM_Scifi_Wall_01_4m",
+      "instances": 68,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>"
+    },
+    {
+      "actor": "Aurelion_Art_M12_Z03_14_9e14c4",
+      "mesh": "/Game/Aurelion/Environment/KitBash/KB3D_CPI_IntGarage_A_Column_A/KB3D_CPI_IntGarage_A_Column_A/StaticMeshes/SM_KB3D_CPI_IntGarage_A_Column_A.SM_KB3D_CPI_IntGarage_A_Column_A",
+      "instances": 51,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>"
+    },
+    {
+      "actor": "Aurelion_Art_M12_Z03_15_6ec551",
+      "mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Floor_04_Small.SM_Scifi_Floor_04_Small",
+      "instances": 44,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>"
+    },
+    {
+      "actor": "Aurelion_Art_M12_Z04_16_543730",
+      "mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Floor_04.SM_Scifi_Floor_04",
+      "instances": 186,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>"
+    },
+    {
+      "actor": "Aurelion_Art_M12_Z04_17_39819d",
+      "mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Wall_01_4m.SM_Scifi_Wall_01_4m",
+      "instances": 188,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>"
+    },
+    {
+      "actor": "Aurelion_Art_M12_Z04_18_d57dbf",
+      "mesh": "/Game/Aurelion/Environment/KitBash/KB3D_CPI_IntGarage_A_Column_A/KB3D_CPI_IntGarage_A_Column_A/StaticMeshes/SM_KB3D_CPI_IntGarage_A_Column_A.SM_KB3D_CPI_IntGarage_A_Column_A",
+      "instances": 4,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>"
+    },
+    {
+      "actor": "Aurelion_Art_M12_Z04_19_63e4a1",
+      "mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Floor_04_Small.SM_Scifi_Floor_04_Small",
+      "instances": 34,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>"
+    },
+    {
+      "actor": "Aurelion_Art_M12_Z06_20_fe61a6",
+      "mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Floor_04.SM_Scifi_Floor_04",
+      "instances": 18,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>"
+    },
+    {
+      "actor": "Aurelion_Art_M12_Z07_24_c20367",
+      "mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Floor_04.SM_Scifi_Floor_04",
+      "instances": 26,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>"
+    },
+    {
+      "actor": "Aurelion_Art_M12_Z08_31_dfe9eb",
+      "mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Floor_04_Small.SM_Scifi_Floor_04_Small",
+      "instances": 2,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>"
+    },
+    {
+      "actor": "Aurelion_Art_M12_Z09_32_603c31",
+      "mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Floor_04.SM_Scifi_Floor_04",
+      "instances": 60,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>"
+    },
+    {
+      "actor": "Aurelion_Art_M12_Z09_33_3a5556",
+      "mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Wall_01_4m.SM_Scifi_Wall_01_4m",
+      "instances": 78,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>"
+    },
+    {
+      "actor": "Aurelion_Art_M12_Z09_34_fc9885",
+      "mesh": "/Game/Aurelion/Environment/KitBash/KB3D_CPI_IntGarage_A_Column_A/KB3D_CPI_IntGarage_A_Column_A/StaticMeshes/SM_KB3D_CPI_IntGarage_A_Column_A.SM_KB3D_CPI_IntGarage_A_Column_A",
+      "instances": 8,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>"
+    },
+    {
+      "actor": "Aurelion_Art_M12_Z09_35_586f99",
+      "mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Floor_04_Small.SM_Scifi_Floor_04_Small",
+      "instances": 51,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>"
+    },
+    {
+      "actor": "Aurelion_Art_M12_Z03_41_b6817d",
+      "mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Railing_4m.SM_Scifi_Railing_4m",
+      "instances": 50,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>"
+    },
+    {
+      "actor": "Aurelion_Art_M12_Z04_42_658d51",
+      "mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Railing_4m.SM_Scifi_Railing_4m",
+      "instances": 35,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>"
+    },
+    {
+      "actor": "Aurelion_Art_M12_Z04_43_a118a7",
+      "mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Crate.SM_Scifi_Crate",
+      "instances": 13,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>"
+    },
+    {
+      "actor": "Aurelion_Art_M12_Z04_44_dd5f3e",
+      "mesh": "/Game/Aurelion/Environment/KitBash/KB3D_CPI_PropConsoleLarge_A/KB3D_CPI_PropConsoleLarge_A/StaticMeshes/SM_KB3D_CPI_PropConsoleLarge_A.SM_KB3D_CPI_PropConsoleLarge_A",
+      "instances": 3,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>"
+    },
+    {
+      "actor": "Aurelion_Art_M12_Z04_45_8c8aca",
+      "mesh": "/Game/Underground_Base/Meshes/SM_wall_column.SM_wall_column",
+      "instances": 3,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>"
+    },
+    {
+      "actor": "Aurelion_Art_M12_Z05_51_94dfdd",
+      "mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Railing_4m.SM_Scifi_Railing_4m",
+      "instances": 116,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>"
+    },
+    {
+      "actor": "Aurelion_Art_M12_Z05_53_427254",
+      "mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Floor_04.SM_Scifi_Floor_04",
+      "instances": 132,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>"
+    },
+    {
+      "actor": "Aurelion_Art_M12_Z06_56_060289",
+      "mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Railing_4m.SM_Scifi_Railing_4m",
+      "instances": 36,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>"
+    },
+    {
+      "actor": "Aurelion_Art_M12_Z09_68_648680",
+      "mesh": "/Engine/BasicShapes/Cube.Cube",
+      "instances": 5,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>"
+    },
+    {
+      "actor": "Aurelion_Art_M12_Z07_71_df6fb1",
+      "mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Railing_4m.SM_Scifi_Railing_4m",
+      "instances": 36,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>"
+    },
+    {
+      "actor": "Aurelion_Art_M12_Z09_72_ee4638",
+      "mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Railing_4m.SM_Scifi_Railing_4m",
+      "instances": 8,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>"
+    },
+    {
+      "actor": "Aurelion_Art_M12_Z03_85_b1c1b3",
+      "mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Floor_04.SM_Scifi_Floor_04",
+      "instances": 72,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>"
+    },
+    {
+      "actor": "Aurelion_Art_M12_Z04_86_7c5bc5",
+      "mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Floor_04.SM_Scifi_Floor_04",
+      "instances": 144,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>"
+    },
+    {
+      "actor": "Aurelion_Art_M12_Z09_90_1a4f7f",
+      "mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Floor_04.SM_Scifi_Floor_04",
+      "instances": 56,
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>"
+    }
+  ],
+  "qualification": "Saved visible static-mesh candidates; runtime-spawned geometry and hidden/native collision layers are outside this census."
+}
