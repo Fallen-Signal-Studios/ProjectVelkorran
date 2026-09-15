@@ -281,3 +281,35 @@ the ordinary third-person Verity combo with four retargeted pack attacks and
 authors a weapon-specific idle/walk/run stance. It preserves the command-target
 bridge and native damage path. This animation change still requires actual
 Selene and companion damage qualification; it is not an additional route pass.
+
+## Fresh environment route, 2026-09-15
+
+`CompanionEnvironmentRoute-20260915-011738-04535f23` reopened the current custom
+architecture map and passed entry, then failed E1 after 66.859 seconds on an
+actual player defeat. Input was released and the asset integrity check passed.
+The editor closed normally. This run never reached companion combat and does
+not qualify the pending companion target bridge or the Twin Blade damage path.
+
+The report records nine cover attempts and eight arrival exposure rejections.
+The input pilot selected points sheltered from only some living enemies, but
+its arrival policy required shelter from all of them. This mismatch repeatedly
+sent the player to points it would immediately reject. Cover steering also
+retained a 65 cm corner tolerance despite the earlier combat-path correction.
+The pilot now requires all current enemies to be occluded when selecting a
+recovery point and uses the same 25 cm corner tolerance as route/combat walking.
+These are ordinary-input driver corrections; no enemy, navigation, resources,
+difficulty or companion behavior was changed.
+
+`test_e1_cover_navigation.py` reproduced both defects before the change (two
+failures, one pass). All six E1 cover and combat-corner regressions pass after
+the correction. The before/after outputs remain alongside the failed run as
+`cover-before.txt` and `cover-after.txt`. Fresh live qualification remains
+necessary; deterministic steering checks do not establish player survival.
+
+The corrected fresh `CompanionCoverRoute-20260915-012337-1a88a9d4` passed E1
+in 165.703 seconds through native enemy defeat, both real interaction holds
+and the ready Selene handoff. It recorded one cover attempt and no arrival
+exposure rejection, with unchanged asset hashes. This is a successful live
+exercise of the revised input pilot, not proof that the correction alone
+caused survival or qualification of later companion damage. Later stages
+retain their own reports and acceptance boundaries.

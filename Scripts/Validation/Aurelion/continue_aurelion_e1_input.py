@@ -313,7 +313,10 @@ class Run:
                             obstacle = parts[9]
                             if parts[0] and obstacle and not isinstance(obstacle,unreal.NarrativeCharacter):
                                 blocked += 1
-                    if blocked:
+                    # Recovery waits require shelter from every current enemy,
+                    # matching the arrival exposure gate below. Partial shelter
+                    # otherwise causes repeated travel to immediately rejected spots.
+                    if blocked == len(enemies) and blocked:
                         choices.append((-blocked, radius, [_xyz(p) for p in path.path_points[1:]]))
             if choices:
                 _, _, points = min(choices, key=lambda c:(c[0],c[1]))
@@ -323,7 +326,7 @@ class Run:
                     shield=value, blocked_enemies=-min(c[0] for c in choices), points=points.copy()))
         if self.cover_goal is not None:
             while self.cover_goal:
-                movement, reached = self.local_move(pc,pawn,self.cover_goal[0],stop=65.)
+                movement, reached = self.local_move(pc,pawn,self.cover_goal[0],stop=25.)
                 if not reached:
                     return movement
                 self.cover_goal.pop(0)
