@@ -1,0 +1,189 @@
+{
+  "actor": "Aurelion_Art_M12_Z09_34_fc9885",
+  "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.Actor_34",
+  "class_name": "Actor",
+  "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.Actor_34.HierarchicalInstancedStaticMesh",
+  "actor_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+  "component_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+  "mesh": "/Game/Aurelion/Environment/KitBash/KB3D_CPI_IntGarage_A_Column_A/KB3D_CPI_IntGarage_A_Column_A/StaticMeshes/SM_KB3D_CPI_IntGarage_A_Column_A.SM_KB3D_CPI_IntGarage_A_Column_A",
+  "mesh_origin": [
+    -24.813091278076172,
+    -1.9073486328125E-06,
+    303.59926891326904
+  ],
+  "mesh_extent": [
+    35.81173324584961,
+    40.00015449523926,
+    304.5541124343872
+  ],
+  "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+  "profile": "Custom",
+  "actor_collision": true,
+  "materials": [
+    "/Game/Aurelion/Environment/RadianceMaterials/M_Radiance_IvoryStone.M_Radiance_IvoryStone",
+    "/Game/Aurelion/Environment/RadianceMaterials/M_Radiance_IvoryStone.M_Radiance_IvoryStone",
+    "/Game/Aurelion/Environment/RadianceMaterials/M_Radiance_IvoryStone.M_Radiance_IvoryStone"
+  ],
+  "instances": [
+    {
+      "index": 0,
+      "location": [
+        -690.3561988919486,
+        26550.000002861012,
+        -1499.0594346139485
+      ],
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-690.356199,Y=26550.000003,Z=-1499.059435),Scale3D=(X=1.396190,Y=1.499994,Z=0.985047))",
+      "scale": [
+        1.3961904512341563,
+        1.4999942064509046,
+        0.9850466230845321
+      ],
+      "quaternion": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    {
+      "index": 1,
+      "location": [
+        759.6438011080514,
+        26550.000002861012,
+        -1499.0594346139485
+      ],
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=759.643801,Y=26550.000003,Z=-1499.059435),Scale3D=(X=1.396190,Y=1.499994,Z=0.985047))",
+      "scale": [
+        1.3961904512341563,
+        1.4999942064509046,
+        0.9850466230845321
+      ],
+      "quaternion": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    {
+      "index": 2,
+      "location": [
+        -690.3561988919486,
+        27750.000002861012,
+        -1499.0594346139485
+      ],
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-690.356199,Y=27750.000003,Z=-1499.059435),Scale3D=(X=1.396190,Y=1.499994,Z=0.985047))",
+      "scale": [
+        1.3961904512341563,
+        1.4999942064509046,
+        0.9850466230845321
+      ],
+      "quaternion": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    {
+      "index": 3,
+      "location": [
+        759.6438011080514,
+        27750.000002861012,
+        -1499.0594346139485
+      ],
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=759.643801,Y=27750.000003,Z=-1499.059435),Scale3D=(X=1.396190,Y=1.499994,Z=0.985047))",
+      "scale": [
+        1.3961904512341563,
+        1.4999942064509046,
+        0.9850466230845321
+      ],
+      "quaternion": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    {
+      "index": 4,
+      "location": [
+        -690.3561988919486,
+        28950.000002861012,
+        -1499.0594346139485
+      ],
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-690.356199,Y=28950.000003,Z=-1499.059435),Scale3D=(X=1.396190,Y=1.499994,Z=0.985047))",
+      "scale": [
+        1.3961904512341563,
+        1.4999942064509046,
+        0.9850466230845321
+      ],
+      "quaternion": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    {
+      "index": 5,
+      "location": [
+        759.6438011080514,
+        28950.000002861012,
+        -1499.0594346139485
+      ],
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=759.643801,Y=28950.000003,Z=-1499.059435),Scale3D=(X=1.396190,Y=1.499994,Z=0.985047))",
+      "scale": [
+        1.3961904512341563,
+        1.4999942064509046,
+        0.9850466230845321
+      ],
+      "quaternion": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    {
+      "index": 6,
+      "location": [
+        -690.3561988919486,
+        30150.000002861012,
+        -1499.0594346139485
+      ],
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-690.356199,Y=30150.000003,Z=-1499.059435),Scale3D=(X=1.396190,Y=1.499994,Z=0.985047))",
+      "scale": [
+        1.3961904512341563,
+        1.4999942064509046,
+        0.9850466230845321
+      ],
+      "quaternion": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    {
+      "index": 7,
+      "location": [
+        759.6438011080514,
+        30150.000002861012,
+        -1499.0594346139485
+      ],
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=759.643801,Y=30150.000003,Z=-1499.059435),Scale3D=(X=1.396190,Y=1.499994,Z=0.985047))",
+      "scale": [
+        1.3961904512341563,
+        1.4999942064509046,
+        0.9850466230845321
+      ],
+      "quaternion": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    }
+  ]
+}

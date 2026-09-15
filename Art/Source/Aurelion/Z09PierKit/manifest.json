@@ -1,0 +1,89 @@
+{
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z09EngagedPier",
+      "triangles": 21064,
+      "nominal_dimensions_m": [
+        1.2,
+        1.0,
+        6.0
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; existing gallery collision retained",
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    }
+  ],
+  "placements": [
+    {
+      "location_cm": [
+        -725,
+        26550,
+        -1500
+      ],
+      "yaw": -90
+    },
+    {
+      "location_cm": [
+        725,
+        26550,
+        -1500
+      ],
+      "yaw": 90
+    },
+    {
+      "location_cm": [
+        -725,
+        27750,
+        -1500
+      ],
+      "yaw": -90
+    },
+    {
+      "location_cm": [
+        725,
+        27750,
+        -1500
+      ],
+      "yaw": 90
+    },
+    {
+      "location_cm": [
+        -725,
+        28950,
+        -1500
+      ],
+      "yaw": -90
+    },
+    {
+      "location_cm": [
+        725,
+        28950,
+        -1500
+      ],
+      "yaw": 90
+    },
+    {
+      "location_cm": [
+        -725,
+        30150,
+        -1500
+      ],
+      "yaw": -90
+    },
+    {
+      "location_cm": [
+        725,
+        30150,
+        -1500
+      ],
+      "yaw": 90
+    }
+  ]
+}
