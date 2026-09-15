@@ -1,0 +1,69 @@
+{
+  "status": "Source and saved engine placement verified; final visual polish, live gameplay and packaged performance pending",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_RefugePanel_2m",
+      "triangles": 33284,
+      "nominal_dimensions_m": [
+        2.0,
+        0.4,
+        3
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_UplightLens"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 1,
+      "collision": "One exact-envelope UCX box; placement collision policy preserved",
+      "solid_bounds_m": [
+        [
+          -1.0,
+          -0.2,
+          0
+        ],
+        [
+          1.0,
+          0.2,
+          3
+        ]
+      ],
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_RefugePanel_1m",
+      "triangles": 23132,
+      "nominal_dimensions_m": [
+        1.0,
+        0.4,
+        3
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_UplightLens"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 1,
+      "collision": "One exact-envelope UCX box; placement collision policy preserved",
+      "solid_bounds_m": [
+        [
+          -0.5,
+          -0.2,
+          0
+        ],
+        [
+          0.5,
+          0.2,
+          3
+        ]
+      ],
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    }
+  ]
+}

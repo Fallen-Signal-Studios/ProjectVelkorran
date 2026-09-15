@@ -26,8 +26,14 @@ try:
     for suffix,x,scale in expected:
         actor=by_label['ART_RefugeBaffle_'+suffix]; c=actor.static_mesh_component
         assert (actor.get_actor_location()-unreal.Vector(x,22060,-1200)).length()<.1
-        assert (actor.get_actor_scale3d()-unreal.Vector(scale,1,1)).length()<.001
-        assert c.static_mesh.get_path_name()=='/Game/Aurelion/Environment/Blender/SM_Aurelion_RecessPanel_2m.SM_Aurelion_RecessPanel_2m'
+        mesh_name=c.static_mesh.get_name()
+        if mesh_name=='SM_Aurelion_RecessPanel_2m':
+            assert c.static_mesh.get_path_name()=='/Game/Aurelion/Environment/Blender/SM_Aurelion_RecessPanel_2m.SM_Aurelion_RecessPanel_2m'
+            assert (actor.get_actor_scale3d()-unreal.Vector(scale,1,1)).length()<.001
+        else:
+            width=1 if scale==.5 else 2
+            assert mesh_name=='SM_Aurelion_KIT_RefugePanel_'+str(width)+'m'
+            assert (actor.get_actor_scale3d()-unreal.Vector(1,1,1)).length()<.001
         assert c.get_collision_enabled()==unreal.CollisionEnabled.QUERY_AND_PHYSICS
         report['baffles'].append(dict(label=actor.get_actor_label(),transform=actor.get_actor_transform().export_text()))
     assert not report['navigation_pending']

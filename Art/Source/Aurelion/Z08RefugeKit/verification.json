@@ -1,0 +1,24 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_RefugePanel_2m",
+      "dimensions_m": [
+        2.0,
+        0.4000000059604645,
+        3.0
+      ],
+      "triangles": 33284
+    },
+    {
+      "asset": "SM_Aurelion_KIT_RefugePanel_1m",
+      "dimensions_m": [
+        1.0,
+        0.4000000059604645,
+        3.0
+      ],
+      "triangles": 23132
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}

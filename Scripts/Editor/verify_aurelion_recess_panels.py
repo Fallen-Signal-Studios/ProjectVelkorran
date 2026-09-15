@@ -20,7 +20,10 @@ for actor in panels:
     p = actor.get_actor_location()
     assert not actor.get_actor_enable_collision()
     assert c.get_collision_enabled() == unreal.CollisionEnabled.NO_COLLISION
-    assert c.get_editor_property('static_mesh').get_name() == 'SM_Aurelion_RecessPanel_2m'
+    mesh_name=c.get_editor_property('static_mesh').get_name()
+    if mesh_name!='SM_Aurelion_RecessPanel_2m':
+        assert mesh_name=='SM_Aurelion_KIT_RefugePanel_'+str(1 if scale==.5 else 2)+'m'
+        scale=1.
     assert abs(p.y-22870) < .1 and abs(p.z+1200) < .1
     assert abs(p.x-x) < .1
     actual_scale = actor.get_actor_scale3d()
