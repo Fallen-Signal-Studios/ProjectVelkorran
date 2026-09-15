@@ -348,3 +348,12 @@ paths, reacquires current-world delegates and unregisters its tick before
 cleanup. Three regressions pass for a collected world, live delegate removal
 and cleanup failure without a surviving callback. The original teardown
 errors remain in the run log; this diagnostic fix changes no gameplay.
+
+`VerityAllowlistRoute-20260915-013744-f4adca8a` passed entry but ended in an
+actual E1 player defeat at 84.485 seconds. Its driver released input and asset
+hashes were unchanged. It never reached a companion handoff, so the repaired
+allowlist's live attack/damage behavior remains unqualified. The editor was
+stopped and closed normally. The repaired elite observer reported a clean
+stop with no errors, and the editor log contained no Python errors. Repeated
+fresh-route launches are not evidence of companion completion; further live
+qualification still needs a successful route to shared combat.
