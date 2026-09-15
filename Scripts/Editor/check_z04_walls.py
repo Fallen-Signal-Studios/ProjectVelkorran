@@ -35,6 +35,10 @@ def check_z04_walls(actors):
     for row in room['components']:
         if not row['actor'].startswith('Z04_'):continue
         actor=labels[row['actor']];c=next(c for c in actor.get_components_by_class(unreal.StaticMeshComponent) if c.get_name()==row['component'])
-        assert c.static_mesh.get_path_name()==row['mesh'] and str(c.get_collision_enabled())==row['collision'] and actor.get_actor_enable_collision()==row['actor_collision']
+        assert c.static_mesh.get_path_name()==row['mesh'] and actor.get_actor_enable_collision()==row['actor_collision']
+        retired={'Z04__ArtPylon_W','Z04__ArtPylon_E','Z04__UpperSpan_01','Z04__UpperSpan_02','Z04__GoldChannel_01','Z04__GoldChannel_02'}
+        if row['actor'] in retired:
+            assert c.get_editor_property('hidden_in_game') and c.get_collision_enabled()==unreal.CollisionEnabled.NO_COLLISION and str(c.get_collision_profile_name())=='NoCollision'
+        else:assert str(c.get_collision_enabled())==row['collision']
     assert len(actors)==3140
     return dict(wall_sections=48,replaced_vendor_instances=188,double_sided=True,native_wall_thickness_cm=50,doorways=2,door_width_cm=600,door_clear_height_cm=450,qualification='Saved full relay wall fit and native geometry preservation; room lighting, other art, live route and packaged performance remain unqualified.')

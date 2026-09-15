@@ -1,0 +1,1065 @@
+{
+  "scope": "Candidates near the room; stopped-editor visibility does not establish live-game visibility or causality.",
+  "components": [
+    {
+      "actor": "Z04_Zone_Sign_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_8.NewTextRenderComponent",
+      "class_name": "TextRenderComponent",
+      "location": [
+        7000.0,
+        -12800.0,
+        480.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "False",
+        "is_editor_only": "False",
+        "text": "Z04  RELAY OVERLOOK\n62 x 38 m",
+        "text_render_color": "<Struct 'Color' (0x00000172335BBC04) {b: 238, g: 232, r: 214, a: 255}>",
+        "world_size": "85.0"
+      }
+    },
+    {
+      "actor": "Z04_Zone_Sign_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_8.Sprite",
+      "class_name": "BillboardComponent",
+      "location": [
+        7000.0,
+        -12800.0,
+        480.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "True",
+        "is_editor_only": "True",
+        "sprite": "<Object '/Engine/EditorResources/S_TextRenderActorIcon.S_TextRenderActorIcon' (0x0000016EBE8E0600) Class 'Texture2D'>"
+      }
+    },
+    {
+      "actor": "Z04_Entry_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_9.NewTextRenderComponent",
+      "class_name": "TextRenderComponent",
+      "location": [
+        7000.0,
+        -12500.0,
+        250.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "False",
+        "is_editor_only": "False",
+        "text": "Z04 ENTRY",
+        "text_render_color": "<Struct 'Color' (0x00000172335D5A04) {b: 238, g: 232, r: 214, a: 255}>",
+        "world_size": "32.0"
+      }
+    },
+    {
+      "actor": "Z04_Entry_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_9.Sprite",
+      "class_name": "BillboardComponent",
+      "location": [
+        7000.0,
+        -12500.0,
+        250.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "True",
+        "is_editor_only": "True",
+        "sprite": "<Object '/Engine/EditorResources/S_TextRenderActorIcon.S_TextRenderActorIcon' (0x0000016EBE8E0600) Class 'Texture2D'>"
+      }
+    },
+    {
+      "actor": "Z04_Receiver_A_CloseDisable_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_38.NewTextRenderComponent",
+      "class_name": "TextRenderComponent",
+      "location": [
+        7400.0,
+        -11260.0,
+        250.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "False",
+        "is_editor_only": "False",
+        "text": "Receiver A | reachable close disable",
+        "text_render_color": "<Struct 'Color' (0x0000017233583004) {b: 238, g: 232, r: 214, a: 255}>",
+        "world_size": "32.0"
+      }
+    },
+    {
+      "actor": "Z04_Receiver_A_CloseDisable_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_38.Sprite",
+      "class_name": "BillboardComponent",
+      "location": [
+        7400.0,
+        -11260.0,
+        250.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "True",
+        "is_editor_only": "True",
+        "sprite": "<Object '/Engine/EditorResources/S_TextRenderActorIcon.S_TextRenderActorIcon' (0x0000016EBE8E0600) Class 'Texture2D'>"
+      }
+    },
+    {
+      "actor": "Z04_Receiver_B_CloseDisable_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_39.NewTextRenderComponent",
+      "class_name": "TextRenderComponent",
+      "location": [
+        5500.0,
+        -10360.0,
+        250.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "False",
+        "is_editor_only": "False",
+        "text": "Receiver B | reachable close disable",
+        "text_render_color": "<Struct 'Color' (0x0000017233583E04) {b: 238, g: 232, r: 214, a: 255}>",
+        "world_size": "32.0"
+      }
+    },
+    {
+      "actor": "Z04_Receiver_B_CloseDisable_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_39.Sprite",
+      "class_name": "BillboardComponent",
+      "location": [
+        5500.0,
+        -10360.0,
+        250.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "True",
+        "is_editor_only": "True",
+        "sprite": "<Object '/Engine/EditorResources/S_TextRenderActorIcon.S_TextRenderActorIcon' (0x0000016EBE8E0600) Class 'Texture2D'>"
+      }
+    },
+    {
+      "actor": "Z04_ScanHead_S_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_40.NewTextRenderComponent",
+      "class_name": "TextRenderComponent",
+      "location": [
+        4700.0,
+        -11800.0,
+        465.00000000000006
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "False",
+        "is_editor_only": "False",
+        "text": "S | scanner source; not a third objective",
+        "text_render_color": "<Struct 'Color' (0x0000017233585A04) {b: 238, g: 232, r: 214, a: 255}>",
+        "world_size": "32.0"
+      }
+    },
+    {
+      "actor": "Z04_ScanHead_S_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_40.Sprite",
+      "class_name": "BillboardComponent",
+      "location": [
+        4700.0,
+        -11800.0,
+        465.00000000000006
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "True",
+        "is_editor_only": "True",
+        "sprite": "<Object '/Engine/EditorResources/S_TextRenderActorIcon.S_TextRenderActorIcon' (0x0000016EBE8E0600) Class 'Texture2D'>"
+      }
+    },
+    {
+      "actor": "Z04_O2_ReconstructionPocket_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_41.NewTextRenderComponent",
+      "class_name": "TextRenderComponent",
+      "location": [
+        7800.0,
+        -9300.0,
+        250.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "False",
+        "is_editor_only": "False",
+        "text": "O2 | sensor reconstruction +2 min; open return route",
+        "text_render_color": "<Struct 'Color' (0x0000017233586804) {b: 238, g: 232, r: 214, a: 255}>",
+        "world_size": "32.0"
+      }
+    },
+    {
+      "actor": "Z04_O2_ReconstructionPocket_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_41.Sprite",
+      "class_name": "BillboardComponent",
+      "location": [
+        7800.0,
+        -9300.0,
+        250.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "True",
+        "is_editor_only": "True",
+        "sprite": "<Object '/Engine/EditorResources/S_TextRenderActorIcon.S_TextRenderActorIcon' (0x0000016EBE8E0600) Class 'Texture2D'>"
+      }
+    },
+    {
+      "actor": "Z04_CP2b_EncounterThreshold_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_42.NewTextRenderComponent",
+      "class_name": "TextRenderComponent",
+      "location": [
+        7000.0,
+        -12600.0,
+        250.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "False",
+        "is_editor_only": "False",
+        "text": "CP2b | relay encounter threshold",
+        "text_render_color": "<Struct 'Color' (0x0000017233587604) {b: 238, g: 232, r: 214, a: 255}>",
+        "world_size": "32.0"
+      }
+    },
+    {
+      "actor": "Z04_CP2b_EncounterThreshold_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_42.Sprite",
+      "class_name": "BillboardComponent",
+      "location": [
+        7000.0,
+        -12600.0,
+        250.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "True",
+        "is_editor_only": "True",
+        "sprite": "<Object '/Engine/EditorResources/S_TextRenderActorIcon.S_TextRenderActorIcon' (0x0000016EBE8E0600) Class 'Texture2D'>"
+      }
+    },
+    {
+      "actor": "Z04_HighRoute_Aim_B_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_43.NewTextRenderComponent",
+      "class_name": "TextRenderComponent",
+      "location": [
+        9000.0,
+        -10100.0,
+        550.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "False",
+        "is_editor_only": "False",
+        "text": "Balcony sightline toward receiver B | target about 35 m",
+        "text_render_color": "<Struct 'Color' (0x0000017233588404) {b: 238, g: 232, r: 214, a: 255}>",
+        "world_size": "32.0"
+      }
+    },
+    {
+      "actor": "Z04_HighRoute_Aim_B_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_43.Sprite",
+      "class_name": "BillboardComponent",
+      "location": [
+        9000.0,
+        -10100.0,
+        550.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "True",
+        "is_editor_only": "True",
+        "sprite": "<Object '/Engine/EditorResources/S_TextRenderActorIcon.S_TextRenderActorIcon' (0x0000016EBE8E0600) Class 'Texture2D'>"
+      }
+    },
+    {
+      "actor": "Z04_SouthAim_S_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_44.NewTextRenderComponent",
+      "class_name": "TextRenderComponent",
+      "location": [
+        8300.0,
+        -12400.0,
+        250.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "False",
+        "is_editor_only": "False",
+        "text": "Ground sightline toward scanner S | target about 36 m",
+        "text_render_color": "<Struct 'Color' (0x0000017233589204) {b: 238, g: 232, r: 214, a: 255}>",
+        "world_size": "32.0"
+      }
+    },
+    {
+      "actor": "Z04_SouthAim_S_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_44.Sprite",
+      "class_name": "BillboardComponent",
+      "location": [
+        8300.0,
+        -12400.0,
+        250.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "True",
+        "is_editor_only": "True",
+        "sprite": "<Object '/Engine/EditorResources/S_TextRenderActorIcon.S_TextRenderActorIcon' (0x0000016EBE8E0600) Class 'Texture2D'>"
+      }
+    },
+    {
+      "actor": "Z04_E2_Enforcer_01_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_45.NewTextRenderComponent",
+      "class_name": "TextRenderComponent",
+      "location": [
+        6200.0,
+        -10600.0,
+        250.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "False",
+        "is_editor_only": "False",
+        "text": "E2 | Dominion Enforcer staging 1 of 4",
+        "text_render_color": "<Struct 'Color' (0x000001723358A004) {b: 238, g: 232, r: 214, a: 255}>",
+        "world_size": "32.0"
+      }
+    },
+    {
+      "actor": "Z04_E2_Enforcer_01_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_45.Sprite",
+      "class_name": "BillboardComponent",
+      "location": [
+        6200.0,
+        -10600.0,
+        250.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "True",
+        "is_editor_only": "True",
+        "sprite": "<Object '/Engine/EditorResources/S_TextRenderActorIcon.S_TextRenderActorIcon' (0x0000016EBE8E0600) Class 'Texture2D'>"
+      }
+    },
+    {
+      "actor": "Z04_E2_Enforcer_02_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_46.NewTextRenderComponent",
+      "class_name": "TextRenderComponent",
+      "location": [
+        7000.0,
+        -10400.0,
+        250.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "False",
+        "is_editor_only": "False",
+        "text": "E2 | Dominion Enforcer staging 2 of 4",
+        "text_render_color": "<Struct 'Color' (0x000001723358AE04) {b: 238, g: 232, r: 214, a: 255}>",
+        "world_size": "32.0"
+      }
+    },
+    {
+      "actor": "Z04_E2_Enforcer_02_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_46.Sprite",
+      "class_name": "BillboardComponent",
+      "location": [
+        7000.0,
+        -10400.0,
+        250.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "True",
+        "is_editor_only": "True",
+        "sprite": "<Object '/Engine/EditorResources/S_TextRenderActorIcon.S_TextRenderActorIcon' (0x0000016EBE8E0600) Class 'Texture2D'>"
+      }
+    },
+    {
+      "actor": "Z04_E2_Enforcer_03_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_47.NewTextRenderComponent",
+      "class_name": "TextRenderComponent",
+      "location": [
+        7500.0,
+        -10000.0,
+        250.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "False",
+        "is_editor_only": "False",
+        "text": "E2 | Dominion Enforcer staging 3 of 4",
+        "text_render_color": "<Struct 'Color' (0x000001723358BC04) {b: 238, g: 232, r: 214, a: 255}>",
+        "world_size": "32.0"
+      }
+    },
+    {
+      "actor": "Z04_E2_Enforcer_03_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_47.Sprite",
+      "class_name": "BillboardComponent",
+      "location": [
+        7500.0,
+        -10000.0,
+        250.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "True",
+        "is_editor_only": "True",
+        "sprite": "<Object '/Engine/EditorResources/S_TextRenderActorIcon.S_TextRenderActorIcon' (0x0000016EBE8E0600) Class 'Texture2D'>"
+      }
+    },
+    {
+      "actor": "Z04_E2_Enforcer_04_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_48.NewTextRenderComponent",
+      "class_name": "TextRenderComponent",
+      "location": [
+        7900.0,
+        -10700.0,
+        250.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "False",
+        "is_editor_only": "False",
+        "text": "E2 | Dominion Enforcer staging 4 of 4",
+        "text_render_color": "<Struct 'Color' (0x000001723358CA04) {b: 238, g: 232, r: 214, a: 255}>",
+        "world_size": "32.0"
+      }
+    },
+    {
+      "actor": "Z04_E2_Enforcer_04_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_48.Sprite",
+      "class_name": "BillboardComponent",
+      "location": [
+        7900.0,
+        -10700.0,
+        250.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "True",
+        "is_editor_only": "True",
+        "sprite": "<Object '/Engine/EditorResources/S_TextRenderActorIcon.S_TextRenderActorIcon' (0x0000016EBE8E0600) Class 'Texture2D'>"
+      }
+    },
+    {
+      "actor": "Z04_E2_Drone_01_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_49.NewTextRenderComponent",
+      "class_name": "TextRenderComponent",
+      "location": [
+        8500.0,
+        -11400.0,
+        250.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "False",
+        "is_editor_only": "False",
+        "text": "E2 | contaminated drone staging 1 of 2",
+        "text_render_color": "<Struct 'Color' (0x000001723358D804) {b: 238, g: 232, r: 214, a: 255}>",
+        "world_size": "32.0"
+      }
+    },
+    {
+      "actor": "Z04_E2_Drone_01_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_49.Sprite",
+      "class_name": "BillboardComponent",
+      "location": [
+        8500.0,
+        -11400.0,
+        250.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "True",
+        "is_editor_only": "True",
+        "sprite": "<Object '/Engine/EditorResources/S_TextRenderActorIcon.S_TextRenderActorIcon' (0x0000016EBE8E0600) Class 'Texture2D'>"
+      }
+    },
+    {
+      "actor": "Z04_E2_Drone_02_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_50.NewTextRenderComponent",
+      "class_name": "TextRenderComponent",
+      "location": [
+        9400.0,
+        -9900.0,
+        550.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "False",
+        "is_editor_only": "False",
+        "text": "E2 | contaminated drone staging 2 of 2",
+        "text_render_color": "<Struct 'Color' (0x000001723358F404) {b: 238, g: 232, r: 214, a: 255}>",
+        "world_size": "32.0"
+      }
+    },
+    {
+      "actor": "Z04_E2_Drone_02_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_50.Sprite",
+      "class_name": "BillboardComponent",
+      "location": [
+        9400.0,
+        -9900.0,
+        550.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "True",
+        "is_editor_only": "True",
+        "sprite": "<Object '/Engine/EditorResources/S_TextRenderActorIcon.S_TextRenderActorIcon' (0x0000016EBE8E0600) Class 'Texture2D'>"
+      }
+    },
+    {
+      "actor": "Z04_Companion_Tharne_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_51.NewTextRenderComponent",
+      "class_name": "TextRenderComponent",
+      "location": [
+        6400.0,
+        -12500.0,
+        250.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "False",
+        "is_editor_only": "False",
+        "text": "Tharne | entry companion anchor",
+        "text_render_color": "<Struct 'Color' (0x0000017233590604) {b: 238, g: 232, r: 214, a: 255}>",
+        "world_size": "32.0"
+      }
+    },
+    {
+      "actor": "Z04_Companion_Tharne_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_51.Sprite",
+      "class_name": "BillboardComponent",
+      "location": [
+        6400.0,
+        -12500.0,
+        250.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "True",
+        "is_editor_only": "True",
+        "sprite": "<Object '/Engine/EditorResources/S_TextRenderActorIcon.S_TextRenderActorIcon' (0x0000016EBE8E0600) Class 'Texture2D'>"
+      }
+    },
+    {
+      "actor": "Z04_Companion_Lyric_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_52.NewTextRenderComponent",
+      "class_name": "TextRenderComponent",
+      "location": [
+        6100.0,
+        -12500.0,
+        250.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "False",
+        "is_editor_only": "False",
+        "text": "Lyric / Ianis case | entry companion anchor",
+        "text_render_color": "<Struct 'Color' (0x0000017233591404) {b: 238, g: 232, r: 214, a: 255}>",
+        "world_size": "32.0"
+      }
+    },
+    {
+      "actor": "Z04_Companion_Lyric_Label",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_52.Sprite",
+      "class_name": "BillboardComponent",
+      "location": [
+        6100.0,
+        -12500.0,
+        250.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "True",
+        "is_editor_only": "True",
+        "sprite": "<Object '/Engine/EditorResources/S_TextRenderActorIcon.S_TextRenderActorIcon' (0x0000016EBE8E0600) Class 'Texture2D'>"
+      }
+    },
+    {
+      "actor": "Aurelion_E2_ReceiverWest",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovCampaignRelayReceiver_2.Label",
+      "class_name": "TextRenderComponent",
+      "location": [
+        5500.0,
+        -10200.0,
+        161.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "False",
+        "is_editor_only": "False",
+        "text": "Text",
+        "text_render_color": "<Struct 'Color' (0x000001723362A004) {b: 255, g: 255, r: 255, a: 255}>",
+        "world_size": "18.0"
+      }
+    },
+    {
+      "actor": "Aurelion_E2_ReceiverEast",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovCampaignRelayReceiver_3.Label",
+      "class_name": "TextRenderComponent",
+      "location": [
+        7400.0,
+        -11100.0,
+        161.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "False",
+        "is_editor_only": "False",
+        "text": "Text",
+        "text_render_color": "<Struct 'Color' (0x000001723362AE04) {b: 255, g: 255, r: 255, a: 255}>",
+        "world_size": "18.0"
+      }
+    },
+    {
+      "actor": "Aurelion_E2_RetryEncounter",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionRequestActor_20.Label",
+      "class_name": "TextRenderComponent",
+      "location": [
+        7180.0,
+        -12850.0,
+        112.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "True",
+        "is_editor_only": "False",
+        "text": "Retry encounter",
+        "text_render_color": "<Struct 'Color' (0x00000172335F6104) {b: 255, g: 255, r: 255, a: 255}>",
+        "world_size": "18.0"
+      }
+    },
+    {
+      "actor": "Aurelion_E2_ReceiversHint",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_117.NewTextRenderComponent",
+      "class_name": "TextRenderComponent",
+      "location": [
+        7000.0,
+        -12900.0,
+        260.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "False",
+        "is_editor_only": "False",
+        "text": "Relay overlook\nDisable both receivers and clear the hostiles.",
+        "text_render_color": "<Struct 'Color' (0x0000017233551404) {b: 255, g: 255, r: 255, a: 255}>",
+        "world_size": "25.0"
+      }
+    },
+    {
+      "actor": "Aurelion_E2_ReceiversHint",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_117.Sprite",
+      "class_name": "BillboardComponent",
+      "location": [
+        7000.0,
+        -12900.0,
+        260.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "True",
+        "is_editor_only": "True",
+        "sprite": "<Object '/Engine/EditorResources/S_TextRenderActorIcon.S_TextRenderActorIcon' (0x0000016EBE8E0600) Class 'Texture2D'>"
+      }
+    },
+    {
+      "actor": "Aurelion_Art_Sign_Z04_0e7c69",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_111.NewTextRenderComponent",
+      "class_name": "TextRenderComponent",
+      "location": [
+        7000.0,
+        -12500.0,
+        240.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "False",
+        "is_editor_only": "False",
+        "text": "RELAY OVERLOOK\nAHEAD: MEETING ATRIUM",
+        "text_render_color": "<Struct 'Color' (0x000001723354BC04) {b: 255, g: 255, r: 255, a: 255}>",
+        "world_size": "24.0"
+      }
+    },
+    {
+      "actor": "Aurelion_Art_Sign_Z04_0e7c69",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_111.Sprite",
+      "class_name": "BillboardComponent",
+      "location": [
+        7000.0,
+        -12500.0,
+        240.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "True",
+        "is_editor_only": "True",
+        "sprite": "<Object '/Engine/EditorResources/S_TextRenderActorIcon.S_TextRenderActorIcon' (0x0000016EBE8E0600) Class 'Texture2D'>"
+      }
+    },
+    {
+      "actor": "ENVL_Z04_Key_00",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.RectLight_11.BillboardComponent_0",
+      "class_name": "BillboardComponent",
+      "location": [
+        5140.0,
+        -11475.0,
+        470.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "True",
+        "is_editor_only": "True",
+        "sprite": "<Object '/Engine/EditorResources/LightIcons/S_LightRect.S_LightRect' (0x0000016EBEE6A800) Class 'Texture2D'>"
+      }
+    },
+    {
+      "actor": "ENVL_Z04_Key_01",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.RectLight_12.BillboardComponent_0",
+      "class_name": "BillboardComponent",
+      "location": [
+        7000.0,
+        -10335.0,
+        470.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "True",
+        "is_editor_only": "True",
+        "sprite": "<Object '/Engine/EditorResources/LightIcons/S_LightRect.S_LightRect' (0x0000016EBEE6A800) Class 'Texture2D'>"
+      }
+    },
+    {
+      "actor": "ENVL_Z04_Key_01",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.RectLight_12.BillboardComponent_1",
+      "class_name": "BillboardComponent",
+      "location": [
+        7000.0,
+        -11900.0,
+        349.9999999999991
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "True",
+        "is_editor_only": "True",
+        "sprite": "<Object '/Engine/EditorResources/LightIcons/S_LightRect.S_LightRect' (0x0000016EBEE6A800) Class 'Texture2D'>"
+      }
+    },
+    {
+      "actor": "ENVL_Z04_Key_01",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.RectLight_12.BillboardComponent_2",
+      "class_name": "BillboardComponent",
+      "location": [
+        7000.0,
+        -10100.0,
+        350.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "True",
+        "is_editor_only": "True",
+        "sprite": "<Object '/Engine/EditorResources/LightIcons/S_LightRect.S_LightRect' (0x0000016EBEE6A800) Class 'Texture2D'>"
+      }
+    },
+    {
+      "actor": "ENVL_Z04_Key_02",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.RectLight_13.BillboardComponent_0",
+      "class_name": "BillboardComponent",
+      "location": [
+        8860.0,
+        -11475.0,
+        470.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "True",
+        "is_editor_only": "True",
+        "sprite": "<Object '/Engine/EditorResources/LightIcons/S_LightRect.S_LightRect' (0x0000016EBEE6A800) Class 'Texture2D'>"
+      }
+    },
+    {
+      "actor": "ENVL_Z04_CeilingBounce_1",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.RectLight_36.BillboardComponent_0",
+      "class_name": "BillboardComponent",
+      "location": [
+        5000.0,
+        -11900.0,
+        600.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "True",
+        "is_editor_only": "True",
+        "sprite": "<Object '/Engine/EditorResources/LightIcons/S_LightRect.S_LightRect' (0x0000016EBEE6A800) Class 'Texture2D'>"
+      }
+    },
+    {
+      "actor": "ENVL_Z04_CeilingBounce_1",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.RectLight_36.BillboardComponent_1",
+      "class_name": "BillboardComponent",
+      "location": [
+        5000.0,
+        -11900.0,
+        349.9999999999998
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "True",
+        "is_editor_only": "True",
+        "sprite": "<Object '/Engine/EditorResources/LightIcons/S_LightRect.S_LightRect' (0x0000016EBEE6A800) Class 'Texture2D'>"
+      }
+    },
+    {
+      "actor": "ENVL_Z04_CeilingBounce_2",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.RectLight_37.BillboardComponent_0",
+      "class_name": "BillboardComponent",
+      "location": [
+        9000.0,
+        -11900.0,
+        600.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "True",
+        "is_editor_only": "True",
+        "sprite": "<Object '/Engine/EditorResources/LightIcons/S_LightRect.S_LightRect' (0x0000016EBEE6A800) Class 'Texture2D'>"
+      }
+    },
+    {
+      "actor": "ENVL_Z04_CeilingBounce_2",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.RectLight_37.BillboardComponent_1",
+      "class_name": "BillboardComponent",
+      "location": [
+        9000.0,
+        -11900.0,
+        349.9999999999998
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "True",
+        "is_editor_only": "True",
+        "sprite": "<Object '/Engine/EditorResources/LightIcons/S_LightRect.S_LightRect' (0x0000016EBEE6A800) Class 'Texture2D'>"
+      }
+    },
+    {
+      "actor": "ENVL_Z04_CeilingBounce_3",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.RectLight_38.BillboardComponent_0",
+      "class_name": "BillboardComponent",
+      "location": [
+        5000.0,
+        -10100.0,
+        600.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "True",
+        "is_editor_only": "True",
+        "sprite": "<Object '/Engine/EditorResources/LightIcons/S_LightRect.S_LightRect' (0x0000016EBEE6A800) Class 'Texture2D'>"
+      }
+    },
+    {
+      "actor": "ENVL_Z04_CeilingBounce_3",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.RectLight_38.BillboardComponent_1",
+      "class_name": "BillboardComponent",
+      "location": [
+        5000.0,
+        -10100.0,
+        349.9999999999998
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "True",
+        "is_editor_only": "True",
+        "sprite": "<Object '/Engine/EditorResources/LightIcons/S_LightRect.S_LightRect' (0x0000016EBEE6A800) Class 'Texture2D'>"
+      }
+    },
+    {
+      "actor": "ENVL_Z04_CeilingBounce_4",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.RectLight_39.BillboardComponent_0",
+      "class_name": "BillboardComponent",
+      "location": [
+        9000.0,
+        -10100.0,
+        600.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "True",
+        "is_editor_only": "True",
+        "sprite": "<Object '/Engine/EditorResources/LightIcons/S_LightRect.S_LightRect' (0x0000016EBEE6A800) Class 'Texture2D'>"
+      }
+    },
+    {
+      "actor": "ENVL_Z04_CeilingBounce_4",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.RectLight_39.BillboardComponent_1",
+      "class_name": "BillboardComponent",
+      "location": [
+        9000.0,
+        -10100.0,
+        349.9999999999998
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "True",
+        "is_editor_only": "True",
+        "sprite": "<Object '/Engine/EditorResources/LightIcons/S_LightRect.S_LightRect' (0x0000016EBEE6A800) Class 'Texture2D'>"
+      }
+    },
+    {
+      "actor": "Aurelion_E2.Drone1",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.BP_AurelionContaminatedDrone_C_2.Arrow",
+      "class_name": "ArrowComponent",
+      "location": [
+        8500.0,
+        -11400.0,
+        90.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "True",
+        "is_editor_only": "True",
+        "arrow_color": "<Struct 'Color' (0x00000171FCD9C2E0) {b: 255, g: 200, r: 150, a: 255}>"
+      }
+    },
+    {
+      "actor": "Aurelion_E2.Drone2",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.BP_AurelionContaminatedDrone_C_3.Arrow",
+      "class_name": "ArrowComponent",
+      "location": [
+        9400.0,
+        -9900.0,
+        390.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "True",
+        "is_editor_only": "True",
+        "arrow_color": "<Struct 'Color' (0x00000171FCD9D7E0) {b: 255, g: 200, r: 150, a: 255}>"
+      }
+    },
+    {
+      "actor": "Aurelion_E2.Enforcer1",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.BP_AurelionEnforcer_C_4.Arrow",
+      "class_name": "ArrowComponent",
+      "location": [
+        6200.0,
+        -10600.0,
+        90.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "True",
+        "is_editor_only": "True",
+        "arrow_color": "<Struct 'Color' (0x00000171FCD9F3E0) {b: 255, g: 200, r: 150, a: 255}>"
+      }
+    },
+    {
+      "actor": "Aurelion_E2.Enforcer2",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.BP_AurelionEnforcer_C_5.Arrow",
+      "class_name": "ArrowComponent",
+      "location": [
+        7000.0,
+        -10400.0,
+        90.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "True",
+        "is_editor_only": "True",
+        "arrow_color": "<Struct 'Color' (0x00000172333605E0) {b: 255, g: 200, r: 150, a: 255}>"
+      }
+    },
+    {
+      "actor": "Aurelion_E2.Enforcer3",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.BP_AurelionEnforcer_C_6.Arrow",
+      "class_name": "ArrowComponent",
+      "location": [
+        6900.0,
+        -9800.0,
+        90.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "True",
+        "is_editor_only": "True",
+        "arrow_color": "<Struct 'Color' (0x00000172333613E0) {b: 255, g: 200, r: 150, a: 255}>"
+      }
+    },
+    {
+      "actor": "Aurelion_E2.Enforcer4",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.BP_AurelionEnforcer_C_7.Arrow",
+      "class_name": "ArrowComponent",
+      "location": [
+        7900.0,
+        -10700.0,
+        90.0
+      ],
+      "properties": {
+        "visible": "True",
+        "hidden_in_game": "True",
+        "is_editor_only": "True",
+        "arrow_color": "<Struct 'Color' (0x00000172333621E0) {b: 255, g: 200, r: 150, a: 255}>"
+      }
+    }
+  ],
+  "decorations": [
+    {
+      "actor": "Z04__ArtPylon_W",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1216.StaticMeshComponent0",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=4080.000000,Y=-11000.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "mesh": "/Game/Aurelion/Environment/Blender/SM_AurelionCanopyPylon.SM_AurelionCanopyPylon",
+      "visible": true,
+      "hidden": false,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>"
+    },
+    {
+      "actor": "Z04__ArtPylon_E",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1217.StaticMeshComponent0",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=9920.000000,Y=-11000.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "mesh": "/Game/Aurelion/Environment/Blender/SM_AurelionCanopyPylon.SM_AurelionCanopyPylon",
+      "visible": true,
+      "hidden": false,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>"
+    },
+    {
+      "actor": "Z04__UpperSpan_01",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1218.StaticMeshComponent0",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=7000.000000,Y=-12720.000000,Z=620.000000),Scale3D=(X=7.750000,Y=1.000000,Z=1.000000))",
+      "mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Railing_8m.SM_Scifi_Railing_8m",
+      "visible": true,
+      "hidden": false,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>"
+    },
+    {
+      "actor": "Z04__UpperSpan_02",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1219.StaticMeshComponent0",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=7000.000000,Y=-9280.000000,Z=620.000000),Scale3D=(X=7.750000,Y=1.000000,Z=1.000000))",
+      "mesh": "/Game/SpaceshipInterior/Meshes/SM_Scifi_Railing_8m.SM_Scifi_Railing_8m",
+      "visible": true,
+      "hidden": false,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>"
+    },
+    {
+      "actor": "Z04__GoldChannel_01",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1220.StaticMeshComponent0",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=6820.000000,Y=-11000.000000,Z=4.000000),Scale3D=(X=0.120000,Y=38.000000,Z=0.040000))",
+      "mesh": "/Engine/BasicShapes/Cube.Cube",
+      "visible": true,
+      "hidden": false,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>"
+    },
+    {
+      "actor": "Z04__GoldChannel_02",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1221.StaticMeshComponent0",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=7180.000000,Y=-11000.000000,Z=4.000000),Scale3D=(X=0.120000,Y=38.000000,Z=0.040000))",
+      "mesh": "/Engine/BasicShapes/Cube.Cube",
+      "visible": true,
+      "hidden": false,
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>"
+    }
+  ]
+}
