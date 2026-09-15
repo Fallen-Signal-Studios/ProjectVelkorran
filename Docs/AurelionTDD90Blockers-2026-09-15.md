@@ -227,6 +227,27 @@ within its 60-second bound, re-resolves the E1 director and rebinds its damage o
 is respawned. Companion damage share was zero, as expected in Tarrik's solo E1; the A4 15–25% measure
 needs a completed route through Selene's encounters.
 
+## E1 passes with relief; a scene refuses to play on a blocked exit mark
+
+`EastRecoveryLoadRoute-20260915-160009-0a4a4dc8` passed E1 in 291 s with no death, so the native retry was
+not needed, and then passed E2, E3 entry and E3 rescue. It failed at E4 entry: after `DestroyReformationCage`
+completed, the `ShareIsolatedThreatData` scene moved from Loading to Failed in 60 ms with the native reason
+`Cinematic exit capsule overlaps blocking geometry`. `ValidateParticipants` ignores every scene participant
+and its attached actors, so the exit mark was occupied by some other character, and the same beat had played
+in both earlier passing routes. The pilot asserted on the failed phase and ended the chain, but the native
+request actor kept accepting play requests afterwards, and `RequestPlay` admits a replay from the Failed
+phase.
+
+That makes this a recoverable refusal rather than a dead end, so the pilot now replays the station up to
+three times, four seconds apart, and records each refusal with a census of the characters standing within
+2.5 m of every authored exit mark. The census is the evidence needed to decide whether this is ordinary
+transient occupancy or a placement defect: if a rescued survivor or companion idles on the mark, an ordinary
+player could face the same refusal, which is a content and design question rather than a pilot one. The
+shared scene observer keeps its strict default; only this driver overrides it.
+
+Damage share across E1, E2 and E3 was 4,413 to the protagonist and zero to companions in 184 native
+receipts, all against required hostiles. The A4 band needs the encounters where a companion fights.
+
 ## Score
 
 **P2 moves from 0 to 2.5 of 5** (the rubric's 0.5 level: material subset on the approved target with the
