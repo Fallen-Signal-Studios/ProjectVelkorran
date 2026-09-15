@@ -1021,3 +1021,19 @@ CacheEnclosureFit-20260914-190946-bb6116d9 imported and saved the corrected owne
 
 
 CacheEnclosureFresh-20260914-191404-9ef6fadc passed all 70 architecture receipts after reopening, with 3,140 actors, clean map packages and no Python errors. The new gate compares each moved visual envelope against the saved native cube bounds and checks nine collision contacts while preserving both priority barrier component transforms/collision. The full preceding chain passed. Supported alignment remains 63.75%; this fixes a measured presentation/collision mismatch, not full environment or live TDD acceptance.
+
+
+## Authored support closures
+
+SupportClosureKit adds a fitted cache roof and separately authored West cache and East flank gate panels. The source roof has 8,836 triangles, exact 2.8 x 2.9 x 0.2 m native collision, a 0.21 m visual envelope including recessed cassette fasteners, and centre pivot. The West gate has 27,636 triangles and is authored at 2.4 x 0.4 x 2.8 m; the East gate has 84,788 triangles and six leaves across 9 x 0.4 x 4.5 m. Both gates use double-faced ceramic cassettes, compression seals, captive fasteners, locking bridges, recessed status lights and lower service grilles.
+
+The existing native SupportPresentation Tick requires a centred 100 cm basis and scales it by Barrier.GetScaledBoxExtent()/50. Each gate is authored at its final proportions before applying inverse dimensions to its exported mesh and normals. The saved component scale reconstructs the exact authored dimensions and matches the native runtime expression; no source access, journal, reward or visibility logic is changed. Both gates remain noncolliding presentation over the original physical barriers. Clean FBX round trips pass for all three modules, and all three scoped coplanar audits report zero overlaps. The Blender roof/cache-gate assembly render was inspected. Engine placement and live acceptance are recorded separately below.
+
+
+SupportClosurePreview-20260914-192116-44f18567 passed 18 exact roof top/bottom collision contacts and four outside misses. Both gate visuals match the existing barrier locations, rotations and native runtime scales; barrier extents/collision, support linkage and cache linkage are preserved. The preview retained 3,138 other actor/collision states and passed refuge protection, survivor clearance and west/east access checks. All three captures were inspected: closed cache front, roof seam/overhang, and the full East flank gate. The run restored capture settings, removed its temporary camera and ended without Python errors. It saved assets but did not save the map.
+
+
+SupportClosureSaved-20260914-192442-555c19b7 saved the reviewed roof/gate placements after creating a map backup. The same roof, native barrier and refuge-access checks passed. All three saved captures were inspected and match the reviewed fit; capture settings were restored and the temporary camera removed. The run ended without Python errors. check_cache_enclosure.py now admits the authored visual transforms only by requiring the complete support-closure check, while retaining the original physical barrier transforms/collision checks.
+
+
+SupportClosureFresh-20260914-192718-b427909a passed all 71 architecture receipts after reopening, with 3,140 actors, clean map packages and no Python errors. The saved roof and both gate meshes retain their reviewed materials, visible flags, UV channels, Nanite precision/full fallback and collision policy. The full preceding chain passed. Supported alignment remains 63.75%; native live priority opening, checkpoint restoration, the remaining environment equipment/evacuation doors, cast presentation, combat and performance acceptance remain required. Selective Chaos destruction is still unimplemented.

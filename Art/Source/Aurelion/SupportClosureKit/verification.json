@@ -1,0 +1,33 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_CacheRoof",
+      "dimensions_m": [
+        2.799999952316284,
+        2.9000000953674316,
+        0.21000000834465027
+      ],
+      "triangles": 8836
+    },
+    {
+      "asset": "SM_Aurelion_KIT_WestCacheGate",
+      "dimensions_m": [
+        0.9999999403953552,
+        1.0,
+        1.0
+      ],
+      "triangles": 27636
+    },
+    {
+      "asset": "SM_Aurelion_KIT_EastFlankGate",
+      "dimensions_m": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "triangles": 84788
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}

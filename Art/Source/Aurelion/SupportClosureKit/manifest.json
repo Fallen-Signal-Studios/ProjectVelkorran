@@ -1,0 +1,97 @@
+{
+  "status": "Source authored; engine and live gate review pending",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_CacheRoof",
+      "triangles": 8836,
+      "nominal_dimensions_m": [
+        2.8,
+        2.9,
+        0.21
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_UplightLens"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 1,
+      "collision": "Exact original roof solid; retaining pins extend 5 mm beyond surface",
+      "solid_bounds_m": [
+        [
+          -1.4,
+          -1.45,
+          -0.1
+        ],
+        [
+          1.4,
+          1.45,
+          0.1
+        ]
+      ],
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_WestCacheGate",
+      "triangles": 27636,
+      "nominal_dimensions_m": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_UplightLens"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "Visual only; normalized native SupportPresentation basis, physical barrier remains authoritative",
+      "authored_dimensions_m": [
+        2.4,
+        0.4,
+        2.8
+      ],
+      "runtime_scale": [
+        2.4,
+        0.4,
+        2.8
+      ],
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_EastFlankGate",
+      "triangles": 84788,
+      "nominal_dimensions_m": [
+        1,
+        1,
+        1
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_UplightLens"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "Visual only; normalized native SupportPresentation basis, physical barrier remains authoritative",
+      "authored_dimensions_m": [
+        9,
+        0.4,
+        4.5
+      ],
+      "runtime_scale": [
+        9,
+        0.4,
+        4.5
+      ],
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    }
+  ]
+}

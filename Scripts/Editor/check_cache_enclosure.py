@@ -1,6 +1,6 @@
 """Measured cache wall coverage; retain native collision and mission controls."""
 from pathlib import Path
-import json,unreal
+import json,runpy,unreal
 
 def check_cache_enclosure(actors):
     root=Path(unreal.Paths.project_dir());source=root/'Art/Source/Aurelion/CacheEnclosureKit'
@@ -20,9 +20,14 @@ def check_cache_enclosure(actors):
             setattr(start,name,getattr(o,name)-getattr(e,name)-10);setattr(end,name,getattr(o,name)+getattr(e,name)+10)
             hit=c.line_trace_component(start,end,False,False,False);assert hit is not None
             contacts.append(dict(actor=a.get_actor_label(),contact=hit[0].export_text()))
+    presentation=labels['Aurelion_SupportBarrierView']
+    authored_closures=presentation.west_barrier_visual.static_mesh.get_name()=='SM_Aurelion_KIT_WestCacheGate'
+    if authored_closures:
+        runpy.run_path(str(root/'Scripts/Editor/check_support_closures.py'))['check_support_closures'](actors)
     for old in baseline:
         if old['class_name'] not in ('SovAurelionPrioritySupport','SovAurelionSupportPresentation'):continue
+        if authored_closures and old['class_name']=='SovAurelionSupportPresentation':continue
         a=labels[old['actor']];c=next(c for c in a.get_components_by_class(unreal.PrimitiveComponent) if c.get_path_name()==old['component'])
         assert c.get_world_transform().export_text()==old['transform'] and str(c.get_collision_enabled())==old['collision']
     assert len(actors)==3140
-    return dict(relocated_skins=3,native_contacts=contacts,qualification='Three wall skins now match measured native solids. Roof and gate presentation, live priority access and destruction remain separate work.')
+    return dict(relocated_skins=3,native_contacts=contacts,authored_closures_checked=authored_closures,qualification='Three wall skins match measured native solids. Authored closures are checked when present; live priority access and destruction remain separate work.')
