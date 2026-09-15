@@ -1,0 +1,15 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z04Receiver",
+      "dimensions_m": [
+        0.8999999761581421,
+        0.6000000238418579,
+        1.309999942779541
+      ],
+      "triangles": 11160
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}

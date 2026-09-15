@@ -1,0 +1,517 @@
+{
+  "actor_count": 3140,
+  "devices": [
+    {
+      "actor": "Aurelion_E2_ReceiverWest",
+      "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovCampaignRelayReceiver_2",
+      "class_name": "SovCampaignRelayReceiver",
+      "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=5500.000000,Y=-10200.000000,Z=66.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "properties": {
+        "receiver_id": "M12_E2_ReceiverWest",
+        "encounter_objective": "<Object '/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovCampaignEncounterObjective_6' (0x0000019A31450800) Class 'SovCampaignEncounterObjective'>"
+      },
+      "components": [
+        {
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovCampaignRelayReceiver_2.SceneRoot",
+          "name": "SceneRoot",
+          "class_name": "SceneComponent",
+          "properties": {
+            "visible": "True",
+            "hidden_in_game": "False"
+          },
+          "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=5500.000000,Y=-10200.000000,Z=66.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "relative_transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=5500.000000,Y=-10200.000000,Z=66.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "parent": null
+        },
+        {
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovCampaignRelayReceiver_2.Body",
+          "name": "Body",
+          "class_name": "BoxComponent",
+          "properties": {
+            "visible": "True",
+            "hidden_in_game": "True",
+            "box_extent": "<Struct 'Vector' (0x0000019A3144A708) {x: 30.000000, y: 45.000000, z: 65.000000}>",
+            "custom_primitive_data": "<Struct 'CustomPrimitiveData' (0x0000019A3144A410) {}>"
+          },
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=5500.000000,Y=-10200.000000,Z=66.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "relative_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "parent": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovCampaignRelayReceiver_2.SceneRoot",
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAllDynamic"
+        },
+        {
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovCampaignRelayReceiver_2.Visual",
+          "name": "Visual",
+          "class_name": "StaticMeshComponent",
+          "properties": {
+            "visible": "True",
+            "hidden_in_game": "False",
+            "custom_primitive_data": "<Struct 'CustomPrimitiveData' (0x0000019A31454310) {}>"
+          },
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=5499.747856,Y=-10200.197061,Z=1.312102),Scale3D=(X=0.448217,Y=0.448217,Z=0.448217))",
+          "relative_transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=1.000000,W=0.000000),Translation=(X=0.197061,Y=-0.252144,Z=-64.687898),Scale3D=(X=0.448217,Y=0.448217,Z=0.448217))",
+          "parent": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovCampaignRelayReceiver_2.Body",
+          "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+          "profile": "Custom",
+          "mesh": "/Game/Underground_Base/Meshes/SM_info_box.SM_info_box",
+          "materials": [
+            "/Game/Aurelion/Art/Props/ReceiverMaterials/MI_Info_Box_6a5b6c63.MI_Info_Box_6a5b6c63"
+          ]
+        },
+        {
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovCampaignRelayReceiver_2.Label",
+          "name": "Label",
+          "class_name": "TextRenderComponent",
+          "properties": {
+            "visible": "True",
+            "hidden_in_game": "False",
+            "text": "Text",
+            "world_size": "18.0",
+            "custom_primitive_data": "<Struct 'CustomPrimitiveData' (0x0000019A3144AB10) {}>"
+          },
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=5500.000000,Y=-10200.000000,Z=161.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "relative_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=95.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "parent": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovCampaignRelayReceiver_2.SceneRoot",
+          "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+          "profile": "NoCollision"
+        },
+        {
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovCampaignRelayReceiver_2.Interactable",
+          "name": "Interactable",
+          "class_name": "SovCampaignRelayInteractable",
+          "properties": {
+            "interaction_distance": "250.0",
+            "interaction_time": "0.5"
+          }
+        }
+      ]
+    },
+    {
+      "actor": "Aurelion_E2_ReceiverEast",
+      "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovCampaignRelayReceiver_3",
+      "class_name": "SovCampaignRelayReceiver",
+      "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=7400.000000,Y=-11100.000000,Z=66.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "properties": {
+        "receiver_id": "M12_E2_ReceiverEast",
+        "encounter_objective": "<Object '/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovCampaignEncounterObjective_6' (0x0000019A31450800) Class 'SovCampaignEncounterObjective'>"
+      },
+      "components": [
+        {
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovCampaignRelayReceiver_3.SceneRoot",
+          "name": "SceneRoot",
+          "class_name": "SceneComponent",
+          "properties": {
+            "visible": "True",
+            "hidden_in_game": "False"
+          },
+          "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=7400.000000,Y=-11100.000000,Z=66.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "relative_transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=7400.000000,Y=-11100.000000,Z=66.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "parent": null
+        },
+        {
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovCampaignRelayReceiver_3.Body",
+          "name": "Body",
+          "class_name": "BoxComponent",
+          "properties": {
+            "visible": "True",
+            "hidden_in_game": "True",
+            "box_extent": "<Struct 'Vector' (0x0000019A3144B508) {x: 30.000000, y: 45.000000, z: 65.000000}>",
+            "custom_primitive_data": "<Struct 'CustomPrimitiveData' (0x0000019A3144B210) {}>"
+          },
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=7400.000000,Y=-11100.000000,Z=66.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "relative_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "parent": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovCampaignRelayReceiver_3.SceneRoot",
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAllDynamic"
+        },
+        {
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovCampaignRelayReceiver_3.Visual",
+          "name": "Visual",
+          "class_name": "StaticMeshComponent",
+          "properties": {
+            "visible": "True",
+            "hidden_in_game": "False",
+            "custom_primitive_data": "<Struct 'CustomPrimitiveData' (0x0000019A31454B10) {}>"
+          },
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.707107,W=0.707107),Translation=(X=7399.747856,Y=-11100.197061,Z=1.312102),Scale3D=(X=0.448217,Y=0.448217,Z=0.448217))",
+          "relative_transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=1.000000,W=0.000000),Translation=(X=0.197061,Y=-0.252144,Z=-64.687898),Scale3D=(X=0.448217,Y=0.448217,Z=0.448217))",
+          "parent": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovCampaignRelayReceiver_3.Body",
+          "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+          "profile": "Custom",
+          "mesh": "/Game/Underground_Base/Meshes/SM_info_box.SM_info_box",
+          "materials": [
+            "/Game/Aurelion/Art/Props/ReceiverMaterials/MI_Info_Box_6a5b6c63.MI_Info_Box_6a5b6c63"
+          ]
+        },
+        {
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovCampaignRelayReceiver_3.Label",
+          "name": "Label",
+          "class_name": "TextRenderComponent",
+          "properties": {
+            "visible": "True",
+            "hidden_in_game": "False",
+            "text": "Text",
+            "world_size": "18.0",
+            "custom_primitive_data": "<Struct 'CustomPrimitiveData' (0x0000019A3144B910) {}>"
+          },
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=7400.000000,Y=-11100.000000,Z=161.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "relative_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=95.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "parent": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovCampaignRelayReceiver_3.SceneRoot",
+          "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+          "profile": "NoCollision"
+        },
+        {
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovCampaignRelayReceiver_3.Interactable",
+          "name": "Interactable",
+          "class_name": "SovCampaignRelayInteractable",
+          "properties": {
+            "interaction_distance": "250.0",
+            "interaction_time": "0.5"
+          }
+        }
+      ]
+    },
+    {
+      "actor": "Aurelion_Z03_SweepScanner1",
+      "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionSweepScanner_2",
+      "class_name": "SovAurelionSweepScanner",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=6200.000000,Y=-18100.000000,Z=200.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "properties": {
+        "scanner_id": "Aurelion.Z03.Scanner17",
+        "mission_id": "M12_FireAndFrost"
+      },
+      "components": [
+        {
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionSweepScanner_2.SceneRoot",
+          "name": "SceneRoot",
+          "class_name": "SceneComponent",
+          "properties": {
+            "visible": "True",
+            "hidden_in_game": "False"
+          },
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=6200.000000,Y=-18100.000000,Z=200.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "relative_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=6200.000000,Y=-18100.000000,Z=200.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "parent": null
+        },
+        {
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionSweepScanner_2.ScanCone",
+          "name": "ScanCone",
+          "class_name": "SpotLightComponent",
+          "properties": {
+            "visible": "True",
+            "hidden_in_game": "False"
+          },
+          "transform": "(Rotation=(X=0.000000,Y=0.104528,Z=0.000000,W=0.994522),Translation=(X=6200.000000,Y=-18100.000000,Z=200.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "relative_transform": "(Rotation=(X=-0.000000,Y=0.104528,Z=0.000000,W=0.994522),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "parent": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionSweepScanner_2.SceneRoot"
+        },
+        {
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionSweepScanner_2.ScannerHead",
+          "name": "ScannerHead",
+          "class_name": "StaticMeshComponent",
+          "properties": {
+            "visible": "False",
+            "hidden_in_game": "True",
+            "custom_primitive_data": "<Struct 'CustomPrimitiveData' (0x0000019A3145AB10) {}>"
+          },
+          "transform": "(Rotation=(X=0.000000,Y=0.104528,Z=0.000000,W=0.994522),Translation=(X=6200.000000,Y=-18100.000000,Z=200.000000),Scale3D=(X=0.350000,Y=0.350000,Z=0.350000))",
+          "relative_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=0.350000,Y=0.350000,Z=0.350000))",
+          "parent": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionSweepScanner_2.ScanCone",
+          "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+          "profile": "Custom",
+          "mesh": "/Engine/BasicShapes/Sphere.Sphere",
+          "materials": [
+            "/Engine/EngineMaterials/DefaultMaterial.DefaultMaterial"
+          ]
+        },
+        {
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionSweepScanner_2.ScannerLabel",
+          "name": "ScannerLabel",
+          "class_name": "TextRenderComponent",
+          "properties": {
+            "visible": "True",
+            "hidden_in_game": "False",
+            "text": "SCANNING",
+            "world_size": "24.0",
+            "custom_primitive_data": "<Struct 'CustomPrimitiveData' (0x0000019A31481810) {}>"
+          },
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=6200.000000,Y=-18100.000000,Z=250.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "relative_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=50.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "parent": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionSweepScanner_2.SceneRoot",
+          "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+          "profile": "NoCollision"
+        },
+        {
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionSweepScanner_2.HierarchicalInstancedStaticMesh",
+          "name": "HierarchicalInstancedStaticMesh",
+          "class_name": "HierarchicalInstancedStaticMeshComponent",
+          "properties": {
+            "visible": "True",
+            "hidden_in_game": "False",
+            "custom_primitive_data": "<Struct 'CustomPrimitiveData' (0x0000019A314D2D10) {}>"
+          },
+          "transform": "(Rotation=(X=0.000000,Y=0.104528,Z=0.000000,W=0.994522),Translation=(X=6200.000000,Y=-18100.000000,Z=200.000000),Scale3D=(X=0.350000,Y=0.350000,Z=0.350000))",
+          "relative_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "parent": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionSweepScanner_2.ScannerHead",
+          "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+          "profile": "Custom",
+          "mesh": "/Game/Underground_Base/Meshes/SM_camera.SM_camera",
+          "materials": [
+            "/Game/Aurelion/Environment/HISMMaterials/MI_Camera_HISM_4e439e0ff9cf.MI_Camera_HISM_4e439e0ff9cf"
+          ],
+          "instances": [
+            "(Rotation=(X=-0.073913,Y=0.073913,Z=-0.703233,W=0.703233),Translation=(X=6201.449673,Y=-18100.209429,Z=208.474284),Scale3D=(X=0.293885,Y=0.293885,Z=0.293885))"
+          ]
+        },
+        {
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionSweepScanner_2.BillboardComponent_0",
+          "name": "BillboardComponent_0",
+          "class_name": "BillboardComponent",
+          "properties": {
+            "visible": "True",
+            "hidden_in_game": "True",
+            "custom_primitive_data": "<Struct 'CustomPrimitiveData' (0x00000199BEEECE10) {}>"
+          },
+          "transform": "(Rotation=(X=0.000000,Y=0.104528,Z=0.000000,W=0.994522),Translation=(X=6200.000000,Y=-18100.000000,Z=200.000000),Scale3D=(X=0.500000,Y=0.500000,Z=0.500000))",
+          "relative_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=0.500000,Y=0.500000,Z=0.500000))",
+          "parent": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionSweepScanner_2.ScanCone",
+          "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+          "profile": "NoCollision"
+        }
+      ]
+    },
+    {
+      "actor": "Aurelion_Z03_SweepScanner2",
+      "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionSweepScanner_3",
+      "class_name": "SovAurelionSweepScanner",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=6200.000000,Y=-16600.000000,Z=200.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "properties": {
+        "scanner_id": "Aurelion.Z03.Scanner32",
+        "mission_id": "M12_FireAndFrost"
+      },
+      "components": [
+        {
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionSweepScanner_3.SceneRoot",
+          "name": "SceneRoot",
+          "class_name": "SceneComponent",
+          "properties": {
+            "visible": "True",
+            "hidden_in_game": "False"
+          },
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=6200.000000,Y=-16600.000000,Z=200.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "relative_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=6200.000000,Y=-16600.000000,Z=200.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "parent": null
+        },
+        {
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionSweepScanner_3.ScanCone",
+          "name": "ScanCone",
+          "class_name": "SpotLightComponent",
+          "properties": {
+            "visible": "True",
+            "hidden_in_game": "False"
+          },
+          "transform": "(Rotation=(X=-0.000000,Y=0.104528,Z=0.000000,W=0.994522),Translation=(X=6200.000000,Y=-16600.000000,Z=200.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "relative_transform": "(Rotation=(X=-0.000000,Y=0.104528,Z=0.000000,W=0.994522),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "parent": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionSweepScanner_3.SceneRoot"
+        },
+        {
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionSweepScanner_3.ScannerHead",
+          "name": "ScannerHead",
+          "class_name": "StaticMeshComponent",
+          "properties": {
+            "visible": "False",
+            "hidden_in_game": "True",
+            "custom_primitive_data": "<Struct 'CustomPrimitiveData' (0x0000019A3145B310) {}>"
+          },
+          "transform": "(Rotation=(X=-0.000000,Y=0.104528,Z=0.000000,W=0.994522),Translation=(X=6200.000000,Y=-16600.000000,Z=200.000000),Scale3D=(X=0.350000,Y=0.350000,Z=0.350000))",
+          "relative_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=0.350000,Y=0.350000,Z=0.350000))",
+          "parent": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionSweepScanner_3.ScanCone",
+          "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+          "profile": "Custom",
+          "mesh": "/Engine/BasicShapes/Sphere.Sphere",
+          "materials": [
+            "/Engine/EngineMaterials/DefaultMaterial.DefaultMaterial"
+          ]
+        },
+        {
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionSweepScanner_3.ScannerLabel",
+          "name": "ScannerLabel",
+          "class_name": "TextRenderComponent",
+          "properties": {
+            "visible": "True",
+            "hidden_in_game": "False",
+            "text": "SCANNING",
+            "world_size": "24.0",
+            "custom_primitive_data": "<Struct 'CustomPrimitiveData' (0x0000019A31481F10) {}>"
+          },
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=6200.000000,Y=-16600.000000,Z=250.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "relative_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=50.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "parent": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionSweepScanner_3.SceneRoot",
+          "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+          "profile": "NoCollision"
+        },
+        {
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionSweepScanner_3.HierarchicalInstancedStaticMesh",
+          "name": "HierarchicalInstancedStaticMesh",
+          "class_name": "HierarchicalInstancedStaticMeshComponent",
+          "properties": {
+            "visible": "True",
+            "hidden_in_game": "False",
+            "custom_primitive_data": "<Struct 'CustomPrimitiveData' (0x0000019A314D3B10) {}>"
+          },
+          "transform": "(Rotation=(X=-0.000000,Y=0.104528,Z=0.000000,W=0.994522),Translation=(X=6200.000000,Y=-16600.000000,Z=200.000000),Scale3D=(X=0.350000,Y=0.350000,Z=0.350000))",
+          "relative_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "parent": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionSweepScanner_3.ScannerHead",
+          "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+          "profile": "Custom",
+          "mesh": "/Game/Underground_Base/Meshes/SM_camera.SM_camera",
+          "materials": [
+            "/Game/Aurelion/Environment/HISMMaterials/MI_Camera_HISM_4e439e0ff9cf.MI_Camera_HISM_4e439e0ff9cf"
+          ],
+          "instances": [
+            "(Rotation=(X=-0.073913,Y=0.073913,Z=-0.703233,W=0.703233),Translation=(X=6201.449673,Y=-16600.209429,Z=208.474284),Scale3D=(X=0.293885,Y=0.293885,Z=0.293885))"
+          ]
+        },
+        {
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionSweepScanner_3.BillboardComponent_0",
+          "name": "BillboardComponent_0",
+          "class_name": "BillboardComponent",
+          "properties": {
+            "visible": "True",
+            "hidden_in_game": "True",
+            "custom_primitive_data": "<Struct 'CustomPrimitiveData' (0x00000199BEEE1810) {}>"
+          },
+          "transform": "(Rotation=(X=-0.000000,Y=0.104528,Z=0.000000,W=0.994522),Translation=(X=6200.000000,Y=-16600.000000,Z=200.000000),Scale3D=(X=0.500000,Y=0.500000,Z=0.500000))",
+          "relative_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=0.500000,Y=0.500000,Z=0.500000))",
+          "parent": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionSweepScanner_3.ScanCone",
+          "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+          "profile": "NoCollision"
+        }
+      ]
+    },
+    {
+      "actor": "Aurelion_Art_M12_Z04_44_dd5f3e",
+      "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.Actor_44",
+      "class_name": "Actor",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "properties": {},
+      "components": [
+        {
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.Actor_44.HierarchicalInstancedStaticMesh",
+          "name": "HierarchicalInstancedStaticMesh",
+          "class_name": "HierarchicalInstancedStaticMeshComponent",
+          "properties": {
+            "visible": "True",
+            "hidden_in_game": "False",
+            "custom_primitive_data": "<Struct 'CustomPrimitiveData' (0x0000019A314BD510) {}>"
+          },
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "relative_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "parent": null,
+          "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+          "profile": "Custom",
+          "mesh": "/Game/Aurelion/Environment/KitBash/KB3D_CPI_PropConsoleLarge_A/KB3D_CPI_PropConsoleLarge_A/StaticMeshes/SM_KB3D_CPI_PropConsoleLarge_A.SM_KB3D_CPI_PropConsoleLarge_A",
+          "materials": [
+            "/Game/Aurelion/Environment/HISMMaterials/M_KB3D_CPI_MetalsTrimA_HISM_2da3950a6258.M_KB3D_CPI_MetalsTrimA_HISM_2da3950a6258",
+            "/Game/Aurelion/Environment/HISMMaterials/M_KB3D_CPI_ScreensGraphics_HISM_dd4d52dc5a85.M_KB3D_CPI_ScreensGraphics_HISM_dd4d52dc5a85",
+            "/Game/Aurelion/Environment/HISMMaterials/M_KB3D_CPI_WireTrim_HISM_4806202bcc7b.M_KB3D_CPI_WireTrim_HISM_4806202bcc7b",
+            "/Game/Aurelion/Environment/HISMMaterials/M_KB3D_CPI_WhiteMetalTrimA_HISM_4f213aaa6ec7.M_KB3D_CPI_WhiteMetalTrimA_HISM_4f213aaa6ec7"
+          ],
+          "instances": [
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=7400.000123,Y=-11123.182134,Z=0.000003),Scale3D=(X=1.819438,Y=1.431784,Z=1.159455))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=5500.000123,Y=-10223.182134,Z=0.000003),Scale3D=(X=1.819438,Y=1.431784,Z=1.159455))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=4700.000105,Y=-11820.091183,Z=172.500001),Scale3D=(X=1.546523,Y=1.240879,Z=0.289864))"
+          ]
+        },
+        {
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.Actor_44.DefaultSceneRoot",
+          "name": "DefaultSceneRoot",
+          "class_name": "SceneComponent",
+          "properties": {
+            "visible": "True",
+            "hidden_in_game": "False"
+          },
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "relative_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "parent": null
+        },
+        {
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.Actor_44.BillboardComponent_0",
+          "name": "BillboardComponent_0",
+          "class_name": "BillboardComponent",
+          "properties": {
+            "visible": "True",
+            "hidden_in_game": "True",
+            "custom_primitive_data": "<Struct 'CustomPrimitiveData' (0x00000199EA7A9D10) {}>"
+          },
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=0.500000,Y=0.500000,Z=0.500000))",
+          "relative_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=0.500000,Y=0.500000,Z=0.500000))",
+          "parent": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.Actor_44.DefaultSceneRoot",
+          "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+          "profile": "NoCollision"
+        }
+      ]
+    },
+    {
+      "actor": "Aurelion_Art_M12_Z04_45_8c8aca",
+      "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.Actor_45",
+      "class_name": "Actor",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "properties": {},
+      "components": [
+        {
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.Actor_45.HierarchicalInstancedStaticMesh",
+          "name": "HierarchicalInstancedStaticMesh",
+          "class_name": "HierarchicalInstancedStaticMeshComponent",
+          "properties": {
+            "visible": "True",
+            "hidden_in_game": "False",
+            "custom_primitive_data": "<Struct 'CustomPrimitiveData' (0x0000019A314BE310) {}>"
+          },
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "relative_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "parent": null,
+          "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+          "profile": "Custom",
+          "mesh": "/Game/Underground_Base/Meshes/SM_wall_column.SM_wall_column",
+          "materials": [
+            "/Game/Aurelion/Environment/RadianceMaterials/M_Radiance_IvoryStone.M_Radiance_IvoryStone"
+          ],
+          "instances": [
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=7408.000031,Y=-11100.000007,Z=140.000000),Scale3D=(X=0.640000,Y=0.290909,Z=0.200000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=5508.000031,Y=-10200.000007,Z=140.000000),Scale3D=(X=0.640000,Y=0.290909,Z=0.200000))",
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=4714.000053,Y=-11800.000012,Z=0.000001),Scale3D=(X=1.120000,Y=0.509090,Z=0.450000))"
+          ]
+        },
+        {
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.Actor_45.DefaultSceneRoot",
+          "name": "DefaultSceneRoot",
+          "class_name": "SceneComponent",
+          "properties": {
+            "visible": "True",
+            "hidden_in_game": "False"
+          },
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "relative_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "parent": null
+        },
+        {
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.Actor_45.BillboardComponent_0",
+          "name": "BillboardComponent_0",
+          "class_name": "BillboardComponent",
+          "properties": {
+            "visible": "True",
+            "hidden_in_game": "True",
+            "custom_primitive_data": "<Struct 'CustomPrimitiveData' (0x00000199EA7A8810) {}>"
+          },
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=0.500000,Y=0.500000,Z=0.500000))",
+          "relative_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=0.500000,Y=0.500000,Z=0.500000))",
+          "parent": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.Actor_45.DefaultSceneRoot",
+          "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+          "profile": "NoCollision"
+        }
+      ]
+    }
+  ],
+  "qualification": "Stopped-editor component inventory, not live interaction or sensor acceptance"
+}

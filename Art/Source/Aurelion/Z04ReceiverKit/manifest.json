@@ -1,0 +1,25 @@
+{
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z04Receiver",
+      "triangles": 11160,
+      "nominal_dimensions_m": [
+        0.9,
+        0.6,
+        1.31
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_ReceiverStatus"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; native receiver Body remains unchanged",
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    }
+  ],
+  "native_status_primitive_data_index": 0
+}
