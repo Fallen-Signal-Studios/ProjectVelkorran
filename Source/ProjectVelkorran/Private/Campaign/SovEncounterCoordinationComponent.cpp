@@ -709,13 +709,15 @@ void USovEncounterCoordinationComponent::TickComponent(float Delta, ELevelTick T
 	auto* Player = Director->GetEncounterPlayer();
 	const auto* ASC = Player ? Player->GetAbilitySystemComponent() : nullptr;
 	const double Now = GetWorld()->GetTimeSeconds();
-	if (bAllowLowResourceRelief && ASC && Player->IsAlive() && Now >= NextReliefAt
+	// Relief is a recoverable state (TDD 8.7): while the player stays nearly out of resources an active relief keeps
+	// renewing, and the cooldown only counts from the moment it lapses after recovery.
+	if (bAllowLowResourceRelief && ASC && Player->IsAlive() && (Now >= NextReliefAt || IsPressureReliefActive())
 		&& SovEncounterCoordinationPolicy::LowResources(
 			ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()), ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetMaxHealthAttribute()),
 			ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetShieldAttribute()), ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetMaxShieldAttribute()),
 			ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetStaminaAttribute()), ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetMaxStaminaAttribute()),
 			ReliefHealthFraction, ReliefShieldDepletedHealthFraction))
-	{ ReliefUntil = Now + ReliefDuration; NextReliefAt = Now + ReliefCooldown; }
+	{ ReliefUntil = Now + ReliefDuration; NextReliefAt = ReliefUntil + ReliefCooldown; }
 	const bool bRelief = IsPressureReliefActive();
 	if (bRelief != bReliefReported)
 	{

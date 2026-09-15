@@ -71,6 +71,15 @@ def _incoming_damage_observer(run, pawn_path):
     return damaged
 
 
+# The pilot follows the game's own fatal recovery after a death, like a player, within these bounds.
+NATIVE_RETRY_LIMIT = 3
+NATIVE_RECOVERY_SECONDS = 60.
+
+
+def _recovery_state(pawn):
+    component = pawn.get_component_by_class(unreal.SovFatalRecoveryComponent) if pawn else None
+    return str(component.get_recovery_state()) if component else None
+
 class Run:
     def __init__(self, output_directory, resume_report=None):
         self.out = Path(output_directory)
@@ -115,13 +124,15 @@ class Run:
         self.last_pickup = None
         self.pressure = None
         self.damage_binding = None
+        self.recovery_started = None
+        self.recovery_attempt = None
         self.report = dict(status='running', scope='E1 combat, secure approach, first native handoff',
                            method='Ordinary Enhanced Input actions in an existing PIE world',
                            physical_keyboard_validation=False, rendered_image_review=False,
                            direct_state_or_resource_or_transform_writes=False,
                            driver_source_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
                            samples=[], stages=[], holds=[], targets=[], input_frames={}, rocket_reactions=[],
-                           cover_attempts=[], cover_exposures=[], pickup_approaches=[],
+                           cover_attempts=[], cover_exposures=[], pickup_approaches=[], native_retries=[],
                            incoming_damage=[], pressure_observation='Read-only native damage receipts and coordination relief state',
                            assets_before=self.before)
         self.actions = {name: unreal.load_asset(ACTION_ROOT + name) for name in
@@ -187,6 +198,43 @@ class Run:
             except Exception:
                 self.report['route_follow_on'] = dict(status='failed', error=traceback.format_exc())
             self.write()
+
+    def follow_native_recovery(self, now, world, pc, pawn):
+        # No input, healing or state writes: the fatal recovery component rescues or retries on its own timers.
+        self.inject()
+        state = _recovery_state(pawn)
+        if self.phase != 'native_recovery':
+            assert self.phase == 'combat', 'Player died outside E1 combat; no recovery is followed here: ' + self.phase
+            assert len(self.report['native_retries']) < NATIVE_RETRY_LIMIT, 'Player died again after the bounded native retries'
+            self.recovery_started = now
+            self.recovery_attempt = self.e1.get_attempt_id().export_text()
+            self.report['native_retries'].append(dict(died_elapsed=now-self.started, attempt=self.recovery_attempt,
+                health=pawn.get_health(), recovery_state=state, position=_xyz(pawn.get_actor_location()),
+                alive_roster=[r['id'] for r in self.roster() if r['alive']]))
+            self.stage('native_recovery')
+            self.phase_at = now
+            return
+        row = self.report['native_retries'][-1]
+        row['last_recovery_state'] = state
+        assert state is None or 'FAILED' not in state.upper(), 'Native fatal recovery reported failure'
+        assert now - self.recovery_started < NATIVE_RECOVERY_SECONDS, 'Native fatal recovery did not resume play in time'
+        assert world == self.world, 'Native recovery changed the world; this driver resumes only same-world recovery'
+        attempt = self.e1.get_attempt_id().export_text()
+        resumed = (pawn.is_alive() and pawn.get_health() > 0. and pawn.is_character_ready()
+                   and self.e1.get_encounter_state() == unreal.SovEncounterState.ACTIVE
+                   and (state is None or any(name in state.upper() for name in ('READY', 'RESCUED'))))
+        if not resumed:
+            return
+        row.update(resumed_elapsed=now-self.started, recovery_seconds=now-self.recovery_started,
+                   new_attempt=attempt, rescued_same_attempt=attempt == self.recovery_attempt,
+                   health=pawn.get_health(), position=_xyz(pawn.get_actor_location()))
+        self.attempt = attempt
+        self.target = self.cover_goal = self.last_pickup = self.path_target = None
+        self.path_points = []
+        self.cover_until = self.next_cover_search = -1000.
+        self.last_position = None
+        self.last_motion_at = now
+        self.stage('combat')
 
     def relief_active(self):
         return _optional(lambda: bool(self.pressure.is_pressure_relief_active())) if self.pressure else None
@@ -639,7 +687,9 @@ class Run:
             if now-self.last_write > 1.:
                 self.last_write = now
                 self.write()
-            assert pawn.is_alive() and pawn.get_health() > 0., 'Player died; no retry, healing, or resurrection was issued'
+            if self.phase == 'native_recovery' or not (pawn.is_alive() and pawn.get_health() > 0.):
+                self.follow_native_recovery(now, world, pc, pawn)
+                return
             if not pawn.is_character_ready() or not state.is_state_valid() or unreal.GameplayStatics.is_game_paused(world):
                 self.inject()
                 return

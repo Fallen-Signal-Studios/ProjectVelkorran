@@ -192,6 +192,23 @@ was cleared. Automated routes had not reached this state, likely because they re
 the corpse cleanup delay. This is a save/reload (R1, R2) and packaged-execution (P1) defect, not a
 performance-capture defect.
 
+## Creator decisions on relief and route retries
+
+`EastUnstickRoute-20260915-153804-dad2354e` died in E1 again. The half-health trigger opened relief at 48.5 s
+(health 45.1, shield 0), but the fixed 4-second window lapsed at about 52.6 s with health still 33 and no shield,
+and the 15-second cooldown blocked renewal until about 63.5 s. A drone burst at 55.3 s left 6.2 health; the
+player died at 58.6 s having defeated none of the four drones.
+
+On 15 September the creator decided two design questions:
+
+1. **Relief persists while resources stay low.** An active relief now renews while the player remains nearly
+   out of resources, lingers for its duration after recovery, and its cooldown counts from the lapse. The
+   existing no-renewal-after-lapse test is unchanged; a new test proves renewal while low and none after
+   recovery.
+2. **The route pilot may take the native death retry.** Instead of ending the run on death, the pilot follows
+   the game's own fatal recovery and encounter retry like a player, within a small bound, and every death,
+   restore and resume is recorded as R1 death/retry evidence rather than hidden.
+
 ## Score
 
 **P2 moves from 0 to 2.5 of 5** (the rubric's 0.5 level: material subset on the approved target with the

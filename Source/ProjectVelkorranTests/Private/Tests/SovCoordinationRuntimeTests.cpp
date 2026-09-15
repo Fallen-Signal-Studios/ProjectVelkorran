@@ -33,6 +33,9 @@ struct FSovCoordinationTestAccess
 	static void Stop(ASovEncounterDirector* Director)
 	{ Director->State = ESovEncounterState::Failed; Director->GetCoordinationComponent()->HandleEncounterState(ESovEncounterState::Active, ESovEncounterState::Failed); }
 	static void EndRelief(USovEncounterCoordinationComponent* Component) { Component->ReliefUntil = 0.; }
+	static double ReliefUntil(const USovEncounterCoordinationComponent* Component) { return Component->ReliefUntil; }
+	static void NearlyLapseRelief(USovEncounterCoordinationComponent* Component)
+	{ Component->ReliefUntil = Component->GetWorld()->GetTimeSeconds() + .1; }
 	static void Suspend(ASovEncounterDirector* Director, AActor* Actor) { Director->SuspendActor(Actor); }
 	static void ReleaseDirector(ASovEncounterDirector* Director) { Director->ReleaseSuspensions(); }
 	static void Stage(USovEncounterCoordinationComponent* Component, FName Id, ASovNPCCharacterBase* Character)
@@ -361,6 +364,36 @@ bool FSovCoordinationShieldDepletedReliefTest::RunTest(const FString& Parameters
 	FSovCoordinationTestAccess::Step(Coordination);
 	TestTrue(TEXT("A depleted shield at half health opens relief before critical health"), Coordination->IsPressureReliefActive());
 	TestEqual(TEXT("Relief grants no health"), PlayerASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()), 50.f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCoordinationReliefPersistsWhileLowTest,
+	"ProjectVelkorran.Campaign.Encounter.Coordination.ReliefPersistsWhileResourcesStayLow",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FSovCoordinationReliefPersistsWhileLowTest::RunTest(const FString& Parameters)
+{
+	FCoordinationWorld Test;
+	Test.Add(TEXT("First"), FVector(200.f, 0.f, 0.f));
+	auto* Coordination = Test.Director->GetCoordinationComponent();
+	FSovCoordinationTestAccess::Start(Test.Director, Test.Player);
+	auto* PlayerASC = Test.Player->GetNarrativeAbilitySystemComponent();
+	PlayerASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetHealthAttribute(), 20.f);
+	FSovCoordinationTestAccess::Step(Coordination);
+	if (!TestTrue(TEXT("Critical resources open relief"), Coordination->IsPressureReliefActive())) { return false; }
+	const double Now = Coordination->GetWorld()->GetTimeSeconds();
+	FSovCoordinationTestAccess::NearlyLapseRelief(Coordination);
+	FSovCoordinationTestAccess::Step(Coordination);
+	TestTrue(TEXT("An active relief renews while resources stay low"),
+		FSovCoordinationTestAccess::ReliefUntil(Coordination) >= Now + Coordination->ReliefDuration - .01);
+	PlayerASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetHealthAttribute(), 100.f);
+	FSovCoordinationTestAccess::NearlyLapseRelief(Coordination);
+	const double Lapsing = FSovCoordinationTestAccess::ReliefUntil(Coordination);
+	FSovCoordinationTestAccess::Step(Coordination);
+	TestEqual(TEXT("Recovered resources stop renewing relief"), FSovCoordinationTestAccess::ReliefUntil(Coordination), Lapsing);
+	FSovCoordinationTestAccess::EndRelief(Coordination);
+	PlayerASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetHealthAttribute(), 20.f);
+	FSovCoordinationTestAccess::Step(Coordination);
+	TestFalse(TEXT("A lapsed relief waits for its cooldown before reopening"), Coordination->IsPressureReliefActive());
 	return true;
 }
 
