@@ -1,0 +1,25 @@
+{
+  "status": "passed",
+  "plinths": [
+    {
+      "actor": "Z09__BlackLowerBand_01",
+      "location_cm": [
+        0,
+        25375,
+        -1500
+      ],
+      "yaw": 0
+    },
+    {
+      "actor": "Z09__BlackLowerBand_02",
+      "location_cm": [
+        0,
+        30825,
+        -1500
+      ],
+      "yaw": 180
+    }
+  ],
+  "actor_count": 3140,
+  "qualification": "Two old floating art bands become floor-mounted split plinths. Their art collision is intentionally removed; native end-wall collision is retained and checked by prior floor verification. Six-metre visual opening is source-ray verified. Live route not qualified."
+}

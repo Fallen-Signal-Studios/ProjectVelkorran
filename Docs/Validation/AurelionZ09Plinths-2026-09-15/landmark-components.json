@@ -1,0 +1,84 @@
+{
+  "status": "read_only",
+  "actors": [
+    {
+      "actor": "Z09__WoundDiscontinuity_01",
+      "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1262",
+      "class_name": "StaticMeshActor",
+      "tags": [],
+      "attachment": null,
+      "components": [
+        {
+          "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1262.StaticMeshComponent0",
+          "class_name": "StaticMeshComponent"
+        }
+      ]
+    },
+    {
+      "actor": "Z09__WoundDiscontinuity_02",
+      "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1263",
+      "class_name": "StaticMeshActor",
+      "tags": [],
+      "attachment": null,
+      "components": [
+        {
+          "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1263.StaticMeshComponent0",
+          "class_name": "StaticMeshComponent"
+        }
+      ]
+    },
+    {
+      "actor": "Z09__WoundDiscontinuity_03",
+      "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1264",
+      "class_name": "StaticMeshActor",
+      "tags": [],
+      "attachment": null,
+      "components": [
+        {
+          "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1264.StaticMeshComponent0",
+          "class_name": "StaticMeshComponent"
+        }
+      ]
+    },
+    {
+      "actor": "Z09__RestrainedVioletSlit_01",
+      "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1265",
+      "class_name": "StaticMeshActor",
+      "tags": [],
+      "attachment": null,
+      "components": [
+        {
+          "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1265.StaticMeshComponent0",
+          "class_name": "StaticMeshComponent"
+        }
+      ]
+    },
+    {
+      "actor": "Z09__RestrainedVioletSlit_02",
+      "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1266",
+      "class_name": "StaticMeshActor",
+      "tags": [],
+      "attachment": null,
+      "components": [
+        {
+          "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1266.StaticMeshComponent0",
+          "class_name": "StaticMeshComponent"
+        }
+      ]
+    },
+    {
+      "actor": "Z09__RestrainedVioletSlit_03",
+      "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1267",
+      "class_name": "StaticMeshActor",
+      "tags": [],
+      "attachment": null,
+      "components": [
+        {
+          "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1267.StaticMeshComponent0",
+          "class_name": "StaticMeshComponent"
+        }
+      ]
+    }
+  ],
+  "qualification": "Component inventory and fixed editor views; no live recognition or witness interaction tested."
+}

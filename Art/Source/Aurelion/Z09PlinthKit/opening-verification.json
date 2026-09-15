@@ -1,0 +1,132 @@
+{
+  "status": "passed",
+  "opening_clear_samples": [
+    {
+      "x": -2.99,
+      "z": 0.02,
+      "blocked": false
+    },
+    {
+      "x": -2.99,
+      "z": 0.2,
+      "blocked": false
+    },
+    {
+      "x": -2.99,
+      "z": 0.4,
+      "blocked": false
+    },
+    {
+      "x": -2.99,
+      "z": 0.6,
+      "blocked": false
+    },
+    {
+      "x": -2.99,
+      "z": 0.79,
+      "blocked": false
+    },
+    {
+      "x": -1.5,
+      "z": 0.02,
+      "blocked": false
+    },
+    {
+      "x": -1.5,
+      "z": 0.2,
+      "blocked": false
+    },
+    {
+      "x": -1.5,
+      "z": 0.4,
+      "blocked": false
+    },
+    {
+      "x": -1.5,
+      "z": 0.6,
+      "blocked": false
+    },
+    {
+      "x": -1.5,
+      "z": 0.79,
+      "blocked": false
+    },
+    {
+      "x": 0,
+      "z": 0.02,
+      "blocked": false
+    },
+    {
+      "x": 0,
+      "z": 0.2,
+      "blocked": false
+    },
+    {
+      "x": 0,
+      "z": 0.4,
+      "blocked": false
+    },
+    {
+      "x": 0,
+      "z": 0.6,
+      "blocked": false
+    },
+    {
+      "x": 0,
+      "z": 0.79,
+      "blocked": false
+    },
+    {
+      "x": 1.5,
+      "z": 0.02,
+      "blocked": false
+    },
+    {
+      "x": 1.5,
+      "z": 0.2,
+      "blocked": false
+    },
+    {
+      "x": 1.5,
+      "z": 0.4,
+      "blocked": false
+    },
+    {
+      "x": 1.5,
+      "z": 0.6,
+      "blocked": false
+    },
+    {
+      "x": 1.5,
+      "z": 0.79,
+      "blocked": false
+    },
+    {
+      "x": 2.99,
+      "z": 0.02,
+      "blocked": false
+    },
+    {
+      "x": 2.99,
+      "z": 0.2,
+      "blocked": false
+    },
+    {
+      "x": 2.99,
+      "z": 0.4,
+      "blocked": false
+    },
+    {
+      "x": 2.99,
+      "z": 0.6,
+      "blocked": false
+    },
+    {
+      "x": 2.99,
+      "z": 0.79,
+      "blocked": false
+    }
+  ],
+  "solid_control_hits": 6,
+  "qualification": "Exported visual mesh rays only; native gameplay collision checked in editor."
+}
