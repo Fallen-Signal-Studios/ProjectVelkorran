@@ -146,3 +146,9 @@ campaign route, destruction or performance. The alignment score is unchanged.
 
 Review images and the saved-state, PIE and clearance reports are retained in
 `Docs/Validation/AurelionCarrierRefinement-2026-09-15/`.
+
+`CarrierInstanceComparison-20260915-082025-9e311996` compared the stable carrier
+against four temporary unit-scale StaticMeshActors using the same assets and
+world poses. Roof artifacts persisted. The run restored all original visibility,
+removed its temporary actors, and ended with exit 0 and no Python errors. It did
+not save the map; replacing the saved HISM presentation is not supported as a fix.
