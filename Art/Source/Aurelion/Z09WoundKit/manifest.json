@@ -1,0 +1,93 @@
+{
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z09Wound_1",
+      "triangles": 16498,
+      "nominal_dimensions_m": [
+        1.7000612020492554,
+        0.026000000536441803,
+        0.2774015963077545
+      ],
+      "materials": [
+        "M_Eclipse_Intrusion",
+        "M_Aurelion_IvoryStone",
+        "M_Eclipse_Seam"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; shallow visual overlay only",
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z09Wound_2",
+      "triangles": 16756,
+      "nominal_dimensions_m": [
+        1.6998670101165771,
+        0.026000000536441803,
+        0.28685426712036133
+      ],
+      "materials": [
+        "M_Eclipse_Intrusion",
+        "M_Aurelion_IvoryStone",
+        "M_Eclipse_Seam"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; shallow visual overlay only",
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z09Wound_3",
+      "triangles": 16691,
+      "nominal_dimensions_m": [
+        1.6995866298675537,
+        0.026000000536441803,
+        0.21541039645671844
+      ],
+      "materials": [
+        "M_Eclipse_Intrusion",
+        "M_Aurelion_IvoryStone",
+        "M_Eclipse_Seam"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; shallow visual overlay only",
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    }
+  ],
+  "placements": [
+    {
+      "actor": "Z09__WoundDiscontinuity_01",
+      "asset": "SM_Aurelion_KIT_Z09Wound_1",
+      "location_cm": [
+        -620,
+        30825.5,
+        -1180
+      ],
+      "yaw": 180
+    },
+    {
+      "actor": "Z09__WoundDiscontinuity_02",
+      "asset": "SM_Aurelion_KIT_Z09Wound_2",
+      "location_cm": [
+        0,
+        30825.5,
+        -980
+      ],
+      "yaw": 180
+    },
+    {
+      "actor": "Z09__WoundDiscontinuity_03",
+      "asset": "SM_Aurelion_KIT_Z09Wound_3",
+      "location_cm": [
+        620,
+        30825.5,
+        -1180
+      ],
+      "yaw": 180
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "status": "passed",
+  "fractures": [
+    {
+      "actor": "Z09__WoundDiscontinuity_01",
+      "asset": "SM_Aurelion_KIT_Z09Wound_1",
+      "location_cm": [
+        -620,
+        30825.5,
+        -1180
+      ],
+      "yaw": 180
+    },
+    {
+      "actor": "Z09__WoundDiscontinuity_02",
+      "asset": "SM_Aurelion_KIT_Z09Wound_2",
+      "location_cm": [
+        0,
+        30825.5,
+        -980
+      ],
+      "yaw": 180
+    },
+    {
+      "actor": "Z09__WoundDiscontinuity_03",
+      "asset": "SM_Aurelion_KIT_Z09Wound_3",
+      "location_cm": [
+        620,
+        30825.5,
+        -1180
+      ],
+      "yaw": 180
+    }
+  ],
+  "actor_count": 3140,
+  "qualification": "Three visual-only north-wall/lintel overlays replace floating decorative cubes. Native walls remain unchanged; visual mounting and live narrative acceptance require separate review."
+}

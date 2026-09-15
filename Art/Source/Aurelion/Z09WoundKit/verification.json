@@ -1,0 +1,33 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z09Wound_1",
+      "dimensions_m": [
+        1.7000612020492554,
+        0.026000000536441803,
+        0.2774015963077545
+      ],
+      "triangles": 16498
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z09Wound_2",
+      "dimensions_m": [
+        1.6998670101165771,
+        0.026000000536441803,
+        0.28685426712036133
+      ],
+      "triangles": 16756
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z09Wound_3",
+      "dimensions_m": [
+        1.6995866298675537,
+        0.026000000536441803,
+        0.21541039645671844
+      ],
+      "triangles": 16691
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}
