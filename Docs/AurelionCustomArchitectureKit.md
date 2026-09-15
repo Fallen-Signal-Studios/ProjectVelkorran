@@ -1092,3 +1092,6 @@ Z03 floor pass: 91 vendor instances replaced by 85 custom room, bridge, ramp and
 
 
 Z03 wayfinding pass: 44 custom floor light registers, one mounted destination plaque, five setup labels hidden, both native scanner labels retained. Retired six obsolete decorations with explicit NoCollision profiles after fresh reload exposed restored collision from their prior profiles. Fresh Z03WayfindingFreshVerified-20260914-221949-9a09cd84: 78 passing reports, 3140 actors, clean map, no Python errors; 44 floor contacts and 194 cm minimum cover clearance. See AurelionZ03Wayfinding-2026-09-14.md. Live guidance, scanner hardware, full map, cast likeness, Chaos and 90% remain open; supported slice estimate 63.75%.
+
+
+Z04 masonry pass: 188 overlapping vendor wall instances replaced with 48 custom double-sided sections across three Blender modules. Native 50 cm wall envelope, 7 m height and both 6 x 4.5 m door openings retained. Three FBX and coplanar checks passed. Saved Z04WallsSaved-20260914-223353-cfc20fc3; fresh Z04WallsFresh-20260914-223631-41edfa85: 79 passing reports, 3140 actors, clean map, no Python errors. See AurelionZ04Walls-2026-09-14.md. Dark ceiling, balcony, floor, props, full map, cast, Chaos and live validation remain open; supported slice estimate 63.75%.

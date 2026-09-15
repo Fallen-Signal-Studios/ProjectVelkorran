@@ -1,0 +1,495 @@
+{
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z04Wall4m",
+      "triangles": 24816,
+      "nominal_dimensions_m": [
+        4,
+        0.5,
+        7
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; native Z04 walls remain authoritative",
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04WallSide",
+      "triangles": 24816,
+      "nominal_dimensions_m": [
+        4.222222222222222,
+        0.5,
+        7
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; native Z04 walls remain authoritative",
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Lintel",
+      "triangles": 15792,
+      "nominal_dimensions_m": [
+        6,
+        0.5,
+        2.5
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; native Z04 walls remain authoritative",
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    }
+  ],
+  "placements": [
+    {
+      "asset": "SM_Aurelion_KIT_Z04Wall4m",
+      "location_cm": [
+        4100,
+        -12900,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Wall4m",
+      "location_cm": [
+        4500,
+        -12900,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Wall4m",
+      "location_cm": [
+        4900,
+        -12900,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Wall4m",
+      "location_cm": [
+        5300,
+        -12900,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Wall4m",
+      "location_cm": [
+        5700,
+        -12900,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Wall4m",
+      "location_cm": [
+        6100,
+        -12900,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Wall4m",
+      "location_cm": [
+        6500,
+        -12900,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Wall4m",
+      "location_cm": [
+        7500,
+        -12900,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Wall4m",
+      "location_cm": [
+        7900,
+        -12900,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Wall4m",
+      "location_cm": [
+        8300,
+        -12900,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Wall4m",
+      "location_cm": [
+        8700,
+        -12900,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Wall4m",
+      "location_cm": [
+        9100,
+        -12900,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Wall4m",
+      "location_cm": [
+        9500,
+        -12900,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Wall4m",
+      "location_cm": [
+        9900,
+        -12900,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Lintel",
+      "location_cm": [
+        7000,
+        -12900,
+        450
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Wall4m",
+      "location_cm": [
+        4100,
+        -9100,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Wall4m",
+      "location_cm": [
+        4500,
+        -9100,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Wall4m",
+      "location_cm": [
+        4900,
+        -9100,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Wall4m",
+      "location_cm": [
+        5300,
+        -9100,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Wall4m",
+      "location_cm": [
+        5700,
+        -9100,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Wall4m",
+      "location_cm": [
+        6100,
+        -9100,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Wall4m",
+      "location_cm": [
+        6500,
+        -9100,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Wall4m",
+      "location_cm": [
+        7500,
+        -9100,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Wall4m",
+      "location_cm": [
+        7900,
+        -9100,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Wall4m",
+      "location_cm": [
+        8300,
+        -9100,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Wall4m",
+      "location_cm": [
+        8700,
+        -9100,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Wall4m",
+      "location_cm": [
+        9100,
+        -9100,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Wall4m",
+      "location_cm": [
+        9500,
+        -9100,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Wall4m",
+      "location_cm": [
+        9900,
+        -9100,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Lintel",
+      "location_cm": [
+        7000,
+        -9100,
+        450
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04WallSide",
+      "location_cm": [
+        3900,
+        -12688.888888888889,
+        0
+      ],
+      "yaw": 90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04WallSide",
+      "location_cm": [
+        3900,
+        -12266.666666666666,
+        0
+      ],
+      "yaw": 90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04WallSide",
+      "location_cm": [
+        3900,
+        -11844.444444444445,
+        0
+      ],
+      "yaw": 90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04WallSide",
+      "location_cm": [
+        3900,
+        -11422.222222222223,
+        0
+      ],
+      "yaw": 90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04WallSide",
+      "location_cm": [
+        3900,
+        -11000.0,
+        0
+      ],
+      "yaw": 90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04WallSide",
+      "location_cm": [
+        3900,
+        -10577.777777777777,
+        0
+      ],
+      "yaw": 90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04WallSide",
+      "location_cm": [
+        3900,
+        -10155.555555555555,
+        0
+      ],
+      "yaw": 90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04WallSide",
+      "location_cm": [
+        3900,
+        -9733.333333333334,
+        0
+      ],
+      "yaw": 90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04WallSide",
+      "location_cm": [
+        3900,
+        -9311.111111111111,
+        0
+      ],
+      "yaw": 90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04WallSide",
+      "location_cm": [
+        10100,
+        -12688.888888888889,
+        0
+      ],
+      "yaw": 90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04WallSide",
+      "location_cm": [
+        10100,
+        -12266.666666666666,
+        0
+      ],
+      "yaw": 90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04WallSide",
+      "location_cm": [
+        10100,
+        -11844.444444444445,
+        0
+      ],
+      "yaw": 90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04WallSide",
+      "location_cm": [
+        10100,
+        -11422.222222222223,
+        0
+      ],
+      "yaw": 90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04WallSide",
+      "location_cm": [
+        10100,
+        -11000.0,
+        0
+      ],
+      "yaw": 90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04WallSide",
+      "location_cm": [
+        10100,
+        -10577.777777777777,
+        0
+      ],
+      "yaw": 90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04WallSide",
+      "location_cm": [
+        10100,
+        -10155.555555555555,
+        0
+      ],
+      "yaw": 90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04WallSide",
+      "location_cm": [
+        10100,
+        -9733.333333333334,
+        0
+      ],
+      "yaw": 90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04WallSide",
+      "location_cm": [
+        10100,
+        -9311.111111111111,
+        0
+      ],
+      "yaw": 90
+    }
+  ]
+}

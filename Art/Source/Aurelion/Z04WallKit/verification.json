@@ -1,0 +1,33 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z04Wall4m",
+      "dimensions_m": [
+        4.0,
+        0.5,
+        7.0
+      ],
+      "triangles": 24816
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04WallSide",
+      "dimensions_m": [
+        4.222222328186035,
+        0.5,
+        7.0
+      ],
+      "triangles": 24816
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Lintel",
+      "dimensions_m": [
+        6.0,
+        0.5,
+        2.5
+      ],
+      "triangles": 15792
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}
