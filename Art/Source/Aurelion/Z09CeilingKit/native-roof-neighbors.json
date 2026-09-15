@@ -1,0 +1,370 @@
+[
+  {
+    "actor": "Z09_Wall_S-1",
+    "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_115.StaticMeshComponent0",
+    "index": null,
+    "mesh": "/Engine/BasicShapes/Cube.Cube",
+    "bounds": [
+      [
+        -800.0,
+        25325.0,
+        -1500.0
+      ],
+      [
+        -300.0,
+        25375.0,
+        -900.0
+      ]
+    ],
+    "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+    "actor_collision": true,
+    "actor_hidden": false,
+    "visible": false,
+    "hidden_in_game": true
+  },
+  {
+    "actor": "Z09_Wall_S1",
+    "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_116.StaticMeshComponent0",
+    "index": null,
+    "mesh": "/Engine/BasicShapes/Cube.Cube",
+    "bounds": [
+      [
+        300.0,
+        25325.0,
+        -1500.0
+      ],
+      [
+        800.0,
+        25375.0,
+        -900.0
+      ]
+    ],
+    "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+    "actor_collision": true,
+    "actor_hidden": false,
+    "visible": false,
+    "hidden_in_game": true
+  },
+  {
+    "actor": "Z09_Lintel_S",
+    "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_117.StaticMeshComponent0",
+    "index": null,
+    "mesh": "/Engine/BasicShapes/Cube.Cube",
+    "bounds": [
+      [
+        -300.0,
+        25325.0,
+        -1050.0
+      ],
+      [
+        300.0,
+        25375.0,
+        -900.0
+      ]
+    ],
+    "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+    "actor_collision": true,
+    "actor_hidden": false,
+    "visible": false,
+    "hidden_in_game": true
+  },
+  {
+    "actor": "Z09_Wall_N-1",
+    "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_118.StaticMeshComponent0",
+    "index": null,
+    "mesh": "/Engine/BasicShapes/Cube.Cube",
+    "bounds": [
+      [
+        -800.0,
+        30825.0,
+        -1500.0
+      ],
+      [
+        -300.0,
+        30875.0,
+        -900.0
+      ]
+    ],
+    "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+    "actor_collision": true,
+    "actor_hidden": false,
+    "visible": false,
+    "hidden_in_game": true
+  },
+  {
+    "actor": "Z09_Wall_N1",
+    "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_119.StaticMeshComponent0",
+    "index": null,
+    "mesh": "/Engine/BasicShapes/Cube.Cube",
+    "bounds": [
+      [
+        300.0,
+        30825.0,
+        -1500.0
+      ],
+      [
+        800.0,
+        30875.0,
+        -900.0
+      ]
+    ],
+    "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+    "actor_collision": true,
+    "actor_hidden": false,
+    "visible": false,
+    "hidden_in_game": true
+  },
+  {
+    "actor": "Z09_Lintel_N",
+    "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_120.StaticMeshComponent0",
+    "index": null,
+    "mesh": "/Engine/BasicShapes/Cube.Cube",
+    "bounds": [
+      [
+        -300.0,
+        30825.0,
+        -1050.0
+      ],
+      [
+        300.0,
+        30875.0,
+        -900.0
+      ]
+    ],
+    "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+    "actor_collision": true,
+    "actor_hidden": false,
+    "visible": false,
+    "hidden_in_game": true
+  },
+  {
+    "actor": "Z09_Wall_EW-1",
+    "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_121.StaticMeshComponent0",
+    "index": null,
+    "mesh": "/Engine/BasicShapes/Cube.Cube",
+    "bounds": [
+      [
+        -825.0,
+        25350.0,
+        -1500.0
+      ],
+      [
+        -775.0,
+        30850.0,
+        -900.0
+      ]
+    ],
+    "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+    "actor_collision": true,
+    "actor_hidden": false,
+    "visible": false,
+    "hidden_in_game": true
+  },
+  {
+    "actor": "Z09_Wall_EW1",
+    "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_122.StaticMeshComponent0",
+    "index": null,
+    "mesh": "/Engine/BasicShapes/Cube.Cube",
+    "bounds": [
+      [
+        775.0,
+        25350.0,
+        -1500.0
+      ],
+      [
+        825.0,
+        30850.0,
+        -900.0
+      ]
+    ],
+    "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+    "actor_collision": true,
+    "actor_hidden": false,
+    "visible": false,
+    "hidden_in_game": true
+  },
+  {
+    "actor": "Z09_Rib_1_-1",
+    "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_123.StaticMeshComponent0",
+    "index": null,
+    "mesh": "/Engine/BasicShapes/Cube.Cube",
+    "bounds": [
+      [
+        -775.0,
+        26490.0,
+        -1500.0
+      ],
+      [
+        -675.0,
+        26610.0,
+        -900.0
+      ]
+    ],
+    "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+    "actor_collision": true,
+    "actor_hidden": false,
+    "visible": false,
+    "hidden_in_game": true
+  },
+  {
+    "actor": "Z09_Rib_1_1",
+    "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_124.StaticMeshComponent0",
+    "index": null,
+    "mesh": "/Engine/BasicShapes/Cube.Cube",
+    "bounds": [
+      [
+        675.0,
+        26490.0,
+        -1500.0
+      ],
+      [
+        775.0,
+        26610.0,
+        -900.0
+      ]
+    ],
+    "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+    "actor_collision": true,
+    "actor_hidden": false,
+    "visible": false,
+    "hidden_in_game": true
+  },
+  {
+    "actor": "Z09_Rib_2_-1",
+    "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_125.StaticMeshComponent0",
+    "index": null,
+    "mesh": "/Engine/BasicShapes/Cube.Cube",
+    "bounds": [
+      [
+        -775.0,
+        27690.0,
+        -1500.0
+      ],
+      [
+        -675.0,
+        27810.0,
+        -900.0
+      ]
+    ],
+    "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+    "actor_collision": true,
+    "actor_hidden": false,
+    "visible": false,
+    "hidden_in_game": true
+  },
+  {
+    "actor": "Z09_Rib_2_1",
+    "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_126.StaticMeshComponent0",
+    "index": null,
+    "mesh": "/Engine/BasicShapes/Cube.Cube",
+    "bounds": [
+      [
+        675.0,
+        27690.0,
+        -1500.0
+      ],
+      [
+        775.0,
+        27810.0,
+        -900.0
+      ]
+    ],
+    "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+    "actor_collision": true,
+    "actor_hidden": false,
+    "visible": false,
+    "hidden_in_game": true
+  },
+  {
+    "actor": "Z09_Rib_3_-1",
+    "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_127.StaticMeshComponent0",
+    "index": null,
+    "mesh": "/Engine/BasicShapes/Cube.Cube",
+    "bounds": [
+      [
+        -775.0,
+        28890.0,
+        -1500.0
+      ],
+      [
+        -675.0,
+        29010.0,
+        -900.0
+      ]
+    ],
+    "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+    "actor_collision": true,
+    "actor_hidden": false,
+    "visible": false,
+    "hidden_in_game": true
+  },
+  {
+    "actor": "Z09_Rib_3_1",
+    "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_128.StaticMeshComponent0",
+    "index": null,
+    "mesh": "/Engine/BasicShapes/Cube.Cube",
+    "bounds": [
+      [
+        675.0,
+        28890.0,
+        -1500.0
+      ],
+      [
+        775.0,
+        29010.0,
+        -900.0
+      ]
+    ],
+    "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+    "actor_collision": true,
+    "actor_hidden": false,
+    "visible": false,
+    "hidden_in_game": true
+  },
+  {
+    "actor": "Z09_Rib_4_-1",
+    "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_129.StaticMeshComponent0",
+    "index": null,
+    "mesh": "/Engine/BasicShapes/Cube.Cube",
+    "bounds": [
+      [
+        -775.0,
+        30090.0,
+        -1500.0
+      ],
+      [
+        -675.0,
+        30210.0,
+        -900.0
+      ]
+    ],
+    "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+    "actor_collision": true,
+    "actor_hidden": false,
+    "visible": false,
+    "hidden_in_game": true
+  },
+  {
+    "actor": "Z09_Rib_4_1",
+    "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_130.StaticMeshComponent0",
+    "index": null,
+    "mesh": "/Engine/BasicShapes/Cube.Cube",
+    "bounds": [
+      [
+        675.0,
+        30090.0,
+        -1500.0
+      ],
+      [
+        775.0,
+        30210.0,
+        -900.0
+      ]
+    ],
+    "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+    "actor_collision": true,
+    "actor_hidden": false,
+    "visible": false,
+    "hidden_in_game": true
+  }
+]
