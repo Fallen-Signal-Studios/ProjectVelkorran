@@ -1,0 +1,51 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z04LowStores",
+      "dimensions_m": [
+        3.0,
+        3.0,
+        1.2000000476837158
+      ],
+      "triangles": 24388
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04WideStores",
+      "dimensions_m": [
+        3.0,
+        2.0,
+        1.2000000476837158
+      ],
+      "triangles": 24388
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04HighStores",
+      "dimensions_m": [
+        3.0,
+        3.0,
+        2.200000047683716
+      ],
+      "triangles": 24388
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04BalconyStores",
+      "dimensions_m": [
+        3.0,
+        2.0,
+        1.125
+      ],
+      "triangles": 24388
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04FootStores",
+      "dimensions_m": [
+        3.0,
+        3.0,
+        2.125
+      ],
+      "triangles": 24388
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}

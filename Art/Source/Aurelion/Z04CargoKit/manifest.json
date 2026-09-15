@@ -1,0 +1,220 @@
+{
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z04LowStores",
+      "triangles": 24388,
+      "nominal_dimensions_m": [
+        3,
+        3,
+        1.2
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; one assembly per retained native cover",
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04WideStores",
+      "triangles": 24388,
+      "nominal_dimensions_m": [
+        3,
+        2,
+        1.2
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; one assembly per retained native cover",
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04HighStores",
+      "triangles": 24388,
+      "nominal_dimensions_m": [
+        3,
+        3,
+        2.2
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; one assembly per retained native cover",
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04BalconyStores",
+      "triangles": 24388,
+      "nominal_dimensions_m": [
+        3,
+        2,
+        1.125
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; one assembly per retained native cover",
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04FootStores",
+      "triangles": 24388,
+      "nominal_dimensions_m": [
+        3,
+        3,
+        2.125
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; one assembly per retained native cover",
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    }
+  ],
+  "placements": [
+    {
+      "asset": "SM_Aurelion_KIT_Z04LowStores",
+      "location_cm": [
+        6950,
+        -12150,
+        0
+      ],
+      "yaw": 0,
+      "native_actor": "Z04_LC_SouthApproach",
+      "original_indices": [
+        0,
+        1
+      ]
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04LowStores",
+      "location_cm": [
+        7850,
+        -11850,
+        0
+      ],
+      "yaw": 0,
+      "native_actor": "Z04_LC_Southeast",
+      "original_indices": [
+        2,
+        3
+      ]
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04LowStores",
+      "location_cm": [
+        6550,
+        -10250,
+        0
+      ],
+      "yaw": 0,
+      "native_actor": "Z04_LC_NorthMid",
+      "original_indices": [
+        4,
+        5
+      ]
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04WideStores",
+      "location_cm": [
+        5450,
+        -9500,
+        0
+      ],
+      "yaw": 0,
+      "native_actor": "Z04_LC_Northwest",
+      "original_indices": [
+        6
+      ]
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04HighStores",
+      "location_cm": [
+        8650,
+        -11950,
+        0
+      ],
+      "yaw": 0,
+      "native_actor": "Z04_HC_SouthFlank",
+      "original_indices": [
+        7,
+        8
+      ]
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04HighStores",
+      "location_cm": [
+        6450,
+        -11350,
+        0
+      ],
+      "yaw": 0,
+      "native_actor": "Z04_HC_Central",
+      "original_indices": [
+        9,
+        10
+      ]
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04HighStores",
+      "location_cm": [
+        5150,
+        -10850,
+        0
+      ],
+      "yaw": 0,
+      "native_actor": "Z04_HC_West",
+      "original_indices": [
+        11,
+        12
+      ]
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04BalconyStores",
+      "location_cm": [
+        9050,
+        -10300,
+        300
+      ],
+      "yaw": 0,
+      "native_actor": "Z04_LC_Balcony",
+      "original_indices": []
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04FootStores",
+      "location_cm": [
+        8350,
+        -10800,
+        0
+      ],
+      "yaw": 0,
+      "native_actor": "Z04_HC_BalconyFoot",
+      "original_indices": []
+    }
+  ]
+}
