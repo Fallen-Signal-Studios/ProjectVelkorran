@@ -12,7 +12,7 @@ def art_transform(label,by_label):
     if '_Engine' in label:
         local=unreal.Transform(location=unreal.Vector(-2600 if label.endswith('Engine-1') else 2600,500,250))
     elif label.endswith('_Forward'):
-        local=unreal.Transform(location=unreal.Vector(0,5300,250),rotation=unreal.Rotator(pitch=-15))
+        local=unreal.Transform(location=unreal.Vector(0,5300,250))
     else:return hull
     return unreal.MathLibrary.compose_transforms(local,hull)
 
@@ -54,6 +54,10 @@ def check_carrier_kit(actors):
             # pose. Comparing to the unbanked world box would reject that repair.
             scale=a.get_actor_scale3d()
             prior=geo['bounds'](geo['corners'](expected,[0,0,0],[scale.x*50,scale.y*50,scale.z*50]))
+            if mesh_name(old['label']).endswith('Hull'):
+                # The authored low dorsal systems house raises the visual crown
+                # to 7.9 m; original width, length and route clearance are retained.
+                prior=geo['bounds'](geo['corners'](expected,[0,0,85],[2200,5250,705]))
             assert all(envelope[0][i]>=prior[0][i]-30 and envelope[1][i]<=prior[1][i]+30 for i in range(3)), (old['label'],envelope,prior)
             ns=sm.get_nanite_settings(mesh)
             assert ns.enabled and ns.position_precision==10 and ns.fallback_percent_triangles==1

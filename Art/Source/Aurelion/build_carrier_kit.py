@@ -37,6 +37,16 @@ for y in range(-36,37,8):
     for side in (-1,1):
         box('Dorsal ceramic armour',(side*8.2,y,6.07),(15.9,7.78,.14),stone,.04)
         box('Shoulder conductor',(side*15.85,y,6.16),(.075,7.32,.035),gold,.005)
+        for offset in (12.2,):
+            x=side*offset
+            box('Recessed dorsal service field',(x,y,6.16),(6.9,5.5,.04),dark,.012)
+            box('Removable ceramic service panel',(x,y,6.205),(6.55,5.15,.06),stone,.016)
+            for dy in (-2.52,2.52):box('Service-panel conductor',(x,y+dy,6.247),(6.4,.055,.025),gold,.004)
+            for dx in (-3.18,3.18):box('Service-panel edge',(x+dx,y,6.247),(.055,4.85,.025),gold,.004)
+            for dx in (-2.85,2.85):
+                for dy in (-2.15,2.15):box('Captive panel latch',(x+dx,y+dy,6.252),(.16,.32,.03),dark,.009)
+            # Asymmetric service channels distinguish access lids from paving.
+            for j in range(4):box('Dorsal recessed intake',(x+side*1.9,y-1.25+j*.8,6.245),(.8,.11,.02),dark,.004)
         # Rectangular service hatches sit flush in the broad side of the chamfered shell.
         box('Side ceramic field',(side*21.82,y,0),(.10,7.78,5.5),stone,.022)
         box('Side inset register',(side*21.88,y,.35),(.04,5.8,2.1),dark,.008)
@@ -47,6 +57,16 @@ for y in range(-36,37,8):
         box('Ventral ceramic armour',(side*7.8,y,-6.08),(15.1,7.78,.16),stone,.025)
     box('Recessed dorsal mechanism',(0,y,5.99),(.48,7.65,.07),dark,.01)
     for x in (-.18,.18):box('Dorsal guide',(x,y,6.035),(.035,7.4,.025),gold,.003)
+# A low tapered dorsal machinery house breaks the former flat-deck silhouette.
+dorsal=loft('Dorsal systems house',[(-28,1.8,.45),(-20,5,1.5),(15,5,1.5),(25,2.2,.45)],dark,.045)
+dorsal.location.z=6.2
+for y in (-15,-5,5):
+    box('Dorsal ceramic roof',(0,y,7.72),(7.45,9.72,.12),stone,.03)
+    for side in (-1,1):
+        box('Systems-house side panel',(side*5,y,6.2),(.12,9.65,1.3),stone,.022)
+        box('Systems-house recessed vent',(side*5.08,y,6.2),(.035,8.5,.75),dark,.008)
+        for k in range(12):box('Systems-house vent fin',(side*5.11,y-3.85+k*.7,6.2),(.035,.10,.6),gold,.008)
+        box('Systems-house roof conductor',(side*3.3,y,7.8),(.08,9.35,.03),gold,.005)
 # Tapered end plating continues the profile instead of a floor-tile cuboid.
 loft('Prow ceramic shell',[(-52.49,12.015,3.815),(-44,20.015,6.015),(-40.15,20.59,6.015)],stone,.015)
 loft('Stern ceramic shell',[(40.15,20.06,5.702),(45,19.015,5.515),(52.49,14.022,3.62)],stone,.015)
@@ -95,7 +115,7 @@ bridge=export_part('SM_Aurelion_KIT_CarrierBridge',[35,20,10])
 hull.hide_render=False;engine.hide_render=False;bridge.hide_render=False
 engine.location=(26,-5,2.5)
 twin=engine.copy();twin.data=engine.data;scene.collection.objects.link(twin);twin.location=(-26,-5,2.5)
-bridge.location=(0,-53,2.5);bridge.rotation_euler[1]=math.radians(15)
+bridge.location=(0,-53,2.5)
 scene.world=bpy.data.worlds.new('Carrier studio');scene.world.color=(.2,.2,.2)
 target=Vector((0,-5,0))
 for pos,power,size in [((30,-70,75),180000,45),((-70,-10,35),130000,45),((30,70,60),200000,40)]:

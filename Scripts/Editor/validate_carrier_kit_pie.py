@@ -5,9 +5,9 @@ Does not grant the Meeting receipt or move the player, actors or journal.
 from pathlib import Path
 import hashlib,json,runpy,time,traceback,unreal
 root=Path(unreal.Paths.project_dir()).resolve()
-DEFER_CARRIER_KIT_AUTORUN=True
-exec(compile((root/'Scripts/Editor/verify_carrier_kit.py').read_text(),'verify_carrier_kit','exec'),globals())
-del DEFER_CARRIER_KIT_AUTORUN
+DEFER_CARRIER_REFINEMENT_AUTORUN=True
+exec(compile((root/'Scripts/Editor/verify_carrier_refinement.py').read_text(),'verify_carrier_refinement','exec'),globals())
+del DEFER_CARRIER_REFINEMENT_AUTORUN
 saved=Path(unreal.Paths.project_saved_dir()).resolve()
 assert saved.is_relative_to(root/'Saved/Validation/Aurelion') and not list((saved/'SaveGames').glob('*.sav'))
 map_file=root/'Content/Aurelion/Maps/L_Aurelion_M12.umap'
@@ -59,6 +59,8 @@ def tick(delta):
             assert a.get_editor_property('hidden')==('_Stable' in label)
             rows.append(dict(label=label,hidden=a.get_editor_property('hidden'),visual_transform=t.export_text()))
         assert len(rows)==8
+        fill=json.loads((root/'Art/Source/Aurelion/CarrierKit/lighting-fit.json').read_text())
+        runpy.run_path(str(root/'Scripts/Editor/fit_carrier_fill.py'))['check_carrier_fill'](live,fill)
         finish(dict(status='passed_before_meeting',parts=rows,clearance='carrier-live-clearance.json',
             qualification='Fresh native PIE boot and pre-meeting geometry/visibility/navigation only; rescued transition, full route and performance remain unqualified.'))
     except Exception:

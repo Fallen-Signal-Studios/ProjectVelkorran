@@ -1,0 +1,475 @@
+{
+  "status": "passed_readonly_carrier_clearance",
+  "phase": "before_meeting",
+  "read_only": true,
+  "world": "/Game/Aurelion/Maps/UEDPIE_0_L_Aurelion_M12.L_Aurelion_M12",
+  "pawn": "/Game/Aurelion/Maps/UEDPIE_0_L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.BP_SovTarrik_C_0",
+  "journal_before": [],
+  "genuine_meeting_receipt": null,
+  "position_before": [
+    -7018.445436661814,
+    -20611.816265973117,
+    97.32144589003181
+  ],
+  "assets_before": {
+    "F:\\ProjectVelkorran\\Content\\Aurelion\\Maps\\L_Aurelion_Graybox_Velkorran.umap": "2c25e5640ee25c9c59996833dfddd4eabb5012c6ad8f2ba5119e26f5d96ff067",
+    "F:\\ProjectVelkorran\\Content\\Aurelion\\Maps\\L_Aurelion_M12.umap": "92628b372beedc4dc2a1a0056f9e5874af84f540e833ec4e507c14e0f3901ed1"
+  },
+  "parts": [
+    {
+      "actor": "/Game/Aurelion/Maps/UEDPIE_0_L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1066",
+      "label": "Aurelion_Carrier_Stable",
+      "component": "/Game/Aurelion/Maps/UEDPIE_0_L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1066.StaticMeshComponent0",
+      "center": [
+        11000.0,
+        500.0,
+        250.0
+      ],
+      "extent": [
+        2200.0,
+        5250.0,
+        600.0
+      ],
+      "min_x": 8800.0,
+      "actor_location": [
+        11000.0,
+        500.0,
+        250.0
+      ],
+      "profile": "NoCollision",
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "nav_eligible": false,
+      "hidden": true,
+      "actor_collision": false,
+      "expected_visible": false
+    },
+    {
+      "actor": "/Game/Aurelion/Maps/UEDPIE_0_L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1067",
+      "label": "Aurelion_Carrier_Stable_Engine-1",
+      "component": "/Game/Aurelion/Maps/UEDPIE_0_L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1067.StaticMeshComponent0",
+      "center": [
+        8400.0,
+        1000.0000000000001,
+        500.0
+      ],
+      "extent": [
+        600.0,
+        3000.0000000000005,
+        400.0
+      ],
+      "min_x": 7800.0,
+      "actor_location": [
+        8400.0,
+        1000.0000000000001,
+        500.0
+      ],
+      "profile": "NoCollision",
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "nav_eligible": false,
+      "hidden": true,
+      "actor_collision": false,
+      "expected_visible": false
+    },
+    {
+      "actor": "/Game/Aurelion/Maps/UEDPIE_0_L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1068",
+      "label": "Aurelion_Carrier_Stable_Engine1",
+      "component": "/Game/Aurelion/Maps/UEDPIE_0_L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1068.StaticMeshComponent0",
+      "center": [
+        13600.0,
+        1000.0000000000001,
+        500.0
+      ],
+      "extent": [
+        600.0,
+        3000.0000000000005,
+        400.0
+      ],
+      "min_x": 13000.0,
+      "actor_location": [
+        13600.0,
+        1000.0000000000001,
+        500.0
+      ],
+      "profile": "NoCollision",
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "nav_eligible": false,
+      "hidden": true,
+      "actor_collision": false,
+      "expected_visible": false
+    },
+    {
+      "actor": "/Game/Aurelion/Maps/UEDPIE_0_L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1069",
+      "label": "Aurelion_Carrier_Stable_Forward",
+      "component": "/Game/Aurelion/Maps/UEDPIE_0_L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1069.StaticMeshComponent0",
+      "center": [
+        11000.0,
+        5800.000000000001,
+        500.0
+      ],
+      "extent": [
+        1819.7797185571296,
+        1000.0000000000002,
+        935.8962420739454
+      ],
+      "min_x": 9180.220281442871,
+      "actor_location": [
+        11000.0,
+        5800.000000000001,
+        500.0
+      ],
+      "profile": "NoCollision",
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "nav_eligible": false,
+      "hidden": true,
+      "actor_collision": false,
+      "expected_visible": false
+    },
+    {
+      "actor": "/Game/Aurelion/Maps/UEDPIE_0_L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_597",
+      "label": "Aurelion_Carrier_Suspended",
+      "component": "/Game/Aurelion/Maps/UEDPIE_0_L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_597.StaticMeshComponent0",
+      "center": [
+        11000.0,
+        500.0,
+        -1000.0
+      ],
+      "extent": [
+        2200.0,
+        5250.413472728804,
+        1765.6150741764327
+      ],
+      "min_x": 8800.0,
+      "actor_location": [
+        11000.0,
+        500.0,
+        -1000.0
+      ],
+      "profile": "NoCollision",
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "nav_eligible": false,
+      "hidden": false,
+      "actor_collision": true,
+      "expected_visible": true
+    },
+    {
+      "actor": "/Game/Aurelion/Maps/UEDPIE_0_L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_607",
+      "label": "Aurelion_Carrier_Suspended_Engine-1",
+      "component": "/Game/Aurelion/Maps/UEDPIE_0_L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_607.StaticMeshComponent0",
+      "center": [
+        8400.0,
+        1000.0,
+        -750.0
+      ],
+      "extent": [
+        600.0,
+        3000.0000000000005,
+        400.00000000000017
+      ],
+      "min_x": 7800.0,
+      "actor_location": [
+        8400.0,
+        1000.0,
+        -750.0
+      ],
+      "profile": "NoCollision",
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "nav_eligible": false,
+      "hidden": false,
+      "actor_collision": true,
+      "expected_visible": true
+    },
+    {
+      "actor": "/Game/Aurelion/Maps/UEDPIE_0_L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_611",
+      "label": "Aurelion_Carrier_Suspended_Engine1",
+      "component": "/Game/Aurelion/Maps/UEDPIE_0_L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_611.StaticMeshComponent0",
+      "center": [
+        13600.0,
+        1000.0,
+        -750.0
+      ],
+      "extent": [
+        600.0,
+        3000.0000000000005,
+        400.00000000000017
+      ],
+      "min_x": 13000.0,
+      "actor_location": [
+        13600.0,
+        1000.0,
+        -750.0
+      ],
+      "profile": "NoCollision",
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "nav_eligible": false,
+      "hidden": false,
+      "actor_collision": true,
+      "expected_visible": true
+    },
+    {
+      "actor": "/Game/Aurelion/Maps/UEDPIE_0_L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_612",
+      "label": "Aurelion_Carrier_Suspended_Forward",
+      "component": "/Game/Aurelion/Maps/UEDPIE_0_L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_612.StaticMeshComponent0",
+      "center": [
+        11000.0,
+        5800.0,
+        -750.0
+      ],
+      "extent": [
+        1819.7797185571296,
+        1000.0000000000005,
+        935.8962420739456
+      ],
+      "min_x": 9180.220281442871,
+      "actor_location": [
+        11000.0,
+        5800.0,
+        -750.0
+      ],
+      "profile": "NoCollision",
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "nav_eligible": false,
+      "hidden": false,
+      "actor_collision": true,
+      "expected_visible": true
+    }
+  ],
+  "gates": [
+    {
+      "actor": "/Game/Aurelion/Maps/UEDPIE_0_L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionJournalGate_1",
+      "label": "Aurelion_CarrierApproachPresentation",
+      "blocking": true
+    },
+    {
+      "actor": "/Game/Aurelion/Maps/UEDPIE_0_L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionJournalGate_2",
+      "label": "Aurelion_CarrierRescuedPresentation",
+      "blocking": false
+    }
+  ],
+  "paths": [
+    {
+      "name": "Selene carrier seam",
+      "start": [
+        7000.0,
+        -4900.0,
+        100.0
+      ],
+      "destination": [
+        7000.0,
+        -4450.0,
+        100.0
+      ],
+      "valid": true,
+      "partial": false,
+      "points": [
+        [
+          7000.0,
+          -4900.0,
+          20.0
+        ],
+        [
+          7000.0,
+          -4450.0,
+          20.0
+        ]
+      ]
+    },
+    {
+      "name": "Selene connector length",
+      "start": [
+        7000.0,
+        -8500.0,
+        100.0
+      ],
+      "destination": [
+        7000.0,
+        -2600.0,
+        100.0
+      ],
+      "valid": true,
+      "partial": false,
+      "points": [
+        [
+          7000.0,
+          -8500.0,
+          20.0
+        ],
+        [
+          7000.0,
+          -2600.0,
+          20.0
+        ]
+      ]
+    },
+    {
+      "name": "Selene east dogleg",
+      "start": [
+        7000.0,
+        -6000.0,
+        100.0
+      ],
+      "destination": [
+        5000.0,
+        0.0,
+        100.0
+      ],
+      "valid": true,
+      "partial": false,
+      "points": [
+        [
+          7000.0,
+          -6000.0,
+          20.0
+        ],
+        [
+          6916.0,
+          -1976.0,
+          10.0
+        ],
+        [
+          5263.0,
+          -1767.0,
+          10.0
+        ],
+        [
+          5225.0,
+          -1729.0,
+          10.0
+        ],
+        [
+          5000.0,
+          -0.0,
+          10.0
+        ]
+      ]
+    }
+  ],
+  "capsule_sweeps": [
+    {
+      "name": "Selene carrier seam",
+      "segment": 0,
+      "start": [
+        7000.0,
+        -4900.0,
+        110.0
+      ],
+      "end": [
+        7000.0,
+        -4450.0,
+        110.0
+      ],
+      "result": {
+        "blocking": false,
+        "native_return": "None (no blocking hit)"
+      }
+    },
+    {
+      "name": "Selene connector length",
+      "segment": 0,
+      "start": [
+        7000.0,
+        -8500.0,
+        110.0
+      ],
+      "end": [
+        7000.0,
+        -2600.0,
+        110.0
+      ],
+      "result": {
+        "blocking": false,
+        "native_return": "None (no blocking hit)"
+      }
+    },
+    {
+      "name": "Selene east dogleg",
+      "segment": 0,
+      "start": [
+        7000.0,
+        -6000.0,
+        110.0
+      ],
+      "end": [
+        6916.0,
+        -1976.0,
+        100.0
+      ],
+      "result": {
+        "blocking": false,
+        "native_return": "None (no blocking hit)"
+      }
+    },
+    {
+      "name": "Selene east dogleg",
+      "segment": 1,
+      "start": [
+        6916.0,
+        -1976.0,
+        100.0
+      ],
+      "end": [
+        5263.0,
+        -1767.0,
+        100.0
+      ],
+      "result": {
+        "blocking": false,
+        "native_return": "None (no blocking hit)"
+      }
+    },
+    {
+      "name": "Selene east dogleg",
+      "segment": 2,
+      "start": [
+        5263.0,
+        -1767.0,
+        100.0
+      ],
+      "end": [
+        5225.0,
+        -1729.0,
+        100.0
+      ],
+      "result": {
+        "blocking": false,
+        "native_return": "None (no blocking hit)"
+      }
+    },
+    {
+      "name": "Selene east dogleg",
+      "segment": 3,
+      "start": [
+        5225.0,
+        -1729.0,
+        100.0
+      ],
+      "end": [
+        5000.0,
+        0.0,
+        100.0
+      ],
+      "result": {
+        "blocking": false,
+        "native_return": "None (no blocking hit)"
+      }
+    }
+  ],
+  "errors": [],
+  "rendered_camera_framing_verified": false,
+  "actual_player_capsule": {
+    "component": "/Game/Aurelion/Maps/UEDPIE_0_L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.BP_SovTarrik_C_0.CollisionCylinder",
+    "radius": 34.0,
+    "half_height": 88.0
+  },
+  "capsule_ignore_scope": "Mobile Narrative characters and their attachments; no carrier, wall, floor or other scenery is ignored",
+  "assets_after": {
+    "F:\\ProjectVelkorran\\Content\\Aurelion\\Maps\\L_Aurelion_Graybox_Velkorran.umap": "2c25e5640ee25c9c59996833dfddd4eabb5012c6ad8f2ba5119e26f5d96ff067",
+    "F:\\ProjectVelkorran\\Content\\Aurelion\\Maps\\L_Aurelion_M12.umap": "92628b372beedc4dc2a1a0056f9e5874af84f540e833ec4e507c14e0f3901ed1"
+  },
+  "journal_after": [],
+  "position_after": [
+    -7018.445436661814,
+    -20611.816265973117,
+    97.32144589003181
+  ],
+  "unchanged": true
+}

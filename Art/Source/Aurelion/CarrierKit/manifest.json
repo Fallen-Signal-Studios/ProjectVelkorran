@@ -2,11 +2,11 @@
   "modules": [
     {
       "asset": "SM_Aurelion_KIT_CarrierHull",
-      "triangles": 71212,
+      "triangles": 141844,
       "nominal_dimensions_m": [
         44.0,
         105.0,
-        12.337499618530273
+        13.975000381469727
       ],
       "materials": [
         "M_Aurelion_ChannelShadow",

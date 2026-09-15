@@ -1,0 +1,382 @@
+{
+  "status": "saved",
+  "geometry": {
+    "parts": [
+      {
+        "label": "Aurelion_Carrier_Suspended",
+        "mesh": "/Game/Aurelion/Environment/ArchitectureKit/Meshes/SM_Aurelion_KIT_CarrierHull.SM_Aurelion_KIT_CarrierHull",
+        "envelope_cm": [
+          [
+            8799.999755859375,
+            -4754.012689598306,
+            -2781.2049952129964
+          ],
+          [
+            13200.000244140625,
+            5791.242089092216,
+            942.4632409349526
+          ]
+        ],
+        "corrected_nominal_envelope_cm": [
+          [
+            8800.0,
+            -4754.912493815681,
+            -2785.1024754721375
+          ],
+          [
+            13200.0,
+            5793.1541730541385,
+            950.7453864856273
+          ]
+        ],
+        "old_unbanked_envelope_cm": [
+          [
+            8800.0,
+            -4750.413472728804,
+            -2765.6150741764327
+          ],
+          [
+            13200.0,
+            5750.413472728804,
+            765.6150741764327
+          ]
+        ],
+        "old_tiles": 794
+      },
+      {
+        "label": "Aurelion_Carrier_Stable",
+        "mesh": "/Game/Aurelion/Environment/ArchitectureKit/Meshes/SM_Aurelion_KIT_CarrierHull.SM_Aurelion_KIT_CarrierHull",
+        "envelope_cm": [
+          [
+            8799.999755859375,
+            -4750.0,
+            -366.0
+          ],
+          [
+            13200.000244140625,
+            5750.0,
+            1031.5
+          ]
+        ],
+        "corrected_nominal_envelope_cm": [
+          [
+            8800.0,
+            -4750.0,
+            -370.0
+          ],
+          [
+            13200.0,
+            5750.0,
+            1040.0
+          ]
+        ],
+        "old_unbanked_envelope_cm": [
+          [
+            8800.0,
+            -4750.0,
+            -350.0
+          ],
+          [
+            13200.0,
+            5750.0,
+            850.0
+          ]
+        ],
+        "old_tiles": 794
+      },
+      {
+        "label": "Aurelion_Carrier_Suspended_Engine-1",
+        "mesh": "/Game/Aurelion/Environment/ArchitectureKit/Meshes/SM_Aurelion_KIT_CarrierNacelle.SM_Aurelion_KIT_CarrierNacelle",
+        "envelope_cm": [
+          [
+            7805.249816894531,
+            -1977.0116250121478,
+            -1921.5680616016598
+          ],
+          [
+            8994.750183105469,
+            4065.843873643609,
+            187.96178362301623
+          ]
+        ],
+        "corrected_nominal_envelope_cm": [
+          [
+            7800.0,
+            -1969.6678201146678,
+            -1933.4841999213131
+          ],
+          [
+            9000.0,
+            4056.513412071836,
+            195.71817797006554
+          ]
+        ],
+        "old_unbanked_envelope_cm": [
+          [
+            7800.0,
+            -2000.0000000000005,
+            -1150.0000000000002
+          ],
+          [
+            9000.0,
+            4000.0000000000005,
+            -349.99999999999983
+          ]
+        ],
+        "old_tiles": 162
+      },
+      {
+        "label": "Aurelion_Carrier_Suspended_Engine1",
+        "mesh": "/Game/Aurelion/Environment/ArchitectureKit/Meshes/SM_Aurelion_KIT_CarrierNacelle.SM_Aurelion_KIT_CarrierNacelle",
+        "envelope_cm": [
+          [
+            13005.249816894531,
+            -1977.0116250121478,
+            -1921.5680616016598
+          ],
+          [
+            14194.750183105469,
+            4065.843873643609,
+            187.96178362301623
+          ]
+        ],
+        "corrected_nominal_envelope_cm": [
+          [
+            13000.0,
+            -1969.6678201146678,
+            -1933.4841999213131
+          ],
+          [
+            14200.0,
+            4056.513412071836,
+            195.71817797006554
+          ]
+        ],
+        "old_unbanked_envelope_cm": [
+          [
+            13000.0,
+            -2000.0000000000005,
+            -1150.0000000000002
+          ],
+          [
+            14200.0,
+            4000.0000000000005,
+            -349.99999999999983
+          ]
+        ],
+        "old_tiles": 162
+      },
+      {
+        "label": "Aurelion_Carrier_Suspended_Forward",
+        "mesh": "/Game/Aurelion/Environment/ArchitectureKit/Meshes/SM_Aurelion_KIT_CarrierBridge.SM_Aurelion_KIT_CarrierBridge",
+        "envelope_cm": [
+          [
+            9270.64599609375,
+            4642.551438222642,
+            -2621.8093697011723
+          ],
+          [
+            12729.353881835938,
+            6801.058604381254,
+            -1263.3071344114414
+          ]
+        ],
+        "corrected_nominal_envelope_cm": [
+          [
+            9250.0,
+            4633.553514990545,
+            -2660.7841585626584
+          ],
+          [
+            12750.0,
+            6807.244698904881,
+            -1236.5119850896933
+          ]
+        ],
+        "old_unbanked_envelope_cm": [
+          [
+            9180.220281442871,
+            4800.0,
+            -1685.8962420739456
+          ],
+          [
+            12819.779718557129,
+            6800.0,
+            185.8962420739456
+          ]
+        ],
+        "old_tiles": 146
+      },
+      {
+        "label": "Aurelion_Carrier_Stable_Engine-1",
+        "mesh": "/Game/Aurelion/Environment/ArchitectureKit/Meshes/SM_Aurelion_KIT_CarrierNacelle.SM_Aurelion_KIT_CarrierNacelle",
+        "envelope_cm": [
+          [
+            7805.249816894531,
+            -2011.0,
+            115.0
+          ],
+          [
+            8994.750183105469,
+            4012.0,
+            889.5000305175781
+          ]
+        ],
+        "corrected_nominal_envelope_cm": [
+          [
+            7800.0,
+            -2000.0000000000005,
+            100.0
+          ],
+          [
+            9000.0,
+            4000.0000000000005,
+            900.0
+          ]
+        ],
+        "old_unbanked_envelope_cm": [
+          [
+            7800.0,
+            -2000.0000000000005,
+            100.0
+          ],
+          [
+            9000.0,
+            4000.0000000000005,
+            900.0
+          ]
+        ],
+        "old_tiles": 162
+      },
+      {
+        "label": "Aurelion_Carrier_Stable_Engine1",
+        "mesh": "/Game/Aurelion/Environment/ArchitectureKit/Meshes/SM_Aurelion_KIT_CarrierNacelle.SM_Aurelion_KIT_CarrierNacelle",
+        "envelope_cm": [
+          [
+            13005.249816894531,
+            -2011.0,
+            115.0
+          ],
+          [
+            14194.750183105469,
+            4012.0,
+            889.5000305175781
+          ]
+        ],
+        "corrected_nominal_envelope_cm": [
+          [
+            13000.0,
+            -2000.0000000000005,
+            100.0
+          ],
+          [
+            14200.0,
+            4000.0000000000005,
+            900.0
+          ]
+        ],
+        "old_unbanked_envelope_cm": [
+          [
+            13000.0,
+            -2000.0000000000005,
+            100.0
+          ],
+          [
+            14200.0,
+            4000.0000000000005,
+            900.0
+          ]
+        ],
+        "old_tiles": 162
+      },
+      {
+        "label": "Aurelion_Carrier_Stable_Forward",
+        "mesh": "/Game/Aurelion/Environment/ArchitectureKit/Meshes/SM_Aurelion_KIT_CarrierBridge.SM_Aurelion_KIT_CarrierBridge",
+        "envelope_cm": [
+          [
+            9270.64599609375,
+            4799.9998779296875,
+            40.0
+          ],
+          [
+            12729.353881835938,
+            6800.000061035156,
+            972.5
+          ]
+        ],
+        "corrected_nominal_envelope_cm": [
+          [
+            9250.0,
+            4800.0,
+            0.0
+          ],
+          [
+            12750.0,
+            6800.0,
+            1000.0
+          ]
+        ],
+        "old_unbanked_envelope_cm": [
+          [
+            9180.220281442871,
+            4800.000000000001,
+            -435.89624207394536
+          ],
+          [
+            12819.779718557129,
+            6800.000000000001,
+            1435.8962420739454
+          ]
+        ],
+        "old_tiles": 146
+      }
+    ],
+    "removed_tiles": 2528,
+    "qualification": "Static art fit and preserved native ownership; live rescue transition and performance remain separate qualification."
+  },
+  "lighting": {
+    "lights": [
+      {
+        "name": "CarrierWestFill",
+        "location": [
+          6000,
+          2500,
+          2500
+        ],
+        "target": [
+          11000,
+          1000,
+          0
+        ],
+        "width": 400,
+        "height": 300,
+        "radius": 11000,
+        "lumens": 10000
+      },
+      {
+        "name": "CarrierForwardFill",
+        "location": [
+          14000,
+          9500,
+          2000
+        ],
+        "target": [
+          11000,
+          1000,
+          0
+        ],
+        "width": 400,
+        "height": 300,
+        "radius": 11000,
+        "lumens": 4000
+      }
+    ],
+    "color": [
+      0.88,
+      0.93,
+      1.0
+    ],
+    "qualification": "Two local shadow-casting exterior fills; global sun/exposure unchanged."
+  },
+  "preserved_lights": 113
+}

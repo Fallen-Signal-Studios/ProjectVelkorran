@@ -1,0 +1,7 @@
+{
+  "color": [0.88, 0.93, 1.0],
+  "lights": [
+    {"name":"CarrierWestFill","location":[6000,2500,2500],"target":[11000,1000,0],"width":400,"height":300,"radius":11000,"lumens":10000},
+    {"name":"CarrierForwardFill","location":[14000,9500,2000],"target":[11000,1000,0],"width":400,"height":300,"radius":11000,"lumens":4000}
+  ]
+}
