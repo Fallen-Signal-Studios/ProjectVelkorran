@@ -291,8 +291,12 @@ class Run(entry.Run):
             cue = self.scene.dialogue_cues[index]
             self.report['dialogue_cues'].append(dict(beat=self.scene_beat, index=index,
                 speaker=str(cue.speaker), text=str(cue.text), elapsed=time.monotonic()-self.started))
-        assert phase != unreal.SovCinematicPhase.FAILED, 'Native scene failed: '+json.dumps(self.report['scene_phases'][-6:])
+        if phase == unreal.SovCinematicPhase.FAILED:
+            self.scene_failed(phase)
         return phase
+
+    def scene_failed(self, phase):
+        assert phase != unreal.SovCinematicPhase.FAILED, 'Native scene failed: '+json.dumps(self.report['scene_phases'][-6:])
 
     def aim_use(self, pc, pawn, actor, kind):
         interaction, component = pc.get_interaction_component(), actor.interactable

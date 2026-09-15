@@ -50,6 +50,20 @@ def tag_name(value):
     return found[0]
 
 
+SCENE_RETRY_LIMIT = 3
+SCENE_RETRY_WAIT_SECONDS = 4.
+SCENE_RETRY_GRACE_SECONDS = 12.
+
+
+def _participant_applies_exit(participant):
+    for name in ('apply_exit_transform', 'b_apply_exit_transform'):
+        try:
+            return bool(participant.get_editor_property(name))
+        except Exception:
+            continue
+    return False
+
+
 class Run(rescue.Run):
     def __init__(self, output_directory):
         super().__init__(output_directory)
@@ -241,6 +255,7 @@ class Run(rescue.Run):
         self.scene = self.requests[beat].story
         self.scene_component = self.scene.campaign_cinematic
         self.cues_seen, self.last_scene_phase = set(), None
+        self.scene_retry = dict(attempts=0, failed_at=None, staged_at=None, failures=[])
         assert self.scene_component.get_phase() == unreal.SovCinematicPhase.IDLE
         def changed(phase,reason):
             self.report['scene_phases'].append(dict(beat=beat,phase=str(phase),reason=str(reason),
@@ -249,6 +264,52 @@ class Run(rescue.Run):
         self.scene_delegate.add_callable(self.scene_callback)
         p = self.scene.get_actor_location()
         self.begin_route(list(route or [])+[(p.x+40.,p.y-70.,p.z)],'aim_scene')
+
+    def scene_reason(self):
+        for row in reversed(self.report['scene_phases']):
+            if row.get('beat') == self.scene_beat and 'FAILED' in str(row.get('phase')) and row.get('reason'):
+                return str(row['reason'])
+        return ''
+
+    def exit_census(self):
+        # Read-only: who stands on each authored exit mark when the native exit check refused the scene.
+        rows = []
+        for participant in self.scene_component.participants:
+            if not _participant_applies_exit(participant):
+                continue
+            mark = _xyz(participant.exit_transform.translation)
+            occupants = []
+            for actor in unreal.GameplayStatics.get_all_actors_of_class(self.world, unreal.Character):
+                distance = math.dist(_xyz(actor.get_actor_location()), mark)
+                if distance < 250.:
+                    occupants.append(dict(actor=_path(actor), name=str(actor.get_name()), distance=round(distance, 1),
+                        alive=rescue.alive(actor), collision=actor.get_actor_enable_collision()))
+            rows.append(dict(binding=str(participant.binding_tag), mark=mark,
+                occupants=sorted(occupants, key=lambda row: row['distance'])))
+        return rows
+
+    def scene_failed(self, phase):
+        # An ordinary player would use the station again once the mark clears; every attempt is recorded.
+        retry = self.scene_retry
+        now = time.monotonic()
+        if retry['staged_at'] is not None and now-retry['staged_at'] < SCENE_RETRY_GRACE_SECONDS:
+            return
+        if retry['failed_at'] is None:
+            retry['failed_at'] = now
+            retry['failures'].append(dict(beat=self.scene_beat, reason=self.scene_reason(), elapsed=now-self.started,
+                attempt=retry['attempts'], census=self.exit_census()))
+            self.report['scene_retries'] = retry
+        reason = self.scene_reason()
+        assert 'overlaps blocking geometry' in reason, 'Native scene failed: '+reason+' '+json.dumps(self.report['scene_phases'][-6:])
+        assert retry['attempts'] < SCENE_RETRY_LIMIT, 'The native scene exit stayed blocked across ordinary replays: '+json.dumps(retry['failures'])
+        if now-retry['failed_at'] < SCENE_RETRY_WAIT_SECONDS:
+            self.inject()
+            return
+        retry['attempts'] += 1
+        retry['failed_at'], retry['staged_at'] = None, now
+        point = self.requests[self.scene_beat].get_actor_location()
+        self.inject()
+        self.begin_route([(point.x+40., point.y-70., point.z)], 'aim_scene')
 
     def finish_scene(self, state, events):
         if self.scene_component.get_phase() != unreal.SovCinematicPhase.COMPLETED:
@@ -267,6 +328,9 @@ class Run(rescue.Run):
         rows = [dict(actor=_path(a),hidden=bool(a.get_editor_property('hidden')),collision=a.get_actor_enable_collision()) for a in actors]
         self.report['physical_cage_views'][beat] = dict(blocking=gate.is_blocking_route(),actors=rows)
         return not gate.is_blocking_route() and all(r['hidden'] and not r['collision'] for r in rows)
+
+    def clear_scene_retry(self):
+        self.scene_retry['staged_at'] = self.scene_retry['failed_at'] = None
 
     def leave_scene(self):
         self.unbind_scene(); self.unbind_request()
@@ -404,7 +468,8 @@ class Run(rescue.Run):
             assert not self.saves.is_load_pending() and not self.saves.is_mission_travel_pending()
             assert pc.get_campaign_transition_state()!=unreal.SovCampaignTransitionState.FAILED,'Native handoff failed'
             if self.scene_component is not None:
-                self.observe_scene()
+                if self.observe_scene() in (unreal.SovCinematicPhase.PLAYING, unreal.SovCinematicPhase.COMPLETED):
+                    self.clear_scene_retry()
             if self.request_result is not None:
                 assert self.request_result['accepted'],'Native request rejected: '+self.request_result['message']
             if not pawn:
