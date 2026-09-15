@@ -10,6 +10,13 @@ assert not unreal.get_editor_subsystem(unreal.LevelEditorSubsystem).is_in_play_i
 ability = unreal.load_asset(root + '/GA_SovVerityTwinAttack')
 item = unreal.load_asset('/Game/Items/Weapons/WI_Verity')
 assert ability.generated_class() in unreal.get_default_object(item.generated_class()).get_editor_property('weapon_abilities')
+for mission_name in ('M12_FireAndFrost', 'M13_ContraryWitness'):
+    mission = unreal.load_asset('/Game/Aurelion/Data/DA_' + mission_name)
+    profiles = [p for p in mission.get_editor_property('protagonist_companions')
+                if str(p.get_editor_property('companion_id')) == 'Selene']
+    assert len(profiles) == 1
+    assert ability.generated_class() in profiles[0].get_editor_property('curated_companion_abilities'), \
+        'Twin Blade weapon grant is absent from companion allowlist: ' + mission_name
 combo = unreal.load_asset(root + '/Combo_VerityTwinBlades')
 assert list(unreal.get_default_object(ability.generated_class()).get_editor_property('DefaultComboAnimations')) == [combo]
 overlay = unreal.load_asset('/Game/Characters/Animation/ABP_SovVerityOverlay')

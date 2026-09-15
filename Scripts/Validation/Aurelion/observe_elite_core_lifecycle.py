@@ -14,7 +14,7 @@ class Observer:
         self.out = Path(os.environ['SOV_AURELION_RUN_DIRECTORY'])/'elite-core-lifecycle.json'
         assert not self.out.exists()
         self.report = dict(read_only=True, damage=[], breaks=[], bindings=[], errors=[])
-        self.bound = {}
+        self.bound = set()
         self.started = time.monotonic()
         self.last = 0.
         self.seen = False
@@ -50,7 +50,9 @@ class Observer:
                     continue
                 asc.on_damage_resolved_as_target.add_callable(self.damage)
                 core.on_weak_point_broken.add_callable(self.broken)
-                self.bound[path] = (asc, core)
+                # Native components may be collected before the next Python tick.
+                # Keep only paths; reacquire delegates from the current world.
+                self.bound.add(path)
                 self.report['bindings'].append(dict(actor=path, elapsed=now-self.started,
                     state=core.capture_weak_point_state().export_text()))
             self.write()
@@ -59,16 +61,30 @@ class Observer:
             self.stop('Observer error')
 
     def stop(self, reason):
-        for asc, core in self.bound.values():
-            if unreal.SystemLibrary.is_valid(asc):
-                asc.on_damage_resolved_as_target.remove_callable(self.damage)
-            if unreal.SystemLibrary.is_valid(core):
-                core.on_weak_point_broken.remove_callable(self.broken)
-        self.bound.clear()
+        if self.handle is None:
+            return
         unreal.unregister_slate_post_tick_callback(self.handle)
         self.handle = None
-        self.report.update(stopped=True, reason=reason)
-        self.write()
+        try:
+            world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_game_world()
+            actors = unreal.GameplayStatics.get_all_actors_of_class(world, unreal.SovAurelionElite) if world else []
+            for actor in actors:
+                if actor.get_path_name() not in self.bound:
+                    continue
+                for component, delegate, callback in (
+                    (actor.get_narrative_ability_system_component(), 'on_damage_resolved_as_target', self.damage),
+                    (actor.get_core_weak_points(), 'on_weak_point_broken', self.broken)):
+                    try:
+                        if component:
+                            getattr(component, delegate).remove_callable(callback)
+                    except Exception:
+                        self.report['errors'].append(traceback.format_exc())
+        except Exception:
+            self.report['errors'].append(traceback.format_exc())
+        finally:
+            self.bound.clear()
+            self.report.update(stopped=True, reason=reason)
+            self.write()
 
     def write(self):
         self.out.write_text(json.dumps(self.report, indent=2), encoding='utf-8')

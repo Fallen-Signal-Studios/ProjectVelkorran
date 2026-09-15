@@ -2,9 +2,12 @@
 import json
 import os
 import shutil
+import sys
 import traceback
 from pathlib import Path
 import unreal
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 out = Path(os.environ['SOV_AURELION_RUN_DIRECTORY'])
 root = '/Game/Characters/Animation/VerityTwinBlades'
@@ -52,12 +55,15 @@ try:
     report['compiler'] = str(result.report)
     assert list(unreal.get_default_object(ability.generated_class()).get_editor_property('DefaultComboAnimations')) == [combo]
     assert ability.generated_class() in unreal.get_default_object(item.generated_class()).get_editor_property('weapon_abilities')
+    from configure_aurelion_companion_equipment import replace_curated_primary
+    companion_assets, report['companion_allowlists'] = replace_curated_primary(
+        'Selene', source.generated_class(), ability.generated_class())
     assert unreal.SovBlueprintAuthoringLibrary.fingerprint_blueprint(source) == source_state
     overlay = unreal.load_asset('/Game/Characters/Animation/ABP_SovVerityOverlay')
     unreal.get_default_object(overlay.generated_class()).set_editor_property('3P_Idle',
         unreal.load_asset(root + '/SovVerity_Twinblades_Idle'))
     unreal.BlueprintEditorLibrary.compile_blueprint(overlay)
-    for asset in assets + [combo, ability, item, overlay]:
+    for asset in assets + [combo, ability, item, overlay] + companion_assets:
         assert unreal.EditorAssetLibrary.save_loaded_asset(asset, False)
         report['saved'].append(asset.get_path_name())
     report['status'] = 'saved; live animation and damage review pending'

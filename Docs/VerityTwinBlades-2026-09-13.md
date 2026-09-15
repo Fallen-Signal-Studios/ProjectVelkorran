@@ -48,3 +48,16 @@ on Selene with the actual weapon mesh. The
 companion command-target correction remains separate; the previous fresh route
 stopped at the E1 stair/drone obstruction before reaching companion qualification.
 This content pass does not establish 90% TDD alignment or a fresh route pass.
+
+## Companion allowlist repair, 2026-09-15
+
+Live E3 observation exposed a missed reference migration: both mission profiles
+still allowlisted the old Verity primary, so the native handoff snapshot omitted
+the new Twin Blade attack. Both saved Selene profiles now reference
+`GA_SovVerityTwinAttack`; their other fields are unchanged. The original authoring
+recipe now migrates this reference and the reload review asserts it in M12 and
+M13. Fresh saved-asset verification passed in
+`VerityCompanionFresh-20260915-013633-fbd1b1ad`, with no Python errors.
+See `AurelionCompanionCombat-2026-09-13.md` for the preserved live failure,
+repair evidence and pending new handoff/damage run. This repairs configuration;
+it does not by itself qualify all four attacks or companion damage.

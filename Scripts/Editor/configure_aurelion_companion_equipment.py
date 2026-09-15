@@ -40,6 +40,35 @@ def configure(hero, npc):
             'loadout': expected, 'runtime_combat_verified': False}
 
 
+def replace_curated_primary(hero, previous, replacement):
+    """Migrate one existing allowlisted attack when its weapon grant is replaced."""
+    assert not unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_game_world()
+    assert previous != replacement and replacement in curated_combat_classes(hero)
+    assets, evidence = [], []
+    for name in ('M12_FireAndFrost', 'M13_ContraryWitness'):
+        mission = unreal.load_asset('/Game/Aurelion/Data/DA_' + name)
+        assert mission, name
+        profiles = list(mission.get_editor_property('protagonist_companions'))
+        matched = [p for p in profiles if str(p.get_editor_property('companion_id')) == hero]
+        assert len(matched) == 1, name
+        profile = matched[0]
+        before = profile.export_text()
+        abilities = list(profile.get_editor_property('curated_companion_abilities'))
+        changed = previous in abilities
+        if changed:
+            assert abilities.count(previous) == 1 and replacement not in abilities, name
+            profile.set_editor_property('curated_companion_abilities',
+                [replacement if cls == previous else cls for cls in abilities])
+            assert profile.export_text() == before.replace(previous.get_path_name(), replacement.get_path_name())
+            mission.set_editor_property('protagonist_companions', profiles)
+            assets.append(mission)
+        else:
+            assert abilities.count(replacement) == 1, 'Missing authored primary allowlist: ' + name
+        evidence.append(dict(mission=mission.get_path_name(), changed=changed,
+                             before=before, after=profile.export_text()))
+    return assets, evidence
+
+
 def main():
     assert not unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_game_world(), 'Stop PIE first'
     result = {}

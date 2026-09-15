@@ -313,3 +313,38 @@ exposure rejection, with unchanged asset hashes. This is a successful live
 exercise of the revised input pilot, not proof that the correction alone
 caused survival or qualification of later companion damage. Later stages
 retain their own reports and acceptance boundaries.
+
+That route subsequently passed E2, E3 entry and E3 rescue. It was deliberately
+stopped during E4 entry through the input chain's `stop()` function, which
+released its active child's input, then PIE was ended normally. No later-stage
+pass is claimed. The companion observer recorded 267 Selene samples: Verity
+was in her inventory, but the copied curated list contained only deflection
+and unarmed punch. Sixty-five samples eventually showed an equipped weapon;
+the animation observer recorded no attack montage and no companion damage
+transaction was recorded. This is an attack-allowlist regression, not evidence
+that weapon draw failed in every sample or that every remaining combat issue
+has the same cause.
+
+Stopped-editor inspection confirmed that both M12 and M13 still allowlisted
+`GA_Attack_Melee_Verity`, while `WI_Verity` now grants `GA_SovVerityTwinAttack`.
+The native inventory snapshot correctly excludes a grant absent from the
+mission allowlist. `repair_verity_companion_allowlist.py` backed up both assets
+and replaced only Selene's old primary class. Full profile text comparison
+verified that the rest of each profile was preserved; neither map was saved.
+The existing Twin Blade authoring recipe now performs this migration when
+replacing the weapon grant, and its fresh review checks both mission profiles.
+Evidence is under that retained run's `verity-companion-allowlist/repair.json`.
+
+`VerityCompanionFresh-20260915-013633-fbd1b1ad` reopened the saved assets and
+passed the new allowlist checks, all four montage bindings and the persistent
+stance reference (exit 0, no Python errors). This remains static evidence.
+`VerityAllowlistRoute-20260915-013744-f4adca8a` is the next fresh normal-order
+handoff/damage qualification run; launching it is not a pass.
+
+Ending the preceding PIE session exposed a diagnostic cleanup failure in
+`observe_elite_core_lifecycle.py`: even `IsValid` rejects a Python wrapper whose
+native component has already been collected. The observer now retains actor
+paths, reacquires current-world delegates and unregisters its tick before
+cleanup. Three regressions pass for a collected world, live delegate removal
+and cleanup failure without a surviving callback. The original teardown
+errors remain in the run log; this diagnostic fix changes no gameplay.
