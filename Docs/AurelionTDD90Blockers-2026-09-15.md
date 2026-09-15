@@ -141,6 +141,33 @@ place while the Weaver, elite and WallRunner took him from 80 to 2 health. Both 
 partner-position rejection now re-issues the ordinary partner move, and focus held by another interactable
 for three seconds moves Tarrik to an alternate standing point, bounded to four repositions.
 
+## Packaged performance capture on the approved PC target
+
+`PackagedCapture-20260915-150900-faab9793` ran the cooked Win64 Development package
+(`AurelionPerfCapture-20260915-150424`, BuildCookRun successful) rendered at 1920×1080 on D3D12 SM6, NVIDIA
+GeForce RTX 5070 (12 GB, driver 591.86) and AMD Ryzen 9 7900X. The opt-in schedule captured M12 for
+60 seconds of steady play, reloaded it three times and exited normally, writing one report per world:
+
+| World | Samples | p50 | p95 | p99 | Max | Frames over 16.67 ms | Longest streak | Harness verdict |
+|---|---:|---:|---:|---:|---:|---:|---:|---|
+| 1 | 4096 | 12.67 | 14.99 | 16.86 | 50.80 | 42 | 3 | Pass |
+| 2 | 4096 | 12.43 | 14.49 | 16.01 | 63.02 | 26 | 1 | Pass |
+| 3 | 4096 | 12.52 | 14.50 | 17.12 | 58.98 | 45 | 2 | Pass |
+| 4 | 4096 | 12.15 | 14.05 | 16.48 | 108.38 | 37 | 2 | Fail (one frame at or above the 100 ms hard stall) |
+
+Load memory across the four worlds was 2,823, 2,358, 2,818 and 2,683 MB, which the portable rule judges
+Stable: no growing trend across three consecutive reloads. The log shows no shader compilation during play;
+blocking shader preload waits (up to 1.15 s) occurred only in frames 1–7 at startup, before warm-up discard.
+Against the TDD 18.8 baseline, 99% of frames are at or within 0.46 ms of the 60 fps target (worlds 2 and 4
+meet it, worlds 1 and 3 miss by 0.19 and 0.46 ms), no frame streak is sustained, memory does not grow and no
+shader compiles in play. The single 108 ms frame in world 4 has no hitch, GC or streaming log entry; that
+world ended on the requested exit, and the frame remains unexplained rather than excluded.
+
+Limits: a Development build, not Shipping; the player stood at M12's start, so this is startup, streaming,
+steady exploration and reload memory, not the worst-case combat capture P2 also requires; one run.
+
 ## Score
 
-Unchanged at **63.75** until the route, soak and captures above produce passing evidence.
+**P2 moves from 0 to 2.5 of 5** (the rubric's 0.5 level: material subset on the approved target with the
+current outcome incomplete, because worst-case combat is not yet captured). All other rows are unchanged
+pending the route, soak and study evidence, so the supported slice estimate is **66.25** (from 63.75).
