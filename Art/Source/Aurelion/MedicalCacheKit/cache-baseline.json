@@ -1,0 +1,58 @@
+[
+  {
+    "actor": "Aurelion_WestMedicalCache",
+    "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionMedicalCache_1",
+    "actor_transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=-3050.000000,Y=22600.000000,Z=-1140.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+    "visual": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionMedicalCache_1.Visual",
+    "visual_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=-3049.966738,Y=22599.157707,Z=-1183.715247),Scale3D=(X=1.377522,Y=1.377522,Z=1.377522))",
+    "location": [
+      -3049.9667382374564,
+      22599.15770652403,
+      -1183.7152465224847
+    ],
+    "scale": [
+      1.3775222528929152,
+      1.3775222528929154,
+      1.3775222528929154
+    ],
+    "quaternion": [
+      0.0,
+      0.0,
+      -0.7071067811865476,
+      0.7071067811865477
+    ],
+    "mesh": "/Game/Underground_Base/Meshes/SM_box_2.SM_box_2",
+    "origin": [
+      -0.6114554405212402,
+      -0.024146080017089844,
+      25.209257125854492
+    ],
+    "extent": [
+      26.772929668426514,
+      29.037643432617188,
+      26.14191246032715
+    ],
+    "visible": true,
+    "hidden": false,
+    "actor_hidden": false,
+    "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+    "profile": "Custom",
+    "actor_collision": true,
+    "body_transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=-3050.000000,Y=22600.000000,Z=-1140.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+    "body_extent": [
+      50.0,
+      40.0,
+      45.0
+    ],
+    "body_collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+    "body_profile": "BlockAllDynamic",
+    "cache_id": "Aurelion.West.MedicalAid",
+    "support": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionPrioritySupport_1",
+    "health_fraction": 0.3499999940395355,
+    "consumed": false,
+    "interaction_distance": 250.0,
+    "interaction_time": 0.3499999940395355,
+    "label_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=-3050.000000,Y=22600.000000,Z=-1065.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+    "label_text": "Text"
+  }
+]

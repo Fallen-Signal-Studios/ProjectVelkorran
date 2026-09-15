@@ -1,0 +1,15 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_MedicalAidCache",
+      "dimensions_m": [
+        0.8050000071525574,
+        1.003999948501587,
+        1.0499999523162842
+      ],
+      "triangles": 22748
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}

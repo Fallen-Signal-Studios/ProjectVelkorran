@@ -1,0 +1,33 @@
+{
+  "status": "Source authored; native cache presentation replacement pending",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_MedicalAidCache",
+      "triangles": 22748,
+      "nominal_dimensions_m": [
+        0.8,
+        1,
+        1.05
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_UplightLens"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "No visual collision; native Body box and interaction retained",
+      "position_precision": 10,
+      "preserve_fallback_geometry": true,
+      "placement": {
+        "location_cm": [
+          -3050,
+          22600,
+          -1200
+        ],
+        "yaw_degrees": 180
+      }
+    }
+  ]
+}
