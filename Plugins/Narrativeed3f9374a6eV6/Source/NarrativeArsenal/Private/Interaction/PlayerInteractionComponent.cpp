@@ -172,7 +172,7 @@ void UPlayerInteractionComponent::PerformInteractionCheck(float DeltaTime)
 	UInteractionSubsystem* Registry = GetWorld() ? GetWorld()->GetSubsystem<UInteractionSubsystem>() : nullptr;
 	if (!Registry || !OwningController || !OwningPawn) { ClearViewedInteractable(); return; }
 	FVector Eye; FRotator Rotation; OwningController->GetPlayerViewPoint(Eye, Rotation);
-	UNarrativeInteractableComponent* Best = nullptr; float BestScore = -FLT_MAX;
+	UNarrativeInteractableComponent* Best = nullptr; float BestScore = -FLT_MAX; bool bBestAdmits = false;
 	for (UNarrativeInteractableComponent* Candidate : Registry->GetInteractableActors())
 	{
 		if (!IsInteractableInReach(Candidate)) { continue; }
@@ -181,8 +181,13 @@ void UPlayerInteractionComponent::PerformInteractionCheck(float DeltaTime)
 		const float Distance = FVector::Distance(Focus, OwningPawn->GetActorLocation());
 		const float Score = FMath::Clamp(Candidate->InteractionPriority, -100, 100) * 4.f + Facing * 2.f
 			- Distance / FMath::Max(1.f, Candidate->InteractionDistance);
-		if (!Best || Score > BestScore || (FMath::IsNearlyEqual(Score, BestScore) && Candidate->GetPathName() < Best->GetPathName()))
-		{ Best = Candidate; BestScore = Score; }
+		// A prompt the player cannot use never displaces one they can: a living hostile refuses interaction,
+		// so it must not take the prompt from a control beside it. Refusals still win when nothing admits.
+		FText Refusal; const bool bAdmits = Candidate->CanInteract(OwningPawn, this, Refusal);
+		if (Best && bBestAdmits && !bAdmits) { continue; }
+		const bool bBetter = !Best || (bAdmits && !bBestAdmits) || Score > BestScore
+			|| (FMath::IsNearlyEqual(Score, BestScore) && Candidate->GetPathName() < Best->GetPathName());
+		if (bBetter) { Best = Candidate; BestScore = Score; bBestAdmits = bAdmits; }
 	}
 	if (Best) { SetViewedInteractable(Best); } else { ClearViewedInteractable(); }
 }

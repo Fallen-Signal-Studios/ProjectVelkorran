@@ -269,6 +269,31 @@ restores the control.
 This is an enemy-behaviour and interaction-readability defect found by ordinary play, not a pilot bound;
 the pilot's reposition limit is unchanged.
 
+## The focus rule, corrected twice
+
+The first attempt at E4B's stolen prompt gave every Aurelion request control `InteractionPriority` 20, matching
+`SovRescueDestination`. All 671 tests passed and the route then failed earlier, at E3's rescue door: the pilot
+held interact for eight seconds and the door never left `AtOrigin`, a hold fifteen previous runs had completed.
+The obvious suspicion was the new priority, because the native focus check re-runs every tick during a hold.
+
+That suspicion was wrong, and the census in
+`RescueDoorCensus2-20260915-165459-08a0b5a9/rescue-door-interactables.json` is why. Of the 21 authored Aurelion
+request controls in M12, the nearest stands 349 cm from the pilot's recorded standing point, outside its own
+300 cm reach. The only authored interactable whose reach covers that point is the rescue door itself, at
+165 cm with a 350 cm range. No authored control could compete there at any priority. The attribution was
+asserted before it was checked; the census is what settled it.
+
+What can still take the prompt there is a *spawned* character: any living hostile or companion carries an
+`NPCInteractable` with the base 200 cm reach, and E3's initial wave fights within that distance of the door.
+The reports recorded focus only when aiming, not during the hold, so this run cannot name what took it.
+
+The priority is reverted. The defect it was aimed at is fixed at its source instead: `CanInteract` already
+refuses a living hostile, which carries no dialogue, but `PerformInteractionCheck` scored candidates without
+ever asking. A prompt the player cannot use now never displaces one they can, and a refusal is still focused
+when nothing usable is in reach, so its own error text can still explain itself. That covers both the E4B
+Elite owning `FrostSetup` and a hostile taking the rescue door mid-hold, without ranking mission controls
+above every other interactable in the world.
+
 ## Score
 
 **P2 moves from 0 to 2.5 of 5** (the rubric's 0.5 level: material subset on the approved target with the

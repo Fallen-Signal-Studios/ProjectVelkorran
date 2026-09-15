@@ -7,6 +7,20 @@
 #include "GameFramework/Controller.h"
 #include "SovAurelionRequestRuntimeTestFixtures.generated.h"
 
+/** A competing prompt whose own admission rule is controlled by the test, as a hostile's refusal is. */
+UCLASS(Transient, NotBlueprintable)
+class USovRefusingTestInteractable : public UNarrativeInteractableComponent
+{
+    GENERATED_BODY()
+public:
+    bool bAdmit = false;
+    virtual bool CanInteract_Implementation(APawn* Interactor, UNarrativeInteractionComponent* InteractionComp, FText& OutErrorText) override
+    {
+        if (!bAdmit) { OutErrorText = FText::FromString(TEXT("This prompt refuses interaction")); }
+        return bAdmit;
+    }
+};
+
 /** Only the owning controller/pawn are supplied; the native focus selection and reach remain active. */
 UCLASS(Transient, NotBlueprintable)
 class USovAurelionFocusTestInteraction : public UPlayerInteractionComponent

@@ -14,7 +14,6 @@
 #include "LevelSequence.h"
 #include "MovieScene.h"
 #include "Tests/SovHandoffRuntimeTestFixtures.h"
-#include "AI/NPCInteractable.h"
 #include "Interaction/InteractionSubsystem.h"
 #include "Campaign/SovAurelionRequestActor.h"
 #include "Character/PlayerDefinition.h"
@@ -387,17 +386,17 @@ bool FSovAurelionPendingHoldTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAurelionRequestFocusPriorityTest,
-    "ProjectVelkorran.Campaign.Aurelion.Request.MissionControlOutranksAdjacentHostilePrompt",
+    "ProjectVelkorran.Campaign.Aurelion.Request.RefusedPromptCannotTakeFocusFromAUsableControl",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovAurelionRequestFocusPriorityTest::RunTest(const FString& Parameters)
 {
     FTerminalWorld F; if (!TestNotNull(TEXT("Ready managed player"), F.ASC)) { return false; }
-    // A hostile stands nearer than the control and on the same line, as the Elite did beside E4B's FrostSetup.
+    // A refusing prompt stands nearer than the control, as the living Elite did beside E4B's FrostSetup.
     auto* Hostile = F.World->SpawnActor<AActor>();
     auto* Body = NewObject<UBoxComponent>(Hostile); Hostile->SetRootComponent(Body); Hostile->AddInstanceComponent(Body);
     Body->SetBoxExtent(FVector(34, 34, 88)); Body->SetCollisionEnabled(ECollisionEnabled::NoCollision); Body->RegisterComponent();
     Hostile->SetActorLocation(F.Player->GetActorLocation() + FVector(100, 0, 0));
-    auto* HostilePrompt = NewObject<UNPCInteractable>(Hostile);
+    auto* HostilePrompt = NewObject<USovRefusingTestInteractable>(Hostile);
     Hostile->AddInstanceComponent(HostilePrompt); HostilePrompt->RegisterComponent(); HostilePrompt->Activate();
     auto* Interaction = NewObject<USovAurelionFocusTestInteraction>(F.PC);
     F.PC->AddInstanceComponent(Interaction); Interaction->RegisterComponent(); Interaction->Configure(F.PC);
@@ -411,20 +410,21 @@ bool FSovAurelionRequestFocusPriorityTest::RunTest(const FString& Parameters)
         || !TestTrue(TEXT("The nearer hostile prompt is within native reach"),
             Interaction->IsInteractableInReach(HostilePrompt)))
     { return false; }
-    TestEqual(TEXT("The authored mission control keeps its mission-critical priority"),
-        F.Terminal->Interactable->InteractionPriority, 20);
+    TestEqual(TEXT("Neither prompt is given an authored priority advantage"),
+        F.Terminal->Interactable->InteractionPriority, HostilePrompt->InteractionPriority);
     Interaction->PerformInteractionCheck(0.f);
-    TestEqual(TEXT("A nearer hostile prompt cannot take focus from the required control"),
+    TestEqual(TEXT("A nearer refused prompt cannot take focus from the usable control"),
         Interaction->Viewed(), static_cast<const UNarrativeInteractableComponent*>(F.Terminal->Interactable));
-    // Without the priority the nearer prompt wins on the native score, which is the failure this guards.
-    F.Terminal->Interactable->InteractionPriority = 0;
+    // The same nearer prompt wins once it admits interaction, so admission is what decided the contest.
+    HostilePrompt->bAdmit = true;
     Interaction->PerformInteractionCheck(0.f);
-    TestEqual(TEXT("Priority, not range or facing, is what decides this contest"),
+    TestEqual(TEXT("Range still decides between two usable prompts"),
         Interaction->Viewed(), static_cast<const UNarrativeInteractableComponent*>(HostilePrompt));
-    F.Terminal->Interactable->InteractionPriority = 20;
+    // With nothing usable in reach the refusal is still shown, so its own error text can explain itself.
+    HostilePrompt->bAdmit = false; F.Terminal->Interactable->Deactivate();
     Interaction->PerformInteractionCheck(0.f);
-    TestEqual(TEXT("Restoring the priority restores the control's prompt"),
-        Interaction->Viewed(), static_cast<const UNarrativeInteractableComponent*>(F.Terminal->Interactable));
+    TestEqual(TEXT("A refusal is still focused when no usable prompt is in reach"),
+        Interaction->Viewed(), static_cast<const UNarrativeInteractableComponent*>(HostilePrompt));
     return true;
 }
 #endif
