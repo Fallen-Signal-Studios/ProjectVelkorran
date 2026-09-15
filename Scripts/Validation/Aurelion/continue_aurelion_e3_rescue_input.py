@@ -352,6 +352,15 @@ class Run(entry.Run):
 
     def hold_use(self, pc):
         remaining = float(pc.get_interaction_component().get_editor_property('remaining_interact_time'))
+        # Focus is re-selected every frame, so a hold can lose its owner to a nearer prompt. Record each
+        # change: a failed hold must name what held focus, not only what was aimed at.
+        focus = pc.get_interaction_component().get_editor_property('viewed_interactable')
+        if _path(focus) != getattr(self, 'last_hold_focus', 'unset'):
+            self.last_hold_focus = _path(focus)
+            self.report.setdefault('hold_focus', []).append(dict(beat=self.hold_beat, remaining=remaining,
+                elapsed=time.monotonic()-self.started, focus=self.last_hold_focus,
+                owner=_path(focus.get_owner()) if focus is not None else None,
+                expected=_path(self.hold_actor.interactable) if self.hold_actor is not None else None))
         if 0. < remaining <= self.hold_seconds+.001:
             self.saw_countdown = True
         is_door = self.phase == 'hold_door'
@@ -368,7 +377,8 @@ class Run(entry.Run):
                 actor=_path(self.hold_actor)))
             self.stage('wait_door' if is_door else 'wait_scene')
         else:
-            assert time.monotonic()-self.phase_at < 8., 'Ordinary hold failed: '+json.dumps(self.report['last_interaction'])
+            assert time.monotonic()-self.phase_at < 8., ('Ordinary hold failed: '+json.dumps(self.report['last_interaction'])
+                +' focus during hold: '+json.dumps(self.report.get('hold_focus', [])[-4:]))
             self.inject(interact=1.)
 
     def finish_scene(self, events):
