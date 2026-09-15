@@ -1,0 +1,51 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "dimensions_m": [
+        3.875,
+        3.799999952316284,
+        0.07500000298023224
+      ],
+      "triangles": 1140
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Ascent",
+      "dimensions_m": [
+        6.004000186920166,
+        12.0,
+        3.3975448608398438
+      ],
+      "triangles": 11656
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Balcony",
+      "dimensions_m": [
+        14.003999710083008,
+        11.0,
+        0.4000000059604645
+      ],
+      "triangles": 25192
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04LowCoverCap",
+      "dimensions_m": [
+        3.0,
+        2.0,
+        0.07500000298023224
+      ],
+      "triangles": 1140
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04HighCoverCap",
+      "dimensions_m": [
+        3.0,
+        3.0,
+        0.07500000298023224
+      ],
+      "triangles": 1140
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}

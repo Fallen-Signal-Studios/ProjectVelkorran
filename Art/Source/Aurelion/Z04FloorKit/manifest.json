@@ -1,0 +1,1583 @@
+{
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "triangles": 1140,
+      "nominal_dimensions_m": [
+        3.875,
+        3.8,
+        0.075
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_IvoryStone"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; native floor, ramp, balcony and cover collision retained",
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Ascent",
+      "triangles": 11656,
+      "nominal_dimensions_m": [
+        6.004000186920166,
+        12.0,
+        3.3975448608398438
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; native floor, ramp, balcony and cover collision retained",
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Balcony",
+      "triangles": 25192,
+      "nominal_dimensions_m": [
+        14.003999710083008,
+        11.0,
+        0.4000000059604645
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; native floor, ramp, balcony and cover collision retained",
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04LowCoverCap",
+      "triangles": 1140,
+      "nominal_dimensions_m": [
+        3,
+        2,
+        0.075
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_IvoryStone"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; native floor, ramp, balcony and cover collision retained",
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04HighCoverCap",
+      "triangles": 1140,
+      "nominal_dimensions_m": [
+        3,
+        3,
+        0.075
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_IvoryStone"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; native floor, ramp, balcony and cover collision retained",
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    }
+  ],
+  "placements": [
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        4093.75,
+        -12710.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        4093.75,
+        -12330.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        4093.75,
+        -11950.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        4093.75,
+        -11570.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        4093.75,
+        -11190.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        4093.75,
+        -10810.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        4093.75,
+        -10430.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        4093.75,
+        -10050.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        4093.75,
+        -9670.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        4093.75,
+        -9290.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        4481.25,
+        -12710.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        4481.25,
+        -12330.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        4481.25,
+        -11950.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        4481.25,
+        -11570.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        4481.25,
+        -11190.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        4481.25,
+        -10810.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        4481.25,
+        -10430.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        4481.25,
+        -10050.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        4481.25,
+        -9670.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        4481.25,
+        -9290.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        4868.75,
+        -12710.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        4868.75,
+        -12330.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        4868.75,
+        -11950.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        4868.75,
+        -11570.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        4868.75,
+        -11190.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        4868.75,
+        -10810.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        4868.75,
+        -10430.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        4868.75,
+        -10050.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        4868.75,
+        -9670.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        4868.75,
+        -9290.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        5256.25,
+        -12710.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        5256.25,
+        -12330.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        5256.25,
+        -11950.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        5256.25,
+        -11570.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        5256.25,
+        -11190.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        5256.25,
+        -10810.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        5256.25,
+        -10430.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        5256.25,
+        -10050.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        5256.25,
+        -9670.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        5256.25,
+        -9290.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        5643.75,
+        -12710.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        5643.75,
+        -12330.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        5643.75,
+        -11950.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        5643.75,
+        -11570.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        5643.75,
+        -11190.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        5643.75,
+        -10810.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        5643.75,
+        -10430.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        5643.75,
+        -10050.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        5643.75,
+        -9670.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        5643.75,
+        -9290.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        6031.25,
+        -12710.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        6031.25,
+        -12330.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        6031.25,
+        -11950.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        6031.25,
+        -11570.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        6031.25,
+        -11190.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        6031.25,
+        -10810.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        6031.25,
+        -10430.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        6031.25,
+        -10050.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        6031.25,
+        -9670.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        6031.25,
+        -9290.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        6418.75,
+        -12710.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        6418.75,
+        -12330.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        6418.75,
+        -11950.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        6418.75,
+        -11570.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        6418.75,
+        -11190.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        6418.75,
+        -10810.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        6418.75,
+        -10430.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        6418.75,
+        -10050.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        6418.75,
+        -9670.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        6418.75,
+        -9290.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        6806.25,
+        -12710.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        6806.25,
+        -12330.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        6806.25,
+        -11950.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        6806.25,
+        -11570.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        6806.25,
+        -11190.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        6806.25,
+        -10810.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        6806.25,
+        -10430.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        6806.25,
+        -10050.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        6806.25,
+        -9670.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        6806.25,
+        -9290.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        7193.75,
+        -12710.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        7193.75,
+        -12330.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        7193.75,
+        -11950.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        7193.75,
+        -11570.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        7193.75,
+        -11190.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        7193.75,
+        -10810.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        7193.75,
+        -10430.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        7193.75,
+        -10050.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        7193.75,
+        -9670.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        7193.75,
+        -9290.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        7581.25,
+        -12710.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        7581.25,
+        -12330.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        7581.25,
+        -11950.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        7581.25,
+        -11570.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        7581.25,
+        -11190.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        7581.25,
+        -10810.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        7581.25,
+        -10430.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        7581.25,
+        -10050.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        7581.25,
+        -9670.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        7581.25,
+        -9290.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        7968.75,
+        -12710.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        7968.75,
+        -12330.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        7968.75,
+        -11950.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        7968.75,
+        -11570.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        7968.75,
+        -11190.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        7968.75,
+        -10810.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        7968.75,
+        -10430.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        7968.75,
+        -10050.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        7968.75,
+        -9670.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        7968.75,
+        -9290.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        8356.25,
+        -12710.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        8356.25,
+        -12330.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        8356.25,
+        -11950.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        8356.25,
+        -11570.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        8356.25,
+        -11190.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        8356.25,
+        -10810.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        8356.25,
+        -10430.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        8356.25,
+        -10050.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        8356.25,
+        -9670.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        8356.25,
+        -9290.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        8743.75,
+        -12710.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        8743.75,
+        -12330.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        8743.75,
+        -11950.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        8743.75,
+        -11570.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        8743.75,
+        -11190.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        8743.75,
+        -10810.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        8743.75,
+        -10430.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        8743.75,
+        -10050.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        8743.75,
+        -9670.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        8743.75,
+        -9290.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        9131.25,
+        -12710.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        9131.25,
+        -12330.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        9131.25,
+        -11950.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        9131.25,
+        -11570.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        9131.25,
+        -11190.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        9131.25,
+        -10810.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        9131.25,
+        -10430.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        9131.25,
+        -10050.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        9131.25,
+        -9670.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        9131.25,
+        -9290.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        9518.75,
+        -12710.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        9518.75,
+        -12330.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        9518.75,
+        -11950.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        9518.75,
+        -11570.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        9518.75,
+        -11190.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        9518.75,
+        -10810.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        9518.75,
+        -10430.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        9518.75,
+        -10050.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        9518.75,
+        -9670.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        9518.75,
+        -9290.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        9906.25,
+        -12710.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        9906.25,
+        -12330.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        9906.25,
+        -11950.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        9906.25,
+        -11570.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        9906.25,
+        -11190.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        9906.25,
+        -10810.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        9906.25,
+        -10430.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        9906.25,
+        -10050.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        9906.25,
+        -9670.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Paving",
+      "location_cm": [
+        9906.25,
+        -9290.0,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Ascent",
+      "location_cm": [
+        9300,
+        -11200,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Ascent",
+      "location_cm": [
+        7700,
+        -9900,
+        0
+      ],
+      "yaw": -90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04Balcony",
+      "location_cm": [
+        9000,
+        -10050,
+        300
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04LowCoverCap",
+      "location_cm": [
+        9050,
+        -10300,
+        420
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z04HighCoverCap",
+      "location_cm": [
+        8350,
+        -10800,
+        220
+      ],
+      "yaw": 0
+    }
+  ]
+}
