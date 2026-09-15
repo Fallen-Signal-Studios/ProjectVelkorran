@@ -1,0 +1,942 @@
+[
+  {
+    "actor": "Z08_WestSurvivorRecess_West",
+    "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_238",
+    "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-3200.000000,Y=22400.000000,Z=-1050.000000),Scale3D=(X=0.400000,Y=10.000000,Z=3.000000))",
+    "location": [
+      -3200.0,
+      22400.0,
+      -1050.0
+    ],
+    "scale": [
+      0.4,
+      10.0,
+      3.0
+    ],
+    "quaternion": [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ],
+    "collision": true,
+    "meshes": [
+      {
+        "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_238.StaticMeshComponent0",
+        "mesh": "/Engine/BasicShapes/Cube.Cube",
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-3200.000000,Y=22400.000000,Z=-1050.000000),Scale3D=(X=0.400000,Y=10.000000,Z=3.000000))",
+        "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+        "profile": "BlockAll",
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "extent": [
+          50.0,
+          50.0,
+          50.0
+        ]
+      }
+    ]
+  },
+  {
+    "actor": "Z08_WestSurvivorRecess_East",
+    "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_239",
+    "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-2000.000000,Y=22400.000000,Z=-1050.000000),Scale3D=(X=0.400000,Y=10.000000,Z=3.000000))",
+    "location": [
+      -2000.0,
+      22400.0,
+      -1050.0
+    ],
+    "scale": [
+      0.4,
+      10.0,
+      3.0
+    ],
+    "quaternion": [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ],
+    "collision": true,
+    "meshes": [
+      {
+        "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_239.StaticMeshComponent0",
+        "mesh": "/Engine/BasicShapes/Cube.Cube",
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-2000.000000,Y=22400.000000,Z=-1050.000000),Scale3D=(X=0.400000,Y=10.000000,Z=3.000000))",
+        "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+        "profile": "BlockAll",
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "extent": [
+          50.0,
+          50.0,
+          50.0
+        ]
+      }
+    ]
+  },
+  {
+    "actor": "Z08_WestSurvivorRecess_North",
+    "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_240",
+    "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-2600.000000,Y=22900.000000,Z=-1050.000000),Scale3D=(X=12.000000,Y=0.400000,Z=3.000000))",
+    "location": [
+      -2600.0,
+      22900.0,
+      -1050.0
+    ],
+    "scale": [
+      12.0,
+      0.4,
+      3.0
+    ],
+    "quaternion": [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ],
+    "collision": true,
+    "meshes": [
+      {
+        "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_240.StaticMeshComponent0",
+        "mesh": "/Engine/BasicShapes/Cube.Cube",
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-2600.000000,Y=22900.000000,Z=-1050.000000),Scale3D=(X=12.000000,Y=0.400000,Z=3.000000))",
+        "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+        "profile": "BlockAll",
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "extent": [
+          50.0,
+          50.0,
+          50.0
+        ]
+      }
+    ]
+  },
+  {
+    "actor": "Z08_WestSurvivorRecess_SouthLeft",
+    "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_241",
+    "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-3050.000000,Y=21900.000000,Z=-1050.000000),Scale3D=(X=3.000000,Y=0.400000,Z=3.000000))",
+    "location": [
+      -3050.0,
+      21900.0,
+      -1050.0
+    ],
+    "scale": [
+      3.0,
+      0.4,
+      3.0
+    ],
+    "quaternion": [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ],
+    "collision": true,
+    "meshes": [
+      {
+        "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_241.StaticMeshComponent0",
+        "mesh": "/Engine/BasicShapes/Cube.Cube",
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-3050.000000,Y=21900.000000,Z=-1050.000000),Scale3D=(X=3.000000,Y=0.400000,Z=3.000000))",
+        "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+        "profile": "BlockAll",
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "extent": [
+          50.0,
+          50.0,
+          50.0
+        ]
+      }
+    ]
+  },
+  {
+    "actor": "Z08_WestSurvivorRecess_SouthRight",
+    "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_242",
+    "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-2150.000000,Y=21900.000000,Z=-1050.000000),Scale3D=(X=3.000000,Y=0.400000,Z=3.000000))",
+    "location": [
+      -2150.0,
+      21900.0,
+      -1050.0
+    ],
+    "scale": [
+      3.0,
+      0.4,
+      3.0
+    ],
+    "quaternion": [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ],
+    "collision": true,
+    "meshes": [
+      {
+        "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_242.StaticMeshComponent0",
+        "mesh": "/Engine/BasicShapes/Cube.Cube",
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-2150.000000,Y=21900.000000,Z=-1050.000000),Scale3D=(X=3.000000,Y=0.400000,Z=3.000000))",
+        "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+        "profile": "BlockAll",
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "extent": [
+          50.0,
+          50.0,
+          50.0
+        ]
+      }
+    ]
+  },
+  {
+    "actor": "Z08_WestSurvivorRecess_ThresholdMark",
+    "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_243",
+    "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-2600.000000,Y=21900.000000,Z=-1198.000000),Scale3D=(X=6.000000,Y=0.200000,Z=0.025000))",
+    "location": [
+      -2600.0,
+      21900.0,
+      -1198.0
+    ],
+    "scale": [
+      6.0,
+      0.2,
+      0.025
+    ],
+    "quaternion": [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ],
+    "collision": true,
+    "meshes": [
+      {
+        "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_243.StaticMeshComponent0",
+        "mesh": "/Engine/BasicShapes/Cube.Cube",
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-2600.000000,Y=21900.000000,Z=-1198.000000),Scale3D=(X=6.000000,Y=0.200000,Z=0.025000))",
+        "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+        "profile": "NoCollision",
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "extent": [
+          50.0,
+          50.0,
+          50.0
+        ]
+      }
+    ]
+  },
+  {
+    "actor": "Z08_EastSurvivorRecess_West",
+    "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_244",
+    "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=2700.000000,Y=22400.000000,Z=-1050.000000),Scale3D=(X=0.400000,Y=10.000000,Z=3.000000))",
+    "location": [
+      2700.0,
+      22400.0,
+      -1050.0
+    ],
+    "scale": [
+      0.4,
+      10.0,
+      3.0
+    ],
+    "quaternion": [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ],
+    "collision": true,
+    "meshes": [
+      {
+        "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_244.StaticMeshComponent0",
+        "mesh": "/Engine/BasicShapes/Cube.Cube",
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=2700.000000,Y=22400.000000,Z=-1050.000000),Scale3D=(X=0.400000,Y=10.000000,Z=3.000000))",
+        "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+        "profile": "BlockAll",
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "extent": [
+          50.0,
+          50.0,
+          50.0
+        ]
+      }
+    ]
+  },
+  {
+    "actor": "Z08_EastSurvivorRecess_East",
+    "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_245",
+    "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=3400.000000,Y=22400.000000,Z=-1050.000000),Scale3D=(X=0.400000,Y=10.000000,Z=3.000000))",
+    "location": [
+      3400.0,
+      22400.0,
+      -1050.0
+    ],
+    "scale": [
+      0.4,
+      10.0,
+      3.0
+    ],
+    "quaternion": [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ],
+    "collision": true,
+    "meshes": [
+      {
+        "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_245.StaticMeshComponent0",
+        "mesh": "/Engine/BasicShapes/Cube.Cube",
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=3400.000000,Y=22400.000000,Z=-1050.000000),Scale3D=(X=0.400000,Y=10.000000,Z=3.000000))",
+        "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+        "profile": "BlockAll",
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "extent": [
+          50.0,
+          50.0,
+          50.0
+        ]
+      }
+    ]
+  },
+  {
+    "actor": "Z08_EastSurvivorRecess_North",
+    "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_246",
+    "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=3050.000000,Y=22900.000000,Z=-1050.000000),Scale3D=(X=7.000000,Y=0.400000,Z=3.000000))",
+    "location": [
+      3050.0,
+      22900.0,
+      -1050.0
+    ],
+    "scale": [
+      7.0,
+      0.4,
+      3.0
+    ],
+    "quaternion": [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ],
+    "collision": true,
+    "meshes": [
+      {
+        "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_246.StaticMeshComponent0",
+        "mesh": "/Engine/BasicShapes/Cube.Cube",
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=3050.000000,Y=22900.000000,Z=-1050.000000),Scale3D=(X=7.000000,Y=0.400000,Z=3.000000))",
+        "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+        "profile": "BlockAll",
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "extent": [
+          50.0,
+          50.0,
+          50.0
+        ]
+      }
+    ]
+  },
+  {
+    "actor": "Z08_EastSurvivorRecess_SouthLeft",
+    "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_247",
+    "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=2750.000000,Y=21900.000000,Z=-1050.000000),Scale3D=(X=1.000000,Y=0.400000,Z=3.000000))",
+    "location": [
+      2750.0,
+      21900.0,
+      -1050.0
+    ],
+    "scale": [
+      1.0,
+      0.4,
+      3.0
+    ],
+    "quaternion": [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ],
+    "collision": true,
+    "meshes": [
+      {
+        "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_247.StaticMeshComponent0",
+        "mesh": "/Engine/BasicShapes/Cube.Cube",
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=2750.000000,Y=21900.000000,Z=-1050.000000),Scale3D=(X=1.000000,Y=0.400000,Z=3.000000))",
+        "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+        "profile": "BlockAll",
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "extent": [
+          50.0,
+          50.0,
+          50.0
+        ]
+      }
+    ]
+  },
+  {
+    "actor": "Z08_EastSurvivorRecess_SouthRight",
+    "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_248",
+    "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=3350.000000,Y=21900.000000,Z=-1050.000000),Scale3D=(X=1.000000,Y=0.400000,Z=3.000000))",
+    "location": [
+      3350.0,
+      21900.0,
+      -1050.0
+    ],
+    "scale": [
+      1.0,
+      0.4,
+      3.0
+    ],
+    "quaternion": [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ],
+    "collision": true,
+    "meshes": [
+      {
+        "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_248.StaticMeshComponent0",
+        "mesh": "/Engine/BasicShapes/Cube.Cube",
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=3350.000000,Y=21900.000000,Z=-1050.000000),Scale3D=(X=1.000000,Y=0.400000,Z=3.000000))",
+        "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+        "profile": "BlockAll",
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "extent": [
+          50.0,
+          50.0,
+          50.0
+        ]
+      }
+    ]
+  },
+  {
+    "actor": "Z08_EastSurvivorRecess_ThresholdMark",
+    "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_249",
+    "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=3050.000000,Y=21900.000000,Z=-1198.000000),Scale3D=(X=5.000000,Y=0.200000,Z=0.025000))",
+    "location": [
+      3050.0,
+      21900.0,
+      -1198.0
+    ],
+    "scale": [
+      5.0,
+      0.2,
+      0.025
+    ],
+    "quaternion": [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ],
+    "collision": true,
+    "meshes": [
+      {
+        "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_249.StaticMeshComponent0",
+        "mesh": "/Engine/BasicShapes/Cube.Cube",
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=3050.000000,Y=21900.000000,Z=-1198.000000),Scale3D=(X=5.000000,Y=0.200000,Z=0.025000))",
+        "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+        "profile": "NoCollision",
+        "origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "extent": [
+          50.0,
+          50.0,
+          50.0
+        ]
+      }
+    ]
+  },
+  {
+    "actor": "ENVL_Z08_Key_00",
+    "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.RectLight_23",
+    "transform": "(Rotation=(X=-0.209388,Y=0.571618,Z=0.272880,W=0.744947),Translation=(X=-650.000000,Y=20250.000000,Z=-800.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+    "location": [
+      -650.0,
+      20250.0,
+      -800.0
+    ],
+    "scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "quaternion": [
+      -0.20938814597131847,
+      0.5716179508862832,
+      0.27287994429609536,
+      0.7449470172785582
+    ],
+    "collision": false,
+    "light": {
+      "type": "RectLightComponent",
+      "intensity": 1800.0,
+      "color": "(R=1.000000,G=0.356400,B=0.095307,A=1.000000)",
+      "radius": 3050.0,
+      "units": "<LightUnits.LUMENS: 2>",
+      "shadow": true,
+      "transform": "(Rotation=(X=-0.209388,Y=0.571618,Z=0.272880,W=0.744947),Translation=(X=-650.000000,Y=20250.000000,Z=-800.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))"
+    },
+    "meshes": []
+  },
+  {
+    "actor": "ENVL_Z08_Key_01",
+    "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.RectLight_24",
+    "transform": "(Rotation=(X=-0.571618,Y=0.209388,Z=0.744947,W=0.272880),Translation=(X=650.000000,Y=20250.000000,Z=-800.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+    "location": [
+      650.0,
+      20250.0,
+      -800.0
+    ],
+    "scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "quaternion": [
+      -0.5716179518216984,
+      0.209388143417688,
+      0.744947017996327,
+      0.2728799423366255
+    ],
+    "collision": false,
+    "light": {
+      "type": "RectLightComponent",
+      "intensity": 1800.0,
+      "color": "(R=0.381326,G=0.603827,B=1.000000,A=1.000000)",
+      "radius": 7950.0,
+      "units": "<LightUnits.LUMENS: 2>",
+      "shadow": false,
+      "transform": "(Rotation=(X=-0.571618,Y=0.209388,Z=0.744947,W=0.272880),Translation=(X=650.000000,Y=20250.000000,Z=-800.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))"
+    },
+    "meshes": []
+  },
+  {
+    "actor": "ENVL_Z08_Key_02",
+    "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.RectLight_25",
+    "transform": "(Rotation=(X=0.143229,Y=0.591672,Z=-0.186659,W=0.771082),Translation=(X=-2100.000000,Y=21880.000000,Z=-730.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+    "location": [
+      -2100.0,
+      21880.0,
+      -730.0
+    ],
+    "scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "quaternion": [
+      0.14322864237198715,
+      0.5916722348167243,
+      -0.18665920078307477,
+      0.7710822688366555
+    ],
+    "collision": false,
+    "light": {
+      "type": "RectLightComponent",
+      "intensity": 1800.0,
+      "color": "(R=0.887923,G=0.913099,B=1.000000,A=1.000000)",
+      "radius": 9700.0,
+      "units": "<LightUnits.LUMENS: 2>",
+      "shadow": false,
+      "transform": "(Rotation=(X=0.143229,Y=0.591672,Z=-0.186659,W=0.771082),Translation=(X=-2100.000000,Y=21880.000000,Z=-730.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))"
+    },
+    "meshes": []
+  },
+  {
+    "actor": "ENVL_Z08_Key_03",
+    "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.RectLight_26",
+    "transform": "(Rotation=(X=0.591672,Y=0.143229,Z=-0.771082,W=0.186659),Translation=(X=2100.000000,Y=21880.000000,Z=-730.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+    "location": [
+      2100.0,
+      21880.0,
+      -730.0
+    ],
+    "scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "quaternion": [
+      0.5916722374209059,
+      0.143228631614212,
+      -0.7710822721124981,
+      0.18665918725068706
+    ],
+    "collision": false,
+    "light": {
+      "type": "RectLightComponent",
+      "intensity": 245.0,
+      "color": "(R=0.887923,G=0.913099,B=1.000000,A=1.000000)",
+      "radius": 5850.0,
+      "units": "<LightUnits.LUMENS: 2>",
+      "shadow": false,
+      "transform": "(Rotation=(X=0.591672,Y=0.143229,Z=-0.771082,W=0.186659),Translation=(X=2100.000000,Y=21880.000000,Z=-730.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))"
+    },
+    "meshes": []
+  },
+  {
+    "actor": "ENVL_Z08_CeilingBounce_-1",
+    "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.RectLight_6",
+    "transform": "(Rotation=(X=-0.000000,Y=0.707107,Z=0.000000,W=0.707107),Translation=(X=-2000.000000,Y=20800.000000,Z=850.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+    "location": [
+      -2000.0,
+      20800.0,
+      850.0
+    ],
+    "scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "quaternion": [
+      -0.0,
+      0.7071067811865476,
+      0.0,
+      0.7071067811865477
+    ],
+    "collision": true,
+    "light": {
+      "type": "RectLightComponent",
+      "intensity": 60000.0,
+      "color": "(R=1.000000,G=0.879622,B=0.701102,A=1.000000)",
+      "radius": 4500.0,
+      "units": "<LightUnits.LUMENS: 2>",
+      "shadow": true,
+      "transform": "(Rotation=(X=-0.000000,Y=0.707107,Z=0.000000,W=0.707107),Translation=(X=-2000.000000,Y=20800.000000,Z=850.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))"
+    },
+    "meshes": []
+  },
+  {
+    "actor": "ENVL_Z08_CeilingBounce_1",
+    "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.RectLight_7",
+    "transform": "(Rotation=(X=-0.000000,Y=0.707107,Z=0.000000,W=0.707107),Translation=(X=2000.000000,Y=20800.000000,Z=850.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+    "location": [
+      2000.0,
+      20800.0,
+      850.0
+    ],
+    "scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "quaternion": [
+      -0.0,
+      0.7071067811865476,
+      0.0,
+      0.7071067811865477
+    ],
+    "collision": true,
+    "light": {
+      "type": "RectLightComponent",
+      "intensity": 60000.0,
+      "color": "(R=1.000000,G=0.879622,B=0.701102,A=1.000000)",
+      "radius": 4500.0,
+      "units": "<LightUnits.LUMENS: 2>",
+      "shadow": true,
+      "transform": "(Rotation=(X=-0.000000,Y=0.707107,Z=0.000000,W=0.707107),Translation=(X=2000.000000,Y=20800.000000,Z=850.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))"
+    },
+    "meshes": []
+  },
+  {
+    "actor": "ENVL_Z08_RecessFill_West",
+    "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.RectLight_34",
+    "transform": "(Rotation=(X=-0.073913,Y=0.073913,Z=0.703233,W=0.703233),Translation=(X=-2600.000000,Y=22150.000000,Z=-840.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+    "location": [
+      -2600.0,
+      22150.0,
+      -840.0
+    ],
+    "scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "quaternion": [
+      -0.07391278520356671,
+      0.07391278520356674,
+      0.703233176253404,
+      0.7032331762534042
+    ],
+    "collision": true,
+    "light": {
+      "type": "RectLightComponent",
+      "intensity": 350.0,
+      "color": "(R=0.938686,G=0.896269,B=0.822786,A=1.000000)",
+      "radius": 1400.0,
+      "units": "<LightUnits.LUMENS: 2>",
+      "shadow": true,
+      "transform": "(Rotation=(X=-0.073913,Y=0.073913,Z=0.703233,W=0.703233),Translation=(X=-2600.000000,Y=22150.000000,Z=-840.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))"
+    },
+    "meshes": []
+  },
+  {
+    "actor": "ENVL_Z08_RecessFill_East",
+    "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.RectLight_35",
+    "transform": "(Rotation=(X=-0.073913,Y=0.073913,Z=0.703233,W=0.703233),Translation=(X=3050.000000,Y=22150.000000,Z=-840.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+    "location": [
+      3050.0,
+      22150.0,
+      -840.0
+    ],
+    "scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "quaternion": [
+      -0.07391278520356671,
+      0.07391278520356674,
+      0.703233176253404,
+      0.7032331762534042
+    ],
+    "collision": true,
+    "light": {
+      "type": "RectLightComponent",
+      "intensity": 350.0,
+      "color": "(R=0.938686,G=0.896269,B=0.822786,A=1.000000)",
+      "radius": 1400.0,
+      "units": "<LightUnits.LUMENS: 2>",
+      "shadow": true,
+      "transform": "(Rotation=(X=-0.073913,Y=0.073913,Z=0.703233,W=0.703233),Translation=(X=3050.000000,Y=22150.000000,Z=-840.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))"
+    },
+    "meshes": []
+  },
+  {
+    "actor": "ENVL_CrucibleVault_-1_0",
+    "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.RectLight_40",
+    "transform": "(Rotation=(X=0.000000,Y=-0.216440,Z=0.000000,W=0.976296),Translation=(X=-2300.000000,Y=19600.000000,Z=300.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+    "location": [
+      -2300.0,
+      19600.0,
+      300.0
+    ],
+    "scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "quaternion": [
+      0.0,
+      -0.21643961393810296,
+      0.0,
+      0.9762960071199335
+    ],
+    "collision": true,
+    "light": {
+      "type": "RectLightComponent",
+      "intensity": 2500.0,
+      "color": "(R=1.000000,G=0.938686,B=0.830770,A=1.000000)",
+      "radius": 3000.0,
+      "units": "<LightUnits.LUMENS: 2>",
+      "shadow": true,
+      "transform": "(Rotation=(X=0.000000,Y=-0.216440,Z=0.000000,W=0.976296),Translation=(X=-2300.000000,Y=19600.000000,Z=300.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))"
+    },
+    "meshes": []
+  },
+  {
+    "actor": "ENVL_CrucibleVault_-1_1",
+    "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.RectLight_41",
+    "transform": "(Rotation=(X=0.000000,Y=-0.216440,Z=0.000000,W=0.976296),Translation=(X=-2300.000000,Y=22000.000000,Z=300.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+    "location": [
+      -2300.0,
+      22000.0,
+      300.0
+    ],
+    "scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "quaternion": [
+      0.0,
+      -0.21643961393810296,
+      0.0,
+      0.9762960071199335
+    ],
+    "collision": true,
+    "light": {
+      "type": "RectLightComponent",
+      "intensity": 2500.0,
+      "color": "(R=1.000000,G=0.938686,B=0.830770,A=1.000000)",
+      "radius": 3000.0,
+      "units": "<LightUnits.LUMENS: 2>",
+      "shadow": true,
+      "transform": "(Rotation=(X=0.000000,Y=-0.216440,Z=0.000000,W=0.976296),Translation=(X=-2300.000000,Y=22000.000000,Z=300.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))"
+    },
+    "meshes": []
+  },
+  {
+    "actor": "ENVL_CrucibleVault_1_0",
+    "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.RectLight_42",
+    "transform": "(Rotation=(X=0.216440,Y=-0.000000,Z=0.976296,W=0.000000),Translation=(X=2300.000000,Y=19600.000000,Z=300.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+    "location": [
+      2300.0,
+      19600.0,
+      300.0
+    ],
+    "scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "quaternion": [
+      0.21643961393810288,
+      -1.325310402089933e-17,
+      0.9762960071199334,
+      5.978088900698841e-17
+    ],
+    "collision": true,
+    "light": {
+      "type": "RectLightComponent",
+      "intensity": 2500.0,
+      "color": "(R=1.000000,G=0.938686,B=0.830770,A=1.000000)",
+      "radius": 3000.0,
+      "units": "<LightUnits.LUMENS: 2>",
+      "shadow": true,
+      "transform": "(Rotation=(X=0.216440,Y=-0.000000,Z=0.976296,W=0.000000),Translation=(X=2300.000000,Y=19600.000000,Z=300.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))"
+    },
+    "meshes": []
+  },
+  {
+    "actor": "ENVL_CrucibleVault_1_1",
+    "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.RectLight_43",
+    "transform": "(Rotation=(X=0.216440,Y=-0.000000,Z=0.976296,W=0.000000),Translation=(X=2300.000000,Y=22000.000000,Z=300.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+    "location": [
+      2300.0,
+      22000.0,
+      300.0
+    ],
+    "scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "quaternion": [
+      0.21643961393810288,
+      -1.325310402089933e-17,
+      0.9762960071199334,
+      5.978088900698841e-17
+    ],
+    "collision": true,
+    "light": {
+      "type": "RectLightComponent",
+      "intensity": 2500.0,
+      "color": "(R=1.000000,G=0.938686,B=0.830770,A=1.000000)",
+      "radius": 3000.0,
+      "units": "<LightUnits.LUMENS: 2>",
+      "shadow": true,
+      "transform": "(Rotation=(X=0.216440,Y=-0.000000,Z=0.976296,W=0.000000),Translation=(X=2300.000000,Y=22000.000000,Z=300.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))"
+    },
+    "meshes": []
+  },
+  {
+    "actor": "ART_RefugeBaffle_WestSign",
+    "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_125",
+    "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=-2600.000000,Y=22000.000000,Z=-990.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+    "location": [
+      -2600.0,
+      22000.0,
+      -990.0
+    ],
+    "scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "quaternion": [
+      -0.0,
+      0.0,
+      -0.7071067811865476,
+      0.7071067811865477
+    ],
+    "collision": true,
+    "text": {
+      "value": "REFUGE\n<  SIDE ACCESS  >",
+      "world_size": 24.0,
+      "horizontal": "<HorizTextAligment.EHTA_CENTER: 1>",
+      "vertical": "<VerticalTextAligment.EVRTA_TEXT_BOTTOM: 2>",
+      "color": "(B=30,G=24,R=18,A=255)",
+      "material": "/Engine/EngineMaterials/DefaultTextMaterialOpaque.DefaultTextMaterialOpaque",
+      "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=-2600.000000,Y=22000.000000,Z=-990.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))"
+    },
+    "meshes": []
+  },
+  {
+    "actor": "ART_RefugeBaffle_EastSign",
+    "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_126",
+    "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=3050.000000,Y=22000.000000,Z=-990.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+    "location": [
+      3050.0,
+      22000.0,
+      -990.0
+    ],
+    "scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "quaternion": [
+      -0.0,
+      0.0,
+      -0.7071067811865476,
+      0.7071067811865477
+    ],
+    "collision": true,
+    "text": {
+      "value": "REFUGE\n<  SIDE ACCESS  >",
+      "world_size": 24.0,
+      "horizontal": "<HorizTextAligment.EHTA_CENTER: 1>",
+      "vertical": "<VerticalTextAligment.EVRTA_TEXT_BOTTOM: 2>",
+      "color": "(B=30,G=24,R=18,A=255)",
+      "material": "/Engine/EngineMaterials/DefaultTextMaterialOpaque.DefaultTextMaterialOpaque",
+      "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=3050.000000,Y=22000.000000,Z=-990.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))"
+    },
+    "meshes": []
+  }
+]

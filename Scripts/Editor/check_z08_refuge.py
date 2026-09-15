@@ -28,9 +28,11 @@ def check_refuge_access(actors):
         values=[v for v in raw if isinstance(v,unreal.HitResult)] if isinstance(raw,tuple) else [raw]
         assert len(values)==1 and isinstance(values[0],unreal.HitResult)
         p=values[0].to_tuple();return dict(blocked=bool(p[0]),actor=p[9].get_actor_label() if p[9] else None)
+    source=Path(unreal.Paths.project_dir())/'Art/Source/Aurelion/Z08RefugeKit/refuge-baseline.json'
+    baffle_labels={r['actor'] for r in json.loads(source.read_text()) if r['actor_collision']};assert len(baffle_labels)==7
     contacts=[]
     for a in actors:
-        if not a.get_actor_label().startswith('ART_RefugeBaffle_') or not a.get_component_by_class(unreal.StaticMeshComponent):continue
+        if a.get_actor_label() not in baffle_labels:continue
         pos=a.get_actor_location()
         for side in (-1,1):
             row=hit(unreal.SystemLibrary.line_trace_single(world,unreal.Vector(pos.x,pos.y+side*80,-1050),unreal.Vector(pos.x,pos.y,-1050),unreal.TraceTypeQuery.TRACE_TYPE_QUERY1,False,[],unreal.DrawDebugTrace.NONE,True))

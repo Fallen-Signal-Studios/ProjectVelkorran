@@ -1,0 +1,11 @@
+{
+  "text_size": 16,
+  "text_y": 22035.5,
+  "text_center_z": -1030,
+  "mount_y": 22039.6,
+  "mount_bottom_z": -1067.5,
+  "key_intensity": 245,
+  "key_radius": 5850,
+  "comparison": "RefugeKeyComparison-20260914-171442-5eed2b6a",
+  "reason": "Reduce west-key washout while keeping front panel details and approach geometry legible; retain original text on a physical mounting plaque."
+}

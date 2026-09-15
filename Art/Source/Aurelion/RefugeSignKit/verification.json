@@ -1,0 +1,15 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_RefugeSign",
+      "dimensions_m": [
+        2.4000000953674316,
+        0.07999999821186066,
+        0.75
+      ],
+      "triangles": 3760
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}
