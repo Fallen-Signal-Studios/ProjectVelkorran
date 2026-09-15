@@ -1,0 +1,242 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z03Paving",
+      "contacts": [
+        {
+          "x_m": -0.9166666666666666,
+          "y_m": -1.3333333333333335,
+          "height_m": 0.0,
+          "expected_m": 0.0
+        },
+        {
+          "x_m": -0.9166666666666666,
+          "y_m": 0.0,
+          "height_m": 0.0,
+          "expected_m": 0.0
+        },
+        {
+          "x_m": -0.9166666666666666,
+          "y_m": 1.3333333333333335,
+          "height_m": 0.0,
+          "expected_m": 0.0
+        },
+        {
+          "x_m": 0.9166666666666666,
+          "y_m": -1.3333333333333335,
+          "height_m": -9.5367431640625e-07,
+          "expected_m": 0.0
+        },
+        {
+          "x_m": 0.9166666666666666,
+          "y_m": 0.0,
+          "height_m": -9.5367431640625e-07,
+          "expected_m": 0.0
+        },
+        {
+          "x_m": 0.9166666666666666,
+          "y_m": 1.3333333333333335,
+          "height_m": -9.5367431640625e-07,
+          "expected_m": 0.0
+        }
+      ]
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03BridgePaving",
+      "contacts": [
+        {
+          "x_m": -0.75,
+          "y_m": -1.408,
+          "height_m": 0.0,
+          "expected_m": 0.0
+        },
+        {
+          "x_m": -0.75,
+          "y_m": 0.0,
+          "height_m": 0.0,
+          "expected_m": 0.0
+        },
+        {
+          "x_m": -0.75,
+          "y_m": 1.408,
+          "height_m": 0.0,
+          "expected_m": 0.0
+        },
+        {
+          "x_m": 0.75,
+          "y_m": -1.408,
+          "height_m": 0.0,
+          "expected_m": 0.0
+        },
+        {
+          "x_m": 0.75,
+          "y_m": 0.0,
+          "height_m": 0.0,
+          "expected_m": 0.0
+        },
+        {
+          "x_m": 0.75,
+          "y_m": 1.408,
+          "height_m": -9.5367431640625e-07,
+          "expected_m": 0.0
+        }
+      ]
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03ServiceSlope",
+      "contacts": [
+        {
+          "x_m": -1.0,
+          "y_m": -5.0,
+          "height_m": 2.750000476837158,
+          "expected_m": 2.75
+        },
+        {
+          "x_m": -1.0,
+          "y_m": -3.0,
+          "height_m": 2.250000476837158,
+          "expected_m": 2.25
+        },
+        {
+          "x_m": -1.0,
+          "y_m": -1.0,
+          "height_m": 1.7499990463256836,
+          "expected_m": 1.75
+        },
+        {
+          "x_m": -1.0,
+          "y_m": 1.0,
+          "height_m": 1.2499990463256836,
+          "expected_m": 1.25
+        },
+        {
+          "x_m": -1.0,
+          "y_m": 3.0,
+          "height_m": 0.7500009536743164,
+          "expected_m": 0.75
+        },
+        {
+          "x_m": -1.0,
+          "y_m": 5.0,
+          "height_m": 0.2500009536743164,
+          "expected_m": 0.24999999999999994
+        },
+        {
+          "x_m": 1.0,
+          "y_m": -5.0,
+          "height_m": 2.750000476837158,
+          "expected_m": 2.75
+        },
+        {
+          "x_m": 1.0,
+          "y_m": -3.0,
+          "height_m": 2.250000476837158,
+          "expected_m": 2.25
+        },
+        {
+          "x_m": 1.0,
+          "y_m": -1.0,
+          "height_m": 1.75,
+          "expected_m": 1.75
+        },
+        {
+          "x_m": 1.0,
+          "y_m": 1.0,
+          "height_m": 1.2499990463256836,
+          "expected_m": 1.25
+        },
+        {
+          "x_m": 1.0,
+          "y_m": 3.0,
+          "height_m": 0.7500009536743164,
+          "expected_m": 0.75
+        },
+        {
+          "x_m": 1.0,
+          "y_m": 5.0,
+          "height_m": 0.2500009536743164,
+          "expected_m": 0.24999999999999994
+        }
+      ]
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03ServiceDeck",
+      "contacts": [
+        {
+          "x_m": -1.0,
+          "y_m": -5.0,
+          "height_m": 9.5367431640625e-07,
+          "expected_m": 0.0
+        },
+        {
+          "x_m": -1.0,
+          "y_m": -3.0,
+          "height_m": 9.5367431640625e-07,
+          "expected_m": 0.0
+        },
+        {
+          "x_m": -1.0,
+          "y_m": -1.0,
+          "height_m": -9.5367431640625e-07,
+          "expected_m": 0.0
+        },
+        {
+          "x_m": -1.0,
+          "y_m": 1.0,
+          "height_m": -9.5367431640625e-07,
+          "expected_m": 0.0
+        },
+        {
+          "x_m": -1.0,
+          "y_m": 3.0,
+          "height_m": 9.5367431640625e-07,
+          "expected_m": 0.0
+        },
+        {
+          "x_m": -1.0,
+          "y_m": 5.0,
+          "height_m": 9.5367431640625e-07,
+          "expected_m": 0.0
+        },
+        {
+          "x_m": 1.0,
+          "y_m": -5.0,
+          "height_m": 9.5367431640625e-07,
+          "expected_m": 0.0
+        },
+        {
+          "x_m": 1.0,
+          "y_m": -3.0,
+          "height_m": 9.5367431640625e-07,
+          "expected_m": 0.0
+        },
+        {
+          "x_m": 1.0,
+          "y_m": -1.0,
+          "height_m": 0.0,
+          "expected_m": 0.0
+        },
+        {
+          "x_m": 1.0,
+          "y_m": 1.0,
+          "height_m": -9.5367431640625e-07,
+          "expected_m": 0.0
+        },
+        {
+          "x_m": 1.0,
+          "y_m": 3.0,
+          "height_m": 9.5367431640625e-07,
+          "expected_m": 0.0
+        },
+        {
+          "x_m": 1.0,
+          "y_m": 5.0,
+          "height_m": 9.5367431640625e-07,
+          "expected_m": 0.0
+        }
+      ]
+    }
+  ],
+  "scope": "36 tile-centre clean-FBX walking-plane contacts; bevels, joints and gameplay collision are outside this test."
+}

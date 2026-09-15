@@ -1086,3 +1086,6 @@ See Docs/AurelionZ03Ribs-2026-09-14.md. Replaced the full 51-column batch with s
 ## Z03 continuous service-route rails - 2026-09-14
 
 See Docs/AurelionZ03Rails-2026-09-14.md. Replaced all fifty vendor rail instances with sixteen fitted custom runs covering the ramps, landing and outgoing bridge. Ramp posts are upright; continuous grips follow the three-metre rise. Native guards remain intact. Clean FBX geometry and 75 handrail profile probes pass; all four saved views were inspected. Z03RailsFresh-20260914-212228-ad730cf7 completed with 76 passing static architecture reports, 3140 actors and a clean map. Live movement, final room art, Chaos destruction and 90 percent alignment remain unqualified; supported slice estimate stays 63.75 percent.
+
+
+Z03 floor pass: 91 vendor instances replaced by 85 custom room, bridge, ramp and landing placements. Four Blender modules, 36 clean-FBX walking-plane probes and 108 native support contacts passed. Owned floor stone finish preserves shared materials. Saved Z03FloorsSaved-20260914-215018-7298b8a4; fresh Z03FloorsFresh-20260914-215343-ebeb675e: 77 passing reports, 3140 actors, clean map, no Python errors. See AurelionZ03Floors-2026-09-14.md. Live route, final lighting, Chaos and 90% alignment remain open; supported slice estimate 63.75%.
