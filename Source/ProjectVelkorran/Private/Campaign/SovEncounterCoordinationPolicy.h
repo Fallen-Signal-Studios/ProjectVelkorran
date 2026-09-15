@@ -5,13 +5,24 @@
 namespace SovEncounterCoordinationPolicy
 {
 	inline bool HasSlot(int Current, int Capacity) { return Current >= 0 && Capacity > 0 && Current < Capacity; }
-	inline bool LowResources(double Health, double MaxHealth, double Shield, double MaxShield, double Stamina, double MaxStamina)
+	/**
+	 * Nearly out of health or resources (TDD 8.7). Critical health alone, or a depleted shield with health at or
+	 * below ShieldDepletedHealthFraction, or depleted shield and stamina together. A single ordinary ranged burst
+	 * against a broken shield can remove a quarter of health, so a relief that waits for critical health alone
+	 * cannot be recoverable.
+	 */
+	inline bool LowResources(double Health, double MaxHealth, double Shield, double MaxShield, double Stamina, double MaxStamina,
+		double HealthFraction = .25, double ShieldDepletedHealthFraction = .5)
 	{
 		if (!std::isfinite(Health) || !std::isfinite(MaxHealth) || !std::isfinite(Shield) || !std::isfinite(MaxShield)
 			|| !std::isfinite(Stamina) || !std::isfinite(MaxStamina) || MaxHealth <= 0. || Health <= 0.
-			|| Shield < 0. || MaxShield < 0. || Stamina < 0. || MaxStamina < 0.) { return false; }
-		return Health / MaxHealth <= .25 || (MaxShield > 0. && MaxStamina > 0.
-			&& Shield / MaxShield <= .1 && Stamina / MaxStamina <= .1);
+			|| Shield < 0. || MaxShield < 0. || Stamina < 0. || MaxStamina < 0.
+			|| !std::isfinite(HealthFraction) || HealthFraction < 0. || HealthFraction > 1.
+			|| !std::isfinite(ShieldDepletedHealthFraction) || ShieldDepletedHealthFraction < 0. || ShieldDepletedHealthFraction > 1.) { return false; }
+		const double HealthRatio = Health / MaxHealth;
+		const bool bShieldDepleted = MaxShield > 0. && Shield / MaxShield <= .1;
+		return HealthRatio <= HealthFraction || (bShieldDepleted && HealthRatio <= ShieldDepletedHealthFraction)
+			|| (bShieldDepleted && MaxStamina > 0. && Stamina / MaxStamina <= .1);
 	}
 	inline bool WarningReady(bool OnScreen, bool RequiresWarning, bool Acknowledged, double Now, double WarningAt, double Lead)
 	{

@@ -341,4 +341,27 @@ bool FSovCoordinationRemoteViewTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCoordinationShieldDepletedReliefTest,
+	"ProjectVelkorran.Campaign.Encounter.Coordination.ShieldDepletedReliefBeforeCriticalHealth",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FSovCoordinationShieldDepletedReliefTest::RunTest(const FString& Parameters)
+{
+	FCoordinationWorld Test;
+	Test.Add(TEXT("First"), FVector(200.f, 0.f, 0.f));
+	auto* Coordination = Test.Director->GetCoordinationComponent();
+	FSovCoordinationTestAccess::Start(Test.Director, Test.Player);
+	auto* PlayerASC = Test.Player->GetNarrativeAbilitySystemComponent();
+	// A depleted shield presupposes one; the exertion fixture authors no shield maximum.
+	PlayerASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetMaxShieldAttribute(), 100.f);
+	PlayerASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetShieldAttribute(), 0.f);
+	PlayerASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetHealthAttribute(), 60.f);
+	FSovCoordinationTestAccess::Step(Coordination);
+	TestFalse(TEXT("A depleted shield above half health keeps ordinary pressure"), Coordination->IsPressureReliefActive());
+	PlayerASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetHealthAttribute(), 50.f);
+	FSovCoordinationTestAccess::Step(Coordination);
+	TestTrue(TEXT("A depleted shield at half health opens relief before critical health"), Coordination->IsPressureReliefActive());
+	TestEqual(TEXT("Relief grants no health"), PlayerASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()), 50.f);
+	return true;
+}
+
 #endif

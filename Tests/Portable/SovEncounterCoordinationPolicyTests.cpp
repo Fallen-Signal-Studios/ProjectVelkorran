@@ -27,6 +27,14 @@ int main()
 	assert(!LowResources(10., 0., 0., 100., 0., 100.)); ++Checks;
 	assert(!LowResources(10., 100., std::numeric_limits<double>::quiet_NaN(), 100., 0., 100.)); ++Checks;
 	assert(!LowResources(10., 100., -1., 100., 0., 100.)); ++Checks;
+	// A depleted shield opens relief at half health, before one more ranged burst is lethal.
+	assert(LowResources(50., 100., 10., 100., 100., 100.)); ++Checks;
+	assert(!LowResources(50.001, 100., 10., 100., 100., 100.)); ++Checks;
+	assert(!LowResources(50., 100., 10.001, 100., 100., 100.)); ++Checks;
+	assert(!LowResources(40., 100., 10., 100., 100., 100., .25, .3)); ++Checks;
+	assert(LowResources(30., 100., 100., 100., 100., 100., .3, .5)); ++Checks;
+	assert(!LowResources(50., 100., 10., 100., 100., 100., std::numeric_limits<double>::quiet_NaN(), .5)); ++Checks;
+	assert(!LowResources(50., 100., 10., 100., 100., 100., .25, 1.5)); ++Checks;
 	assert(!WarningReady(false, true, true, 2., .5, std::numeric_limits<double>::infinity())); ++Checks;
 	assert(Slots(2, false) == 2 && Slots(2, true) == 1 && Slots(1, true) == 1); ++Checks;
 	// A 90 degree horizontal frame at 16:9 spans +/-1 horizontally and +/-0.5625 vertically per unit of depth.

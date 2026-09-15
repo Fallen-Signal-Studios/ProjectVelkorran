@@ -73,6 +73,37 @@ retained fresh route to reach separate departures without an operator. It is one
 reliability; the CP9 reload, the EastWalkers outcome, physical input, rendered review and packaged
 execution remain separate evidence.
 
+## Second outcome, CP9 chaining and a measured relief gap
+
+`EastCP9Route-20260915-134512-73ea7536` committed the EastWalkers priority through ordinary input: the east
+flank opened, the west cache stayed blocking and the aftermath identity became `M12_EastWalkersPrioritized`.
+It then failed at E4B when the three-second native frost window expired during the heat approach. The
+layout contract makes Thermal Fracture recoverable, so the E4B driver now retries a missed or rejected
+window through a fresh ordinary frost setup, bounded to three misses.
+
+`EastRetryRoute-20260915-135911-1147bc03` died in E1 before reaching the retry. Its damage-share observer
+recorded 1,244 damage to E1 hostiles, all from the player (E1 has no companion). Its pressure record
+explains the death. At 74.3 s the shield was gone and health was 50.3 with three drones alive; relief did
+not open because health was above 25%. A drone burst at 79.0 s left 22.9 health, relief opened at 79.5 s,
+and the next attack the relief interval admitted, at 81.7 s, dealt exactly 22.9. A standard burst against
+a broken shield removes up to about 36 health, so relief that waits for 25% health can never be the
+recoverable low-pressure state TDD 8.7 requires.
+
+Relief thresholds are now authored encounter data on the coordination component. Critical health keeps
+its 0.25 default, and a new shield-depleted trigger opens relief at or below half health
+(`ReliefShieldDepletedHealthFraction` 0.5). Relief still grants no resources, and the 1.5 s relief attack
+spacing is unchanged until the earlier trigger has been measured in play.
+
+## Checkpoint soak with the corrected harness
+
+`CheckpointSoak30-20260915-140340-a3940143` completed 30 of 30 cycles in one editor process: 30 fresh M12 starts reached a ready mission with a
+new CP0 checkpoint, and 30 of 30 public `load_slot(CHECKPOINT, 0)` requests completed with one successful
+native callback, a new world, an unchanged journal and a ready protagonist for three seconds. The median
+reload took 4.03 s (maximum 4.38 s); warm starts were ready in about 0.9 s. In 28 cycles a newer
+same-boundary CP0 landed between the header read and the load and was accepted. R2 asks for more than
+99.5% reload success and 100 consecutive starts in both frame profiles, so this is supporting evidence,
+not R2 qualification; the 100-cycle 60 fps and 30 fps runs are next.
+
 ## Score
 
 Unchanged at **63.75** until the route, soak and captures above produce passing evidence.

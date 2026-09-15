@@ -117,6 +117,10 @@ bool USovEncounterCoordinationComponent::ValidateComposition(FString& Error) con
 		if (!FMath::IsFinite(Value) || Value <= 0.f || Value > 120.f)
 		{ Error = TEXT("Encounter coordination intervals must be finite, positive and at most 120 seconds."); return false; }
 	}
+	if (!FMath::IsFinite(ReliefHealthFraction) || ReliefHealthFraction < 0.f || ReliefHealthFraction > 1.f
+		|| !FMath::IsFinite(ReliefShieldDepletedHealthFraction) || ReliefShieldDepletedHealthFraction < ReliefHealthFraction
+		|| ReliefShieldDepletedHealthFraction > 1.f)
+	{ Error = TEXT("Relief health fractions must lie in 0..1, with the shield-depleted fraction at or above the critical fraction."); return false; }
 	if (ReliefDuration > ReliefCooldown || WarningLeadSeconds < 0.25f)
 	{ Error = TEXT("Relief must have a recovery interval and offscreen warnings need at least 0.25 seconds of lead time."); return false; }
 	for (const auto& Quota : SimultaneousRoleQuotas)
@@ -709,7 +713,8 @@ void USovEncounterCoordinationComponent::TickComponent(float Delta, ELevelTick T
 		&& SovEncounterCoordinationPolicy::LowResources(
 			ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()), ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetMaxHealthAttribute()),
 			ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetShieldAttribute()), ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetMaxShieldAttribute()),
-			ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetStaminaAttribute()), ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetMaxStaminaAttribute())))
+			ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetStaminaAttribute()), ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetMaxStaminaAttribute()),
+			ReliefHealthFraction, ReliefShieldDepletedHealthFraction))
 	{ ReliefUntil = Now + ReliefDuration; NextReliefAt = Now + ReliefCooldown; }
 	const bool bRelief = IsPressureReliefActive();
 	if (bRelief != bReliefReported)

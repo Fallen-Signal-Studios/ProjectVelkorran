@@ -67,6 +67,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Encounter|Pressure") float ReliefDuration = 4.f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Encounter|Pressure") float ReliefCooldown = 15.f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Encounter|Pressure") float ReliefAttackInterval = 1.5f;
+	/** Health fraction that opens relief on its own. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Encounter|Pressure", meta=(ClampMin="0", ClampMax="1")) float ReliefHealthFraction = .25f;
+	/** Health fraction that opens relief once the shield is depleted, before one more burst becomes lethal. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Encounter|Pressure", meta=(ClampMin="0", ClampMax="1")) float ReliefShieldDepletedHealthFraction = .5f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Encounter|Warnings") bool bRequireOffscreenRangedWarning = true;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Encounter|Warnings") float WarningLeadSeconds = 0.75f;
 	UPROPERTY(BlueprintAssignable, Category="Encounter") FSovEncounterWaveChanged OnWaveChanged;
