@@ -24,13 +24,14 @@ def wall(name,w,d,h):
                 px=side*w/4;pw=w/2-.43
                 box('Recessed panel bed',(px,face*d*.397,h*.48),(pw,.016,h*.54),dark,.003)
                 box('Carved stone field',(px,face*d*.428,h*.48),(pw-.06,.028,h*.54-.065),stone,.008)
-                for sx in (-1,1):
-                    box('Fine incised panel border',(px+sx*(pw/2-.09),face*d*.49,h*.48),(.014,.008,h*.54-.19),dark,.001)
+                # The exposed panel bed already forms a 30 mm primary border.
+                # Avoid a second 14 mm parallel line that falls below one pixel
+                # along much of the gallery; retain the modeled stepped inset.
                 points=[(side*(w/2-.29),face*d*.46,.36),(side*(w/2-.29),face*d*.46,h*.74),
                         (side*(w/2-.68),face*d*.46,h*.84),(side*(w/2-.68),face*d*.46,h-.37)]
                 # Path extrusion follows +Y: offset the rear face to retain a symmetric envelope.
-                path('Recessed oblique conductor',[(x,y-(.014 if face<0 else 0),z) for x,y,z in points],.024,.014,gold,.002)
-                for j in range(5):box('Lower service register',(side*(w/2-.45),face*d*.475,.40+j*.045),(.18,.012,.012),gold,.001)
+                path('Recessed oblique conductor',[(x,y-(.014 if face<0 else 0),z) for x,y,z in points],.036,.014,gold,.003)
+                for j in range(3):box('Lower service register',(side*(w/2-.45),face*d*.475,.40+j*.0675),(.18,.012,.018),gold,.002)
             else:
                 box('Lintel relief field',(side*w/4,face*d*.425,h*.49),(w/2-.28,.028,h*.42),stone,.006)
                 box('Lintel fine conductor',(side*w/4,face*d*.485,h*.73),(w/2-.34,.012,.018),gold,.002)

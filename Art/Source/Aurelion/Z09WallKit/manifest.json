@@ -2,7 +2,7 @@
   "modules": [
     {
       "asset": "SM_Aurelion_KIT_Z09WallSide",
-      "triangles": 13740,
+      "triangles": 10732,
       "nominal_dimensions_m": [
         3.9245715141296387,
         0.2580000162124634,
@@ -21,7 +21,7 @@
     },
     {
       "asset": "SM_Aurelion_KIT_Z09WallEnd",
-      "triangles": 13740,
+      "triangles": 10732,
       "nominal_dimensions_m": [
         4.995999813079834,
         0.2580000162124634,
@@ -40,7 +40,7 @@
     },
     {
       "asset": "SM_Aurelion_KIT_Z09Baffle",
-      "triangles": 13740,
+      "triangles": 10732,
       "nominal_dimensions_m": [
         4.995999813079834,
         0.21399998664855957,
