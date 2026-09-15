@@ -499,7 +499,11 @@ void ANarrativeNPCCharacter::Load_Implementation()
 
 bool ANarrativeNPCCharacter::IsSaveRecordDestroyed() const
 {
-	return AbilitySystemComponent && AbilitySystemComponent->GetAvatarActor() == this
+	// Checkpoint capture visits every savable NPC, including ones whose ability system has no actor info yet
+	// or any longer (a companion respawned by a handoff, a corpse awaiting cleanup). GetAvatarActor() asserts
+	// on missing actor info and crashed a packaged session; without actor info the record is not destroyed.
+	return AbilitySystemComponent && AbilitySystemComponent->AbilityActorInfo.IsValid()
+		&& AbilitySystemComponent->AbilityActorInfo->AvatarActor.Get() == this
 		&& AbilitySystemComponent->IsDead();
 }
 

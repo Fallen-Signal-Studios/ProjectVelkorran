@@ -62,6 +62,11 @@ def _admitted(value):
     return True
 
 
+# A snag on a complete native path gets bounded ordinary sidesteps before the stall deadline.
+UNSTICK_AFTER_SECONDS = 6.
+UNSTICK_SECONDS = .6
+UNSTICK_LIMIT = 3
+
 class Run(e1.Run):
     def __init__(self, output_directory):
         super().__init__(output_directory)
@@ -250,9 +255,18 @@ class Run(e1.Run):
             self.waypoints.pop(0)
             self.path_target = None
             self.last_motion_at = time.monotonic()
+            self.unstick_count = 0
+            self.unstick_until = None
             self.inject()
             return
         now = time.monotonic()
+        if getattr(self, 'unstick_until', None) is not None:
+            if now < self.unstick_until:
+                # Ordinary sidestep away from whatever holds the capsule, then re-path from the new position.
+                self.inject(move=self.unstick_move)
+                return
+            self.unstick_until = None
+            self.path_target = None
         if self.path_target != destination or now-self.last_path > .8:
             self.path_target, self.last_path = destination, now
             path = unreal.SovAurelionNavigationLibrary.find_path_to_location_synchronously(
@@ -271,7 +285,19 @@ class Run(e1.Run):
         pos = pawn.get_actor_location()
         if self.last_position is None or math.hypot(pos.x-self.last_position[0], pos.y-self.last_position[1]) > 35.:
             self.last_position, self.last_motion_at = e1._xyz(pos), now
-        assert now-self.last_motion_at < 18., 'Ordinary movement stalled; inspect recorded native path/collision'
+        stalled = now-self.last_motion_at
+        if stalled > UNSTICK_AFTER_SECONDS and getattr(self, 'unstick_count', 0) < UNSTICK_LIMIT:
+            self.unstick_count = getattr(self, 'unstick_count', 0) + 1
+            side = 1. if self.unstick_count % 2 else -1.
+            # local_move returns (right, forward); a right-only input steps perpendicular to the blocked lane.
+            self.unstick_move = (side, 0.)
+            self.unstick_until = now + UNSTICK_SECONDS
+            self.last_motion_at = now
+            self.report.setdefault('unstick_attempts', []).append(dict(elapsed=now-self.started, destination=destination,
+                position=e1._xyz(pos), side=side, attempt=self.unstick_count,
+                path=self.report.get('last_route_path')))
+            return
+        assert stalled < 18., 'Ordinary movement stalled; inspect recorded native path/collision'
 
     def prepare_hold(self, actor, identity, then):
         self.hold_spec = dict(actor=actor, identity=identity, then=then,

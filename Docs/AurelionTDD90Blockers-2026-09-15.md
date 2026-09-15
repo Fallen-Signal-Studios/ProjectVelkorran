@@ -174,6 +174,24 @@ world ended on the requested exit, and the frame remains unexplained rather than
 Limits: a Development build, not Shipping; the player stood at M12's start, so this is startup, streaming,
 steady exploration and reload memory, not the worst-case combat capture P2 also requires; one run.
 
+## Packaged crash during the played capture
+
+The creator's packaged `Play-Aurelion.ps1 -PerfCapture` session reached real combat (twelve enemy deaths across
+E1 and E2), then crashed at the Selene handoff with `Assertion failed: AbilityActorInfo.IsValid()`. The call
+path was `USovSaveSubsystem::Tick` → `CaptureAndWrite` → `UNarrativeSaveSubsystem::CreateActorRecord` →
+`ANarrativeNPCCharacter::IsSaveRecordDestroyed` → `UAbilitySystemComponent::GetAvatarActor()`. The checkpoint
+capture reached an NPC whose ability system had no actor info (the respawned companion or a corpse awaiting its
+90-second cleanup), and the asserting accessor terminated the game. Because the capture exports only when a
+world ends normally, the played combat report was lost with it.
+
+`IsSaveRecordDestroyed` now reads the avatar only when actor info is valid; without it the record is not
+destroyed. The three `SovSaveSubsystem` player-avatar comparisons (save admission, restoration capture and
+restore-owner matching) use the same non-asserting read, because a handoff can transiently leave the player's
+ability system without actor info on the save tick. A new regression test captures an NPC whose actor info
+was cleared. Automated routes had not reached this state, likely because they reach the handoff sooner than
+the corpse cleanup delay. This is a save/reload (R1, R2) and packaged-execution (P1) defect, not a
+performance-capture defect.
+
 ## Score
 
 **P2 moves from 0 to 2.5 of 5** (the rubric's 0.5 level: material subset on the approved target with the

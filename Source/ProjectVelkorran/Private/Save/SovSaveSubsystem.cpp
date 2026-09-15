@@ -36,6 +36,13 @@
 #include "UnrealFramework/NarrativeTeamAgentInterface.h"
 #include "UObject/StrongObjectPtr.h"
 
+namespace SovSaveAvatar
+{
+    /** GetAvatarActor() asserts when actor info is missing, which a handoff can leave transiently; read it safely. */
+    static AActor* AvatarOf(const UAbilitySystemComponent* ASC)
+    { return ASC && ASC->AbilityActorInfo.IsValid() ? ASC->AbilityActorInfo->AvatarActor.Get() : nullptr; }
+}
+
 namespace
 {
     class FPlatformSaveStorage final : public ISovSaveStorage
@@ -427,7 +434,7 @@ bool USovSaveSubsystem::CanCaptureInternal(FString& Error, bool bAllowEntrySuspe
     SovSavePolicy::Admission Admission;
     Admission.Authority = PC->HasAuthority(); Admission.Standalone = World->GetNetMode() == NM_Standalone;
     Admission.Ready = Pawn->IsCharacterReady(); Admission.Alive = ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()) > 0.f;
-    Admission.StableIdentity = ASC->GetAvatarActor() == Pawn && State->GetActiveMission()
+    Admission.StableIdentity = SovSaveAvatar::AvatarOf(ASC) == Pawn && State->GetActiveMission()
         && State->GetActiveProtagonist() == Pawn->GetProtagonistIdentityTag();
     Admission.StateValid = State->IsStateValid() && Techniques->IsTechniqueStateValid();
     Admission.Grounded = Pawn->GetCharacterMovement() && Pawn->GetCharacterMovement()->IsMovingOnGround();
@@ -912,7 +919,7 @@ bool USovSaveSubsystem::BindPendingRestore(ASovPlayerController* PC, uint64 Rest
     }
     auto* ASC = Cast<UNarrativeAbilitySystemComponent>(PC->GetAbilitySystemComponent());
     const auto* Pawn = Cast<ASovPlayerCharacterBase>(PC->GetPawn());
-    if (!Pawn || !ASC || ASC->GetAvatarActor() != PC->GetPawn() || !PC->GetPlayerState<APlayerState>())
+    if (!Pawn || !ASC || SovSaveAvatar::AvatarOf(ASC) != PC->GetPawn() || !PC->GetPlayerState<APlayerState>())
     { Error = TEXT("Managed restoration requires its exact initialized player, pawn and ASC."); return false; }
     RestoreWorld = PC->GetWorld(); RestoreController = PC; RestorePawn = PC->GetPawn(); RestoreASC = ASC;
     RestorePlayerState = PC->GetPlayerState<APlayerState>(); PendingRestoreEpoch = RestoreEpoch;
@@ -933,7 +940,7 @@ bool USovSaveSubsystem::MatchesRestoreOwner(ASovPlayerController* PC, uint64 Res
         && PendingRestoreEpoch == RestoreEpoch && RestorePawn.IsValid() && PC->GetPawn() == RestorePawn.Get()
         && RestorePlayerState.IsValid() && PC->GetPlayerState<APlayerState>() == RestorePlayerState.Get()
         && RestoreASC.IsValid() && PC->GetAbilitySystemComponent() == RestoreASC.Get()
-        && RestoreASC->GetAvatarActor() == RestorePawn.Get() && MatchesRestoreGenerations();
+        && SovSaveAvatar::AvatarOf(RestoreASC.Get()) == RestorePawn.Get() && MatchesRestoreGenerations();
 }
 void USovSaveSubsystem::NotifyCampaignReady(ASovPlayerController* PC, bool bSucceeded, uint64 RestoreEpoch)
 {

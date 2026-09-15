@@ -31,7 +31,7 @@ $AurelionArguments = @(
 )
 if ($PerfCapture) {
     # Opt-in local frame-time and memory capture; one report is written when each world ends.
-    $AurelionArguments += '-dpcvars=sov.PerfCapture=1,sov.PerfCapture.ExportOnEnd=1'
+    $AurelionArguments += '-dpcvars=sov.PerfCapture=1,sov.PerfCapture.ExportOnEnd=1,sov.PerfCapture.ExportIntervalSeconds=30'
 }
 $AurelionStart = New-Object System.Diagnostics.ProcessStartInfo
 $AurelionStart.FileName = $AurelionExecutable

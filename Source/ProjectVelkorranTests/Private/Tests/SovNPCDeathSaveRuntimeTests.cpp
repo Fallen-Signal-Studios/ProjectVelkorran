@@ -263,4 +263,24 @@ bool FSovNPCDeathLoadOwnershipTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("NPC reconciliation cannot convert player downed state to death"), PlayerASC->IsDead());
 	return true;
 }
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovNPCSaveRecordWithoutActorInfoTest,
+	"ProjectVelkorran.Campaign.NPCDeathSave.CaptureWithoutAbilityActorInfo",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovNPCSaveRecordWithoutActorInfoTest::RunTest(const FString& Parameters)
+{
+	// A packaged checkpoint capture crashed on an NPC whose ability system had no actor info.
+	SovNPCDeathSaveTests::FWorld F;
+	if (!TestNotNull(TEXT("Save subsystem"), F.Saves)) { return false; }
+	auto* NPC = F.Spawn();
+	if (!TestNotNull(TEXT("NPC fixture"), NPC)) { return false; }
+	auto* ASC = NPC->GetNarrativeAbilitySystemComponent();
+	if (!TestNotNull(TEXT("NPC ability system"), ASC)) { return false; }
+	ASC->ClearActorInfo();
+	const INarrativeSavableActor* Savable = Cast<INarrativeSavableActor>(NPC);
+	if (!TestNotNull(TEXT("NPC is savable"), Savable)) { return false; }
+	TestFalse(TEXT("Missing actor info is not a destroyed record"), Savable->IsSaveRecordDestroyed());
+	FNarrativeActorRecord Record;
+	TestTrue(TEXT("Checkpoint capture survives an NPC without actor info"), F.Saves->CreateActorRecord(NPC, Record));
+	return true;
+}
 #endif

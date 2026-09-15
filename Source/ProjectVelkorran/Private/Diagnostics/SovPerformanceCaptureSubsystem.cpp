@@ -34,6 +34,8 @@ TAutoConsoleVariable<float> MemoryToleranceMegabytes(TEXT("sov.PerfCapture.Memor
 
 TAutoConsoleVariable<int32> ExportOnEnd(TEXT("sov.PerfCapture.ExportOnEnd"), 0,
 	TEXT("1 writes a report under Saved/Diagnostics when each captured game world ends. Never on by default."), ECVF_Default);
+TAutoConsoleVariable<float> ExportIntervalSeconds(TEXT("sov.PerfCapture.ExportIntervalSeconds"), 0.f,
+	TEXT("When positive, also writes a report this often during play, so a crash cannot erase a capture."), ECVF_Default);
 TAutoConsoleVariable<int32> ReloadCount(TEXT("sov.PerfCapture.ReloadCount"), 0,
 	TEXT("Packaged game only: reopen the current map this many times, so load memory is judged across reloads."), ECVF_Default);
 TAutoConsoleVariable<float> ReloadAfterSeconds(TEXT("sov.PerfCapture.ReloadAfterSeconds"), 60.f,
@@ -161,6 +163,18 @@ void USovPerformanceCaptureSubsystem::Tick(float DeltaTime)
 		return;
 	}
 	RecordSampleMilliseconds(DeltaTime * 1000.f);
+	const float Interval = SovPerformanceCapture::ExportIntervalSeconds.GetValueOnAnyThread();
+	if (FMath::IsFinite(Interval) && Interval > 0.f && GetWorld()
+		&& Samples.Num() >= static_cast<int32>(SovPerformancePolicy::MinimumSamplesForVerdict)
+		&& static_cast<double>(GetWorld()->GetTimeSeconds()) - LastPeriodicExportSeconds >= static_cast<double>(FMath::Max(Interval, 5.f)))
+	{
+		LastPeriodicExportSeconds = static_cast<double>(GetWorld()->GetTimeSeconds());
+		FString Relative, Error;
+		if (!ExportLocalReport(Relative, Error))
+		{
+			UE_LOG(LogSovPerformance, Warning, TEXT("Periodic performance capture export failed: %s"), *Error);
+		}
+	}
 	UpdateScheduledCapture();
 }
 
@@ -233,6 +247,7 @@ void USovPerformanceCaptureSubsystem::ClearSamples()
 	bLoadMemoryRecorded = false;
 	bScheduledActionRequested = false;
 	FirstAdmittedWorldSeconds = 0.;
+	LastPeriodicExportSeconds = 0.;
 }
 
 void USovPerformanceCaptureSubsystem::RecordLoadMemoryBytes(double UsedBytes)

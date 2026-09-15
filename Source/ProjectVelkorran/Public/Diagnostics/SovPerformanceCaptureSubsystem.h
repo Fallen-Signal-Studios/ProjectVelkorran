@@ -142,6 +142,7 @@ private:
 	/** One reload or quit request per world; the request itself retires this world. */
 	bool bScheduledActionRequested = false;
 	double FirstAdmittedWorldSeconds = 0.;
+	double LastPeriodicExportSeconds = 0.;
 	/** Opt-in packaged-game reload/quit schedule driven by sov.PerfCapture.ReloadCount and QuitAfterReloads. */
 	void UpdateScheduledCapture();
 };
