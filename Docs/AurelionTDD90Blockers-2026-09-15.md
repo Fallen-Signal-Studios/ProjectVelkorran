@@ -10,7 +10,7 @@ evidence, never on implementation alone.
 | Gate | Rows (missing points) | Can this workstation close it? |
 |---|---|---|
 | Fresh unattended M12→M13 route | M1 (2), M2 (1.5), M3 (2), R1 (1), R2 (2.25), P1 (0.5), A4 (1.5), C2 (1.5) | **Yes**, once the route runs end to end |
-| Measured performance on an approved target | P2 (5) | **Partly.** Workstation captures are possible; an approved target hardware/profile is a user decision |
+| Measured performance on an approved target | P2 (5) | **Yes, for PC.** On 15 September the creator approved this Windows workstation (AMD Ryzen 9 7900X) as a PC target profile. Packaged captures here are admissible; editor/PIE captures and console claims are not |
 | Recruited-player studies | C1, C4, A1, A2, D2 recognition/comprehension thresholds, M3 noticed consequence | **No.** Needs human participants |
 | Canon, scene and cost review | M1, D3 | **No.** Needs a reviewer; D3 also needs authored voice and scenes |
 | Content presentation (dense-combat readability, minimap, final scenes) | V2, U3, U4, D3 | Partly, with authoring and rendered review |
@@ -103,6 +103,28 @@ reload took 4.03 s (maximum 4.38 s); warm starts were ready in about 0.9 s. In 2
 same-boundary CP0 landed between the header read and the load and was accepted. R2 asks for more than
 99.5% reload success and 100 consecutive starts in both frame profiles, so this is supporting evidence,
 not R2 qualification; the 100-cycle 60 fps and 30 fps runs are next.
+
+## Observer crash and the approved PC target
+
+`EastReliefRoute-20260915-141228-d3c167f8` passed entry, E1 (149 s, relief never needed) and E2 (70 s), then
+the editor terminated 19 seconds into E3 entry with `EXCEPTION_ACCESS_VIOLATION` in CoreUObject called from
+the Python plugin during garbage collection. It was the first run past E2 with the new damage-share
+observer, which retained Python delegate wrappers on enemy ability systems that E2's death cleanup then
+destroyed. The repository's Elite Core observer met the same wrapper-lifetime class earlier and moved to
+retained paths. The observer now keeps only actor paths and callables, rescans four times a second,
+unbinds any participant that stops being alive while it still exists, and forgets bindings on a world
+change. This is the evidenced cause, not yet a confirmed one; the next route run confirms or refutes it.
+
+On 15 September the creator approved this Windows workstation (AMD Ryzen 9 7900X) as a PC target
+profile, so packaged captures here are admissible for P2. The capture harness now supports an unattended
+packaged capture through opt-in cvars, all off by default: `sov.PerfCapture.ExportOnEnd` writes a
+uniquely named report when each captured world ends, `ReloadCount` and `ReloadAfterSeconds` reopen the
+packaged map on a schedule so load memory is judged across three reloads, and `QuitAfterReloads` exits
+afterwards. Reload and quit act only in packaged game worlds, never in the editor or PIE.
+`Scripts/Capture-AurelionPerformance.ps1` launches the packaged build rendered with that schedule and
+collects the reports, and `Play-Aurelion.ps1 -PerfCapture` arms capture for a played session. The
+unattended capture covers startup, streaming, steady play and reload memory; it cannot drive combat, so
+the worst-case combat percentile needs a played capture or a packaged autoplay path.
 
 ## Score
 

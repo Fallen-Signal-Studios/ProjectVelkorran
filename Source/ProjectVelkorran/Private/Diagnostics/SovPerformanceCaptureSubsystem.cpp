@@ -6,6 +6,9 @@
 #include "Engine/World.h"
 #include "HAL/IConsoleManager.h"
 #include "HAL/PlatformMemory.h"
+#include "Kismet/GameplayStatics.h"
+#include "Misc/CoreDelegates.h"
+#include "UObject/Package.h"
 #include "HAL/PlatformProperties.h"
 #include "Misc/App.h"
 #include "Misc/DateTime.h"
@@ -28,6 +31,19 @@ TAutoConsoleVariable<float> JudgedPercentile(TEXT("sov.PerfCapture.JudgedPercent
 	TEXT("Percentile the target is judged at, 0..1. 0.95 judges p95."), ECVF_Default);
 TAutoConsoleVariable<float> MemoryToleranceMegabytes(TEXT("sov.PerfCapture.MemoryToleranceMb"), 64.f,
 	TEXT("Per-load rise in used memory, in megabytes, treated as noise when judging the reload trend."), ECVF_Default);
+
+TAutoConsoleVariable<int32> ExportOnEnd(TEXT("sov.PerfCapture.ExportOnEnd"), 0,
+	TEXT("1 writes a report under Saved/Diagnostics when each captured game world ends. Never on by default."), ECVF_Default);
+TAutoConsoleVariable<int32> ReloadCount(TEXT("sov.PerfCapture.ReloadCount"), 0,
+	TEXT("Packaged game only: reopen the current map this many times, so load memory is judged across reloads."), ECVF_Default);
+TAutoConsoleVariable<float> ReloadAfterSeconds(TEXT("sov.PerfCapture.ReloadAfterSeconds"), 60.f,
+	TEXT("Steady-state seconds captured in each world before the next reload or quit."), ECVF_Default);
+TAutoConsoleVariable<int32> QuitAfterReloads(TEXT("sov.PerfCapture.QuitAfterReloads"), 0,
+	TEXT("Packaged game only: exit after the final reloaded world has been captured."), ECVF_Default);
+
+/** Process lifetime, so a scheduled capture spans the worlds each reload creates. */
+int32& ReloadsRequested() { static int32 Count = 0; return Count; }
+int32& ExportSequence() { static int32 Sequence = 0; return Sequence; }
 
 constexpr int32 MaximumLoadMemorySamples = 64;
 constexpr double BytesPerMegabyte = 1024.0 * 1024.0;
@@ -114,6 +130,15 @@ void USovPerformanceCaptureSubsystem::Initialize(FSubsystemCollectionBase& Colle
 
 void USovPerformanceCaptureSubsystem::Deinitialize()
 {
+	// Opt-in unattended export: a packaged capture has no Blueprint caller for ExportLocalReport.
+	if (IsCapturing() && SovPerformanceCapture::ExportOnEnd.GetValueOnAnyThread() != 0 && Samples.Num() > 0)
+	{
+		FString Relative, Error;
+		if (!ExportLocalReport(Relative, Error))
+		{
+			UE_LOG(LogSovPerformance, Warning, TEXT("Performance capture export on world end failed: %s"), *Error);
+		}
+	}
 	ClearSamples();
 	Super::Deinitialize();
 }
@@ -136,6 +161,35 @@ void USovPerformanceCaptureSubsystem::Tick(float DeltaTime)
 		return;
 	}
 	RecordSampleMilliseconds(DeltaTime * 1000.f);
+	UpdateScheduledCapture();
+}
+
+void USovPerformanceCaptureSubsystem::UpdateScheduledCapture()
+{
+	UWorld* World = GetWorld();
+	// Reload and quit are packaged-game conveniences only; editor and PIE worlds are never driven.
+	if (!World || World->WorldType != EWorldType::Game || GIsEditor || bScheduledActionRequested) { return; }
+	const int32 Reloads = FMath::Max(0, SovPerformanceCapture::ReloadCount.GetValueOnAnyThread());
+	const bool bQuit = SovPerformanceCapture::QuitAfterReloads.GetValueOnAnyThread() != 0;
+	if (Reloads <= 0 && !bQuit) { return; }
+	const float After = SovPerformanceCapture::ReloadAfterSeconds.GetValueOnAnyThread();
+	const float Steady = FMath::IsFinite(After) ? FMath::Clamp(After, 5.f, 3600.f) : 60.f;
+	if (Samples.Num() < static_cast<int32>(SovPerformancePolicy::MinimumSamplesForVerdict)
+		|| static_cast<double>(World->GetTimeSeconds()) - FirstAdmittedWorldSeconds < static_cast<double>(Steady)) { return; }
+	bScheduledActionRequested = true;
+	int32& Requested = SovPerformanceCapture::ReloadsRequested();
+	if (Requested < Reloads)
+	{
+		++Requested;
+		const FString Map = UWorld::RemovePIEPrefix(World->GetOutermost()->GetName());
+		UE_LOG(LogSovPerformance, Log, TEXT("Performance capture reload %d of %d: %s"), Requested, Reloads, *Map);
+		UGameplayStatics::OpenLevel(World, FName(*Map));
+	}
+	else if (bQuit)
+	{
+		UE_LOG(LogSovPerformance, Log, TEXT("Performance capture schedule complete after %d reloads; exiting."), Requested);
+		FPlatformMisc::RequestExit(false, TEXT("SovPerformanceCapture"));
+	}
 }
 
 void USovPerformanceCaptureSubsystem::RecordSampleMilliseconds(float Milliseconds)
@@ -154,6 +208,7 @@ void USovPerformanceCaptureSubsystem::RecordSampleMilliseconds(float Millisecond
 		return;
 	}
 	++FramesObserved;
+	if (Samples.Num() == 0 && GetWorld()) { FirstAdmittedWorldSeconds = static_cast<double>(GetWorld()->GetTimeSeconds()); }
 	if (!bLoadMemoryRecorded)
 	{
 		// One steady-state reading per captured world; loading and warm-up spikes are excluded.
@@ -176,6 +231,8 @@ void USovPerformanceCaptureSubsystem::ClearSamples()
 	DroppedOldest = 0;
 	WarmupDiscarded = 0;
 	bLoadMemoryRecorded = false;
+	bScheduledActionRequested = false;
+	FirstAdmittedWorldSeconds = 0.;
 }
 
 void USovPerformanceCaptureSubsystem::RecordLoadMemoryBytes(double UsedBytes)
@@ -308,8 +365,9 @@ bool USovPerformanceCaptureSubsystem::ExportLocalReport(FString& OutRelativePath
 	Json += TEXT("Not a console or certification capture.\"\n");
 	Json += TEXT("}\n");
 
-	const FString Relative = FString::Printf(TEXT("Diagnostics/PerfCapture-%s-%s.json"),
-		*Platform, *FDateTime::UtcNow().ToString(TEXT("%Y%m%d-%H%M%S")));
+	// A per-process sequence keeps several world reports written within one second distinct.
+	const FString Relative = FString::Printf(TEXT("Diagnostics/PerfCapture-%s-%s-%03d.json"),
+		*Platform, *FDateTime::UtcNow().ToString(TEXT("%Y%m%d-%H%M%S")), ++SovPerformanceCapture::ExportSequence());
 	const FString Absolute = FPaths::Combine(FPaths::ProjectSavedDir(), Relative);
 	IFileManager::Get().MakeDirectory(*FPaths::GetPath(Absolute), true);
 	if (!FFileHelper::SaveStringToFile(Json, *Absolute, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM))

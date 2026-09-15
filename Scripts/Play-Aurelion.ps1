@@ -7,7 +7,7 @@ Candidate launcher: place beside the archived Windows/ProjectVelkorran directory
 Each launch keeps its own save and log folder. It does not alter an existing profile.
 #>
 [CmdletBinding()]
-param([string] $ArchiveDirectory = $PSScriptRoot)
+param([string] $ArchiveDirectory = $PSScriptRoot, [switch] $PerfCapture)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -29,6 +29,10 @@ $AurelionArguments = @(
     ('-UserDir="' + $AurelionUserDirectory.Replace('\', '/') + '/"'),
     ('-abslog="' + $AurelionLogPath + '"')
 )
+if ($PerfCapture) {
+    # Opt-in local frame-time and memory capture; one report is written when each world ends.
+    $AurelionArguments += '-dpcvars=sov.PerfCapture=1,sov.PerfCapture.ExportOnEnd=1'
+}
 $AurelionStart = New-Object System.Diagnostics.ProcessStartInfo
 $AurelionStart.FileName = $AurelionExecutable
 $AurelionStart.WorkingDirectory = Split-Path -Parent $AurelionExecutable
@@ -43,6 +47,7 @@ if ($null -eq $AurelionProcess) { throw 'The playtest process did not start.' }
     ProcessId = $AurelionProcess.Id
     UserDirectory = $AurelionUserDirectory
     Log = $AurelionLogPath
+    PerfCapture = [bool]$PerfCapture
     StartedLocal = (Get-Date).ToString('o')
 } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $AurelionRunDirectory 'launch.json') -Encoding UTF8
 Write-Output "Aurelion opened at M12. This run's saves and log: $AurelionRunDirectory"

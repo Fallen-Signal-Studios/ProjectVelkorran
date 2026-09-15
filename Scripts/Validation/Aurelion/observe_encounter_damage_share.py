@@ -1,10 +1,15 @@
 """Read-only damage share across Aurelion encounters: who damages the hostiles required for victory.
 
 Binds each live required participant's native damage-resolved delegate and attributes applied shield
-plus health damage to the current player pawn, a protagonist companion, or another source. Bindings are
-released whenever the game world changes, so no old world is retained across mission travel or a
-checkpoint load. It writes no gameplay state and injects no input. The share is evidence for the TDD's
-ordinary companion-contribution band; it does not judge whether that contribution is well tuned.
+plus health damage to the current player pawn, a protagonist companion, or another source. It writes no
+gameplay state and injects no input. The share is evidence for the TDD's ordinary companion-contribution
+band; it does not judge whether that contribution is well tuned.
+
+Object lifetime: no actor, component or delegate wrapper is held between ticks. A Python wrapper whose
+native object is destroyed during cleanup can be dereferenced by the Python plugin during garbage
+collection, which crashed the editor after E2's drones were cleaned up. Bindings keep only the actor path
+and the callable; each scan reacquires the live delegate, unbinds any participant that is no longer
+alive while it still exists, and simply forgets bindings when the world changes.
 """
 import json
 import os
@@ -14,6 +19,7 @@ from pathlib import Path
 import unreal
 
 _RUN = None
+SCAN_SECONDS = .25
 
 
 def _path(obj):
@@ -32,8 +38,8 @@ class Run:
         self.last_scan = 0.
         self.last_write = 0.
         self.report = dict(status='running', scope='Applied shield plus health damage to required encounter hostiles, by source',
-                           method='Native OnDamageResolvedAsTarget receipts only; no input or state writes',
-                           encounters={}, receipts=0, rebinds=0)
+                           method='Native OnDamageResolvedAsTarget receipts only; no input or state writes; no wrappers retained between ticks',
+                           encounters={}, receipts=0, rebinds=0, unbound_participants=0)
 
     def write(self):
         for row in self.report['encounters'].values():
@@ -50,52 +56,66 @@ class Run:
         temp.write_text(json.dumps(self.report, indent=2, default=str), encoding='utf8')
         os.replace(temp, self.out / 'damage-share.json')
 
-    def release(self):
-        for delegate, callback in self.bound.values():
-            try:
-                delegate.remove_callable(callback)
-            except Exception:
-                pass
-        self.bound = {}
-
     def observer(self, encounter, participant, target_path):
         def damaged(result):
-            if _path(result.target_actor) != target_path:
-                return
-            amount = float(result.applied_health_damage) + float(result.applied_shield_damage)
-            if amount <= 0.:
-                return
-            world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_game_world()
-            pawn = unreal.GameplayStatics.get_player_pawn(world, 0) if world else None
-            source = result.source_actor
-            if source is not None and pawn is not None and source == pawn:
-                kind = 'player'
-            elif isinstance(source, unreal.SovProtagonistCompanionCharacter):
-                kind = 'companion'
-            else:
-                kind = 'other'
-            row = self.report['encounters'].setdefault(encounter, dict(player=0., companion=0., other=0., participants={}))
-            row[kind] += amount
-            row['participants'][participant] = row['participants'].get(participant, 0.) + amount
-            self.report['receipts'] += 1
+            try:
+                if _path(result.target_actor) != target_path:
+                    return
+                amount = float(result.applied_health_damage) + float(result.applied_shield_damage)
+                if amount <= 0.:
+                    return
+                world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_game_world()
+                pawn = unreal.GameplayStatics.get_player_pawn(world, 0) if world else None
+                source = result.source_actor
+                if source is not None and pawn is not None and _path(source) == _path(pawn):
+                    kind = 'player'
+                elif isinstance(source, unreal.SovProtagonistCompanionCharacter):
+                    kind = 'companion'
+                else:
+                    kind = 'other'
+                row = self.report['encounters'].setdefault(encounter, dict(player=0., companion=0., other=0., participants={}))
+                row[kind] += amount
+                row['participants'][participant] = row['participants'].get(participant, 0.) + amount
+                self.report['receipts'] += 1
+            except Exception:
+                self.report.setdefault('callback_errors', []).append(traceback.format_exc()[-400:])
         return damaged
 
     def scan(self, world):
+        live = {}
         for director in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.SovEncounterDirector):
             encounter = str(director.encounter_id)
             for participant in director.participants:
                 actor = participant.character
                 if not participant.required_for_victory or not unreal.SystemLibrary.is_valid(actor):
                     continue
-                key = _path(actor)
-                if key in self.bound:
-                    continue
+                live[_path(actor)] = (encounter, str(participant.participant_id), actor)
+        # Unbind anything no longer alive while its native object still exists; forget vanished ones.
+        for key in list(self.bound):
+            row = live.get(key)
+            if row is None:
+                del self.bound[key]
+                self.report['unbound_participants'] += 1
+                continue
+            actor = row[2]
+            if actor.is_actor_being_destroyed() or not actor.is_alive():
                 asc = actor.get_narrative_ability_system_component()
-                if asc is None:
-                    continue
-                callback = self.observer(encounter, str(participant.participant_id), key)
-                asc.on_damage_resolved_as_target.add_callable(callback)
-                self.bound[key] = (asc.on_damage_resolved_as_target, callback)
+                if asc is not None:
+                    try:
+                        asc.on_damage_resolved_as_target.remove_callable(self.bound[key])
+                    except Exception:
+                        pass
+                del self.bound[key]
+                self.report['unbound_participants'] += 1
+        for key, (encounter, participant, actor) in live.items():
+            if key in self.bound or actor.is_actor_being_destroyed() or not actor.is_alive():
+                continue
+            asc = actor.get_narrative_ability_system_component()
+            if asc is None:
+                continue
+            callback = self.observer(encounter, participant, key)
+            asc.on_damage_resolved_as_target.add_callable(callback)
+            self.bound[key] = callback
 
     def tick(self, _delta):
         if self.done:
@@ -105,11 +125,11 @@ class Run:
             world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_game_world()
             current = hash(world) if world is not None else None
             if current != self.world_hash:
-                # Never keep old-world delegates or actor wrappers across travel or a reload.
-                self.release()
+                # Old-world objects are never touched again; their delegates die with them.
+                self.bound = {}
                 self.world_hash = current
                 self.report['rebinds'] += 1
-            if world is not None and now - self.last_scan > 1.:
+            if world is not None and now - self.last_scan > SCAN_SECONDS:
                 self.last_scan = now
                 self.scan(world)
             if now - self.last_write > 5.:
@@ -126,9 +146,25 @@ class Run:
         if self.handle is not None:
             unreal.unregister_slate_post_tick_callback(self.handle)
             self.handle = None
-        self.release()
+        world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_game_world()
+        if world is not None and hash(world) == self.world_hash:
+            try:
+                self.scan_release(world)
+            except Exception:
+                pass
+        self.bound = {}
         self.report['status'] = status
         self.write()
+
+    def scan_release(self, world):
+        for director in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.SovEncounterDirector):
+            for participant in director.participants:
+                actor = participant.character
+                key = _path(actor) if unreal.SystemLibrary.is_valid(actor) else None
+                if key in self.bound:
+                    asc = actor.get_narrative_ability_system_component()
+                    if asc is not None:
+                        asc.on_damage_resolved_as_target.remove_callable(self.bound[key])
 
 
 def start(output_directory):
