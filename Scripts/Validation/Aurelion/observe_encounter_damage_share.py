@@ -5,11 +5,10 @@ plus health damage to the current player pawn, a protagonist companion, or anoth
 gameplay state and injects no input. The share is evidence for the TDD's ordinary companion-contribution
 band; it does not judge whether that contribution is well tuned.
 
-Object lifetime: no actor, component or delegate wrapper is held between ticks. A Python wrapper whose
-native object is destroyed during cleanup can be dereferenced by the Python plugin during garbage
-collection, which crashed the editor after E2's drones were cleaned up. Bindings keep only the actor path
-and the callable; each scan reacquires the live delegate, unbinds any participant that is no longer
-alive while it still exists, and simply forgets bindings when the world changes.
+Object lifetime: a Python delegate binding lasts only as long as its delegate wrapper, so the wrapper is
+kept while its participant lives. Keeping wrappers of destroyed actors crashed the editor during garbage
+collection after E2's cleanup, so each scan unbinds and drops a participant's wrapper as soon as it is no
+longer alive, long before death cleanup destroys it, and forgets every binding when the world changes.
 """
 import json
 import os
@@ -38,7 +37,7 @@ class Run:
         self.last_scan = 0.
         self.last_write = 0.
         self.report = dict(status='running', scope='Applied shield plus health damage to required encounter hostiles, by source',
-                           method='Native OnDamageResolvedAsTarget receipts only; no input or state writes; no wrappers retained between ticks',
+                           method='Native OnDamageResolvedAsTarget receipts only; no input or state writes; wrappers retained only while participants live',
                            encounters={}, receipts=0, rebinds=0, unbound_participants=0)
 
     def write(self):
@@ -90,7 +89,7 @@ class Run:
                 if not participant.required_for_victory or not unreal.SystemLibrary.is_valid(actor):
                     continue
                 live[_path(actor)] = (encounter, str(participant.participant_id), actor)
-        # Unbind anything no longer alive while its native object still exists; forget vanished ones.
+        # Unbind and drop a wrapper as soon as its participant stops being alive; forget vanished ones.
         for key in list(self.bound):
             row = live.get(key)
             if row is None:
@@ -99,13 +98,11 @@ class Run:
                 continue
             actor = row[2]
             if actor.is_actor_being_destroyed() or not actor.is_alive():
-                asc = actor.get_narrative_ability_system_component()
-                if asc is not None:
-                    try:
-                        asc.on_damage_resolved_as_target.remove_callable(self.bound[key])
-                    except Exception:
-                        pass
-                del self.bound[key]
+                delegate, callback = self.bound.pop(key)
+                try:
+                    delegate.remove_callable(callback)
+                except Exception:
+                    pass
                 self.report['unbound_participants'] += 1
         for key, (encounter, participant, actor) in live.items():
             if key in self.bound or actor.is_actor_being_destroyed() or not actor.is_alive():
@@ -114,8 +111,10 @@ class Run:
             if asc is None:
                 continue
             callback = self.observer(encounter, participant, key)
-            asc.on_damage_resolved_as_target.add_callable(callback)
-            self.bound[key] = callback
+            delegate = asc.on_damage_resolved_as_target
+            delegate.add_callable(callback)
+            # The binding lives only as long as this delegate wrapper.
+            self.bound[key] = (delegate, callback)
 
     def tick(self, _delta):
         if self.done:
@@ -162,9 +161,8 @@ class Run:
                 actor = participant.character
                 key = _path(actor) if unreal.SystemLibrary.is_valid(actor) else None
                 if key in self.bound:
-                    asc = actor.get_narrative_ability_system_component()
-                    if asc is not None:
-                        asc.on_damage_resolved_as_target.remove_callable(self.bound[key])
+                    delegate, callback = self.bound[key]
+                    delegate.remove_callable(callback)
 
 
 def start(output_directory):
