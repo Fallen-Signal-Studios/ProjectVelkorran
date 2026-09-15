@@ -1,0 +1,44 @@
+{
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z09Paving",
+      "triangles": 2820,
+      "nominal_dimensions_m": [
+        4.0,
+        3.9285714626312256,
+        0.11999999731779099
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_Basalt",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; native gallery floor collision remains authoritative",
+      "surface_top_metres": 0.12,
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z09PavingApproach",
+      "triangles": 2820,
+      "nominal_dimensions_m": [
+        3.0,
+        4.809999942779541,
+        0.11999999731779099
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_Basalt",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; native gallery floor collision remains authoritative",
+      "surface_top_metres": 0.12,
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    }
+  ]
+}
