@@ -1095,3 +1095,5 @@ Z03 wayfinding pass: 44 custom floor light registers, one mounted destination pl
 
 
 Z04 masonry pass: 188 overlapping vendor wall instances replaced with 48 custom double-sided sections across three Blender modules. Native 50 cm wall envelope, 7 m height and both 6 x 4.5 m door openings retained. Three FBX and coplanar checks passed. Saved Z04WallsSaved-20260914-223353-cfc20fc3; fresh Z04WallsFresh-20260914-223631-41edfa85: 79 passing reports, 3140 actors, clean map, no Python errors. See AurelionZ04Walls-2026-09-14.md. Dark ceiling, balcony, floor, props, full map, cast, Chaos and live validation remain open; supported slice estimate 63.75%.
+
+Z04 ceiling pass (2026-09-14): 144 custom coffers now cover the full 62 x 38 m relay roof, with six reviewed upward washes on existing light actors. Saved views inspected; Z04CeilingFresh-20260914-225819-a9f60e93 passed all 80 architecture reports with 3140 actors and a clean map. See Docs/AurelionZ04Ceiling-2026-09-14.md. Live combat, packaged performance and selective Chaos destruction remain open.
