@@ -157,6 +157,9 @@ void ASovCinderStickyGrenadeProjectile::BeginPlay()
 	}
 	else
 	{
+		// Authority owns every collision decision, as for Velkorran's Hunger and the drone rocket. A proxy that
+		// blocked locally would stop or stick where the server did not, until replicated movement corrected it.
+		CollisionSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		StartProjectileMovement();
 	}
 

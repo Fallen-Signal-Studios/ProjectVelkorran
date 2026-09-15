@@ -19,4 +19,18 @@ namespace SovEncounterCoordinationPolicy
 			&& std::isfinite(Lead) && Lead >= 0. && Now >= WarningAt + Lead);
 	}
 	inline int Slots(int Normal, bool Relief) { return Relief ? std::min(Normal, 1) : Normal; }
+	/**
+	 * Whether a point at view-space offsets (Forward along the view, Right, Up) lies inside a frame with this
+	 * horizontal field of view and aspect ratio. Used where the player's viewport is not on this machine.
+	 */
+	inline bool WithinViewFrame(double Forward, double Right, double Up, double HorizontalFovDegrees, double AspectRatio)
+	{
+		if (!std::isfinite(Forward) || !std::isfinite(Right) || !std::isfinite(Up) || !std::isfinite(HorizontalFovDegrees)
+			|| !std::isfinite(AspectRatio) || Forward <= 0. || HorizontalFovDegrees <= 0. || HorizontalFovDegrees >= 180.
+			|| AspectRatio <= 0.) { return false; }
+		const double TanHalfWidth = std::tan(HorizontalFovDegrees * std::acos(-1.) / 360.);
+		return std::abs(Right) <= Forward * TanHalfWidth && std::abs(Up) <= Forward * TanHalfWidth / AspectRatio;
+	}
+	/** The narrowest common display frame: a wider real view can only make the rule require a warning, never skip one. */
+	inline constexpr double RemoteViewAspectRatio = 16. / 9.;
 }

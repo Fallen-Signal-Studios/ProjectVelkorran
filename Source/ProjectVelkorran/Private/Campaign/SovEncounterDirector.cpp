@@ -386,6 +386,17 @@ bool ASovEncounterDirector::HasEncounterPlayer(const AActor* Actor) const
 	return IsValid(Actor) && bHasEntryCheckpoint && Actor == ResolvePlayer();
 }
 
+bool ASovEncounterDirector::IsEncounterCombatant(const AActor* Actor) const
+{
+	return HasEncounterPlayer(Actor);
+}
+
+void ASovEncounterDirector::GetEncounterCombatants(TArray<ASovPlayerCharacterBase*>& OutCombatants) const
+{
+	OutCombatants.Reset();
+	if (ASovPlayerCharacterBase* Player = ResolvePlayer(); IsEncounterCombatant(Player)) { OutCombatants.Add(Player); }
+}
+
 bool ASovEncounterDirector::IsEntryCheckpointQuiescentForSave(const ASovPlayerCharacterBase* Player) const
 {
 	FString Error;

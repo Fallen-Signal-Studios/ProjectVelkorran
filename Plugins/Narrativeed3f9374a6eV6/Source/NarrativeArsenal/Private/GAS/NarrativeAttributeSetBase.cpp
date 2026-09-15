@@ -454,7 +454,7 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 			&& !EffectAssetTags.HasTagExact(Tags.Damage_Fatal)
 			&& UArsenalStatics::GetAttitude(SourceActor, TargetActor) == ETeamAttitude::Hostile)
 		{
-			if (const auto* Settings = UNarrativeGameUserSettings::GetSovSettings())
+			if (const auto* Settings = UNarrativeGameUserSettings::GetSovPlayerSettings(TargetActor))
 			{
 				const float Scale = Settings->GetIncomingDamageScale();
 				RoutedDamage = SovCombatTransaction::BoundedProduct(RoutedDamage, FMath::IsFinite(Scale) ? FMath::Clamp(Scale, 0.f, 10.f) : 1.f);

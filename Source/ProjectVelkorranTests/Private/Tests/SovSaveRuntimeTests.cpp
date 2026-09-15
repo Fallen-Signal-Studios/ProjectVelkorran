@@ -25,6 +25,7 @@
 #include "Settings/SovGameUserSettings.h"
 #include "Sovereign/SovGameplayTags.h"
 #include "Subsystems/NarrativeSaveSubsystem.h"
+#include "UObject/Script.h"
 #include "UObject/StrongObjectPtr.h"
 
 TArray<FName> USovSavePhaseProbeComponent::RestoreOrder;
@@ -235,6 +236,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovNarrativeCaptureTransactionTest, "ProjectVe
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovNarrativeCaptureTransactionTest::RunTest(const FString& Parameters)
 {
+    // Actor save events (PrepareForSave, GetActorGUID) go through AActor::ProcessEvent, which skips them in a world not initialized for play.
+    FEditorScriptExecutionGuard ScriptGuard;
     const UWorld::InitializationValues WorldInitialization = UWorld::InitializationValues().AllowAudioPlayback(false).RequiresHitProxies(false)
         .CreatePhysicsScene(false).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
     UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true,
@@ -261,6 +264,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovNarrativeRestorePhaseTest, "ProjectVelkorra
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovNarrativeRestorePhaseTest::RunTest(const FString& Parameters)
 {
+    // Actor save events (PrepareForSave, Load, GetActorGUID) go through AActor::ProcessEvent, which skips them in a world not initialized for play.
+    FEditorScriptExecutionGuard ScriptGuard;
     const UWorld::InitializationValues WorldInitialization = UWorld::InitializationValues().AllowAudioPlayback(false).RequiresHitProxies(false)
         .CreatePhysicsScene(false).CreateNavigation(false).CreateAISystem(false).ShouldSimulatePhysics(false).SetTransactional(false);
     UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true,

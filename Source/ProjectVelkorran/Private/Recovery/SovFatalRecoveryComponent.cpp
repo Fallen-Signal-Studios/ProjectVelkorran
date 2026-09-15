@@ -88,7 +88,7 @@ ASovEncounterDirector* USovFatalRecoveryComponent::FindActiveEncounter() const
 	ASovEncounterDirector* Found = nullptr;
 	for (TActorIterator<ASovEncounterDirector> It(GetWorld()); It; ++It)
 	{
-		if (!It->HasEncounterPlayer(GetOwner()) || It->GetEncounterState() != ESovEncounterState::Active) { continue; }
+		if (!It->IsEncounterCombatant(GetOwner()) || It->GetEncounterState() != ESovEncounterState::Active) { continue; }
 		if (Found) { return nullptr; }
 		Found = *It;
 	}
@@ -239,9 +239,9 @@ void USovFatalRecoveryComponent::ResolveFatal(uint64 ExpectedEpoch)
 	APlayerController* PC = P ? Cast<APlayerController>(P->GetController()) : nullptr;
 	if (!IsCurrentContext(ExpectedEpoch, ASC, P, PC) || State != ESovRecoveryState::ResolvingFatal || !OwnsFatalRecovery()) { return; }
 	ASovEncounterDirector* Encounter = PendingEncounter;
-	const bool bActive = IsValid(Encounter) && Encounter->HasEncounterPlayer(P)
+	const bool bActive = IsValid(Encounter) && Encounter->IsEncounterCombatant(P)
 		&& Encounter->GetEncounterState() == ESovEncounterState::Active && Encounter->GetAttemptId().IsValid();
-	const auto* Settings = UNarrativeGameUserSettings::GetSovSettings();
+	const auto* Settings = UNarrativeGameUserSettings::GetSovSessionSettings(P);
 	if (SovRecoveryPolicy::CanRescue(true, bActive, bActive && Encounter->bAllowCompanionRescue,
 		!Settings || Settings->IsCompanionRescueAllowed(), bActive && UsedRescueAttempt == Encounter->GetAttemptId(),
 		FatalTransaction.IsValid(), bExcludedFatal, true, IsSafeRecoveryPosition(P, P->GetActorLocation())))

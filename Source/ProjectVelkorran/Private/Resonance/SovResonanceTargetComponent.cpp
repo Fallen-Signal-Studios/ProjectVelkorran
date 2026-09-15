@@ -34,7 +34,7 @@ void USovResonanceTargetComponent::ObserveReveal(bool bRevealed, float Remaining
 	ExposedBy = bRevealed ? Instigator : nullptr;
 	ExposureUntil = GetWorld()->GetTimeSeconds() + FMath::Max(0.f, Remaining);
 	if (bRevealed)
-	{ if (auto* Coordinator = USovResonanceComponent::FindActive(GetWorld())) { Coordinator->ObserveExposure(this, Instigator); } }
+	{ if (auto* Coordinator = USovResonanceComponent::FindForActor(GetWorld(), Instigator)) { Coordinator->ObserveExposure(this, Instigator); } }
 }
 bool USovResonanceTargetComponent::IsExposedBy(AActor* Selene) const
 {
@@ -62,7 +62,7 @@ bool USovResonanceTargetComponent::CanResolve(ESovResonanceType Type, const USov
 bool USovResonanceTargetComponent::BeginTerminalOperation(AActor* Selene, FString& Reason)
 {
 	Reason.Reset();
-	auto* Coordinator = USovResonanceComponent::FindActive(GetWorld());
+	auto* Coordinator = USovResonanceComponent::FindForActor(GetWorld(), Selene);
 	auto* ASC = IsValid(Selene) ? UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Selene) : nullptr;
 	if (!GetOwner() || !GetOwner()->HasAuthority() || !Coordinator || Coordinator->GetSelene() != Selene
 		|| !Coordinator->IsPermitted(ESovResonanceType::TerminalRelease, GetOwner()) || !AllowedTypes.Contains(ESovResonanceType::TerminalRelease)
@@ -87,7 +87,7 @@ void USovResonanceTargetComponent::RecordProtection(AActor* Selene, float Pressu
 void USovResonanceTargetComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* Function)
 {
 	Super::TickComponent(DeltaTime, TickType, Function);
-	auto* Coordinator = USovResonanceComponent::FindActive(GetWorld());
+	auto* Coordinator = USovResonanceComponent::FindForActor(GetWorld(), Operator.Get());
 	auto* ASC = Operator.IsValid() ? UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Operator.Get()) : nullptr;
 	if (!GetOwner()->HasAuthority() || !Coordinator || Coordinator->GetSelene() != Operator.Get()
 		|| !Coordinator->IsPermitted(ESovResonanceType::TerminalRelease, GetOwner()) || !ASC

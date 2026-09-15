@@ -100,7 +100,7 @@ bool ASovAurelionSweepScanner::CaptureObservation()
     if (!GetCurrentPlayer(Player, PC) || !CanSee(Player, SeenPosition)) { return false; }
     const auto State = RelayDirector->GetEncounterState();
     if (State != ESovEncounterState::Inactive && State != ESovEncounterState::Active) { return false; }
-    if (State == ESovEncounterState::Active && !RelayDirector->HasEncounterPlayer(Player)) { return false; }
+    if (State == ESovEncounterState::Active && !RelayDirector->IsEncounterCombatant(Player)) { return false; }
     FObservation Next;
     Next.ScannerId = ScannerId; Next.SensorTransform = GetActorTransform(); Next.Director = RelayDirector;
     Next.DirectorGeneration = RelayDirector->GetLifecycleGeneration(); Next.Attempt = RelayDirector->GetAttemptId();
@@ -161,7 +161,7 @@ void ASovAurelionSweepScanner::DeliverObservation()
 {
     if (!OwnsObservation()) { ClearObservation(); return; }
     if (RelayDirector->GetEncounterState() != ESovEncounterState::Active) { return; }
-    if (!RelayDirector->HasEncounterPlayer(Observation.Player.Get()) || !RelayDirector->GetAttemptId().IsValid()) { ClearObservation(); return; }
+    if (!RelayDirector->IsEncounterCombatant(Observation.Player.Get()) || !RelayDirector->GetAttemptId().IsValid()) { ClearObservation(); return; }
     Observation.Attempt = RelayDirector->GetAttemptId(); Observation.bEncounterWasActive = true;
     const bool bWasComplete = GetAlertedRecipientCount() == 2;
     for (int32 Index = 0; Index < Observation.Receivers.Num(); ++Index)

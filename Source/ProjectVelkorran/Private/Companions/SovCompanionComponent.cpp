@@ -332,7 +332,7 @@ void USovCompanionComponent::HandleDeath(AActor* Actor, UNarrativeAbilitySystemC
 	CancelContextCommand();
 	if (GetOwner()->IsA<ASovProtagonistCompanionCharacter>() || IsValid(RequiredEncounter))
 	{
-		if (auto* ActivePlayer = USovResonanceComponent::FindActive(GetWorld()))
+		if (auto* ActivePlayer = USovResonanceComponent::FindForActor(GetWorld(), GetOwner()))
 		{ if (auto* Recovery = ActivePlayer->GetOwner()->FindComponentByClass<USovFatalRecoveryComponent>()) { if (Recovery->RequestCompanionFailure(this)) { return; } } }
 	}
 	if (IsValid(RequiredEncounter)) { RequiredEncounter->FailEncounter(); }

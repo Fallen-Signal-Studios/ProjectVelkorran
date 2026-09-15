@@ -316,7 +316,7 @@ void USovCorruptionComponent::AdvanceOverwrite(float DeltaSeconds)
 		for (TActorIterator<ASovEncounterDirector> It(GetWorld()); It; ++It)
 		{
 			if (It->EncounterId == Permission->OverwriteEncounterId && It->GetEncounterState() == ESovEncounterState::Active
-				&& It->HasEncounterPlayer(GetOwner()))
+				&& It->IsEncounterCombatant(GetOwner()))
 			{
 				if (Director) { Director = nullptr; break; } // Ambiguous authored identity fails closed.
 				Director = *It;
@@ -333,7 +333,7 @@ void USovCorruptionComponent::AdvanceOverwrite(float DeltaSeconds)
 			RefreshSavedSnapshot(); // Save observers see the committed clock and cannot resurrect an expired timer.
 			OnRep_State(Previous); // Explicit zero-time mechanical feedback precedes encounter failure.
 			if (ValidOwner() && Campaign() == CurrentCampaign && CurrentCampaign->GetActiveMission() == Mission
-				&& IsValid(Director) && Director->HasEncounterPlayer(GetOwner()) && !IsCombatPressureImmune())
+				&& IsValid(Director) && Director->IsEncounterCombatant(GetOwner()) && !IsCombatPressureImmune())
 			{
 				Director->FailEncounter();
 			}

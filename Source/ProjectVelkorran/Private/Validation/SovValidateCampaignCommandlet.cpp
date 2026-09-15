@@ -8,6 +8,7 @@
 #include "Campaign/SovCampaignDefinition.h"
 #include "Character/CharacterDefinition.h"
 #include "Framework/SovPlayerController.h"
+#include "Misc/FileHelper.h"
 #include "Misc/PackageName.h"
 #include "Misc/Parse.h"
 #include "Diagnostics/SovDiagnosticsSubsystem.h"
@@ -85,11 +86,32 @@ namespace
 		}
 		return Errors;
 	}
-	int32 ValidateDependencyClosure(const TArray<FName>& RootPackages, const TMap<FName, USovCampaignDefinition*>& Missions, bool bShippingValidation)
+	/** The route by which the root of a dependency chain enters the cook. */
+	FString CookEntryRoute(FName Package, const TMap<FName, FName>& Parents, const TMap<FName, FString>& RootRoutes)
+	{
+		TSet<FName> Seen;
+		while (!Package.IsNone() && !Seen.Contains(Package))
+		{
+			Seen.Add(Package);
+			const FName* Parent = Parents.Find(Package);
+			if (!Parent || Parent->IsNone()) { break; }
+			Package = *Parent;
+		}
+		const FString* Route = RootRoutes.Find(Package);
+		return Route ? *Route : FString(TEXT("mission manifest or -AdditionalAssets"));
+	}
+	int32 ValidateDependencyClosure(const TArray<FName>& RootPackages, const TArray<FSovCookRoot>& CookListRoots,
+		const TMap<FName, USovCampaignDefinition*>& Missions, bool bShippingValidation)
 	{
 		FAssetRegistryModule& Module = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry"));
 		IAssetRegistry& Registry = Module.Get(); Registry.SearchAllAssets(true);
 		TArray<FName> Pending = RootPackages;
+        TMap<FName, FString> RootRoutes;
+        const auto AddCookRoot = [&Pending, &RootRoutes](FName Package, const FString& Route)
+        {
+            Pending.AddUnique(Package);
+            if (!RootRoutes.Contains(Package)) { RootRoutes.Add(Package, Route); }
+        };
         int32 ImplicitRootErrors = 0;
         if (bShippingValidation)
         {
@@ -103,10 +125,17 @@ namespace
             }
             else
             {
-                for (FName Package : AlwaysCookPackages) { Pending.AddUnique(Package); }
+                for (FName Package : AlwaysCookPackages) { AddCookRoot(Package, TEXT("Asset Manager AlwaysCook rule")); }
                 UE_LOG(LogSovMission, Display, TEXT("Included %d effective production AlwaysCook packages as campaign validation roots."), AlwaysCookPackages.Num());
             }
+            // The cooker also adds game-default maps and classes, packaging maps and directories, the touch
+            // interface and every config reference loaded at startup. None of those are Asset Manager rules.
+            TArray<FSovCookRoot> ConfiguredRoots;
+            SovCampaignContentValidation::GatherConfiguredCookRoots(SovCampaignContentValidation::ReadConfiguredCookInputs(), ConfiguredRoots);
+            for (const FSovCookRoot& Root : ConfiguredRoots) { AddCookRoot(Root.Package, Root.Route); }
+            UE_LOG(LogSovMission, Display, TEXT("Included %d configured cook entry packages as campaign validation roots."), ConfiguredRoots.Num());
         }
+        for (const FSovCookRoot& Root : CookListRoots) { AddCookRoot(Root.Package, Root.Route); }
         TMap<FName, FName> DependencyParents;
         for (FName Root : Pending) { DependencyParents.Add(Root, NAME_None); }
 		TSet<FName> Visited; TSet<UObject*> VisitedAssets; TMap<FName, UObject*> EvidenceIds, CueIds;
@@ -123,9 +152,20 @@ namespace
 			bool bForbidden = false;
 			for (const FString& Root : ExcludedRoots) { bForbidden |= Name.StartsWith(Root, ESearchCase::IgnoreCase); }
 			for (const FString& Segment : LegacySegments) { bForbidden |= Name.Contains(Segment, ESearchCase::IgnoreCase); }
-			if (bShippingValidation && bForbidden) { UE_LOG(LogSovMission, Error, TEXT("Campaign dependency enters excluded/legacy content: %s"), *Name); ++Errors; }
+			if (bShippingValidation && bForbidden)
+			{
+				UE_LOG(LogSovMission, Error, TEXT("Campaign dependency enters excluded/legacy content: %s. Enters the cook through: %s"),
+					*Name, *CookEntryRoute(Package, DependencyParents, RootRoutes));
+				++Errors;
+			}
 			if (!Name.StartsWith(TEXT("/Script/")) && !FPackageName::DoesPackageExist(Name))
-			{ UE_LOG(LogSovMission, Error, TEXT("Campaign dependency package missing: %s"), *Name); ++Errors; continue; }
+			{
+				// A configured entry naming a missing asset is a settings fault the cooker also skips, not shipped content.
+				if (const FString* Route = RootRoutes.Find(Package))
+				{ UE_LOG(LogSovMission, Warning, TEXT("Configured cook entry (%s) names a missing package: %s"), **Route, *Name); }
+				else { UE_LOG(LogSovMission, Error, TEXT("Campaign dependency package missing: %s"), *Name); ++Errors; }
+				continue;
+			}
 			// Script packages contain native defaults, not authored shipping asset instances.
 			if (!Name.StartsWith(TEXT("/Script/")))
 			{
@@ -152,9 +192,10 @@ namespace
                         const FString ProhibitedReason = SovCampaignContentValidation::ProhibitedAssetReason(Asset);
                         if (!ProhibitedReason.IsEmpty())
                         {
-                            UE_LOG(LogSovMission, Error, TEXT("Campaign dependency contains prohibited system: %s (%s). Dependency chain: %s"),
+                            UE_LOG(LogSovMission, Error, TEXT("Campaign dependency contains prohibited system: %s (%s). Dependency chain: %s. Enters the cook through: %s"),
                                 *Asset->GetPathName(), *ProhibitedReason,
-                                *SovCampaignContentValidation::DescribeDependencyChain(Package, DependencyParents));
+                                *SovCampaignContentValidation::DescribeDependencyChain(Package, DependencyParents),
+                                *CookEntryRoute(Package, DependencyParents, RootRoutes));
                             ++Errors;
                         }
                     }
@@ -162,7 +203,12 @@ namespace
 				}
 			}
 			TArray<FName> Dependencies;
-			Registry.GetDependencies(Package, Dependencies, UE::AssetRegistry::EDependencyCategory::Package);
+			// Mirror the cooker, which explores only game dependencies (CookGenerationHelper and CookRequestCluster
+			// query EDependencyQuery::Game): an editor-only reference never ships, so it must not raise a finding.
+			// World Partition external actors are game dependencies and are followed, because a real cook folds
+			// them into generated streaming cells.
+			Registry.GetDependencies(Package, Dependencies, UE::AssetRegistry::EDependencyCategory::Package,
+				UE::AssetRegistry::EDependencyQuery::Game);
             for (FName Dependency : Dependencies)
             {
                 if (!DependencyParents.Contains(Dependency)) { DependencyParents.Add(Dependency, Package); }
@@ -322,7 +368,26 @@ int32 USovValidateCampaignCommandlet::Main(const FString& Params)
 			else { RetainedRoots.Emplace(Asset); RootPackages.AddUnique(Asset->GetOutermost()->GetFName()); }
 		}
 	}
-	Errors += ValidateDependencyClosure(RootPackages, Missions, bShippingValidation);
+	// The cooker's own package list is the authoritative cook graph: every cooked package becomes a root.
+	TArray<FSovCookRoot> CookListRoots;
+	FString CookListPath;
+	if (FParse::Value(*Params, TEXT("CookList="), CookListPath))
+	{
+		FString CookListText;
+		TArray<FName> CookedPackages;
+		if (!FFileHelper::LoadFileToString(CookListText, *CookListPath)
+			|| !SovCampaignContentValidation::ReadCookListRoots(CookListText, CookedPackages))
+		{
+			UE_LOG(LogSovMission, Error, TEXT("-CookList=%s names no cooked package. Supply the log of a -run=cook -CookList run over the shipping map set."), *CookListPath);
+			++Errors;
+		}
+		else
+		{
+			for (FName Package : CookedPackages) { CookListRoots.Add({ Package, TEXT("cooker -CookList output") }); }
+			UE_LOG(LogSovMission, Display, TEXT("Included %d cooked packages from %s as campaign validation roots."), CookedPackages.Num(), *CookListPath);
+		}
+	}
+	Errors += ValidateDependencyClosure(RootPackages, CookListRoots, Missions, bShippingValidation);
 	UE_LOG(LogSovMission, Display, TEXT("Native mission preflight: %d assets, %d errors. Melee, corruption, status, evidence, cue and Narrative dialogue graph validators ran over dependency assets. Use -ShippingValidation for string-table IDs, excluded systems and effective production AlwaysCook dependency roots; -AdditionalAssets includes dynamic-only content. Map actors, World Partition coverage, ability cleanup, Blueprint compilation, translation coverage, cook/package and playthroughs require separate gates. This commandlet alone does not qualify a shipping candidate."), Missions.Num(), Errors);
 	return Errors == 0 ? 0 : 1;
 }

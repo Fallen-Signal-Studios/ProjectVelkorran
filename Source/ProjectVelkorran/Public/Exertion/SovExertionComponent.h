@@ -62,6 +62,7 @@ protected:
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* TickFunction) override;
 private:
 	friend struct FSovExertionTestAccess;
+	friend struct FSovReplicationReadinessTestAccess;
 	void UpdateExertion(float DeltaTime);
 	bool CanMutate() const;
 	bool TrySpendScaledCost(float PaidCost);

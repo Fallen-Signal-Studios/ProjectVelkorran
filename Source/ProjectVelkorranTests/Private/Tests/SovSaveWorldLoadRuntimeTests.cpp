@@ -10,6 +10,7 @@
 #include "Misc/AutomationTest.h"
 #include "Save/SovSaveSubsystem.h"
 #include "Subsystems/NarrativeSaveSubsystem.h"
+#include "UObject/Script.h"
 #include "UObject/StrongObjectPtr.h"
 
 #if WITH_AUTOMATION_TESTS
@@ -38,6 +39,8 @@ namespace
 {
     struct FSaveLoadWorlds
     {
+        // Actor save events (PrepareForSave, Load, GetActorGUID) go through AActor::ProcessEvent, which skips them in a world not initialized for play.
+        FEditorScriptExecutionGuard ScriptGuard;
         TStrongObjectPtr<UGameInstance> Instance{ NewObject<UGameInstance>() };
         TArray<UWorld*> Worlds;
         FDelegateHandle InitialSaveHandle;

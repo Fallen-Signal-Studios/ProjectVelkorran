@@ -142,7 +142,7 @@ void USovProtectionInterceptReceipt::ReceiveResult(const FSovDamageResult& Resul
 	const bool bAcceptedDamage = Result.AppliedHealthDamage > KINDA_SMALL_NUMBER || Result.AppliedShieldDamage > KINDA_SMALL_NUMBER;
 	if (!bAcceptedDefense && !bAcceptedDamage) { return; }
 	bDelivered = true; CommittedTransaction = Result.TransactionId;
-	if (auto* Resonance = USovResonanceComponent::FindActive(ProtectorActor->GetWorld()))
+	if (auto* Resonance = USovResonanceComponent::FindForActor(ProtectorActor->GetWorld(), ProtectorActor.Get()))
 	{ Resonance->NotifyProtectionIntercept(this, Result); }
 	if (auto* Generator = ProtectorActor->FindComponentByClass<USovTarrikEchoGenerationComponent>())
 	{

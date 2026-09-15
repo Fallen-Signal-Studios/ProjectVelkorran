@@ -32,13 +32,13 @@ These are kept distinct throughout and never collapsed into "passed":
 |---|---|---|
 | C1 | Authored protagonist handoff and separate persistent state | **CLOSED** (12 Sep, see updates) |
 | C2 | Campaign resource save defaults not established in native code | **CLOSED** |
-| C3 | Campaign checkpoint contract incomplete | **PARTIAL** |
+| C3 | Campaign checkpoint contract incomplete | **CLOSED** (12 Sep, see updates) |
 | E1 | Selene pulse not connected to combat | **CLOSED** |
 | E2 | Enemy ability selection is an authoring responsibility | **CLOSED** |
 | E3 | Weak-point break does not change enemy equipment | **CLOSED** |
 | E4 | Link and weak-point state not checkpoint-persistent | **CLOSED** |
 | E5 | Dismemberment completion is content-dependent | **CONTENT/EDITOR GATE** |
-| E6 | Faction repertoire and perception/encounter fairness | **PARTIAL** |
+| E6 | Faction repertoire and perception/encounter fairness | **CLOSED** (12 Sep, see updates) |
 | PC01 | Selene Echo expenditure does not deliver the control kit | **CLOSED** (12 Sep, see updates) |
 | PC02 | Tarrik release depends on Blueprint for two paths | **CLOSED** (12 Sep, see updates) |
 | PC03 | Tarrik Echo generation incomplete | **CLOSED** (12 Sep, see updates) |
@@ -47,13 +47,15 @@ These are kept distinct throughout and never collapsed into "passed":
 | PC06 | Echo encounter/checkpoint wiring not demonstrated | **SUPERSEDED (in part) / PARTIAL** |
 | PC07 | Full-meter Deflections do not refresh Echo combat activity | **CLOSED** |
 | PC08 | Zero-damage Poise/status packets outside the transaction | **CLOSED** |
-| PC09 | Guard cancellation weaker than Deflection/Echo adapters | **PARTIAL** |
+| PC09 | Guard cancellation weaker than Deflection/Echo adapters | **CLOSED** (source, 12 Sep, see updates) |
+| PC09-C | Guard/counter authoring: grant, input, counter classification, presentation | **CONTENT/EDITOR GATE** |
 | PC10 | Shield/Health/Poise balance and content gates | **CONTENT/EDITOR GATE** |
 | PC11 | Stamina, movement, combos, weapon transitions | **CONTENT/EDITOR GATE** |
 | PC12 | Coverage proves construction more than combat behaviour | **SUPERSEDED** |
 | T1 | `InitialMission` unset on campaign GameModes | **CONTENT/EDITOR GATE** |
-| T2 | Cook exclusion incomplete | **PARTIAL** |
-| T3 | Campaign UI carries template behaviour | **PARTIAL** |
+| T2 | Cook exclusion incomplete | **CLOSED** (source/config/validation, 14 Sep, see updates) |
+| T2-B | Template boot config still ships MP menu, loot UI, XP events and demo world | **CONTENT/EDITOR GATE** |
+| T3 | Campaign UI carries template behaviour | **CONTENT/EDITOR GATE** (14 Sep, see updates) |
 | T4 | Intermittent hostile AI startup | **CLOSED** |
 | T5 | Packaged Win64 Game target unverified | **OPEN (Windows gate)** |
 | T6 | `ProjectVelkorranTests` sets `bUseUnity = false` | **CLOSED** |
@@ -62,10 +64,10 @@ These are kept distinct throughout and never collapsed into "passed":
 | X1 | `/Game/Cues` absent from version control | **EXTERNAL CONTENT GATE** (see below) |
 | X2 | `SciFi_Drone_1` marketplace pack absent | **EXTERNAL CONTENT GATE** (see below) |
 
-Closed: 14. Partial: 6. Open: 1. Content/editor gated: 9. Superseded: 2. External gates: 2.
+Closed: 18. Partial: 1. Open: 1. Content/editor gated: 12. Superseded: 2. External gates: 2.
 
-_Recounted from the table above on 12 September after C1 closed. The earlier totals line did not
-reconcile with its own rows. K1–K4 count as four gated items; PC06 counts as superseded, its small
+_Recounted from the table above on 12 September after C1 closed, again after C3, E6, PC09 and T2 closed, and after T3 was gated. The earlier totals line did not
+reconcile with its own rows. K1–K4 count as four gated items; PC09-C and T2-B count as one each; PC06 counts as superseded, its small
 remaining part recorded under its own heading._
 
 The single remaining OPEN item is T5, the packaged Win64 Game target, which is a Windows
@@ -176,42 +178,327 @@ missing implementation.
      are covered by the Companion suites instead.
    - Windows/MSVC remains a separate gate.
 
-### C3 — Campaign checkpoint contract (PARTIAL)
+### C3 — Campaign checkpoint contract (CLOSED 12 September)
 
-Extensive native types now exist — `SovAurelionCheckpoint`, `SovCampaignDefinition`,
-`SovAurelionMissionDefinition`, `SovEncounterSnapshotLibrary` — so "no project checkpoint types beyond
-empty seams" is stale. The two specific defects the audit cited are closed (see above). Not re-verified: rolling
-autosave/backup and version migration. Source-only; medium priority.
+Work done in an isolated git worktree (`ProjectVelkorran-c3`, branch `engineering/c3-checkpoint-contract`),
+not the shared checkout.
 
-### E6 — Perception and encounter fairness (PARTIAL)
+1. **TDD.** §11.9 (three rolling autosaves, one checkpoint slot, ten manual slots; never claim a save before
+   serialisation and platform write both succeed), §15.9 (temporary-slot/atomic replacement where the
+   platform permits, retain last known-good on failure, validate schema before applying, deterministic
+   migrations with golden-file tests, migration history in the header), §15.16 (failed write keeps the old
+   save; corrupted save offers last known-good and preserves the file), §18.5 (kill during write, denied
+   write, load after migration, corrupted newest autosave, protagonist transition), §19.7 (schema 1.0 at the
+   first external build; prototype saves unsupported, so no envelope migration exists to test).
+2. **What the source implements** (read before any change). Two physical banks per logical slot with a
+   generation counter and readback verification (the contract's replacement for an atomic rename, which
+   Unreal's generic save API does not offer); rolling autosave selection by oldest generation in the
+   subsystem tick; explicit recovery confirmation and byte-preserving recovery files; one payload
+   migration, campaign state schema 1 to 2.
+3. **Evidence — automation-verified on Mac.** `ProjectVelkorran.Campaign.CheckpointContract`, five tests
+   through the production capture, autosave tick, writer, reader and decoder, staged through the controller
+   as the game mode stages them, on C1's two-protagonist fixtures:
+   `RollingAutosavesReplaceOldestAcrossRestart`, `InterruptedWriteRecoversLastGoodCampaign`,
+   `SchemaOneCampaignMigratesThroughLoaderDeterministically`, `MissingActiveRecordStaysRejectedAfterMigration`,
+   `CorruptOrIncompleteCampaignSaveIsRejected`. Outcomes are asserted on the stored bytes and on each
+   protagonist's reloaded state, not on helper existence. Detail in [SaveSlotEngineering.md](SaveSlotEngineering.md).
+4. **Defect found and fixed.** TDD §15.9 requires migration history in the save header.
+   `FSovSaveSlotHeader::MigrationHistory` existed but nothing wrote it, so a campaign migrated from schema 1
+   was re-saved with no record of the migration. The campaign state now records `CampaignState 1->2` when the
+   migration runs and `CaptureAndWrite` copies it into the header. The test failed before the fix and passes
+   after it.
+5. **Negative controls.** Three temporary breaks, reverted from git before confirmation: autosave rotation
+   always choosing slot 0 failed the rotation test; writes targeting the last good bank failed the
+   interrupted-write and corruption tests; a migration that no longer advances the schema version failed the
+   migration and missing-record tests. The C1 partition tests stayed green throughout.
+6. **Suites.** With CheckpointContract, ProtagonistPartition, Objectives, Save, Handoff, Companion, Travel and
+   the Aurelion pause UI: **68 passed, 0 failed.** Full forced-unity suite, run twice on the same build
+   in the fresh worktree: **624 passed, 3 failed** and **625 passed, 2 failed**, of 627. In both runs one
+   failure is `GameplayCuesStillResolve` (X1). Every other failure is the `SciFi_Drone_1` spillover (X2):
+   `ABP_RefDrone`/`BS_Drone` errors from a deliberate drone-roster load landing on whichever `PlacedNPC` test
+   runs next, a different one each run. `Campaign.PlacedNPC` run alone on that build passed 12 of 12. No
+   failure involves the save, checkpoint or campaign-state code changed here.
+7. **Not proven here, stated so it is not assumed.** Map travel and required-asset existence preflight (the
+   fixture missions are transient objects); real platform write APIs and a process kill mid-write (the
+   storage seam is in-memory, so tears are simulated at that seam); golden-file migration fixtures, which need
+   stable asset paths and are therefore content-gated. Migration determinism is shown by repeated
+   byte-identical output instead. Windows/MSVC remains a separate gate.
 
-`SovEncounterDirector`, `SovEncounterCoordinationComponent`, `SovEncounterCoordinationPolicy.h` and
-`SovThreatTargeting.h` now exist, so "no encounter director in source" is stale. Not re-verified: that
-Hound acquisition respects perception rather than scanning all characters by distance. Source-only;
-medium. Verification: automation asserting no acquisition without authorised stimulus.
+### E6 — Perception and encounter fairness (CLOSED 12 September)
 
-### PC01–PC04, PC09 — Ability and generation completeness (PARTIAL)
+Work done in the isolated worktree `ProjectVelkorran-c3`, branch `engineering/e6-perception-fairness`
+(stacked on C3), not the shared checkout.
+
+1. **Question.** Do hostile NPCs, especially Hounds and the Aurelion roster, acquire and pursue the player
+   only through perception and awareness, or can any of them target an undetected player by raw distance?
+2. **Authority.** TDD §8.3 (AI Perception for sensed stimuli; unaware → suspicious/investigating →
+   acquiring → engaging), §8.5 (cloak breaks direct target confidence; enemies may suppress the last known
+   area), §8.6 (sight, hearing, damage, ally alerts, network sensors for Reformation, Echo/corruption for
+   selected units, command broadcasts, spoofing), §8.7 (the director owns composition and escalation, not
+   individual attack timing).
+3. **Target-acquisition architecture, as implemented.**
+   - *Stimulus.* `ANarrativeNPCController::HandleThreatPerception` accepts Sight, Hearing and Damage from the
+     controller's AI Perception component. Other producers (the Aurelion sweep scanner, Echo, commands,
+     authored forced combat) call the Blueprint-callable `ReportThreatObservation` explicitly.
+   - *Awareness.* Each observation carries a confidence capped by source (Sight 1.0, Damage 0.9, network
+     sensor and Echo 0.8, Command 0.6, ally alert 0.55, Hearing 0.5), decays to zero at expiry, and keeps a
+     last-known position. Cloaked targets and a perception component that is not sight-ready cannot create
+     sight observations.
+   - *Acquisition gate.* `CanDirectlyTargetThreat` requires an eligible hostile target and, for a
+     threat-memory-managed controller, a direct observation (sight, damage, network sensor or Echo) at
+     confidence 0.65 or more. Hearing, commands and ally alerts are investigation only.
+   - *Aggro and combat request.* Narrative bot attack selection, `USovBTTask_UseCombatAbility`, the native
+     Hound, Drone and Handler abilities, the Aurelion role activities and crossfire queries all consume that
+     gate. Threat memory clears an attack target or focus that fails it and leaves the last-known position.
+   - *Communication.* `ShareThreatWith` needs mutual friendly attitude, a shared faction, a finite radius
+     (2,500 cm authored) and a managed recipient; alerts cannot be relayed, cannot outlive the original
+     observation and never authorise direct fire. The Weaver shares only a threat it is directly tracking.
+     The Aurelion sweep scanner reports only a player inside its cone and range with clear line of sight,
+     only to its two registered relay drones that opt into network threats.
+   - *Encounters.* The director and coordinator suspend threat memory for staging and restore; they never
+     assign a target or report a threat.
+4. **Distance-based fallback, classified.** The Hound attack abilities' `FindBestAttackTarget` scans the
+   world for the nearest valid character when focus is invalid, and the Handler's Horn Charge uses it.
+   Every candidate passes `SovThreatTargeting::CanTrack`, i.e. the controller gate. It is therefore an
+   intentional combat-state fallback after legitimate detection (case 1), not a stealth bypass, for any
+   managed controller. The gate has one documented exception: a controller with no perception component,
+   no report and no `bRequireThreatMemoryForTargeting` keeps Narrative's legacy nonperception targeting.
+5. **Content check (read-only editor probe).** Every tracked hostile resolves to a managed controller:
+   Enforcer, Elite, Linkbound, WallRunner, Weaver and Security Drone use `BP_NarrativeNPCController`; the
+   Contaminated Drone uses `BP_AurelionContaminatedDroneController`; `BP_DominionHound` and
+   `BP_DominionHoundMaster` use `BP_NarrativeNPCController`. Each carries AI Perception with Sight (6,000 cm,
+   lose at 7,000), Hearing (10,000 cm) and Damage. The legacy exception is unreachable for the authored
+   roster, so no case-2 defect exists in current content.
+6. **Evidence — automation-verified on Mac.** `ProjectVelkorran.Campaign.PerceptionFairness`:
+   `RosterControllersRequireObservationBeforeAcquisition` spawns each roster enemy's *authored* controller
+   class (resolved through its definition or pawn class) on a real combatant and asserts: managed; no direct
+   target and no Hound bite against an undetected player 250 cm away; hearing records an investigation
+   position only; no ally alert without any observation; a relayed noise and a relayed sighting are
+   investigation only for the ally; sight authorises acquisition and the bite; losing sight revokes it and
+   memory keeps the last-known position while the player moves.
+   `EncounterActivationGrantsNoTargetWithoutAuthoredReport`: an active encounter grants nothing; a command
+   broadcast is investigation only; an authored Damage report — the forced-combat override — authorises
+   acquisition. Existing coverage retained: `Threat.PerceptionLossAndForgetting`,
+   `Threat.SelectionCloakAndExpiry`, `Threat.FactionSharingAndLifecycle`,
+   `Threat.NativeAbilityAcquisitionAndWindupLoss` and
+   `Encounter.Coordination.ThreatSuspensionOwnersAndPawnReplacement`.
+   Portable-tested: `Tests/Portable/NarrativeThreatPolicyTests.cpp`, 36,660 decay/sharing boundaries.
+7. **Negative controls.** Two temporary breaks, reverted from git before confirmation: a 2,000 cm distance shortcut in `SovThreatTargeting::CanTrack`, and a 2,000 cm bypass inside the managed branch of `CanDirectlyTargetThreat`. Under both, 14 of 15 tests failed: every stealth assertion for all eight roster enemies (undetected target, Hound scan by distance, hearing, relayed alerts, loss of sight), the encounter-activation and command-broadcast assertions, and 12 of 13 existing `Campaign.Threat` suites.
+8. **Suites.** With PerceptionFairness, Threat, AI, Encounter, Drone and Aurelion: **129 passed, 0 failed.** Full forced-unity suite in the worktree: **627 passed, 2 failed** of 629. The failures are `GameplayCuesStillResolve` (X1) and `PlacedNPC.OwnedEditorAssignmentPreservesMetadataAndRefusesForeignIdentity` failing only on the `BS_Drone` invalid-sample error from the external drone pack (X2 spillover); neither involves perception, threat or acquisition code.
+9. **Not proven here, and not source defects.**
+   - *Content tuning:* the authored sight's peripheral angle is 180°, so these enemies see all round,
+     still only with line of sight. Hearing range is 10,000 cm. Stealth feel is a content/playtest gate.
+   - *Hearing producers:* no project or Narrative source emits noise events. Hearing is handled correctly
+     when a stimulus exists; whether weapons, movement and alarms produce it is Blueprint/content work.
+   - *Latent fail-open:* a future enemy authored with a controller lacking perception would regain legacy
+     distance targeting. The roster test pins the tracked roster so that regression fails automation.
+   - Security Drone behaviour is not exercised in automation (X2 pack); its controller class matches the
+     Enforcer's per the probe.
+10. **PC04 relationship.** The undetected-bypass gate reads raw `UAIPerceptionComponent::GetKnownPerceivedActors`
+    across all senses. With this roster's `max_age` of 0 a stimulus never ages out, so a player once heard
+    stays "known" and the bypass is withheld even though hearing never authorises targeting. That errs
+    conservative, not permissive, but it disagrees with the acquisition authority. The signal the gate
+    should rely on is threat memory's *direct observation* — `ANarrativeNPCController::CanDirectlyTargetThreat`
+    for each registered threat, or equivalently any `Sight`/`Damage`/`NetworkSensor` memory with
+    `bDirectObservation` during the traversal window. Recorded only; PC04's overlap-harness blocker is not
+    reopened here.
+
+### PC01–PC04 — Ability and generation completeness (PARTIAL)
 
 All named spenders now exist as native files: six Selene abilities including `Deflection`, `Dispatch`,
 `StaccatoZero`, `StillpointGrenade`, `VeritysWake`, `AxiomNullPulse`; and `TarrikCinderSlam`,
 `TarrikCinderlineRequiem`, `TarrikGuard`. Generation components exist for both protagonists, and
-`GuardLifecycleValidation.md` records five guard lifecycle suites. **These are marked PARTIAL rather
+`GuardLifecycleValidation.md` records the guard lifecycle suites (PC09 closed separately, below). **These are marked PARTIAL rather
 than CLOSED deliberately:** this pass confirmed the files and entry points exist, not that each
 delivers its payload natively without a Blueprint release hook. Closing them requires per-ability
 review, which is a slice of its own rather than a reconciliation result.
+
+### PC09 — Guard cancellation (source CLOSED 12 September; authoring remainder is PC09-C)
+
+Work done in the isolated worktree `ProjectVelkorran-c3`, branch `engineering/pc09-guard-lifecycle`
+(stacked on E6), not the shared checkout. Evidence and reclassification pass; no production source changed.
+
+1. **Question.** Does Tarrik's native Guard state admit, cancel and transition correctly, so that the
+   only remaining gap is authored guard/counter content?
+2. **Authority.** TDD v2 §5.2.3 (holding guard establishes a frontal plane; perfect guard creates a fast
+   counter window and generates Echo), §6.5 (standard guard impact 8–20 Stamina; an exhausted guard breaks
+   posture), the Echo table (+12 perfect guard, +10 guard counter), the Resonance table (Selene's Sever
+   extends Tarrik's counter window), and `Config/DefaultEngine.ini` combat settings (start Stamina 8,
+   perfect cost 5, guard multiplier 0.25).
+3. **The audit claim is stale.** It said the ability observed only death, PoiseBroken and Sequencer while
+   active, and that only the newer Echo/Deflection adapters closed the activation-to-binding race. In the
+   current tree `USovGuardComponent` and `USovGameplayAbility_TarrikGuard` both refuse and live-cancel on
+   dead, interacting, sequencer-controlled, ragdoll, fatal, poise-broken, guard-broken, Echo-active and
+   deflecting, plus any Busy contribution beyond one activation-owned Busy (`AnyCountChange`). Both re-check
+   immediately after binding, and activation epochs stop a cancelled start from continuing.
+4. **Lifecycle, as implemented.**
+   - *Admission and start.* Direct `BeginGuard` and GAS activation share one blocker set; the component also
+     requires 8 Stamina and no existing guard or broken posture. Ownership flags are published before GAS tag
+     dispatch so a reentrant cancel removes the contribution being added.
+   - *Stamina and perfect defence.* Damage routing (`NarrativeAttributeSetBase`) resolves the frontal arc,
+     heavy/unblockable class and Stamina transactionally. Perfect guard costs 5, blocks fully and still
+     succeeds on the last Stamina, then breaks posture without a counter. Ordinary impact costs the clamped
+     8–20 and mitigates to 0.25; an unaffordable cost or a heavy attack outside perfect timing breaks posture.
+   - *Interruption and cancellation.* The component ends Guard on any blocker; ending broadcasts
+     `OnGuardEnded`, which ends the ability; ability end ends the component. Removal and component rebinding
+     end both.
+   - *Counter.* A perfect guard opens one owned counter window (0.8 s). It survives input release and
+     attack-state Busy changes, is cleared by incapacity or another defence, is consumed once by a landed
+     `Sov.Damage.Source.GuardCounter` hit, and can be extended only while open.
+   - *Cleanup.* Broken posture clears on its timer; rebinding removes every owned tag and cancels timers.
+5. **Adapter differences, classified.** Echo, Melee, Deflection and Axiom also observe
+   `Narrative.State.Weapon.Equipping`; Guard does not. No native code applies that tag (Narrative's authored
+   equip flow does) and the TDD sets no rule for guarding through an equip, so it is a PIE/content check, not a
+   source defect. `Sov.State.Status.Frozen` is not a gap: both native freeze paths (`SovSelenePayload`,
+   `SovStatusComponent`) grant Busy with it, and Guard cancels on Busy. Native Melee refuses activation while
+   `State.Guarding`, so a counter attack starts after release; the counter window surviving release is what
+   makes that work, and it is now proven.
+6. **Evidence — automation-verified on Mac.** `ProjectVelkorran.Campaign.Guard`, eight suites in a real
+   world with the Narrative ASC and attribute set and no authored assets. The five existing suites
+   (`AdmissionAndDirectInterrupts`, `GASCancellationAndEffectOwnership`, `ReentrantStartAndTagOwnership`,
+   `PerfectDefenseLastStamina`, `CounterSurvivesAttackBusy`) are joined by:
+   - `StaminaAdmissionImpactAndBreakRecovery`: 7.9 Stamina refuses both entries with no residue; 8 starts;
+     Narrative's production tag-input release ends Guard; perfect timing expires on its timer without ending
+     the hold; ordinary impact costs 10 and takes a quarter of the unguarded Shield loss; an unaffordable
+     impact breaks, spends only what remains and refuses restart; the break expires, empty Stamina still
+     refuses, 8 restarts; a heavy attack outside perfect timing breaks and also expires back to a startable
+     Guard; no owned tag or Busy remains and every start has one end.
+   - `CounterWindowReleaseExpiryAndSingleOwnership`: release preserves the counter; two concurrent attack
+     Busy contributions and their removal do not kill it; re-guarding and perfect-guarding again leaves one
+     counter contribution that pays once; the window expires, removing its tag, and then pays nothing; poise
+     break and Deflecting clear it; Guard reactivates afterwards with no residue.
+   - `RebindingReleasesOwnedStateAndReactivates`: rebinding with Guard and counter held, and again during
+     broken posture, leaves no owned tag on either ASC, applies nothing when the cancelled timers would have
+     fired, and Guard reactivates.
+   The first run of the new suites failed on the fixture, not source: a timer armed outside a timer tick is
+   pending until the next tick, so the test advanced 0.01 s short of each expiry. Margins were widened; no
+   assertion was removed.
+7. **Negative controls.** Seven seams were broken one at a time in production source, each rebuilt and run against the Guard suites, then restored from git (source diff empty; clean rebuild 8/8). All seven were caught: Busy clearing the counter (both counter suites); broken posture never expiring (StaminaAdmissionImpactAndBreakRecovery); Guarding tag leaking on end (7 of 8 suites); start-Stamina check removed (StaminaAdmissionImpactAndBreakRecovery); counter not consumed on landing (both counter suites); rebinding leaking counter and broken tags (RebindingReleasesOwnedStateAndReactivates); live interruption removed from component and ability (four suites including both cancellation suites). Three of the seven — stuck break, missing start-Stamina check, rebinding leak — were caught only by the new suites; the original five passed with those seams broken.
+8. **Suites.** Guard 8/8. Affected suites (Guard, Defense, WeakPoint, Finisher, Projectile, Foundation, Selene, Exertion, Echo, Readiness, AxiomNullPulse, DominionHound, Transactions, Resonance, Melee, Companion, Threat) 129/0. Full suite 630 passed, 2 failed of 632: Validation.GameplayCuesStillResolve (X1) and PlacedNPC.DefinitionFallbackAndExistingOwnership, whose only error was the ABP_RefDrone missing-skeleton log from the SciFi_Drone_1 pack (X2 spillover); that test passes 1/1 run alone.
+9. **Remainder, reclassified as PC09-C (content/editor gate).** A search of the on-disk `Content` tree,
+   untracked assets included, found no reference to `SovGameplayAbility_TarrikGuard`, `Sov.State.Guard*`,
+   `Sov.Event.Guard*`, `Damage.GuardClass` or `GuardCounter`. So no authored asset yet:
+   - grants Guard to Tarrik or maps it to `Narrative.Input.AltAttack`;
+   - implements the Blueprint presentation hooks (`Guard Ability Started/Ended`, `Guard Impact`,
+     `Perfect Defense`, `Guard Broken`, `Counter Landed`) or guard hold/block/break/counter animation;
+   - authors a counter attack node whose `AttackClassifications` carry `Sov.Damage.Source.GuardCounter`;
+   - classifies enemy attacks as `Damage.GuardClass.Heavy`/`Unblockable` where intended.
+   Also gated: the blocked-hit cue's `/Game/Cues` root (X1), guarding through an authored weapon equip, and
+   owning-client prediction under latency (no Mac network automation).
 
 ### PC06 — remaining part (PARTIAL)
 
 Echo persistence is carried by `AttributesToSave`. What is still unevidenced is a native caller that
 begins/ends an encounter boundary for resource purposes. Source-only; low priority given C2.
 
-### T2 — Cook exclusion (PARTIAL)
+### T2 — Cook exclusion (source, config and validation CLOSED 14 September; template boot remainder is T2-B)
 
-Narrowed on 12 September: demo tale content (the SecretMerchant quest and dialogue) is now rejected,
-portable- and automation-verified. Remaining: implicit AlwaysCook roots beyond
-`GatherAlwaysCookPackages`, and confirmation that no campaign manifest still reaches XP/currency
-assets. Note from that work: tracked content contains **no** vendor, crafting, rarity, morality or
-approval assets, so rules for those categories would be dead code.
+Work done in the isolated worktree `ProjectVelkorran-c3`, branch `engineering/t2-cook-integrity`
+(stacked on PC09), not the shared checkout. Shipping-build integrity audit: what actually enters a
+packaged campaign cook, not what exists in the repository or is reachable in the editor.
+
+1. **Question.** Can campaign packaging or cook discovery still pull in systems or assets that the campaign
+   does not permit — XP, currency, loot, multiplayer or template UI, or other demo content — and does
+   validation catch that without rejecting legitimate Narrative dependencies?
+2. **Authority.** TDD v2 §1 (launch multiplayer: None, LOCKED), §15 content management (mission manifests
+   enumerate dependencies; unused December-system assets excluded from cook), Appendix F (no obsolete class,
+   loot, XP, rarity, vendor, crafting, morality or approval system in the campaign cook).
+3. **Method.** The UE 5.7 cooker itself, `-run=cook -targetplatform=Mac -CookList -cookshowinstigators`, for the
+   packaging stage's map set (`L_Aurelion_M12`, `L_Aurelion_M13`) and for no map. It lists every package a cook
+   would include, with the instigator that added it, without saving. The first runs used
+   `r.AreShaderErrorsFatal=0` because this host's Metal toolchain was broken; package discovery does not
+   depend on compiled shaders. The host was later repaired (Xcode 26.6 system resources, Metal toolchain).
+4. **Campaign cook-entry architecture, as measured.**
+   - *Command-line maps:* the packaging stage passes `-map=`, so the cooker's all-maps fallback never runs; a
+     no-map CookList confirmed the same roots minus the two maps.
+   - *GameMapsSettings defaults:* `GameDefaultMap` (Narrative `MainMenuMap`), `GlobalDefaultGameMode`
+     (`BP_NarrativeGameMode`), `GameInstanceClass` (`BP_NarrativeGameInstance`). `ServerDefaultMap` is excluded
+     from a default cook.
+   - *Asset Manager `ModifyCook`:* Primary Asset rules. Before the fix, NPCDefinition and PlayerDefinition were
+     type-level AlwaysCook over `/NarrativePro` and `/Game`: 114 roots, 72 of them Narrative definitions no
+     campaign content references.
+   - *Startup soft object paths:* every non-editor config soft path loaded at startup, including
+     `ArsenalSettings.GameEntryMap` (Narrative's demo open world) and `CharacterCreatorMap`.
+   - *Startup packages:* classes loaded from config at startup (Narrative GameplayEffect classes, input actions,
+     demo impact/footstep VFX, editor Tales node widgets).
+   - *DirectoriesToAlwaysCook:* `/Game/Aurelion/VFX` and engine-plugin content directories.
+   - *Input:* `DefaultTouchInterface=/Game/Input/TIS_MobileControls` names a missing asset.
+   - *Dependencies:* game (non-editor-only) hard and soft package references from all of the above.
+5. **Prohibited content found in the actual pre-fix cook (4,228 packages).** Six prohibited identities
+   (`GE_GiveXP`, `NE_GiveXP`, `W_NarrativeMenu_Looting`, `WBP_Loot_TheirInventory`, `WBP_Loot_YourInventory`,
+   `W_NarrativeMenu_MPMainMenu`), 494 Narrative demo packages and 173 demo quest/dialogue packages including
+   the SecretMerchant vendor quest. Campaign content itself references none of it: the campaign GameModes,
+   `BP_AurelionPlayerController` and both mission maps name no Narrative framework, template menu or demo package.
+6. **Fixes.**
+   - *Primary Asset rule (`c2b322d8`).* Definition types stay registered under `/NarrativePro` for runtime
+     primary-asset-ID resolution, but the type rule is `Unknown` and a `/Game`-filtered `CustomPrimaryAssetRules`
+     entry restores AlwaysCook for campaign-owned definitions. A custom override cannot lower a type rule.
+   - *Validation cook-entry coverage (`011ad12a`).* `GatherConfiguredCookRoots` reads game defaults, packaging
+     maps and directories, the touch interface and startup config references the way the cooker does;
+     `-CookList=<log>` makes the cooker's own package list the root set; each finding names its cook-entry route.
+   - *Validation dependency walk.* (`9f71fd09`) The walk now uses the cooker's game-only dependency query, so an editor-only reference never raises a finding; it changed no finding in this graph. Validation from configured roots and validation rooted at the cooker's post-fix package list flag the identical 64 prohibited identities, so no cook-entry route is missed. 23 of those 64 are absent from the CookList because `-CookList` only explores requests: it never loads or saves, so World Partition external actors are never folded into generated streaming cells, and the listing deliberately omits external-actor packages. Every one of the 23 is reached through the demo open world's external actors (e.g. `LS_Robbery` → `BPE_AddCurrency`, a `BP_LootableChest` actor, `DA_Crowd_Bandit` → `NPC_Mass_Ped_Bandit`) and ships in a real cook; validation reports them correctly. The campaign maps have no tracked external actors, so the CookList is faithful for campaign content.
+   No asset was deleted and no prohibited-content rule was loosened.
+7. **Post-fix cook (3,985 packages).** AlwaysCook roots 114 → 45; Narrative AlwaysCook roots 72 → 3, and those
+   three (`AC_Pacifist`, `Appearance_Selene`, `Appearance_Tarrik_FullSuit`) are bundle references from campaign
+   definitions, i.e. legitimate dependencies. Demo packages 494 → 434 and demo quest/dialogue 173 → 152: the
+   content the demo definitions used to root is still reachable through the demo open world. The remaining six
+   prohibited identities enter only through `GameDefaultMap`, `GlobalDefaultGameMode` and
+   `ArsenalSettings.GameEntryMap`/`CharacterCreatorMap`.
+8. **Negative controls.** Each control was applied to the fixed configuration, validated, and restored from a copy (`DefaultGame.ini` verified identical afterwards). NC1 — a config soft reference (`ArsenalSettings.DefaultMusicSet` → `BPE_AddCurrency`) and a game-default class (`GlobalDefaultServerGameMode` → `NE_GiveXP_C`), injected by command-line ini override: caught, with the XP and currency findings naming exactly those two routes. NC2 — `+DirectoriesToAlwaysCook` for Narrative's Luca dialogue folder: 18 new findings through that route, including the transitive `DBP_Luca` → `QBP_Demo_Narrative_SecretMerchant` and `NE_GiveXP` → `GE_GiveXP` chains. NC3 — the Primary Asset rule reverted to type-level AlwaysCook: effective AlwaysCook roots rose 45 → 114 and 56 findings named the Asset Manager rule, including the loot UI and demo dialogue it re-roots. NC4 — the pre-fix cooker list through `-CookList`: 68 findings against 64 after the fix, the four extra being content only the removed demo definitions carried. Non-overreach: the only Narrative AlwaysCook roots left are campaign bundle references (`AC_Pacifist`, `Appearance_Selene`, `Appearance_Tarrik_FullSuit`), which raise no finding, and the existing identity, demo-tale and loadout non-overreach suites pass.
+9. **Suites.** Portable-tested: `Tests/Portable/SovCampaignCookRootPolicyTests.cpp` (32 checks) and `SovCampaignContentPolicyTests.cpp` (83 checks), clang `-Werror -pedantic` with UBSan. Automation-verified on Mac: `Campaign.Validation` 14/15, including the new `ConfiguredCookRoots`, `ProductionCookInputs` and `CookListRoots` and the existing identity, XP-modifier, AlwaysCook-root, demo-loadout and demo-tale non-overreach suites; the one failure is `GameplayCuesStillResolve` (X1). Affected suites (Validation, PlacedNPC, Encounter, AI, Aurelion) 124/125, same X1 failure. Full suite 633 passed, 2 failed of 635: `GameplayCuesStillResolve` (X1) and `PlacedNPC.OwnedEditorAssignmentPreservesMetadataAndRefusesForeignIdentity`, whose only error was the `BS_Drone` missing-animation log from the absent `SciFi_Drone_1` pack (X2 spillover); that test passes 1/1 alone.
+10. **Reclassified as T2-B (content/editor and product decision).** The template boot configuration —
+    `GameDefaultMap`, `GlobalDefaultGameMode`, `GameInstanceClass`, `ArsenalSettings.GameEntryMap` and
+    `CharacterCreatorMap` — is the only remaining route for the multiplayer menu, loot UI, XP events and demo
+    world. Replacing it means deciding what a packaged build boots into, which needs an authored campaign front
+    end (T3). Shipping validation fails on it and names each route.
+11. **Outside T2, recorded.** `NPC_AurelionEnforcer` still grants the Narrative demo pistol (existing gate K4).
+    The M12/M13 manifest is rejected by the commandlet ("Curated companion abilities must be concrete and
+    unique"), and the manifest check still expects `M01_Mantle`/`M02_OneDegree`; 387 referenced MetaHuman,
+    UltraDynamicSky and overlay-material packages are absent from the checkout. `/Game/Cues` (X1),
+    `SciFi_Drone_1` (X2), Windows/MSVC, and a full packaged cook remain outside.
+
+### T3 — Campaign UI template behaviour (CONTENT/EDITOR GATE, 14 September)
+
+Work done read-only in the isolated worktree `ProjectVelkorran-c3`, branch `engineering/t3-campaign-ui`
+(stacked on T2). No source or content changed.
+
+1. **Question.** Can a player in the campaign open Narrative template screens that the campaign does not permit:
+   a general inventory grid, character creation, loot, multiplayer menus, or other template UI?
+2. **Authority.** TDD v2 §10.7 ("The campaign has no general grid/list inventory"), §13.6 (pause menu: Resume,
+   Current Mission, Techniques, Equipment, Evidence & Records, Map, Tutorials, Settings, Save/Load, Return to
+   Main Menu; Equipment has no comparison columns or rarity), §19.4 (remove inventory grids and item stacks and
+   multiplayer authority assumptions embedded in campaign UI).
+3. **Native layer, source-verified.** `ASovPlayerController` uses `USovNativeGameplayHUD`, an asset-free layer
+   shell, and opens only project menus: `USovAurelionPauseMenu` (Resume, checkpoint load, Settings, Quit),
+   accessibility settings, records, application interruption, fatal recovery and dialogue choice.
+   `ASovPlayerCharacterBase::GetCharacterCreatorData` returns nothing for campaign-managed initialization, and
+   `bLoadCharacterCreatorOnNewGame` is false. No native code opens a template inventory, character-creator, loot
+   or multiplayer menu, and none handles menu input: `ANarrativePlayerController` natively binds only look and
+   the ability inputs from `DA_DefaultAbilityInputs`.
+4. **Where template behaviour is decided: content absent from the repository.** Narrative's menu inputs
+   (`IA_OpenInventory`, `IA_OpenMap`, `IA_PauseGame`, `IA_QuickUseItems`, `IA_Quicksave`, `IA_Wait`,
+   `IA_WeaponWheel`) are bound in `IMC_Default` and handled only in the template `BP_NarrativePlayerController`.
+   The campaign controller `BP_AurelionPlayerController` derives from `/Game/Framework/BP_SovPlayerController`,
+   which per [CampaignFoundation.md](CampaignFoundation.md) owns input mappings, HUD classes and menu behaviour and
+   points `PauseMenuClass` at the copied `W_NarrativeMenu_Pause`; the campaign controller overrides that with
+   `USovAurelionPauseMenu`. That parent Blueprint and the project copies under `/Game/Framework`, `/Game/Input`,
+   `/Game/Items/Weapons`, `/Game/Abilities` and `/Game/UI/Narrative` were authored on the Windows work PC. They are
+   excluded by `.gitignore` (`/Content/*`), have never been committed on any branch, and shipping validation reports
+   them missing. Which screens the campaign player can open, and how the campaign pause menu is reached, therefore
+   cannot be established or tested from this repository.
+5. **Template UI reach found without that content.** The campaign HUD `WBP_AurelionGameplayHUD` reuses Narrative HUD
+   pieces (game HUD, compass, minimap, screen-space markers, player-info HUD, crosshairs, interaction, notifications,
+   Tales overlay), not menu screens. Template inventory grid widgets reach the cook through `NPC_AurelionEnforcer`'s
+   demo pistol (K4), and the vehicle HUD through Narrative's DriveToDestination activity in
+   `AC_AurelionSecurityDrone`. The template main menu, loot controller and character creator enter only through the
+   boot configuration (T2-B).
+6. **Decisions (14 September, creator).** T3 is gated as content rather than implemented natively: a native menu
+   guard written without the authored Blueprints could conflict with wiring that cannot be inspected. Packaged
+   builds will boot into an authored Sovereign front end; the template boot stays flagged by shipping validation
+   (T2-B) until then.
+7. **To reopen.** Commit the project-authored copies from the work PC, adjusting `.gitignore` as was done for
+   `Content/Cues`; audit which screens the campaign controller opens against §10.7 and §13.6 with runtime tests; author
+   the campaign front end map, GameMode and menu, which also resolves T2-B.
 
 ### T5 — Packaged Win64 Game target (OPEN, Windows gate)
 
@@ -270,6 +557,20 @@ the production handoff and load sequencing rather than by comparing keys or stru
 negative control and the explicit limits are under C1 above. One content dependency surfaced and is
 recorded there rather than closed: first-visit non-Echo resources depend on the authored
 `DefaultAttributes` effect.
+
+**12 September — C3 closed, one source defect fixed.** The checkpoint contract was qualified through the
+production save path in an isolated worktree. The missing save-header migration history (TDD §15.9) was the
+one defect; it is fixed and covered. Negative controls, suite results and explicit limits are under C3 above.
+The fresh worktree also showed that X2's error spillover still reaches unrelated tests, contrary to the X2
+note below; that is recorded for its own slice rather than folded into C3.
+
+**12 September — E6 closed, no source defect.** Every tracked hostile — the Aurelion roster and both Dominion Hound Blueprints — acquires the player only through its authored perception and threat memory. The Hound world scan is a gated combat-state fallback, not a stealth bypass. The latent legacy nonperception path is unreachable for the authored roster and is now pinned by automation. Detail, negative controls and the PC04 signal recommendation are under E6 above.
+
+**12 September — PC09 source closed, no source defect; authoring reclassified as PC09-C.** Native Guard admission, Stamina, perfect defence, interruption, re-entrant start, cancellation, counter survival and cleanup are automation-verified across eight suites with negative controls. The audit's cancellation complaint no longer describes the source. No authored asset grants, maps, presents or counter-classifies Guard yet; that remainder is PC09-C. Detail under PC09 above.
+
+**14 September — T2 closed for source, config and validation; boot remainder reclassified as T2-B.** The UE 5.7 cooker's own CookList showed every Narrative demo definition cooked through an AlwaysCook Primary Asset rule, and shipping validation blind to game defaults, packaging settings and startup config references. Both are fixed, and validation now follows only the dependencies the cooker follows. What still ships prohibited content is the template boot configuration, which needs an authored campaign front end (T3). Detail under T2 above.
+
+**14 September — T3 gated as content; front-end decision recorded.** The native campaign layer opens only project menus and loads no character-creator data, but the campaign's input and menu wiring lives in `/Game/Framework/BP_SovPlayerController` and the project UI copies, which were authored on the work PC and never committed. T3 is gated until that content is committed. Packaged builds will boot into an authored Sovereign front end, so T2-B stays flagged until one exists. Detail under T3 above.
 
 ## X2 — `SciFi_Drone_1` marketplace pack, an external content gate
 

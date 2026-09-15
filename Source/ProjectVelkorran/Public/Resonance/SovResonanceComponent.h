@@ -28,6 +28,13 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Resonance") void CancelInteraction();
 	UPROPERTY(BlueprintAssignable, Category="Resonance") FSovResonanceChanged OnInteractionChanged;
 	static USovResonanceComponent* FindActive(UWorld* World);
+	/**
+	 * The coordinator that owns Context's Resonance: Context's own when it is a player's pawn, otherwise its
+	 * companion leader's, otherwise the single standalone player's (FindActive). Callers resolve from the actor
+	 * involved rather than from "the" player, so a later multi-player mode changes only this resolution.
+	 * Resonance remains standalone-only.
+	 */
+	static USovResonanceComponent* FindForActor(UWorld* World, const AActor* Context);
 	/** Native receipt path only; no Blueprint can fabricate a protection award. */
 	void NotifyProtectionIntercept(USovProtectionInterceptReceipt* Receipt, const FSovDamageResult& Result);
 	bool IsTicketCurrent(const USovResonanceTicket* Ticket) const;

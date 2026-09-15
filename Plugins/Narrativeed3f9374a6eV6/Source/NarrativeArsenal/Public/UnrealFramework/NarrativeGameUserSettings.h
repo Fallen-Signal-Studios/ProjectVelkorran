@@ -46,6 +46,18 @@ public:
 
 	/** Project extension seam; neutral defaults preserve other Narrative consumers. */
 	static const UNarrativeGameUserSettings* GetSovSettings();
+	/**
+	 * Assist and accessibility preferences that shape gameplay resolved on behalf of the player controlling
+	 * PlayerContext (an avatar, pawn, controller or component on one). Authority-side gameplay must read player
+	 * preferences here rather than from GetSovSettings, which is this process's local user: on a listen server that
+	 * is the host, and on a dedicated server nobody. Single-player campaign: always the local settings.
+	 */
+	static const UNarrativeGameUserSettings* GetSovPlayerSettings(const UObject* PlayerContext);
+	/**
+	 * Difficulty rules shared by everyone in WorldContext's session, such as enemy cadence and rescue permission.
+	 * Single-player campaign: always the local settings.
+	 */
+	static const UNarrativeGameUserSettings* GetSovSessionSettings(const UObject* WorldContext);
 	virtual float GetIncomingDamageScale() const { return 1.f; }
 	virtual float GetEnemyRecoveryScale() const { return 1.f; }
     virtual uint8 GetCampaignModifiers() const { return 0; }

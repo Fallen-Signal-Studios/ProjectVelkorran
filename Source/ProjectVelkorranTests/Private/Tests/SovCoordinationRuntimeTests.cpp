@@ -2,6 +2,7 @@
 #include "Tests/SovRuntimeObjectTestFixtures.h"
 #include "Tests/SovCoordinationRuntimeTestFixtures.h"
 #include "Tests/SovExertionRuntimeTestFixtures.h"
+#include "Tests/SovRuntimeActorTestFixtures.h"
 #include "AI/NarrativeNPCController.h"
 #include "Campaign/SovEncounterCoordinationComponent.h"
 #include "Campaign/SovEncounterDirector.h"
@@ -315,4 +316,29 @@ bool FSovReservedPresentationReentryTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Last release restores original body/weapon state, not an inherited hidden baseline"), !Future->IsHidden() && !Visual->IsHidden() && Visual->GetActorEnableCollision() && !Weapon->IsHidden() && Weapon->GetActorEnableCollision());
 	return true;
 }
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCoordinationRemoteViewTest, "ProjectVelkorran.Campaign.Encounter.Coordination.RemotePlayerViewGatesRangedAdmission",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FSovCoordinationRemoteViewTest::RunTest(const FString& Parameters)
+{
+	static_cast<void>(Parameters);
+	FCoordinationWorld Test;
+	auto* Ranged = Test.Add(TEXT("Ranged"), FVector(-500.f, 0.f, 0.f));
+	FGameplayAbilitySpecHandle RangedHandle; Attack(ASC(Ranged), RangedHandle, false);
+	auto* Remote = Test.World->SpawnActor<ASovRuntimeTestPlayerController>();
+	if (!TestNotNull(TEXT("Remote player controller"), Remote)) { return false; }
+	Remote->Possess(Test.Player); Remote->SetViewTarget(Test.Player);
+	// On a server, a client's controller exists but is not local: its viewport is on the client.
+	TestFalse(TEXT("The encounter player's controller is not local"), Remote->IsLocalController());
+	FSovCoordinationTestAccess::Start(Test.Director, Test.Player);
+	const auto Face = [&](double Yaw)
+	{ Test.Player->SetActorRotation(FRotator(0., Yaw, 0.)); Remote->SetControlRotation(FRotator(0., Yaw, 0.)); };
+	Face(0.);
+	TestFalse(TEXT("An attacker behind the remote player's reported view still requires a warning"),
+		ASC(Ranged)->TryActivateBotAttack(Test.Player, RangedHandle));
+	Face(180.);
+	TestTrue(TEXT("An attacker inside the remote player's reported view is admitted without a local viewport"),
+		ASC(Ranged)->TryActivateBotAttack(Test.Player, RangedHandle));
+	return true;
+}
+
 #endif
