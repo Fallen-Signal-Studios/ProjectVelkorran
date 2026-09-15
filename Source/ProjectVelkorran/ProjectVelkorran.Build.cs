@@ -24,6 +24,7 @@ public class ProjectVelkorran : ModuleRules
 				"GameplayTasks",
 				"Niagara",
 				"PhysicsCore",
+				"GeometryCollectionEngine",
 				"NarrativeArsenal", "LevelSequence", "MovieScene",
 				"NarrativeSaveSystem",
 				"NarrativeCommonUI",

@@ -1,6 +1,6 @@
 # Aurelion selective Chaos destruction
 
-Status: an isolated cargo Geometry Collection and solver test are implemented under `/Game/Aurelion/ArtReview/Chaos`. Campaign destructible placements and combat destruction hooks are not implemented yet.
+Status: the isolated cargo Geometry Collection now has a native damageable cover owner, a drone gunfire connection, saved intact/broken state, and bounded Chaos debris. Campaign placements, protagonist attack connections and nonstructural panels remain unfinished.
 
 The user requested Chaos destruction for appropriate cover and nonstructural walls. Finalize each intact asset and placement first, then author and qualify its destructible version before declaring that area complete. Begin with one freestanding cover object and one optional nonstructural panel in a controlled test scene, then expand to campaign placements after live qualification.
 
@@ -81,5 +81,21 @@ Destruction should use that existing authority: a stable placed owner with autho
 `Scripts/Validation/Aurelion/build_destruction_groups.py` now validates the ten reviewed obstruction groups against the collision survey. `Docs/AurelionDestructionGroups-2026-09-15.json` records all nineteen visual members, exact obstruction component paths, transforms and bounds, excluded unrelated overlaps, and reserved deterministic placement GUIDs. These GUIDs are not yet assigned to Narrative savable actors. Campaign destruction remains disabled.
 
 Nine groups must break both cargo visuals and retire their shared obstruction together. `Z08_HC_NorthMid` (source instance 16) has one visual and one obstruction, so it is the first integration candidate. This grouping avoids changing a shared collider while another member still looks intact. Sky and trigger overlaps are explicitly excluded. Nonstructural panels still require a separate ownership and mission-role survey.
+
+## Native cover owner, 2026-09-15
+
+`ASovDestructibleCover` owns an intact visual and box obstruction for one authored group. Destruction requires explicit opt-in, an authored placement GUID and a fractured collection. Finite positive damage accumulates against 120 health by default. The break retires the intact visual, shot/movement collision and navigation relevance together. Further hits do not repeat the break. Structural actors do not opt in automatically.
+
+The existing drone gunfire point-damage path now admits this exact owner type before character ASC targeting. An intercepted shot follows either scenery damage or character GAS damage, never both. Other attacks, including protagonist weapons, melee and explosions, are not connected by this change.
+
+The actor uses Narrative's existing stable actor/save interfaces and Structure restore phase. Remaining health and broken state are SaveGame properties. Loading reconciles collision and presentation and removes transient debris without replaying break effects. The automated serializer round-trip uses the same `ArIsSaveGame` and `ArNoDelta` flags as Narrative. This is not yet a full campaign checkpoint reload qualification.
+
+Debris is created only on a break, uses an impact-directed impulse, ignores characters and queries, and is removed after six seconds (hard maximum ten). A collection with more than 65 transforms is excluded from cosmetic debris spawning; the authored prototype has one root and twelve fragments. This is a per-object bound, not a profiled simultaneous-destruction budget. Optional Niagara and sound fields are exposed but have no authored assignments yet. Client break presentation and network qualification remain open.
+
+Runtime component registration must precede explicit simulation startup. The initial implementation created its solver proxy too early; merely checking `IsRootBroken` missed that defect. The corrected validator requires at least eight fragments to move more than 10 cm as well as testing damage, collision retirement, control preservation and cleanup.
+
+`NativeCoverRendered-20260915-112203-601c1fd2` completed with exit 0 and no Python errors. All twelve fragments moved 12.1-211.5 cm, the control stayed intact, and debris cleared within the authored lifetime. Intact/fractured/cleared captures were taken from the piloted simulation view. Earlier captures without a piloted viewport were stale and are excluded from visual evidence. The three cargo materials now persist Geometry Collection usage flags. The fractured object visibly collapses into large chunks; flat interior faces and material-specific fracture detail still need art work.
+
+The two new native automation tests cover protected defaults, invalid damage, accumulation, repeated hits, both saved states, collision/navigation flags, and the real drone muzzle trace with a character behind the cover. Build and test reports are recorded alongside the isolated simulation evidence. No M12/M13 map or cargo HISM was changed. Campaign enablement still requires replacing the entire reviewed obstruction group, real protagonist attacks, traversal/navigation checks, full checkpoint reload, effects/audio and performance qualification.
 
 Fresh editor run `DestructionGroups-20260915-103551-a06a2876` completed with exit 0, no Python errors, 3140 actors and a clean map. The grouping validator passed against that fresh survey: member bounds tile each obstruction envelope within 0.1 cm and all reviewed components block Pawn and Visibility. Fault injection correctly rejected a missing collider, a collider spanning an extra visual, a gap in the visual envelope, and duplicated instance identities. This is static ownership validation, not combat, traversal, checkpoint or destruction-performance qualification.

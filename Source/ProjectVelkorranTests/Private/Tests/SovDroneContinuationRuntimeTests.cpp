@@ -15,6 +15,9 @@
 #include "Presentation/SovReformationDroneSelfDestructPresentation.h"
 #include "Sovereign/SovGameplayTags.h"
 #include "UObject/Script.h"
+#include "World/SovDestructibleCover.h"
+#include "Components/BoxComponent.h"
+#include "GeometryCollection/GeometryCollectionObject.h"
 
 #if WITH_AUTOMATION_TESTS
 namespace
@@ -555,5 +558,34 @@ bool FSovDroneFatalConfigurationSnapshotTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Fatal self hit uses frozen effect class despite authored mutation"), F.SourceHealth(), 0.f);
 	TestFalse(TEXT("Fatal cleanup still ends action"), Ability->IsActive());
 	return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovDroneDestructibleTraceTest,
+    "ProjectVelkorran.World.Destruction.DroneTraceRetiresCover",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FSovDroneDestructibleTraceTest::RunTest(const FString& Parameters)
+{
+    FDroneWorld F;
+    if (!F.Valid()) { return false; }
+    FActorSpawnParameters Spawn;
+    Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+    auto* Cover = F.World->SpawnActor<ASovDestructibleCover>(ASovDestructibleCover::StaticClass(),
+        FVector(75, 0, 0), FRotator::ZeroRotator, Spawn);
+    Cover->Obstruction->SetBoxExtent(FVector(10, 50, 100));
+    Cover->PlacementGuid = FGuid(1, 2, 3, 4);
+    Cover->FracturedAsset = NewObject<UGeometryCollection>(Cover);
+    Cover->bDestructionEnabled = true;
+    Cover->RemainingHealth = 12.f;
+    FGameplayAbilitySpecHandle Handle;
+    auto* Gun = F.Grant<USovDroneContinuationGun>(Handle);
+    if (!TestNotNull(TEXT("Real drone weapon granted"), Gun)) { return false; }
+    TestTrue(TEXT("Real GAS activation"), F.ASC()->TryActivateAbility(Handle, false));
+    Gun->FireGunBurstFromAim();
+    TestTrue(TEXT("Real muzzle trace damages scenery without a target ASC"), Cover->IsBroken());
+    TestEqual(TEXT("Intercepted shot does not also damage character behind cover"), F.TargetShield(), 100.f);
+    TestEqual(TEXT("Trace obstruction removed"), Cover->Obstruction->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
+    Gun->RequestEnd();
+    F.Tick(.5f);
+    TestEqual(TEXT("Cancelled burst cannot shoot through new opening"), F.TargetShield(), 100.f);
+    return true;
 }
 #endif

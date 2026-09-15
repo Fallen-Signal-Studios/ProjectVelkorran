@@ -1,0 +1,37 @@
+{
+  "displacement_cm": {
+    "SM_Aurelion_KIT_Z08SealedStores": 0.0,
+    "SM_Aurelion_KIT_Z08SealedStores_0": 177.5473203948619,
+    "SM_Aurelion_KIT_Z08SealedStores_1": 211.53954159765658,
+    "SM_Aurelion_KIT_Z08SealedStores_2": 66.01818292880428,
+    "SM_Aurelion_KIT_Z08SealedStores_3": 188.94613314361584,
+    "SM_Aurelion_KIT_Z08SealedStores_4": 124.62667156638781,
+    "SM_Aurelion_KIT_Z08SealedStores_5": 20.9038342168948,
+    "SM_Aurelion_KIT_Z08SealedStores_6": 12.07168953974363,
+    "SM_Aurelion_KIT_Z08SealedStores_7": 18.568654199103097,
+    "SM_Aurelion_KIT_Z08SealedStores_8": 51.764925548447486,
+    "SM_Aurelion_KIT_Z08SealedStores_9": 20.932425285707446,
+    "SM_Aurelion_KIT_Z08SealedStores_10": 175.61772804487063,
+    "SM_Aurelion_KIT_Z08SealedStores_11": 41.95997629947639
+  },
+  "root_broken": true,
+  "fragment_transforms": 13,
+  "sockets": {
+    "SM_Aurelion_KIT_Z08SealedStores": "<Struct 'Vector' (0x0000023FFD658DD0) {x: 0.000000, y: 300.000000, z: 0.000000}>",
+    "SM_Aurelion_KIT_Z08SealedStores_0": "<Struct 'Vector' (0x0000023FFD658DD0) {x: 41.578438, y: 467.401779, z: -42.082405}>",
+    "SM_Aurelion_KIT_Z08SealedStores_1": "<Struct 'Vector' (0x0000023FFD658DD0) {x: 158.919495, y: 329.004248, z: -136.573517}>",
+    "SM_Aurelion_KIT_Z08SealedStores_2": "<Struct 'Vector' (0x0000023FFD658DD0) {x: 35.209682, y: 253.944416, z: -31.584204}>",
+    "SM_Aurelion_KIT_Z08SealedStores_3": "<Struct 'Vector' (0x0000023FFD658DD0) {x: 177.152649, y: 347.843410, z: -45.039852}>",
+    "SM_Aurelion_KIT_Z08SealedStores_4": "<Struct 'Vector' (0x0000023FFD658DD0) {x: -2.003154, y: 392.726692, z: -83.243950}>",
+    "SM_Aurelion_KIT_Z08SealedStores_5": "<Struct 'Vector' (0x0000023FFD658DD0) {x: 20.903820, y: 299.975921, z: -0.003606}>",
+    "SM_Aurelion_KIT_Z08SealedStores_6": "<Struct 'Vector' (0x0000023FFD658DD0) {x: 12.071289, y: 299.901703, z: 0.002541}>",
+    "SM_Aurelion_KIT_Z08SealedStores_7": "<Struct 'Vector' (0x0000023FFD658DD0) {x: 18.467234, y: 298.063096, z: 0.067844}>",
+    "SM_Aurelion_KIT_Z08SealedStores_8": "<Struct 'Vector' (0x0000023FFD658DD0) {x: 42.812099, y: 314.035223, z: -25.490080}>",
+    "SM_Aurelion_KIT_Z08SealedStores_9": "<Struct 'Vector' (0x0000023FFD658DD0) {x: 20.862959, y: 300.948347, z: 1.415631}>",
+    "SM_Aurelion_KIT_Z08SealedStores_10": "<Struct 'Vector' (0x0000023FFD658DD0) {x: 45.489433, y: 158.205276, z: -93.094330}>",
+    "SM_Aurelion_KIT_Z08SealedStores_11": "<Struct 'Vector' (0x0000023FFD658DD0) {x: -3.457250, y: 258.480392, z: -4.980886}>"
+  },
+  "status": "passed",
+  "cleanup_seconds": 7.498092908412218,
+  "qualification": "Native damage and Chaos simulation only; campaign, protagonist weapons, nav traversal and full checkpoint reload still pending."
+}

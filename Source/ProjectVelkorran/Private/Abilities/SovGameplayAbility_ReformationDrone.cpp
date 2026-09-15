@@ -1,6 +1,8 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 
 #include "Abilities/SovGameplayAbility_ReformationDrone.h"
+#include "World/SovDestructibleCover.h"
+#include "Engine/DamageEvents.h"
 
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
@@ -656,6 +658,17 @@ bool USovGameplayAbility_ReformationDroneWeaponBase::ApplyPointDamage(
 	UAbilitySystemComponent* SourceASC = CurrentActorInfo->AbilitySystemComponent.Get();
 	AActor* SourceActor = CurrentActorInfo->AvatarActor.Get();
 	UAbilitySystemComponent* TargetASC = ResolveAbilitySystemFromActor(Hit.GetActor());
+	// Environmental cover has no character ASC. Admit only an explicitly authored
+	// owner, after the same activation gate; never send both scenery and GAS damage.
+	if (ASovDestructibleCover* Cover = Cast<ASovDestructibleCover>(Hit.GetActor()))
+	{
+		if (!IsValid(SourceASC) || !IsValid(SourceActor) || !Hit.bBlockingHit
+			|| !CurrentActorInfo->IsNetAuthority() || !IsWeaponActivationCurrent(Epoch)
+			|| !CanContinueWeaponPayload()) { return false; }
+		const FPointDamageEvent Event(Damage, Hit,
+			(FVector(Hit.ImpactPoint) - SourceActor->GetActorLocation()).GetSafeNormal(), nullptr);
+		return Cover->TakeDamage(Damage, Event, nullptr, SourceActor) > 0.f;
+	}
 	if (!IsValid(SourceASC)
 		|| !IsValid(SourceActor)
 		|| !IsValid(TargetASC)
