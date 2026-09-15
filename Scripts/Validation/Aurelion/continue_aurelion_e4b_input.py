@@ -28,8 +28,11 @@ CINDERLINE='/Game/Items/Weapons/WI_Cinderline.WI_Cinderline_C'
 _path,_xyz,_optional=common._path,common._xyz,common._optional
 
 
+FROST_RETRY_LIMIT = 3
+
 class Run(phase_a.Run):
     def __init__(self,output_directory):
+        self.last_frost_miss=-1000.
         super().__init__(output_directory)
         self.controls={}
         self.thermal=self.elite=self.core=self.poise=self.frost_anchor=None
@@ -44,7 +47,7 @@ class Run(phase_a.Run):
             entry_requires=['earned nineteen-beat journal and real Tarrik/owned Selene',
                 'same active E4B attempt with inherited living Elite and protected roster',
                 'existing Cinderline/ammunition and three authored normal request controls'],
-            thermal_receipts=[],thermal_damage=[],core_breaks=[],frost_windows=[],
+            thermal_receipts=[],thermal_damage=[],core_breaks=[],frost_windows=[],missed_frost_windows=[],
             contextual_requests=[],combat_targets=[],wheels=[],native_thermal=None,native_victory=None)
 
     def inject(self,move=(0.,0.),look=(0.,0.),attack=0.,aim=0.,reload=0.,interact=0.,pulse=0.,wheel_hold=0.):
@@ -224,6 +227,16 @@ class Run(phase_a.Run):
         self.selector=wheel.Selector(CINDERLINE)
         self.stage('select_cinderline')
 
+    def retry_frost(self,pawn,reason):
+        # Thermal Fracture is recoverable: a missed or rejected window returns to an ordinary fresh frost setup.
+        self.inject();self.unbind_request();self.request_result=None
+        self.report['missed_frost_windows'].append(dict(elapsed=time.monotonic()-self.started,phase=self.phase,
+            control=self.control_name,reason=reason,state=self.thermal_state()))
+        assert len(self.report['missed_frost_windows'])<=FROST_RETRY_LIMIT, 'Thermal Fracture window repeatedly missed: '+reason
+        self.last_frost_miss=time.monotonic()
+        p=self.controls['FrostSetup'].get_actor_location()
+        self.go_control('FrostSetup',then='prepare_frost',point=(p.x-250.,p.y,pawn.get_actor_location().z))
+
     def go_control(self,name,then='aim_control',point=None):
         self.control_name=name
         actor=self.controls[name];p=actor.get_actor_location()
@@ -290,6 +303,9 @@ class Run(phase_a.Run):
         self.inject()
         if self.request_result is None:
             assert time.monotonic()-self.phase_at<3., 'Deferred native request produced no current result'
+            return
+        if not self.request_result['accepted'] and self.control_name in ('FrostSetup','HeatConfirm'):
+            self.retry_frost(pawn,'Native '+self.control_name+' rejected: '+self.request_result['message'])
             return
         assert self.request_result['accepted'], 'Native request rejected: '+self.request_result['message']
         self.unbind_request();self.request_result=None
@@ -461,7 +477,7 @@ class Run(phase_a.Run):
             assert all(r['alive'] for r in rows if not r['required']) and {r['id'] for r in rows if not r['required']}==prior.PROTECTED
             if self.report['native_thermal'] is None:
                 assert rescue.alive(self.elite), 'Elite died before its real thermal payoff'
-            if self.request_result is not None:
+            if self.request_result is not None and self.request_result['control'] not in ('FrostSetup','HeatConfirm'):
                 assert self.request_result['accepted'], 'Native contextual request failed: '+self.request_result['message']
             if now-self.last_sample>.5:
                 self.last_sample=now
@@ -484,12 +500,14 @@ class Run(phase_a.Run):
                 self.inject();return
             weapon=common.Run.weapon(self,pawn)
             if self.phase=='walk_route':
-                if self.control_name=='HeatConfirm':
-                    assert self.thermal.get_fracture_window_remaining_seconds()>.35, 'Native frost window expired during physical approach; no extension was supplied'
+                if self.control_name=='HeatConfirm' and self.thermal.get_fracture_window_remaining_seconds()<=.35:
+                    self.retry_frost(pawn,'Native frost window expired during physical approach; no extension was supplied')
+                    return
                 self.walk(pc,pawn)
             elif self.phase=='aim_control':
-                if self.control_name=='HeatConfirm':
-                    assert self.thermal.get_fracture_window_remaining_seconds()>.35, 'Native frost window expired before ordinary heat hold'
+                if self.control_name=='HeatConfirm' and self.thermal.get_fracture_window_remaining_seconds()<=.35:
+                    self.retry_frost(pawn,'Native frost window expired before ordinary heat hold')
+                    return
                 self.aim_control(pc,pawn)
             elif self.phase=='wait_partner_mark':
                 self.inject()
@@ -507,7 +525,10 @@ class Run(phase_a.Run):
                     self.report['waiting_for_elite']=dict(reason='Native reach intervals do not overlap',
                         endpoint=self.report['heat_endpoint'])
                     return
-                if self.poise.get_poise()>.1 and not self.poise.is_poise_recovering():
+                # A retry waits for the closed window and the native one-second setup cooldown.
+                if (self.poise.get_poise()>.1 and not self.poise.is_poise_recovering()
+                        and self.thermal.get_fracture_window_remaining_seconds()<=0.
+                        and time.monotonic()-self.last_frost_miss>=1.25):
                     self.stage('aim_control')
             elif self.phase=='wait_thermal_payoff':
                 self.confirm_thermal()
