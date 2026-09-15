@@ -19,6 +19,18 @@ struct FSovAurelionPIEMouseInputResult
     UPROPERTY(BlueprintReadOnly) FString Report;
 };
 
+USTRUCT(BlueprintType)
+struct FSovAurelionPIEPointerInputResult
+{
+    GENERATED_BODY()
+    /** Press and release both reached Slate for the same validated PIE viewport. */
+    UPROPERTY(BlueprintReadOnly) bool bRouted = false;
+    UPROPERTY(BlueprintReadOnly) bool bPressHandled = false;
+    UPROPERTY(BlueprintReadOnly) bool bReleaseHandled = false;
+    UPROPERTY(BlueprintReadOnly) FVector2D ScreenPosition = FVector2D::ZeroVector;
+    UPROPERTY(BlueprintReadOnly) FString Report;
+};
+
 /** Editor-only synthetic mouse input for the two exact Aurelion PIE wrappers. */
 UCLASS()
 class PROJECTVELKORRANEDITOR_API USovAurelionPIEInputLibrary : public UBlueprintFunctionLibrary
@@ -33,4 +45,12 @@ public:
     UFUNCTION(BlueprintCallable, Category="Velkorran|Editor|PIE Input")
     static FSovAurelionPIEMouseInputResult InjectAurelionPIEMouseDelta(
         UWorld* World, float DeltaX, float DeltaY);
+
+    /** Routes one left-button press and release through Slate at the PIE viewport centre.
+     * This is the same application input path a desktop click takes, including input
+     * preprocessors and CommonUI action routing; no widget handler or equipment state is
+     * called directly. It does not validate physical desktop mouse delivery.
+     */
+    UFUNCTION(BlueprintCallable, Category="Velkorran|Editor|PIE Input")
+    static FSovAurelionPIEPointerInputResult InjectAurelionPIELeftClick(UWorld* World);
 };

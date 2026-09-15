@@ -59,6 +59,18 @@ def _journal(state):
             for e in state.get_journal()]
 
 
+def _incoming_damage_observer(run, pawn_path):
+    # One-argument delegate; capture the run and exact pawn in a factory.
+    def damaged(result):
+        if _path(result.target_actor) != pawn_path:
+            return
+        run.report['incoming_damage'].append(dict(elapsed=time.monotonic()-run.started,
+            source=_path(result.source_actor), health=result.applied_health_damage,
+            shield=result.applied_shield_damage, poise=result.applied_poise_damage, fatal=result.fatal,
+            relief=run.relief_active()))
+    return damaged
+
+
 class Run:
     def __init__(self, output_directory, resume_report=None):
         self.out = Path(output_directory)
@@ -101,6 +113,8 @@ class Run:
         self.cover_until = -1000.
         self.next_cover_search = -1000.
         self.last_pickup = None
+        self.pressure = None
+        self.damage_binding = None
         self.report = dict(status='running', scope='E1 combat, secure approach, first native handoff',
                            method='Ordinary Enhanced Input actions in an existing PIE world',
                            physical_keyboard_validation=False, rendered_image_review=False,
@@ -108,6 +122,7 @@ class Run:
                            driver_source_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
                            samples=[], stages=[], holds=[], targets=[], input_frames={}, rocket_reactions=[],
                            cover_attempts=[], cover_exposures=[], pickup_approaches=[],
+                           incoming_damage=[], pressure_observation='Read-only native damage receipts and coordination relief state',
                            assets_before=self.before)
         self.actions = {name: unreal.load_asset(ACTION_ROOT + name) for name in
                         ('IA_Move', 'IA_Look', 'IA_Attack', 'IA_AltAttack', 'IA_Reload', 'IA_Interact')}
@@ -173,9 +188,16 @@ class Run:
                 self.report['route_follow_on'] = dict(status='failed', error=traceback.format_exc())
             self.write()
 
+    def relief_active(self):
+        return _optional(lambda: bool(self.pressure.is_pressure_relief_active())) if self.pressure else None
+
     def release_world_references(self):
         # Completed input observers must not keep an old PIE world alive across
         # the mission's genuine map travel. Serialized evidence remains intact.
+        if self.damage_binding is not None:
+            _optional(lambda binding=self.damage_binding: binding[0].remove_callable(binding[1]))
+            self.damage_binding = None
+        self.pressure = None
         self.world = self.owner = self.e1 = self.target = self.hold_actor = None
         self.path_target = None
         self.path_points = []
@@ -577,6 +599,14 @@ class Run:
                 assert len(matches) == 1
                 self.e1 = matches[0]
                 assert self.e1.get_encounter_state() == unreal.SovEncounterState.ACTIVE
+                self.pressure = self.e1.get_component_by_class(unreal.SovEncounterCoordinationComponent)
+                if self.pressure is not None:
+                    self.report['pressure_configuration'] = {name: _optional(lambda n=name: self.pressure.get_editor_property(n)) for name in
+                        ('allow_low_resource_relief', 'relief_duration', 'relief_cooldown', 'relief_attack_interval', 'melee_attacker_slots')}
+                damage_delegate = pawn.get_narrative_ability_system_component().on_damage_resolved_as_target
+                damage_callback = _incoming_damage_observer(self, _path(pawn))
+                damage_delegate.add_callable(damage_callback)
+                self.damage_binding = (damage_delegate, damage_callback)
                 roster = self.roster()
                 if self.resume_report:
                     initial = self.resume_report['initial']
@@ -603,7 +633,9 @@ class Run:
                 self.report['samples'].append(dict(elapsed=now-self.started, phase=self.phase, pawn=_path(pawn),
                     position=_xyz(pawn.get_actor_location()), health=pawn.get_health(), ready=pawn.is_character_ready(),
                     transition=str(pc.get_campaign_transition_state()), protagonist=str(state.get_active_protagonist()),
-                    journal=events, encounter=str(self.e1.get_encounter_state()), roster=self.roster()))
+                    journal=events, encounter=str(self.e1.get_encounter_state()), roster=self.roster(),
+                    shield=_optional(lambda: pawn.get_component_by_class(unreal.SovShieldComponent).get_shield()),
+                    relief=self.relief_active()))
             if now-self.last_write > 1.:
                 self.last_write = now
                 self.write()

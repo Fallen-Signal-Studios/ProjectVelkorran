@@ -16,6 +16,15 @@ enum class ESovPerformanceVerdict : uint8
 	Fail,
 };
 
+/** Mirrors SovPerformancePolicy::EMemoryTrend. */
+UENUM(BlueprintType)
+enum class ESovMemoryTrend : uint8
+{
+	Insufficient,
+	Stable,
+	Growing,
+};
+
 /**
  * One capture's outcome, including the identity of the machine that produced it.
  *
@@ -48,6 +57,13 @@ struct PROJECTVELKORRAN_API FSovPerformanceCaptureSummary
 	UPROPERTY(BlueprintReadOnly) float HardStallMilliseconds = 0.f;
 	UPROPERTY(BlueprintReadOnly) float AllowedOverBudgetFraction = 0.f;
 	UPROPERTY(BlueprintReadOnly) float JudgedPercentile = 0.f;
+	/** Process used physical memory when the summary was built, and the operating system's peak. */
+	UPROPERTY(BlueprintReadOnly) float UsedPhysicalMegabytes = 0.f;
+	UPROPERTY(BlueprintReadOnly) float PeakUsedPhysicalMegabytes = 0.f;
+	/** One reading per mission world, taken as its warm-up completes, across this process. */
+	UPROPERTY(BlueprintReadOnly) TArray<float> LoadMemoryMegabytes;
+	UPROPERTY(BlueprintReadOnly) ESovMemoryTrend MemoryTrend = ESovMemoryTrend::Insufficient;
+	UPROPERTY(BlueprintReadOnly) float MemoryToleranceMegabytes = 0.f;
 
 	/** "Mac", "Windows", and so on. Never inferred by a reader; always recorded. */
 	UPROPERTY(BlueprintReadOnly) FString Platform;
@@ -99,6 +115,16 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Sovereign|Performance") void ClearSamples();
 
 	/**
+	 * Admit one mission-load memory reading. Production calls this once per captured world when warm-up
+	 * completes; tests drive the same path. Readings persist across worlds for the process lifetime,
+	 * because the trend is judged across reloads that each create a new subsystem.
+	 */
+	UFUNCTION(BlueprintCallable, Category="Sovereign|Performance")
+	void RecordLoadMemoryBytes(double UsedBytes);
+
+	UFUNCTION(BlueprintCallable, Category="Sovereign|Performance") void ClearLoadMemory();
+
+	/**
 	 * Every valid frame this capture has seen, warm-up and admitted alike. Exposed so a capture that
 	 * produced no verdict can be told apart from one that never ran.
 	 */
@@ -112,4 +138,5 @@ private:
 	int32 RejectedSamples = 0;
 	int32 DroppedOldest = 0;
 	int32 WarmupDiscarded = 0;
+	bool bLoadMemoryRecorded = false;
 };

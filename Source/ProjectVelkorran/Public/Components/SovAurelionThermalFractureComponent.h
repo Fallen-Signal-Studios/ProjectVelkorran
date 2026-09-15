@@ -63,6 +63,8 @@ public:
     /** Contextual, nonlethal heat impact. Requires nearby Tarrik and visibility during a real frost window. */
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Aurelion|Thermal Fracture") bool RequestConfirmFracture(ASovPlayerCharacterBase* Tarrik, FString& Error);
     UFUNCTION(BlueprintPure, Category="Aurelion|Thermal Fracture") bool HasCompletedFracture(const ASovEncounterDirector* Director, const FGuid& AttemptId) const;
+    /** Completed receipt for the bound director's current attempt; false while unbound. */
+    UFUNCTION(BlueprintPure, Category="Aurelion|Thermal Fracture") bool HasCompletedCurrentFracture() const;
     UFUNCTION(BlueprintPure, Category="Aurelion|Thermal Fracture") FSovAurelionThermalFractureReceipt GetFractureReceipt() const { return Receipt; }
     UFUNCTION(BlueprintPure, Category="Aurelion|Thermal Fracture") float GetFractureWindowRemainingSeconds() const;
     virtual void PrepareForSave_Implementation() override;

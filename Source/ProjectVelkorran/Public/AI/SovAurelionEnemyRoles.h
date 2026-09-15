@@ -181,6 +181,8 @@ class PROJECTVELKORRAN_API USovAurelionCoreWeakPoints : public USovWeakPointComp
     GENERATED_BODY()
 public:
     USovAurelionCoreWeakPoints();
+    /** The Core is Thermal Fracture's exposed joint: breakable only after this attempt's completed payoff. */
+    virtual bool CanBreakWeakPoint(const FSovWeakPointZone& Zone, const FSovDamageResult& DamageResult) const override;
 };
 
 /** Rebinds the same uniquely tagged physical frost anchor after native actor reconstruction. */

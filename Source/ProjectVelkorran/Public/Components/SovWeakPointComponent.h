@@ -293,6 +293,13 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Sovereign|Weak Point|Reveal")
 	FSovWeakPointRevealStateChangedSignature OnWeakPointRevealStateChanged;
 
+	/**
+	 * Owner rule for whether a matching damaging hit may break this zone now. A refused hit is still a
+	 * weak-point hit, but it never breaks, rewards or applies the zone's consequence. Authored breaks
+	 * and restored state are unaffected.
+	 */
+	virtual bool CanBreakWeakPoint(const FSovWeakPointZone& Zone, const FSovDamageResult& DamageResult) const { return true; }
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;

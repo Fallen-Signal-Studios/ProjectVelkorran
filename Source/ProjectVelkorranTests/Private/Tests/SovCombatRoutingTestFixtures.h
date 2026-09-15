@@ -85,6 +85,16 @@ public:
 	UFUNCTION(CallInEditor) void ObserveBreak(FName Id, const FSovDamageResult& Result);
 };
 
+/** Owner break rule under test; hits still resolve through the production component. */
+UCLASS(Transient, NotBlueprintable)
+class USovWeakPointGatedTestComponent : public USovWeakPointRoutingTestComponent
+{
+	GENERATED_BODY()
+public:
+	bool bAllowBreak = false;
+	virtual bool CanBreakWeakPoint(const FSovWeakPointZone& Zone, const FSovDamageResult& DamageResult) const override { return bAllowBreak; }
+};
+
 UCLASS(Transient, NotBlueprintable)
 class USovWeakPointFireTestAbility : public UGameplayAbility
 {

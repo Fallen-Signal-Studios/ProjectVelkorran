@@ -292,4 +292,29 @@ bool FSovPerformanceCaptureRecordsPlatform::RunTest(const FString& Parameters)
 	}
 	return true;
 }
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovPerformanceLoadMemoryTrendTest,
+	"ProjectVelkorran.Diagnostics.Performance.LoadMemoryTrendAcrossReloads",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+bool FSovPerformanceLoadMemoryTrendTest::RunTest(const FString& Parameters)
+{
+	USovPerformanceCaptureSubsystem* Capture = NewObject<USovPerformanceCaptureSubsystem>(GetTransientPackage());
+	if (!TestNotNull(TEXT("Capture subsystem"), Capture)) { return false; }
+	const double Megabyte = 1024.0 * 1024.0;
+	Capture->ClearLoadMemory();
+	Capture->RecordLoadMemoryBytes(3000 * Megabyte);
+	Capture->RecordLoadMemoryBytes(3100 * Megabyte);
+	TestEqual(TEXT("Two loads cannot judge a trend"), Capture->BuildSummary().MemoryTrend, ESovMemoryTrend::Insufficient);
+	Capture->RecordLoadMemoryBytes(0.0);
+	Capture->RecordLoadMemoryBytes(std::numeric_limits<double>::quiet_NaN());
+	TestEqual(TEXT("Failed memory queries are not admitted"), Capture->BuildSummary().LoadMemoryMegabytes.Num(), 2);
+	Capture->RecordLoadMemoryBytes(3200 * Megabyte);
+	FSovPerformanceCaptureSummary Summary = Capture->BuildSummary();
+	TestEqual(TEXT("Three rising reloads beyond tolerance are a growing trend"), Summary.MemoryTrend, ESovMemoryTrend::Growing);
+	TestTrue(TEXT("Current and peak process memory are recorded"), Summary.UsedPhysicalMegabytes > 0.f && Summary.PeakUsedPhysicalMegabytes >= Summary.UsedPhysicalMegabytes * .5f);
+	Capture->ClearLoadMemory();
+	for (const double Load : {3000.0, 3010.0, 2995.0, 3020.0}) { Capture->RecordLoadMemoryBytes(Load * Megabyte); }
+	TestEqual(TEXT("Noise within tolerance is stable"), Capture->BuildSummary().MemoryTrend, ESovMemoryTrend::Stable);
+	Capture->ClearLoadMemory();
+	return true;
+}
 #endif

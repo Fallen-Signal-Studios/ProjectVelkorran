@@ -579,6 +579,15 @@ USovAurelionCoreWeakPoints::USovAurelionCoreWeakPoints()
     FSovWeakPointZone Core; Core.ZoneId = TEXT("Core");
     WeakPointZones.Add(Core);
 }
+bool USovAurelionCoreWeakPoints::CanBreakWeakPoint(const FSovWeakPointZone& Zone, const FSovDamageResult& DamageResult) const
+{
+    // Layout contract: Selene arrests the exposed joint and Tarrik's strike fractures it. Ordinary fire,
+    // companions and blasts must not break the Core before this attempt's frost, heat and Poise payoff.
+    if (Zone.ZoneId != FName(TEXT("Core"))) { return true; }
+    const auto* Elite = Cast<ASovAurelionElite>(GetOwner());
+    const auto* Thermal = Elite ? Elite->GetThermalFracture() : nullptr;
+    return Thermal && Thermal->HasCompletedCurrentFracture();
+}
 
 void USovAurelionEliteThermalFracture::PrepareForSave_Implementation()
 {

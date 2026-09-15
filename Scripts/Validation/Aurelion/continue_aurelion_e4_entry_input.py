@@ -24,7 +24,11 @@ HANDOFF = 'HandoffToSeleneCage'
 REFORMATION = 'DestroyReformationCage'
 SHARING = 'ShareIsolatedThreatData'
 WEST, EAST, PRIORITY = 'PriorityWestStretchers', 'PriorityEastWalkers', 'LocalPriorityCommitted'
-FINAL = INITIAL + [DOMINION, HANDOFF, REFORMATION, SHARING, WEST, PRIORITY]
+# Both legal outcomes of the one local decision are playable; the default preserves the original West route.
+CHOICE = os.environ.get('SOV_AURELION_PRIORITY', 'WestStretchers')
+assert CHOICE in ('WestStretchers', 'EastWalkers'), 'SOV_AURELION_PRIORITY must be WestStretchers or EastWalkers'
+SELECTED, REJECTED = (WEST, EAST) if CHOICE == 'WestStretchers' else (EAST, WEST)
+FINAL = INITIAL + [DOMINION, HANDOFF, REFORMATION, SHARING, SELECTED, PRIORITY]
 E4_ID = 'M12_E4_QuarantineCrucibleA'
 E4_BEAT = 'SeverCrucibleLinks'
 HOSTILES = {'E4.Linkbound1', 'E4.Linkbound2', 'E4.Weaver', 'E4.Elite', 'E4.WallRunner'}
@@ -56,7 +60,7 @@ class Run(rescue.Run):
         self.e4_paths = {}
         self.cage_gates = {}
         self.held_kind = None
-        self.report.update(scope='GroundLyric through three full scenes, native Selene handoff, exclusive WestStretchers priority and E4A initial entry only',
+        self.report.update(scope='GroundLyric through three full scenes, native Selene handoff, exclusive '+CHOICE+' priority and E4A initial entry only',
             pending=['E4A link severing and combat', 'E4 WallRunner reinforcement', 'Crucible handoff and Thermal Fracture',
                      'Every later route beat', 'Physical keyboard operation and rendered scene quality'],
             entry_requires=['exact eleven-beat prefix through GroundLyric with actual E3 and cinematic receipts',
@@ -195,7 +199,8 @@ class Run(rescue.Run):
         terminals = unreal.GameplayStatics.get_all_actors_of_class(world, unreal.SovAurelionPriorityTerminal)
         assert len(terminals) == 2 and {a.priority for a in terminals} == {
             unreal.SovAurelionRescuePriority.WEST_STRETCHERS,unreal.SovAurelionRescuePriority.EAST_WALKERS}
-        self.priority = next(a for a in terminals if a.priority == unreal.SovAurelionRescuePriority.WEST_STRETCHERS)
+        selected_priority = unreal.SovAurelionRescuePriority.WEST_STRETCHERS if CHOICE == 'WestStretchers' else unreal.SovAurelionRescuePriority.EAST_WALKERS
+        self.priority = next(a for a in terminals if a.priority == selected_priority)
         assert abs(float(self.priority.interactable.interaction_time)-.35) < .001
         assert self.selected_choice(state) == 'None' and self.support.get_priority() == unreal.SovAurelionRescuePriority.UNSET
         assert not self.support.is_west_cache_accessible() and not self.support.is_east_flank_open()
@@ -316,7 +321,7 @@ class Run(rescue.Run):
             assert self.saw_countdown, 'The actual ordinary hold countdown was not observed'
             if self.request_result is not None:
                 assert self.request_result['accepted'], 'Native handoff request rejected: '+self.request_result['message']
-            self.report['holds'].append(dict(beat=HANDOFF if self.held_kind=='handoff' else WEST,
+            self.report['holds'].append(dict(beat=HANDOFF if self.held_kind=='handoff' else SELECTED,
                 native_countdown=True,seconds=self.hold_seconds,
                 input_game_seconds=unreal.GameplayStatics.get_time_seconds(self.world)-self.hold_started,actor=_path(self.hold_actor)))
             self.stage('wait_'+self.held_kind)
@@ -325,10 +330,10 @@ class Run(rescue.Run):
             self.inject(interact=1.)
 
     def confirm_priority(self, state, events):
-        assert self.selected_choice(state) in ('None',WEST), 'The other exclusive route was selected'
-        if self.selected_choice(state) != WEST or not state.is_beat_complete(unreal.Name(MISSION),unreal.Name(PRIORITY)):
+        assert self.selected_choice(state) in ('None',SELECTED), 'The other exclusive route was selected'
+        if self.selected_choice(state) != SELECTED or not state.is_beat_complete(unreal.Name(MISSION),unreal.Name(PRIORITY)):
             return False
-        assert [e['beat'] for e in events] == FINAL and not state.is_beat_complete(unreal.Name(MISSION),unreal.Name(EAST))
+        assert [e['beat'] for e in events] == FINAL and not state.is_beat_complete(unreal.Name(MISSION),unreal.Name(REJECTED))
         if self.priority.is_request_pending():
             return False
         # WriteCheckpoint also queues an autosave with the same boundary ID. Its
@@ -344,22 +349,24 @@ class Run(rescue.Run):
         assert before[0]['generation'] < after[0]['generation']
         assert all(s['mission'] == MISSION and s['map']=='/Game/Aurelion/Maps/L_Aurelion_M12' for s in relevant)
         assert all(s['slot_index']==0 and s['explicit_boundary'] for s in relevant)
-        records = [c for e in state.get_journal() if str(e.beat_id)==WEST for c in e.consequences]
+        records = [c for e in state.get_journal() if str(e.beat_id)==SELECTED for c in e.consequences]
         assert len(records)==1
         r,d=records[0],records[0].definition
-        assert str(d.consequence_id)=='M12_WestStretchersPrioritized' and str(r.resolved_instigator_id)=='Selene'
-        assert {str(v) for v in d.subject_ids}=={'Aurelion_WestStretchers'}
+        assert str(d.consequence_id)=='M12_'+CHOICE+'Prioritized' and str(r.resolved_instigator_id)=='Selene'
+        assert {str(v) for v in d.subject_ids}=={'Aurelion_'+CHOICE}
         assert {str(v) for v in d.witness_ids}=={'Tarrik','Selene'} and d.publicity==unreal.SovRecordPublicity.SHARED
         assert {str(v) for v in d.consumer_ids}=={'M12_PriorityEvacuation','M13_PriorityAftermath'}
         assert tag_name(d.choice_tag)=='Campaign.Aurelion.Choice.EvacuationPriority'
-        assert tag_name(d.outcome_tag)=='Campaign.Aurelion.Outcome.WestStretchersFirst'
-        if not (self.support.get_priority()==unreal.SovAurelionRescuePriority.WEST_STRETCHERS
-            and self.support.is_west_cache_accessible() and not self.support.is_east_flank_open()
-            and self.support.west_cache_barrier.get_collision_enabled()==unreal.CollisionEnabled.NO_COLLISION
-            and self.support.east_flank_barrier.get_collision_enabled()==unreal.CollisionEnabled.QUERY_AND_PHYSICS):
+        assert tag_name(d.outcome_tag)=='Campaign.Aurelion.Outcome.'+CHOICE+'First'
+        west = CHOICE == 'WestStretchers'
+        opened, closed = (self.support.west_cache_barrier, self.support.east_flank_barrier) if west else (self.support.east_flank_barrier, self.support.west_cache_barrier)
+        if not (self.support.get_priority()==(unreal.SovAurelionRescuePriority.WEST_STRETCHERS if west else unreal.SovAurelionRescuePriority.EAST_WALKERS)
+            and self.support.is_west_cache_accessible()==west and self.support.is_east_flank_open()==(not west)
+            and opened.get_collision_enabled()==unreal.CollisionEnabled.NO_COLLISION
+            and closed.get_collision_enabled()==unreal.CollisionEnabled.QUERY_AND_PHYSICS):
             return False
-        assert str(self.support.get_aftermath_consequence_id())=='M12_WestStretchersPrioritized'
-        self.report['choice']=dict(selected=WEST,rejected_alternative_not_committed=EAST,
+        assert str(self.support.get_aftermath_consequence_id())=='M12_'+CHOICE+'Prioritized'
+        self.report['choice']=dict(selected=SELECTED,rejected_alternative_not_committed=REJECTED,
             receipts=events[-2:],consequence=r.export_text(),native_save_callbacks=relevant,
             support=self.support_state(),cache_used=False,readback='Native successful write callbacks; no reload was requested')
         return True
@@ -495,12 +502,12 @@ class Run(rescue.Run):
                 assert {r['id'] for r in rows if r['required'] and not r['hidden']}==HOSTILES-{'E4.WallRunner'}
                 assert {r['id'] for r in rows if r['required'] and r['hidden']}=={'E4.WallRunner'}
                 assert {r['id'] for r in rows if not r['required']}==PROTECTED and all(r['alive'] for r in rows)
-                assert [e['beat'] for e in events]==FINAL and self.selected_choice(state)==WEST
+                assert [e['beat'] for e in events]==FINAL and self.selected_choice(state)==SELECTED
                 assert not self.e4_entry.is_result_pending() and self.report['choice'] is not None
                 self.report['e4_entry']=dict(attempt=attempt,physical_overlap=True,native_wave=0,roster=rows,
                     player=_path(pawn),companion=_path(self.companion),journal=events,support=self.support_state(),
                     no_sever_or_thermal_journal_receipt=True,phase_b_inactive=True)
-                self.finish(True,'Three complete native scenes, the real Selene handoff and exclusive WestStretchers priority with CP4b/CP5 success led to genuine E4A initial entry. All seven protected people are alive; four enemies are released and WallRunner remains reserved. E4 combat and every later beat remain unqualified.')
+                self.finish(True,'Three complete native scenes, the real Selene handoff and exclusive '+CHOICE+' priority with CP4b/CP5 success led to genuine E4A initial entry. All seven protected people are alive; four enemies are released and WallRunner remains reserved. E4 combat and every later beat remain unqualified.')
         except Exception:
             self.report['error']=traceback.format_exc()
             self.finish(False,self.report['error'])

@@ -5,6 +5,7 @@
 #include "Diagnostics/SovPerformancePolicy.h"
 #include "Engine/World.h"
 #include "HAL/IConsoleManager.h"
+#include "HAL/PlatformMemory.h"
 #include "HAL/PlatformProperties.h"
 #include "Misc/App.h"
 #include "Misc/DateTime.h"
@@ -25,6 +26,29 @@ TAutoConsoleVariable<float> AllowedOverBudgetFraction(TEXT("sov.PerfCapture.Allo
 	TEXT("Share of frames permitted above the target, 0..1."), ECVF_Default);
 TAutoConsoleVariable<float> JudgedPercentile(TEXT("sov.PerfCapture.JudgedPercentile"), 0.95f,
 	TEXT("Percentile the target is judged at, 0..1. 0.95 judges p95."), ECVF_Default);
+TAutoConsoleVariable<float> MemoryToleranceMegabytes(TEXT("sov.PerfCapture.MemoryToleranceMb"), 64.f,
+	TEXT("Per-load rise in used memory, in megabytes, treated as noise when judging the reload trend."), ECVF_Default);
+
+constexpr int32 MaximumLoadMemorySamples = 64;
+constexpr double BytesPerMegabyte = 1024.0 * 1024.0;
+
+/** Process lifetime: each reload creates a new world subsystem, and the trend spans reloads. */
+TArray<double>& LoadMemorySamples()
+{
+	static TArray<double> Samples;
+	return Samples;
+}
+
+const TCHAR* MemoryTrendName(ESovMemoryTrend Trend)
+{
+	switch (Trend)
+	{
+	case ESovMemoryTrend::Insufficient: return TEXT("Insufficient");
+	case ESovMemoryTrend::Stable: return TEXT("Stable");
+	case ESovMemoryTrend::Growing: return TEXT("Growing");
+	}
+	return TEXT("Insufficient");
+}
 
 SovPerformancePolicy::FFrameBudget ConfiguredBudget()
 {
@@ -130,6 +154,12 @@ void USovPerformanceCaptureSubsystem::RecordSampleMilliseconds(float Millisecond
 		return;
 	}
 	++FramesObserved;
+	if (!bLoadMemoryRecorded)
+	{
+		// One steady-state reading per captured world; loading and warm-up spikes are excluded.
+		bLoadMemoryRecorded = true;
+		RecordLoadMemoryBytes(static_cast<double>(FPlatformMemory::GetStats().UsedPhysical));
+	}
 	if (SovPerformancePolicy::DropOldestBeforeAppend(static_cast<std::size_t>(Samples.Num())))
 	{
 		Samples.RemoveAt(0, 1, EAllowShrinking::No);
@@ -145,6 +175,27 @@ void USovPerformanceCaptureSubsystem::ClearSamples()
 	RejectedSamples = 0;
 	DroppedOldest = 0;
 	WarmupDiscarded = 0;
+	bLoadMemoryRecorded = false;
+}
+
+void USovPerformanceCaptureSubsystem::RecordLoadMemoryBytes(double UsedBytes)
+{
+	if (!SovPerformancePolicy::ValidMemoryBytes(UsedBytes))
+	{
+		++RejectedSamples;
+		return;
+	}
+	TArray<double>& Loads = SovPerformanceCapture::LoadMemorySamples();
+	if (Loads.Num() >= SovPerformanceCapture::MaximumLoadMemorySamples)
+	{
+		Loads.RemoveAt(0, 1, EAllowShrinking::No);
+	}
+	Loads.Add(UsedBytes);
+}
+
+void USovPerformanceCaptureSubsystem::ClearLoadMemory()
+{
+	SovPerformanceCapture::LoadMemorySamples().Reset();
 }
 
 FSovPerformanceCaptureSummary USovPerformanceCaptureSubsystem::BuildSummary() const
@@ -161,6 +212,20 @@ FSovPerformanceCaptureSummary USovPerformanceCaptureSubsystem::BuildSummary() co
 	Summary.HardStallMilliseconds = static_cast<float>(Budget.HardStallMilliseconds);
 	Summary.AllowedOverBudgetFraction = static_cast<float>(Budget.AllowedOverBudgetFraction);
 	Summary.JudgedPercentile = static_cast<float>(Budget.JudgedPercentile);
+	const FPlatformMemoryStats Memory = FPlatformMemory::GetStats();
+	Summary.UsedPhysicalMegabytes = static_cast<float>(static_cast<double>(Memory.UsedPhysical) / SovPerformanceCapture::BytesPerMegabyte);
+	Summary.PeakUsedPhysicalMegabytes = static_cast<float>(static_cast<double>(Memory.PeakUsedPhysical) / SovPerformanceCapture::BytesPerMegabyte);
+	const TArray<double>& Loads = SovPerformanceCapture::LoadMemorySamples();
+	for (const double Load : Loads) { Summary.LoadMemoryMegabytes.Add(static_cast<float>(Load / SovPerformanceCapture::BytesPerMegabyte)); }
+	const double ToleranceMegabytes = static_cast<double>(SovPerformanceCapture::MemoryToleranceMegabytes.GetValueOnAnyThread());
+	Summary.MemoryToleranceMegabytes = static_cast<float>(ToleranceMegabytes);
+	switch (SovPerformancePolicy::EvaluateLoadMemory(Loads.GetData(), static_cast<std::size_t>(Loads.Num()),
+		ToleranceMegabytes * SovPerformanceCapture::BytesPerMegabyte))
+	{
+	case SovPerformancePolicy::EMemoryTrend::Stable: Summary.MemoryTrend = ESovMemoryTrend::Stable; break;
+	case SovPerformancePolicy::EMemoryTrend::Growing: Summary.MemoryTrend = ESovMemoryTrend::Growing; break;
+	default: Summary.MemoryTrend = ESovMemoryTrend::Insufficient; break;
+	}
 	Summary.Platform = FString(FPlatformProperties::PlatformName());
 	Summary.BuildConfiguration = LexToString(FApp::GetBuildConfiguration());
 	Summary.bEditorBuild = GIsEditor;
@@ -228,6 +293,16 @@ bool USovPerformanceCaptureSubsystem::ExportLocalReport(FString& OutRelativePath
 	Json += FString::Printf(TEXT("  \"hard_stall_ms\": %.4f,\n"), Summary.HardStallMilliseconds);
 	Json += FString::Printf(TEXT("  \"allowed_over_fraction\": %.4f,\n"), Summary.AllowedOverBudgetFraction);
 	Json += FString::Printf(TEXT("  \"judged_percentile\": %.4f,\n"), Summary.JudgedPercentile);
+	Json += FString::Printf(TEXT("  \"used_physical_mb\": %.1f,\n"), Summary.UsedPhysicalMegabytes);
+	Json += FString::Printf(TEXT("  \"peak_used_physical_mb\": %.1f,\n"), Summary.PeakUsedPhysicalMegabytes);
+	Json += FString::Printf(TEXT("  \"memory_trend\": \"%s\",\n"), SovPerformanceCapture::MemoryTrendName(Summary.MemoryTrend));
+	Json += FString::Printf(TEXT("  \"memory_tolerance_mb\": %.1f,\n"), Summary.MemoryToleranceMegabytes);
+	Json += TEXT("  \"load_memory_mb\": [");
+	for (int32 Index = 0; Index < Summary.LoadMemoryMegabytes.Num(); ++Index)
+	{
+		Json += FString::Printf(TEXT("%s%.1f"), Index == 0 ? TEXT("") : TEXT(", "), Summary.LoadMemoryMegabytes[Index]);
+	}
+	Json += TEXT("],\n");
 	// Stated in the artefact itself so a desktop capture cannot be quoted as a console result.
 	Json += TEXT("  \"scope\": \"Local capture on the recorded platform only. ");
 	Json += TEXT("Not a console or certification capture.\"\n");

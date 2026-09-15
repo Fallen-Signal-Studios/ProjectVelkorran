@@ -826,4 +826,31 @@ bool FSovApprovedDamageBudgetHealingTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("The approved nonlethal transaction cannot become a kill"), Target->LastDamageResult.bFatal);
     return true;
 }
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovWeakPointOwnerBreakGateTest,
+	"ProjectVelkorran.Campaign.WeakPoint.OwnerBreakGate", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovWeakPointOwnerBreakGateTest::RunTest(const FString& Parameters)
+{
+	FCombatRoutingWorld Fixture;
+	auto* Source = Fixture.Character(100.f, 0);
+	auto* Target = Fixture.Character(0.f, 1);
+	if (!Source || !Target) { AddError(TEXT("Fixture actors failed")); return false; }
+	auto* ASC = Target->GetNarrativeAbilitySystemComponent();
+	auto* WeakPoints = NewObject<USovWeakPointGatedTestComponent>(Target);
+	Target->AddInstanceComponent(WeakPoints);
+	WeakPoints->RegisterComponent();
+	WeakPoints->InitializeWithAbilitySystem(ASC);
+	WeakPoints->Observe();
+	Source->TestEcho->RestoreEchoFromCheckpoint(0.f);
+	Attack(Source, Target, 5.f, 0.f, false, TEXT("weapon"));
+	TestFalse(TEXT("A refused owner rule leaves the zone intact"), WeakPoints->IsWeakPointBroken(TEXT("Weapon")));
+	TestEqual(TEXT("A refused break publishes no detailed break"), WeakPoints->DetailedBreakCount, 0);
+	TestFalse(TEXT("A refused break applies no consequence"), ASC->HasMatchingGameplayTag(FSovGameplayTags::Get().State_Status_DeviceDisabled));
+	TestTrue(TEXT("Authored failure is not an owner-gated damage break"), WeakPoints->BreakWeakPointWithoutReward(TEXT("Sensor")));
+	WeakPoints->bAllowBreak = true;
+	Attack(Source, Target, 5.f, 0.f, false, TEXT("weapon"));
+	TestTrue(TEXT("The same ordinary hit breaks once the owner allows it"), WeakPoints->IsWeakPointBroken(TEXT("Weapon")));
+	TestEqual(TEXT("The allowed break publishes one detailed break"), WeakPoints->DetailedBreakCount, 1);
+	return true;
+}
+
 #endif

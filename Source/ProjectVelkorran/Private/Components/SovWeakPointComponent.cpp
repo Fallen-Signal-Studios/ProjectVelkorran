@@ -559,6 +559,8 @@ ESovWeakPointHitResolution USovWeakPointComponent::ResolveWeakPointHit(
 	if (DamageResult.AppliedShieldDamage + DamageResult.AppliedHealthDamage + KINDA_SMALL_NUMBER
 		< FMath::Max(MinimumAppliedDamage, 0.0f))
 		return DamageResult.bPeriodicDamage ? ESovWeakPointHitResolution::NotWeakPoint : ESovWeakPointHitResolution::AcceptedUnbrokenHit;
+	if (!CanBreakWeakPoint(*MatchingZone, DamageResult))
+		return DamageResult.bPeriodicDamage ? ESovWeakPointHitResolution::NotWeakPoint : ESovWeakPointHitResolution::AcceptedUnbrokenHit;
 	FPendingWeakPointBreak& PendingBreak = PendingBreaks.AddDefaulted_GetRef();
 	PendingBreak.TransactionId = DamageResult.TransactionId;
 	PendingBreak.SourceActor = DamageResult.SourceActor.Get();

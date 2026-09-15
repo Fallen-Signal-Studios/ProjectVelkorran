@@ -337,6 +337,11 @@ bool USovAurelionThermalFractureComponent::HasCompletedFracture(const ASovEncoun
     return Receipt.IsComplete() && Director == BoundDirector.Get() && Receipt.AttemptId == AttemptId
         && IsContextCurrent(Context, false);
 }
+bool USovAurelionThermalFractureComponent::HasCompletedCurrentFracture() const
+{
+    const ASovEncounterDirector* Director = BoundDirector.Get();
+    return Director && HasCompletedFracture(Director, Director->GetAttemptId());
+}
 void USovAurelionThermalFractureComponent::HandleEncounterState(ESovEncounterState Previous, ESovEncounterState Current)
 {
     if (!BoundDirector.IsValid() || BoundDirector->GetEncounterState() != Current) { return; }

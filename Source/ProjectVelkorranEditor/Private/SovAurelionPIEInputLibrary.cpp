@@ -7,12 +7,14 @@
 #include "Engine/GameViewportClient.h"
 #include "Engine/LocalPlayer.h"
 #include "Engine/World.h"
+#include "Framework/Application/SlateApplication.h"
 #include "GameFramework/PlayerInput.h"
 #include "GenericPlatform/GenericPlatformInputDeviceMapper.h"
 #include "InputCoreTypes.h"
 #include "InputKeyEventArgs.h"
 #include "Misc/App.h"
 #include "UObject/Package.h"
+#include "Widgets/SViewport.h"
 
 FSovAurelionPIEMouseInputResult USovAurelionPIEInputLibrary::InjectAurelionPIEMouseDelta(
     UWorld* World, float DeltaX, float DeltaY)
@@ -86,5 +88,58 @@ FSovAurelionPIEMouseInputResult USovAurelionPIEInputLibrary::InjectAurelionPIEMo
     Result.Report = Result.bRouted
         ? TEXT("Synthetic mouse samples routed through ordinary InputKey. Observe the following input frame and actual wheel selection; analog consumed flags may be false.")
         : TEXT("Input ownership changed after MouseY; the requested pair cannot be qualified.");
+    return Result;
+}
+
+FSovAurelionPIEPointerInputResult USovAurelionPIEInputLibrary::InjectAurelionPIELeftClick(UWorld* World)
+{
+    FSovAurelionPIEPointerInputResult Result;
+    if (!IsInGameThread() || !GEditor || !GEngine || !FSlateApplication::IsInitialized() || !IsValid(World)
+        || World->WorldType != EWorldType::PIE || GEditor->PlayWorld != World || GEditor->IsSimulateInEditorInProgress())
+    { Result.Report = TEXT("Pointer input requires the current real Aurelion PIE world and Slate on the game thread."); return Result; }
+    const FString Package = UWorld::RemovePIEPrefix(World->GetOutermost()->GetName());
+    if (Package != TEXT("/Game/Aurelion/Maps/L_Aurelion_M12") && Package != TEXT("/Game/Aurelion/Maps/L_Aurelion_M13"))
+    { Result.Report = TEXT("Pointer input is restricted to the exact M12 and M13 Aurelion wrappers."); return Result; }
+    int32 PIEWorldCount = 0;
+    for (const FWorldContext& Context : GEngine->GetWorldContexts())
+    { if (Context.WorldType == EWorldType::PIE && IsValid(Context.World())) { ++PIEWorldCount; } }
+    UGameInstance* const GameInstance = World->GetGameInstance();
+    if (PIEWorldCount != 1 || !IsValid(GameInstance) || GameInstance->GetNumLocalPlayers() != 1)
+    { Result.Report = TEXT("Requires one PIE world with exactly one local player."); return Result; }
+    ULocalPlayer* const LocalPlayer = GameInstance->GetLocalPlayers()[0];
+    ASovPlayerController* const Controller = IsValid(LocalPlayer)
+        ? Cast<ASovPlayerController>(LocalPlayer->GetPlayerController(World)) : nullptr;
+    UGameViewportClient* const ViewportClient = IsValid(LocalPlayer) ? LocalPlayer->ViewportClient.Get() : nullptr;
+    const TSharedPtr<SViewport> ViewportWidget = IsValid(ViewportClient) ? ViewportClient->GetGameViewportWidget() : nullptr;
+    if (!IsValid(Controller) || Controller->IsActorBeingDestroyed() || !Controller->IsLocalController()
+        || !IsValid(ViewportClient) || ViewportClient->GetWorld() != World || !ViewportWidget.IsValid())
+    { Result.Report = TEXT("Requires the sole current local Sovereign controller and its PIE viewport widget."); return Result; }
+    const FGeometry& Geometry = ViewportWidget->GetTickSpaceGeometry();
+    const FVector2D Size(Geometry.GetLocalSize());
+    if (Size.X < 2. || Size.Y < 2.)
+    { Result.Report = TEXT("The PIE viewport has no arranged screen geometry."); return Result; }
+    Result.ScreenPosition = FVector2D(Geometry.LocalToAbsolute(Size * .5));
+    const auto StillCurrent = [&]()
+    {
+        return IsValid(World) && GEditor && GEditor->PlayWorld == World && IsValid(LocalPlayer)
+            && LocalPlayer->GetPlayerController(World) == Controller && IsValid(Controller) && !Controller->IsActorBeingDestroyed()
+            && LocalPlayer->ViewportClient == ViewportClient && ViewportClient->GetGameViewportWidget() == ViewportWidget;
+    };
+    FSlateApplication& Slate = FSlateApplication::Get();
+    TSet<FKey> Pressed; Pressed.Add(EKeys::LeftMouseButton);
+    const FPointerEvent Press(FSlateApplicationBase::CursorPointerIndex, Result.ScreenPosition, Result.ScreenPosition,
+        Pressed, EKeys::LeftMouseButton, 0.f, Slate.GetModifierKeys());
+    Result.bPressHandled = Slate.ProcessMouseButtonDownEvent(nullptr, Press);
+    if (!StillCurrent())
+    { Result.Report = TEXT("Viewport ownership changed after press; release was still sent to avoid a held button.");
+      Slate.ProcessMouseButtonUpEvent(FPointerEvent(FSlateApplicationBase::CursorPointerIndex, Result.ScreenPosition,
+          Result.ScreenPosition, TSet<FKey>(), EKeys::LeftMouseButton, 0.f, Slate.GetModifierKeys())); return Result; }
+    const FPointerEvent Release(FSlateApplicationBase::CursorPointerIndex, Result.ScreenPosition, Result.ScreenPosition,
+        TSet<FKey>(), EKeys::LeftMouseButton, 0.f, Slate.GetModifierKeys());
+    Result.bReleaseHandled = Slate.ProcessMouseButtonUpEvent(Release);
+    Result.bRouted = StillCurrent();
+    Result.Report = Result.bRouted
+        ? TEXT("Left press and release routed through Slate at the PIE viewport centre. Observe the actual UI result; handled flags depend on the receiving widget.")
+        : TEXT("Viewport ownership changed after release; the click cannot be qualified.");
     return Result;
 }

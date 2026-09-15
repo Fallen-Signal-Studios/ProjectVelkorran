@@ -22,6 +22,9 @@ RAW_MOUSE_MAGNITUDE = 120.
 DIRECTIONS = tuple((math.cos(i*math.pi/4.)*RAW_MOUSE_MAGNITUDE, math.sin(i*math.pi/4.)*RAW_MOUSE_MAGNITUDE) for i in range(8))
 STEP_CAP_SECONDS = 2.
 DIAGNOSTIC_INTERVAL_SECONDS = .25
+# Main-hand selection needs one real click; allow a focus click plus bounded retries.
+MAINHAND_CLICK_RETRY_SECONDS = .75
+MAINHAND_CLICK_LIMIT = 6
 
 
 def _path(obj):
@@ -101,7 +104,9 @@ class Selector:
                            diagnostic_interval_seconds=DIAGNOSTIC_INTERVAL_SECONDS,
                            direction_step_cap_seconds=STEP_CAP_SECONDS,
                            raw_mouse_magnitude=RAW_MOUSE_MAGNITUDE,
-                           manual_mainhand=self.manual_mainhand, maximum_seconds=self.maximum_seconds)
+                           manual_mainhand=self.manual_mainhand, maximum_seconds=self.maximum_seconds,
+                           mainhand_clicks=[])
+        self.last_click_frame = None
 
     def _finish(self, passed, reason):
         self.done = True
@@ -295,12 +300,23 @@ class Selector:
             if sample['selected_class'] == self.weapon_class:
                 if self.manual_mainhand and not sample['manual_mainhand_ready']:
                     # CommonUI's real EquipWeaponMainhand click supplies this slot.
-                    # Keep normal T held; do not call the handler or set UI fields.
+                    # Keep normal T held; send an ordinary Slate click and re-observe.
+                    # The first click can only focus the viewport, so retry on a later frame.
                     self.correct_since = None
                     self.report.update(phase='await_manual_mainhand',
-                        operator_instruction='Click the actual main-hand selection while Axiom is highlighted; the wheel remains held',
+                        operator_instruction='Automated ordinary Slate left click; no widget handler or equipment setter is called',
                         manual_mainhand_observation={key:sample[key] for key in
                             ('mainhand_slot','mainhand_item','mainhand_class','mainhand_current_owner','offhand_slot','manual_mainhand_ready')})
+                    clicks = self.report['mainhand_clicks']
+                    if (self.last_click_frame != sample['frame'] and len(clicks) < MAINHAND_CLICK_LIMIT
+                            and (not clicks or elapsed-clicks[-1]['elapsed'] >= MAINHAND_CLICK_RETRY_SECONDS)):
+                        result = unreal.SovAurelionPIEInputLibrary.inject_aurelion_pie_left_click(world)
+                        self.last_click_frame = sample['frame']
+                        clicks.append(dict(elapsed=round(elapsed, 3), frame=sample['frame'], routed=bool(result.routed),
+                            press_handled=bool(result.press_handled), release_handled=bool(result.release_handled),
+                            screen_position=[float(result.screen_position.x), float(result.screen_position.y)],
+                            report=result.report))
+                        assert result.routed, 'Ordinary main-hand click could not be routed: '+result.report
                     return True, self.report
                 if self.manual_mainhand:
                     self.report['manual_mainhand_verified'] = True

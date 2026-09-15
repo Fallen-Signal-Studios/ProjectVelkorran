@@ -210,6 +210,10 @@ bool FSovAurelionRoleComponentsTest::RunTest(const FString& Parameters)
     TestNotNull(TEXT("Thermal elite retains actual native Poise lifecycle"), Elite->GetElitePoise());
     TestFalse(TEXT("An unbound elite never fabricates a fracture receipt"), Elite->GetThermalFracture()->GetFractureReceipt().IsComplete());
     TestFalse(TEXT("Empty core matcher requires real mesh authoring"), Elite->GetCoreWeakPoints()->HasValidWeakPointConfiguration());
+    FSovWeakPointZone CoreZone; CoreZone.ZoneId = TEXT("Core");
+    TestFalse(TEXT("Ordinary damage cannot break the Core before this attempt's Thermal Fracture"),
+        Elite->GetCoreWeakPoints()->CanBreakWeakPoint(CoreZone, FSovDamageResult()));
+    TestFalse(TEXT("An unbound elite reports no current fracture"), Elite->GetThermalFracture()->HasCompletedCurrentFracture());
     TArray<USovCommandLinkComponent*> Links; Weaver->GetComponents(Links);
     TestEqual(TEXT("Weaver owns exactly two native link components"), Links.Num(), 2);
     TestTrue(TEXT("Two anchors are distinct native subobjects"), Weaver->GetAnchorA() != Weaver->GetAnchorB());

@@ -323,5 +323,24 @@ int main()
 	}
 
 	std::cout << Checks << " performance capture policy checks passed\n";
+	// Load memory trend: three consecutive rises beyond tolerance grow; noise and interruptions do not.
+	{
+		const double Megabyte = 1024.0 * 1024.0;
+		const double Steady[] = {3000 * Megabyte, 3010 * Megabyte, 2995 * Megabyte, 3020 * Megabyte};
+		Check(EvaluateLoadMemory(Steady, 4, 64 * Megabyte) == EMemoryTrend::Stable);
+		const double Rising[] = {3000 * Megabyte, 3100 * Megabyte, 3200 * Megabyte};
+		Check(EvaluateLoadMemory(Rising, 3, 64 * Megabyte) == EMemoryTrend::Growing);
+		const double Interrupted[] = {3000 * Megabyte, 3100 * Megabyte, 3050 * Megabyte, 3150 * Megabyte};
+		Check(EvaluateLoadMemory(Interrupted, 4, 64 * Megabyte) == EMemoryTrend::Stable);
+		Check(EvaluateLoadMemory(Rising, 2, 64 * Megabyte) == EMemoryTrend::Insufficient);
+		const double Corrupt[] = {3000 * Megabyte, NaNValue, 3200 * Megabyte};
+		Check(EvaluateLoadMemory(Corrupt, 3, 64 * Megabyte) == EMemoryTrend::Insufficient);
+		const double Zero[] = {3000 * Megabyte, 0.0, 3200 * Megabyte};
+		Check(EvaluateLoadMemory(Zero, 3, 64 * Megabyte) == EMemoryTrend::Insufficient);
+		Check(EvaluateLoadMemory(Rising, 3, -1.0) == EMemoryTrend::Insufficient);
+		Check(EvaluateLoadMemory(Rising, 3, NaNValue) == EMemoryTrend::Insufficient);
+		Check(EvaluateLoadMemory(nullptr, 3, 64 * Megabyte) == EMemoryTrend::Insufficient);
+	}
+
 	return 0;
 }

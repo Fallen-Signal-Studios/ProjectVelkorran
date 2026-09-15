@@ -181,6 +181,56 @@ inline bool ReportSafeCharacter(char Character)
 	return bLower || bUpper || bDigit || Character == '.' || Character == '_' || Character == '-';
 }
 
+/** Mission loads needed before memory can be judged: TDD 18.8's three consecutive reloads. */
+constexpr std::size_t MinimumLoadsForMemoryTrend = 3;
+/** Beyond this a reading is corrupt rather than a process footprint. */
+constexpr double ImplausibleMemoryBytes = 1.0e15;
+
+enum class EMemoryTrend
+{
+	/** Too few loads or an unusable reading. Deliberately not Stable. */
+	Insufficient,
+	Stable,
+	Growing,
+};
+
+/** True when a used-memory reading is finite, positive and plausible. Zero is a failed query. */
+inline bool ValidMemoryBytes(double Value)
+{
+	const bool bIsNaN = !(Value == Value);
+	return !bIsNaN && Value > 0.0 && Value < ImplausibleMemoryBytes;
+}
+
+/**
+ * Judge used memory recorded once per completed mission load, in load order. Growing when any three
+ * consecutive loads each rise by more than ToleranceBytes over the load before; a fall or a rise within
+ * tolerance breaks the run. Invalid input, an unusable tolerance or fewer than three loads is
+ * Insufficient, never Stable.
+ */
+inline EMemoryTrend EvaluateLoadMemory(const double* Chronological, std::size_t Count, double ToleranceBytes)
+{
+	const bool bToleranceIsNaN = !(ToleranceBytes == ToleranceBytes);
+	if (!Chronological || Count < MinimumLoadsForMemoryTrend || bToleranceIsNaN
+		|| !(ToleranceBytes >= 0.0) || !(ToleranceBytes < ImplausibleMemoryBytes)) { return EMemoryTrend::Insufficient; }
+	for (std::size_t Index = 0; Index < Count; ++Index)
+	{
+		if (!ValidMemoryBytes(Chronological[Index])) { return EMemoryTrend::Insufficient; }
+	}
+	std::size_t Rises = 0;
+	for (std::size_t Index = 1; Index < Count; ++Index)
+	{
+		if (Chronological[Index] > Chronological[Index - 1] + ToleranceBytes)
+		{
+			if (++Rises >= MinimumLoadsForMemoryTrend - 1) { return EMemoryTrend::Growing; }
+		}
+		else
+		{
+			Rises = 0;
+		}
+	}
+	return EMemoryTrend::Stable;
+}
+
 /** A verdict that qualifies the samples. Insufficient and InvalidBudget deliberately do not. */
 inline bool QualifiesCapture(EVerdict Verdict)
 {
