@@ -126,6 +126,21 @@ collects the reports, and `Play-Aurelion.ps1 -PerfCapture` arms capture for a pl
 unattended capture covers startup, streaming, steady play and reload memory; it cannot drive combat, so
 the worst-case combat percentile needs a played capture or a packaged autoplay path.
 
+## Crash fix confirmed; E4B driver defects
+
+`EastObserverRoute-20260915-145036-f81b59b4` passed entry through E4A with no editor crash, so the observer
+lifetime change removed the E2-cleanup crash. It also exposed that dropping every delegate wrapper removes
+the Python binding itself: only six damage receipts were recorded. The observer now keeps each wrapper
+while its participant lives and unbinds it as soon as the participant stops being alive.
+
+E4B died in 30 s. The native frost rule first rejected the setup because Selene was 129 cm from the
+clean mark but did not satisfy its full condition (on the mark, with sight of the elite, Tarrik in support
+range); the driver's partner check used distance alone. On the retry a WallRunner's interactable held
+Tarrik's focus in front of the frost control ("The interaction is obstructed") and the driver aimed in
+place while the Weaver, elite and WallRunner took him from 80 to 2 health. Both are driver defects: a
+partner-position rejection now re-issues the ordinary partner move, and focus held by another interactable
+for three seconds moves Tarrik to an alternate standing point, bounded to four repositions.
+
 ## Score
 
 Unchanged at **63.75** until the route, soak and captures above produce passing evidence.
