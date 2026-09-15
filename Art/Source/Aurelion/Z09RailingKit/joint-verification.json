@@ -1,0 +1,8 @@
+{
+  "status": "passed",
+  "continuous_balusters": 12,
+  "samples_per_baluster": 103,
+  "seated_register_legs": 8,
+  "clear_sightline_samples": 24,
+  "qualification": "Exported visual mesh rays only; no collision is authored and native barriers remain authoritative."
+}

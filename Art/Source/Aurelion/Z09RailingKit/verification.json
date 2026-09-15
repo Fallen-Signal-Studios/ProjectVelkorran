@@ -1,0 +1,15 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z09Guardrail",
+      "dimensions_m": [
+        4.75,
+        0.2199999988079071,
+        1.2999999523162842
+      ],
+      "triangles": 18500
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}

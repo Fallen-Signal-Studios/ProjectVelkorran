@@ -1,0 +1,23 @@
+{
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z09Guardrail",
+      "triangles": 18500,
+      "nominal_dimensions_m": [
+        4.75,
+        0.2199999988079071,
+        1.2999999523162842
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; existing native approach barriers remain authoritative",
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    }
+  ]
+}

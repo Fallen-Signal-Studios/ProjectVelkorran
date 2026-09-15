@@ -1,0 +1,43 @@
+{
+  "status": "saved",
+  "settings": {
+    "status": "passed",
+    "instances": [
+      {
+        "index": 0,
+        "original_indices": [
+          0,
+          1
+        ],
+        "bounds_error_cm": 3.0699891794938594e-05
+      },
+      {
+        "index": 1,
+        "original_indices": [
+          2,
+          3
+        ],
+        "bounds_error_cm": 3.0699891794938594e-05
+      },
+      {
+        "index": 2,
+        "original_indices": [
+          4,
+          5
+        ],
+        "bounds_error_cm": 3.0699891794938594e-05
+      },
+      {
+        "index": 3,
+        "original_indices": [
+          6,
+          7
+        ],
+        "bounds_error_cm": 3.0699891794938594e-05
+      }
+    ],
+    "actor_count": 3140,
+    "qualification": "All 8 former doubled vendor envelopes covered by 4 unit-scale guardrails; visual-only component collision and native approach barriers unchanged. Live traversal and final visual acceptance remain open."
+  },
+  "preserved_actor_states": 3140
+}
