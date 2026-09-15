@@ -1,0 +1,24 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z03RouteRegister",
+      "dimensions_m": [
+        0.11999999731779099,
+        1.0,
+        0.007499999832361937
+      ],
+      "triangles": 2820
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03DestinationPlaque",
+      "dimensions_m": [
+        1.600000023841858,
+        0.08699999749660492,
+        0.6499999761581421
+      ],
+      "triangles": 1692
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}

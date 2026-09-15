@@ -1,0 +1,397 @@
+{
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z03RouteRegister",
+      "triangles": 2820,
+      "nominal_dimensions_m": [
+        0.12,
+        1,
+        0.0075
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_UplightLens",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; visual wayfinding only",
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03DestinationPlaque",
+      "triangles": 1692,
+      "nominal_dimensions_m": [
+        1.6,
+        0.087,
+        0.65
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; visual wayfinding only",
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    }
+  ],
+  "placements": [
+    {
+      "location_cm": [
+        7200,
+        -19550,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -19450,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -19350,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -19250,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -19150,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -19050,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -18950,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -18850,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -18750,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -18650,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -18550,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -18450,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -18350,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -18250,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -18150,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -18050,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -17950,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -17850,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -17750,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -17650,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -17550,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -17450,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -17350,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -17250,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -17150,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -17050,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -16950,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -16850,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -16750,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -16650,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -16550,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -16450,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -16350,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -16250,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -16150,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -16050,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -15950,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -15850,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -15750,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -15650,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -15550,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -15450,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -15350,
+        -0.1
+      ],
+      "yaw": 0
+    },
+    {
+      "location_cm": [
+        7200,
+        -15250,
+        -0.1
+      ],
+      "yaw": 0
+    }
+  ]
+}

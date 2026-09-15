@@ -26,6 +26,8 @@ def check_z03_ceiling(actors):
     for row in room['components']:
         if not row['actor'].startswith('Z03_'):continue
         actor=labels[row['actor']];component=actor.get_component_by_class(unreal.StaticMeshComponent)
-        assert component.static_mesh.get_path_name()==row['mesh'] and str(component.get_collision_enabled())==row['collision'] and actor.get_actor_enable_collision()==row['actor_collision']
+        retired_names={'Z03__ArtPylon_W','Z03__ArtPylon_E','Z03__UpperSpan_01','Z03__UpperSpan_02','Z03__GoldChannel_01','Z03__GoldChannel_02'}
+        retired=row['actor'] in retired_names and component.get_editor_property('hidden_in_game') and component.get_collision_enabled()==unreal.CollisionEnabled.NO_COLLISION
+        assert component.static_mesh.get_path_name()==row['mesh'] and (retired or str(component.get_collision_enabled())==row['collision']) and actor.get_actor_enable_collision()==row['actor_collision']
     assert len(actors)==3140
     return dict(coffers=72,covered_area_m2=1056,minimum_visual_height_cm=600,preserved_room_marks=preserved,qualification='Saved full ceiling coverage and unchanged native room/scanner staging; live scanner traversal and performance remain unqualified.')

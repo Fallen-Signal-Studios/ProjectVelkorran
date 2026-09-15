@@ -1089,3 +1089,6 @@ See Docs/AurelionZ03Rails-2026-09-14.md. Replaced all fifty vendor rail instance
 
 
 Z03 floor pass: 91 vendor instances replaced by 85 custom room, bridge, ramp and landing placements. Four Blender modules, 36 clean-FBX walking-plane probes and 108 native support contacts passed. Owned floor stone finish preserves shared materials. Saved Z03FloorsSaved-20260914-215018-7298b8a4; fresh Z03FloorsFresh-20260914-215343-ebeb675e: 77 passing reports, 3140 actors, clean map, no Python errors. See AurelionZ03Floors-2026-09-14.md. Live route, final lighting, Chaos and 90% alignment remain open; supported slice estimate 63.75%.
+
+
+Z03 wayfinding pass: 44 custom floor light registers, one mounted destination plaque, five setup labels hidden, both native scanner labels retained. Retired six obsolete decorations with explicit NoCollision profiles after fresh reload exposed restored collision from their prior profiles. Fresh Z03WayfindingFreshVerified-20260914-221949-9a09cd84: 78 passing reports, 3140 actors, clean map, no Python errors; 44 floor contacts and 194 cm minimum cover clearance. See AurelionZ03Wayfinding-2026-09-14.md. Live guidance, scanner hardware, full map, cast likeness, Chaos and 90% remain open; supported slice estimate 63.75%.
