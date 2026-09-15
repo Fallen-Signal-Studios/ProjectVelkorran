@@ -1076,3 +1076,8 @@ Z03CeilingLightFresh-20260914-200845-591d53af passed all 73 architecture receipt
 ## Z03 full wall replacement - 2026-09-14
 
 See Docs/AurelionZ03Walls-2026-09-14.md. Replaced 68 vendor panels with 34 full-size custom masonry sections on the original actor, using three modular Nanite meshes. Concealed backing closes the coffer edge; the 600 x 450 cm doorway and native collision remain intact. Saved and inspected three views. Z03WallsFresh-20260914-204845-81683cda completed with 74 passing static architecture reports, 3140 actors and a clean map. Live traversal, complete room art, performance and 90 percent alignment remain unqualified; the supported slice estimate stays 63.75 percent.
+
+
+## Z03 piers and rib cover - 2026-09-14
+
+See Docs/AurelionZ03Ribs-2026-09-14.md. Replaced the full 51-column batch with six custom piers and three complete cover assemblies, with the original nine visual envelopes and native collision retained. Z03RibsFresh-20260914-210257-61fa778e completed with 75 passing static architecture reports, twelve native cover contacts, 3140 actors and a clean map. Saved approach, middle and close views were inspected. Live scanner concealment, complete room art, Chaos destruction and 90 percent alignment remain unqualified; supported slice estimate stays 63.75 percent.

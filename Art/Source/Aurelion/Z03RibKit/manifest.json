@@ -1,0 +1,125 @@
+{
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z03Pier",
+      "triangles": 21064,
+      "nominal_dimensions_m": [
+        1.2,
+        1.0,
+        6.0
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; measured native Z03 rib collision remains authoritative",
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03RibCover",
+      "triangles": 17860,
+      "nominal_dimensions_m": [
+        4,
+        2,
+        3
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; measured native Z03 rib collision remains authoritative",
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    }
+  ],
+  "placements": [
+    {
+      "asset": "SM_Aurelion_KIT_Z03Pier",
+      "location_cm": [
+        5975,
+        -18600,
+        0
+      ],
+      "yaw": -90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03Pier",
+      "location_cm": [
+        8025,
+        -18600,
+        0
+      ],
+      "yaw": 90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03Pier",
+      "location_cm": [
+        5975,
+        -17400,
+        0
+      ],
+      "yaw": -90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03Pier",
+      "location_cm": [
+        8025,
+        -17400,
+        0
+      ],
+      "yaw": 90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03Pier",
+      "location_cm": [
+        5975,
+        -16200,
+        0
+      ],
+      "yaw": -90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03Pier",
+      "location_cm": [
+        8025,
+        -16200,
+        0
+      ],
+      "yaw": 90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03RibCover",
+      "location_cm": [
+        6400,
+        -18600,
+        0
+      ],
+      "yaw": 90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03RibCover",
+      "location_cm": [
+        6900,
+        -17400,
+        0
+      ],
+      "yaw": 90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03RibCover",
+      "location_cm": [
+        6400,
+        -16300,
+        0
+      ],
+      "yaw": 90
+    }
+  ]
+}
