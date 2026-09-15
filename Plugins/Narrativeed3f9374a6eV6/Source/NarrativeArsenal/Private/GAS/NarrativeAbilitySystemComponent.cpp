@@ -21,6 +21,7 @@
 #include "NarrativeLogChannels.h"
 #include "GAS/AbilityConfiguration.h"
 #include "Sovereign/SovGameplayTags.h"
+#include "Sovereign/SovEnvironmentDamage.h"
 
 UNarrativeAbilitySystemComponent::UNarrativeAbilitySystemComponent(const FObjectInitializer& ObjectInitializer)
 {
@@ -835,6 +836,13 @@ TArray<FActiveGameplayEffectHandle> UNarrativeAbilitySystemComponent::ApplyGamep
 		{
 			if (Data.IsValid())
 			{
+				// Scenery has no ability system to receive this spec. Only authored damageable
+				// owners are admitted, with the spec's authored base damage.
+				if (Data->HasHitResult())
+				{
+					SovEnvironmentDamage::ApplyPoint(GetAvatarActor(), *Data->GetHitResult(),
+						SpecHandle.Data->GetSetByCallerMagnitude(FNarrativeGameplayTags::Get().SetByCaller_Damage, false, 0.f));
+				}
 				EffectHandles.Append(Data->ApplyGameplayEffectSpec(*SpecHandle.Data.Get()));
 			}
 			else

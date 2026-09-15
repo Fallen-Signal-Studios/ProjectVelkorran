@@ -2,6 +2,7 @@
 #include "Projectiles/SovCinderRequiemLine.h"
 #include "Combat/SovCinderLineMath.h"
 #include "Combat/SovTarrikPayloadSupport.h"
+#include "Sovereign/SovEnvironmentDamage.h"
 #include "Components/SceneComponent.h"
 #include "Engine/OverlapResult.h"
 #include "Net/UnrealNetwork.h"
@@ -78,6 +79,14 @@ void ASovCinderRequiemLine::DetonateNext()
 		{
 			SovTarrikPayload::ApplyBurn(Source, Target, Context, BurnEffectClass, EchoAbilityTag, BurnDamagePerTick, BurnSeconds);
 		}
+	}
+	// Scenery follows the character packets and, like them, receives one packet per line.
+	if (!IsActorBeingDestroyed() && SourceActor.IsValid())
+	{
+		for (const TWeakObjectPtr<AActor>& Damaged : DamagedScenery) { if (Damaged.IsValid()) { Query.AddIgnoredActor(Damaged.Get()); } }
+		TArray<AActor*> NewlyDamaged;
+		SovEnvironmentDamage::ApplyRadial(InstigatorActor, Origin, BlastRadius, BaseDamage, 1.f, true, Query, &NewlyDamaged);
+		for (AActor* Actor : NewlyDamaged) { DamagedScenery.Add(Actor); }
 	}
 	LastDetonatedNode = Node;
 	ForceNetUpdate();

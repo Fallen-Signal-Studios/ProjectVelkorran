@@ -37,6 +37,7 @@ private:
 	UPROPERTY() FGameplayEffectContextHandle SourceContext;
 	FGameplayTag EchoAbilityTag;
 	TSet<TWeakObjectPtr<UAbilitySystemComponent>> DamagedTargets;
+	TSet<TWeakObjectPtr<AActor>> DamagedScenery;
 	FTimerHandle DetonationTimer;
 	float DetonationInterval = 0.035f;
 	float BaseDamage = 60.f;

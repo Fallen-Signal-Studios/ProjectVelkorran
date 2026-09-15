@@ -1,5 +1,7 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Tests/SovSelenePayloadTestFixtures.h"
+#include "World/SovDestructibleCover.h"
+#include "GeometryCollection/GeometryCollectionObject.h"
 #include "Tests/SovAxiomRuntimeTestFixtures.h"
 #include "Tests/SovRuntimeActorTestFixtures.h"
 #include "Combat/SovSelenePayload.h"
@@ -357,6 +359,29 @@ bool FSovNativeAndGenericStatusOwnershipTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Ordinary damage still reaches the generic status listener"), Status->HasActiveStatus(Tags.Status_Apply_Chill));
 	ASC->AddLooseGameplayTag(Tags.Status_Immunity_All);
 	TestFalse(TEXT("Explicit all-status immunity rejects native control receipts"), SovSelenePayload::Damage(Ctx, Target, nullptr, 1.0f, 0.0f, 1.0f, true));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovSeleneWakeDestructibleCoverTest, "ProjectVelkorran.World.Destruction.SeleneWakeBreaksCoverWithoutPassing",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovSeleneWakeDestructibleCoverTest::RunTest(const FString& Parameters)
+{
+	SovSelenePayloadTests::FSeleneTestWorld Fixture;
+	auto* Source = Fixture.Character(FVector::ZeroVector, 0);
+	auto* Hidden = Fixture.Character(FVector(1000.0f, 0.0f, 0.0f));
+	FActorSpawnParameters Spawn; Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	auto* Cover = Fixture.World->SpawnActor<ASovDestructibleCover>(ASovDestructibleCover::StaticClass(), FVector(750.0f, 0.0f, 0.0f), FRotator::ZeroRotator, Spawn);
+	if (!Source || !Hidden || !Cover) { AddError(TEXT("Fixture creation failed")); return false; }
+	Cover->Obstruction->SetBoxExtent(FVector(25.0f, 600.0f, 200.0f)); Cover->PlacementGuid = FGuid(0x5E1E, 1, 2, 3);
+	Cover->FracturedAsset = NewObject<UGeometryCollection>(Cover); Cover->bDestructionEnabled = true; Cover->RemainingHealth = 40.0f;
+	FSovSeleneProjectileParameters Data;
+	Data.Context = SovSelenePayloadTests::Context(Source, FSovGameplayTags::Get().Ability_Echo_Selene_VeritysWake);
+	Data.Mode = ESovSeleneProjectileMode::Wake; Data.Radius = 250.0f; Data.Damage = 50.0f; Data.Speed = 2200.0f;
+	auto* Wave = ASovSeleneCombatProjectile::SpawnNativePayload(nullptr, FVector::ZeroVector, Data);
+	if (!Wave) { AddError(TEXT("Wave creation failed")); return false; }
+	Wave->Tick(0.5f);
+	TestTrue(TEXT("Wake base damage breaks the cover at its wall"), Cover->IsBroken());
+	TestEqual(TEXT("The stopped segment does not pass through the new opening"), Hidden->ResolvedHitCount, 0);
 	return true;
 }
 

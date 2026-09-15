@@ -77,5 +77,7 @@ private:
     float ChargeScalar=1.f;
     bool bMeleeCharging=false;
     bool bHitConfirmed=false;
+    /** Scenery contacts from the current sweep step; applied after the step so a break cannot open later samples. */
+    TArray<FHitResult> PendingEnvironmentDamage;
     bool bStartedUnarmed=false;
 };

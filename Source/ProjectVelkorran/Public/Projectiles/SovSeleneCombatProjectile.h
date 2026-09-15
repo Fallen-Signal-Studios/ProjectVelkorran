@@ -79,6 +79,7 @@ private:
 	FSovSeleneProjectileParameters Tuning;
 	TSet<TWeakObjectPtr<AActor>> OutboundTargets;
 	TSet<TWeakObjectPtr<AActor>> ReturnTargets;
+	TSet<TWeakObjectPtr<AActor>> SceneryTargets;
 	FVector Velocity = FVector::ZeroVector;
 	FVector ReleaseOrigin = FVector::ZeroVector;
 	float Age = 0.0f;

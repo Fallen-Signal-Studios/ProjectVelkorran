@@ -1,5 +1,7 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Tests/SovMeleeRuntimeTestFixtures.h"
+#include "World/SovDestructibleCover.h"
+#include "GeometryCollection/GeometryCollectionObject.h"
 #include "Tests/SovAxiomRuntimeTestFixtures.h"
 #include "Melee/SovAbilityTask_MeleeSweep.h"
 #include "Melee/SovMeleeAttackDefinition.h"
@@ -140,6 +142,30 @@ bool FSovMeleeCoverRuntimeTest::RunTest(const FString& Parameters)
     // During startup the authored pose places the weapon beyond the blocking wall.
     Mesh->SetWorldLocation(FVector(180,0,100)); F.Advance(Ability,.1f); F.Advance(Ability,.15f);
     TestEqual(TEXT("Independent source-to-contact geometry rejects the occluded contact"),Target->ResolvedHitCount,0);
+    ASC->CancelAbilityHandle(Handle);
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovMeleeDestructibleCoverRuntimeTest,
+    "ProjectVelkorran.World.Destruction.MeleeBladeBreaksCoverWithoutReachingThrough",EAutomationTestFlags::EditorContext|EAutomationTestFlags::ProductFilter)
+bool FSovMeleeDestructibleCoverRuntimeTest::RunTest(const FString& Parameters)
+{
+    FMeleeWorld F; auto* Source=F.Character(FVector(0,0,100),0); auto* Target=F.Character(FVector(180,0,100),1);
+    if (!Source||!Target) { return false; }
+    auto* Mesh=NewObject<USovMeleeRuntimeTestMesh>(Source); Source->AddInstanceComponent(Mesh);
+    Mesh->SetupAttachment(Source->GetRootComponent()); Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision); Mesh->RegisterComponent();
+    FActorSpawnParameters Spawn; Spawn.SpawnCollisionHandlingOverride=ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+    auto* Cover=F.World->SpawnActor<ASovDestructibleCover>(ASovDestructibleCover::StaticClass(),FVector(90,0,100),FRotator::ZeroRotator,Spawn);
+    if (!Cover) { return false; }
+    Cover->Obstruction->SetBoxExtent(FVector(10,300,150)); Cover->PlacementGuid=FGuid(0x3E1EE,1,2,3);
+    Cover->FracturedAsset=NewObject<UGeometryCollection>(Cover); Cover->bDestructionEnabled=true; Cover->RemainingHealth=15.f;
+    auto* ASC=Source->GetNarrativeAbilitySystemComponent();
+    const auto Handle=ASC->GiveAbility(FGameplayAbilitySpec(USovMeleeRuntimeTestAbility::StaticClass(),1));
+    TestTrue(TEXT("Attack begins on the source side of cover"),ASC->TryActivateAbility(Handle,false));
+    auto* Ability=Cast<USovMeleeRuntimeTestAbility>(ASC->FindAbilitySpecFromHandle(Handle)->GetPrimaryInstance());
+    if (!Ability) { return false; }
+    Mesh->SetWorldLocation(FVector(180,0,100)); F.Advance(Ability,.1f); F.Advance(Ability,.15f);
+    TestTrue(TEXT("Authored node damage breaks the blocking cover"),Cover->IsBroken());
+    TestEqual(TEXT("The blocked step does not reach the target through the new opening"),Target->ResolvedHitCount,0);
     ASC->CancelAbilityHandle(Handle);
     return true;
 }

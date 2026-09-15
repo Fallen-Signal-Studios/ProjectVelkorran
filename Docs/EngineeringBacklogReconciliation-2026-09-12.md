@@ -44,7 +44,7 @@ These are kept distinct throughout and never collapsed into "passed":
 | PC03 | Tarrik Echo generation incomplete | **CLOSED** (12 Sep, see updates) |
 | PC04 | Selene generation covers only three reward sources | **PARTIAL** |
 | PC05 | Signature-readiness feedback disagrees with ability thresholds | **CLOSED** |
-| PC06 | Echo encounter/checkpoint wiring not demonstrated | **SUPERSEDED (in part) / PARTIAL** |
+| PC06 | Echo encounter/checkpoint wiring not demonstrated | **CLOSED** (persistence superseded by C2; encounter boundary 15 Sep, see updates) |
 | PC07 | Full-meter Deflections do not refresh Echo combat activity | **CLOSED** |
 | PC08 | Zero-damage Poise/status packets outside the transaction | **CLOSED** |
 | PC09 | Guard cancellation weaker than Deflection/Echo adapters | **CLOSED** (source, 12 Sep, see updates) |
@@ -57,21 +57,21 @@ These are kept distinct throughout and never collapsed into "passed":
 | T2-B | Template boot config still ships MP menu, loot UI, XP events and demo world | **CONTENT/EDITOR GATE** |
 | T3 | Campaign UI carries template behaviour | **CONTENT/EDITOR GATE** (14 Sep, see updates) |
 | T4 | Intermittent hostile AI startup | **CLOSED** |
-| T5 | Packaged Win64 Game target unverified | **OPEN (Windows gate)** |
+| T5 | Packaged Win64 Game target unverified | **CLOSED** (13 Sep evidence, reconciled 15 Sep, see updates) |
 | T6 | `ProjectVelkorranTests` sets `bUseUnity = false` | **CLOSED** |
 | K1–K4 | Cargo miplevels, navmesh export, camera FOV, Enforcer demo pistol | **CONTENT/EDITOR GATE** |
 | K5 | `BP_SovPlayerController::ReceiveBeginPlay` ordering | **CONTENT/EDITOR GATE** |
 | X1 | `/Game/Cues` absent from version control | **EXTERNAL CONTENT GATE** (see below) |
 | X2 | `SciFi_Drone_1` marketplace pack absent | **EXTERNAL CONTENT GATE** (see below) |
 
-Closed: 18. Partial: 1. Open: 1. Content/editor gated: 12. Superseded: 2. External gates: 2.
+Closed: 20. Partial: 1. Open: 0. Content/editor gated: 12. Superseded: 1. External gates: 2.
 
-_Recounted from the table above on 12 September after C1 closed, again after C3, E6, PC09 and T2 closed, and after T3 was gated. The earlier totals line did not
-reconcile with its own rows. K1–K4 count as four gated items; PC09-C and T2-B count as one each; PC06 counts as superseded, its small
-remaining part recorded under its own heading._
+_Recounted from the table above on 12 September after C1 closed, again after C3, E6, PC09 and T2 closed, after T3 was gated, and on
+15 September after T5 was reconciled and PC06 closed. The earlier totals line did not reconcile with its own rows. K1–K4 count as four
+gated items; PC09-C and T2-B count as one each._
 
-The single remaining OPEN item is T5, the packaged Win64 Game target, which is a Windows
-environment gate rather than code. **There is currently no open source-only code defect in the
+No item remains OPEN: T5, the packaged Win64 Game target, was qualified on the Windows workstation on
+13 September. **There is currently no open source-only code defect in the
 tree**, with PC04 the nearest thing to one and its gap being missing evidence rather than
 missing implementation.
 
@@ -386,10 +386,10 @@ Work done in the isolated worktree `ProjectVelkorran-c3`, branch `engineering/pc
    Also gated: the blocked-hit cue's `/Game/Cues` root (X1), guarding through an authored weapon equip, and
    owning-client prediction under latency (no Mac network automation).
 
-### PC06 — remaining part (PARTIAL)
+### PC06 — remaining part (CLOSED 15 September)
 
-Echo persistence is carried by `AttributesToSave`. What is still unevidenced is a native caller that
-begins/ends an encounter boundary for resource purposes. Source-only; low priority given C2.
+Echo persistence is carried by `AttributesToSave`. The native encounter-boundary caller already existed in
+`ASovEncounterDirector`; director-level automation now evidences it. See the 15 September update.
 
 ### T2 — Cook exclusion (source, config and validation CLOSED 14 September; template boot remainder is T2-B)
 
@@ -571,6 +571,12 @@ note below; that is recorded for its own slice rather than folded into C3.
 **14 September — T2 closed for source, config and validation; boot remainder reclassified as T2-B.** The UE 5.7 cooker's own CookList showed every Narrative demo definition cooked through an AlwaysCook Primary Asset rule, and shipping validation blind to game defaults, packaging settings and startup config references. Both are fixed, and validation now follows only the dependencies the cooker follows. What still ships prohibited content is the template boot configuration, which needs an authored campaign front end (T3). Detail under T2 above.
 
 **14 September — T3 gated as content; front-end decision recorded.** The native campaign layer opens only project menus and loads no character-creator data, but the campaign's input and menu wiring lives in `/Game/Framework/BP_SovPlayerController` and the project UI copies, which were authored on the work PC and never committed. T3 is gated until that content is committed. Packaged builds will boot into an authored Sovereign front end, so T2-B stays flagged until one exists. Detail under T3 above.
+
+**15 September — T5 closed; the row was stale.** The Windows workstation built the Win64 Development Game target on 13 September (`Win64GameBounded-20260913.log`, `-MaxParallelActions=2` after a PCH memory failure at default parallelism), cooked, staged and archived both Aurelion maps with zero errors (`PlaytestCook-20260913-092721-1e378ea4`, 8,250 packages, 943 warnings), and launched packaged M12 headless to a normal exit. Detail in [AurelionEclipseAlignment-2026-09-13.md](AurelionEclipseAlignment-2026-09-13.md). Packaged M13 cold launch exits by design without an M12 handoff; rendering, input, audio and performance remain production gates, not T5. The Game target also built again on 15 September in `20260915-121111-ad9371e0` (Win64 Development, exit 0) alongside 665 passing automation tests; that run did not package.
+
+**15 September — PC06 closed; its remaining part was already implemented.** `ASovEncounterDirector::BeginEncounter` opens the player's Echo encounter scope, and both `CompleteEncounter` and `FailEncounter` close it with the authored completion reserve. What was missing was evidence, not a caller. `NativeVictoryCommitsExactlyOnce` now asserts the scope opens on the production entry and closes on an actual required death, and `ProtectedDeathAndDestructionNeverBecomeVictory` asserts it closes on both protected-loss failures. All 11 `ProjectVelkorran.Campaign.EncounterObjective` tests passed in `20260915-121535-3b9af4c8` with source integrity unchanged. Checkpoint persistence remains carried by C2's `AttributesToSave` path.
+
+**15 September — destructible cover admits protagonist and explosive damage.** Not a reconciliation row, recorded because it closes a source gap named in [AurelionChaosDestruction.md](AurelionChaosDestruction.md): only drone gunfire could damage `ASovDestructibleCover`. A plugin-level `ISovEnvironmentDamageable` admission now serves Narrative hit-result target data, native melee, Selene Wake/Dispatch, Cinder Judgement, sticky grenades and Requiem. Six new `ProjectVelkorran.World.Destruction` suites passed within the 665-test run above. Campaign enablement remains content-gated.
 
 ## X2 — `SciFi_Drone_1` marketplace pack, an external content gate
 

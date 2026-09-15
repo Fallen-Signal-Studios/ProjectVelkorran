@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "NarrativeSavableActor.h"
+#include "Sovereign/SovEnvironmentDamage.h"
 #include "SovDestructibleCover.generated.h"
 
 class UBoxComponent;
@@ -14,7 +15,7 @@ class USoundBase;
 
 /** One authored obstruction group. Structural supports must never opt in. */
 UCLASS(Blueprintable)
-class PROJECTVELKORRAN_API ASovDestructibleCover : public AActor, public INarrativeSavableActor
+class PROJECTVELKORRAN_API ASovDestructibleCover : public AActor, public INarrativeSavableActor, public ISovEnvironmentDamageable
 {
     GENERATED_BODY()
 public:

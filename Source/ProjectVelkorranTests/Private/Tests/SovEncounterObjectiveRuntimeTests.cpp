@@ -1,5 +1,6 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Tests/SovEncounterObjectiveRuntimeTestFixtures.h"
+#include "Components/SovEchoComponent.h"
 #include "Tests/SovCampaignTerminalRuntimeTestFixtures.h"
 #include "Campaign/SovAurelionRequestActor.h"
 #include "Components/TextRenderComponent.h"
@@ -205,6 +206,9 @@ bool FSovEncounterObjectiveNativeVictoryTest::RunTest(const FString& Parameters)
     F.Director->ProtectedParticipantIds.Add(TEXT("Survivor.Reformation"));
     if (!TestTrue(TEXT("Production entry capture and encounter begin succeed"), F.Start())) { AddError(F.SetupError); return false; }
     TestTrue(TEXT("Director captured the real player's entry"), F.Director->HasEncounterPlayer(F.Player));
+    auto* Echo = F.Player->GetEchoComponent();
+    if (!TestNotNull(TEXT("Campaign player owns Echo"), Echo)) { return false; }
+    TestTrue(TEXT("Native director begin opens the Echo encounter scope"), Echo->IsEncounterActive());
     TestFalse(TEXT("A manual completion cannot skip a living required guard"), F.Director->CompleteEncounter());
     TestEqual(TEXT("Raw campaign completion cannot invent the encounter receipt"),
         F.PC->GetCampaignState()->CompleteBeat(F.Objective->CompletionBeat), ESovCampaignResult::Invalid);
@@ -218,6 +222,7 @@ bool FSovEncounterObjectiveNativeVictoryTest::RunTest(const FString& Parameters)
     F.PC->GetCampaignState()->OnBeatCommitted.AddDynamic(Observer, &USovEncounterObjectiveTestObserver::BeatCommitted);
     const FGuid Attempt = F.Director->GetAttemptId(); F.Kill(TEXT("Formation.Guard"));
     TestEqual(TEXT("Actual required death resolves the director"), F.Director->GetEncounterState(), ESovEncounterState::Succeeded);
+    TestFalse(TEXT("Native director completion closes the Echo encounter scope"), Echo->IsEncounterActive());
     TestTrue(TEXT("Victory has confirmed hostile and survivor proof"), F.Director->HasConfirmedVictory());
     TestTrue(TEXT("Save admission waits for deferred campaign receipt"), F.Objective->IsResultPending());
     TestEqual(TEXT("Director callback has not recursively written a journal event"), F.PC->GetCampaignState()->GetJournal().Num(), 0);
@@ -246,6 +251,7 @@ bool FSovEncounterObjectiveProtectionTest::RunTest(const FString& Parameters)
         if (bDestroy) { F.Director->GetParticipant(TEXT("Survivor.Reformation"))->Destroy(); FSovCrucibleRuntimeTestAccess::Step(F.Director, .016f); }
         else { F.Kill(TEXT("Survivor.Reformation")); }
         TestEqual(TEXT("Protected loss fails the attempt"), F.Director->GetEncounterState(), ESovEncounterState::Failed);
+        TestFalse(TEXT("Native director failure closes the Echo encounter scope"), F.Player->GetEchoComponent() && F.Player->GetEchoComponent()->IsEncounterActive());
         F.Kill(TEXT("Formation.Guard")); F.NextFrame();
         TestFalse(TEXT("Hostile death after survivor failure is not victory"), F.Director->HasConfirmedVictory());
         TestEqual(TEXT("Failure never writes campaign success"), F.PC->GetCampaignState()->GetJournal().Num(), 0);

@@ -18,6 +18,7 @@
 #include "Items/WeaponItem.h"
 #include "NarrativeGameplayTags.h"
 #include "Sovereign/SovGameplayTags.h"
+#include "Sovereign/SovEnvironmentDamage.h"
 #include "Targeting/SovTargetingComponent.h"
 #include "UnrealFramework/NarrativeCharacter.h"
 #include "UnrealFramework/NarrativeGameUserSettings.h"
@@ -337,11 +338,22 @@ void USovGameplayAbility_Melee::OnContact(const FHitResult& Hit,AActor* Target)
     bHitConfirmed|=Receipt->bAppliedDamage; OnMeleeImpact(Hit,Target,Receipt->bAppliedDamage);
 }
 void USovGameplayAbility_Melee::OnEnvironment(const FHitResult& Hit,AActor* Target)
-{ if (ContextValid()) { OnMeleeEnvironmentContact(Hit); } }
+{
+    if (!ContextValid()) { return; }
+    if (IsValid(Hit.GetActor()) && Hit.GetActor()->Implements<USovEnvironmentDamageable>()) { PendingEnvironmentDamage.Add(Hit); }
+    OnMeleeEnvironmentContact(Hit);
+}
 void USovGameplayAbility_Melee::OnStep(float Elapsed)
 {
     if (!NodeGeometryValid()) { FinishMelee(); return; }
     const auto Node=AttackDefinition->Nodes[NodeIndex];
+    if (!PendingEnvironmentDamage.IsEmpty())
+    {
+        const TArray<FHitResult> Contacts=MoveTemp(PendingEnvironmentDamage); PendingEnvironmentDamage.Reset();
+        for (const FHitResult& Contact:Contacts)
+        { if (CanDispatchNativeAttack()) { SovEnvironmentDamage::ApplyPoint(ActionAvatar.Get(),Contact,Node.Damage*ChargeScalar); } }
+        if (!NodeGeometryValid()) { FinishMelee(); return; }
+    }
     if (Elapsed<Node.BranchOpen-(bHitConfirmed?Node.HitConfirmAdvance:0.f)) { return; }
     auto* ASC=Cast<UNarrativeAbilitySystemComponent>(ActionASC.Get()); FGameplayTag Input; bool bHeld=false;
     if (!ASC||!ASC->ConsumeCombatInputWindow(this,InputWindow,Input,bHeld)) { return; }
@@ -374,6 +386,7 @@ void USovGameplayAbility_Melee::EndAbility(const FGameplayAbilitySpecHandle Hand
     if (bEndingMelee||!IsEndAbilityValid(Handle,Info)) { return; }
     ++MeleeActivationEpoch;
     bMeleeEndPending=true;
+    PendingEnvironmentDamage.Reset();
     if (ScopeLockCount>0) { Super::EndAbility(Handle,Info,Activation,bReplicate,bCancelled); return; }
     TStrongObjectPtr<USovGameplayAbility_Melee> ActionLifetime(this);
     TGuardValue<bool> Ending(bEndingMelee,true);

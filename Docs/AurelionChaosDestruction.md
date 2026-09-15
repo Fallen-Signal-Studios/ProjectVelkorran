@@ -103,3 +103,22 @@ After merging `origin/main` at `ac3cc446` into this content branch (`4e30965a`),
 Fresh merged-build simulation `NativeCoverMerged-20260915-112919-bcf7c07d` exited 0 with no Python errors or missing Geometry Collection material-usage warnings. All twelve fragments moved 12.1-211.6 cm; control preservation and cleanup passed again. Its inspected images and reports replace the earlier evidence in `Docs/Validation/AurelionNativeCover-2026-09-15`. The overall 90% TDD goal is not qualified by these checks.
 
 Fresh editor run `DestructionGroups-20260915-103551-a06a2876` completed with exit 0, no Python errors, 3140 actors and a clean map. The grouping validator passed against that fresh survey: member bounds tile each obstruction envelope within 0.1 cm and all reviewed components block Pawn and Visibility. Fault injection correctly rejected a missing collider, a collider spanning an extra visual, a gap in the visual envelope, and duplicated instance identities. This is static ownership validation, not combat, traversal, checkpoint or destruction-performance qualification.
+
+## Protagonist and explosive damage admission, 2026-09-15
+
+Only drone gunfire could damage `ASovDestructibleCover` before this change. The customized Narrative plugin cannot see game-module classes, so the admission point lives there: `ISovEnvironmentDamageable` marks an authored scenery owner, and `SovEnvironmentDamage::ApplyPoint`/`ApplyRadial` are the single path from character combat into scenery. The helpers require an authoritative source, reject anything carrying an ability system, and still leave opt-in, placement identity and health to the owner. The cover owner implements the marker; drone gunfire keeps its existing explicit admission.
+
+Connected paths:
+
+| Path | Admission | Ordering |
+| --- | --- | --- |
+| Narrative target data (`ApplyGameplayEffectSpecToTargetData`), used by ordinary hitscan fire | Point, spec `SetByCaller.Damage` | Scenery hit results only; character specs unchanged |
+| Native melee sweep environment contact | Point, node damage x charge scalar | Deferred to the end of the sweep step so a break cannot open later samples of the same blade motion |
+| Selene Wake/Dispatch projectile wall hit | Point, base damage, once per projectile | After character hits in the segment; the segment still stops at the wall |
+| Tarrik Cinder Judgement | Direct point when the blocking hit has no ASC, then radial with the shot's falloff and sightline rule | After all character packets |
+| Cinder sticky grenade | Radial with explosion damage, falloff and sightline rule | After character packets |
+| Cinderline Requiem line | Radial per detonation, one packet per owner per line | After character packets |
+
+Radial admission resolves every candidate's sightline before damaging any of them and measures falloff to the nearest bounds point. Damage magnitudes are authored base values; character mitigation, hit-zone and difficulty modifiers are not applied to scenery. Narrative's generic curve-based `ArsenalStatics` explosion and Velkorran's Hunger are not connected. Firearm admission depends on the weapon's effect spec carrying `SetByCaller.Damage`; the authored Cinderline weapon asset was not inspected in a live session.
+
+Validation `20260915-121111-ad9371e0` rebuilt the Win64 Development Editor and Game targets (both exit 0) and passed all 665 matching `ProjectVelkorran` automation tests with source integrity unchanged. The six new suites under `ProjectVelkorran.World.Destruction` exercise the real paths: point and radial admission (owner opt-in, ability-system rejection, falloff, blocked sightline, range, retired collision), Narrative hit-result target data, a native melee sweep that breaks cover without reaching the target behind it in the same step, a Selene Wake that breaks cover without passing it, and a paid Cinder Judgement direct hit that breaks cover while the character behind it receives nothing. Grenade and Requiem admission are compile-verified and share the radial helper's tested behaviour, but have no dedicated runtime test. None of this is live campaign qualification: no M12 placement is enabled, and traversal, navigation rebuild, checkpoint reload, effects, audio and performance remain the rollout gates listed above.

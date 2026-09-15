@@ -24,6 +24,7 @@
 #include "NiagaraSystem.h"
 #include "PhysicsEngine/RadialForceComponent.h"
 #include "Sovereign/SovGameplayTags.h"
+#include "Sovereign/SovEnvironmentDamage.h"
 #include "UnrealFramework/NarrativeTeamAgentInterface.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogSovCinderStickyGrenade, Log, All);
@@ -390,6 +391,12 @@ void ASovCinderStickyGrenadeProjectile::ApplyExplosion()
 			BurnDuration);
 
 		SourceASC->ApplyGameplayEffectSpecToTarget(*DamageSpec, TargetASC);
+	}
+	// Characters resolve first so a scenery break cannot open their sightline in this blast.
+	if (IsValid(SourceAvatar.Get()) && !IsActorBeingDestroyed())
+	{
+		SovEnvironmentDamage::ApplyRadial(SourceAvatar.Get(), DetonationLocation, ExplosionRadius, ExplosionDamage,
+			MinimumDamageFraction, bRequiresLineOfSight, QueryParams);
 	}
 }
 

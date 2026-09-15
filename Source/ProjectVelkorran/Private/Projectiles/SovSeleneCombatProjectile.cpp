@@ -9,6 +9,7 @@
 #include "GameFramework/Controller.h"
 #include "Net/UnrealNetwork.h"
 #include "Sovereign/SovGameplayTags.h"
+#include "Sovereign/SovEnvironmentDamage.h"
 
 ASovSeleneCombatProjectile::ASovSeleneCombatProjectile()
 {
@@ -193,6 +194,18 @@ void ASovSeleneCombatProjectile::Advance(float DeltaSeconds)
 	{
 		if (Hit.Time > WallTime || bFinished || IsActorBeingDestroyed() || !SovSelenePayload::ValidSource(Tuning.Context)) { break; }
 		if (Mode != ESovSeleneProjectileMode::Stillpoint) { HitTarget(SovSelenePayload::ResolveTarget(Hit.GetActor()), Hit, Start); }
+	}
+	// Authored scenery stops this segment like any wall and receives one base packet per projectile.
+	if (bWall && Mode != ESovSeleneProjectileMode::Stillpoint && !bFinished && !IsActorBeingDestroyed()
+		&& SovSelenePayload::ValidSource(Tuning.Context))
+	{
+		const FHitResult* WallHit = Hits.FindByPredicate([WallTime](const FHitResult& Hit)
+			{ return Hit.Time == WallTime && IsValid(Hit.GetActor()) && Hit.GetActor()->Implements<USovEnvironmentDamageable>(); });
+		if (WallHit && !SceneryTargets.Contains(TWeakObjectPtr<AActor>(WallHit->GetActor())))
+		{
+			SceneryTargets.Add(TWeakObjectPtr<AActor>(WallHit->GetActor()));
+			SovEnvironmentDamage::ApplyPoint(Tuning.Context.SourceAvatar.Get(), *WallHit, Tuning.Damage);
+		}
 	}
 	if (bFinished || IsActorBeingDestroyed()) { return; }
 	const FVector Destination = FMath::Lerp(Start, End, WallTime);

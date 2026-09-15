@@ -1,5 +1,7 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Tests/SovCinderJudgementGeometryFixtures.h"
+#include "World/SovDestructibleCover.h"
+#include "GeometryCollection/GeometryCollectionObject.h"
 #include "Tests/SovAxiomRuntimeTestFixtures.h"
 #include "ArsenalSettings.h"
 #include "ArsenalStatics.h"
@@ -355,4 +357,30 @@ bool FSovCinderJudgementRadialContinuationTest::RunTest(const FString& Parameter
 	TestNull(TEXT("Partial retired blast cannot publish a complete-shot packet"), F.Presentation());
 	return true;
 }
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCinderJudgementDestructibleCoverTest,
+	"ProjectVelkorran.World.Destruction.CinderJudgementDirectHitBreaksCover",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCinderJudgementDestructibleCoverTest::RunTest(const FString& Parameters)
+{
+	FJudgementGeometryWorld F;
+	auto* Source = F.Character(FVector::ZeroVector, 0);
+	auto* Target = F.Character(FVector(220.0, 0.0, 0.0), 1);
+	FActorSpawnParameters Spawn; Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	auto* Cover = F.World ? F.World->SpawnActor<ASovDestructibleCover>(ASovDestructibleCover::StaticClass(), FVector(50.0, 0.0, 0.0), FRotator::ZeroRotator, Spawn) : nullptr;
+	if (!Target || !Cover) { return false; }
+	Cover->Obstruction->SetBoxExtent(FVector(1.0, 300.0, 300.0)); Cover->PlacementGuid = FGuid(0xC1DE, 1, 2, 3);
+	Cover->FracturedAsset = NewObject<UGeometryCollection>(Cover); Cover->bDestructionEnabled = true; Cover->RemainingHealth = 1.0f;
+	auto* Ability = ActivateJudgement(*this, Source);
+	if (!Ability) { return false; }
+	TestTrue(TEXT("Paid shot resolves against the cover"), Ability->ReleaseCinderJudgementFromAim());
+	auto* Packet = F.Presentation();
+	if (!TestNotNull(TEXT("Native presentation packet"), Packet)) { return false; }
+	TestEqual(TEXT("Cover is the resolved hit"), Packet->GetHitActor(), static_cast<AActor*>(Cover));
+	TestTrue(TEXT("Direct Judgement damage breaks the cover"), Cover->IsBroken());
+	TestEqual(TEXT("Characters resolved before the break receive nothing through it"), Target->ResolvedHitCount, 0);
+	TestEqual(TEXT("One existing Echo payment"), Source->TestEcho->GetEcho(), 50.0f);
+	Ability->FinishEchoAbility(true);
+	return true;
+}
+
 #endif

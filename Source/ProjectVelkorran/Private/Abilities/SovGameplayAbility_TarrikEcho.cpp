@@ -29,6 +29,7 @@
 #include "Projectiles/SovVelkorransHungerProjectile.h"
 #include "Targeting/SovAimAssist.h"
 #include "Sovereign/SovGameplayTags.h"
+#include "Sovereign/SovEnvironmentDamage.h"
 #include "UnrealFramework/NarrativeCharacter.h"
 #include "UnrealFramework/NarrativeTeamAgentInterface.h"
 #include "Weapons/NarrativeProjectile.h"
@@ -1351,6 +1352,16 @@ bool USovGameplayAbility_TarrikCinderJudgement::
 			ImpactNormal,
 			BlockingHit ? BlockingHit->GetActor() : nullptr,
 			ExplosionDamageCauser);
+		if (DiscardRetiredPacket()) { return bDirectDamageResolved || RadialTargetsResolved > 0; }
+		// Scenery follows every character packet, so a break cannot expose them to this blast.
+		if (BlockingHit && !Shot.DirectTargetASC.IsValid())
+		{
+			SovEnvironmentDamage::ApplyPoint(Avatar, *BlockingHit, Shot.DirectDamage);
+		}
+		FCollisionQueryParams SceneryQuery(SCENE_QUERY_STAT(SovCinderJudgementScenery), false, Avatar);
+		SceneryQuery.AddIgnoredActor(ExplosionDamageCauser);
+		SovEnvironmentDamage::ApplyRadial(Avatar, TraceEnd + (ImpactNormal * 2.0f), Shot.Radius, Shot.ExplosionDamage,
+			Shot.MinimumFraction, Shot.bRequiresLineOfSight, SceneryQuery);
 		if (DiscardRetiredPacket()) { return bDirectDamageResolved || RadialTargetsResolved > 0; }
 		ApplyJudgementPhysicsImpulse(Shot, TraceEnd, ImpactNormal);
 	}
