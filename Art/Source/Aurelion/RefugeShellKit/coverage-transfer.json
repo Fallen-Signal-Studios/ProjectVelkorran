@@ -1,6 +1,7 @@
 {
   "status": "passed",
-  "unchanged_other_placements": 62,
+  "unchanged_other_placements": 59,
+  "cache_relocated_placements": 3,
   "transferred_skins": 34,
   "walls": [
     {

@@ -1,0 +1,104 @@
+{
+  "status": "Measured native enclosure 490 cm north of stale assembly skins",
+  "rows": [
+    {
+      "original_index": 263,
+      "actor": "Aurelion_RecoveryCacheCabinet_West",
+      "old_bounds_cm": [
+        [
+          -3190.0,
+          21975.0,
+          -1200.0
+        ],
+        [
+          -3170.0,
+          22245.0,
+          -920.0000000000001
+        ]
+      ],
+      "bounds_cm": [
+        [
+          -3190.0,
+          22465.0,
+          -1200.0
+        ],
+        [
+          -3170.0,
+          22735.0,
+          -920.0000000000001
+        ]
+      ],
+      "translation_cm": [
+        0,
+        490,
+        0
+      ]
+    },
+    {
+      "original_index": 264,
+      "actor": "Aurelion_RecoveryCacheCabinet_East",
+      "old_bounds_cm": [
+        [
+          -2930.0,
+          21975.0,
+          -1200.0
+        ],
+        [
+          -2910.0,
+          22245.0,
+          -920.0000000000001
+        ]
+      ],
+      "bounds_cm": [
+        [
+          -2930.0,
+          22465.0,
+          -1200.0
+        ],
+        [
+          -2910.0,
+          22735.0,
+          -920.0000000000001
+        ]
+      ],
+      "translation_cm": [
+        0,
+        490,
+        0
+      ]
+    },
+    {
+      "original_index": 265,
+      "actor": "Aurelion_RecoveryCacheCabinet_Back",
+      "old_bounds_cm": [
+        [
+          -3180.0,
+          22235.0,
+          -1200.0
+        ],
+        [
+          -2920.0,
+          22255.0,
+          -920.0000000000001
+        ]
+      ],
+      "bounds_cm": [
+        [
+          -3180.0,
+          22725.0,
+          -1200.0
+        ],
+        [
+          -2920.0,
+          22745.0,
+          -920.0000000000001
+        ]
+      ],
+      "translation_cm": [
+        0,
+        490,
+        0
+      ]
+    }
+  ]
+}

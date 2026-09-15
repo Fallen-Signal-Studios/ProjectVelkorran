@@ -1,5 +1,5 @@
 {
-  "status": "Perimeter and four retained partitions; 34 duplicate refuge skins transferred to RefugeShellKit",
+  "status": "Perimeter and four partitions; three cache skins aligned to measured native enclosure; 34 refuge skins transferred to RefugeShellKit",
   "modules": [
     {
       "asset": "SM_Aurelion_KIT_Z08Wall_4x7",
@@ -638,7 +638,7 @@
       "asset": "SM_Aurelion_KIT_Z08Partition_270x280",
       "location_m": [
         -31.8,
-        13.099999999999994,
+        18.0,
         0.0
       ],
       "yaw": 90
@@ -647,7 +647,7 @@
       "asset": "SM_Aurelion_KIT_Z08Partition_270x280",
       "location_m": [
         -29.2,
-        13.099999999999994,
+        18.0,
         0.0
       ],
       "yaw": 90
@@ -656,7 +656,7 @@
       "asset": "SM_Aurelion_KIT_Z08Partition_260x280",
       "location_m": [
         -30.5,
-        14.449999999999989,
+        19.349999999999994,
         0.0
       ],
       "yaw": 0
@@ -684,12 +684,12 @@
       "bounds_cm": [
         [
           -3190.0,
-          21975.0,
+          22465.0,
           -1200.0
         ],
         [
           -3170.0,
-          22245.0,
+          22735.0,
           -920.0000000000001
         ]
       ],
@@ -700,12 +700,12 @@
       "bounds_cm": [
         [
           -2930.0,
-          21975.0,
+          22465.0,
           -1200.0
         ],
         [
           -2910.0,
-          22245.0,
+          22735.0,
           -920.0000000000001
         ]
       ],
@@ -716,12 +716,12 @@
       "bounds_cm": [
         [
           -3180.0,
-          22235.0,
+          22725.0,
           -1200.0
         ],
         [
           -2920.0,
-          22255.0,
+          22745.0,
           -920.0000000000001
         ]
       ],

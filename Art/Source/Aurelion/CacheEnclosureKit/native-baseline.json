@@ -1,0 +1,514 @@
+{
+  "actor_count": 3140,
+  "components": [
+    {
+      "actor": "Z08_WestSurvivorRecess_West",
+      "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_238",
+      "class_name": "StaticMeshActor",
+      "actor_transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.707107,W=0.707107),Translation=(X=-3200.000000,Y=22400.000000,Z=-1050.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_238.StaticMeshComponent0",
+      "transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.707107,W=0.707107),Translation=(X=-3200.000000,Y=22400.000000,Z=-1050.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "visible": true,
+      "hidden": false,
+      "actor_hidden": false,
+      "actor_collision": true,
+      "mesh": "/Game/Aurelion/Environment/ArchitectureKit/Meshes/SM_Aurelion_KIT_RefugeShell_10m.SM_Aurelion_KIT_RefugeShell_10m",
+      "materials": [
+        "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_Reveal.M_AurelionKit_Reveal",
+        "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_PavingIvory.M_AurelionKit_PavingIvory",
+        "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_Gold.M_AurelionKit_Gold",
+        "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_UplightLens.M_AurelionKit_UplightLens"
+      ],
+      "mesh_origin": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "mesh_extent": [
+        500.0,
+        20.00005340576172,
+        149.0
+      ]
+    },
+    {
+      "actor": "Z08_West_Stretcher_1",
+      "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_250",
+      "class_name": "StaticMeshActor",
+      "actor_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-2850.000000,Y=22500.000000,Z=-1160.000000),Scale3D=(X=0.850000,Y=2.200000,Z=0.300000))",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_250.StaticMeshComponent0",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-2850.000000,Y=22500.000000,Z=-1160.000000),Scale3D=(X=0.850000,Y=2.200000,Z=0.300000))",
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "profile": "NoCollision",
+      "visible": false,
+      "hidden": true,
+      "actor_hidden": false,
+      "actor_collision": true,
+      "mesh": "/Engine/BasicShapes/Cube.Cube",
+      "materials": [
+        "/Game/Aurelion/Materials/M_GB_scenic.M_GB_scenic"
+      ],
+      "mesh_origin": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "mesh_extent": [
+        50.0,
+        50.0,
+        50.0
+      ]
+    },
+    {
+      "actor": "Z08_West_StretcherCase_1_Label",
+      "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_53",
+      "class_name": "TextRenderActor",
+      "actor_transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=-2850.000000,Y=22500.000000,Z=-890.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_53.NewTextRenderComponent",
+      "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=-2850.000000,Y=22500.000000,Z=-890.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "profile": "NoCollision",
+      "visible": true,
+      "hidden": true,
+      "actor_hidden": true,
+      "actor_collision": false
+    },
+    {
+      "actor": "Z08_West_StretcherCase_1_Label",
+      "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_53",
+      "class_name": "TextRenderActor",
+      "actor_transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=-2850.000000,Y=22500.000000,Z=-890.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.TextRenderActor_53.Sprite",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=-2850.000000,Y=22500.000000,Z=-890.000000),Scale3D=(X=0.500000,Y=0.500000,Z=0.500000))",
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "profile": "NoCollision",
+      "visible": true,
+      "hidden": true,
+      "actor_hidden": true,
+      "actor_collision": false
+    },
+    {
+      "actor": "Z08_West_StretcherCase_1_StandIn",
+      "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1017",
+      "class_name": "StaticMeshActor",
+      "actor_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-2850.000000,Y=22500.000000,Z=-1135.500000),Scale3D=(X=1.500000,Y=1.500000,Z=0.090000))",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1017.StaticMeshComponent0",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-2850.000000,Y=22500.000000,Z=-1135.500000),Scale3D=(X=1.500000,Y=1.500000,Z=0.090000))",
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "profile": "NoCollision",
+      "visible": false,
+      "hidden": true,
+      "actor_hidden": true,
+      "actor_collision": false,
+      "mesh": "/Engine/BasicShapes/Cylinder.Cylinder",
+      "materials": [
+        "/Game/Aurelion/Materials/M_GB_route.M_GB_route"
+      ],
+      "mesh_origin": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "mesh_extent": [
+        50.0,
+        50.0,
+        50.0
+      ]
+    },
+    {
+      "actor": "Aurelion_PrioritySupport",
+      "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionPrioritySupport_1",
+      "class_name": "SovAurelionPrioritySupport",
+      "actor_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionPrioritySupport_1.WestCacheBarrier",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-3050.000000,Y=22475.000000,Z=-1060.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAllDynamic",
+      "visible": true,
+      "hidden": true,
+      "actor_hidden": false,
+      "actor_collision": true,
+      "box_extent": [
+        120.0,
+        20.0,
+        140.0
+      ]
+    },
+    {
+      "actor": "Aurelion_PrioritySupport",
+      "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionPrioritySupport_1",
+      "class_name": "SovAurelionPrioritySupport",
+      "actor_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionPrioritySupport_1.EastFlankBarrier",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=2350.000000,Y=20700.000000,Z=-675.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAllDynamic",
+      "visible": true,
+      "hidden": true,
+      "actor_hidden": false,
+      "actor_collision": true,
+      "box_extent": [
+        450.0,
+        20.0,
+        225.0
+      ]
+    },
+    {
+      "actor": "Aurelion_RecoveryCacheCabinet_West",
+      "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1096",
+      "class_name": "StaticMeshActor",
+      "actor_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-3180.000000,Y=22600.000000,Z=-1060.000000),Scale3D=(X=0.200000,Y=2.700000,Z=2.800000))",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1096.StaticMeshComponent0",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-3180.000000,Y=22600.000000,Z=-1060.000000),Scale3D=(X=0.200000,Y=2.700000,Z=2.800000))",
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "visible": false,
+      "hidden": true,
+      "actor_hidden": false,
+      "actor_collision": true,
+      "mesh": "/Engine/BasicShapes/Cube.Cube",
+      "materials": [
+        "/Game/Aurelion/Materials/M_GB_wall.M_GB_wall"
+      ],
+      "mesh_origin": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "mesh_extent": [
+        50.0,
+        50.0,
+        50.0
+      ]
+    },
+    {
+      "actor": "Aurelion_RecoveryCacheCabinet_East",
+      "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1097",
+      "class_name": "StaticMeshActor",
+      "actor_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-2920.000000,Y=22600.000000,Z=-1060.000000),Scale3D=(X=0.200000,Y=2.700000,Z=2.800000))",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1097.StaticMeshComponent0",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-2920.000000,Y=22600.000000,Z=-1060.000000),Scale3D=(X=0.200000,Y=2.700000,Z=2.800000))",
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "visible": false,
+      "hidden": true,
+      "actor_hidden": false,
+      "actor_collision": true,
+      "mesh": "/Engine/BasicShapes/Cube.Cube",
+      "materials": [
+        "/Game/Aurelion/Materials/M_GB_wall.M_GB_wall"
+      ],
+      "mesh_origin": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "mesh_extent": [
+        50.0,
+        50.0,
+        50.0
+      ]
+    },
+    {
+      "actor": "Aurelion_RecoveryCacheCabinet_Back",
+      "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1098",
+      "class_name": "StaticMeshActor",
+      "actor_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-3050.000000,Y=22735.000000,Z=-1060.000000),Scale3D=(X=2.600000,Y=0.200000,Z=2.800000))",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1098.StaticMeshComponent0",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-3050.000000,Y=22735.000000,Z=-1060.000000),Scale3D=(X=2.600000,Y=0.200000,Z=2.800000))",
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "visible": false,
+      "hidden": true,
+      "actor_hidden": false,
+      "actor_collision": true,
+      "mesh": "/Engine/BasicShapes/Cube.Cube",
+      "materials": [
+        "/Game/Aurelion/Materials/M_GB_wall.M_GB_wall"
+      ],
+      "mesh_origin": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "mesh_extent": [
+        50.0,
+        50.0,
+        50.0
+      ]
+    },
+    {
+      "actor": "Aurelion_RecoveryCacheCabinet_Roof",
+      "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1099",
+      "class_name": "StaticMeshActor",
+      "actor_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-3050.000000,Y=22600.000000,Z=-910.000000),Scale3D=(X=2.800000,Y=2.900000,Z=0.200000))",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1099.StaticMeshComponent0",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-3050.000000,Y=22600.000000,Z=-910.000000),Scale3D=(X=2.800000,Y=2.900000,Z=0.200000))",
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAll",
+      "visible": false,
+      "hidden": true,
+      "actor_hidden": false,
+      "actor_collision": true,
+      "mesh": "/Engine/BasicShapes/Cube.Cube",
+      "materials": [
+        "/Game/Aurelion/Materials/M_GB_wall.M_GB_wall"
+      ],
+      "mesh_origin": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "mesh_extent": [
+        50.0,
+        50.0,
+        50.0
+      ]
+    },
+    {
+      "actor": "Aurelion_WestMedicalCache",
+      "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionMedicalCache_1",
+      "class_name": "SovAurelionMedicalCache",
+      "actor_transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=-3050.000000,Y=22600.000000,Z=-1140.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionMedicalCache_1.Body",
+      "transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=-3050.000000,Y=22600.000000,Z=-1140.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+      "profile": "BlockAllDynamic",
+      "visible": true,
+      "hidden": true,
+      "actor_hidden": false,
+      "actor_collision": true,
+      "box_extent": [
+        50.0,
+        40.0,
+        45.0
+      ]
+    },
+    {
+      "actor": "Aurelion_WestMedicalCache",
+      "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionMedicalCache_1",
+      "class_name": "SovAurelionMedicalCache",
+      "actor_transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=-3050.000000,Y=22600.000000,Z=-1140.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionMedicalCache_1.Visual",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=-1.000000,W=0.000000),Translation=(X=-3050.000000,Y=22600.000000,Z=-1200.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "profile": "NoCollision",
+      "visible": true,
+      "hidden": false,
+      "actor_hidden": false,
+      "actor_collision": true,
+      "mesh": "/Game/Aurelion/Environment/ArchitectureKit/Meshes/SM_Aurelion_KIT_MedicalAidCache.SM_Aurelion_KIT_MedicalAidCache",
+      "materials": [
+        "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_Reveal.M_AurelionKit_Reveal",
+        "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_PavingIvory.M_AurelionKit_PavingIvory",
+        "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_Gold.M_AurelionKit_Gold",
+        "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_UplightLens.M_AurelionKit_UplightLens"
+      ],
+      "mesh_origin": [
+        0.0,
+        0.0,
+        52.499996185302734
+      ],
+      "mesh_extent": [
+        40.250003814697266,
+        50.20000076293945,
+        52.499996185302734
+      ]
+    },
+    {
+      "actor": "Aurelion_WestMedicalCache",
+      "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionMedicalCache_1",
+      "class_name": "SovAurelionMedicalCache",
+      "actor_transform": "(Rotation=(X=-0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=-3050.000000,Y=22600.000000,Z=-1140.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionMedicalCache_1.Label",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=-3050.000000,Y=22600.000000,Z=-1065.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "profile": "NoCollision",
+      "visible": true,
+      "hidden": false,
+      "actor_hidden": false,
+      "actor_collision": true
+    },
+    {
+      "actor": "Aurelion_SupportBarrierView",
+      "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionSupportPresentation_1",
+      "class_name": "SovAurelionSupportPresentation",
+      "actor_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionSupportPresentation_1.WestBarrierVisual",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "profile": "Custom",
+      "visible": true,
+      "hidden": false,
+      "actor_hidden": false,
+      "actor_collision": true,
+      "mesh": "/Game/Aurelion/Art/Props/SM_RuntimeBarrierPanel100.SM_RuntimeBarrierPanel100",
+      "materials": [
+        "/Game/SpaceshipInterior/Materials/M_Scifi_Door_01.M_Scifi_Door_01"
+      ],
+      "mesh_origin": [
+        2.6702880859375e-05,
+        0.0,
+        0.0
+      ],
+      "mesh_extent": [
+        50.0,
+        50.0,
+        50.0
+      ]
+    },
+    {
+      "actor": "Aurelion_SupportBarrierView",
+      "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionSupportPresentation_1",
+      "class_name": "SovAurelionSupportPresentation",
+      "actor_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovAurelionSupportPresentation_1.EastBarrierVisual",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "profile": "Custom",
+      "visible": true,
+      "hidden": false,
+      "actor_hidden": false,
+      "actor_collision": true,
+      "mesh": "/Game/Aurelion/Art/Props/SM_RuntimeBarrierPanel100.SM_RuntimeBarrierPanel100",
+      "materials": [
+        "/Game/SpaceshipInterior/Materials/M_Scifi_Door_01.M_Scifi_Door_01"
+      ],
+      "mesh_origin": [
+        2.6702880859375e-05,
+        0.0,
+        0.0
+      ],
+      "mesh_extent": [
+        50.0,
+        50.0,
+        50.0
+      ]
+    },
+    {
+      "actor": "ART_RecessPanel_West_01",
+      "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1083",
+      "class_name": "StaticMeshActor",
+      "actor_transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=1.000000,W=0.000000),Translation=(X=-3100.000000,Y=22870.000000,Z=-1200.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1083.StaticMeshComponent0",
+      "transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=1.000000,W=0.000000),Translation=(X=-3100.000000,Y=22870.000000,Z=-1200.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "profile": "NoCollision",
+      "visible": true,
+      "hidden": false,
+      "actor_hidden": false,
+      "actor_collision": false,
+      "mesh": "/Game/Aurelion/Environment/ArchitectureKit/Meshes/SM_Aurelion_KIT_RefugePanel_2m.SM_Aurelion_KIT_RefugePanel_2m",
+      "materials": [
+        "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_Reveal.M_AurelionKit_Reveal",
+        "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_PavingIvory.M_AurelionKit_PavingIvory",
+        "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_Gold.M_AurelionKit_Gold",
+        "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_UplightLens.M_AurelionKit_UplightLens"
+      ],
+      "mesh_origin": [
+        0.0,
+        0.0,
+        150.0
+      ],
+      "mesh_extent": [
+        100.0,
+        20.000009536743164,
+        150.0
+      ]
+    },
+    {
+      "actor": "ART_RecessPanel_West_02",
+      "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1170",
+      "class_name": "StaticMeshActor",
+      "actor_transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=1.000000,W=0.000000),Translation=(X=-2900.000000,Y=22870.000000,Z=-1200.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1170.StaticMeshComponent0",
+      "transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=1.000000,W=0.000000),Translation=(X=-2900.000000,Y=22870.000000,Z=-1200.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "profile": "NoCollision",
+      "visible": true,
+      "hidden": false,
+      "actor_hidden": false,
+      "actor_collision": false,
+      "mesh": "/Game/Aurelion/Environment/ArchitectureKit/Meshes/SM_Aurelion_KIT_RefugePanel_2m.SM_Aurelion_KIT_RefugePanel_2m",
+      "materials": [
+        "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_Reveal.M_AurelionKit_Reveal",
+        "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_PavingIvory.M_AurelionKit_PavingIvory",
+        "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_Gold.M_AurelionKit_Gold",
+        "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_UplightLens.M_AurelionKit_UplightLens"
+      ],
+      "mesh_origin": [
+        0.0,
+        0.0,
+        150.0
+      ],
+      "mesh_extent": [
+        100.0,
+        20.000009536743164,
+        150.0
+      ]
+    },
+    {
+      "actor": "KIT_Z08_Paving_00_10",
+      "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_2492",
+      "class_name": "StaticMeshActor",
+      "actor_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-3300.000000,Y=22600.000000,Z=-1212.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_2492.StaticMeshComponent0",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-3300.000000,Y=22600.000000,Z=-1212.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "profile": "NoCollision",
+      "visible": true,
+      "hidden": false,
+      "actor_hidden": false,
+      "actor_collision": false,
+      "mesh": "/Game/Aurelion/Environment/ArchitectureKit/Meshes/SM_Aurelion_KIT_PavingIvory_4m.SM_Aurelion_KIT_PavingIvory_4m",
+      "materials": [
+        "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_Reveal.M_AurelionKit_Reveal",
+        "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_PavingIvory.M_AurelionKit_PavingIvory",
+        "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_PavingBasalt.M_AurelionKit_PavingBasalt",
+        "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_Gold.M_AurelionKit_Gold"
+      ],
+      "mesh_origin": [
+        0.0,
+        0.0,
+        6.0
+      ],
+      "mesh_extent": [
+        200.00001525878906,
+        200.00001525878906,
+        6.0
+      ]
+    },
+    {
+      "actor": "KIT_Z08_Paving_01_10",
+      "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_2504",
+      "class_name": "StaticMeshActor",
+      "actor_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-2900.000000,Y=22600.000000,Z=-1212.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_2504.StaticMeshComponent0",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-2900.000000,Y=22600.000000,Z=-1212.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+      "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+      "profile": "NoCollision",
+      "visible": true,
+      "hidden": false,
+      "actor_hidden": false,
+      "actor_collision": false,
+      "mesh": "/Game/Aurelion/Environment/ArchitectureKit/Meshes/SM_Aurelion_KIT_PavingIvory_4m.SM_Aurelion_KIT_PavingIvory_4m",
+      "materials": [
+        "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_Reveal.M_AurelionKit_Reveal",
+        "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_PavingIvory.M_AurelionKit_PavingIvory",
+        "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_PavingBasalt.M_AurelionKit_PavingBasalt",
+        "/Game/Aurelion/Environment/ArchitectureKit/Materials/M_AurelionKit_Gold.M_AurelionKit_Gold"
+      ],
+      "mesh_origin": [
+        0.0,
+        0.0,
+        6.0
+      ],
+      "mesh_extent": [
+        200.00001525878906,
+        200.00001525878906,
+        6.0
+      ]
+    }
+  ]
+}

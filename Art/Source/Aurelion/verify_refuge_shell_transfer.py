@@ -3,8 +3,20 @@ import json,math
 from pathlib import Path
 base=Path(__file__).resolve().parent;root=base/'RefugeShellKit'
 old=json.loads((root/'wall-assembly-baseline.json').read_text());new=json.loads((base/'Z08WallKit/manifest.json').read_text())
-assert new['placements']==old['placements'][:58]+old['placements'][92:]
-assert new['interior_coverage']==old['interior_coverage'][34:]
+# Preserve the original transfer contract, accounting for the separately measured cache relocation.
+relocations=json.loads((base/'CacheEnclosureKit/skin-relocation.json').read_text())['rows']
+expected_placements=json.loads(json.dumps(old['placements'][:58]+old['placements'][92:]))
+expected_coverage=json.loads(json.dumps(old['interior_coverage'][34:]))
+for r in relocations:
+    i=next(i for i,p in enumerate(expected_coverage) if p['original_index']==r['original_index'])
+    assert expected_coverage[i]['bounds_cm']==r['old_bounds_cm']
+    expected_coverage[i]['bounds_cm']=r['bounds_cm']
+    expected_placements[58+i]['location_m'][1]+=r['translation_cm'][1]/100
+assert len(new['placements'])==len(expected_placements)
+for actual,expected in zip(new['placements'],expected_placements):
+    assert actual['asset']==expected['asset'] and actual['yaw']==expected['yaw']
+    assert all(abs(a-b)<1e-8 for a,b in zip(actual['location_m'],expected['location_m']))
+assert new['interior_coverage']==expected_coverage
 walls=[r for r in json.loads((root/'shell-baseline.json').read_text()) if not r['actor'].endswith('ThresholdMark')]
 assignments={r['actor']:[] for r in walls}
 for piece in new['replaced_refuge_coverage']:
@@ -24,5 +36,5 @@ for wall in walls:
             overlap=[min(p['bounds_cm'][1][k],q['bounds_cm'][1][k])-max(p['bounds_cm'][0][k],q['bounds_cm'][0][k]) for k in range(3)]
             assert min(overlap)<.001
     rows.append(dict(actor=wall['actor'],original_indices=[p['original_index'] for p in pieces],original_volume_cm3=volume))
-(root/'coverage-transfer.json').write_text(json.dumps(dict(status='passed',unchanged_other_placements=62,transferred_skins=34,walls=rows,qualification='Removed skins partition the exact native solid envelopes; new visible caps have documented 2-4 cm setbacks.'),indent=2))
+(root/'coverage-transfer.json').write_text(json.dumps(dict(status='passed',unchanged_other_placements=59,cache_relocated_placements=3,transferred_skins=34,walls=rows,qualification='Removed skins partition the exact native solid envelopes; new visible caps have documented 2-4 cm setbacks.'),indent=2))
 print('REFUGE_SHELL_COVERAGE_TRANSFER_PASS')

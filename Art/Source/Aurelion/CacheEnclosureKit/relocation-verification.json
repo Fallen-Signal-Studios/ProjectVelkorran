@@ -1,0 +1,258 @@
+{
+  "status": "passed",
+  "checks": [
+    {
+      "actor": "Aurelion_RecoveryCacheCabinet_West",
+      "location": "old_bounds_cm",
+      "z": 0.5,
+      "side": -1,
+      "hit": false
+    },
+    {
+      "actor": "Aurelion_RecoveryCacheCabinet_West",
+      "location": "old_bounds_cm",
+      "z": 0.5,
+      "side": 1,
+      "hit": false
+    },
+    {
+      "actor": "Aurelion_RecoveryCacheCabinet_West",
+      "location": "old_bounds_cm",
+      "z": 1.2,
+      "side": -1,
+      "hit": false
+    },
+    {
+      "actor": "Aurelion_RecoveryCacheCabinet_West",
+      "location": "old_bounds_cm",
+      "z": 1.2,
+      "side": 1,
+      "hit": false
+    },
+    {
+      "actor": "Aurelion_RecoveryCacheCabinet_West",
+      "location": "old_bounds_cm",
+      "z": 2.3,
+      "side": -1,
+      "hit": false
+    },
+    {
+      "actor": "Aurelion_RecoveryCacheCabinet_West",
+      "location": "old_bounds_cm",
+      "z": 2.3,
+      "side": 1,
+      "hit": false
+    },
+    {
+      "actor": "Aurelion_RecoveryCacheCabinet_West",
+      "location": "bounds_cm",
+      "z": 0.5,
+      "side": -1,
+      "hit": true
+    },
+    {
+      "actor": "Aurelion_RecoveryCacheCabinet_West",
+      "location": "bounds_cm",
+      "z": 0.5,
+      "side": 1,
+      "hit": true
+    },
+    {
+      "actor": "Aurelion_RecoveryCacheCabinet_West",
+      "location": "bounds_cm",
+      "z": 1.2,
+      "side": -1,
+      "hit": true
+    },
+    {
+      "actor": "Aurelion_RecoveryCacheCabinet_West",
+      "location": "bounds_cm",
+      "z": 1.2,
+      "side": 1,
+      "hit": true
+    },
+    {
+      "actor": "Aurelion_RecoveryCacheCabinet_West",
+      "location": "bounds_cm",
+      "z": 2.3,
+      "side": -1,
+      "hit": true
+    },
+    {
+      "actor": "Aurelion_RecoveryCacheCabinet_West",
+      "location": "bounds_cm",
+      "z": 2.3,
+      "side": 1,
+      "hit": true
+    },
+    {
+      "actor": "Aurelion_RecoveryCacheCabinet_East",
+      "location": "old_bounds_cm",
+      "z": 0.5,
+      "side": -1,
+      "hit": false
+    },
+    {
+      "actor": "Aurelion_RecoveryCacheCabinet_East",
+      "location": "old_bounds_cm",
+      "z": 0.5,
+      "side": 1,
+      "hit": false
+    },
+    {
+      "actor": "Aurelion_RecoveryCacheCabinet_East",
+      "location": "old_bounds_cm",
+      "z": 1.2,
+      "side": -1,
+      "hit": false
+    },
+    {
+      "actor": "Aurelion_RecoveryCacheCabinet_East",
+      "location": "old_bounds_cm",
+      "z": 1.2,
+      "side": 1,
+      "hit": false
+    },
+    {
+      "actor": "Aurelion_RecoveryCacheCabinet_East",
+      "location": "old_bounds_cm",
+      "z": 2.3,
+      "side": -1,
+      "hit": false
+    },
+    {
+      "actor": "Aurelion_RecoveryCacheCabinet_East",
+      "location": "old_bounds_cm",
+      "z": 2.3,
+      "side": 1,
+      "hit": false
+    },
+    {
+      "actor": "Aurelion_RecoveryCacheCabinet_East",
+      "location": "bounds_cm",
+      "z": 0.5,
+      "side": -1,
+      "hit": true
+    },
+    {
+      "actor": "Aurelion_RecoveryCacheCabinet_East",
+      "location": "bounds_cm",
+      "z": 0.5,
+      "side": 1,
+      "hit": true
+    },
+    {
+      "actor": "Aurelion_RecoveryCacheCabinet_East",
+      "location": "bounds_cm",
+      "z": 1.2,
+      "side": -1,
+      "hit": true
+    },
+    {
+      "actor": "Aurelion_RecoveryCacheCabinet_East",
+      "location": "bounds_cm",
+      "z": 1.2,
+      "side": 1,
+      "hit": true
+    },
+    {
+      "actor": "Aurelion_RecoveryCacheCabinet_East",
+      "location": "bounds_cm",
+      "z": 2.3,
+      "side": -1,
+      "hit": true
+    },
+    {
+      "actor": "Aurelion_RecoveryCacheCabinet_East",
+      "location": "bounds_cm",
+      "z": 2.3,
+      "side": 1,
+      "hit": true
+    },
+    {
+      "actor": "Aurelion_RecoveryCacheCabinet_Back",
+      "location": "old_bounds_cm",
+      "z": 0.5,
+      "side": -1,
+      "hit": false
+    },
+    {
+      "actor": "Aurelion_RecoveryCacheCabinet_Back",
+      "location": "old_bounds_cm",
+      "z": 0.5,
+      "side": 1,
+      "hit": false
+    },
+    {
+      "actor": "Aurelion_RecoveryCacheCabinet_Back",
+      "location": "old_bounds_cm",
+      "z": 1.2,
+      "side": -1,
+      "hit": false
+    },
+    {
+      "actor": "Aurelion_RecoveryCacheCabinet_Back",
+      "location": "old_bounds_cm",
+      "z": 1.2,
+      "side": 1,
+      "hit": false
+    },
+    {
+      "actor": "Aurelion_RecoveryCacheCabinet_Back",
+      "location": "old_bounds_cm",
+      "z": 2.3,
+      "side": -1,
+      "hit": false
+    },
+    {
+      "actor": "Aurelion_RecoveryCacheCabinet_Back",
+      "location": "old_bounds_cm",
+      "z": 2.3,
+      "side": 1,
+      "hit": false
+    },
+    {
+      "actor": "Aurelion_RecoveryCacheCabinet_Back",
+      "location": "bounds_cm",
+      "z": 0.5,
+      "side": -1,
+      "hit": true
+    },
+    {
+      "actor": "Aurelion_RecoveryCacheCabinet_Back",
+      "location": "bounds_cm",
+      "z": 0.5,
+      "side": 1,
+      "hit": true
+    },
+    {
+      "actor": "Aurelion_RecoveryCacheCabinet_Back",
+      "location": "bounds_cm",
+      "z": 1.2,
+      "side": -1,
+      "hit": true
+    },
+    {
+      "actor": "Aurelion_RecoveryCacheCabinet_Back",
+      "location": "bounds_cm",
+      "z": 1.2,
+      "side": 1,
+      "hit": true
+    },
+    {
+      "actor": "Aurelion_RecoveryCacheCabinet_Back",
+      "location": "bounds_cm",
+      "z": 2.3,
+      "side": -1,
+      "hit": true
+    },
+    {
+      "actor": "Aurelion_RecoveryCacheCabinet_Back",
+      "location": "bounds_cm",
+      "z": 2.3,
+      "side": 1,
+      "hit": true
+    }
+  ],
+  "qualification": "18 corrected surface contacts and 18 empty former-location probes on exported assembly; native collision qualified separately."
+}

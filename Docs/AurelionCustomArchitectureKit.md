@@ -1008,3 +1008,16 @@ MedicalCacheArtFit-20260914-185014-921bd737 passed the native-field, Body and fl
 
 
 MedicalCacheArtSaved-20260914-185358-dae2378f saved the reviewed replacement after backing up the map. All three saved captures were inspected; the temporary camera was removed and capture settings restored. MedicalCacheArtFresh-20260914-185718-0a8726a2 then passed all 69 architecture receipts after reopening, with 3,140 actors, clean map packages and no Python errors. The new receipt confirms native cache fields, four floor contacts and the original Body front contact. Live medical use, consumption and checkpoint reload remain unqualified by this art pass. Supported alignment remains 63.75%; selective Chaos destruction remains required and unimplemented.
+
+
+## Cache enclosure placement correction
+
+CacheEnclosureAudit-20260914-190525-48ab4a9e measured the saved native support and cache geometry without changing the map. The West/East/Back physical cabinet walls are at Y=22600/22600/22735, but assembly skins 263-265 remained at Y=22110/22110/22245 after the refuge relocation. All three physical cubes are hidden, so the enclosure had invisible collision and unrelated visible walls 4.9 m south. The physical roof is also hidden. Both native support visual components remain at the origin in the saved editor scene; runtime Tick aligns them with the barriers. Their current mesh is a normalized 100 cm vendor panel.
+
+The Z08 wall generator now derives the three skin placements from the measured 490 cm relocation. The remaining 59 placements and all native actors, collision, rewards and priority controls are retained. The updated source transfer check explicitly accounts for these three placements while retaining the original 34-skin refuge-shell coverage proof. Clean FBX round-trip and wall-fit checks pass. verify_cache_skin_relocation.py additionally proves 18 contacts at the corrected locations and 18 empty probes at their former locations. The enclosure roof and authored gate presentation are still required; this correction does not qualify live access, priority outcomes or Chaos destruction.
+
+
+CacheEnclosureFit-20260914-190946-bb6116d9 imported and saved the corrected owned assembly, passed nine native wall-contact probes and preserved all 3,140 actor/collision states. No map save was required. All three captures were inspected: the enclosure surrounds the cache at its real location; the room context confirms the separate roof/gate presentation gap. The former-location camera is partly occluded by the retained refuge baffles, so the clean-FBX miss probes supply the precise absence evidence. Capture warmup was restored from 64 to 4 and the temporary camera removed. No Python errors were reported.
+
+
+CacheEnclosureFresh-20260914-191404-9ef6fadc passed all 70 architecture receipts after reopening, with 3,140 actors, clean map packages and no Python errors. The new gate compares each moved visual envelope against the saved native cube bounds and checks nine collision contacts while preserving both priority barrier component transforms/collision. The full preceding chain passed. Supported alignment remains 63.75%; this fixes a measured presentation/collision mismatch, not full environment or live TDD acceptance.
