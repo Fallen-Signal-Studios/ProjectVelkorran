@@ -120,6 +120,10 @@ def tick(dt):
                 if os.environ.get('SOV_AURELION_ENTRY_CONTINUE_E1')=='1':
                     import continue_aurelion_e1_input
                     continue_aurelion_e1_input.start(OUT/'E1Continuation')
+                    if os.environ.get('SOV_AURELION_DAMAGE_SHARE')=='1':
+                        import observe_encounter_damage_share
+                        observe_encounter_damage_share.start(OUT/'DamageShare')
+                        report['damage_share_started']=True
                     report['e1_continuation_started']=True
                     write()
                 return

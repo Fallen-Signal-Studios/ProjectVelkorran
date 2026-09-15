@@ -61,6 +61,18 @@ M13 unattended.
    consequence, outcome tag, aftermath identity and which barrier opens. Neither outcome has been
    replayed end to end yet.
 
+## First unattended fresh M12→M13 route
+
+`CoreGateRoute-20260915-132715-08bff503` passed the entire chain through ordinary input with no
+operator step: entry (39 s), E1 (121 s), E2 (70 s), E3 entry (94 s), E3 rescue (80 s), E4 entry with
+the WestStretchers priority (98 s), E4A with the automated Axiom click (13 s), E4B (21 s) with one
+native Thermal Fracture receipt followed by the ordinary Core follow-up, M13 entry (77 s) and M13
+(287 s). M13 recorded all 35 journal receipts, M12 and M13 completion, the paired physical lift and all
+ten scenes completed without skipping. Every stage reported unchanged asset hashes. This is the first
+retained fresh route to reach separate departures without an operator. It is one pass, not
+reliability; the CP9 reload, the EastWalkers outcome, physical input, rendered review and packaged
+execution remain separate evidence.
+
 ## Score
 
 Unchanged at **63.75** until the route, soak and captures above produce passing evidence.

@@ -56,6 +56,17 @@ class Run:
         self.report.update(status='passed' if passed else 'failed', reason=reason)
         self.write()
         unreal.log('Aurelion route input chain: '+self.report['status']+': '+reason)
+        # The earned CP9 reload must observe this same session. Drop this chain's driver references first,
+        # so the probe's stale-world audit only sees retired observers.
+        if passed and os.environ.get('SOV_AURELION_ROUTE_CP9') == '1':
+            self.child = self.module = None
+            try:
+                import probe_m13_native_checkpoint_reload as cp9
+                probe = cp9.start(self.out/'CP9Reload')
+                self.report['cp9_reload'] = dict(status=probe.report.get('status'), output=str(probe.out))
+            except Exception:
+                self.report['cp9_reload'] = dict(status='failed_to_start', error=traceback.format_exc())
+            self.write()
 
     def tick(self, _delta):
         if self.done:
