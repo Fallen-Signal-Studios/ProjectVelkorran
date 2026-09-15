@@ -141,6 +141,14 @@ place while the Weaver, elite and WallRunner took him from 80 to 2 health. Both 
 partner-position rejection now re-issues the ordinary partner move, and focus held by another interactable
 for three seconds moves Tarrik to an alternate standing point, bounded to four repositions.
 
+## Entry timeout during the played capture
+
+`EastFocusRoute-20260915-151536-0f792fd1` failed at entry: "Campaign initialization failed: Campaign
+character readiness timed out" 40 seconds after PIE began. A packaged `Play-Aurelion.ps1 -PerfCapture`
+session (the creator's played combat capture) had started two minutes after the editor, rendering on the
+same GPU and CPU. The overlap starved PIE loading; this is recorded as resource contention, not a
+regression, and no editor workload runs during a played capture so neither measurement is skewed.
+
 ## Packaged performance capture on the approved PC target
 
 `PackagedCapture-20260915-150900-faab9793` ran the cooked Win64 Development package
