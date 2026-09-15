@@ -219,12 +219,41 @@ class Run:
         assert state is None or 'FAILED' not in state.upper(), 'Native fatal recovery reported failure'
         assert now - self.recovery_started < NATIVE_RECOVERY_SECONDS, 'Native fatal recovery did not resume play in time'
         assert world == self.world, 'Native recovery changed the world; this driver resumes only same-world recovery'
+        players_ready = isinstance(pc, unreal.SovPlayerController) and isinstance(pawn, unreal.SovPlayerCharacterBase)
+        campaign = pc.get_campaign_state() if players_ready else None
+        mission = campaign.get_active_mission() if campaign else None
+        transition = str(pc.get_campaign_transition_state()) if players_ready else None
+        if not (players_ready and mission and pc.get_campaign_transition_state() == unreal.SovCampaignTransitionState.IDLE):
+            # Transient checkpoint-load state: record it and keep waiting within the recovery bound.
+            row['load_transients'] = row.get('load_transients', 0) + 1
+            row['last_transient'] = dict(pawn=_path(pawn) if pawn else None, mission=bool(mission), transition=transition)
+            return
+        assert str(mission.mission_id) == MISSION, 'Native recovery restored a different mission'
+        if self.e1 is None or not unreal.SystemLibrary.is_valid(self.e1):
+            matches = [d for d in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.SovEncounterDirector)
+                       if str(d.encounter_id) == 'M12_E1_PressureHall']
+            assert len(matches) == 1, 'Native recovery left no single E1 director'
+            self.e1 = matches[0]
+            row['e1_director_replaced'] = True
+        encounter = self.e1.get_encounter_state()
+        row.update(last_e1_state=str(encounter), last_pawn=_path(pawn), checkpoint_load=bool(row.get('load_transients')))
         attempt = self.e1.get_attempt_id().export_text()
         resumed = (pawn.is_alive() and pawn.get_health() > 0. and pawn.is_character_ready()
-                   and self.e1.get_encounter_state() == unreal.SovEncounterState.ACTIVE
+                   and encounter == unreal.SovEncounterState.ACTIVE
                    and (state is None or any(name in state.upper() for name in ('READY', 'RESCUED'))))
         if not resumed:
             return
+        self.pressure = self.e1.get_component_by_class(unreal.SovEncounterCoordinationComponent)
+        if _path(pawn) != getattr(self, 'damage_pawn', None):
+            # A checkpoint load can respawn the protagonist; observe the restored pawn's native damage from here on.
+            if self.damage_binding is not None:
+                _optional(lambda binding=self.damage_binding: binding[0].remove_callable(binding[1]))
+            damage_delegate = pawn.get_narrative_ability_system_component().on_damage_resolved_as_target
+            damage_callback = _incoming_damage_observer(self, _path(pawn))
+            damage_delegate.add_callable(damage_callback)
+            self.damage_binding = (damage_delegate, damage_callback)
+            self.damage_pawn = _path(pawn)
+            row['damage_observer_rebound'] = True
         row.update(resumed_elapsed=now-self.started, recovery_seconds=now-self.recovery_started,
                    new_attempt=attempt, rescued_same_attempt=attempt == self.recovery_attempt,
                    health=pawn.get_health(), position=_xyz(pawn.get_actor_location()))
@@ -629,6 +658,9 @@ class Run:
                 if not pawn or not isinstance(pc, unreal.SovPlayerController):
                     self.inject()
                     return
+            if self.phase == 'native_recovery':
+                self.follow_native_recovery(now, world, pc, pawn)
+                return
             assert isinstance(pc, unreal.SovPlayerController) and isinstance(pawn, unreal.SovPlayerCharacterBase)
             state = pc.get_campaign_state()
             assert state and state.get_active_mission() and str(state.get_active_mission().mission_id) == MISSION
@@ -655,6 +687,7 @@ class Run:
                 damage_callback = _incoming_damage_observer(self, _path(pawn))
                 damage_delegate.add_callable(damage_callback)
                 self.damage_binding = (damage_delegate, damage_callback)
+                self.damage_pawn = _path(pawn)
                 roster = self.roster()
                 if self.resume_report:
                     initial = self.resume_report['initial']
