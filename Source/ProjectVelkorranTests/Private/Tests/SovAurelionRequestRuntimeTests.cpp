@@ -14,6 +14,8 @@
 #include "LevelSequence.h"
 #include "MovieScene.h"
 #include "Tests/SovHandoffRuntimeTestFixtures.h"
+#include "AI/NPCInteractable.h"
+#include "Interaction/InteractionSubsystem.h"
 #include "Campaign/SovAurelionRequestActor.h"
 #include "Character/PlayerDefinition.h"
 #include "Components/BoxComponent.h"
@@ -381,6 +383,48 @@ bool FSovAurelionPendingHoldTest::RunTest(const FString& Parameters)
     Component->CancelContextCommand();
     TestFalse(TEXT("Explicit cancellation removes accepted intent"), Component->HasAcceptedHoldPosition(NPC));
     TestEqual(TEXT("Pending and selected holds never award campaign proof"), F.PC->GetCampaignState()->GetJournal().Num(), 0);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAurelionRequestFocusPriorityTest,
+    "ProjectVelkorran.Campaign.Aurelion.Request.MissionControlOutranksAdjacentHostilePrompt",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovAurelionRequestFocusPriorityTest::RunTest(const FString& Parameters)
+{
+    FTerminalWorld F; if (!TestNotNull(TEXT("Ready managed player"), F.ASC)) { return false; }
+    // A hostile stands nearer than the control and on the same line, as the Elite did beside E4B's FrostSetup.
+    auto* Hostile = F.World->SpawnActor<AActor>();
+    auto* Body = NewObject<UBoxComponent>(Hostile); Hostile->SetRootComponent(Body); Hostile->AddInstanceComponent(Body);
+    Body->SetBoxExtent(FVector(34, 34, 88)); Body->SetCollisionEnabled(ECollisionEnabled::NoCollision); Body->RegisterComponent();
+    Hostile->SetActorLocation(F.Player->GetActorLocation() + FVector(100, 0, 0));
+    auto* HostilePrompt = NewObject<UNPCInteractable>(Hostile);
+    Hostile->AddInstanceComponent(HostilePrompt); HostilePrompt->RegisterComponent(); HostilePrompt->Activate();
+    auto* Interaction = NewObject<USovAurelionFocusTestInteraction>(F.PC);
+    F.PC->AddInstanceComponent(Interaction); Interaction->RegisterComponent(); Interaction->Configure(F.PC);
+    // This fixture world never begins play, so both candidates enter the same public registry the game reads.
+    auto* Registry = F.World->GetSubsystem<UInteractionSubsystem>();
+    if (!TestNotNull(TEXT("The world supplies the native interaction registry"), Registry)) { return false; }
+    F.Terminal->Interactable->Activate(); HostilePrompt->Activate();
+    Registry->CacheInteractable(F.Terminal->Interactable); Registry->CacheInteractable(HostilePrompt);
+    if (!TestTrue(TEXT("The required control is within native reach"),
+            Interaction->IsInteractableInReach(F.Terminal->Interactable))
+        || !TestTrue(TEXT("The nearer hostile prompt is within native reach"),
+            Interaction->IsInteractableInReach(HostilePrompt)))
+    { return false; }
+    TestEqual(TEXT("The authored mission control keeps its mission-critical priority"),
+        F.Terminal->Interactable->InteractionPriority, 20);
+    Interaction->PerformInteractionCheck(0.f);
+    TestEqual(TEXT("A nearer hostile prompt cannot take focus from the required control"),
+        Interaction->Viewed(), static_cast<const UNarrativeInteractableComponent*>(F.Terminal->Interactable));
+    // Without the priority the nearer prompt wins on the native score, which is the failure this guards.
+    F.Terminal->Interactable->InteractionPriority = 0;
+    Interaction->PerformInteractionCheck(0.f);
+    TestEqual(TEXT("Priority, not range or facing, is what decides this contest"),
+        Interaction->Viewed(), static_cast<const UNarrativeInteractableComponent*>(HostilePrompt));
+    F.Terminal->Interactable->InteractionPriority = 20;
+    Interaction->PerformInteractionCheck(0.f);
+    TestEqual(TEXT("Restoring the priority restores the control's prompt"),
+        Interaction->Viewed(), static_cast<const UNarrativeInteractableComponent*>(F.Terminal->Interactable));
     return true;
 }
 #endif

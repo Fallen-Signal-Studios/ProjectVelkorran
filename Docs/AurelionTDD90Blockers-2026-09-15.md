@@ -248,6 +248,27 @@ shared scene observer keeps its strict default; only this driver overrides it.
 Damage share across E1, E2 and E3 was 4,413 to the protagonist and zero to companions in 184 native
 receipts, all against required hostiles. The A4 band needs the encounters where a companion fights.
 
+## A hostile can take the prompt from a required control
+
+`EastSceneRetryRoute-20260915-161638-8ae425e1` passed E1 in 141 s, E2, E3 entry, E3 rescue, E4 entry and E4A.
+The `ShareIsolatedThreatData` exit mark was clear this time and no scene replay was needed, which confirms the
+earlier refusal was transient occupancy rather than a placement defect. The run then failed in E4B: for 42
+seconds the Thermal Fracture `FrostSetup` control never held interaction focus, because a Linkbound and then
+the Elite owned it, and the pilot exhausted its four ordinary repositions.
+
+The native focus rule in `UPlayerInteractionComponent::PerformInteractionCheck` scores each candidate as
+`InteractionPriority*4 + Facing*2 - Distance/InteractionDistance`. Every Aurelion request control used the
+default priority of zero, so a hostile standing nearer than the control outranks it even while the player
+looks straight at the control. In a crowded fight around the Elite, that makes a required mission control
+unusable through no fault of the player, and the same rule would do this to an ordinary player. The project
+already treats mission-critical interactables this way: `SovRescueDestination` sets priority 20. Aurelion
+request actors now do the same, and a new test spawns a nearer hostile `NPCInteractable` and proves the
+control keeps the prompt, that removing the priority hands the prompt to the hostile, and that restoring it
+restores the control.
+
+This is an enemy-behaviour and interaction-readability defect found by ordinary play, not a pilot bound;
+the pilot's reposition limit is unchanged.
+
 ## Score
 
 **P2 moves from 0 to 2.5 of 5** (the rubric's 0.5 level: material subset on the approved target with the

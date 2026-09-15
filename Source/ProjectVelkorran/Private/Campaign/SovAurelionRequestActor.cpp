@@ -69,6 +69,9 @@ ASovAurelionRequestActor::ASovAurelionRequestActor()
     Label->SetRelativeLocation(FVector(0, 0, 65)); Label->SetWorldSize(8.f); Label->SetHorizontalAlignment(EHTA_Center);
     Interactable = CreateDefaultSubobject<USovAurelionRequestInteractable>(TEXT("Interactable"));
     Interactable->InteractionDistance = 300.f; Interactable->InteractionTime = .35f;
+    // A required mission control outranks incidental interactables, so a hostile standing beside it
+    // cannot take the prompt during a fight. Matches the rescue destination's mission-critical priority.
+    Interactable->InteractionPriority = 20;
     Interactable->InteractableNameText = LOCTEXT("Name", "Aurelion");
     ActionText = LOCTEXT("Interact", "Interact");
 }

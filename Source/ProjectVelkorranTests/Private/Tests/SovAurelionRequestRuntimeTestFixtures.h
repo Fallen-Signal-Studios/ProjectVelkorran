@@ -2,7 +2,21 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "Cinematics/SovAurelionStorySequenceActor.h"
+#include "Interaction/PlayerInteractionComponent.h"
+#include "UnrealFramework/NarrativeCharacter.h"
+#include "GameFramework/Controller.h"
 #include "SovAurelionRequestRuntimeTestFixtures.generated.h"
+
+/** Only the owning controller/pawn are supplied; the native focus selection and reach remain active. */
+UCLASS(Transient, NotBlueprintable)
+class USovAurelionFocusTestInteraction : public UPlayerInteractionComponent
+{
+    GENERATED_BODY()
+public:
+    void Configure(AController* Controller)
+    { OwningController = Controller; OwningPawn = Cast<ANarrativeCharacter>(Controller->GetPawn()); }
+    const UNarrativeInteractableComponent* Viewed() const { return ViewedInteractable; }
+};
 UCLASS()
 class ASovAurelionStoryTestActor : public ASovAurelionStorySequenceActor
 {
