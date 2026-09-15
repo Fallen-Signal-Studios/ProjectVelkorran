@@ -29,6 +29,8 @@ _path,_xyz,_optional=common._path,common._xyz,common._optional
 
 
 FROST_RETRY_LIMIT = 3
+AIM_REPOSITION_LIMIT = 4
+AIM_FOCUS_STALL_SECONDS = 3.
 
 class Run(phase_a.Run):
     def __init__(self,output_directory):
@@ -234,8 +236,24 @@ class Run(phase_a.Run):
             control=self.control_name,reason=reason,state=self.thermal_state()))
         assert len(self.report['missed_frost_windows'])<=FROST_RETRY_LIMIT, 'Thermal Fracture window repeatedly missed: '+reason
         self.last_frost_miss=time.monotonic()
+        if 'Selene must occupy' in reason:
+            # The native frost rule needs Selene on the clean mark with sight of the elite; reposition her first.
+            self.go_control('MovePartner')
+            return
         p=self.controls['FrostSetup'].get_actor_location()
         self.go_control('FrostSetup',then='prepare_frost',point=(p.x-250.,p.y,pawn.get_actor_location().z))
+
+    def reposition_for_focus(self,pawn,focus):
+        # Another interactable (for example a hostile's) can hold focus in front of the control. Step to an
+        # alternate ordinary standing point instead of aiming indefinitely under fire.
+        rows=self.report.setdefault('aim_repositions',[])
+        rows.append(dict(elapsed=time.monotonic()-self.started,control=self.control_name,focus=_path(focus),
+            player=_xyz(pawn.get_actor_location())))
+        assert len(rows)<=AIM_REPOSITION_LIMIT, 'Contextual control focus repeatedly obstructed: '+self.control_name
+        p=self.controls[self.control_name].get_actor_location()
+        side=150. if len(rows)%2 else -150.
+        then='prepare_frost' if self.control_name=='FrostSetup' else 'aim_control'
+        self.go_control(self.control_name,then=then,point=(p.x-200.,p.y+side,pawn.get_actor_location().z))
 
     def go_control(self,name,then='aim_control',point=None):
         self.control_name=name
@@ -505,6 +523,11 @@ class Run(phase_a.Run):
                     return
                 self.walk(pc,pawn)
             elif self.phase=='aim_control':
+                focus=pc.get_interaction_component().get_editor_property('viewed_interactable')
+                if (focus is not None and focus!=self.controls[self.control_name].interactable
+                        and now-self.phase_at>AIM_FOCUS_STALL_SECONDS):
+                    self.reposition_for_focus(pawn,focus)
+                    return
                 if self.control_name=='HeatConfirm' and self.thermal.get_fracture_window_remaining_seconds()<=.35:
                     self.retry_frost(pawn,'Native frost window expired before ordinary heat hold')
                     return
