@@ -1,0 +1,15 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z09Slit_1",
+      "dimensions_m": [
+        0.6472704410552979,
+        0.026000000536441803,
+        2.7819182872772217
+      ],
+      "triangles": 16520
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}
