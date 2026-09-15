@@ -1,0 +1,2593 @@
+{
+  "actor_count": 3140,
+  "visual_actor": "Aurelion_Art_M12_Z08_47_7ff693",
+  "visual_component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.Actor_47.HierarchicalInstancedStaticMesh",
+  "mesh": "/Game/Aurelion/Environment/ArchitectureKit/Meshes/SM_Aurelion_KIT_Z08SealedStores.SM_Aurelion_KIT_Z08SealedStores",
+  "candidates": [
+    {
+      "source_instance_index": 0,
+      "source_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-2750.000023,Y=19174.999994,Z=-1200.000000),Scale3D=(X=1.500000,Y=0.750000,Z=0.600000))",
+      "bounds_cm": [
+        [
+          -2900.0,
+          19099.99998855591,
+          -1200.0000035762787
+        ],
+        [
+          -2600.0,
+          19250.000005722046,
+          -1080.0
+        ]
+      ],
+      "overlapping_colliders": [
+        {
+          "actor": "Z08_LC_Southwest",
+          "actor_path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_228",
+          "class_name": "StaticMeshActor",
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_228.StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-2750.000000,Y=19250.000000,Z=-1140.000000),Scale3D=(X=3.000000,Y=3.000000,Z=1.200000))",
+          "bounds_cm": [
+            [
+              -2900.0,
+              19100.0,
+              -1200.0
+            ],
+            [
+              -2600.0,
+              19400.0,
+              -1080.0
+            ]
+          ],
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAll",
+          "pawn_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "visibility_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "center_probes": [
+            {
+              "axis": "x",
+              "start_cm": [
+                -2910.0,
+                19174.999997138977,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                -2590.0,
+                19174.999997138977,
+                -1140.0000017881393
+              ],
+              "contact_cm": [
+                -2900.0,
+                19174.999997138977,
+                -1140.0000017881393
+              ]
+            },
+            {
+              "axis": "y",
+              "start_cm": [
+                -2750.0,
+                19089.99998855591,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                -2750.0,
+                19260.000005722046,
+                -1140.0000017881393
+              ],
+              "contact_cm": [
+                -2750.0,
+                19100.000000369026,
+                -1140.0000017881393
+              ]
+            }
+          ]
+        },
+        {
+          "actor": "Aurelion_E4A_Entry",
+          "actor_path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovCampaignEncounterObjective_8",
+          "class_name": "SovCampaignEncounterObjective",
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.SovCampaignEncounterObjective_8.StartVolume",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=18900.000000,Z=-1090.000000),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+          "bounds_cm": [
+            [
+              -3200.0,
+              18660.0,
+              -1300.0
+            ],
+            [
+              3200.0,
+              19140.0,
+              -880.0
+            ]
+          ],
+          "collision": "<CollisionEnabled.QUERY_ONLY: 1>",
+          "profile": "Custom",
+          "pawn_response": "<CollisionResponseType.ECR_OVERLAP: 1>",
+          "visibility_response": "<CollisionResponseType.ECR_IGNORE: 0>",
+          "center_probes": [
+            {
+              "axis": "x",
+              "start_cm": [
+                -2910.0,
+                19174.999997138977,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                -2590.0,
+                19174.999997138977,
+                -1140.0000017881393
+              ],
+              "contact_cm": null
+            },
+            {
+              "axis": "y",
+              "start_cm": [
+                -2750.0,
+                19089.99998855591,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                -2750.0,
+                19260.000005722046,
+                -1140.0000017881393
+              ],
+              "contact_cm": [
+                -2750.0,
+                19089.99998855591,
+                -1140.0000017881393
+              ]
+            }
+          ]
+        },
+        {
+          "actor": "SM_SkySphere",
+          "actor_path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1111",
+          "class_name": "StaticMeshActor",
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1111.StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=10000.000000,Y=10000.000000,Z=10000.000000))",
+          "bounds_cm": [
+            [
+              -40960000.0,
+              -40960000.0,
+              -40960000.0
+            ],
+            [
+              40960000.0,
+              40960000.0,
+              40960000.0
+            ]
+          ],
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAll",
+          "pawn_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "visibility_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "center_probes": [
+            {
+              "axis": "x",
+              "start_cm": [
+                -2910.0,
+                19174.999997138977,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                -2590.0,
+                19174.999997138977,
+                -1140.0000017881393
+              ],
+              "contact_cm": null
+            },
+            {
+              "axis": "y",
+              "start_cm": [
+                -2750.0,
+                19089.99998855591,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                -2750.0,
+                19260.000005722046,
+                -1140.0000017881393
+              ],
+              "contact_cm": null
+            }
+          ]
+        }
+      ],
+      "approved_for_destruction": false
+    },
+    {
+      "source_instance_index": 1,
+      "source_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-2750.000023,Y=19324.999994,Z=-1200.000000),Scale3D=(X=1.500000,Y=0.750000,Z=0.600000))",
+      "bounds_cm": [
+        [
+          -2900.0,
+          19249.99998855591,
+          -1200.0000035762787
+        ],
+        [
+          -2600.0,
+          19400.000005722046,
+          -1080.0
+        ]
+      ],
+      "overlapping_colliders": [
+        {
+          "actor": "Z08_LC_Southwest",
+          "actor_path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_228",
+          "class_name": "StaticMeshActor",
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_228.StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-2750.000000,Y=19250.000000,Z=-1140.000000),Scale3D=(X=3.000000,Y=3.000000,Z=1.200000))",
+          "bounds_cm": [
+            [
+              -2900.0,
+              19100.0,
+              -1200.0
+            ],
+            [
+              -2600.0,
+              19400.0,
+              -1080.0
+            ]
+          ],
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAll",
+          "pawn_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "visibility_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "center_probes": [
+            {
+              "axis": "x",
+              "start_cm": [
+                -2910.0,
+                19324.999997138977,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                -2590.0,
+                19324.999997138977,
+                -1140.0000017881393
+              ],
+              "contact_cm": [
+                -2900.0,
+                19324.999997138977,
+                -1140.0000017881393
+              ]
+            },
+            {
+              "axis": "y",
+              "start_cm": [
+                -2750.0,
+                19239.99998855591,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                -2750.0,
+                19410.000005722046,
+                -1140.0000017881393
+              ],
+              "contact_cm": [
+                -2750.0,
+                19239.99998855591,
+                -1140.0000017881393
+              ]
+            }
+          ]
+        },
+        {
+          "actor": "SM_SkySphere",
+          "actor_path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1111",
+          "class_name": "StaticMeshActor",
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1111.StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=10000.000000,Y=10000.000000,Z=10000.000000))",
+          "bounds_cm": [
+            [
+              -40960000.0,
+              -40960000.0,
+              -40960000.0
+            ],
+            [
+              40960000.0,
+              40960000.0,
+              40960000.0
+            ]
+          ],
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAll",
+          "pawn_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "visibility_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "center_probes": [
+            {
+              "axis": "x",
+              "start_cm": [
+                -2910.0,
+                19324.999997138977,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                -2590.0,
+                19324.999997138977,
+                -1140.0000017881393
+              ],
+              "contact_cm": null
+            },
+            {
+              "axis": "y",
+              "start_cm": [
+                -2750.0,
+                19239.99998855591,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                -2750.0,
+                19410.000005722046,
+                -1140.0000017881393
+              ],
+              "contact_cm": null
+            }
+          ]
+        }
+      ],
+      "approved_for_destruction": false
+    },
+    {
+      "source_instance_index": 2,
+      "source_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-1550.000023,Y=19774.999994,Z=-1200.000000),Scale3D=(X=1.500000,Y=0.750000,Z=0.600000))",
+      "bounds_cm": [
+        [
+          -1700.0,
+          19699.99998855591,
+          -1200.0000035762787
+        ],
+        [
+          -1400.0,
+          19850.000005722046,
+          -1080.0
+        ]
+      ],
+      "overlapping_colliders": [
+        {
+          "actor": "Z08_LC_WestSouth",
+          "actor_path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_229",
+          "class_name": "StaticMeshActor",
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_229.StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-1550.000000,Y=19850.000000,Z=-1140.000000),Scale3D=(X=3.000000,Y=3.000000,Z=1.200000))",
+          "bounds_cm": [
+            [
+              -1700.0,
+              19700.0,
+              -1200.0
+            ],
+            [
+              -1400.0,
+              20000.0,
+              -1080.0
+            ]
+          ],
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAll",
+          "pawn_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "visibility_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "center_probes": [
+            {
+              "axis": "x",
+              "start_cm": [
+                -1710.0,
+                19774.999997138977,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                -1390.0,
+                19774.999997138977,
+                -1140.0000017881393
+              ],
+              "contact_cm": [
+                -1700.0,
+                19774.999997138977,
+                -1140.0000017881393
+              ]
+            },
+            {
+              "axis": "y",
+              "start_cm": [
+                -1550.0,
+                19689.99998855591,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                -1550.0,
+                19860.000005722046,
+                -1140.0000017881393
+              ],
+              "contact_cm": [
+                -1550.0,
+                19700.000000369026,
+                -1140.0000017881393
+              ]
+            }
+          ]
+        },
+        {
+          "actor": "SM_SkySphere",
+          "actor_path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1111",
+          "class_name": "StaticMeshActor",
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1111.StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=10000.000000,Y=10000.000000,Z=10000.000000))",
+          "bounds_cm": [
+            [
+              -40960000.0,
+              -40960000.0,
+              -40960000.0
+            ],
+            [
+              40960000.0,
+              40960000.0,
+              40960000.0
+            ]
+          ],
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAll",
+          "pawn_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "visibility_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "center_probes": [
+            {
+              "axis": "x",
+              "start_cm": [
+                -1710.0,
+                19774.999997138977,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                -1390.0,
+                19774.999997138977,
+                -1140.0000017881393
+              ],
+              "contact_cm": null
+            },
+            {
+              "axis": "y",
+              "start_cm": [
+                -1550.0,
+                19689.99998855591,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                -1550.0,
+                19860.000005722046,
+                -1140.0000017881393
+              ],
+              "contact_cm": null
+            }
+          ]
+        }
+      ],
+      "approved_for_destruction": false
+    },
+    {
+      "source_instance_index": 3,
+      "source_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-1550.000023,Y=19924.999994,Z=-1200.000000),Scale3D=(X=1.500000,Y=0.750000,Z=0.600000))",
+      "bounds_cm": [
+        [
+          -1700.0,
+          19849.99998855591,
+          -1200.0000035762787
+        ],
+        [
+          -1400.0,
+          20000.000005722046,
+          -1080.0
+        ]
+      ],
+      "overlapping_colliders": [
+        {
+          "actor": "Z08_LC_WestSouth",
+          "actor_path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_229",
+          "class_name": "StaticMeshActor",
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_229.StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-1550.000000,Y=19850.000000,Z=-1140.000000),Scale3D=(X=3.000000,Y=3.000000,Z=1.200000))",
+          "bounds_cm": [
+            [
+              -1700.0,
+              19700.0,
+              -1200.0
+            ],
+            [
+              -1400.0,
+              20000.0,
+              -1080.0
+            ]
+          ],
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAll",
+          "pawn_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "visibility_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "center_probes": [
+            {
+              "axis": "x",
+              "start_cm": [
+                -1710.0,
+                19924.999997138977,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                -1390.0,
+                19924.999997138977,
+                -1140.0000017881393
+              ],
+              "contact_cm": [
+                -1700.0,
+                19924.999997138977,
+                -1140.0000017881393
+              ]
+            },
+            {
+              "axis": "y",
+              "start_cm": [
+                -1550.0,
+                19839.99998855591,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                -1550.0,
+                20010.000005722046,
+                -1140.0000017881393
+              ],
+              "contact_cm": [
+                -1550.0,
+                19839.99998855591,
+                -1140.0000017881393
+              ]
+            }
+          ]
+        },
+        {
+          "actor": "SM_SkySphere",
+          "actor_path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1111",
+          "class_name": "StaticMeshActor",
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1111.StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=10000.000000,Y=10000.000000,Z=10000.000000))",
+          "bounds_cm": [
+            [
+              -40960000.0,
+              -40960000.0,
+              -40960000.0
+            ],
+            [
+              40960000.0,
+              40960000.0,
+              40960000.0
+            ]
+          ],
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAll",
+          "pawn_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "visibility_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "center_probes": [
+            {
+              "axis": "x",
+              "start_cm": [
+                -1710.0,
+                19924.999997138977,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                -1390.0,
+                19924.999997138977,
+                -1140.0000017881393
+              ],
+              "contact_cm": null
+            },
+            {
+              "axis": "y",
+              "start_cm": [
+                -1550.0,
+                19839.99998855591,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                -1550.0,
+                20010.000005722046,
+                -1140.0000017881393
+              ],
+              "contact_cm": null
+            }
+          ]
+        }
+      ],
+      "approved_for_destruction": false
+    },
+    {
+      "source_instance_index": 4,
+      "source_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=549.999977,Y=19474.999994,Z=-1200.000000),Scale3D=(X=1.500000,Y=0.750000,Z=0.600000))",
+      "bounds_cm": [
+        [
+          400.0,
+          19399.99998855591,
+          -1200.0000035762787
+        ],
+        [
+          700.0,
+          19550.000005722046,
+          -1080.0
+        ]
+      ],
+      "overlapping_colliders": [
+        {
+          "actor": "Z08_LC_SouthMid",
+          "actor_path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_230",
+          "class_name": "StaticMeshActor",
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_230.StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=550.000000,Y=19550.000000,Z=-1140.000000),Scale3D=(X=3.000000,Y=3.000000,Z=1.200000))",
+          "bounds_cm": [
+            [
+              400.0,
+              19400.0,
+              -1200.0
+            ],
+            [
+              700.0,
+              19700.0,
+              -1080.0
+            ]
+          ],
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAll",
+          "pawn_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "visibility_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "center_probes": [
+            {
+              "axis": "x",
+              "start_cm": [
+                390.0,
+                19474.999997138977,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                710.0,
+                19474.999997138977,
+                -1140.0000017881393
+              ],
+              "contact_cm": [
+                400.0,
+                19474.999997138977,
+                -1140.0000017881393
+              ]
+            },
+            {
+              "axis": "y",
+              "start_cm": [
+                550.0,
+                19389.99998855591,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                550.0,
+                19560.000005722046,
+                -1140.0000017881393
+              ],
+              "contact_cm": [
+                550.0,
+                19400.000000369026,
+                -1140.0000017881393
+              ]
+            }
+          ]
+        },
+        {
+          "actor": "SM_SkySphere",
+          "actor_path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1111",
+          "class_name": "StaticMeshActor",
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1111.StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=10000.000000,Y=10000.000000,Z=10000.000000))",
+          "bounds_cm": [
+            [
+              -40960000.0,
+              -40960000.0,
+              -40960000.0
+            ],
+            [
+              40960000.0,
+              40960000.0,
+              40960000.0
+            ]
+          ],
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAll",
+          "pawn_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "visibility_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "center_probes": [
+            {
+              "axis": "x",
+              "start_cm": [
+                390.0,
+                19474.999997138977,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                710.0,
+                19474.999997138977,
+                -1140.0000017881393
+              ],
+              "contact_cm": null
+            },
+            {
+              "axis": "y",
+              "start_cm": [
+                550.0,
+                19389.99998855591,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                550.0,
+                19560.000005722046,
+                -1140.0000017881393
+              ],
+              "contact_cm": null
+            }
+          ]
+        }
+      ],
+      "approved_for_destruction": false
+    },
+    {
+      "source_instance_index": 5,
+      "source_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=549.999977,Y=19624.999994,Z=-1200.000000),Scale3D=(X=1.500000,Y=0.750000,Z=0.600000))",
+      "bounds_cm": [
+        [
+          400.0,
+          19549.99998855591,
+          -1200.0000035762787
+        ],
+        [
+          700.0,
+          19700.000005722046,
+          -1080.0
+        ]
+      ],
+      "overlapping_colliders": [
+        {
+          "actor": "Z08_LC_SouthMid",
+          "actor_path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_230",
+          "class_name": "StaticMeshActor",
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_230.StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=550.000000,Y=19550.000000,Z=-1140.000000),Scale3D=(X=3.000000,Y=3.000000,Z=1.200000))",
+          "bounds_cm": [
+            [
+              400.0,
+              19400.0,
+              -1200.0
+            ],
+            [
+              700.0,
+              19700.0,
+              -1080.0
+            ]
+          ],
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAll",
+          "pawn_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "visibility_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "center_probes": [
+            {
+              "axis": "x",
+              "start_cm": [
+                390.0,
+                19624.999997138977,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                710.0,
+                19624.999997138977,
+                -1140.0000017881393
+              ],
+              "contact_cm": [
+                400.0,
+                19624.999997138977,
+                -1140.0000017881393
+              ]
+            },
+            {
+              "axis": "y",
+              "start_cm": [
+                550.0,
+                19539.99998855591,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                550.0,
+                19710.000005722046,
+                -1140.0000017881393
+              ],
+              "contact_cm": [
+                550.0,
+                19539.99998855591,
+                -1140.0000017881393
+              ]
+            }
+          ]
+        },
+        {
+          "actor": "SM_SkySphere",
+          "actor_path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1111",
+          "class_name": "StaticMeshActor",
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1111.StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=10000.000000,Y=10000.000000,Z=10000.000000))",
+          "bounds_cm": [
+            [
+              -40960000.0,
+              -40960000.0,
+              -40960000.0
+            ],
+            [
+              40960000.0,
+              40960000.0,
+              40960000.0
+            ]
+          ],
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAll",
+          "pawn_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "visibility_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "center_probes": [
+            {
+              "axis": "x",
+              "start_cm": [
+                390.0,
+                19624.999997138977,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                710.0,
+                19624.999997138977,
+                -1140.0000017881393
+              ],
+              "contact_cm": null
+            },
+            {
+              "axis": "y",
+              "start_cm": [
+                550.0,
+                19539.99998855591,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                550.0,
+                19710.000005722046,
+                -1140.0000017881393
+              ],
+              "contact_cm": null
+            }
+          ]
+        }
+      ],
+      "approved_for_destruction": false
+    },
+    {
+      "source_instance_index": 6,
+      "source_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=1249.999977,Y=21174.999994,Z=-1200.000000),Scale3D=(X=1.500000,Y=0.750000,Z=0.600000))",
+      "bounds_cm": [
+        [
+          1100.0,
+          21099.99998855591,
+          -1200.0000035762787
+        ],
+        [
+          1400.0,
+          21250.000005722046,
+          -1080.0
+        ]
+      ],
+      "overlapping_colliders": [
+        {
+          "actor": "Z08_LC_EastNorth",
+          "actor_path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_231",
+          "class_name": "StaticMeshActor",
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_231.StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=1250.000000,Y=21250.000000,Z=-1140.000000),Scale3D=(X=3.000000,Y=3.000000,Z=1.200000))",
+          "bounds_cm": [
+            [
+              1100.0,
+              21100.0,
+              -1200.0
+            ],
+            [
+              1400.0,
+              21400.0,
+              -1080.0
+            ]
+          ],
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAll",
+          "pawn_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "visibility_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "center_probes": [
+            {
+              "axis": "x",
+              "start_cm": [
+                1090.0,
+                21174.999997138977,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                1410.0,
+                21174.999997138977,
+                -1140.0000017881393
+              ],
+              "contact_cm": [
+                1100.0,
+                21174.999997138977,
+                -1140.0000017881393
+              ]
+            },
+            {
+              "axis": "y",
+              "start_cm": [
+                1250.0,
+                21089.99998855591,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                1250.0,
+                21260.000005722046,
+                -1140.0000017881393
+              ],
+              "contact_cm": [
+                1250.0,
+                21100.000000369026,
+                -1140.0000017881393
+              ]
+            }
+          ]
+        },
+        {
+          "actor": "SM_SkySphere",
+          "actor_path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1111",
+          "class_name": "StaticMeshActor",
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1111.StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=10000.000000,Y=10000.000000,Z=10000.000000))",
+          "bounds_cm": [
+            [
+              -40960000.0,
+              -40960000.0,
+              -40960000.0
+            ],
+            [
+              40960000.0,
+              40960000.0,
+              40960000.0
+            ]
+          ],
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAll",
+          "pawn_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "visibility_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "center_probes": [
+            {
+              "axis": "x",
+              "start_cm": [
+                1090.0,
+                21174.999997138977,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                1410.0,
+                21174.999997138977,
+                -1140.0000017881393
+              ],
+              "contact_cm": null
+            },
+            {
+              "axis": "y",
+              "start_cm": [
+                1250.0,
+                21089.99998855591,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                1250.0,
+                21260.000005722046,
+                -1140.0000017881393
+              ],
+              "contact_cm": null
+            }
+          ]
+        }
+      ],
+      "approved_for_destruction": false
+    },
+    {
+      "source_instance_index": 7,
+      "source_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=1249.999977,Y=21324.999994,Z=-1200.000000),Scale3D=(X=1.500000,Y=0.750000,Z=0.600000))",
+      "bounds_cm": [
+        [
+          1100.0,
+          21249.99998855591,
+          -1200.0000035762787
+        ],
+        [
+          1400.0,
+          21400.000005722046,
+          -1080.0
+        ]
+      ],
+      "overlapping_colliders": [
+        {
+          "actor": "Z08_LC_EastNorth",
+          "actor_path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_231",
+          "class_name": "StaticMeshActor",
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_231.StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=1250.000000,Y=21250.000000,Z=-1140.000000),Scale3D=(X=3.000000,Y=3.000000,Z=1.200000))",
+          "bounds_cm": [
+            [
+              1100.0,
+              21100.0,
+              -1200.0
+            ],
+            [
+              1400.0,
+              21400.0,
+              -1080.0
+            ]
+          ],
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAll",
+          "pawn_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "visibility_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "center_probes": [
+            {
+              "axis": "x",
+              "start_cm": [
+                1090.0,
+                21324.999997138977,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                1410.0,
+                21324.999997138977,
+                -1140.0000017881393
+              ],
+              "contact_cm": [
+                1100.0,
+                21324.999997138977,
+                -1140.0000017881393
+              ]
+            },
+            {
+              "axis": "y",
+              "start_cm": [
+                1250.0,
+                21239.99998855591,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                1250.0,
+                21410.000005722046,
+                -1140.0000017881393
+              ],
+              "contact_cm": [
+                1250.0,
+                21239.99998855591,
+                -1140.0000017881393
+              ]
+            }
+          ]
+        },
+        {
+          "actor": "SM_SkySphere",
+          "actor_path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1111",
+          "class_name": "StaticMeshActor",
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1111.StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=10000.000000,Y=10000.000000,Z=10000.000000))",
+          "bounds_cm": [
+            [
+              -40960000.0,
+              -40960000.0,
+              -40960000.0
+            ],
+            [
+              40960000.0,
+              40960000.0,
+              40960000.0
+            ]
+          ],
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAll",
+          "pawn_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "visibility_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "center_probes": [
+            {
+              "axis": "x",
+              "start_cm": [
+                1090.0,
+                21324.999997138977,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                1410.0,
+                21324.999997138977,
+                -1140.0000017881393
+              ],
+              "contact_cm": null
+            },
+            {
+              "axis": "y",
+              "start_cm": [
+                1250.0,
+                21239.99998855591,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                1250.0,
+                21410.000005722046,
+                -1140.0000017881393
+              ],
+              "contact_cm": null
+            }
+          ]
+        }
+      ],
+      "approved_for_destruction": false
+    },
+    {
+      "source_instance_index": 8,
+      "source_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=749.999977,Y=22174.999994,Z=-1200.000000),Scale3D=(X=1.500000,Y=0.750000,Z=0.600000))",
+      "bounds_cm": [
+        [
+          600.0,
+          22099.99998855591,
+          -1200.0000035762787
+        ],
+        [
+          900.0,
+          22250.000005722046,
+          -1080.0
+        ]
+      ],
+      "overlapping_colliders": [
+        {
+          "actor": "Z08_LC_Northeast",
+          "actor_path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_232",
+          "class_name": "StaticMeshActor",
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_232.StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=750.000000,Y=22250.000000,Z=-1140.000000),Scale3D=(X=3.000000,Y=3.000000,Z=1.200000))",
+          "bounds_cm": [
+            [
+              600.0,
+              22100.0,
+              -1200.0
+            ],
+            [
+              900.0,
+              22400.0,
+              -1080.0
+            ]
+          ],
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAll",
+          "pawn_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "visibility_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "center_probes": [
+            {
+              "axis": "x",
+              "start_cm": [
+                590.0,
+                22174.999997138977,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                910.0,
+                22174.999997138977,
+                -1140.0000017881393
+              ],
+              "contact_cm": [
+                600.0,
+                22174.999997138977,
+                -1140.0000017881393
+              ]
+            },
+            {
+              "axis": "y",
+              "start_cm": [
+                750.0,
+                22089.99998855591,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                750.0,
+                22260.000005722046,
+                -1140.0000017881393
+              ],
+              "contact_cm": [
+                750.0,
+                22100.000000369026,
+                -1140.0000017881393
+              ]
+            }
+          ]
+        },
+        {
+          "actor": "SM_SkySphere",
+          "actor_path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1111",
+          "class_name": "StaticMeshActor",
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1111.StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=10000.000000,Y=10000.000000,Z=10000.000000))",
+          "bounds_cm": [
+            [
+              -40960000.0,
+              -40960000.0,
+              -40960000.0
+            ],
+            [
+              40960000.0,
+              40960000.0,
+              40960000.0
+            ]
+          ],
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAll",
+          "pawn_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "visibility_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "center_probes": [
+            {
+              "axis": "x",
+              "start_cm": [
+                590.0,
+                22174.999997138977,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                910.0,
+                22174.999997138977,
+                -1140.0000017881393
+              ],
+              "contact_cm": null
+            },
+            {
+              "axis": "y",
+              "start_cm": [
+                750.0,
+                22089.99998855591,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                750.0,
+                22260.000005722046,
+                -1140.0000017881393
+              ],
+              "contact_cm": null
+            }
+          ]
+        }
+      ],
+      "approved_for_destruction": false
+    },
+    {
+      "source_instance_index": 9,
+      "source_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=749.999977,Y=22324.999994,Z=-1200.000000),Scale3D=(X=1.500000,Y=0.750000,Z=0.600000))",
+      "bounds_cm": [
+        [
+          600.0,
+          22249.99998855591,
+          -1200.0000035762787
+        ],
+        [
+          900.0,
+          22400.000005722046,
+          -1080.0
+        ]
+      ],
+      "overlapping_colliders": [
+        {
+          "actor": "Z08_LC_Northeast",
+          "actor_path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_232",
+          "class_name": "StaticMeshActor",
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_232.StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=750.000000,Y=22250.000000,Z=-1140.000000),Scale3D=(X=3.000000,Y=3.000000,Z=1.200000))",
+          "bounds_cm": [
+            [
+              600.0,
+              22100.0,
+              -1200.0
+            ],
+            [
+              900.0,
+              22400.0,
+              -1080.0
+            ]
+          ],
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAll",
+          "pawn_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "visibility_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "center_probes": [
+            {
+              "axis": "x",
+              "start_cm": [
+                590.0,
+                22324.999997138977,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                910.0,
+                22324.999997138977,
+                -1140.0000017881393
+              ],
+              "contact_cm": [
+                600.0,
+                22324.999997138977,
+                -1140.0000017881393
+              ]
+            },
+            {
+              "axis": "y",
+              "start_cm": [
+                750.0,
+                22239.99998855591,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                750.0,
+                22410.000005722046,
+                -1140.0000017881393
+              ],
+              "contact_cm": [
+                750.0,
+                22239.99998855591,
+                -1140.0000017881393
+              ]
+            }
+          ]
+        },
+        {
+          "actor": "SM_SkySphere",
+          "actor_path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1111",
+          "class_name": "StaticMeshActor",
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1111.StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=10000.000000,Y=10000.000000,Z=10000.000000))",
+          "bounds_cm": [
+            [
+              -40960000.0,
+              -40960000.0,
+              -40960000.0
+            ],
+            [
+              40960000.0,
+              40960000.0,
+              40960000.0
+            ]
+          ],
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAll",
+          "pawn_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "visibility_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "center_probes": [
+            {
+              "axis": "x",
+              "start_cm": [
+                590.0,
+                22324.999997138977,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                910.0,
+                22324.999997138977,
+                -1140.0000017881393
+              ],
+              "contact_cm": null
+            },
+            {
+              "axis": "y",
+              "start_cm": [
+                750.0,
+                22239.99998855591,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                750.0,
+                22410.000005722046,
+                -1140.0000017881393
+              ],
+              "contact_cm": null
+            }
+          ]
+        }
+      ],
+      "approved_for_destruction": false
+    },
+    {
+      "source_instance_index": 10,
+      "source_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-1650.000023,Y=22074.999994,Z=-1200.000000),Scale3D=(X=1.500000,Y=0.750000,Z=0.600000))",
+      "bounds_cm": [
+        [
+          -1800.0,
+          21999.99998855591,
+          -1200.0000035762787
+        ],
+        [
+          -1500.0,
+          22150.000005722046,
+          -1080.0
+        ]
+      ],
+      "overlapping_colliders": [
+        {
+          "actor": "Z08_LC_Northwest",
+          "actor_path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_233",
+          "class_name": "StaticMeshActor",
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_233.StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-1650.000000,Y=22150.000000,Z=-1140.000000),Scale3D=(X=3.000000,Y=3.000000,Z=1.200000))",
+          "bounds_cm": [
+            [
+              -1800.0,
+              22000.0,
+              -1200.0
+            ],
+            [
+              -1500.0,
+              22300.0,
+              -1080.0
+            ]
+          ],
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAll",
+          "pawn_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "visibility_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "center_probes": [
+            {
+              "axis": "x",
+              "start_cm": [
+                -1810.0,
+                22074.999997138977,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                -1490.0,
+                22074.999997138977,
+                -1140.0000017881393
+              ],
+              "contact_cm": [
+                -1800.0,
+                22074.999997138977,
+                -1140.0000017881393
+              ]
+            },
+            {
+              "axis": "y",
+              "start_cm": [
+                -1650.0,
+                21989.99998855591,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                -1650.0,
+                22160.000005722046,
+                -1140.0000017881393
+              ],
+              "contact_cm": [
+                -1650.0,
+                22000.000000369026,
+                -1140.0000017881393
+              ]
+            }
+          ]
+        },
+        {
+          "actor": "SM_SkySphere",
+          "actor_path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1111",
+          "class_name": "StaticMeshActor",
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1111.StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=10000.000000,Y=10000.000000,Z=10000.000000))",
+          "bounds_cm": [
+            [
+              -40960000.0,
+              -40960000.0,
+              -40960000.0
+            ],
+            [
+              40960000.0,
+              40960000.0,
+              40960000.0
+            ]
+          ],
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAll",
+          "pawn_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "visibility_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "center_probes": [
+            {
+              "axis": "x",
+              "start_cm": [
+                -1810.0,
+                22074.999997138977,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                -1490.0,
+                22074.999997138977,
+                -1140.0000017881393
+              ],
+              "contact_cm": null
+            },
+            {
+              "axis": "y",
+              "start_cm": [
+                -1650.0,
+                21989.99998855591,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                -1650.0,
+                22160.000005722046,
+                -1140.0000017881393
+              ],
+              "contact_cm": null
+            }
+          ]
+        }
+      ],
+      "approved_for_destruction": false
+    },
+    {
+      "source_instance_index": 11,
+      "source_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-1650.000023,Y=22224.999994,Z=-1200.000000),Scale3D=(X=1.500000,Y=0.750000,Z=0.600000))",
+      "bounds_cm": [
+        [
+          -1800.0,
+          22149.99998855591,
+          -1200.0000035762787
+        ],
+        [
+          -1500.0,
+          22300.000005722046,
+          -1080.0
+        ]
+      ],
+      "overlapping_colliders": [
+        {
+          "actor": "Z08_LC_Northwest",
+          "actor_path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_233",
+          "class_name": "StaticMeshActor",
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_233.StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-1650.000000,Y=22150.000000,Z=-1140.000000),Scale3D=(X=3.000000,Y=3.000000,Z=1.200000))",
+          "bounds_cm": [
+            [
+              -1800.0,
+              22000.0,
+              -1200.0
+            ],
+            [
+              -1500.0,
+              22300.0,
+              -1080.0
+            ]
+          ],
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAll",
+          "pawn_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "visibility_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "center_probes": [
+            {
+              "axis": "x",
+              "start_cm": [
+                -1810.0,
+                22224.999997138977,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                -1490.0,
+                22224.999997138977,
+                -1140.0000017881393
+              ],
+              "contact_cm": [
+                -1800.0,
+                22224.999997138977,
+                -1140.0000017881393
+              ]
+            },
+            {
+              "axis": "y",
+              "start_cm": [
+                -1650.0,
+                22139.99998855591,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                -1650.0,
+                22310.000005722046,
+                -1140.0000017881393
+              ],
+              "contact_cm": [
+                -1650.0,
+                22139.99998855591,
+                -1140.0000017881393
+              ]
+            }
+          ]
+        },
+        {
+          "actor": "SM_SkySphere",
+          "actor_path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1111",
+          "class_name": "StaticMeshActor",
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1111.StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=10000.000000,Y=10000.000000,Z=10000.000000))",
+          "bounds_cm": [
+            [
+              -40960000.0,
+              -40960000.0,
+              -40960000.0
+            ],
+            [
+              40960000.0,
+              40960000.0,
+              40960000.0
+            ]
+          ],
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAll",
+          "pawn_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "visibility_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "center_probes": [
+            {
+              "axis": "x",
+              "start_cm": [
+                -1810.0,
+                22224.999997138977,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                -1490.0,
+                22224.999997138977,
+                -1140.0000017881393
+              ],
+              "contact_cm": null
+            },
+            {
+              "axis": "y",
+              "start_cm": [
+                -1650.0,
+                22139.99998855591,
+                -1140.0000017881393
+              ],
+              "end_cm": [
+                -1650.0,
+                22310.000005722046,
+                -1140.0000017881393
+              ],
+              "contact_cm": null
+            }
+          ]
+        }
+      ],
+      "approved_for_destruction": false
+    },
+    {
+      "source_instance_index": 12,
+      "source_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-2550.000023,Y=20374.999994,Z=-1200.000000),Scale3D=(X=1.500000,Y=0.750000,Z=1.100000))",
+      "bounds_cm": [
+        [
+          -2700.0,
+          20299.99998855591,
+          -1200.000006556511
+        ],
+        [
+          -2400.0,
+          20450.000005722046,
+          -980.0
+        ]
+      ],
+      "overlapping_colliders": [
+        {
+          "actor": "Z08_HC_WestOuter",
+          "actor_path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_234",
+          "class_name": "StaticMeshActor",
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_234.StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-2550.000000,Y=20450.000000,Z=-1090.000000),Scale3D=(X=3.000000,Y=3.000000,Z=2.200000))",
+          "bounds_cm": [
+            [
+              -2700.0,
+              20300.0,
+              -1200.0
+            ],
+            [
+              -2400.0,
+              20600.0,
+              -980.0
+            ]
+          ],
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAll",
+          "pawn_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "visibility_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "center_probes": [
+            {
+              "axis": "x",
+              "start_cm": [
+                -2710.0,
+                20374.999997138977,
+                -1090.0000032782555
+              ],
+              "end_cm": [
+                -2390.0,
+                20374.999997138977,
+                -1090.0000032782555
+              ],
+              "contact_cm": [
+                -2700.0,
+                20374.999997138977,
+                -1090.0000032782555
+              ]
+            },
+            {
+              "axis": "y",
+              "start_cm": [
+                -2550.0,
+                20289.99998855591,
+                -1090.0000032782555
+              ],
+              "end_cm": [
+                -2550.0,
+                20460.000005722046,
+                -1090.0000032782555
+              ],
+              "contact_cm": [
+                -2550.0,
+                20300.000000369026,
+                -1090.0000032782555
+              ]
+            }
+          ]
+        },
+        {
+          "actor": "SM_SkySphere",
+          "actor_path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1111",
+          "class_name": "StaticMeshActor",
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1111.StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=10000.000000,Y=10000.000000,Z=10000.000000))",
+          "bounds_cm": [
+            [
+              -40960000.0,
+              -40960000.0,
+              -40960000.0
+            ],
+            [
+              40960000.0,
+              40960000.0,
+              40960000.0
+            ]
+          ],
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAll",
+          "pawn_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "visibility_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "center_probes": [
+            {
+              "axis": "x",
+              "start_cm": [
+                -2710.0,
+                20374.999997138977,
+                -1090.0000032782555
+              ],
+              "end_cm": [
+                -2390.0,
+                20374.999997138977,
+                -1090.0000032782555
+              ],
+              "contact_cm": null
+            },
+            {
+              "axis": "y",
+              "start_cm": [
+                -2550.0,
+                20289.99998855591,
+                -1090.0000032782555
+              ],
+              "end_cm": [
+                -2550.0,
+                20460.000005722046,
+                -1090.0000032782555
+              ],
+              "contact_cm": null
+            }
+          ]
+        }
+      ],
+      "approved_for_destruction": false
+    },
+    {
+      "source_instance_index": 13,
+      "source_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-2550.000023,Y=20524.999994,Z=-1200.000000),Scale3D=(X=1.500000,Y=0.750000,Z=1.100000))",
+      "bounds_cm": [
+        [
+          -2700.0,
+          20449.99998855591,
+          -1200.000006556511
+        ],
+        [
+          -2400.0,
+          20600.000005722046,
+          -980.0
+        ]
+      ],
+      "overlapping_colliders": [
+        {
+          "actor": "Z08_HC_WestOuter",
+          "actor_path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_234",
+          "class_name": "StaticMeshActor",
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_234.StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-2550.000000,Y=20450.000000,Z=-1090.000000),Scale3D=(X=3.000000,Y=3.000000,Z=2.200000))",
+          "bounds_cm": [
+            [
+              -2700.0,
+              20300.0,
+              -1200.0
+            ],
+            [
+              -2400.0,
+              20600.0,
+              -980.0
+            ]
+          ],
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAll",
+          "pawn_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "visibility_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "center_probes": [
+            {
+              "axis": "x",
+              "start_cm": [
+                -2710.0,
+                20524.999997138977,
+                -1090.0000032782555
+              ],
+              "end_cm": [
+                -2390.0,
+                20524.999997138977,
+                -1090.0000032782555
+              ],
+              "contact_cm": [
+                -2700.0,
+                20524.999997138977,
+                -1090.0000032782555
+              ]
+            },
+            {
+              "axis": "y",
+              "start_cm": [
+                -2550.0,
+                20439.99998855591,
+                -1090.0000032782555
+              ],
+              "end_cm": [
+                -2550.0,
+                20610.000005722046,
+                -1090.0000032782555
+              ],
+              "contact_cm": [
+                -2550.0,
+                20439.99998855591,
+                -1090.0000032782555
+              ]
+            }
+          ]
+        },
+        {
+          "actor": "SM_SkySphere",
+          "actor_path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1111",
+          "class_name": "StaticMeshActor",
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1111.StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=10000.000000,Y=10000.000000,Z=10000.000000))",
+          "bounds_cm": [
+            [
+              -40960000.0,
+              -40960000.0,
+              -40960000.0
+            ],
+            [
+              40960000.0,
+              40960000.0,
+              40960000.0
+            ]
+          ],
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAll",
+          "pawn_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "visibility_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "center_probes": [
+            {
+              "axis": "x",
+              "start_cm": [
+                -2710.0,
+                20524.999997138977,
+                -1090.0000032782555
+              ],
+              "end_cm": [
+                -2390.0,
+                20524.999997138977,
+                -1090.0000032782555
+              ],
+              "contact_cm": null
+            },
+            {
+              "axis": "y",
+              "start_cm": [
+                -2550.0,
+                20439.99998855591,
+                -1090.0000032782555
+              ],
+              "end_cm": [
+                -2550.0,
+                20610.000005722046,
+                -1090.0000032782555
+              ],
+              "contact_cm": null
+            }
+          ]
+        }
+      ],
+      "approved_for_destruction": false
+    },
+    {
+      "source_instance_index": 14,
+      "source_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-1550.000023,Y=21074.999994,Z=-1200.000000),Scale3D=(X=1.500000,Y=0.750000,Z=1.100000))",
+      "bounds_cm": [
+        [
+          -1700.0,
+          20999.99998855591,
+          -1200.000006556511
+        ],
+        [
+          -1400.0,
+          21150.000005722046,
+          -980.0
+        ]
+      ],
+      "overlapping_colliders": [
+        {
+          "actor": "Z08_HC_WestInner",
+          "actor_path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_235",
+          "class_name": "StaticMeshActor",
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_235.StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-1550.000000,Y=21150.000000,Z=-1090.000000),Scale3D=(X=3.000000,Y=3.000000,Z=2.200000))",
+          "bounds_cm": [
+            [
+              -1700.0,
+              21000.0,
+              -1200.0
+            ],
+            [
+              -1400.0,
+              21300.0,
+              -980.0
+            ]
+          ],
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAll",
+          "pawn_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "visibility_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "center_probes": [
+            {
+              "axis": "x",
+              "start_cm": [
+                -1710.0,
+                21074.999997138977,
+                -1090.0000032782555
+              ],
+              "end_cm": [
+                -1390.0,
+                21074.999997138977,
+                -1090.0000032782555
+              ],
+              "contact_cm": [
+                -1700.0,
+                21074.999997138977,
+                -1090.0000032782555
+              ]
+            },
+            {
+              "axis": "y",
+              "start_cm": [
+                -1550.0,
+                20989.99998855591,
+                -1090.0000032782555
+              ],
+              "end_cm": [
+                -1550.0,
+                21160.000005722046,
+                -1090.0000032782555
+              ],
+              "contact_cm": [
+                -1550.0,
+                21000.000000369026,
+                -1090.0000032782555
+              ]
+            }
+          ]
+        },
+        {
+          "actor": "SM_SkySphere",
+          "actor_path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1111",
+          "class_name": "StaticMeshActor",
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1111.StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=10000.000000,Y=10000.000000,Z=10000.000000))",
+          "bounds_cm": [
+            [
+              -40960000.0,
+              -40960000.0,
+              -40960000.0
+            ],
+            [
+              40960000.0,
+              40960000.0,
+              40960000.0
+            ]
+          ],
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAll",
+          "pawn_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "visibility_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "center_probes": [
+            {
+              "axis": "x",
+              "start_cm": [
+                -1710.0,
+                21074.999997138977,
+                -1090.0000032782555
+              ],
+              "end_cm": [
+                -1390.0,
+                21074.999997138977,
+                -1090.0000032782555
+              ],
+              "contact_cm": null
+            },
+            {
+              "axis": "y",
+              "start_cm": [
+                -1550.0,
+                20989.99998855591,
+                -1090.0000032782555
+              ],
+              "end_cm": [
+                -1550.0,
+                21160.000005722046,
+                -1090.0000032782555
+              ],
+              "contact_cm": null
+            }
+          ]
+        }
+      ],
+      "approved_for_destruction": false
+    },
+    {
+      "source_instance_index": 15,
+      "source_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-1550.000023,Y=21224.999994,Z=-1200.000000),Scale3D=(X=1.500000,Y=0.750000,Z=1.100000))",
+      "bounds_cm": [
+        [
+          -1700.0,
+          21149.99998855591,
+          -1200.000006556511
+        ],
+        [
+          -1400.0,
+          21300.000005722046,
+          -980.0
+        ]
+      ],
+      "overlapping_colliders": [
+        {
+          "actor": "Z08_HC_WestInner",
+          "actor_path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_235",
+          "class_name": "StaticMeshActor",
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_235.StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-1550.000000,Y=21150.000000,Z=-1090.000000),Scale3D=(X=3.000000,Y=3.000000,Z=2.200000))",
+          "bounds_cm": [
+            [
+              -1700.0,
+              21000.0,
+              -1200.0
+            ],
+            [
+              -1400.0,
+              21300.0,
+              -980.0
+            ]
+          ],
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAll",
+          "pawn_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "visibility_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "center_probes": [
+            {
+              "axis": "x",
+              "start_cm": [
+                -1710.0,
+                21224.999997138977,
+                -1090.0000032782555
+              ],
+              "end_cm": [
+                -1390.0,
+                21224.999997138977,
+                -1090.0000032782555
+              ],
+              "contact_cm": [
+                -1700.0,
+                21224.999997138977,
+                -1090.0000032782555
+              ]
+            },
+            {
+              "axis": "y",
+              "start_cm": [
+                -1550.0,
+                21139.99998855591,
+                -1090.0000032782555
+              ],
+              "end_cm": [
+                -1550.0,
+                21310.000005722046,
+                -1090.0000032782555
+              ],
+              "contact_cm": [
+                -1550.0,
+                21139.99998855591,
+                -1090.0000032782555
+              ]
+            }
+          ]
+        },
+        {
+          "actor": "SM_SkySphere",
+          "actor_path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1111",
+          "class_name": "StaticMeshActor",
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1111.StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=10000.000000,Y=10000.000000,Z=10000.000000))",
+          "bounds_cm": [
+            [
+              -40960000.0,
+              -40960000.0,
+              -40960000.0
+            ],
+            [
+              40960000.0,
+              40960000.0,
+              40960000.0
+            ]
+          ],
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAll",
+          "pawn_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "visibility_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "center_probes": [
+            {
+              "axis": "x",
+              "start_cm": [
+                -1710.0,
+                21224.999997138977,
+                -1090.0000032782555
+              ],
+              "end_cm": [
+                -1390.0,
+                21224.999997138977,
+                -1090.0000032782555
+              ],
+              "contact_cm": null
+            },
+            {
+              "axis": "y",
+              "start_cm": [
+                -1550.0,
+                21139.99998855591,
+                -1090.0000032782555
+              ],
+              "end_cm": [
+                -1550.0,
+                21310.000005722046,
+                -1090.0000032782555
+              ],
+              "contact_cm": null
+            }
+          ]
+        }
+      ],
+      "approved_for_destruction": false
+    },
+    {
+      "source_instance_index": 16,
+      "source_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-350.000023,Y=22099.999992,Z=-1200.000000),Scale3D=(X=1.500000,Y=1.000000,Z=1.100000))",
+      "bounds_cm": [
+        [
+          -500.0,
+          21999.99998474121,
+          -1200.000006556511
+        ],
+        [
+          -200.00000000000003,
+          22200.000007629395,
+          -980.0
+        ]
+      ],
+      "overlapping_colliders": [
+        {
+          "actor": "Z08_HC_NorthMid",
+          "actor_path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_236",
+          "class_name": "StaticMeshActor",
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_236.StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-350.000000,Y=22100.000000,Z=-1090.000000),Scale3D=(X=3.000000,Y=2.000000,Z=2.200000))",
+          "bounds_cm": [
+            [
+              -500.0,
+              22000.0,
+              -1200.0
+            ],
+            [
+              -200.0,
+              22200.0,
+              -980.0
+            ]
+          ],
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAll",
+          "pawn_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "visibility_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "center_probes": [
+            {
+              "axis": "x",
+              "start_cm": [
+                -510.0,
+                22099.999996185303,
+                -1090.0000032782555
+              ],
+              "end_cm": [
+                -190.00000000000003,
+                22099.999996185303,
+                -1090.0000032782555
+              ],
+              "contact_cm": [
+                -500.0,
+                22099.999996185303,
+                -1090.0000032782555
+              ]
+            },
+            {
+              "axis": "y",
+              "start_cm": [
+                -350.0,
+                21989.99998474121,
+                -1090.0000032782555
+              ],
+              "end_cm": [
+                -350.0,
+                22210.000007629395,
+                -1090.0000032782555
+              ],
+              "contact_cm": [
+                -350.0,
+                22000.000000012195,
+                -1090.0000032782555
+              ]
+            }
+          ]
+        },
+        {
+          "actor": "SM_SkySphere",
+          "actor_path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1111",
+          "class_name": "StaticMeshActor",
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1111.StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=10000.000000,Y=10000.000000,Z=10000.000000))",
+          "bounds_cm": [
+            [
+              -40960000.0,
+              -40960000.0,
+              -40960000.0
+            ],
+            [
+              40960000.0,
+              40960000.0,
+              40960000.0
+            ]
+          ],
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAll",
+          "pawn_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "visibility_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "center_probes": [
+            {
+              "axis": "x",
+              "start_cm": [
+                -510.0,
+                22099.999996185303,
+                -1090.0000032782555
+              ],
+              "end_cm": [
+                -190.00000000000003,
+                22099.999996185303,
+                -1090.0000032782555
+              ],
+              "contact_cm": null
+            },
+            {
+              "axis": "y",
+              "start_cm": [
+                -350.0,
+                21989.99998474121,
+                -1090.0000032782555
+              ],
+              "end_cm": [
+                -350.0,
+                22210.000007629395,
+                -1090.0000032782555
+              ],
+              "contact_cm": null
+            }
+          ]
+        }
+      ],
+      "approved_for_destruction": false
+    },
+    {
+      "source_instance_index": 17,
+      "source_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=1249.999977,Y=19774.999994,Z=-1200.000000),Scale3D=(X=1.500000,Y=0.750000,Z=1.100000))",
+      "bounds_cm": [
+        [
+          1100.0,
+          19699.99998855591,
+          -1200.000006556511
+        ],
+        [
+          1400.0,
+          19850.000005722046,
+          -980.0
+        ]
+      ],
+      "overlapping_colliders": [
+        {
+          "actor": "Z08_HC_EastSouth",
+          "actor_path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_237",
+          "class_name": "StaticMeshActor",
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_237.StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=1250.000000,Y=19850.000000,Z=-1090.000000),Scale3D=(X=3.000000,Y=3.000000,Z=2.200000))",
+          "bounds_cm": [
+            [
+              1100.0,
+              19700.0,
+              -1200.0
+            ],
+            [
+              1400.0,
+              20000.0,
+              -980.0
+            ]
+          ],
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAll",
+          "pawn_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "visibility_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "center_probes": [
+            {
+              "axis": "x",
+              "start_cm": [
+                1090.0,
+                19774.999997138977,
+                -1090.0000032782555
+              ],
+              "end_cm": [
+                1410.0,
+                19774.999997138977,
+                -1090.0000032782555
+              ],
+              "contact_cm": [
+                1100.0,
+                19774.999997138977,
+                -1090.0000032782555
+              ]
+            },
+            {
+              "axis": "y",
+              "start_cm": [
+                1250.0,
+                19689.99998855591,
+                -1090.0000032782555
+              ],
+              "end_cm": [
+                1250.0,
+                19860.000005722046,
+                -1090.0000032782555
+              ],
+              "contact_cm": [
+                1250.0,
+                19700.000000369026,
+                -1090.0000032782555
+              ]
+            }
+          ]
+        },
+        {
+          "actor": "SM_SkySphere",
+          "actor_path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1111",
+          "class_name": "StaticMeshActor",
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1111.StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=10000.000000,Y=10000.000000,Z=10000.000000))",
+          "bounds_cm": [
+            [
+              -40960000.0,
+              -40960000.0,
+              -40960000.0
+            ],
+            [
+              40960000.0,
+              40960000.0,
+              40960000.0
+            ]
+          ],
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAll",
+          "pawn_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "visibility_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "center_probes": [
+            {
+              "axis": "x",
+              "start_cm": [
+                1090.0,
+                19774.999997138977,
+                -1090.0000032782555
+              ],
+              "end_cm": [
+                1410.0,
+                19774.999997138977,
+                -1090.0000032782555
+              ],
+              "contact_cm": null
+            },
+            {
+              "axis": "y",
+              "start_cm": [
+                1250.0,
+                19689.99998855591,
+                -1090.0000032782555
+              ],
+              "end_cm": [
+                1250.0,
+                19860.000005722046,
+                -1090.0000032782555
+              ],
+              "contact_cm": null
+            }
+          ]
+        }
+      ],
+      "approved_for_destruction": false
+    },
+    {
+      "source_instance_index": 18,
+      "source_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=1249.999977,Y=19924.999994,Z=-1200.000000),Scale3D=(X=1.500000,Y=0.750000,Z=1.100000))",
+      "bounds_cm": [
+        [
+          1100.0,
+          19849.99998855591,
+          -1200.000006556511
+        ],
+        [
+          1400.0,
+          20000.000005722046,
+          -980.0
+        ]
+      ],
+      "overlapping_colliders": [
+        {
+          "actor": "Z08_HC_EastSouth",
+          "actor_path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_237",
+          "class_name": "StaticMeshActor",
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_237.StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=1250.000000,Y=19850.000000,Z=-1090.000000),Scale3D=(X=3.000000,Y=3.000000,Z=2.200000))",
+          "bounds_cm": [
+            [
+              1100.0,
+              19700.0,
+              -1200.0
+            ],
+            [
+              1400.0,
+              20000.0,
+              -980.0
+            ]
+          ],
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAll",
+          "pawn_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "visibility_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "center_probes": [
+            {
+              "axis": "x",
+              "start_cm": [
+                1090.0,
+                19924.999997138977,
+                -1090.0000032782555
+              ],
+              "end_cm": [
+                1410.0,
+                19924.999997138977,
+                -1090.0000032782555
+              ],
+              "contact_cm": [
+                1100.0,
+                19924.999997138977,
+                -1090.0000032782555
+              ]
+            },
+            {
+              "axis": "y",
+              "start_cm": [
+                1250.0,
+                19839.99998855591,
+                -1090.0000032782555
+              ],
+              "end_cm": [
+                1250.0,
+                20010.000005722046,
+                -1090.0000032782555
+              ],
+              "contact_cm": [
+                1250.0,
+                19839.99998855591,
+                -1090.0000032782555
+              ]
+            }
+          ]
+        },
+        {
+          "actor": "SM_SkySphere",
+          "actor_path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1111",
+          "class_name": "StaticMeshActor",
+          "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1111.StaticMeshComponent0",
+          "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=0.000000,Z=0.000000),Scale3D=(X=10000.000000,Y=10000.000000,Z=10000.000000))",
+          "bounds_cm": [
+            [
+              -40960000.0,
+              -40960000.0,
+              -40960000.0
+            ],
+            [
+              40960000.0,
+              40960000.0,
+              40960000.0
+            ]
+          ],
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "profile": "BlockAll",
+          "pawn_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "visibility_response": "<CollisionResponseType.ECR_BLOCK: 2>",
+          "center_probes": [
+            {
+              "axis": "x",
+              "start_cm": [
+                1090.0,
+                19924.999997138977,
+                -1090.0000032782555
+              ],
+              "end_cm": [
+                1410.0,
+                19924.999997138977,
+                -1090.0000032782555
+              ],
+              "contact_cm": null
+            },
+            {
+              "axis": "y",
+              "start_cm": [
+                1250.0,
+                19839.99998855591,
+                -1090.0000032782555
+              ],
+              "end_cm": [
+                1250.0,
+                20010.000005722046,
+                -1090.0000032782555
+              ],
+              "contact_cm": null
+            }
+          ]
+        }
+      ],
+      "approved_for_destruction": false
+    }
+  ],
+  "qualification": "Broad-phase AABB and two simple component traces per overlap. Not an ownership assignment, fracture implementation, traversal test, or stable checkpoint identity. Shared colliders must be split or retained deliberately before any instance can become destructible."
+}

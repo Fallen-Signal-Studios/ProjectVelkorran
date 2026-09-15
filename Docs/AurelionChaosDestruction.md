@@ -40,4 +40,16 @@ The user requested Chaos destruction for appropriate cover and nonstructural wal
 - Checkpoint reload before and after destruction restores the correct state without resetting unrelated mission progress.
 - Worst-case nearby destruction meets measured campaign performance and debris budgets before broad rollout.
 
-The existing 68 architecture checks establish static fit only. They do not qualify Chaos destruction, live combat or save/load behavior for this phase.
+The existing 73 architecture checks establish static fit only. They do not qualify Chaos destruction, live combat or save/load behavior for this phase.
+
+## Collision ownership survey
+
+`Scripts/Editor/audit_aurelion_destruction_candidates.py` surveys all nineteen finalized cargo visuals against collision-enabled primitive components in the saved M12 map. It records component paths, transforms, world bounds, Pawn/Visibility responses and two horizontal simple-collision probes for each overlapping component. It first runs the existing cargo fit check, makes no map changes, and asserts a clean map before and after execution.
+
+An overlapping bounding box does not prove that a collider belongs to the cargo: floors, shared barriers, triggers and unrelated geometry can overlap. These rows are review evidence, not automatic removal instructions. HISM instance indices are source references, not stable checkpoint identities. None of these candidates is approved for campaign destruction until its actual obstruction ownership, stable identity and gameplay role are qualified.
+
+The inspected drone point-damage path (`USovGameplayAbility_ReformationDroneWeaponBase::ApplyPointDamage`) rejects targets without a valid hostile ability system. A Geometry Collection alone therefore does not supply the required damage integration for this attack. This source finding is not a live combat qualification or evidence that every weapon shares that path.
+
+Verified run: `DestructionOwnershipVerified-20260914-202435-08e54112`, terminal exit 0, no Python errors, 3140 actors and clean map. Full measured output is `Docs/AurelionDestructionCandidates-2026-09-14.json`.
+
+The nineteen visuals overlap ten native cover components: six `Z08_LC_*` and four `Z08_HC_*` actors. Nine cover actors span two cargo visuals each; `Z08_HC_NorthMid` spans one. Both horizontal component probes report contact for each cover overlap. Independent per-crate destruction must therefore split the shared obstruction or intentionally fracture both visuals as one authored state group. The sky sphere also overlaps the broad-phase bounds, and instance 0 overlaps the E4 entry trigger; neither is cargo collision ownership. Preserve those unrelated components.
