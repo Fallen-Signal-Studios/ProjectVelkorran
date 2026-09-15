@@ -1,6 +1,6 @@
 """Flush court, exact retained markings and unchanged native floor controls."""
 from pathlib import Path
-import json
+import json,runpy
 import unreal
 def check_z08_court(world,actors,nanite_enabled=True):
     fit=json.loads((Path(unreal.Paths.project_dir())/'Art/Source/Aurelion/Z08CourtKit/court-fit.json').read_text());labels={a.get_actor_label():a for a in actors}
@@ -21,7 +21,15 @@ def check_z08_court(world,actors,nanite_enabled=True):
         assert not c.get_editor_property('visible') and c.get_editor_property('hidden_in_game') and c.get_collision_enabled()==unreal.CollisionEnabled.NO_COLLISION
     row=fit['old'];a=labels[row['actor']];c=a.get_component_by_class(unreal.InstancedStaticMeshComponent)
     assert a.get_actor_transform().export_text()==row['actor_transform'] and c.get_world_transform().export_text()==row['component_transform'] and c.static_mesh.get_path_name()==row['mesh']
-    assert sorted(c.get_instance_transform(i,world_space=True).export_text() for i in range(c.get_instance_count()))==sorted(fit['retained_transforms']) and c.get_instance_count()==5
+    retained=fit['retained_transforms']
+    if labels['Z08_WestSurvivorRecess_ThresholdMark'].static_mesh_component.static_mesh.get_name()=='SM_Aurelion_KIT_RefugeThreshold_6m':
+        source=Path(unreal.Paths.project_dir())/'Art/Source/Aurelion/RefugeShellKit'
+        overlay=json.loads((source/'threshold-overlay-baseline.json').read_text())
+        assert overlay['actor']==row['actor'] and sorted(overlay['all_transforms'])==sorted(retained)
+        runpy.run_path(str(Path(unreal.Paths.project_dir())/'Scripts/Editor/check_refuge_shell.py'))['check_refuge_shell'](actors)
+        retained=overlay['all_transforms'][2:4]
+    assert sorted(c.get_instance_transform(i,world_space=True).export_text() for i in range(c.get_instance_count()))==sorted(retained)
+    retained_count=c.get_instance_count()
     row=fit['court'];a=labels[row['actor']];c=a.static_mesh_component
     assert a.get_actor_transform().export_text()==row['actor_transform'] and c.static_mesh.get_path_name()==row['mesh'] and str(c.get_collision_enabled())==row['collision']
     assert not c.get_editor_property('visible') and c.get_editor_property('hidden_in_game')
@@ -32,4 +40,4 @@ def check_z08_court(world,actors,nanite_enabled=True):
             hit=next(v for v in raw if isinstance(v,unreal.HitResult)) if isinstance(raw,tuple) else raw
             assert hit and hit.to_tuple()[0] and hit.to_tuple()[9]==floor and abs(hit.to_tuple()[5].z+1200)<.01
             probes.append([x,y,-1200])
-    return dict(nanite_enabled=nanite_enabled,position_precision=6,retained_markings=5,retired_court_instances=72,hidden_underlay_tiles=20,floor_contacts=probes,qualification='Saved surface fit and isolated native collision; live encounters, final lighting/materials and performance remain unqualified.')
+    return dict(nanite_enabled=nanite_enabled,position_precision=6,retained_markings=retained_count,retired_court_instances=72,hidden_underlay_tiles=20,floor_contacts=probes,qualification='Saved surface fit and isolated native collision; live encounters, final lighting/materials and performance remain unqualified.')

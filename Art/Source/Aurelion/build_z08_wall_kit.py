@@ -28,9 +28,12 @@ for side in (-1,1):
     for x in list(range(-33,-4,4))+list(range(5,34,4)):place(bay,x,side*24.165,0,0 if side<0 else 180)
     place(lintel,0,side*24.165,4.5,0 if side<0 else 180)
 assert len(assembled)==58
-interior=[];panel_modules={}
+interior=[];panel_modules={};replaced=[]
 baseline=json.loads((ROOT/'wall-fit.json').read_text())['old']['instances']
 for row in baseline[228:]:
+    if row['index']<262:
+        replaced.append(dict(original_index=row['index'],bounds_cm=row['bounds'],replacement='RefugeShellKit exact-envelope native wall replacement'))
+        continue
     lo,hi=row['bounds'];size=[(b-a)/100 for a,b in zip(lo,hi)];axis=0 if size[0]<size[1] else 1
     w=round(size[1-axis],3);d=round(size[axis],3);h=round(size[2],3);key=(w,d,h)
     if key not in panel_modules:
@@ -48,7 +51,7 @@ for row in baseline[228:]:
     x=(lo[0]+hi[0])/200;y=(lo[1]+hi[1])/200-208;z=lo[2]/100+12
     place(panel_modules[key],x,y,z,90 if axis==0 else 0)
     interior.append(dict(original_index=row['index'],bounds_cm=row['bounds'],asset=panel_modules[key].name))
-assert len(interior)==38 and len(assembled)==96
+assert len(interior)==4 and len(assembled)==62 and len(replaced)==34
 for i,o in enumerate(assembled):
     for loop in o.data.uv_layers[1].data:loop.uv=((loop.uv.x+i%10)/10,(loop.uv.y+i//10)/10)
 bpy.ops.object.select_all(action='DESELECT')
@@ -59,7 +62,7 @@ bpy.ops.export_scene.fbx(filepath=str(ROOT/(assembly.name+'.fbx')),use_selection
 assembly.data.calc_loop_triangles()
 manifest.append(dict(asset=assembly.name,triangles=len(assembly.data.loop_triangles),nominal_dimensions_m=list(assembly.dimensions),materials=[m.name for m in assembly.data.materials],uv_layers=2,convex_hulls=0,collision='None; original native walls remain authoritative'))
 manifest[-1]['preserve_fallback_geometry']=True
-(ROOT/'manifest.json').write_text(json.dumps(dict(status='Authored perimeter and retained partition coverage; in-engine review required',modules=manifest,placements=placements,interior_coverage=interior),indent=2))
+(ROOT/'manifest.json').write_text(json.dumps(dict(status='Perimeter and four retained partitions; 34 duplicate refuge skins transferred to RefugeShellKit',modules=manifest,placements=placements,interior_coverage=interior,replaced_refuge_coverage=replaced),indent=2))
 assembly.hide_render=True;bay.hide_render=False;lintel.hide_render=False;lintel.location=(0,0,7.2)
 scene.world=bpy.data.worlds.new('Crucible masonry studio');scene.world.color=(.14,.14,.14)
 for pos,power,size in [((1,-6,7),2100,5),((-5,-2,4),1300,4),((4,2,7),1600,4)]:

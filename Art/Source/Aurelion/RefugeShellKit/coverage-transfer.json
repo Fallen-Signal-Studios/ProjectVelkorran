@@ -1,0 +1,102 @@
+{
+  "status": "passed",
+  "unchanged_other_placements": 62,
+  "transferred_skins": 34,
+  "walls": [
+    {
+      "actor": "Z08_WestSurvivorRecess_West",
+      "original_indices": [
+        228,
+        229,
+        230,
+        231
+      ],
+      "original_volume_cm3": 12000000.0
+    },
+    {
+      "actor": "Z08_WestSurvivorRecess_East",
+      "original_indices": [
+        232,
+        233,
+        234,
+        235
+      ],
+      "original_volume_cm3": 12000000.000000136
+    },
+    {
+      "actor": "Z08_WestSurvivorRecess_North",
+      "original_indices": [
+        236,
+        237,
+        238,
+        239,
+        240,
+        241
+      ],
+      "original_volume_cm3": 14400000.0
+    },
+    {
+      "actor": "Z08_WestSurvivorRecess_SouthLeft",
+      "original_indices": [
+        242,
+        243
+      ],
+      "original_volume_cm3": 3600000.0
+    },
+    {
+      "actor": "Z08_WestSurvivorRecess_SouthRight",
+      "original_indices": [
+        244,
+        245
+      ],
+      "original_volume_cm3": 3600000.0
+    },
+    {
+      "actor": "Z08_EastSurvivorRecess_West",
+      "original_indices": [
+        246,
+        247,
+        248,
+        249
+      ],
+      "original_volume_cm3": 12000000.0
+    },
+    {
+      "actor": "Z08_EastSurvivorRecess_East",
+      "original_indices": [
+        250,
+        251,
+        252,
+        253
+      ],
+      "original_volume_cm3": 12000000.0
+    },
+    {
+      "actor": "Z08_EastSurvivorRecess_North",
+      "original_indices": [
+        254,
+        255,
+        256,
+        257
+      ],
+      "original_volume_cm3": 8400000.0
+    },
+    {
+      "actor": "Z08_EastSurvivorRecess_SouthLeft",
+      "original_indices": [
+        258,
+        259
+      ],
+      "original_volume_cm3": 1200000.0
+    },
+    {
+      "actor": "Z08_EastSurvivorRecess_SouthRight",
+      "original_indices": [
+        260,
+        261
+      ],
+      "original_volume_cm3": 1200000.0
+    }
+  ],
+  "qualification": "Removed skins partition the exact native solid envelopes; new visible caps have documented 2-4 cm setbacks."
+}

@@ -31,6 +31,7 @@ for row in json.loads((root/'manifest.json').read_text())['interior_coverage']:
         start=center.copy();start[axis]+=side*(extent+.001);direction=Vector((0,0,0));direction[axis]=-side
         hit=o.ray_cast(start,direction,distance=extent*2+.002);assert hit[0],row
     interior.append(row['original_index'])
-assert interior==list(range(228,266))
-(root/'visual-fit-verification.json').write_text(json.dumps(dict(status='passed',doorway_rays=doors,wall_face_rays=faces,interior_indices=interior,qualification='FBX visible openings, perimeter recess and all 38 partition envelopes; native collision and live wall-running must be checked separately.'),indent=2))
+assert interior==list(range(262,266))
+assert [r['original_index'] for r in json.loads((root/'manifest.json').read_text())['replaced_refuge_coverage']]==list(range(228,262))
+(root/'visual-fit-verification.json').write_text(json.dumps(dict(status='passed',doorway_rays=doors,wall_face_rays=faces,interior_indices=interior,qualification='FBX visible openings, perimeter recess and four retained partition envelopes; 34 refuge skins now owned by RefugeShellKit, checked separately.'),indent=2))
 print('Z08_WALL_VISUAL_FIT_PASS')

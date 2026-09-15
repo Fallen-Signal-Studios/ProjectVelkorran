@@ -15,7 +15,9 @@ def check_z08_walls(world,actors):
     assert sm.get_convex_collision_count(m)==0 and sm.get_simple_collision_count(m)==0
     b=m.get_bounds();assert abs(b.origin.z-b.box_extent.z)<.01 and abs(b.origin.z+b.box_extent.z-700)<.01
     manifest=json.loads((root/'Art/Source/Aurelion/Z08WallKit/manifest.json').read_text())
-    assert [r['original_index'] for r in manifest['interior_coverage']]==list(range(228,266))
+    assert [r['original_index'] for r in manifest['interior_coverage']]==list(range(262,266))
+    assert [r['original_index'] for r in manifest['replaced_refuge_coverage']]==list(range(228,262))
+    runpy.run_path(str(root/'Scripts/Editor/check_refuge_shell.py'))['check_refuge_shell'](actors)
     contacts=[]
     assert len(fit['physical'])==8
     for row in fit['physical']:
@@ -31,4 +33,4 @@ def check_z08_walls(world,actors):
             contacts.append(dict(actor=row['actor'],z=z))
     doors=runpy.run_path(str(root/'Scripts/Editor/check_z08_vault.py'))['check_z08_vault'](world,actors)['doorway_capsules']
     assert len(actors)==3140
-    return dict(wall_bays=56,lintels=2,interior_panels=38,physical_contacts=contacts,doorway_capsules=doors,qualification='Stopped-editor asset fit and native collision; live wall-running, routes and performance remain unqualified.')
+    return dict(wall_bays=56,lintels=2,interior_panels=4,refuge_skins_replaced=34,physical_contacts=contacts,doorway_capsules=doors,qualification='Stopped-editor asset fit and native collision; live wall-running, routes and performance remain unqualified.')

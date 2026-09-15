@@ -42,6 +42,15 @@ def check_z08_paving(world, actors):
     center=fit['centerline'];c=labels[center['actor']].get_component_by_class(unreal.InstancedStaticMeshComponent)
     # HISM removal swaps retained slots; require the exact transform multiset.
     retained_centerline=court_fit['retained_transforms'] if court_fit else fit['retained_centerline']
+    threshold=labels['Z08_WestSurvivorRecess_ThresholdMark'].get_component_by_class(unreal.StaticMeshComponent)
+    if threshold.static_mesh.get_name()=='SM_Aurelion_KIT_RefugeThreshold_6m':
+        source=Path(unreal.Paths.project_dir())/'Art/Source/Aurelion/RefugeShellKit'
+        overlay=json.loads((source/'threshold-overlay-baseline.json').read_text())
+        assert overlay['actor']==center['actor'] and sorted(overlay['all_transforms'])==sorted(retained_centerline)
+        # Three formerly retained bands are now authored embedded inlays. Require
+        # their replacements and preserve the other two exact guidance poses.
+        runpy.run_path(str(Path(unreal.Paths.project_dir())/'Scripts/Editor/check_refuge_shell.py'))['check_refuge_shell'](actors)
+        retained_centerline=overlay['all_transforms'][2:4]
     assert sorted(c.get_instance_transform(i,world_space=True).export_text() for i in range(c.get_instance_count()))==sorted(retained_centerline)
     assert c.get_editor_property('visible') and not c.get_editor_property('hidden_in_game')
     for row in fit['guides']:

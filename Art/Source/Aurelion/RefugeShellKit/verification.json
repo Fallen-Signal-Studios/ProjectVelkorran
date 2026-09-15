@@ -1,0 +1,69 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_RefugeShell_1m",
+      "dimensions_m": [
+        1.0,
+        0.40000009536743164,
+        2.9600000381469727
+      ],
+      "triangles": 23132
+    },
+    {
+      "asset": "SM_Aurelion_KIT_RefugeShell_3m",
+      "dimensions_m": [
+        3.0,
+        0.4000001847743988,
+        2.9600000381469727
+      ],
+      "triangles": 56416
+    },
+    {
+      "asset": "SM_Aurelion_KIT_RefugeShell_7m",
+      "dimensions_m": [
+        7.0,
+        0.4000001847743988,
+        2.9700000286102295
+      ],
+      "triangles": 122984
+    },
+    {
+      "asset": "SM_Aurelion_KIT_RefugeShell_10m",
+      "dimensions_m": [
+        10.0,
+        0.4000001847743988,
+        2.9800000190734863
+      ],
+      "triangles": 166420
+    },
+    {
+      "asset": "SM_Aurelion_KIT_RefugeShell_12m",
+      "dimensions_m": [
+        12.0,
+        0.4000001847743988,
+        2.9700000286102295
+      ],
+      "triangles": 199704
+    },
+    {
+      "asset": "SM_Aurelion_KIT_RefugeThreshold_5m",
+      "dimensions_m": [
+        5.0,
+        0.20000000298023224,
+        0.02500000037252903
+      ],
+      "triangles": 4324
+    },
+    {
+      "asset": "SM_Aurelion_KIT_RefugeThreshold_6m",
+      "dimensions_m": [
+        6.0,
+        0.20000000298023224,
+        0.02500000037252903
+      ],
+      "triangles": 5076
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}

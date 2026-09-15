@@ -1,6 +1,7 @@
 """Verify visual cladding placement without changing mission collision."""
 import json
 import os
+import runpy
 from pathlib import Path
 import unreal
 
@@ -43,10 +44,20 @@ report['local_fill_lights'] = dict(count=2, lumens_each=350, attenuation_cm=1400
 baseline = json.loads((Path(os.environ['SOV_AURELION_RUN_DIRECTORY'])/'environment-cast-audit.json').read_text())
 by_label = {a.get_actor_label(): a for a in actors}
 checked = 0
+shell_checked = set()
+if any(a.get_component_by_class(unreal.StaticMeshComponent) and a.get_component_by_class(unreal.StaticMeshComponent).static_mesh and a.get_component_by_class(unreal.StaticMeshComponent).static_mesh.get_name().startswith('SM_Aurelion_KIT_RefugeShell_') for a in actors):
+    # The shell's stepped visual caps differ from the old cube bounds. Verify
+    # its exact original solid envelope with physical probes instead.
+    shell = runpy.run_path(str(Path(unreal.Paths.project_dir())/'Scripts/Editor/check_refuge_shell.py'))['check_refuge_shell'](actors)
+    shell_checked = {r['actor'] for r in shell['placements'] if r['collision_probes']}
+    report['refuge_shell_physical_envelopes'] = len(shell_checked)
 for row in baseline['maps']['L_Aurelion_M12']['actors']:
     if not row['label'].startswith('Z') or not any(c['collision'] != '<CollisionEnabled.NO_COLLISION: 0>' for c in row['components']):
         continue
     actor = by_label[row['label']]
+    if row['label'] in shell_checked:
+        assert actor.get_actor_location().export_text() == row['location'], row['label']
+        continue
     origin, extent = actor.get_actor_bounds(False)
     assert origin.export_text() == row['bounds_origin'] and extent.export_text() == row['bounds_extent'], row['label']
     assert actor.get_actor_location().export_text() == row['location'], row['label']
