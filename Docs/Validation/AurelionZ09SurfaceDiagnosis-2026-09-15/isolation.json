@@ -1,0 +1,11 @@
+{
+  "status": "captured",
+  "views": [
+    "context",
+    "isolated",
+    "isolated-fallback"
+  ],
+  "source_mesh": "/Game/Aurelion/Environment/ArchitectureKit/Meshes/SM_Aurelion_KIT_Z09Baffle.SM_Aurelion_KIT_Z09Baffle",
+  "actor_count": 3140,
+  "qualification": "Base color diagnostic; no map or asset saves. Isolated mode hides all original static mesh components and uses one temporary baffle at its saved pose."
+}
