@@ -1,0 +1,370 @@
+{
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z03Wall4m",
+      "triangles": 11308,
+      "nominal_dimensions_m": [
+        4,
+        0.85,
+        6.55
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; native Z03 room walls remain authoritative",
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03Wall44m",
+      "triangles": 11308,
+      "nominal_dimensions_m": [
+        4.4,
+        0.85,
+        6.55
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; native Z03 room walls remain authoritative",
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03Lintel",
+      "triangles": 4336,
+      "nominal_dimensions_m": [
+        6,
+        0.85,
+        2.05
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; native Z03 room walls remain authoritative",
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    }
+  ],
+  "placements": [
+    {
+      "asset": "SM_Aurelion_KIT_Z03Wall4m",
+      "location_cm": [
+        5882.5,
+        -19600,
+        0
+      ],
+      "yaw": -90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03Wall4m",
+      "location_cm": [
+        5882.5,
+        -19200,
+        0
+      ],
+      "yaw": -90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03Wall4m",
+      "location_cm": [
+        5882.5,
+        -18800,
+        0
+      ],
+      "yaw": -90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03Wall4m",
+      "location_cm": [
+        5882.5,
+        -18400,
+        0
+      ],
+      "yaw": -90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03Wall4m",
+      "location_cm": [
+        5882.5,
+        -18000,
+        0
+      ],
+      "yaw": -90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03Wall4m",
+      "location_cm": [
+        5882.5,
+        -17600,
+        0
+      ],
+      "yaw": -90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03Wall4m",
+      "location_cm": [
+        5882.5,
+        -17200,
+        0
+      ],
+      "yaw": -90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03Wall4m",
+      "location_cm": [
+        5882.5,
+        -16800,
+        0
+      ],
+      "yaw": -90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03Wall4m",
+      "location_cm": [
+        5882.5,
+        -16400,
+        0
+      ],
+      "yaw": -90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03Wall4m",
+      "location_cm": [
+        5882.5,
+        -16000,
+        0
+      ],
+      "yaw": -90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03Wall4m",
+      "location_cm": [
+        5882.5,
+        -15600,
+        0
+      ],
+      "yaw": -90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03Wall4m",
+      "location_cm": [
+        5882.5,
+        -15200,
+        0
+      ],
+      "yaw": -90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03Wall4m",
+      "location_cm": [
+        8117.5,
+        -19600,
+        0
+      ],
+      "yaw": 90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03Wall4m",
+      "location_cm": [
+        8117.5,
+        -19200,
+        0
+      ],
+      "yaw": 90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03Wall4m",
+      "location_cm": [
+        8117.5,
+        -18800,
+        0
+      ],
+      "yaw": 90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03Wall4m",
+      "location_cm": [
+        8117.5,
+        -18400,
+        0
+      ],
+      "yaw": 90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03Wall4m",
+      "location_cm": [
+        8117.5,
+        -18000,
+        0
+      ],
+      "yaw": 90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03Wall4m",
+      "location_cm": [
+        8117.5,
+        -17600,
+        0
+      ],
+      "yaw": 90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03Wall4m",
+      "location_cm": [
+        8117.5,
+        -17200,
+        0
+      ],
+      "yaw": 90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03Wall4m",
+      "location_cm": [
+        8117.5,
+        -16800,
+        0
+      ],
+      "yaw": 90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03Wall4m",
+      "location_cm": [
+        8117.5,
+        -16400,
+        0
+      ],
+      "yaw": 90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03Wall4m",
+      "location_cm": [
+        8117.5,
+        -16000,
+        0
+      ],
+      "yaw": 90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03Wall4m",
+      "location_cm": [
+        8117.5,
+        -15600,
+        0
+      ],
+      "yaw": 90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03Wall4m",
+      "location_cm": [
+        8117.5,
+        -15200,
+        0
+      ],
+      "yaw": 90
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03Wall4m",
+      "location_cm": [
+        6100,
+        -14982.5,
+        0
+      ],
+      "yaw": 180
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03Wall4m",
+      "location_cm": [
+        6500,
+        -14982.5,
+        0
+      ],
+      "yaw": 180
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03Wall4m",
+      "location_cm": [
+        7500,
+        -14982.5,
+        0
+      ],
+      "yaw": 180
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03Wall4m",
+      "location_cm": [
+        7900,
+        -14982.5,
+        0
+      ],
+      "yaw": 180
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03Wall44m",
+      "location_cm": [
+        6120,
+        -19817.5,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03Wall44m",
+      "location_cm": [
+        6560,
+        -19817.5,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03Wall44m",
+      "location_cm": [
+        7000,
+        -19817.5,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03Wall44m",
+      "location_cm": [
+        7440,
+        -19817.5,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03Wall44m",
+      "location_cm": [
+        7880,
+        -19817.5,
+        0
+      ],
+      "yaw": 0
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z03Lintel",
+      "location_cm": [
+        7000,
+        -14982.5,
+        450
+      ],
+      "yaw": 180
+    }
+  ],
+  "qualification": "34 fitted wall sections. Visual depth projects outward from native room faces; clear north doorway is 6m wide and 4.5m tall."
+}

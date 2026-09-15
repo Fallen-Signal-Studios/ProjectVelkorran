@@ -1071,3 +1071,8 @@ Z03CeilingLightSavedVerified-20260914-200618-8f112068 passed the exact stored-co
 
 
 Z03CeilingLightFresh-20260914-200845-591d53af passed all 73 architecture receipts after reopening, with 3,140 actors, clean map packages and no Python errors. The three CofferWash components persist at the reviewed poses and 300-lumen settings; all original room/scanner light transforms, colors and measured properties remain unchanged. The entire preceding architecture chain passed. Supported alignment remains 63.75%; this resolves the reviewed ceiling-readability gap, not final room, live scanner, cast, destruction or packaged-performance acceptance.
+
+
+## Z03 full wall replacement - 2026-09-14
+
+See Docs/AurelionZ03Walls-2026-09-14.md. Replaced 68 vendor panels with 34 full-size custom masonry sections on the original actor, using three modular Nanite meshes. Concealed backing closes the coffer edge; the 600 x 450 cm doorway and native collision remain intact. Saved and inspected three views. Z03WallsFresh-20260914-204845-81683cda completed with 74 passing static architecture reports, 3140 actors and a clean map. Live traversal, complete room art, performance and 90 percent alignment remain unqualified; the supported slice estimate stays 63.75 percent.
