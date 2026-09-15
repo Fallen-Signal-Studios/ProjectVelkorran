@@ -209,6 +209,24 @@ On 15 September the creator decided two design questions:
    the game's own fatal recovery and encounter retry like a player, within a small bound, and every death,
    restore and resume is recorded as R1 death/retry evidence rather than hidden.
 
+## First route with persistent relief and native retry
+
+`EastRetryReliefRoute-20260915-154907-170d30ae` ran both creator decisions. E1 lasted 175 s, longer than the
+115–121 s passes, and the player dealt 2,140 native damage across 104 observed receipts. Relief opened at
+170.7 s (health 32.7, no shield) and, unlike the previous run, stayed active while resources remained low
+until death at 175.6 s. It slowed but did not stop damage already committed: drone hits of 12 landed at
+174.5 and 175.5 s, and the player died with two of the drones alive. Persistent relief is working as
+decided; whether it is enough recovery for an ordinary player remains study evidence, not a pilot claim.
+
+The death then exercised native recovery. The fatal recovery component moved from ResolvingFatal to
+Retrying, and because the encounter retry could not start for a dead protagonist it fell back to the
+checkpoint 0 load. That load briefly left the campaign without an active mission, and the pilot's per-tick
+mission assertion ended the run 1.5 s later. This was a pilot defect, not a game failure: nothing reported
+a failed recovery. The pilot now treats pawn, controller and mission absence during recovery as transient
+within its 60-second bound, re-resolves the E1 director and rebinds its damage observer if the protagonist
+is respawned. Companion damage share was zero, as expected in Tarrik's solo E1; the A4 15–25% measure
+needs a completed route through Selene's encounters.
+
 ## Score
 
 **P2 moves from 0 to 2.5 of 5** (the rubric's 0.5 level: material subset on the approved target with the
