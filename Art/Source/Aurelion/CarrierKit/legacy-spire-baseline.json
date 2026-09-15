@@ -1,0 +1,50 @@
+{
+  "actor": "Aurelion_Radiance_AtriumEastRelatedForm",
+  "path": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1077",
+  "class_name": "StaticMeshActor",
+  "component": "/Game/Aurelion/Maps/L_Aurelion_M12.L_Aurelion_M12:PersistentLevel.StaticMeshActor_1077.StaticMeshComponent0",
+  "actor_transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.707107,W=0.707107),Translation=(X=11000.000103,Y=0.000273,Z=860.093567),Scale3D=(X=0.070000,Y=0.070000,Z=0.070000))",
+  "component_transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.707107,W=0.707107),Translation=(X=11000.000103,Y=0.000273,Z=860.093567),Scale3D=(X=0.070000,Y=0.070000,Z=0.070000))",
+  "mesh": "/Game/Aurelion/Environment/ValidatedMeshes/SM_KB3D_UTP_BldgLG_D_2e1cf0516ee1.SM_KB3D_UTP_BldgLG_D_2e1cf0516ee1",
+  "mesh_origin": [
+    -0.00390625,
+    0.00146484375,
+    37545.36291503906
+  ],
+  "mesh_extent": [
+    43428.73828125,
+    13811.60888671875,
+    37546.69958496094
+  ],
+  "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+  "profile": "Custom",
+  "actor_collision": false,
+  "materials": [
+    "/Game/Aurelion/Environment/KitBashRadiance/KB3D_UTP_BldgLG_D/KB3D_UTP_BldgLG_D/Materials/M_KB3D_UTP_MetalLightGreyWorn.M_KB3D_UTP_MetalLightGreyWorn",
+    "/Game/Aurelion/Environment/KitBashRadiance/KB3D_UTP_BldgLG_D/KB3D_UTP_BldgLG_D/Materials/M_KB3D_UTP_MetalBlack.M_KB3D_UTP_MetalBlack",
+    "/Game/Aurelion/Environment/KitBashRadiance/KB3D_UTP_BldgLG_D/KB3D_UTP_BldgLG_D/Materials/M_KB3D_UTP_ConcreteMix.M_KB3D_UTP_ConcreteMix",
+    "/Game/Aurelion/Environment/RadianceMaterials/M_ScenicPBR_KB3D_UTP_GlassTinted_M12.M_ScenicPBR_KB3D_UTP_GlassTinted_M12"
+  ],
+  "instances": [
+    {
+      "index": null,
+      "location": [
+        11000.000102539063,
+        0.0002734375000000001,
+        860.0935668945312
+      ],
+      "transform": "(Rotation=(X=0.000000,Y=-0.000000,Z=0.707107,W=0.707107),Translation=(X=11000.000103,Y=0.000273,Z=860.093567),Scale3D=(X=0.070000,Y=0.070000,Z=0.070000))",
+      "scale": [
+        0.07,
+        0.07,
+        0.07
+      ],
+      "quaternion": [
+        0.0,
+        -0.0,
+        0.7071067811865477,
+        0.7071067811865476
+      ]
+    }
+  ]
+}

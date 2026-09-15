@@ -1,0 +1,64 @@
+{
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_CarrierHull",
+      "triangles": 71212,
+      "nominal_dimensions_m": [
+        44.0,
+        105.0,
+        12.337499618530273
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; journal-owned scenery, excluded from navigation",
+      "position_precision": 10,
+      "preserve_fallback_geometry": true,
+      "pivot": "Centre; Blender -Y is UE forward +Y"
+    },
+    {
+      "asset": "SM_Aurelion_KIT_CarrierNacelle",
+      "triangles": 64004,
+      "nominal_dimensions_m": [
+        11.894999504089355,
+        60.230003356933594,
+        7.744999885559082
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; journal-owned scenery, excluded from navigation",
+      "position_precision": 10,
+      "preserve_fallback_geometry": true,
+      "pivot": "Centre; Blender -Y is UE forward +Y"
+    },
+    {
+      "asset": "SM_Aurelion_KIT_CarrierBridge",
+      "triangles": 4868,
+      "nominal_dimensions_m": [
+        34.58707809448242,
+        20.0,
+        9.324999809265137
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; journal-owned scenery, excluded from navigation",
+      "position_precision": 10,
+      "preserve_fallback_geometry": true,
+      "pivot": "Centre; Blender -Y is UE forward +Y"
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_CarrierHull",
+      "dimensions_m": [
+        44.0,
+        105.0,
+        12.337499618530273
+      ],
+      "triangles": 71212
+    },
+    {
+      "asset": "SM_Aurelion_KIT_CarrierNacelle",
+      "dimensions_m": [
+        11.894999504089355,
+        60.230003356933594,
+        7.744999885559082
+      ],
+      "triangles": 64004
+    },
+    {
+      "asset": "SM_Aurelion_KIT_CarrierBridge",
+      "dimensions_m": [
+        34.58707809448242,
+        20.0,
+        9.324999809265137
+      ],
+      "triangles": 4868
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}
