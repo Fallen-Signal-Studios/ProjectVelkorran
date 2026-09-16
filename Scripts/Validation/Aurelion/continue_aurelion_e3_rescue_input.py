@@ -323,13 +323,27 @@ class Run(entry.Run):
                     retry['blocked_since'] = now
                 if now-retry['blocked_since'] >= 2.:
                     point, position = actor.get_actor_location(), pawn.get_actor_location()
-                    points = ([(point.x-130., point.y-180., position.z), (point.x, point.y-160., position.z)]
-                        if retry['attempts'] == 0 else [(point.x+180., point.y-130., position.z), (point.x+160., point.y, position.z)])
+                    # The station admits interaction within its own range, but the scene admits only within
+                    # the cinematic's RequestRange of the story actor, which is a different actor standing
+                    # somewhere else. A sidestep that keeps the station in reach can still leave the scene's
+                    # entry, which is how a FreeTrappedMarine request was refused after an ordinary
+                    # reposition. Candidates must satisfy both, and aiming continues when none does.
+                    station = self.scene.get_actor_location() if self.scene is not None else point
+                    scene_range = float(self.scene_component.get_editor_property('request_range')) if self.scene_component is not None else 400.
+                    station_range = float(component.interaction_distance)
+                    offsets = ([(-130., -180.), (0., -160.), (-90., -120.)] if retry['attempts'] == 0
+                        else [(180., -130.), (160., 0.), (120., -90.)])
+                    points = [(point.x+dx, point.y+dy, position.z) for dx, dy in offsets
+                        if math.hypot(dx, dy) <= station_range*.8
+                        and math.hypot(point.x+dx-station.x, point.y+dy-station.y) <= scene_range*.8][:1]
                     retry['attempts'] += 1
                     retry['blocked_since'] = None
-                    retry['routes'].append(dict(focus=_path(focus), npc=_path(focus_owner),
-                        points=points, elapsed=now-self.started, reason='Native request admitted but nearby NPC owns interaction focus'))
+                    retry['routes'].append(dict(focus=_path(focus), npc=_path(focus_owner), points=points,
+                        station=_xyz(station), scene_request_range=scene_range, station_range=station_range,
+                        elapsed=now-self.started, reason='Native request admitted but nearby NPC owns interaction focus'))
                     self.inject()
+                    if not points:
+                        return
                     self.begin_route(points, 'aim_scene')
                     return
             else:

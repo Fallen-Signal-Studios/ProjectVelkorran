@@ -360,6 +360,24 @@ and the damage-share rows recorded one kill's worth of damage each. E1's drones 
 have more health, not because a different mechanism resolves them. Damage share is therefore a fair measure
 here, and the companion's contribution is genuinely small rather than mismeasured.
 
+## A reposition that satisfied the station but left the scene
+
+`EastCP9Retry-20260915-180307-a642bb8a` passed E1, E2 and E3 entry, then failed in the E3 rescue when the
+`FreeTrappedMarine` request was refused: `Cinematic requires the ready current protagonist at its physical
+entry`. The player was ready, idle, at full health and 197 cm from the request station, inside that station's
+300 cm range, which is why the interaction was admitted at all.
+
+The native check at `SovCampaignCinematicComponent.cpp:540` does not measure the station. It measures the
+player against the cinematic component's own owner, the story actor, within that component's `RequestRange`.
+Those are two different actors in two different places. The pilot's sidestep offsets, used when another
+prompt owns interaction focus, were computed purely from the station, so a legal sidestep could keep the
+station in reach while stepping outside the scene's entry. Candidates are now filtered against both ranges,
+and the pilot keeps aiming rather than walking somewhere the scene will refuse.
+
+The prompt that displaced focus was `E3.Linkbound3`, recorded dead with zero health: a corpse, whose loot
+prompt a player can genuinely use. The admission fix is therefore behaving as designed — it excludes prompts
+that refuse interaction, not prompts that happen to be inconvenient — and this run is not evidence against it.
+
 ## Checkpoint reload soak, 100 cycles at 60 fps
 
 `CheckpointSoak100x60-20260915-175112-8798e3b5` ran 100 consecutive cycles in one editor process with
