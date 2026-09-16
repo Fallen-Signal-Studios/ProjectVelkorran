@@ -1,9 +1,16 @@
 # Aurelion alignment estimate — 13 September 2026
 
-Current planning estimate: **about 64% for the M12–M13 Aurelion slice**
-(63.75/100, judgment range 60–70%). The 90% goal remains active. This carries
-forward the existing 26-requirement, 100-point slice rubric; it does not award
-new points merely for builds, repeated partial routes, or cosmetic changes.
+Current planning estimate: **about 69% for the M12–M13 Aurelion slice**
+(68.75/100, judgment range 65–75%), superseding the 63.75 recorded here on
+13 September. The 90% goal remains active. This carries forward the existing
+26-requirement, 100-point slice rubric; it does not award new points merely for
+builds, repeated partial routes, or cosmetic changes.
+
+The 15 September evidence, per-row movements and their limits are in
+[AurelionTDD90Blockers-2026-09-15.md](AurelionTDD90Blockers-2026-09-15.md):
+an approved-target packaged capture moved P2, and two fresh unattended
+M12→M13 routes covering both legal priority outcomes moved M1, M2 and M3.
+Companion contribution is now measured and falls short of A4's band.
 
 The whole-TDD estimate in `TDDAlignment-2026-09-11.md` was approximately 37%.
 That includes the full campaign and platform obligations. It is a different

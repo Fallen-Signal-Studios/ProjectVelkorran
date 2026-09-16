@@ -252,7 +252,8 @@ class Run:
         assert len(earned['journal']) == 35 and set(source['completed_scenes']) == set(completed_route.SCENES)
         assert all(v['completed'] and not v['skipped'] for v in source['completed_scenes'].values())
         world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_game_world()
-        assert world is not None and 'UEDPIE_' in world.get_name() and 'L_Aurelion_M13' in world.get_name()
+        # A PIE world's own name is the map name; only its package path carries the UEDPIE_ prefix.
+        assert world is not None and 'UEDPIE_' in world.get_path_name() and 'L_Aurelion_M13' in world.get_path_name()
         pc = unreal.GameplayStatics.get_player_controller(world, 0)
         pawn = unreal.GameplayStatics.get_player_pawn(world, 0)
         assert [path(world), path(pc), path(pawn)] == [earned['world'], earned['controller'], earned['profile']['player']['actor']]

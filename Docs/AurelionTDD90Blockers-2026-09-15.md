@@ -294,8 +294,54 @@ when nothing usable is in reach, so its own error text can still explain itself.
 Elite owning `FrostSetup` and a hostile taking the rescue door mid-hold, without ranking mission controls
 above every other interactable in the world.
 
+## Second unattended route, on the other outcome
+
+`EastAdmissionRoute-20260915-165825-549f9098` passed the entire chain unattended with the EastWalkers
+priority: entry, E1 (150 s), E2, E3 entry, E3 rescue (78 s), E4 entry, E4A, E4B (26 s), M13 entry and M13
+(284 s). The E4 entry committed `PriorityEastWalkers` and recorded `PriorityWestStretchers` as the rejected
+alternative. M13 earned all thirteen of its receipts through ordinary controls — independent assents,
+handoffs, native co-action arrival, the paired physical lift, full unskipped scenes and CP7/8/9 — with the
+22 M12 receipts unchanged and separate exits persisting. Every stage reported unchanged asset hashes.
+
+The E3 rescue door held its own focus throughout this time, recorded change by change, and E4B passed with
+no repositions and one missed frost window it recovered from. That is consistent with the admission fix,
+but one passing run is not proof that the focus contest is settled; the recording is now in place to name
+the actor if it recurs.
+
+## Companion contribution is measured, and short of its band
+
+The observer took 163 native receipts across the route. The protagonist dealt 3,868 damage and the companion
+29.6, a route share of **0.8%**. The only encounter where the companion fought at all was E4A, at **11.1%**
+(29.6 of 266). TDD A4 asks for an ordinary companion contribution of 15–25%, so this is measured evidence
+that the row is *not* met, not evidence for it. A4 stays at 1.5 of 3.
+
+One detail needs explaining before anything is concluded from these totals: every required participant in
+E2, E3 and E4A shows exactly 53.2 damage, while E1's drones show 340–611. A uniform figure across unrelated
+enemies suggests those encounters are resolved by a sever or objective mechanism rather than by damage, in
+which case damage share is the wrong measure of contribution for them and the band needs a measure that
+matches how each encounter is actually won.
+
+## The CP9 reload did not run
+
+The chained checkpoint-9 reload reported failed, but it never reached a reload. Its precondition asserts
+`'UEDPIE_' in world.get_name() and 'L_Aurelion_M13' in world.get_name()`, and a PIE world's own name is the
+map name — only its package path carries the prefix, as the M13 report's
+`/Game/Aurelion/Maps/UEDPIE_0_L_Aurelion_M13.L_Aurelion_M13` shows. The assertion could never hold, so this
+is a harness defect and says nothing about the save system. Both checks now read the package path, and the
+reload needs a fresh route to run inside.
+
 ## Score
 
-**P2 moves from 0 to 2.5 of 5** (the rubric's 0.5 level: material subset on the approved target with the
-current outcome incomplete, because worst-case combat is not yet captured). All other rows are unchanged
-pending the route, soak and study evidence, so the supported slice estimate is **66.25** (from 63.75).
+Three rows move, each on this run's measured evidence and none to full credit:
+
+| Row | Was | Now | What earned it, and what is still missing |
+|---|---:|---:|---|
+| M1 | 6 / 8 | 7 / 8 | Two fresh unattended ordinary-control playthroughs of the complete M12→M13 path (`CoreGateRoute`, `EastAdmissionRoute`). Canon review with zero surviving contradiction is still unstarted, and needs a reviewer |
+| M2 | 4.5 / 6 | 5 / 6 | Current-build regression through the switches: independent assents, handoffs, native co-action arrival and the paired physical lift, all through ordinary input. Restore is not covered, because the CP9 reload never ran, and one run is not a latency/reliability sample |
+| M3 | 2 / 4 | 3 / 4 | Both legal outcomes now played end to end with their matching consequence, tag and aftermath identity, and both escapes persist. Recall and noticed-consequence remain player-study evidence |
+
+P2 stays at 2.5 of 5 pending a worst-case combat capture. A4 stays at 1.5 of 3 on the measurement above.
+R1 and R2 are unchanged: this run had no death, so no retry was exercised, and no soak has been run.
+
+The supported slice estimate is **68.75** (from 66.25). Reaching 90 needs 21.25 more points, and the
+study, canon-review and authored-content rows remain outside what this workstation can close.
