@@ -12,8 +12,12 @@ from pathlib import Path
 import time
 import unreal
 
-MAP = '/Game/Aurelion/Maps/L_Aurelion_M12'
-MISSION = 'M12_FireAndFrost'
+# Parameterised so a second protagonist can be captured without editing this file.
+MAP = os.environ.get('SOV_HUD_MAP', '/Game/Aurelion/Maps/L_Aurelion_M12')
+MISSION = os.environ.get('SOV_HUD_MISSION', 'M12_FireAndFrost')
+# The run has to prove which protagonist it photographed rather than assume it. M13 opens on Tarrik
+# and only hands to Selene later, so pointing at her map is not the same as capturing her.
+PROTAGONIST = os.environ.get('SOV_HUD_PROTAGONIST', 'Sov.Character.Player.Tarrik')
 READY_SECONDS = 180.
 SHOT_SECONDS = 45.
 SETTLE_SECONDS = 1.5
@@ -114,7 +118,7 @@ class Run:
             world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_game_world()
             if self.phase == 'await_ready':
                 if now-self.phase_at > READY_SECONDS:
-                    self.finish(False, 'The session did not reach a ready protagonist in M12')
+                    self.finish(False, 'The session never reached ' + PROTAGONIST + ' ready in ' + MISSION)
                     self.stage('end_play')
                     return
                 if world is None or 'L_Aurelion_M12' not in world.get_name():
@@ -133,6 +137,12 @@ class Run:
                          if w.get_visibility() != unreal.SlateVisibility.COLLAPSED]
                 if not shown:
                     return
+                # The surface reports the live protagonist tag in its diagnostics. Requiring it here
+                # means a run that never reaches the intended protagonist fails loudly, instead of
+                # quietly photographing the other one and reporting success.
+                if not any(PROTAGONIST in w.get_paint_diagnostics() for w in shown):
+                    return
+                self.report['protagonist'] = PROTAGONIST
                 self.sample(world, 'at_detect')
                 # The paint probe stays off. It proved every submission route draws correctly, and
                 # the blank captures were the screenshot path excluding UI rather than anything in

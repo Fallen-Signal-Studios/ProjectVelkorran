@@ -223,6 +223,12 @@ bool USovHolographicHUDWidget::ReadSnapshot(const ASovPlayerController* Controll
 {
 	Out = FSovHolographicHUDSnapshot();
 	if (!IsValid(Controller)) { return false; }
+	// Cinematic hiding needs nothing here. Narrative's documented route is a GameplayTag track adding
+	// Narrative.State.Player.WantsHideHUD.All to the player - the sequence actor's own
+	// bHideEvenEssentialHUDElements is deprecated in favour of it - and ReadCurrentVitals already
+	// refuses on State_Player_WantsHideHUD, which parent-matches .All. A gate on the controller's
+	// live sequence list was written here and removed: it would have blanked the surface during
+	// every sequence, including ones authored to keep the HUD up.
 	if (!USovCombatVitalsWidget::ReadCurrentVitals(Controller, Out.Vitals)) { return false; }
 	SovCombatReadiness::Read(Controller, Out.Readiness);
 	if (const auto* Settings = USovGameUserSettings::Get()) { Out.Settings = Settings->GetSettingsSnapshot(); }
@@ -298,19 +304,19 @@ USovHolographicHUDWidget::FPalette USovHolographicHUDWidget::BuildPalette() cons
 	// labels were doing. So the reference palettes are followed exactly and the glyphs are kept.
 	if (Displayed.Vitals.Protagonist == FSovGameplayTags::Get().Character_Player_Selene)
 	{
-		Palette.Glow = FLinearColor(.20f, .75f, 1.f);
-		Palette.ShieldFrom = FLinearColor(.30f, .66f, 1.f);
-		Palette.ShieldTo = FLinearColor(.78f, .94f, 1.f);
-		Palette.HealthFrom = FLinearColor(.10f, .80f, .50f);
-		Palette.HealthTo = FLinearColor(.60f, .97f, .82f);
+		Palette.Glow = FLinearColor(.12f, .70f, 1.f);
+		Palette.ShieldFrom = FLinearColor(.22f, .60f, 1.f);
+		Palette.ShieldTo = FLinearColor(.62f, .90f, 1.f);
+		Palette.HealthFrom = FLinearColor(.05f, .72f, .44f);
+		Palette.HealthTo = FLinearColor(.34f, .95f, .72f);
 	}
 	else
 	{
-		Palette.Glow = FLinearColor(.95f, .20f, .05f);
-		Palette.ShieldFrom = FLinearColor(.98f, .64f, .18f);
-		Palette.ShieldTo = FLinearColor(1.f, .90f, .60f);
-		Palette.HealthFrom = FLinearColor(.78f, .09f, .05f);
-		Palette.HealthTo = FLinearColor(1.f, .36f, .14f);
+		Palette.Glow = FLinearColor(1.f, .16f, .03f);
+		Palette.ShieldFrom = FLinearColor(1.f, .58f, .10f);
+		Palette.ShieldTo = FLinearColor(1.f, .86f, .48f);
+		Palette.HealthFrom = FLinearColor(.70f, .05f, .02f);
+		Palette.HealthTo = FLinearColor(1.f, .28f, .08f);
 	}
 	return Palette;
 }
@@ -526,13 +532,17 @@ int32 USovHolographicHUDWidget::PaintEchoArc(const FGeometry& Geometry, FSlateWi
 		// disappeared against a white floor, leaving the lit end reading as a stray diagonal line
 		// instead of the left end of a long bar.
 		DrawSegment(Elements, Layer, Paint, A, B, FLinearColor(.02f, .03f, .05f, .55f), 16.f * Scale);
-		DrawSegment(Elements, Layer + 1, Paint, A, B, Palette.Line.CopyWithNewOpacity(.45f), 15.f * Scale);
+		DrawSegment(Elements, Layer + 1, Paint, A, B, Palette.Line.CopyWithNewOpacity(.55f), 15.f * Scale);
 		if (Fraction > T0 + KINDA_SMALL_NUMBER)
 		{
 			// The final partial segment fills proportionally rather than snapping on.
 			const float Fill = FMath::Clamp((Fraction - T0) * Segments, 0.f, 1.f);
+			// A saturated body with a thinner bright core: the references light each segment from
+			// inside rather than filling it flat, which is what kept this reading washed out.
 			DrawSegment(Elements, Layer + 2, Paint, A, FMath::Lerp(A, B, Fill),
-				Palette.ShieldTo.CopyWithNewOpacity(.98f), 12.f * Scale);
+				Palette.Accent.CopyWithNewOpacity(.98f), 12.f * Scale);
+			DrawSegment(Elements, Layer + 3, Paint, A, FMath::Lerp(A, B, Fill),
+				Palette.ShieldTo.CopyWithNewOpacity(.85f), 5.f * Scale);
 		}
 	}
 
@@ -567,8 +577,8 @@ int32 USovHolographicHUDWidget::PaintRadar(const FGeometry& Geometry, FSlateWind
 	for (int32 Step = 1; Step <= 3; ++Step)
 	{
 		BuildArc(Ring, Centre, Radius * (static_cast<float>(Step) / 3.f), 0.f, 360.f, 64);
-		DrawPolyline(Elements, Layer + 1, Paint, Ring, Palette.Line.CopyWithNewOpacity(Step == 3 ? .85f : .28f),
-			Step == 3 ? 1.8f : 1.f);
+		DrawPolyline(Elements, Layer + 1, Paint, Ring, Palette.Line.CopyWithNewOpacity(Step == 3 ? .95f : .45f),
+			Step == 3 ? 2.f : 1.2f);
 	}
 	// Cardinal marks: which way is forward must be readable at a glance.
 	for (int32 Tick = 0; Tick < 4; ++Tick)

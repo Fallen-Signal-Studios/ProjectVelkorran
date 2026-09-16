@@ -114,15 +114,20 @@ together lets the second discard the first.
 - **Ammo draws twice until an editor step runs.** The legacy `WBP_WeaponInfo` child of
   `WBP_AurelionGameplayHUD` is still live; collapsing it is a Content change through the existing
   authoring path.
-- **The surface honours one hide path, not the cinematic one.** `ReadCurrentVitals` refuses on
-  `State_Player_WantsHideHUD`, and this surface reads its whole snapshot through that function, so
-  it already collapses whenever that tag is set — inherited rather than implemented.
-  `UNarrativeGameplayHUD::SetHUDHidden`, with its `EssentialWidgets` exemption, *is* implemented in
-  `WBP_AurelionGameplayHUD`; an earlier read of the C++ alone wrongly concluded it was not, and a
-  first correction of that then overstated the gap in the other direction. What is actually missing
-  is narrow: nothing in C++ invokes `SetHUDHidden`, and this surface sits outside the widget tree it
-  hides, so a sequencer-driven hide would not reach it. The project already has the signal
-  (`CurrentSequences`, used by the haptics component). Unfixed, and needs a test.
+- **Cinematic hiding is already honoured, by the route Narrative recommends.** A sequence hides the
+  HUD by adding `Narrative.State.Player.WantsHideHUD.All` to the player through a GameplayTag track;
+  `ANarrativeLevelSequenceActor::bHideEvenEssentialHUDElements` is explicitly deprecated in favour of
+  it. This surface reads its whole snapshot through `ReadCurrentVitals`, which refuses on
+  `State_Player_WantsHideHUD`, and `HasMatchingGameplayTag` parent-matches `.All` — so it collapses
+  for exactly the sequences authored to hide the HUD, and stays up for the ones that are not.
+
+  This took three passes to state correctly. A read of the C++ alone concluded the contract was
+  unimplemented; it is implemented, in `WBP_AurelionGameplayHUD`. A correction then claimed this
+  surface ignored it. A gate on the controller's live sequence list was then written to close that
+  supposed gap, and removed on finding the deprecation notice: it would have blanked the surface
+  during every sequence, including ones deliberately authored to keep the HUD up. `SetHUDHidden`
+  remains uninvoked from C++ and cannot reach a widget outside the tree it hides, but that is not a
+  gap in this surface — it is simply a different mechanism. Covered by a test.
 - **The surface bypasses the registered UI layers.** The HUD registers `UI.Layer.Game`,
   `UI.Layer.Menu` and `UI.Layer.Modal`, and the project already pushes menus through `OpenMenu`.
   This widget calls `AddToPlayerScreen` directly. That is not why it appeared blank — the sibling

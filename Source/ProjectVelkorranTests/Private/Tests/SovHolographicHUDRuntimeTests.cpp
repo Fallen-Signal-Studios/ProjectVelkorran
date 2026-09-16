@@ -5,6 +5,8 @@
 #include "Framework/SovPlayerState.h"
 #include "UI/SovHolographicHUDWidget.h"
 #include "Sovereign/SovGameplayTags.h"
+#include "NarrativeGameplayTags.h"
+#include "GAS/NarrativeAbilitySystemComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "Misc/AutomationTest.h"
@@ -153,6 +155,39 @@ bool FSovHolographicProtagonistPaletteTest::RunTest(const FString& Parameters)
 	// Thickened, never dropped: contrast must not cost a readout.
 	TestEqual(TEXT("A high contrast health bar stays opaque"), TarrikContrast.A, 1.f);
 	TestEqual(TEXT("A high contrast shield bar stays opaque"), ContrastShield.A, 1.f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovHolographicCinematicHideTest,
+	"ProjectVelkorran.Campaign.HolographicHUD.ACinematicHideTagCollapsesTheSurfaceAndReleasingItRestoresIt",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovHolographicCinematicHideTest::RunTest(const FString& Parameters)
+{
+	FHolographicWorld F;
+	if (!TestTrue(TEXT("Ready holographic fixture"), F.Valid())) { return false; }
+	auto* ASC = F.Player->GetNarrativeAbilitySystemComponent();
+	if (!TestNotNull(TEXT("The protagonist has an ability system"), ASC)) { return false; }
+
+	FSovHolographicHUDSnapshot Snapshot;
+	if (!TestTrue(TEXT("The surface reads a live protagonist to begin with"),
+		USovHolographicHUDWidget::ReadSnapshot(F.Controller, Snapshot))) { return false; }
+
+	// Narrative hides the HUD for a cinematic by adding this tag through a GameplayTag track; the
+	// sequence actor's own bHideEvenEssentialHUDElements is deprecated in favour of it. The leaf is
+	// applied here rather than the parent on purpose: the surface is protected only by parent
+	// matching, so asserting the parent directly would exercise nothing that could actually break.
+	const FGameplayTag Hide = FNarrativeGameplayTags::Get().State_Player_WantsHideHUD_All;
+	ASC->AddLooseGameplayTag(Hide);
+	FSovHolographicHUDSnapshot Hidden;
+	TestFalse(TEXT("A cinematic hide tag refuses the snapshot"),
+		USovHolographicHUDWidget::ReadSnapshot(F.Controller, Hidden));
+	TestFalse(TEXT("A refused snapshot is never left displayable"), Hidden.bValid);
+
+	// Hiding has to be transient. A surface that never came back would be worse than one that never left.
+	ASC->RemoveLooseGameplayTag(Hide);
+	FSovHolographicHUDSnapshot Restored;
+	TestTrue(TEXT("Releasing the cinematic restores the surface"),
+		USovHolographicHUDWidget::ReadSnapshot(F.Controller, Restored));
 	return true;
 }
 #endif
