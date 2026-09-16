@@ -4,6 +4,7 @@
 #include "Character/PlayerDefinition.h"
 #include "Framework/SovPlayerState.h"
 #include "UI/SovHolographicHUDWidget.h"
+#include "Sovereign/SovGameplayTags.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "Misc/AutomationTest.h"
@@ -18,6 +19,9 @@ struct FSovHolographicHUDTestAccess
 	{ Widget.Displayed = Snapshot; }
 	static FLinearColor Backing(const USovHolographicHUDWidget& Widget) { return Widget.BuildPalette().Backing; }
 	static FLinearColor Accent(const USovHolographicHUDWidget& Widget) { return Widget.BuildPalette().Accent; }
+	static FLinearColor HealthFrom(const USovHolographicHUDWidget& Widget) { return Widget.BuildPalette().HealthFrom; }
+	static FLinearColor HealthTo(const USovHolographicHUDWidget& Widget) { return Widget.BuildPalette().HealthTo; }
+	static FLinearColor ShieldTo(const USovHolographicHUDWidget& Widget) { return Widget.BuildPalette().ShieldTo; }
 };
 
 namespace
@@ -94,6 +98,61 @@ bool FSovHolographicContrastTest::RunTest(const FString& Parameters)
 	// Contrast is achieved by thickening the backing, never by removing a readout.
 	TestTrue(TEXT("High contrast keeps a visible accent for the readout"),
 		FSovHolographicHUDTestAccess::Accent(*Widget).A > 0.f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovHolographicProtagonistPaletteTest,
+	"ProjectVelkorran.Campaign.HolographicHUD.EachProtagonistGetsItsOwnPaletteUntilContrastOverridesIt",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovHolographicProtagonistPaletteTest::RunTest(const FString& Parameters)
+{
+	FHolographicWorld F;
+	if (!TestTrue(TEXT("Ready holographic fixture"), F.Valid())) { return false; }
+	// Constructed directly: a surface built through CreateWidget would need an attached local player.
+	auto* Widget = NewObject<USovHolographicHUDWidget>(F.Player);
+	if (!TestNotNull(TEXT("Surface constructs"), Widget)) { return false; }
+
+	const FSovGameplayTags& Tags = FSovGameplayTags::Get();
+	FSovHolographicHUDSnapshot Snapshot;
+	USovHolographicHUDWidget::ReadSnapshot(F.Controller, Snapshot);
+	Snapshot.Settings.bHighContrastHUD = false;
+
+	Snapshot.Vitals.Protagonist = Tags.Character_Player_Tarrik;
+	FSovHolographicHUDTestAccess::SetSnapshot(*Widget, Snapshot);
+	const FLinearColor TarrikHealth = FSovHolographicHUDTestAccess::HealthTo(*Widget);
+	const FLinearColor TarrikAccent = FSovHolographicHUDTestAccess::Accent(*Widget);
+
+	Snapshot.Vitals.Protagonist = Tags.Character_Player_Selene;
+	FSovHolographicHUDTestAccess::SetSnapshot(*Widget, Snapshot);
+	const FLinearColor SeleneHealth = FSovHolographicHUDTestAccess::HealthTo(*Widget);
+	const FLinearColor SeleneAccent = FSovHolographicHUDTestAccess::Accent(*Widget);
+
+	// A transparent bar is an absent readout, whichever protagonist is wearing it.
+	TestEqual(TEXT("Tarrik's health bar is drawn opaque"), TarrikHealth.A, 1.f);
+	TestEqual(TEXT("Selene's health bar is drawn opaque"), SeleneHealth.A, 1.f);
+	// Both protagonists were asked for, so the identity branch has to actually resolve differently.
+	TestFalse(TEXT("The protagonists do not share one accent"), TarrikAccent.Equals(SeleneAccent));
+	TestFalse(TEXT("The protagonists do not share one health colour"), TarrikHealth.Equals(SeleneHealth));
+	// Direction rather than exact values: the references read red for Tarrik and green for Selene.
+	TestTrue(TEXT("Tarrik's health reads red"), TarrikHealth.R > TarrikHealth.G && TarrikHealth.R > TarrikHealth.B);
+	TestTrue(TEXT("Selene's health reads green"), SeleneHealth.G > SeleneHealth.R);
+
+	// Urgency was previously forced warm for both protagonists so that reading it never depended on
+	// knowing whose HUD this is. Following the references' per-protagonist colours gives that up, and
+	// what replaces it is the shield and cross glyphs plus this: contrast erases identity entirely.
+	Snapshot.Settings.bHighContrastHUD = true;
+	Snapshot.Vitals.Protagonist = Tags.Character_Player_Tarrik;
+	FSovHolographicHUDTestAccess::SetSnapshot(*Widget, Snapshot);
+	const FLinearColor TarrikContrast = FSovHolographicHUDTestAccess::HealthTo(*Widget);
+	const FLinearColor ContrastShield = FSovHolographicHUDTestAccess::ShieldTo(*Widget);
+	Snapshot.Vitals.Protagonist = Tags.Character_Player_Selene;
+	FSovHolographicHUDTestAccess::SetSnapshot(*Widget, Snapshot);
+	const FLinearColor SeleneContrast = FSovHolographicHUDTestAccess::HealthTo(*Widget);
+	TestTrue(TEXT("High contrast resolves both protagonists to the same health colour"),
+		TarrikContrast.Equals(SeleneContrast));
+	// Thickened, never dropped: contrast must not cost a readout.
+	TestEqual(TEXT("A high contrast health bar stays opaque"), TarrikContrast.A, 1.f);
+	TestEqual(TEXT("A high contrast shield bar stays opaque"), ContrastShield.A, 1.f);
 	return true;
 }
 #endif
