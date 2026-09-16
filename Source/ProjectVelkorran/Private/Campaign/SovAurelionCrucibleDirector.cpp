@@ -1,5 +1,6 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Campaign/SovAurelionCrucibleDirector.h"
+#include "AI/SovAurelionEnemyRoles.h"
 #include "Campaign/SovEncounterCoordinationComponent.h"
 #include "Campaign/SovCampaignEncounterObjective.h"
 #include "Campaign/SovCampaignHandoffAnchor.h"
@@ -376,12 +377,31 @@ void ASovAurelionThermalPhaseDirector::BindFracture()
         FractureSource->OnThermalFractureCompleted.AddUniqueDynamic(this, &ThisClass::HandleFracture);
     }
 }
+namespace
+{
+/** The link phase is fought at the link phase's durability; the same elite re-arms for the real
+ * fight as this phase goes active, including on a retry, which restores the full crucible pool. */
+void ApplyCrucibleDurability(ASovAurelionThermalPhaseDirector* Director)
+{
+    if (!IsValid(Director) || !Director->HasAuthority()) { return; }
+    ASovNPCCharacterBase* const Elite = Director->GetParticipant(Director->EliteParticipantId);
+    if (!IsValid(Elite) || !Elite->IsAlive()) { return; }
+    UNarrativeAbilitySystemComponent* const ASC = Elite->GetNarrativeAbilitySystemComponent();
+    if (!IsValid(ASC) || ASC->GetAvatarActor() != Elite) { return; }
+    FGameplayEffectContextHandle Context = ASC->MakeEffectContext();
+    Context.AddInstigator(Elite, Elite);
+    const FGameplayEffectSpecHandle Spec = ASC->MakeOutgoingSpec(USovAurelionEliteCrucibleDurability::StaticClass(), 1.f, Context);
+    if (Spec.IsValid()) { ASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get()); }
+}
+}
+
 void ASovAurelionThermalPhaseDirector::HandlePhaseState(ESovEncounterState Previous, ESovEncounterState Current)
 {
     if (Current == ESovEncounterState::Active)
     {
         FractureAttemptId.Invalidate(); FractureFrostId.Invalidate(); FractureHeatId.Invalidate(); FracturePayoffId.Invalidate();
         BindFracture(); SetActorTickEnabled(true);
+        ApplyCrucibleDurability(this);
     }
 }
 void ASovAurelionThermalPhaseDirector::HandleFracture(const FSovAurelionThermalFractureReceipt& Receipt)

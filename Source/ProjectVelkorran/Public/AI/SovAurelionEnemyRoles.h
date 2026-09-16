@@ -139,6 +139,26 @@ public:
     USovAurelionElitePoiseAttributes();
 };
 
+/** Boss durability for the link phase, applied the same ordinary startup way as the poise attributes.
+ * The seeded elite inherited an ordinary enforcer's pool; measured play had it dying in seconds. */
+UCLASS()
+class PROJECTVELKORRAN_API USovAurelionEliteDurability : public UGameplayEffect
+{
+    GENERATED_BODY()
+public:
+    USovAurelionEliteDurability();
+};
+
+/** The same elite re-arms for its real fight when the thermal phase begins. Applied by the phase
+ * director, never at startup: the link phase must be fought at the link phase's durability. */
+UCLASS()
+class PROJECTVELKORRAN_API USovAurelionEliteCrucibleDurability : public UGameplayEffect
+{
+    GENERATED_BODY()
+public:
+    USovAurelionEliteCrucibleDurability();
+};
+
 /** Readiness-only bootstrap. Stops after a live/restored/severed instance or 30 seconds.
  * It never runs combat decisions or resets an existing link. */
 UCLASS(ClassGroup=(Sovereign), BlueprintType, meta=(BlueprintSpawnableComponent))

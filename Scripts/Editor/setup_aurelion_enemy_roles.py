@@ -628,9 +628,12 @@ def build_enemy_assets(output_dir):
                 cdo.get_thermal_fracture().set_editor_property("auto_activate", True)
                 ability = duplicate(_path(ability).split(".")[0], ROOT + "AC_Abilities_AurelionElite")
                 startup = list(ability.get_editor_property("startup_effects"))
-                poise_effect = unreal.SovAurelionElitePoiseAttributes.static_class()
-                if _path(poise_effect) not in [_path(effect) for effect in startup]:
-                    startup.append(poise_effect)
+                # Poise, then boss durability. The seeded elite inherits an ordinary enforcer's health
+                # pool; the durability effect overrides it after those base attributes are applied.
+                for effect_class in (unreal.SovAurelionElitePoiseAttributes, unreal.SovAurelionEliteDurability):
+                    effect = effect_class.static_class()
+                    if _path(effect) not in [_path(existing) for existing in startup]:
+                        startup.append(effect)
                 ability.set_editor_property("startup_effects", startup)
                 definition.set_editor_property("ability_configuration", ability)
                 # CharacterAppearance's runtime getter unconditionally dereferences

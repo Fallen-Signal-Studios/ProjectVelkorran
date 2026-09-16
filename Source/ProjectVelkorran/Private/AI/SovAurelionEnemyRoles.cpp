@@ -1,5 +1,6 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "AI/SovAurelionEnemyRoles.h"
+#include "AI/SovAurelionElitePolicy.h"
 #include "Presentation/SovBloodFeedbackComponent.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
@@ -490,6 +491,36 @@ USovAurelionElitePoiseAttributes::USovAurelionElitePoiseAttributes()
         Modifier.ModifierOp = EGameplayModOp::Override; Modifier.ModifierMagnitude = FScalableFloat(100.f);
         Modifiers.Add(Modifier);
     }
+}
+
+namespace
+{
+// Both boss pools are written the same way: override the health pair, then add armour on top of
+// whatever the seeded definition and any surviving Weaver ward already supply.
+void BuildEliteDurability(TArray<FGameplayModifierInfo>& Modifiers, float Health, float Armor)
+{
+    for (const FGameplayAttribute& Attribute : {UNarrativeAttributeSetBase::GetMaxHealthAttribute(), UNarrativeAttributeSetBase::GetHealthAttribute()})
+    {
+        FGameplayModifierInfo Modifier; Modifier.Attribute = Attribute;
+        Modifier.ModifierOp = EGameplayModOp::Override; Modifier.ModifierMagnitude = FScalableFloat(Health);
+        Modifiers.Add(Modifier);
+    }
+    FGameplayModifierInfo Plating; Plating.Attribute = UNarrativeAttributeSetBase::GetArmorAttribute();
+    Plating.ModifierOp = EGameplayModOp::Additive; Plating.ModifierMagnitude = FScalableFloat(Armor);
+    Modifiers.Add(Plating);
+}
+}
+
+USovAurelionEliteDurability::USovAurelionEliteDurability()
+{
+    DurationPolicy = EGameplayEffectDurationType::Instant;
+    BuildEliteDurability(Modifiers, SovAurelionElitePolicy::LinkPhaseHealth, SovAurelionElitePolicy::LinkPhaseArmor);
+}
+
+USovAurelionEliteCrucibleDurability::USovAurelionEliteCrucibleDurability()
+{
+    DurationPolicy = EGameplayEffectDurationType::Instant;
+    BuildEliteDurability(Modifiers, SovAurelionElitePolicy::CruciblePhaseHealth, SovAurelionElitePolicy::CruciblePhaseArmor);
 }
 
 USovAurelionFreshCommandLink::USovAurelionFreshCommandLink()

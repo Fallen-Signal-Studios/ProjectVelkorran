@@ -3,6 +3,7 @@
 #include "Tests/SovBotAttackTestFixtures.h"
 #include "Tests/SovRuntimeObjectTestFixtures.h"
 #include "AI/NarrativeNPCController.h"
+#include "AI/SovAurelionElitePolicy.h"
 #include "AI/SovAurelionRoleActivities.h"
 #include "Components/BoxComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
@@ -686,6 +687,44 @@ bool FSovAurelionRoleConfigurationRestoreTest::RunTest(const FString& Parameters
     TestFalse(TEXT("A second owner's suspension is never bypassed"), F.Controller->IsThreatMemorySuspendedOnlyBy(First));
     F.Controller->SetThreatMemorySuspended(First, false);
     TestTrue(TEXT("Remaining owner's exact lease is retained"), F.Controller->IsThreatMemorySuspendedOnlyBy(Second));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAurelionEliteDurabilityTest, "ProjectVelkorran.Campaign.Aurelion.EnemyRoles.EliteDurabilityScalesBothBossPhases",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FSovAurelionEliteDurabilityTest::RunTest(const FString& Parameters)
+{
+    FRoleWorld F;
+    if (!F.Valid()) { return false; }
+    auto* ASC = F.Runner->GetNarrativeAbilitySystemComponent();
+    // The seeded enforcer pool the elite inherited, and an existing armour value it must not discard.
+    ASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetMaxHealthAttribute(), 53.2f);
+    ASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetHealthAttribute(), 53.2f);
+    ASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetArmorAttribute(), 11.f);
+    ASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetMaxPoiseAttribute(), 100.f);
+    ASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetPoiseAttribute(), 100.f);
+
+    const auto Link = ASC->MakeOutgoingSpec(USovAurelionEliteDurability::StaticClass(), 1.f, ASC->MakeEffectContext());
+    if (!TestTrue(TEXT("Actual link-phase durability builds through GAS"), Link.IsValid())) { return false; }
+    ASC->ApplyGameplayEffectSpecToSelf(*Link.Data.Get());
+    TestEqual(TEXT("Link phase raises the boss health pool"), ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetMaxHealthAttribute()), SovAurelionElitePolicy::LinkPhaseHealth);
+    TestEqual(TEXT("Link phase fills that pool"), ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()), SovAurelionElitePolicy::LinkPhaseHealth);
+    TestEqual(TEXT("Armour is added to what the definition already supplied, never overwritten"),
+        ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetArmorAttribute()), 11.f + SovAurelionElitePolicy::LinkPhaseArmor);
+    TestEqual(TEXT("Durability does not disturb poise"), ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetPoiseAttribute()), 100.f);
+
+    // The real fight: the same elite re-arms at the phase boundary, which is also its full restore.
+    ASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetHealthAttribute(), 40.f);
+    const auto Crucible = ASC->MakeOutgoingSpec(USovAurelionEliteCrucibleDurability::StaticClass(), 1.f, ASC->MakeEffectContext());
+    if (!TestTrue(TEXT("Actual crucible durability builds through GAS"), Crucible.IsValid())) { return false; }
+    ASC->ApplyGameplayEffectSpecToSelf(*Crucible.Data.Get());
+    TestEqual(TEXT("The crucible boss carries the larger pool"), ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetMaxHealthAttribute()), SovAurelionElitePolicy::CruciblePhaseHealth);
+    TestEqual(TEXT("Hardening restores the elite for its real fight"), ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()), SovAurelionElitePolicy::CruciblePhaseHealth);
+    TestEqual(TEXT("Crucible armour stacks on the link-phase plating"), ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetArmorAttribute()),
+        11.f + SovAurelionElitePolicy::LinkPhaseArmor + SovAurelionElitePolicy::CruciblePhaseArmor);
+    TestTrue(TEXT("The second fight is strictly harder than the first"), SovAurelionElitePolicy::CruciblePhaseHealth > SovAurelionElitePolicy::LinkPhaseHealth);
+    // The measured starting point this scaling answers: an ordinary trash-mob pool on the mission's boss.
+    TestTrue(TEXT("Both phases far exceed the measured baseline"), SovAurelionElitePolicy::LinkPhaseHealth > SovAurelionElitePolicy::BaselineHealth * 3.f);
     return true;
 }
 #endif
