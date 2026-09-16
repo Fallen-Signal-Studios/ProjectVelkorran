@@ -19,6 +19,7 @@
 #include "Components/SovStatusComponent.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
 #include "Sovereign/SovGameplayTags.h"
+#include "Weapons/SovAdsComponent.h"
 
 ASovPlayerCharacterBase::ASovPlayerCharacterBase(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -31,6 +32,8 @@ ASovPlayerCharacterBase::ASovPlayerCharacterBase(const FObjectInitializer& Objec
 	ResonanceComponent = CreateDefaultSubobject<USovResonanceComponent>(TEXT("SovResonanceComponent"));
 	RecoveryComponent = CreateDefaultSubobject<USovFatalRecoveryComponent>(TEXT("SovRecoveryComponent"));
 	TargetingComponent = CreateDefaultSubobject<USovTargetingComponent>(TEXT("SovTargetingComponent"));
+	// Both protagonists aim; the sight each looks through is chosen from the weapon they wield.
+	CreateDefaultSubobject<USovAdsComponent>(TEXT("SovAdsComponent"));
 	CorruptionComponent = CreateDefaultSubobject<USovCorruptionComponent>(TEXT("SovCorruptionComponent"));
 	ShieldComponent = CreateDefaultSubobject<USovShieldComponent>(TEXT("SovShieldComponent"));
 	HealthRechargeComponent = CreateDefaultSubobject<USovHealthRechargeComponent>(
