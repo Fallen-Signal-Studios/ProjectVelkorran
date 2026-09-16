@@ -183,5 +183,8 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Aurelion Elite|Summon", meta = (ClampMin = "100.0", Units = "cm"))
 	float SummonDistance = 420.f;
 
+	/** Lets a test supply a content-free add, so no asynchronous appearance load outlives its world. */
+	friend struct FSovAurelionEliteTestAccess;
+
 	UPROPERTY(Transient) TArray<TWeakObjectPtr<ASovNPCCharacterBase>> Summoned;
 };

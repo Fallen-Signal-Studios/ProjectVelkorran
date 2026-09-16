@@ -1301,6 +1301,20 @@ bool FSovTransferredDefeatMetadataLoadTest::RunTest(const FString& Parameters)
     return true;
 }
 
+/**
+ * Supplies the summon with a content-free add.
+ *
+ * Spawning the authored Enforcer here loads its appearance asynchronously, and that load completes
+ * after the fixture world is destroyed: the NPC then initialises with no controller and the engine
+ * asserts inside the activity component, landing on whichever unrelated test is running next. The
+ * shipping summon still uses the authored definition, where a live world makes that ordinary.
+ */
+struct FSovAurelionEliteTestAccess
+{
+    static void SetSummonDefinition(USovGameplayAbility_AurelionEliteSummon& Ability, UNPCDefinition* Definition)
+    { Ability.SummonDefinition = Definition; }
+};
+
 namespace
 {
 template <typename TAbility>
@@ -1339,6 +1353,11 @@ bool FSovAurelionEliteSummonTest::RunTest(const FString& Parameters)
     FGameplayAbilitySpecHandle Handle;
     auto* Summon = GrantEliteAbility<USovGameplayAbility_AurelionEliteSummon>(EliteASC, Handle);
     if (!TestNotNull(TEXT("Summon ability instance exists"), Summon)) { return false; }
+    // Content-free add: this test is about phase gating and attempt scoping, not about loading art.
+    auto* AddDefinition = NewObject<UNPCDefinition>(F.PC); F.PC->KeepAlive.Add(AddDefinition);
+    AddDefinition->NPCClassPath = ASovCampaignMassRoundTripNPC::StaticClass();
+    AddDefinition->bAllowMultipleInstances = true;
+    FSovAurelionEliteTestAccess::SetSummonDefinition(*Summon, AddDefinition);
 
     const int32 ParticipantsBefore = F.Director->Participants.Num();
     const int32 NPCsBefore = CountLivingNPCs(F.World);
