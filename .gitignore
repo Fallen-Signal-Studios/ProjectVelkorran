@@ -256,3 +256,7 @@ Content/Space_Creator_Pro/PlanetCreator_1_V2/Textures/Miscellaneous_Texture/T_Hi
 Content/TwinBladesBundle/TwinBladesAndTwinSword/Map/Materials/Texture/T_Ground_BaseColor.uasset
 Content/TwinBladesBundle/TwinBladesAndTwinSword/Map/Materials/Texture/T_Ground_Normal.uasset
 Content/TwinBladesBundle/TwinBladesAndTwinSword/Map/Materials/Texture/T_Ground_ORD.uasset
+
+# NVIDIA DLSS 4.5 plugin (DLSS + StreamlineNGXCommon only), installed locally and deliberately kept out of
+# version control: about 1.2 GB of NVIDIA binaries under NVIDIA's license. Machines without it fall back to TSR.
+/Plugins/NVIDIA/
