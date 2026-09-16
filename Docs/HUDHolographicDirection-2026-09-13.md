@@ -1,3 +1,9 @@
+> **Superseded on 15 September 2026** by
+> [AurelionHolographicHUD-2026-09-15.md](AurelionHolographicHUD-2026-09-15.md). The creator supplied
+> reference images for both protagonists and asked for the whole HUD to be rebuilt holographically
+> in engine. The Halo-style corner-mark direction below is retained as the record of what preceded
+> it, not as current direction.
+
 # Holographic HUD refinement
 
 User direction: make the HUD more holographic and minimal, with Halo: Campaign

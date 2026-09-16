@@ -55,6 +55,10 @@ public:
 
 	const FSovHolographicHUDSnapshot& GetDisplayed() const { return Displayed; }
 
+	/** Compact paint diagnostics, readable from a capture session rather than inferred from symptoms. */
+	UFUNCTION(BlueprintPure, Category = "Sovereign|HUD")
+	FString GetPaintDiagnostics() const;
+
 protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;
 	virtual int32 NativePaint(const FPaintArgs& Args, const FGeometry& Geometry, const FSlateRect& CullingRect,
@@ -65,10 +69,12 @@ private:
 
 	struct FPalette
 	{
-		FLinearColor Accent;
-		FLinearColor Warm;      // health, and anything urgent
-		FLinearColor Backing;   // optical veil, opaque under high contrast
-		FLinearColor Line;
+		// Initialised, because this is reported as diagnostics before the first paint assigns it and
+		// an uninitialised colour would read as a plausible-looking measurement.
+		FLinearColor Accent = FLinearColor::Transparent;
+		FLinearColor Warm = FLinearColor::Transparent;      // health, and anything urgent
+		FLinearColor Backing = FLinearColor::Transparent;   // optical veil, opaque under high contrast
+		FLinearColor Line = FLinearColor::Transparent;
 		bool bHighContrast = false;
 	};
 
@@ -84,4 +90,15 @@ private:
 	FSovHolographicHUDSnapshot Displayed;
 	/** Advances only with real time, so the radar sweep reads as motion rather than a stutter. */
 	mutable float SweepSeconds = 0.f;
+	/** Measured, not assumed: whether paint runs, at what size, and what it was given to draw. */
+	mutable int32 PaintCount = 0;
+	mutable FVector2D LastPaintSize = FVector2D::ZeroVector;
+	/** Whether a paint reached the drawing stage, and the colours it would have drawn with. */
+	mutable bool bLastPaintDrew = false;
+	mutable FPalette LastPalette;
+	/** The clip rectangle the paint was handed, and where the surface sits in absolute space. */
+	mutable FVector4 LastCulling = FVector4(0.f, 0.f, 0.f, 0.f);
+	mutable FVector2D LastAbsolutePosition = FVector2D::ZeroVector;
+	int32 RefreshCount = 0;
+	bool bLastRefreshReady = false;
 };

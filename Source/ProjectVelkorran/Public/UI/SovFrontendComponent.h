@@ -69,6 +69,7 @@ private:
     void Unbind();
     void ReleaseSetupPause();
     void RemoveCombatVitals();
+    void RemoveHolographicHUD();
     bool bEnding = false;
     bool bOwnSetupPause = false;
     TWeakObjectPtr<UWorld> AudioAppliedWorld;

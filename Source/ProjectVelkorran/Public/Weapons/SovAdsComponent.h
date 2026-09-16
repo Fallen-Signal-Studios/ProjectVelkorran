@@ -79,7 +79,7 @@ protected:
 	virtual void TickComponent(float DeltaSeconds, ELevelTick TickType, FActorComponentTickFunction* TickFunction) override;
 
 private:
-	friend class FSovAdsRuntimeTestAccess;
+	friend struct FSovAdsRuntimeTestAccess;
 
 	/** Authority-independent read of whether the owner is currently aiming a ranged weapon. */
 	bool IsAimingRangedWeapon(ESovAdsSight& OutSight) const;

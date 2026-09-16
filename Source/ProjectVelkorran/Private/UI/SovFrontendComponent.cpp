@@ -46,7 +46,7 @@ void USovFrontendComponent::RefreshFrontend()
     auto* PC = Cast<ASovPlayerController>(GetOwner());
     if (bEnding || !IsActive() || !PC || !PC->IsLocalController() || !PC->GetLocalPlayer()
         || IsRunningCommandlet() || !FSlateApplication::IsInitialized())
-    { UnbindObjectives(); RemoveCombatVitals(); return; }
+    { UnbindObjectives(); RemoveCombatVitals(); RemoveHolographicHUD(); return; }
     // The holographic surface carries the resources itself, so the plain readout stands down while
     // it is up rather than drawing a second set of bars over the same information.
     if (bShowHolographicHUD)
@@ -54,15 +54,14 @@ void USovFrontendComponent::RefreshFrontend()
         if (!HolographicHUD)
         {
             HolographicHUD = CreateWidget<USovHolographicHUDWidget>(PC, USovHolographicHUDWidget::StaticClass());
-            if (HolographicHUD) { HolographicHUD->AddToPlayerScreen(-1); }
+            // Above the gameplay HUD rather than beneath it. The threat overlay sits at 60 and is the
+            // one surface observed to render in a capture; a combat readout is no less essential, and
+            // at a negative depth this drew nothing a player could see. Threat cues still win ties.
+            if (HolographicHUD) { HolographicHUD->AddToPlayerScreen(50); }
         }
         if (HolographicHUD) { HolographicHUD->RefreshHolographicHUD(); }
     }
-    else if (HolographicHUD)
-    {
-        HolographicHUD->RemoveFromParent();
-        HolographicHUD = nullptr;
-    }
+    else { RemoveHolographicHUD(); }
     if (bShowCombatVitals && !bShowHolographicHUD)
     {
         if (!CombatVitals)
@@ -402,18 +401,24 @@ void USovFrontendComponent::Unbind()
 void USovFrontendComponent::RemoveCombatVitals()
 {
     if (CombatVitals) { CombatVitals->RemoveFromParent(); CombatVitals = nullptr; }
-    // The single teardown path for combat surfaces: Deactivate, EndPlay and the not-ready early
-    // return all come through here, so the holographic surface never outlives its controller.
+}
+
+/** Kept separate from the vitals teardown: folding the two together made the plain readout's
+ * every-tick stand-down destroy and rebuild the holographic surface on every frame, so it never
+ * survived long enough to paint. */
+void USovFrontendComponent::RemoveHolographicHUD()
+{
     if (HolographicHUD) { HolographicHUD->RemoveFromParent(); HolographicHUD = nullptr; }
 }
 void USovFrontendComponent::Deactivate()
 {
     Super::Deactivate();
     RemoveCombatVitals();
+    RemoveHolographicHUD();
 }
 void USovFrontendComponent::EndPlay(const EEndPlayReason::Type Reason)
 {
-    bEnding = true; UnbindObjectives(); Unbind(); ReleaseSetupPause(); RemoveCombatVitals();
+    bEnding = true; UnbindObjectives(); Unbind(); ReleaseSetupPause(); RemoveCombatVitals(); RemoveHolographicHUD();
     if (BoundSave.IsValid()) { BoundSave->OnLoadCompleted.RemoveDynamic(this, &ThisClass::OnLoadCompleted); }
     BoundSave.Reset(); bRecoveryMenuPending = false; RecoveryMessage.Reset();
     if (SetupMenu) { SetupMenu->DeactivateWidget(); SetupMenu = nullptr; }

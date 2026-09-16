@@ -4,6 +4,7 @@
 
 #include "Characters/SovPlayerCharacterBase.h"
 #include "Components/SovEchoComponent.h"
+#include "HAL/IConsoleManager.h"
 #include "Framework/SovPlayerController.h"
 #include "Items/WeaponItem.h"
 #include "Rendering/DrawElements.h"
@@ -13,6 +14,15 @@
 #include "Widgets/Layout/SBox.h"
 
 #define LOCTEXT_NAMESPACE "SovHolographicHUD"
+
+/**
+ * Submits one rectangle by three different routes so a blank surface can be attributed to a specific
+ * drawing path instead of guessed at. Off by default, so no probe can reach a player.
+ */
+static TAutoConsoleVariable<int32> CVarHolographicPaintProbe(
+	TEXT("sov.HUD.HolographicPaintProbe"), 0,
+	TEXT("Draw diagnostic marks on the holographic HUD to identify which submission path renders."),
+	ECVF_Cheat);
 
 namespace
 {
@@ -82,7 +92,10 @@ USovHolographicHUDWidget::USovHolographicHUDWidget(const FObjectInitializer& Ini
 
 TSharedRef<SWidget> USovHolographicHUDWidget::RebuildWidget()
 {
-	// Everything is painted; there is no child tree to keep in step.
+	// Everything is painted rather than composed from child widgets, so the root carries no content.
+	// The sibling threat overlay renders full screen from exactly this, which disproves an earlier
+	// assumption here that a bare box would leave the paint routines drawing into a zero-sized
+	// rectangle: a screen-added widget is allotted the screen regardless of its root's desired size.
 	return SNew(SBox);
 }
 
@@ -120,7 +133,26 @@ void USovHolographicHUDWidget::RefreshHolographicHUD()
 	FSovHolographicHUDSnapshot Current;
 	const bool bReady = ReadSnapshot(Cast<ASovPlayerController>(GetOwningPlayer()), Current);
 	Displayed = Current;
+	++RefreshCount;
+	bLastRefreshReady = bReady;
 	SetVisibility(bReady ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+}
+
+FString USovHolographicHUDWidget::GetPaintDiagnostics() const
+{
+	// The palette is reported because a theme that resolves to zero alpha would draw nothing at any
+	// depth, and that failure is indistinguishable from being painted underneath something opaque.
+	return FString::Printf(
+		TEXT("paints=%d drew=%d size=%.0fx%.0f refreshes=%d ready=%d valid=%d inViewport=%d contacts=%d ")
+		TEXT("accentA=%.2f lineA=%.2f warmA=%.2f backA=%.2f cull=%.0f,%.0f,%.0f,%.0f abs=%.0f,%.0f protagonist=%s"),
+		PaintCount, bLastPaintDrew ? 1 : 0, LastPaintSize.X, LastPaintSize.Y, RefreshCount,
+		bLastRefreshReady ? 1 : 0, Displayed.bValid ? 1 : 0, IsInViewport() ? 1 : 0, Displayed.Contacts.Num(),
+		LastPalette.Accent.A, LastPalette.Line.A, LastPalette.Warm.A, LastPalette.Backing.A,
+		LastCulling.X, LastCulling.Y, LastCulling.Z, LastCulling.W,
+		LastAbsolutePosition.X, LastAbsolutePosition.Y,
+		// The protagonist is an identity tag, not an enum: an unset tag is exactly the case that would
+		// make the theme resolve to nothing, so it has to be readable rather than reduced to a number.
+		*Displayed.Vitals.Protagonist.ToString());
 }
 
 USovHolographicHUDWidget::FPalette USovHolographicHUDWidget::BuildPalette() const
@@ -381,9 +413,34 @@ int32 USovHolographicHUDWidget::NativePaint(const FPaintArgs& Args, const FGeome
 	FSlateWindowElementList& Elements, int32 Layer, const FWidgetStyle& Style, bool bParentEnabled) const
 {
 	int32 Result = Super::NativePaint(Args, Geometry, CullingRect, Elements, Layer, Style, bParentEnabled);
+	// Counted before the validity gate, so a paint that ran but drew nothing is distinguishable
+	// from a paint that never ran at all.
+	++PaintCount;
+	LastPaintSize = Geometry.GetLocalSize();
+	// Never measured before: an empty or degenerate culling rectangle discards every element while
+	// leaving every other reading above looking perfectly healthy.
+	LastCulling = FVector4(CullingRect.Left, CullingRect.Top, CullingRect.Right, CullingRect.Bottom);
+	LastAbsolutePosition = Geometry.GetAbsolutePosition();
+	if (CVarHolographicPaintProbe.GetValueOnGameThread() != 0)
+	{
+		const FVector2D ProbeSize(220.f, 90.f);
+		const FVector2D At(60.f, 300.f);
+		// Route one: exactly how the sibling overlay that does render submits a box.
+		FSlateDrawElement::MakeBox(Elements, Result + 1,
+			Geometry.ToPaintGeometry(ProbeSize, FSlateLayoutTransform(At)),
+			FCoreStyle::Get().GetBrush("WhiteBrush"), ESlateDrawEffect::None, FLinearColor(1.f, 0.f, 1.f, 1.f));
+		// Route two: this file's own box helper, which uses a function-local static brush.
+		DrawBlock(Elements, Result + 2, Geometry, At + FVector2D(240.f, 0.f), ProbeSize, FLinearColor(0.f, 1.f, 0.f, 1.f));
+		// Route three: this file's own line helper.
+		DrawSegment(Elements, Result + 3, Geometry.ToPaintGeometry(), At + FVector2D(480.f, 0.f),
+			At + FVector2D(700.f, 90.f), FLinearColor(1.f, 1.f, 0.f, 1.f), 6.f);
+	}
 	if (!Displayed.bValid) { return Result; }
 	if (const UWorld* const World = GetWorld()) { SweepSeconds = World->GetTimeSeconds(); }
 	const FPalette Palette = BuildPalette();
+	// Recorded rather than inferred: this is the last point before anything is submitted to draw.
+	LastPalette = Palette;
+	bLastPaintDrew = true;
 	const float Scale = FMath::IsFinite(Displayed.Settings.UIScale) ? FMath::Clamp(Displayed.Settings.UIScale, .75f, 2.f) : 1.f;
 	Result = PaintEdging(Geometry, Elements, Result, Palette);
 	Result = PaintIdentityPlate(Geometry, Elements, Result, Palette, Scale);
