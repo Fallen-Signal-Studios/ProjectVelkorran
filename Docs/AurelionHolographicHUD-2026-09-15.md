@@ -114,12 +114,15 @@ together lets the second discard the first.
 - **Ammo draws twice until an editor step runs.** The legacy `WBP_WeaponInfo` child of
   `WBP_AurelionGameplayHUD` is still live; collapsing it is a Content change through the existing
   authoring path.
-- **The surface ignores the cinematic hide contract.** `UNarrativeGameplayHUD::SetHUDHidden`, with
-  its `EssentialWidgets` exemption, *is* implemented in `WBP_AurelionGameplayHUD` — an earlier read
-  of the C++ alone wrongly concluded it was not. What is true is narrower: nothing in C++ invokes
-  it, and this surface sits outside the widget tree it hides, so it would stay on screen through
-  cinematics where the HUD it replaces correctly vanishes. The project already has the signal to
-  drive this (`CurrentSequences`, used by the haptics component). Unfixed, and needs a test.
+- **The surface honours one hide path, not the cinematic one.** `ReadCurrentVitals` refuses on
+  `State_Player_WantsHideHUD`, and this surface reads its whole snapshot through that function, so
+  it already collapses whenever that tag is set — inherited rather than implemented.
+  `UNarrativeGameplayHUD::SetHUDHidden`, with its `EssentialWidgets` exemption, *is* implemented in
+  `WBP_AurelionGameplayHUD`; an earlier read of the C++ alone wrongly concluded it was not, and a
+  first correction of that then overstated the gap in the other direction. What is actually missing
+  is narrow: nothing in C++ invokes `SetHUDHidden`, and this surface sits outside the widget tree it
+  hides, so a sequencer-driven hide would not reach it. The project already has the signal
+  (`CurrentSequences`, used by the haptics component). Unfixed, and needs a test.
 - **The surface bypasses the registered UI layers.** The HUD registers `UI.Layer.Game`,
   `UI.Layer.Menu` and `UI.Layer.Modal`, and the project already pushes menus through `OpenMenu`.
   This widget calls `AddToPlayerScreen` directly. That is not why it appeared blank — the sibling

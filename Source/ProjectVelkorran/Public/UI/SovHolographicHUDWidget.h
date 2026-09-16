@@ -71,9 +71,13 @@ private:
 	{
 		// Initialised, because this is reported as diagnostics before the first paint assigns it and
 		// an uninitialised colour would read as a plausible-looking measurement.
-		FLinearColor Accent = FLinearColor::Transparent;
-		FLinearColor Warm = FLinearColor::Transparent;      // health, and anything urgent
-		FLinearColor Backing = FLinearColor::Transparent;   // optical veil, opaque under high contrast
+		FLinearColor Accent = FLinearColor::Transparent;      // filaments, frames, identity text
+		FLinearColor Glow = FLinearColor::Transparent;        // the bleed around a torn edge
+		FLinearColor ShieldFrom = FLinearColor::Transparent;  // thin upper bar, and a ready pip
+		FLinearColor ShieldTo = FLinearColor::Transparent;
+		FLinearColor HealthFrom = FLinearColor::Transparent;  // heavier lower bar
+		FLinearColor HealthTo = FLinearColor::Transparent;
+		FLinearColor Backing = FLinearColor::Transparent;     // optical veil, opaque under high contrast
 		FLinearColor Line = FLinearColor::Transparent;
 		bool bHighContrast = false;
 	};

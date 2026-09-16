@@ -4,11 +4,16 @@
 
 #include "Characters/SovPlayerCharacterBase.h"
 #include "Components/SovEchoComponent.h"
-#include "HAL/IConsoleManager.h"
+#include "Fonts/FontMeasure.h"
+#include "Framework/Application/SlateApplication.h"
 #include "Framework/SovPlayerController.h"
+#include "HAL/IConsoleManager.h"
 #include "Items/WeaponItem.h"
 #include "Rendering/DrawElements.h"
+#include "Rendering/DrawElementTypes.h"
+#include "Sovereign/SovGameplayTags.h"
 #include "Styling/CoreStyle.h"
+#include "Types/SlateEnums.h"
 #include "UI/SovHUDStyle.h"
 #include "UnrealFramework/NarrativeCharacter.h"
 #include "Widgets/Layout/SBox.h"
@@ -16,8 +21,11 @@
 #define LOCTEXT_NAMESPACE "SovHolographicHUD"
 
 /**
- * Submits one rectangle by three different routes so a blank surface can be attributed to a specific
- * drawing path instead of guessed at. Off by default, so no probe can reach a player.
+ * Submits one rectangle by three drawing routes so a blank surface can be attributed to a specific
+ * path instead of guessed at. Off by default, so no probe can reach a player.
+ *
+ * It has already earned its keep once: every route drew correctly, which is what proved the blank
+ * captures were the screenshot path excluding UI rather than anything wrong with this surface.
  */
 static TAutoConsoleVariable<int32> CVarHolographicPaintProbe(
 	TEXT("sov.HUD.HolographicPaintProbe"), 0,
@@ -26,6 +34,8 @@ static TAutoConsoleVariable<int32> CVarHolographicPaintProbe(
 
 namespace
 {
+enum class ETextAlign : uint8 { Left, Centre, Right };
+
 /** Slate draws lines, so every curve here is described as a short polyline. */
 void BuildArc(TArray<FVector2D>& Out, const FVector2D& Centre, float Radius, float FromDegrees, float ToDegrees, int32 Segments)
 {
@@ -37,6 +47,22 @@ void BuildArc(TArray<FVector2D>& Out, const FVector2D& Centre, float Radius, flo
 		const float Angle = FMath::DegreesToRadians(FMath::Lerp(FromDegrees, ToDegrees, Alpha));
 		Out.Add(Centre + FVector2D(FMath::Cos(Angle), FMath::Sin(Angle)) * Radius);
 	}
+}
+
+/** The reference's plates and bars are cut at the corners rather than rounded. */
+void BuildChamferedRect(TArray<FVector2D>& Out, const FVector2D& At, const FVector2D& Size, float Cut)
+{
+	const float C = FMath::Max(FMath::Min(Cut, FMath::Min(Size.X, Size.Y) * .5f), 0.f);
+	Out.Reset(9);
+	Out.Add(At + FVector2D(C, 0.f));
+	Out.Add(At + FVector2D(Size.X - C, 0.f));
+	Out.Add(At + FVector2D(Size.X, C));
+	Out.Add(At + FVector2D(Size.X, Size.Y - C));
+	Out.Add(At + FVector2D(Size.X - C, Size.Y));
+	Out.Add(At + FVector2D(C, Size.Y));
+	Out.Add(At + FVector2D(0.f, Size.Y - C));
+	Out.Add(At + FVector2D(0.f, C));
+	Out.Add(At + FVector2D(C, 0.f));
 }
 
 void DrawPolyline(FSlateWindowElementList& Elements, int32 Layer, const FPaintGeometry& Paint,
@@ -53,7 +79,7 @@ void DrawSegment(FSlateWindowElementList& Elements, int32 Layer, const FPaintGeo
 	DrawPolyline(Elements, Layer, Paint, Points, Colour, Thickness);
 }
 
-/** A filled block, used for bar fills and the opaque high-contrast backing. */
+/** A filled block, used for bar tracks, glyphs and the opaque high-contrast backing. */
 void DrawBlock(FSlateWindowElementList& Elements, int32 Layer, const FGeometry& Geometry,
 	const FVector2D& Position, const FVector2D& Size, const FLinearColor& Colour)
 {
@@ -63,16 +89,110 @@ void DrawBlock(FSlateWindowElementList& Elements, int32 Layer, const FGeometry& 
 		&Brush, ESlateDrawEffect::None, Colour);
 }
 
+/** The references fill every bar with a gradient, which Slate supports directly. */
+void DrawGradientBlock(FSlateWindowElementList& Elements, int32 Layer, const FGeometry& Geometry,
+	const FVector2D& Position, const FVector2D& Size, const FLinearColor& From, const FLinearColor& To)
+{
+	if (Size.X <= 0.f || Size.Y <= 0.f || (From.A <= 0.f && To.A <= 0.f)) { return; }
+	TArray<FSlateGradientStop> Stops;
+	Stops.Add(FSlateGradientStop(FVector2f(0.f, 0.f), From));
+	Stops.Add(FSlateGradientStop(FVector2f(static_cast<float>(Size.X), 0.f), To));
+	// Orient_Vertical runs vertical bands along X, which is the left-to-right sweep the bars want.
+	FSlateDrawElement::MakeGradient(Elements, Layer,
+		Geometry.ToPaintGeometry(Size, FSlateLayoutTransform(Position)), Stops, Orient_Vertical);
+}
+
+/** Slate has no filled-circle primitive, so the radar's disc is scanned out in rows. */
+void DrawDisc(FSlateWindowElementList& Elements, int32 Layer, const FGeometry& Geometry,
+	const FVector2D& Centre, float Radius, const FLinearColor& Colour)
+{
+	if (Colour.A <= 0.f || Radius <= 1.f) { return; }
+	const int32 Rows = FMath::Clamp(FMath::RoundToInt(Radius * .7f), 16, 64);
+	const float RowHeight = (2.f * Radius) / Rows + 1.f;
+	for (int32 Index = 0; Index < Rows; ++Index)
+	{
+		const float Y = ((static_cast<float>(Index) + .5f) / Rows * 2.f - 1.f) * Radius;
+		const float HalfWidth = FMath::Sqrt(FMath::Max(Radius * Radius - Y * Y, 0.f));
+		DrawBlock(Elements, Layer, Geometry, Centre + FVector2D(-HalfWidth, Y - RowHeight * .5f),
+			FVector2D(HalfWidth * 2.f, RowHeight), Colour);
+	}
+}
+
+float MeasureText(const FText& Text, const FSlateFontInfo& Font)
+{
+	if (!FSlateApplication::IsInitialized()) { return Text.ToString().Len() * Font.Size * .6f; }
+	const TSharedRef<FSlateFontMeasure> Measure = FSlateApplication::Get().GetRenderer()->GetFontMeasureService();
+	return static_cast<float>(Measure->Measure(Text.ToString(), Font).X);
+}
+
 void DrawLabel(FSlateWindowElementList& Elements, int32 Layer, const FGeometry& Geometry,
-	const FVector2D& Position, const FText& Text, const FLinearColor& Colour, int32 FontSize)
+	const FVector2D& At, const FText& Text, const FLinearColor& Colour, int32 FontSize,
+	ETextAlign Align = ETextAlign::Left, const ANSICHAR* Style = "Bold")
 {
 	if (Text.IsEmpty() || Colour.A <= 0.f) { return; }
-	const FSlateFontInfo Font = FCoreStyle::GetDefaultFontStyle("Bold", FMath::Max(FontSize, 6));
-	// A one pixel shadow keeps text legible against a bright environment, as the existing readout does.
-	FSlateDrawElement::MakeText(Elements, Layer, Geometry.ToPaintGeometry(FVector2D(600.f, 24.f), FSlateLayoutTransform(Position + FVector2D(1.f, 1.f))),
-		Text, Font, ESlateDrawEffect::None, FLinearColor(0.f, 0.f, 0.f, Colour.A * .8f));
-	FSlateDrawElement::MakeText(Elements, Layer + 1, Geometry.ToPaintGeometry(FVector2D(600.f, 24.f), FSlateLayoutTransform(Position)),
+	const FSlateFontInfo Font = FCoreStyle::GetDefaultFontStyle(Style, FMath::Max(FontSize, 6));
+	const float Width = MeasureText(Text, Font);
+	FVector2D Position = At;
+	if (Align == ETextAlign::Centre) { Position.X -= Width * .5f; }
+	else if (Align == ETextAlign::Right) { Position.X -= Width; }
+	const FVector2D Box(Width + 12.f, FontSize * 2.f);
+	// A one pixel shadow keeps text legible against a bright environment, as the old readout did.
+	FSlateDrawElement::MakeText(Elements, Layer,
+		Geometry.ToPaintGeometry(Box, FSlateLayoutTransform(Position + FVector2D(1.f, 1.f))),
+		Text, Font, ESlateDrawEffect::None, FLinearColor(0.f, 0.f, 0.f, Colour.A * .75f));
+	FSlateDrawElement::MakeText(Elements, Layer + 1,
+		Geometry.ToPaintGeometry(Box, FSlateLayoutTransform(Position)),
 		Text, Font, ESlateDrawEffect::None, Colour);
+}
+
+/** The references title the plate with the bare name, spaced out: T A R R I K. */
+FText Letterspaced(const FText& Identity)
+{
+	FString Name = Identity.ToString();
+	int32 Slash = INDEX_NONE;
+	if (Name.FindChar(TEXT('/'), Slash)) { Name.LeftInline(Slash); }
+	Name.TrimStartAndEndInline();
+	FString Spaced;
+	Spaced.Reserve(Name.Len() * 2);
+	for (int32 Index = 0; Index < Name.Len(); ++Index)
+	{
+		if (Index > 0) { Spaced.AppendChar(TEXT(' ')); }
+		Spaced.AppendChar(Name[Index]);
+	}
+	return FText::FromString(Spaced);
+}
+
+void DrawShieldGlyph(FSlateWindowElementList& Elements, int32 Layer, const FPaintGeometry& Paint,
+	const FVector2D& Centre, float Size, const FLinearColor& Colour)
+{
+	const float W = Size * .48f, H = Size * .58f;
+	TArray<FVector2D> Points;
+	Points.Add(Centre + FVector2D(0.f, -H));
+	Points.Add(Centre + FVector2D(W, -H * .55f));
+	Points.Add(Centre + FVector2D(W * .72f, H * .55f));
+	Points.Add(Centre + FVector2D(0.f, H));
+	Points.Add(Centre + FVector2D(-W * .72f, H * .55f));
+	Points.Add(Centre + FVector2D(-W, -H * .55f));
+	Points.Add(Centre + FVector2D(0.f, -H));
+	DrawPolyline(Elements, Layer, Paint, Points, Colour, 1.6f);
+}
+
+void DrawCrossGlyph(FSlateWindowElementList& Elements, int32 Layer, const FGeometry& Geometry,
+	const FVector2D& Centre, float Size, const FLinearColor& Colour)
+{
+	const float Arm = Size * .46f, Thick = Size * .26f;
+	DrawBlock(Elements, Layer, Geometry, Centre - FVector2D(Arm, Thick * .5f), FVector2D(Arm * 2.f, Thick), Colour);
+	DrawBlock(Elements, Layer, Geometry, Centre - FVector2D(Thick * .5f, Arm), FVector2D(Thick, Arm * 2.f), Colour);
+}
+
+void DrawChevron(FSlateWindowElementList& Elements, int32 Layer, const FPaintGeometry& Paint,
+	const FVector2D& Tip, float Size, float DirectionX, const FLinearColor& Colour, float Thickness)
+{
+	TArray<FVector2D> Points;
+	Points.Add(Tip + FVector2D(-Size * DirectionX, -Size));
+	Points.Add(Tip);
+	Points.Add(Tip + FVector2D(-Size * DirectionX, Size));
+	DrawPolyline(Elements, Layer, Paint, Points, Colour, Thickness);
 }
 
 /** Deterministic jitter: the torn edge must not crawl from frame to frame. */
@@ -144,10 +264,10 @@ FString USovHolographicHUDWidget::GetPaintDiagnostics() const
 	// depth, and that failure is indistinguishable from being painted underneath something opaque.
 	return FString::Printf(
 		TEXT("paints=%d drew=%d size=%.0fx%.0f refreshes=%d ready=%d valid=%d inViewport=%d contacts=%d ")
-		TEXT("accentA=%.2f lineA=%.2f warmA=%.2f backA=%.2f cull=%.0f,%.0f,%.0f,%.0f abs=%.0f,%.0f protagonist=%s"),
+		TEXT("accentA=%.2f lineA=%.2f healthA=%.2f backA=%.2f cull=%.0f,%.0f,%.0f,%.0f abs=%.0f,%.0f protagonist=%s"),
 		PaintCount, bLastPaintDrew ? 1 : 0, LastPaintSize.X, LastPaintSize.Y, RefreshCount,
 		bLastRefreshReady ? 1 : 0, Displayed.bValid ? 1 : 0, IsInViewport() ? 1 : 0, Displayed.Contacts.Num(),
-		LastPalette.Accent.A, LastPalette.Line.A, LastPalette.Warm.A, LastPalette.Backing.A,
+		LastPalette.Accent.A, LastPalette.Line.A, LastPalette.HealthTo.A, LastPalette.Backing.A,
 		LastCulling.X, LastCulling.Y, LastCulling.Z, LastCulling.W,
 		LastAbsolutePosition.X, LastAbsolutePosition.Y,
 		// The protagonist is an identity tag, not an enum: an unset tag is exactly the case that would
@@ -162,11 +282,36 @@ USovHolographicHUDWidget::FPalette USovHolographicHUDWidget::BuildPalette() cons
 	FPalette Palette;
 	Palette.bHighContrast = bHighContrast;
 	Palette.Accent = Theme.Accent;
-	// Health reads warm for both protagonists: urgency should not depend on knowing whose HUD this is.
-	Palette.Warm = bHighContrast ? FLinearColor::White : FLinearColor(.96f, .32f, .22f);
-	// High contrast trades the optical veil for an opaque backing rather than dropping the readout.
-	Palette.Backing = bHighContrast ? FLinearColor(0.f, 0.f, 0.f, 1.f) : Theme.Background;
 	Palette.Line = bHighContrast ? FLinearColor::White : Theme.Accent;
+	// High contrast trades the optical veil for an opaque backing rather than dropping the readout.
+	Palette.Backing = bHighContrast ? FLinearColor(0.f, 0.f, 0.f, 1.f) : FLinearColor(.015f, .025f, .04f, .55f);
+	if (bHighContrast)
+	{
+		// Glow and gradients are decoration that costs legibility; the bars stay flat and white.
+		Palette.ShieldFrom = Palette.ShieldTo = FLinearColor::White;
+		Palette.HealthFrom = Palette.HealthTo = FLinearColor::White;
+		return Palette;
+	}
+	// The references give each protagonist a distinct health colour. That would normally make
+	// urgency depend on knowing whose HUD this is, but the references also put a shield glyph and a
+	// medical cross on the bars, which carries the meaning without colour - the job the old text
+	// labels were doing. So the reference palettes are followed exactly and the glyphs are kept.
+	if (Displayed.Vitals.Protagonist == FSovGameplayTags::Get().Character_Player_Selene)
+	{
+		Palette.Glow = FLinearColor(.20f, .75f, 1.f);
+		Palette.ShieldFrom = FLinearColor(.30f, .66f, 1.f);
+		Palette.ShieldTo = FLinearColor(.78f, .94f, 1.f);
+		Palette.HealthFrom = FLinearColor(.10f, .80f, .50f);
+		Palette.HealthTo = FLinearColor(.60f, .97f, .82f);
+	}
+	else
+	{
+		Palette.Glow = FLinearColor(.95f, .20f, .05f);
+		Palette.ShieldFrom = FLinearColor(.98f, .64f, .18f);
+		Palette.ShieldTo = FLinearColor(1.f, .90f, .60f);
+		Palette.HealthFrom = FLinearColor(.78f, .09f, .05f);
+		Palette.HealthTo = FLinearColor(1.f, .36f, .14f);
+	}
 	return Palette;
 }
 
@@ -177,43 +322,43 @@ int32 USovHolographicHUDWidget::PaintEdging(const FGeometry& Geometry, FSlateWin
 	if (Palette.bHighContrast) { return Layer; }
 	const FVector2D Size = Geometry.GetLocalSize();
 	const FPaintGeometry Paint = Geometry.ToPaintGeometry();
-	const float Bleed = FMath::Min(Size.X, Size.Y) * .035f;
+	const float Bleed = FMath::Min(Size.X, Size.Y) * .030f;
 
-	// Four torn runs: two along the top shoulders, two along the bottom, leaving the centre clear.
+	// Four runs hugging the corners and running off the sides. The centre is deliberately left
+	// clear: the references frame an empty screen rather than drawing across it.
 	const FVector2D Runs[4][2] = {
-		{ FVector2D(Size.X * .02f, Size.Y * .045f), FVector2D(Size.X * .30f, Size.Y * .025f) },
-		{ FVector2D(Size.X * .70f, Size.Y * .025f), FVector2D(Size.X * .98f, Size.Y * .045f) },
-		{ FVector2D(Size.X * .02f, Size.Y * .955f), FVector2D(Size.X * .32f, Size.Y * .975f) },
-		{ FVector2D(Size.X * .68f, Size.Y * .975f), FVector2D(Size.X * .98f, Size.Y * .955f) },
+		{ FVector2D(-Size.X * .02f, Size.Y * .060f), FVector2D(Size.X * .265f, Size.Y * .020f) },
+		{ FVector2D(Size.X * .735f, Size.Y * .020f), FVector2D(Size.X * 1.02f, Size.Y * .060f) },
+		{ FVector2D(-Size.X * .02f, Size.Y * .940f), FVector2D(Size.X * .300f, Size.Y * .980f) },
+		{ FVector2D(Size.X * .700f, Size.Y * .980f), FVector2D(Size.X * 1.02f, Size.Y * .940f) },
 	};
 	for (int32 Run = 0; Run < 4; ++Run)
 	{
 		const FVector2D From = Runs[Run][0];
 		const FVector2D To = Runs[Run][1];
-		// Three passes: a wide dim bleed, a mid glow, then a bright filament.
-		for (int32 Pass = 0; Pass < 3; ++Pass)
+		// Four passes: a wide dim bleed in the glow colour tightening to a bright accent filament.
+		for (int32 Pass = 0; Pass < 4; ++Pass)
 		{
-			const float Width = Bleed * (1.f - static_cast<float>(Pass) * .34f);
-			const float Opacity = .10f + static_cast<float>(Pass) * .26f;
+			const float Width = Bleed * (1.f - static_cast<float>(Pass) * .23f);
+			const float Opacity = Pass == 3 ? .95f : .07f + static_cast<float>(Pass) * .09f;
+			const FLinearColor Colour = Pass >= 2 ? Palette.Accent : Palette.Glow;
 			TArray<FVector2D> Points;
-			const int32 Steps = 26;
+			const int32 Steps = 30;
 			for (int32 Index = 0; Index <= Steps; ++Index)
 			{
 				const float Alpha = static_cast<float>(Index) / static_cast<float>(Steps);
 				FVector2D Point = FMath::Lerp(From, To, Alpha);
 				// Torn rather than ruled: the offset is seeded per point and never changes.
 				const float Offset = EdgeJitter(Run * 1000 + Pass * 100 + Index) * Width;
-				Point.Y += Offset;
 				// Fray toward the ends so each run dissolves instead of stopping abruptly.
-				const float Taper = FMath::Sin(Alpha * PI);
-				Point.Y += Offset * (1.f - Taper);
+				Point.Y += Offset + Offset * (1.f - FMath::Sin(Alpha * PI));
 				Points.Add(Point);
 			}
-			const FLinearColor Glow = Pass == 2 ? Palette.Accent : Palette.Warm;
-			DrawPolyline(Elements, Layer + Pass, Paint, Points, Glow.CopyWithNewOpacity(Opacity), Width * .55f);
+			DrawPolyline(Elements, Layer + Pass, Paint, Points, Colour.CopyWithNewOpacity(Opacity),
+				FMath::Max(Width * (Pass == 3 ? .14f : .5f), 1.f));
 		}
 	}
-	return Layer + 3;
+	return Layer + 4;
 }
 
 int32 USovHolographicHUDWidget::PaintIdentityPlate(const FGeometry& Geometry, FSlateWindowElementList& Elements, int32 Layer,
@@ -221,38 +366,54 @@ int32 USovHolographicHUDWidget::PaintIdentityPlate(const FGeometry& Geometry, FS
 {
 	const FVector2D Size = Geometry.GetLocalSize();
 	const FPaintGeometry Paint = Geometry.ToPaintGeometry();
-	const float PlateWidth = FMath::Min(Size.X * .42f, 720.f * Scale);
-	const float Left = (Size.X - PlateWidth) * .5f;
-	const float Top = Size.Y * .035f;
-	const float BarHeight = 12.f * Scale;
+	const float PlateWidth = FMath::Min(Size.X * .44f, 900.f * Scale);
+	const float PlateHeight = 96.f * Scale;
+	const FVector2D At((Size.X - PlateWidth) * .5f, Size.Y * .022f);
 
-	DrawBlock(Elements, Layer, Geometry, FVector2D(Left, Top), FVector2D(PlateWidth, 74.f * Scale), Palette.Backing);
+	DrawBlock(Elements, Layer, Geometry, At, FVector2D(PlateWidth, PlateHeight), Palette.Backing);
+	TArray<FVector2D> Frame;
+	BuildChamferedRect(Frame, At, FVector2D(PlateWidth, PlateHeight), 26.f * Scale);
+	DrawPolyline(Elements, Layer + 1, Paint, Frame, Palette.Line.CopyWithNewOpacity(.85f), 1.8f);
 
-	// Name, letterspaced by the theme's own identity text.
-	DrawLabel(Elements, Layer + 1, Geometry, FVector2D(Left + PlateWidth * .5f - 48.f * Scale, Top + 2.f * Scale),
-		SovHUDStyle::ForProtagonist(Displayed.Vitals.Protagonist, Palette.bHighContrast).Identity,
-		Palette.Accent, FMath::RoundToInt(15.f * Scale));
+	// The bare name, letterspaced and centred on the plate's top edge.
+	DrawLabel(Elements, Layer + 2, Geometry, FVector2D(At.X + PlateWidth * .5f, At.Y + 1.f * Scale),
+		Letterspaced(SovHUDStyle::ForProtagonist(Displayed.Vitals.Protagonist, Palette.bHighContrast).Identity),
+		Palette.Accent, FMath::RoundToInt(15.f * Scale), ETextAlign::Centre);
 
-	const auto BarAt = [&](int32 Index, float Y, float Height, const FLinearColor& Fill, const FText& Label)
+	const float TrackLeft = At.X + 56.f * Scale;
+	const float TrackWidth = PlateWidth - 92.f * Scale;
+	const auto Bar = [&](int32 Index, float Y, float Height, const FLinearColor& From, const FLinearColor& To, bool bChevron)
 	{
 		const float Maximum = Displayed.Vitals.Values[Index].Maximum;
 		const float Fraction = Maximum > KINDA_SMALL_NUMBER
 			? FMath::Clamp(Displayed.Vitals.Values[Index].Current / Maximum, 0.f, 1.f) : 0.f;
-		const float TrackLeft = Left + 46.f * Scale;
-		const float TrackWidth = PlateWidth - 70.f * Scale;
-		DrawBlock(Elements, Layer + 1, Geometry, FVector2D(TrackLeft, Y), FVector2D(TrackWidth, Height),
-			FLinearColor(.10f, .16f, .20f, Palette.bHighContrast ? 1.f : .45f));
-		DrawBlock(Elements, Layer + 2, Geometry, FVector2D(TrackLeft, Y), FVector2D(TrackWidth * Fraction, Height), Fill);
-		DrawSegment(Elements, Layer + 3, Paint, FVector2D(TrackLeft, Y + Height), FVector2D(TrackLeft + TrackWidth, Y + Height),
-			Palette.Line.CopyWithNewOpacity(.5f), 1.f);
-		// The label is the reason this survives without colour.
-		DrawLabel(Elements, Layer + 3, Geometry, FVector2D(Left + 6.f * Scale, Y - 2.f * Scale), Label,
-			Palette.Line.CopyWithNewOpacity(.85f), FMath::RoundToInt(10.f * Scale));
+		DrawBlock(Elements, Layer + 2, Geometry, FVector2D(TrackLeft, Y), FVector2D(TrackWidth, Height),
+			FLinearColor(.04f, .06f, .09f, Palette.bHighContrast ? 1.f : .60f));
+		DrawGradientBlock(Elements, Layer + 3, Geometry, FVector2D(TrackLeft, Y),
+			FVector2D(TrackWidth * Fraction, Height), From, To);
+		TArray<FVector2D> Outline;
+		BuildChamferedRect(Outline, FVector2D(TrackLeft, Y), FVector2D(TrackWidth, Height), Height * .42f);
+		DrawPolyline(Elements, Layer + 4, Paint, Outline, Palette.Line.CopyWithNewOpacity(.8f), 1.4f);
+		if (bChevron)
+		{
+			// The heavier bar ends in a point, as the references do.
+			DrawChevron(Elements, Layer + 4, Paint, FVector2D(TrackLeft + TrackWidth + 11.f * Scale, Y + Height * .5f),
+				Height * .46f, 1.f, Palette.Line.CopyWithNewOpacity(.9f), 2.f);
+		}
 	};
-	// Shield above, health below and heavier: the reference's weighting, and the right reading order.
-	BarAt(1, Top + 26.f * Scale, BarHeight * .55f, Palette.Accent, LOCTEXT("Shield", "SHD"));
-	BarAt(0, Top + 42.f * Scale, BarHeight, Palette.Warm, LOCTEXT("Health", "HP"));
-	return Layer + 4;
+	const float ShieldY = At.Y + 29.f * Scale;
+	const float ShieldHeight = 11.f * Scale;
+	const float HealthY = At.Y + 48.f * Scale;
+	const float HealthHeight = 21.f * Scale;
+	// Shield above, health below and heavier: the references' weighting, and the right reading order.
+	Bar(1, ShieldY, ShieldHeight, Palette.ShieldFrom, Palette.ShieldTo, false);
+	Bar(0, HealthY, HealthHeight, Palette.HealthFrom, Palette.HealthTo, true);
+	// These glyphs are the reason the readout survives without colour.
+	DrawShieldGlyph(Elements, Layer + 4, Paint, FVector2D(At.X + 34.f * Scale, ShieldY + ShieldHeight * .5f),
+		17.f * Scale, Palette.ShieldTo);
+	DrawCrossGlyph(Elements, Layer + 4, Geometry, FVector2D(At.X + 34.f * Scale, HealthY + HealthHeight * .5f),
+		18.f * Scale, Palette.HealthTo);
+	return Layer + 5;
 }
 
 int32 USovHolographicHUDWidget::PaintAbilityPips(const FGeometry& Geometry, FSlateWindowElementList& Elements, int32 Layer,
@@ -260,44 +421,38 @@ int32 USovHolographicHUDWidget::PaintAbilityPips(const FGeometry& Geometry, FSla
 {
 	const FVector2D Size = Geometry.GetLocalSize();
 	const FPaintGeometry Paint = Geometry.ToPaintGeometry();
-	const int32 Count = FMath::Min(Displayed.Readiness.Abilities.Num(), 6);
-	if (Count <= 0) { return Layer; }
-	const float PipWidth = 26.f * Scale;
-	const float PipHeight = 8.f * Scale;
-	const float Gap = 6.f * Scale;
-	const float Total = Count * PipWidth + (Count - 1) * Gap;
+	// The references always show six slots, filled or not, so the row does not change width in play.
+	const int32 Slots = 6;
+	const float PipWidth = 27.f * Scale;
+	const float PipHeight = 9.f * Scale;
+	const float Gap = 7.f * Scale;
+	const float Total = Slots * PipWidth + (Slots - 1) * Gap;
 	const float Left = (Size.X - Total) * .5f;
-	const float Top = Size.Y * .035f + 86.f * Scale;
+	const float Top = Size.Y * .022f + 76.f * Scale;
 
-	for (int32 Index = 0; Index < Count; ++Index)
+	for (int32 Index = 0; Index < Slots; ++Index)
 	{
-		const FSovAbilityHUDEntry& Entry = Displayed.Readiness.Abilities[Index];
 		const FVector2D At(Left + Index * (PipWidth + Gap), Top);
-		// Filled means usable now; an outline alone means known but not ready.
-		const bool bReady = Entry.State == ESovAbilityHUDState::EchoReady;
-		const bool bActive = Entry.State == ESovAbilityHUDState::Active;
-		const FLinearColor Fill = bActive ? Palette.Warm : Palette.Accent;
+		const FSovAbilityHUDEntry* const Entry = Displayed.Readiness.Abilities.IsValidIndex(Index)
+			? &Displayed.Readiness.Abilities[Index] : nullptr;
+		const bool bReady = Entry && Entry->State == ESovAbilityHUDState::EchoReady;
+		const bool bActive = Entry && Entry->State == ESovAbilityHUDState::Active;
+		// Filled means usable now; an outline alone means known but not ready, or no ability at all.
 		if (bReady || bActive)
 		{
-			DrawBlock(Elements, Layer + 1, Geometry, At, FVector2D(PipWidth, PipHeight), Fill.CopyWithNewOpacity(.9f));
+			DrawGradientBlock(Elements, Layer + 1, Geometry, At, FVector2D(PipWidth, PipHeight),
+				bActive ? Palette.HealthFrom : Palette.ShieldFrom, bActive ? Palette.HealthTo : Palette.ShieldTo);
 		}
-		else
+		else if (Entry && Entry->CooldownDuration > KINDA_SMALL_NUMBER && Entry->CooldownRemaining > 0.f)
 		{
-			DrawBlock(Elements, Layer, Geometry, At, FVector2D(PipWidth, PipHeight), Palette.Backing);
-			// Cooldown fills the outline from the left, so progress is legible without a number.
-			if (Entry.CooldownDuration > KINDA_SMALL_NUMBER && Entry.CooldownRemaining > 0.f)
-			{
-				const float Done = FMath::Clamp(1.f - Entry.CooldownRemaining / Entry.CooldownDuration, 0.f, 1.f);
-				DrawBlock(Elements, Layer + 1, Geometry, At, FVector2D(PipWidth * Done, PipHeight), Fill.CopyWithNewOpacity(.35f));
-			}
+			// Cooldown fills from the left, so progress is legible without a number.
+			const float Done = FMath::Clamp(1.f - Entry->CooldownRemaining / Entry->CooldownDuration, 0.f, 1.f);
+			DrawBlock(Elements, Layer + 1, Geometry, At, FVector2D(PipWidth * Done, PipHeight),
+				Palette.Accent.CopyWithNewOpacity(.40f));
 		}
 		TArray<FVector2D> Outline;
-		Outline.Add(At);
-		Outline.Add(At + FVector2D(PipWidth, 0.f));
-		Outline.Add(At + FVector2D(PipWidth, PipHeight));
-		Outline.Add(At + FVector2D(0.f, PipHeight));
-		Outline.Add(At);
-		DrawPolyline(Elements, Layer + 2, Paint, Outline, Palette.Line.CopyWithNewOpacity(bReady ? .95f : .5f), 1.f);
+		BuildChamferedRect(Outline, At, FVector2D(PipWidth, PipHeight), 3.f * Scale);
+		DrawPolyline(Elements, Layer + 2, Paint, Outline, Palette.Line.CopyWithNewOpacity(bReady ? .95f : .45f), 1.2f);
 	}
 	return Layer + 3;
 }
@@ -307,13 +462,37 @@ int32 USovHolographicHUDWidget::PaintAmmo(const FGeometry& Geometry, FSlateWindo
 {
 	if (Displayed.AmmoInClip < 0) { return Layer; }
 	const FVector2D Size = Geometry.GetLocalSize();
-	const FVector2D Plate(190.f * Scale, 46.f * Scale);
-	const FVector2D At(Size.X - Plate.X - 40.f * Scale, Size.Y * .045f);
+	const FPaintGeometry Paint = Geometry.ToPaintGeometry();
+	const FVector2D Plate(232.f * Scale, 72.f * Scale);
+	const FVector2D At(Size.X - Plate.X - Size.X * .035f, Size.Y * .048f);
+
 	DrawBlock(Elements, Layer, Geometry, At, Plate, Palette.Backing);
-	DrawLabel(Elements, Layer + 1, Geometry, At + FVector2D(14.f * Scale, 8.f * Scale),
-		FText::Format(LOCTEXT("AmmoFormat", "{0} / {1}"), Displayed.AmmoInClip, FMath::Max(Displayed.AmmoReserve, 0)),
-		Palette.Accent, FMath::RoundToInt(18.f * Scale));
-	return Layer + 2;
+	TArray<FVector2D> Frame;
+	BuildChamferedRect(Frame, At, Plate, 20.f * Scale);
+	DrawPolyline(Elements, Layer + 1, Paint, Frame, Palette.Line.CopyWithNewOpacity(.85f), 1.8f);
+
+	// Three rounds, as the references mark the readout.
+	const float RoundWidth = 5.f * Scale;
+	const float RoundHeight = 20.f * Scale;
+	for (int32 Round = 0; Round < 3; ++Round)
+	{
+		DrawBlock(Elements, Layer + 2, Geometry,
+			At + FVector2D(24.f * Scale + Round * (RoundWidth + 4.f * Scale), Plate.Y * .5f - RoundHeight * .5f),
+			FVector2D(RoundWidth, RoundHeight), Palette.Accent.CopyWithNewOpacity(.95f));
+	}
+
+	const FText Clip = FText::AsNumber(Displayed.AmmoInClip);
+	const int32 ClipSize = FMath::RoundToInt(30.f * Scale);
+	const FSlateFontInfo ClipFont = FCoreStyle::GetDefaultFontStyle("Bold", FMath::Max(ClipSize, 6));
+	const float ClipLeft = At.X + 66.f * Scale;
+	DrawLabel(Elements, Layer + 2, Geometry, FVector2D(ClipLeft, At.Y + Plate.Y * .5f - ClipSize * .78f),
+		Clip, Palette.Accent, ClipSize);
+	// The reserve is quieter and trails the clip count, which is the number that matters in a fight.
+	DrawLabel(Elements, Layer + 2, Geometry,
+		FVector2D(ClipLeft + MeasureText(Clip, ClipFont) + 10.f * Scale, At.Y + Plate.Y * .5f - 2.f * Scale),
+		FText::Format(LOCTEXT("AmmoReserve", "/ {0}"), FMath::Max(Displayed.AmmoReserve, 0)),
+		Palette.Line.CopyWithNewOpacity(.75f), FMath::RoundToInt(14.f * Scale));
+	return Layer + 3;
 }
 
 int32 USovHolographicHUDWidget::PaintEchoArc(const FGeometry& Geometry, FSlateWindowElementList& Elements, int32 Layer,
@@ -322,33 +501,52 @@ int32 USovHolographicHUDWidget::PaintEchoArc(const FGeometry& Geometry, FSlateWi
 	if (Displayed.MaxEcho <= KINDA_SMALL_NUMBER) { return Layer; }
 	const FVector2D Size = Geometry.GetLocalSize();
 	const FPaintGeometry Paint = Geometry.ToPaintGeometry();
-	const FVector2D Centre(Size.X * .5f, Size.Y * 1.62f);
-	const float Radius = Size.Y * .78f;
 	const float Fraction = FMath::Clamp(Displayed.Echo / Displayed.MaxEcho, 0.f, 1.f);
 
-	// A shallow arc across the bottom, segmented so charge is countable rather than estimated.
-	const int32 Segments = 8;
-	const float Span = 26.f;
-	TArray<FVector2D> Points;
+	// A long shallow sweep across the bottom, leaving the left end where the radar sits and lifting
+	// toward the right, as the references draw it. A quadratic curve is enough to describe it.
+	const FVector2D Start(Size.X * .175f, Size.Y * .862f);
+	const FVector2D Control(Size.X * .560f, Size.Y * .942f);
+	const FVector2D End(Size.X * .965f, Size.Y * .800f);
+	const auto PointAt = [&](float T)
+	{
+		const float U = 1.f - T;
+		return Start * (U * U) + Control * (2.f * U * T) + End * (T * T);
+	};
+
+	// Segmented so charge is countable rather than estimated.
+	const int32 Segments = 11;
 	for (int32 Index = 0; Index < Segments; ++Index)
 	{
-		const float From = -90.f - Span * .5f + Span * (static_cast<float>(Index) / Segments) + .6f;
-		const float To = -90.f - Span * .5f + Span * (static_cast<float>(Index + 1) / Segments) - .6f;
-		const float SegmentStart = static_cast<float>(Index) / Segments;
-		const bool bFilled = Fraction > SegmentStart + KINDA_SMALL_NUMBER;
-		BuildArc(Points, Centre, Radius, From, To, 12);
-		DrawPolyline(Elements, Layer, Paint, Points, Palette.Line.CopyWithNewOpacity(.28f), 9.f * Scale);
-		if (bFilled)
+		const float T0 = static_cast<float>(Index) / Segments;
+		const float T1 = static_cast<float>(Index + 1) / Segments;
+		const FVector2D A = PointAt(T0 + .005f);
+		const FVector2D B = PointAt(T1 - .005f);
+		// An unlit segment is drawn dark first and outlined second. At a fifth opacity it simply
+		// disappeared against a white floor, leaving the lit end reading as a stray diagonal line
+		// instead of the left end of a long bar.
+		DrawSegment(Elements, Layer, Paint, A, B, FLinearColor(.02f, .03f, .05f, .55f), 16.f * Scale);
+		DrawSegment(Elements, Layer + 1, Paint, A, B, Palette.Line.CopyWithNewOpacity(.45f), 15.f * Scale);
+		if (Fraction > T0 + KINDA_SMALL_NUMBER)
 		{
 			// The final partial segment fills proportionally rather than snapping on.
-			const float SegmentFill = FMath::Clamp((Fraction - SegmentStart) * Segments, 0.f, 1.f);
-			BuildArc(Points, Centre, Radius, From, FMath::Lerp(From, To, SegmentFill), 12);
-			DrawPolyline(Elements, Layer + 1, Paint, Points, Palette.Accent.CopyWithNewOpacity(.95f), 9.f * Scale);
+			const float Fill = FMath::Clamp((Fraction - T0) * Segments, 0.f, 1.f);
+			DrawSegment(Elements, Layer + 2, Paint, A, FMath::Lerp(A, B, Fill),
+				Palette.ShieldTo.CopyWithNewOpacity(.98f), 12.f * Scale);
 		}
 	}
-	DrawLabel(Elements, Layer + 2, Geometry, FVector2D(Size.X * .5f - 18.f * Scale, Size.Y - 34.f * Scale),
-		LOCTEXT("Echo", "ECHO"), Palette.Line.CopyWithNewOpacity(.8f), FMath::RoundToInt(10.f * Scale));
-	return Layer + 3;
+
+	// The centre marker, and the only word this element needs.
+	const FVector2D Middle = PointAt(.5f);
+	const float Mark = 7.f * Scale;
+	DrawChevron(Elements, Layer + 3, Paint, Middle + FVector2D(-16.f * Scale, 0.f), Mark, -1.f,
+		Palette.Accent.CopyWithNewOpacity(.9f), 2.f);
+	DrawChevron(Elements, Layer + 3, Paint, Middle + FVector2D(16.f * Scale, 0.f), Mark, 1.f,
+		Palette.Accent.CopyWithNewOpacity(.9f), 2.f);
+	DrawLabel(Elements, Layer + 3, Geometry, FVector2D(Middle.X, Middle.Y + 16.f * Scale),
+		LOCTEXT("Echo", "ECHO"), Palette.Line.CopyWithNewOpacity(.75f), FMath::RoundToInt(10.f * Scale),
+		ETextAlign::Centre);
+	return Layer + 5;
 }
 
 int32 USovHolographicHUDWidget::PaintRadar(const FGeometry& Geometry, FSlateWindowElementList& Elements, int32 Layer,
@@ -356,57 +554,80 @@ int32 USovHolographicHUDWidget::PaintRadar(const FGeometry& Geometry, FSlateWind
 {
 	const FVector2D Size = Geometry.GetLocalSize();
 	const FPaintGeometry Paint = Geometry.ToPaintGeometry();
-	const float Radius = FMath::Min(Size.Y * .16f, 150.f * Scale);
-	const FVector2D Centre(52.f * Scale + Radius, Size.Y - 62.f * Scale - Radius);
+	const float Radius = FMath::Min(Size.Y * .145f, 175.f * Scale);
+	const FVector2D Centre(Size.X * .060f + Radius, Size.Y * .735f);
+
+	// Its own colour rather than the shared veil. The backing alpha is tuned to sit behind text; a
+	// disc that large at .55 washes to mid grey over the entry floor and reads as a blob rather than
+	// an instrument. The references show a dark scope, and that only holds if it is genuinely dark.
+	DrawDisc(Elements, Layer, Geometry, Centre, Radius,
+		Palette.bHighContrast ? FLinearColor(0.f, 0.f, 0.f, 1.f) : FLinearColor(.006f, .012f, .022f, .78f));
 
 	TArray<FVector2D> Ring;
 	for (int32 Step = 1; Step <= 3; ++Step)
 	{
 		BuildArc(Ring, Centre, Radius * (static_cast<float>(Step) / 3.f), 0.f, 360.f, 64);
-		DrawPolyline(Elements, Layer, Paint, Ring, Palette.Line.CopyWithNewOpacity(Step == 3 ? .8f : .3f), Step == 3 ? 1.6f : 1.f);
+		DrawPolyline(Elements, Layer + 1, Paint, Ring, Palette.Line.CopyWithNewOpacity(Step == 3 ? .85f : .28f),
+			Step == 3 ? 1.8f : 1.f);
 	}
-	// Cardinal ticks: which way is forward must be readable at a glance.
+	// Cardinal marks: which way is forward must be readable at a glance.
 	for (int32 Tick = 0; Tick < 4; ++Tick)
 	{
-		const float Angle = FMath::DegreesToRadians(90.f * Tick);
+		const float Angle = FMath::DegreesToRadians(90.f * Tick - 90.f);
 		const FVector2D Direction(FMath::Cos(Angle), FMath::Sin(Angle));
-		DrawSegment(Elements, Layer, Paint, Centre + Direction * Radius * .92f, Centre + Direction * Radius * 1.12f,
-			Palette.Line.CopyWithNewOpacity(.7f), 1.4f);
+		const FVector2D Normal(-Direction.Y, Direction.X);
+		DrawSegment(Elements, Layer + 1, Paint, Centre + Direction * Radius * 1.01f,
+			Centre + Direction * Radius * 1.17f, Palette.Line.CopyWithNewOpacity(.8f), 2.f);
+		DrawSegment(Elements, Layer + 1, Paint, Centre + Direction * Radius * 1.09f - Normal * 4.f * Scale,
+			Centre + Direction * Radius * 1.09f + Normal * 4.f * Scale, Palette.Line.CopyWithNewOpacity(.55f), 1.4f);
 	}
-	// The sweep, and the player's own facing wedge at the centre.
-	const float SweepAngle = FMath::Fmod(SweepSeconds * 90.f, 360.f) - 90.f;
+	// The sweep is a fading fan rather than a single line: Slate has no filled wedge, and a fan of
+	// radial lines with falling opacity reads as the same cone.
 	if (!Palette.bHighContrast)
 	{
-		DrawSegment(Elements, Layer + 1, Paint, Centre,
-			Centre + FVector2D(FMath::Cos(FMath::DegreesToRadians(SweepAngle)), FMath::Sin(FMath::DegreesToRadians(SweepAngle))) * Radius,
-			Palette.Accent.CopyWithNewOpacity(.5f), 2.f);
+		const float Sweep = FMath::Fmod(SweepSeconds * 70.f, 360.f);
+		const int32 Fan = 18;
+		for (int32 Index = 0; Index < Fan; ++Index)
+		{
+			const float Angle = FMath::DegreesToRadians(Sweep - static_cast<float>(Index) * 2.4f);
+			const FVector2D Direction(FMath::Cos(Angle), FMath::Sin(Angle));
+			const float Opacity = (1.f - static_cast<float>(Index) / Fan) * .40f;
+			DrawSegment(Elements, Layer + 2, Paint, Centre, Centre + Direction * Radius * .97f,
+				Palette.Accent.CopyWithNewOpacity(Opacity), 2.4f);
+		}
 	}
-	TArray<FVector2D> Wedge;
-	Wedge.Add(Centre + FVector2D(0.f, -9.f * Scale));
-	Wedge.Add(Centre + FVector2D(-6.f * Scale, 6.f * Scale));
-	Wedge.Add(Centre + FVector2D(6.f * Scale, 6.f * Scale));
-	Wedge.Add(Centre + FVector2D(0.f, -9.f * Scale));
-	DrawPolyline(Elements, Layer + 2, Paint, Wedge, Palette.Line.CopyWithNewOpacity(.95f), 1.6f);
+	// The player's own facing, at the centre.
+	TArray<FVector2D> Arrow;
+	Arrow.Add(Centre + FVector2D(0.f, -12.f * Scale));
+	Arrow.Add(Centre + FVector2D(8.f * Scale, 9.f * Scale));
+	Arrow.Add(Centre + FVector2D(-8.f * Scale, 9.f * Scale));
+	Arrow.Add(Centre + FVector2D(0.f, -12.f * Scale));
+	DrawPolyline(Elements, Layer + 3, Paint, Arrow, Palette.Line.CopyWithNewOpacity(.95f), 2.f);
+	Arrow.Reset();
+	Arrow.Add(Centre + FVector2D(0.f, -7.f * Scale));
+	Arrow.Add(Centre + FVector2D(4.f * Scale, 5.f * Scale));
+	Arrow.Add(Centre + FVector2D(-4.f * Scale, 5.f * Scale));
+	Arrow.Add(Centre + FVector2D(0.f, -7.f * Scale));
+	DrawPolyline(Elements, Layer + 3, Paint, Arrow, Palette.Line.CopyWithNewOpacity(.8f), 2.f);
 
 	for (const FSovProximityContact& Contact : Displayed.Contacts)
 	{
 		// Screen up is the player's facing, so bearing rotates clockwise from straight up.
 		const float Angle = FMath::DegreesToRadians(Contact.BearingDegrees - 90.f);
 		const FVector2D At = Centre + FVector2D(FMath::Cos(Angle), FMath::Sin(Angle)) * (Radius * Contact.NormalisedRange);
-		const float Dot = (Contact.bLiveSighting ? 4.2f : 3.2f) * Scale;
+		const float Dot = (Contact.bLiveSighting ? 5.0f : 4.0f) * Scale;
 		// A memory is drawn as an open mark, a live sighting as a filled one: certainty is visible.
 		if (Contact.bLiveSighting)
 		{
-			DrawBlock(Elements, Layer + 3, Geometry, At - FVector2D(Dot * .5f), FVector2D(Dot, Dot),
-				Palette.Warm.CopyWithNewOpacity(Contact.Alpha));
+			DrawDisc(Elements, Layer + 4, Geometry, At, Dot, Palette.HealthTo.CopyWithNewOpacity(Contact.Alpha));
 		}
 		else
 		{
 			BuildArc(Ring, At, Dot, 0.f, 360.f, 12);
-			DrawPolyline(Elements, Layer + 3, Paint, Ring, Palette.Warm.CopyWithNewOpacity(Contact.Alpha * .9f), 1.2f);
+			DrawPolyline(Elements, Layer + 4, Paint, Ring, Palette.HealthTo.CopyWithNewOpacity(Contact.Alpha * .9f), 1.2f);
 		}
 	}
-	return Layer + 4;
+	return Layer + 5;
 }
 
 int32 USovHolographicHUDWidget::NativePaint(const FPaintArgs& Args, const FGeometry& Geometry, const FSlateRect& CullingRect,
@@ -417,8 +638,6 @@ int32 USovHolographicHUDWidget::NativePaint(const FPaintArgs& Args, const FGeome
 	// from a paint that never ran at all.
 	++PaintCount;
 	LastPaintSize = Geometry.GetLocalSize();
-	// Never measured before: an empty or degenerate culling rectangle discards every element while
-	// leaving every other reading above looking perfectly healthy.
 	LastCulling = FVector4(CullingRect.Left, CullingRect.Top, CullingRect.Right, CullingRect.Bottom);
 	LastAbsolutePosition = Geometry.GetAbsolutePosition();
 	if (CVarHolographicPaintProbe.GetValueOnGameThread() != 0)
