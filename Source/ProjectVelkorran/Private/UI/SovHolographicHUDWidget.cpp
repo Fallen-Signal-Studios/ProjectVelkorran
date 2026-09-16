@@ -9,6 +9,8 @@
 #include "Framework/SovPlayerController.h"
 #include "HAL/IConsoleManager.h"
 #include "Items/WeaponItem.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
 #include "Rendering/DrawElements.h"
 #include "Rendering/DrawElementTypes.h"
 #include "Sovereign/SovGameplayTags.h"
@@ -254,6 +256,25 @@ bool USovHolographicHUDWidget::ReadSnapshot(const ASovPlayerController* Controll
 	return true;
 }
 
+void USovHolographicHUDWidget::EnsureEdgeMaterial()
+{
+	if (bEdgeMaterialChecked) { return; }
+	// Attempted once. A missing asset is not an error: the edging falls back to drawn lines, so a
+	// fresh clone without this content, and the content-free runtime tests, both still work.
+	bEdgeMaterialChecked = true;
+	auto* const Material = Cast<UMaterialInterface>(
+		FSoftObjectPath(TEXT("/Game/Aurelion/UI/M_AurelionHolographicEdge.M_AurelionHolographicEdge")).TryLoad());
+	if (!Material) { return; }
+	EdgeTop = UMaterialInstanceDynamic::Create(Material, this);
+	EdgeBottom = UMaterialInstanceDynamic::Create(Material, this);
+	if (!EdgeTop || !EdgeBottom) { EdgeTop = nullptr; EdgeBottom = nullptr; return; }
+	// The only difference between them: which side of the band the screen edge is on.
+	EdgeTop->SetScalarParameterValue(TEXT("FlipV"), 0.f);
+	EdgeBottom->SetScalarParameterValue(TEXT("FlipV"), 1.f);
+	EdgeTopBrush.SetResourceObject(EdgeTop);
+	EdgeBottomBrush.SetResourceObject(EdgeBottom);
+}
+
 void USovHolographicHUDWidget::RefreshHolographicHUD()
 {
 	FSovHolographicHUDSnapshot Current;
@@ -261,6 +282,22 @@ void USovHolographicHUDWidget::RefreshHolographicHUD()
 	Displayed = Current;
 	++RefreshCount;
 	bLastRefreshReady = bReady;
+	EnsureEdgeMaterial();
+	if (bReady && EdgeTop && EdgeBottom)
+	{
+		// Tinted here rather than in paint: parameters are owner state, and paint is const.
+		const FPalette Palette = BuildPalette();
+		EdgeTop->SetVectorParameterValue(TEXT("EdgeColour"), Palette.Accent);
+		EdgeTop->SetVectorParameterValue(TEXT("GlowColour"), Palette.Glow);
+		EdgeBottom->SetVectorParameterValue(TEXT("EdgeColour"), Palette.Accent);
+		EdgeBottom->SetVectorParameterValue(TEXT("GlowColour"), Palette.Glow);
+		// High contrast drops the glow entirely, exactly as the polyline path does. Unity otherwise:
+		// above it the colour clips channel by channel, turning amber into yellow and teal into
+		// white, so the multiply erases the very identity it is applied to.
+		const float Intensity = Palette.bHighContrast ? 0.f : 1.f;
+		EdgeTop->SetScalarParameterValue(TEXT("EdgeIntensity"), Intensity);
+		EdgeBottom->SetScalarParameterValue(TEXT("EdgeIntensity"), Intensity);
+	}
 	SetVisibility(bReady ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
 }
 
@@ -270,12 +307,16 @@ FString USovHolographicHUDWidget::GetPaintDiagnostics() const
 	// depth, and that failure is indistinguishable from being painted underneath something opaque.
 	return FString::Printf(
 		TEXT("paints=%d drew=%d size=%.0fx%.0f refreshes=%d ready=%d valid=%d inViewport=%d contacts=%d ")
-		TEXT("accentA=%.2f lineA=%.2f healthA=%.2f backA=%.2f cull=%.0f,%.0f,%.0f,%.0f abs=%.0f,%.0f protagonist=%s"),
+		TEXT("accentA=%.2f lineA=%.2f healthA=%.2f backA=%.2f cull=%.0f,%.0f,%.0f,%.0f abs=%.0f,%.0f ")
+		TEXT("edgeMaterial=%d protagonist=%s"),
 		PaintCount, bLastPaintDrew ? 1 : 0, LastPaintSize.X, LastPaintSize.Y, RefreshCount,
 		bLastRefreshReady ? 1 : 0, Displayed.bValid ? 1 : 0, IsInViewport() ? 1 : 0, Displayed.Contacts.Num(),
 		LastPalette.Accent.A, LastPalette.Line.A, LastPalette.HealthTo.A, LastPalette.Backing.A,
 		LastCulling.X, LastCulling.Y, LastCulling.Z, LastCulling.W,
 		LastAbsolutePosition.X, LastAbsolutePosition.Y,
+		// Which edging actually drew. Without this the material path and the polyline fallback are
+		// indistinguishable in a report, and the only way to tell them apart is to look at a frame.
+		(EdgeTop && EdgeBottom) ? 1 : 0,
 		// The protagonist is an identity tag, not an enum: an unset tag is exactly the case that would
 		// make the theme resolve to nothing, so it has to be readable rather than reduced to a number.
 		*Displayed.Vitals.Protagonist.ToString());
@@ -328,6 +369,31 @@ int32 USovHolographicHUDWidget::PaintEdging(const FGeometry& Geometry, FSlateWin
 	if (Palette.bHighContrast) { return Layer; }
 	const FVector2D Size = Geometry.GetLocalSize();
 	const FPaintGeometry Paint = Geometry.ToPaintGeometry();
+
+	// Four bands hugging the corners, frayed in the shader. A line cannot bleed, which is why the
+	// polyline version below reads as scribble rather than plasma; the material falls off into glow.
+	// The centre is left clear either way: the references frame an empty screen.
+	if (EdgeTop && EdgeBottom)
+	{
+		const float Band = Size.Y * .085f;
+		const FVector2D Bands[4][2] = {
+			{ FVector2D(0.f, 0.f), FVector2D(Size.X * .30f, Band) },
+			{ FVector2D(Size.X * .70f, 0.f), FVector2D(Size.X * .30f, Band) },
+			{ FVector2D(0.f, Size.Y - Band), FVector2D(Size.X * .32f, Band) },
+			{ FVector2D(Size.X * .68f, Size.Y - Band), FVector2D(Size.X * .32f, Band) },
+		};
+		for (int32 Index = 0; Index < 4; ++Index)
+		{
+			// The brushes are members rather than locals: Slate keeps the brush's resource handle,
+			// and a stack brush would be gone by the time the element list is drawn. Tinting is
+			// white because the material already carries the protagonist's colours.
+			FSlateDrawElement::MakeBox(Elements, Layer,
+				Geometry.ToPaintGeometry(Bands[Index][1], FSlateLayoutTransform(Bands[Index][0])),
+				Index < 2 ? &EdgeTopBrush : &EdgeBottomBrush, ESlateDrawEffect::None, FLinearColor::White);
+		}
+		return Layer + 1;
+	}
+
 	const float Bleed = FMath::Min(Size.X, Size.Y) * .030f;
 
 	// Four runs hugging the corners and running off the sides. The centre is deliberately left

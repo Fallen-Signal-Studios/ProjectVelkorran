@@ -62,6 +62,26 @@ class Run:
         self.done = True
         self.report['status'] = 'passed' if passed else 'failed'
         self.report['reason'] = reason
+        # A material whose shader will not compile for Slate is replaced by the default material and
+        # draws nothing, while everything else still reports success: the asset loads, its
+        # parameters resolve, the surface paints. That failure was found only by looking at a
+        # picture, so it is checked here instead.
+        substitutions = []
+        log = self.out / 'Editor.log'
+        if log.exists():
+            try:
+                for line in log.read_text(encoding='utf8', errors='ignore').splitlines():
+                    if 'Failed to compile Material' in line:
+                        substitutions.append(line.strip())
+            except OSError as error:
+                self.report['material_log_unreadable'] = str(error)
+        self.report['default_material_substitutions'] = substitutions
+        if substitutions:
+            # Written straight to the report: status and reason were already recorded above, so
+            # reassigning the arguments here would leave a run reading 'failed' while still carrying
+            # the success reason - a check that disagrees with itself and misdirects whoever reads it.
+            self.report['status'] = 'failed'
+            self.report['reason'] = 'A material fell back to the default material: ' + substitutions[0]
         self.report['capture_exists'] = self.shot.exists()
         if self.shot.exists():
             self.report['capture_bytes'] = self.shot.stat().st_size

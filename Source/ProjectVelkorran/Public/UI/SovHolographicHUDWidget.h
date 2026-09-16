@@ -7,9 +7,11 @@
 #include "Settings/SovGameUserSettings.h"
 #include "UI/SovCombatReadinessWidget.h"
 #include "UI/SovCombatVitalsWidget.h"
+#include "Styling/SlateBrush.h"
 #include "SovHolographicHUDWidget.generated.h"
 
 class ASovPlayerController;
+class UMaterialInstanceDynamic;
 
 /** One reading of everything the surface draws, taken together so the frame is internally consistent. */
 struct FSovHolographicHUDSnapshot
@@ -91,9 +93,18 @@ private:
 	int32 PaintEchoArc(const FGeometry& Geometry, FSlateWindowElementList& Elements, int32 Layer, const FPalette& Palette, float Scale) const;
 	int32 PaintRadar(const FGeometry& Geometry, FSlateWindowElementList& Elements, int32 Layer, const FPalette& Palette, float Scale) const;
 
+	/** Resolves the torn edge material once. Absence is normal: the surface falls back to drawn lines. */
+	void EnsureEdgeMaterial();
+
 	FSovHolographicHUDSnapshot Displayed;
 	/** Advances only with real time, so the radar sweep reads as motion rather than a stutter. */
 	mutable float SweepSeconds = 0.f;
+	/** Two instances of one material, differing only by which side of the band is the screen edge. */
+	UPROPERTY(Transient) TObjectPtr<UMaterialInstanceDynamic> EdgeTop;
+	UPROPERTY(Transient) TObjectPtr<UMaterialInstanceDynamic> EdgeBottom;
+	FSlateBrush EdgeTopBrush;
+	FSlateBrush EdgeBottomBrush;
+	bool bEdgeMaterialChecked = false;
 	/** Measured, not assumed: whether paint runs, at what size, and what it was given to draw. */
 	mutable int32 PaintCount = 0;
 	mutable FVector2D LastPaintSize = FVector2D::ZeroVector;
