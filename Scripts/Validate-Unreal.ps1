@@ -227,7 +227,14 @@ try {
             "-ExecCmds=Automation RunTests $TestFilter", '-TestExit=Automation Test Queue Empty',
             "-ReportExportPath=$reportDirectory", "-AbsLog=$editorLog"
         )
-    if ($DisableAura) { $automationArguments += '-DisablePlugins=Aura' }
+    # Fab is always off here. Automation runs headless under -NullRHI, where no web browser can be
+    # created, and once an editor user has signed into Fab it logs in from the saved session at startup
+    # and opens its browser tab - which asserts on the missing browser and kills the run before a single
+    # test executes. The engine reads only the first -DisablePlugins= on the command line (FParse::Value
+    # in PluginManager), so every plugin to disable has to share one comma-separated flag.
+    $pluginsToDisable = @('Fab')
+    if ($DisableAura) { $pluginsToDisable += 'Aura' }
+    $automationArguments += ('-DisablePlugins=' + ($pluginsToDisable -join ','))
     $editorExit = Invoke-LoggedProcess -Executable $editorExecutable -LogName 'Automation' `
         -TimeoutSeconds $AutomationTimeoutSeconds -Arguments $automationArguments
     $summary.automation = "process exit $editorExit; report not yet validated"
