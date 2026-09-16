@@ -72,7 +72,9 @@ def header_data(header):
         generation=int(header.generation), mission=str(header.mission_id), map=str(header.map_package),
         boundary=str(header.boundary_id), boundary_kind=str(header.boundary_kind),
         protagonist=tag(header.active_protagonist), account=str(header.account_namespace),
-        definition=str(header.mission_definition), product=str(header.product))
+        # export_text is stable across loads; a struct wrapper's text embeds its own object address,
+        # so two wrappers of the same path would never compare equal.
+        definition=header.mission_definition.export_text(), product=str(header.product))
 
 
 def live_companion(world, pc, pawn):

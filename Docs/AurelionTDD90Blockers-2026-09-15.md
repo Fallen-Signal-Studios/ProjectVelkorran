@@ -330,6 +330,33 @@ map name — only its package path carries the prefix, as the M13 report's
 is a harness defect and says nothing about the save system. Both checks now read the package path, and the
 reload needs a fresh route to run inside.
 
+## Third route, and the CP9 reload refused by its own comparison
+
+`WestCP9Route-20260915-171804-345ef191` passed the whole chain unattended again, this time committing
+`PriorityWestStretchers`: E1 164.9 s, E3 rescue 78.0 s, E4B 42.6 s with two missed frost windows it recovered
+from and no repositions, M13 284.6 s with all thirteen receipts. Two complete unattended routes on the two
+different outcomes now exist under the same build.
+
+With the world check corrected, the CP9 probe reached the native load: the callback reported success and
+carried a header whose raw text is identical to the expected one, down to `Generation=39`,
+`BoundaryId="Aurelion.CP9"` and the timestamp. The probe still refused it. The dictionaries differ in exactly
+one key, `definition`, which holds an `unreal.SoftObjectPath` struct wrapper: two wrappers of the same path
+are different Python objects, and their text form embeds the object address, so equality fails no matter how
+many times the same checkpoint is loaded. The reload is not qualified yet, but the failure is the harness's
+comparison, not the save system, and the header text is the evidence for that.
+
+Two consecutive harness defects have now stood between this route and its reload evidence. Both were
+assertions that could never pass, and both were only visible once the run reached them.
+
+## Companion contribution across two routes
+
+The second route's companion share is **2.0%** in E4A (5.3 of 266) and **0.13%** across the route, against
+11.1% and 0.8% in the first. Both runs sit far below A4's 15–25% band, and the spread between them is wider
+than the band itself, so neither run supports a claim about tuning. The measurement question raised above
+stands: E1's drones absorb 340–611 damage each while every required participant elsewhere absorbs exactly
+53.2, so those encounters are not decided by damage and need a contribution measure that matches how they
+are won.
+
 ## Score
 
 Three rows move, each on this run's measured evidence and none to full credit:
