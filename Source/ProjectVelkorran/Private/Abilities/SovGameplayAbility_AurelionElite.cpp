@@ -67,6 +67,15 @@ bool USovGameplayAbility_AurelionEliteBase::IsPhaseAdmitted() const
 	return static_cast<uint8>(ResolvePhase()) >= static_cast<uint8>(RequiredPhase);
 }
 
+float USovGameplayAbility_AurelionEliteBase::GetBotAttackFrequency_Implementation() const
+{
+	const float Base = Super::GetBotAttackFrequency_Implementation();
+	// The policy states an interval multiplier, so a shorter interval is a higher frequency. Without
+	// this the phases changed which abilities were allowed but never how hard the boss pressed.
+	const float Interval = SovAurelionElitePolicy::AttackIntervalScale(ResolvePhase());
+	return Interval > KINDA_SMALL_NUMBER ? Base / Interval : Base;
+}
+
 AActor* USovGameplayAbility_AurelionEliteBase::FindBossTarget(AActor* SourceActor) const
 {
 	const ASovEncounterDirector* const Director = ResolveOwningDirector();
@@ -105,7 +114,14 @@ void USovGameplayAbility_AurelionEliteBase::ActivateAbility(
 		return;
 	}
 	const bool bResolved = ExecuteBossPayload(Avatar, Target);
-	if (World) { NextAllowedActivationTime = World->GetTimeSeconds() + FMath::Max(CooldownDuration, 0.f); }
+	if (World)
+	{
+		// The phase scale has to apply here too. Shortening only the selection cadence achieves
+		// nothing while this gate still holds the opening phase's interval: the enrage's faster
+		// selection would simply be refused here and the intended pressure absorbed.
+		const float Interval = SovAurelionElitePolicy::AttackIntervalScale(ResolvePhase());
+		NextAllowedActivationTime = World->GetTimeSeconds() + FMath::Max(CooldownDuration * Interval, 0.f);
+	}
 	if (IsActive()) { EndAbility(Handle, ActorInfo, ActivationInfo, true, !bResolved); }
 }
 

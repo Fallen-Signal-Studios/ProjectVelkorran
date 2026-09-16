@@ -1313,6 +1313,10 @@ struct FSovAurelionEliteTestAccess
 {
     static void SetSummonDefinition(USovGameplayAbility_AurelionEliteSummon& Ability, UNPCDefinition* Definition)
     { Ability.SummonDefinition = Definition; }
+    static double NextAllowed(const USovGameplayAbility_AurelionEliteBase& Ability)
+    { return Ability.NextAllowedActivationTime; }
+    static void ClearGate(USovGameplayAbility_AurelionEliteBase& Ability)
+    { Ability.NextAllowedActivationTime = 0.; }
 };
 
 namespace
@@ -1385,6 +1389,51 @@ bool FSovAurelionEliteSummonTest::RunTest(const FString& Parameters)
         if (IsValid(*It) && F.Director->FindParticipantId(*It).IsNone()) { ++Unregistered; }
     }
     TestTrue(TEXT("The summoned adds are attempt-scoped rather than participants"), Unregistered >= Living);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAurelionElitePacingTest,
+    "ProjectVelkorran.Campaign.Aurelion.ElitePressesHarderAsItsPhasesAdvance",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovAurelionElitePacingTest::RunTest(const FString& Parameters)
+{
+    FEncounterObjectiveWorld F(true);
+    if (!TestNotNull(TEXT("Ready crucible campaign"), F.ASC) || !F.Start()) { AddError(F.SetupError); return false; }
+    auto* Elite = F.Director->GetParticipant(TEXT("Formation.Guard"));
+    if (!TestNotNull(TEXT("Fixture supplies the elite participant"), Elite)) { return false; }
+    auto* EliteASC = Elite->GetNarrativeAbilitySystemComponent();
+    FGameplayAbilitySpecHandle Handle;
+    auto* Slam = GrantEliteAbility<USovGameplayAbility_AurelionEliteSlam>(EliteASC, Handle);
+    if (!TestNotNull(TEXT("Slam ability instance exists"), Slam)) { return false; }
+    // Within reach, so activation is decided by phase pacing rather than by target acquisition.
+    F.Player->SetActorLocation(Elite->GetActorLocation() + FVector(200.f, 0.f, 0.f));
+
+    // The rate bot selection is told this attack can repeat at.
+    SetEliteHealthFraction(EliteASC, 1.f);
+    const float OpeningFrequency = Slam->GetBotAttackFrequency();
+    SetEliteHealthFraction(EliteASC, .1f);
+    const float EnragedFrequency = Slam->GetBotAttackFrequency();
+    TestTrue(TEXT("An enraged boss is offered to selection more often"), EnragedFrequency > OpeningFrequency);
+
+    // The gate that actually decides whether an activation is refused. Scaling selection alone is
+    // absorbed here, so pacing has to shorten this too or the phases change nothing the player feels.
+    const double Now = F.World->GetTimeSeconds();
+    SetEliteHealthFraction(EliteASC, 1.f);
+    FSovAurelionEliteTestAccess::ClearGate(*Slam);
+    EliteASC->TryActivateAbility(Handle);
+    const double OpeningGate = FSovAurelionEliteTestAccess::NextAllowed(*Slam) - Now;
+
+    SetEliteHealthFraction(EliteASC, .1f);
+    FSovAurelionEliteTestAccess::ClearGate(*Slam);
+    EliteASC->TryActivateAbility(Handle);
+    const double EnragedGate = FSovAurelionEliteTestAccess::NextAllowed(*Slam) - Now;
+
+    // A zero gate would mean the activation was refused outright, which would make the comparison
+    // below pass for the wrong reason.
+    if (!TestTrue(TEXT("The opening phase sets a real activation gate"), OpeningGate > 0.)) { return false; }
+    TestTrue(TEXT("An enraged boss may act again sooner"), EnragedGate < OpeningGate);
+    // Faster, never free: the boss must not be able to act every frame.
+    TestTrue(TEXT("Pressure never removes the gate entirely"), EnragedGate > 0.);
     return true;
 }
 

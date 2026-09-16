@@ -32,6 +32,8 @@ public:
 	virtual float GetBotAttackMinimumRange_Implementation() const override { return MinimumAttackRange; }
 	virtual float GetBotAttackMaximumRange_Implementation() const override { return MaximumAttackRange; }
 	virtual bool RequiresBotAttackToken_Implementation() const override { return bBotRequiresAttackToken; }
+	/** Later phases press harder: the policy's interval scale shortens the gap between attacks. */
+	virtual float GetBotAttackFrequency_Implementation() const override;
 
 	/** The phase this ability first becomes available; the opening phase stays readable. */
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Aurelion Elite")
@@ -75,6 +77,9 @@ protected:
 	 * Deliberately not a UPROPERTY: the scaling policy is an engine-free header covered by portable
 	 * tests, so its enum is a plain C++ type. These abilities are configured in their constructors. */
 	SovAurelionElitePolicy::EPhase RequiredPhase = SovAurelionElitePolicy::EPhase::First;
+
+	/** Lets a test observe the activation gate, which is where phase pacing is easily absorbed. */
+	friend struct FSovAurelionEliteTestAccess;
 
 	UPROPERTY(Transient) TWeakObjectPtr<AActor> BossTarget;
 	double NextAllowedActivationTime = 0.;
