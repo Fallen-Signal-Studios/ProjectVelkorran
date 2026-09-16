@@ -67,6 +67,9 @@ public:
 	FGameplayTag Ability_NPC_DominionHound_HornCharge;
 	FGameplayTag Ability_NPC_DominionHound_Pounce;
 	FGameplayTag Ability_NPC_DominionHandler_CommandHound;
+	FGameplayTag Ability_NPC_AurelionElite_Slam;
+	FGameplayTag Ability_NPC_AurelionElite_Lance;
+	FGameplayTag Ability_NPC_AurelionElite_Summon;
 	FGameplayTag Ability_Echo_Tarrik_CinderSlam;
 	FGameplayTag Ability_Echo_Tarrik_VelkorransHunger;
 	FGameplayTag Ability_Echo_Tarrik_CinderStickyGrenade;

@@ -81,6 +81,9 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 	AddTag(Ability_Echo_Selene_StillpointGrenade, "Sov.Ability.Echo.Selene.StillpointGrenade", "Selene's universal Stillpoint Grenade Echo ability.");
 	AddTag(Ability_Echo_Selene_Dispatch, "Sov.Ability.Echo.Selene.Dispatch", "Selene's Verity throw-and-recall signature Echo ability.");
 	AddTag(Ability_Echo_Selene_StaccatoZero, "Sov.Ability.Echo.Selene.StaccatoZero", "Selene's Staccato precision Echo ability.");
+	AddTag(Ability_NPC_AurelionElite_Slam, "Sov.Ability.NPC.AurelionElite.Slam", "The Aurelion Elite's radial ground slam.");
+	AddTag(Ability_NPC_AurelionElite_Lance, "Sov.Ability.NPC.AurelionElite.Lance", "The Aurelion Elite's ranged lance.");
+	AddTag(Ability_NPC_AurelionElite_Summon, "Sov.Ability.NPC.AurelionElite.Summon", "The Aurelion Elite's attempt-scoped reinforcement summon.");
 	AddTag(Ability_Echo_Selene_AxiomNullPulse, "Sov.Ability.Echo.Selene.AxiomNullPulse", "Selene's Axiom shield-disruption Echo ability.");
 	AddTag(Ability_Echo_Selene_VeritysWake, "Sov.Ability.Echo.Selene.VeritysWake", "Selene's Verity frost-wave Echo ability.");
 	AddTag(AnimSet_Ability_Tarrik_CinderSlam, "Narrative.Anim.AnimSets.Ability.Tarrik.CinderSlam", "Weapon-layer animation set for Cinder Slam.");
