@@ -635,6 +635,17 @@ def build_enemy_assets(output_dir):
                     if _path(effect) not in [_path(existing) for existing in startup]:
                         startup.append(effect)
                 ability.set_editor_property("startup_effects", startup)
+                # The boss repertoire. Narrative's bot selection chooses among everything the elite
+                # owns, so these join the seeded enforcer's existing attacks rather than replacing
+                # them: the elite still swings, and now also slams, lances and calls reinforcements.
+                granted = list(ability.get_editor_property("default_abilities"))
+                for ability_class in (unreal.SovGameplayAbility_AurelionEliteSlam,
+                                      unreal.SovGameplayAbility_AurelionEliteLance,
+                                      unreal.SovGameplayAbility_AurelionEliteSummon):
+                    boss_ability = ability_class.static_class()
+                    if _path(boss_ability) not in [_path(existing) for existing in granted]:
+                        granted.append(boss_ability)
+                ability.set_editor_property("default_abilities", granted)
                 definition.set_editor_property("ability_configuration", ability)
                 # CharacterAppearance's runtime getter unconditionally dereferences
                 # its requester for variation seeds. BaseMesh is authored directly
