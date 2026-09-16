@@ -31,6 +31,9 @@ public:
     void RefreshFrontend();
     /** Opt-in native resource readout; authored HUD content remains in place. */
     UPROPERTY(EditDefaultsOnly, Category="Sovereign|Combat HUD") bool bShowCombatVitals = false;
+    /** The holographic surface for both protagonists. It replaces the plain resource readout. */
+    UPROPERTY(EditDefaultsOnly, Category="Sovereign|Combat HUD") bool bShowHolographicHUD = true;
+    const class USovHolographicHUDWidget* GetHolographicHUD() const { return HolographicHUD; }
     virtual void Deactivate() override;
     UFUNCTION(BlueprintCallable, Category="Accessibility") bool OpenAccessibilitySettings();
     USovAccessibilityPresentation* GetPresentation() const { return Presentation; }
@@ -91,6 +94,8 @@ private:
     uint64 SpeechEpoch = 0;
     TWeakObjectPtr<USovNarrativeCue> SpeechCue;
     UPROPERTY(Transient) TObjectPtr<USovCombatVitalsWidget> CombatVitals;
+    /** The holographic combat surface. Owns the resource readout when it is up, so the two never stack. */
+    UPROPERTY(Transient) TObjectPtr<class USovHolographicHUDWidget> HolographicHUD;
     UPROPERTY(Transient) TObjectPtr<USovAccessibilityPresentation> Presentation;
     UPROPERTY(Transient) TObjectPtr<USovAccessibilitySettingsMenu> SetupMenu;
 };

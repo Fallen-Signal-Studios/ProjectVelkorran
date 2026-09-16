@@ -1,6 +1,7 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "UI/SovFrontendComponent.h"
 #include "UI/SovCombatVitalsWidget.h"
+#include "UI/SovHolographicHUDWidget.h"
 #include "UI/SovAccessibilityPresentation.h"
 #include "UI/SovAccessibilitySettingsMenu.h"
 #include "Framework/SovPlayerController.h"
@@ -46,7 +47,23 @@ void USovFrontendComponent::RefreshFrontend()
     if (bEnding || !IsActive() || !PC || !PC->IsLocalController() || !PC->GetLocalPlayer()
         || IsRunningCommandlet() || !FSlateApplication::IsInitialized())
     { UnbindObjectives(); RemoveCombatVitals(); return; }
-    if (bShowCombatVitals)
+    // The holographic surface carries the resources itself, so the plain readout stands down while
+    // it is up rather than drawing a second set of bars over the same information.
+    if (bShowHolographicHUD)
+    {
+        if (!HolographicHUD)
+        {
+            HolographicHUD = CreateWidget<USovHolographicHUDWidget>(PC, USovHolographicHUDWidget::StaticClass());
+            if (HolographicHUD) { HolographicHUD->AddToPlayerScreen(-1); }
+        }
+        if (HolographicHUD) { HolographicHUD->RefreshHolographicHUD(); }
+    }
+    else if (HolographicHUD)
+    {
+        HolographicHUD->RemoveFromParent();
+        HolographicHUD = nullptr;
+    }
+    if (bShowCombatVitals && !bShowHolographicHUD)
     {
         if (!CombatVitals)
         {
@@ -385,6 +402,9 @@ void USovFrontendComponent::Unbind()
 void USovFrontendComponent::RemoveCombatVitals()
 {
     if (CombatVitals) { CombatVitals->RemoveFromParent(); CombatVitals = nullptr; }
+    // The single teardown path for combat surfaces: Deactivate, EndPlay and the not-ready early
+    // return all come through here, so the holographic surface never outlives its controller.
+    if (HolographicHUD) { HolographicHUD->RemoveFromParent(); HolographicHUD = nullptr; }
 }
 void USovFrontendComponent::Deactivate()
 {
