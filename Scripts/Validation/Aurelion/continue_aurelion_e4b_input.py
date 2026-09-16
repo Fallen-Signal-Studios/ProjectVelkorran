@@ -414,7 +414,9 @@ class Run(phase_a.Run):
             actual_match=True
         distance=math.dist(_xyz(pawn.get_actor_location()),_xyz(location))
         in_range=distance<min(2400.,max(500.,weapon.get_attack_range()*.8))
-        move=self.approach(self.world,pc,pawn,actor) if (not clear or not in_range) and distance>450. else (0.,0.)
+        # Blocked sight has to be answered by moving, at any range: a pilot standing inside 450 cm with no
+        # line to its target neither fires nor repositions, which stalled an E4B run against a live WallRunner.
+        move=self.approach(self.world,pc,pawn,actor) if (not clear or not in_range) and distance>120. else (0.,0.)
         clip,reserve=weapon.get_ammo_in_clip(),weapon.get_spare_ammo()
         assert clip>0 or reserve>0, 'Existing Cinderline ammunition exhausted; no refill was issued'
         game_time=unreal.GameplayStatics.get_time_seconds(self.world)

@@ -237,7 +237,8 @@ class Run(entry.Run):
         look, error = self.look(self.world, pc, location)
         clear = self.clear_sight(self.world, pawn, target)
         in_range = distance < min(2400., max(500., weapon.get_attack_range()*.8))
-        movement = self.approach(self.world, pc, pawn, target) if (not clear or not in_range) and distance > 450. else (0.,0.)
+        # The same blocked-sight stall this driver shares with E4B: keep moving while the line is blocked.
+        movement = self.approach(self.world, pc, pawn, target) if (not clear or not in_range) and distance > 120. else (0.,0.)
         clip, reserve = weapon.get_ammo_in_clip(), weapon.get_spare_ammo()
         # The same bounded ordinary pickup approach used in E1. Enemy-authored
         # native drops must actually exist, match Cinderline and have a full path.

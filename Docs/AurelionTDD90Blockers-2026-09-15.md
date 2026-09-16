@@ -352,10 +352,13 @@ assertions that could never pass, and both were only visible once the run reache
 
 The second route's companion share is **2.0%** in E4A (5.3 of 266) and **0.13%** across the route, against
 11.1% and 0.8% in the first. Both runs sit far below A4's 15–25% band, and the spread between them is wider
-than the band itself, so neither run supports a claim about tuning. The measurement question raised above
-stands: E1's drones absorb 340–611 damage each while every required participant elsewhere absorbs exactly
-53.2, so those encounters are not decided by damage and need a contribution measure that matches how they
-are won.
+than the band itself, so neither run supports a claim about tuning.
+
+The earlier suspicion about the uniform 53.2 figure was wrong, and a later run's roster settles it: the
+Weaver and WallRunner sit at exactly 53.2 health while alive, so 53.2 is simply what those enemies are worth,
+and the damage-share rows recorded one kill's worth of damage each. E1's drones absorb 340–611 because they
+have more health, not because a different mechanism resolves them. Damage share is therefore a fair measure
+here, and the companion's contribution is genuinely small rather than mismeasured.
 
 ## Score
 
