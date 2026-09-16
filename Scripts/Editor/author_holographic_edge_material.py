@@ -40,8 +40,12 @@ FLIP_V = 'FlipV'
 # a torn edge; a harder one reads as a cut-paper silhouette, which is what 7 produced - hard enough
 # that the mask was effectively binary and the edge had no falloff at all. The threshold sets how
 # much of the band survives: against signed noise of +/-.45, .42 left most of it standing.
-THRESHOLD = .55
+THRESHOLD = .62
 STEEPNESS = 3.2
+# How sharply each run fades in along its own length. A run is drawn as a rectangle and the noise
+# frays across the band, never along it, so without this taper the band stops dead at its inner end
+# and leaves a straight vertical cut across the screen.
+TAPER = 4.5
 
 
 def expression(material, cls, x, y):
@@ -126,9 +130,11 @@ def build():
     noise.set_editor_property('quality', 3)
     noise.set_editor_property('turbulence', True)
     noise.set_editor_property('levels', 3)
-    # Signed, so it displaces the boundary both ways rather than only eroding it.
-    noise.set_editor_property('output_min', -.45)
-    noise.set_editor_property('output_max', .45)
+    # Signed, so it displaces the boundary both ways rather than only eroding it. Kept modest: a
+    # wider swing pushes torn islands far enough inboard that the edging reads as blotches rather
+    # than as a frayed edge.
+    noise.set_editor_property('output_min', -.38)
+    noise.set_editor_property('output_max', .38)
     noise.set_editor_property('level_scale', 2.2)
     # Tiling stays off. It was enabled to stop the edge crawling between frames, which was the wrong
     # reason: the fray holds still because the position is static UVs, not because it tiles. What
@@ -156,6 +162,38 @@ def build():
 
     opacity = expression(material, unreal.MaterialExpressionClamp, 200, -60)
     connect(steep, '', opacity, '')
+
+    # Fade each run in along its own length, at both ends. The caller extends the outer ends past
+    # the screen so only the inner ones are ever seen fading; symmetry keeps one material serving
+    # the left-hand and right-hand runs without a second mirroring parameter.
+    along = expression(material, unreal.MaterialExpressionComponentMask, -880, 420)
+    along.set_editor_property('r', True)
+    along.set_editor_property('g', False)
+    along.set_editor_property('b', False)
+    along.set_editor_property('a', False)
+    connect(plain, '', along, '')
+
+    opening = expression(material, unreal.MaterialExpressionMultiply, -700, 400)
+    connect(along, '', opening, 'A')
+    connect(constant(material, TAPER, -880, 520), '', opening, 'B')
+    opening_cut = expression(material, unreal.MaterialExpressionClamp, -540, 400)
+    connect(opening, '', opening_cut, '')
+
+    closing_start = expression(material, unreal.MaterialExpressionOneMinus, -700, 540)
+    connect(along, '', closing_start, '')
+    closing = expression(material, unreal.MaterialExpressionMultiply, -540, 540)
+    connect(closing_start, '', closing, 'A')
+    connect(constant(material, TAPER, -700, 660), '', closing, 'B')
+    closing_cut = expression(material, unreal.MaterialExpressionClamp, -380, 540)
+    connect(closing, '', closing_cut, '')
+
+    window = expression(material, unreal.MaterialExpressionMultiply, -200, 460)
+    connect(opening_cut, '', window, 'A')
+    connect(closing_cut, '', window, 'B')
+
+    masked = expression(material, unreal.MaterialExpressionMultiply, 380, 120)
+    connect(opacity, '', masked, 'A')
+    connect(window, '', masked, 'B')
 
     # Glow further out, bright filament where the edge survives the cut.
     glow = expression(material, unreal.MaterialExpressionVectorParameter, -340, -520)
@@ -186,7 +224,7 @@ def build():
     connect(intensity, '', emissive, 'B')
 
     to_property(emissive, '', unreal.MaterialProperty.MP_EMISSIVE_COLOR)
-    to_property(opacity, '', unreal.MaterialProperty.MP_OPACITY)
+    to_property(masked, '', unreal.MaterialProperty.MP_OPACITY)
 
     unreal.MaterialEditingLibrary.recompile_material(material)
     assert library.save_asset(ASSET_PATH), 'Material did not save'

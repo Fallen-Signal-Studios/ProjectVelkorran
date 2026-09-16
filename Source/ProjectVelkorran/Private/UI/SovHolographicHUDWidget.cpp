@@ -375,12 +375,16 @@ int32 USovHolographicHUDWidget::PaintEdging(const FGeometry& Geometry, FSlateWin
 	// The centre is left clear either way: the references frame an empty screen.
 	if (EdgeTop && EdgeBottom)
 	{
-		const float Band = Size.Y * .085f;
+		const float Band = Size.Y * .072f;
+		// The material fades each run in at both ends along its length. Only the inner ends should
+		// be seen doing it, so the outer ends are pushed past the screen edge where their taper
+		// falls outside the viewport entirely.
+		const float Overhang = Size.X * .045f;
 		const FVector2D Bands[4][2] = {
-			{ FVector2D(0.f, 0.f), FVector2D(Size.X * .30f, Band) },
-			{ FVector2D(Size.X * .70f, 0.f), FVector2D(Size.X * .30f, Band) },
-			{ FVector2D(0.f, Size.Y - Band), FVector2D(Size.X * .32f, Band) },
-			{ FVector2D(Size.X * .68f, Size.Y - Band), FVector2D(Size.X * .32f, Band) },
+			{ FVector2D(-Overhang, 0.f), FVector2D(Size.X * .30f + Overhang, Band) },
+			{ FVector2D(Size.X * .70f, 0.f), FVector2D(Size.X * .30f + Overhang, Band) },
+			{ FVector2D(-Overhang, Size.Y - Band), FVector2D(Size.X * .32f + Overhang, Band) },
+			{ FVector2D(Size.X * .68f, Size.Y - Band), FVector2D(Size.X * .32f + Overhang, Band) },
 		};
 		for (int32 Index = 0; Index < 4; ++Index)
 		{
