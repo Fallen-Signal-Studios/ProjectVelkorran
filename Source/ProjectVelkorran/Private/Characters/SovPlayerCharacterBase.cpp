@@ -19,6 +19,7 @@
 #include "Components/SovStatusComponent.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
 #include "Sovereign/SovGameplayTags.h"
+#include "AI/SovProximityDetectionComponent.h"
 #include "Weapons/SovAdsComponent.h"
 
 ASovPlayerCharacterBase::ASovPlayerCharacterBase(const FObjectInitializer& ObjectInitializer)
@@ -34,6 +35,8 @@ ASovPlayerCharacterBase::ASovPlayerCharacterBase(const FObjectInitializer& Objec
 	TargetingComponent = CreateDefaultSubobject<USovTargetingComponent>(TEXT("SovTargetingComponent"));
 	// Both protagonists aim; the sight each looks through is chosen from the weapon they wield.
 	CreateDefaultSubobject<USovAdsComponent>(TEXT("SovAdsComponent"));
+	// The radar reports only hostiles this protagonist has actually seen, and forgets them.
+	CreateDefaultSubobject<USovProximityDetectionComponent>(TEXT("SovProximityDetection"));
 	CorruptionComponent = CreateDefaultSubobject<USovCorruptionComponent>(TEXT("SovCorruptionComponent"));
 	ShieldComponent = CreateDefaultSubobject<USovShieldComponent>(TEXT("SovShieldComponent"));
 	HealthRechargeComponent = CreateDefaultSubobject<USovHealthRechargeComponent>(
