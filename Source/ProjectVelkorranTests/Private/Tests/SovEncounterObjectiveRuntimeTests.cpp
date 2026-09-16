@@ -2,6 +2,8 @@
 #include "Tests/SovEncounterObjectiveRuntimeTestFixtures.h"
 #include "Components/SovEchoComponent.h"
 #include "Tests/SovCampaignTerminalRuntimeTestFixtures.h"
+#include "Abilities/SovGameplayAbility_AurelionElite.h"
+#include "AI/SovAurelionElitePolicy.h"
 #include "Campaign/SovAurelionRequestActor.h"
 #include "Components/TextRenderComponent.h"
 #include "UnrealFramework/NarrativeGameUserSettings.h"
@@ -26,6 +28,7 @@
 #include "AI/NPCDefinition.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "Framework/SovPlayerState.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
 #include "GAS/NarrativeAttributeSetBase.h"
@@ -1295,6 +1298,128 @@ bool FSovTransferredDefeatMetadataLoadTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Relinquished source loads through the same native path"), Save->LoadActorFromRecord(PhaseA, SavedA));
     TestTrue(TEXT("The source cannot reacquire any transferred row"), PhaseA->Participants.IsEmpty());
     TestEqual(TEXT("Metadata restoration cannot publish any new campaign proof"), F.PC->GetCampaignState()->GetJournal().Num(), JournalCount);
+    return true;
+}
+
+namespace
+{
+template <typename TAbility>
+TAbility* GrantEliteAbility(UNarrativeAbilitySystemComponent* ASC, FGameplayAbilitySpecHandle& OutHandle)
+{
+    OutHandle = ASC->GiveAbility(FGameplayAbilitySpec(TAbility::StaticClass(), 1));
+    FGameplayAbilitySpec* const Spec = ASC->FindAbilitySpecFromHandle(OutHandle);
+    return Spec ? Cast<TAbility>(Spec->GetPrimaryInstance()) : nullptr;
+}
+
+int32 CountLivingNPCs(UWorld* World)
+{
+    int32 Count = 0;
+    for (TActorIterator<ASovNPCCharacterBase> It(World); It; ++It) { if (IsValid(*It)) { ++Count; } }
+    return Count;
+}
+
+/** The boss phase policy reads remaining health fraction, so set both ends of it explicitly. */
+void SetEliteHealthFraction(UNarrativeAbilitySystemComponent* ASC, float Fraction)
+{
+    ASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetMaxHealthAttribute(), 100.f);
+    ASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetHealthAttribute(), 100.f * Fraction);
+}
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAurelionEliteSummonTest,
+    "ProjectVelkorran.Campaign.Aurelion.EliteSummonIsPhaseGatedAndNeverBecomesAVictoryParticipant",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovAurelionEliteSummonTest::RunTest(const FString& Parameters)
+{
+    FEncounterObjectiveWorld F(true);
+    if (!TestNotNull(TEXT("Ready crucible campaign"), F.ASC) || !F.Start()) { AddError(F.SetupError); return false; }
+    auto* Elite = F.Director->GetParticipant(TEXT("Formation.Guard"));
+    if (!TestNotNull(TEXT("Fixture supplies the elite participant"), Elite)) { return false; }
+    auto* EliteASC = Elite->GetNarrativeAbilitySystemComponent();
+    FGameplayAbilitySpecHandle Handle;
+    auto* Summon = GrantEliteAbility<USovGameplayAbility_AurelionEliteSummon>(EliteASC, Handle);
+    if (!TestNotNull(TEXT("Summon ability instance exists"), Summon)) { return false; }
+
+    const int32 ParticipantsBefore = F.Director->Participants.Num();
+    const int32 NPCsBefore = CountLivingNPCs(F.World);
+
+    // Adds stay out of the opening phase so the first stretch of the fight remains readable.
+    SetEliteHealthFraction(EliteASC, 1.f);
+    EliteASC->TryActivateAbility(Handle);
+    TestEqual(TEXT("A boss at full health summons nothing"), Summon->GetLivingSummonCount(), 0);
+    TestEqual(TEXT("A refused summon spawns no characters at all"), CountLivingNPCs(F.World), NPCsBefore);
+
+    // The second phase opens at 66% remaining health.
+    SetEliteHealthFraction(EliteASC, .5f);
+    EliteASC->TryActivateAbility(Handle);
+    const int32 Living = Summon->GetLivingSummonCount();
+    if (!TestTrue(TEXT("A wounded boss brings in adds"), Living > 0)) { return false; }
+    TestTrue(TEXT("Summons respect their living ceiling"), Living <= 4);
+    TestEqual(TEXT("Every summon is a real spawned character"), CountLivingNPCs(F.World), NPCsBefore + Living);
+
+    // The required roster is fixed before the fight starts. Summons pressure the player and are
+    // cleaned up with the attempt; they never join the victory condition.
+    TestEqual(TEXT("Summoning never adds a victory participant"), F.Director->Participants.Num(), ParticipantsBefore);
+    int32 Unregistered = 0;
+    for (TActorIterator<ASovNPCCharacterBase> It(F.World); It; ++It)
+    {
+        if (IsValid(*It) && F.Director->FindParticipantId(*It).IsNone()) { ++Unregistered; }
+    }
+    TestTrue(TEXT("The summoned adds are attempt-scoped rather than participants"), Unregistered >= Living);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAurelionEliteLanceRangeTest,
+    "ProjectVelkorran.Campaign.Aurelion.EliteLanceRefusesBeyondItsRange",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovAurelionEliteLanceRangeTest::RunTest(const FString& Parameters)
+{
+    FEncounterObjectiveWorld F(true);
+    if (!TestNotNull(TEXT("Ready crucible campaign"), F.ASC) || !F.Start()) { AddError(F.SetupError); return false; }
+    auto* Elite = F.Director->GetParticipant(TEXT("Formation.Guard"));
+    if (!TestNotNull(TEXT("Fixture supplies the elite participant"), Elite)) { return false; }
+    auto* EliteASC = Elite->GetNarrativeAbilitySystemComponent();
+    FGameplayAbilitySpecHandle Handle;
+    auto* Lance = GrantEliteAbility<USovGameplayAbility_AurelionEliteLance>(EliteASC, Handle);
+    if (!TestNotNull(TEXT("Lance ability instance exists"), Lance)) { return false; }
+
+    const float PlayerHealthBefore = F.ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute());
+    // Well beyond the lance's authored reach.
+    F.Player->SetActorLocation(Elite->GetActorLocation() + FVector(9000.f, 0.f, 0.f));
+    EliteASC->TryActivateAbility(Handle);
+    TestEqual(TEXT("A shot from outside its range never reaches the player"),
+        F.ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()), PlayerHealthBefore);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAurelionEliteSlamTest,
+    "ProjectVelkorran.Campaign.Aurelion.EliteSlamSparesItsOwnSide",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovAurelionEliteSlamTest::RunTest(const FString& Parameters)
+{
+    FEncounterObjectiveWorld F(true);
+    if (!TestNotNull(TEXT("Ready crucible campaign"), F.ASC) || !F.Start()) { AddError(F.SetupError); return false; }
+    auto* Elite = F.Director->GetParticipant(TEXT("Formation.Guard"));
+    auto* Ally = F.Director->GetParticipant(TEXT("Crucible.NodeWest"));
+    if (!TestNotNull(TEXT("Fixture supplies the elite participant"), Elite)
+        || !TestNotNull(TEXT("Fixture supplies a same-side participant"), Ally)) { return false; }
+    auto* EliteASC = Elite->GetNarrativeAbilitySystemComponent();
+    auto* AllyASC = Ally->GetNarrativeAbilitySystemComponent();
+    FGameplayAbilitySpecHandle Handle;
+    auto* Slam = GrantEliteAbility<USovGameplayAbility_AurelionEliteSlam>(EliteASC, Handle);
+    if (!TestNotNull(TEXT("Slam ability instance exists"), Slam)) { return false; }
+
+    // Its own side is placed well inside the slam radius, where an indiscriminate payload would hit.
+    Ally->SetActorLocation(Elite->GetActorLocation() + FVector(120.f, 0.f, 0.f));
+    const float EliteHealthBefore = EliteASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute());
+    const float AllyHealthBefore = AllyASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute());
+
+    EliteASC->TryActivateAbility(Handle);
+
+    TestEqual(TEXT("The slam never damages the boss itself"),
+        EliteASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()), EliteHealthBefore);
+    TestEqual(TEXT("The slam never damages its own side"),
+        AllyASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()), AllyHealthBefore);
     return true;
 }
 
