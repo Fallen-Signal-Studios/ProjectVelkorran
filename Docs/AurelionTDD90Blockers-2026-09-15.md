@@ -360,6 +360,30 @@ and the damage-share rows recorded one kill's worth of damage each. E1's drones 
 have more health, not because a different mechanism resolves them. Damage share is therefore a fair measure
 here, and the companion's contribution is genuinely small rather than mismeasured.
 
+## Checkpoint reload soak, 100 cycles at 60 fps
+
+`CheckpointSoak100x60-20260915-175112-8798e3b5` ran 100 consecutive cycles in one editor process with
+`t.MaxFPS 60` applied each cycle: a fresh M12 PIE start, a public CP0 checkpoint reload through
+`SovSaveSubsystem.load_slot`, and an end. All 100 cycles passed. 100 of 100 fresh starts reached a ready
+protagonist, 100 of 100 reload requests returned `LoadStarted` and every one completed with a success
+callback on the `Aurelion.CP0` boundary: a **reload success rate of 1.0**, against R2's >99.5% threshold.
+
+| Measure | Min | Median | p95 | Max |
+|---|---:|---:|---:|---:|
+| Reload seconds | 4.09 | 4.16 | 4.41 | 4.69 |
+| Fresh start to ready | 0.94 | 0.99 | 1.25 | 23.34 |
+
+Reload time is remarkably tight: the slowest of 100 reloads exceeded the median by 0.53 s. The one 23.3 s
+ready time is the first cycle, where the process was still cold; every later start was near one second. The
+checkpoint generation advanced in 99 of the 100 cycles, the exception being the first, which had no earlier
+generation to advance from.
+
+Limits, which matter for what this can support: editor PIE in a single process, not a packaged build and not
+target hardware; the CP0 boundary, not every beat; no gameplay input; and one hour is not the long-session
+stability R2 also asks for. R2 additionally requires 100 consecutive starts in **both** frame profiles, and
+only 60 fps has been run, so the row is deliberately not rescored here. The 30 fps profile is queued behind
+the route currently holding the machine.
+
 ## Score
 
 Three rows move, each on this run's measured evidence and none to full credit:
