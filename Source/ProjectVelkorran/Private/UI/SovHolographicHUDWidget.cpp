@@ -1,6 +1,8 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 
 #include "UI/SovHolographicHUDWidget.h"
+#include "UI/SovHolographicHUDSurface.h"
+#include "Blueprint/WidgetTree.h"
 
 #include "Characters/SovPlayerCharacterBase.h"
 #include "Components/SovEchoComponent.h"
@@ -301,6 +303,133 @@ void USovHolographicHUDWidget::RefreshHolographicHUD()
 		EdgeBottom->SetScalarParameterValue(TEXT("EdgeIntensity"), Intensity);
 	}
 	SetVisibility(bReady ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+	UpdateSurface();
+}
+
+void USovHolographicHUDWidget::SetSurfaceClass(TSubclassOf<USovHolographicHUDSurface> InSurfaceClass)
+{
+	if (SurfaceClass == InSurfaceClass) { return; }
+	SurfaceClass = InSurfaceClass;
+	if (IsValid(Surface)) { Surface->RemoveFromParent(); Surface = nullptr; }
+	UpdateSurface();
+}
+
+FVector2D USovHolographicHUDWidget::ResolveSafeSize() const
+{
+	const FGeometry& Cached = GetCachedGeometry();
+	FSlateRect SafeRect;
+	if (SafeAreaSource.IsValid() && SafeAreaSource->GetSafeAreaAbsoluteRect(SafeRect))
+	{
+		const FVector2D Min = Cached.AbsoluteToLocal(FVector2D(SafeRect.Left, SafeRect.Top));
+		const FVector2D Max = Cached.AbsoluteToLocal(FVector2D(SafeRect.Right, SafeRect.Bottom));
+		if (!Min.ContainsNaN() && !Max.ContainsNaN() && Max.X - Min.X > 1. && Max.Y - Min.Y > 1.) { return Max - Min; }
+	}
+	return FVector2D(Cached.GetLocalSize());
+}
+
+FSovHolographicHUDView USovHolographicHUDWidget::BuildView(const FVector2D& SafeSize) const
+{
+	FSovHolographicHUDView View;
+	View.bValid = Displayed.bValid;
+	View.Protagonist = Displayed.Vitals.Protagonist;
+	View.SweepSeconds = SweepSeconds;
+
+	const auto Bar = [](const FSovCombatVitalValue& Value)
+	{
+		FSovHolographicHUDBar Out;
+		Out.Current = FMath::IsFinite(Value.Current) ? Value.Current : 0.f;
+		Out.Maximum = FMath::IsFinite(Value.Maximum) ? Value.Maximum : 0.f;
+		// An absent resource reads as empty. Dividing by a zero maximum would report it full.
+		Out.Fraction = Out.Maximum > KINDA_SMALL_NUMBER ? FMath::Clamp(Out.Current / Out.Maximum, 0.f, 1.f) : 0.f;
+		return Out;
+	};
+	View.Health = Bar(Displayed.Vitals.Values[0]);
+	View.Shield = Bar(Displayed.Vitals.Values[1]);
+	View.Stamina = Bar(Displayed.Vitals.Values[2]);
+	View.Poise = Bar(Displayed.Vitals.Values[3]);
+	FSovCombatVitalValue EchoValue;
+	EchoValue.Current = Displayed.Echo;
+	EchoValue.Maximum = Displayed.MaxEcho;
+	View.Echo = Bar(EchoValue);
+
+	// A magazine-less weapon omits the readout rather than showing zero rounds.
+	View.bHasAmmo = Displayed.AmmoInClip >= 0;
+	View.AmmoInClip = FMath::Max(Displayed.AmmoInClip, 0);
+	View.AmmoReserve = FMath::Max(Displayed.AmmoReserve, 0);
+
+	for (const FSovAbilityHUDEntry& Entry : Displayed.Readiness.Abilities)
+	{
+		FSovHolographicHUDPip Pip;
+		Pip.Name = Entry.Name;
+		Pip.Binding = Entry.Binding;
+		Pip.Status = Entry.Status;
+		Pip.Icon = static_cast<ESovHolographicHUDIcon>(Entry.Icon);
+		Pip.State = static_cast<ESovHolographicHUDPipState>(Entry.State);
+		Pip.SemanticSlot = Entry.SemanticSlot;
+		Pip.bReady = Entry.State == ESovAbilityHUDState::EchoReady;
+		Pip.CooldownFraction = Entry.CooldownDuration > KINDA_SMALL_NUMBER
+			? FMath::Clamp(1.f - Entry.CooldownRemaining / Entry.CooldownDuration, 0.f, 1.f) : 1.f;
+		View.Pips.Add(Pip);
+	}
+
+	const FPalette Palette = BuildPalette();
+	View.Palette.Accent = Palette.Accent;
+	View.Palette.Glow = Palette.Glow;
+	View.Palette.ShieldFrom = Palette.ShieldFrom;
+	View.Palette.ShieldTo = Palette.ShieldTo;
+	View.Palette.HealthFrom = Palette.HealthFrom;
+	View.Palette.HealthTo = Palette.HealthTo;
+	View.Palette.Backing = Palette.Backing;
+	View.Palette.Line = Palette.Line;
+	View.Palette.bHighContrast = Palette.bHighContrast;
+
+	const FVector2D Size(FMath::Max(SafeSize.X, 1.), FMath::Max(SafeSize.Y, 1.));
+	const auto Layout = SovHolographicHUDLayout::Compute(Size, Displayed.Settings.UIScale);
+	View.Scale = Layout.Scale;
+	View.SafeSize = Layout.Size;
+	View.Plate = Layout.Plate;
+	View.Ammo = Layout.Ammo;
+	View.Arc = Layout.Arc;
+	View.Radar = Layout.Radar;
+	View.ArcStart = Layout.ArcStart;
+	View.ArcControl = Layout.ArcControl;
+	View.ArcEnd = Layout.ArcEnd;
+	View.RadarCentre = Layout.RadarCentre;
+	View.RadarRadius = Layout.RadarRadius;
+
+	for (const FSovProximityContact& Contact : Displayed.Contacts)
+	{
+		FSovHolographicHUDContact Out;
+		Out.BearingDegrees = Contact.BearingDegrees;
+		Out.NormalisedRange = FMath::Clamp(Contact.NormalisedRange, 0.f, 1.f);
+		Out.Alpha = FMath::Clamp(Contact.Alpha, 0.f, 1.f);
+		Out.bLiveSighting = Contact.bLiveSighting;
+		// Screen up is the player's facing, the same convention the painted radar uses.
+		const float Angle = FMath::DegreesToRadians(Contact.BearingDegrees - 90.f);
+		Out.Offset = FVector2D(FMath::Cos(Angle), FMath::Sin(Angle)) * (Layout.RadarRadius * Out.NormalisedRange);
+		View.Contacts.Add(Out);
+	}
+	return View;
+}
+
+void USovHolographicHUDWidget::UpdateSurface()
+{
+	if (!SurfaceClass)
+	{
+		if (IsValid(Surface)) { Surface->RemoveFromParent(); Surface = nullptr; }
+		return;
+	}
+	if (!IsValid(Surface))
+	{
+		APlayerController* const Owner = GetOwningPlayer();
+		if (!Owner) { return; }
+		Surface = CreateWidget<USovHolographicHUDSurface>(Owner, SurfaceClass);
+		if (!Surface) { return; }
+		// Behind the subtitle surface, exactly where the painted HUD sits.
+		Surface->AddToPlayerScreen(-2);
+	}
+	Surface->SetVisibility(Displayed.bValid ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+	Surface->ApplyHolographicHUDView(BuildView(ResolveSafeSize()));
 }
 
 void USovHolographicHUDWidget::SetSafeAreaSource(USovAccessibilityPresentation* Presentation) { SafeAreaSource = Presentation; }
@@ -733,6 +862,8 @@ int32 USovHolographicHUDWidget::NativePaint(const FPaintArgs& Args, const FGeome
 	}
 	if (!Displayed.bValid) { return Result; }
 	if (const UWorld* const World = GetWorld()) { SweepSeconds = World->GetTimeSeconds(); }
+	// An authored surface draws the whole HUD. Painting underneath it would double every readout.
+	if (IsValid(Surface)) { return Result; }
 	const FPalette Palette = BuildPalette();
 	// Recorded rather than inferred: this is the last point before anything is submitted to draw.
 	LastPalette = Palette;

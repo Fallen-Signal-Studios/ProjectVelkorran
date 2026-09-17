@@ -4,6 +4,9 @@
 #include "Character/PlayerDefinition.h"
 #include "Framework/SovPlayerState.h"
 #include "UI/SovHolographicHUDWidget.h"
+#include "UI/SovHolographicHUDSurface.h"
+#include "Tests/SovHolographicHUDTestFixtures.h"
+#include "UI/SovHolographicHUDLayout.h"
 #include "Sovereign/SovGameplayTags.h"
 #include "NarrativeGameplayTags.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
@@ -24,6 +27,10 @@ struct FSovHolographicHUDTestAccess
 	static FLinearColor HealthFrom(const USovHolographicHUDWidget& Widget) { return Widget.BuildPalette().HealthFrom; }
 	static FLinearColor HealthTo(const USovHolographicHUDWidget& Widget) { return Widget.BuildPalette().HealthTo; }
 	static FLinearColor ShieldTo(const USovHolographicHUDWidget& Widget) { return Widget.BuildPalette().ShieldTo; }
+	static FSovHolographicHUDView View(const USovHolographicHUDWidget& Widget, const FVector2D& SafeSize)
+	{ return Widget.BuildView(SafeSize); }
+	static void SetSurface(USovHolographicHUDWidget& Widget, USovHolographicHUDSurface* Surface) { Widget.Surface = Surface; }
+	static bool PaintDrew(const USovHolographicHUDWidget& Widget) { return Widget.bLastPaintDrew; }
 };
 
 namespace
@@ -188,6 +195,71 @@ bool FSovHolographicCinematicHideTest::RunTest(const FString& Parameters)
 	FSovHolographicHUDSnapshot Restored;
 	TestTrue(TEXT("Releasing the cinematic restores the surface"),
 		USovHolographicHUDWidget::ReadSnapshot(F.Controller, Restored));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovHolographicViewTest,
+	"ProjectVelkorran.Campaign.HolographicHUD.AuthoredSurfaceReceivesTheSameFrameThePainterWouldDraw",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovHolographicViewTest::RunTest(const FString& Parameters)
+{
+	// The HUD keeps reading resources, grants, contacts and layout; only the drawing moves to an
+	// authored widget. The frame it publishes must therefore agree with the layout every other
+	// surface already avoids, and must not restate a resource the painter would have omitted.
+	FHolographicWorld F;
+	if (!TestTrue(TEXT("Ready holographic fixture"), F.Valid())) { return false; }
+	// Constructed directly, as the sibling palette tests are: CreateWidget needs an attached local player.
+	auto* Widget = NewObject<USovHolographicHUDWidget>(F.Player);
+	if (!TestNotNull(TEXT("Holographic HUD widget"), Widget)) { return false; }
+
+	FSovHolographicHUDSnapshot Snapshot;
+	Snapshot.bValid = true;
+	Snapshot.Vitals.Values[0] = {60.f, 120.f};   // Health
+	Snapshot.Vitals.Values[1] = {0.f, 0.f};      // Shield, absent on this protagonist
+	Snapshot.Echo = 35.f;
+	Snapshot.MaxEcho = 100.f;
+	Snapshot.AmmoInClip = -1;
+	Snapshot.Settings.UIScale = 1.f;
+	FSovProximityContact Contact;
+	Contact.BearingDegrees = 90.f;               // Directly to the player's right.
+	Contact.NormalisedRange = 1.f;
+	Contact.Alpha = 1.f;
+	Contact.bLiveSighting = true;
+	Snapshot.Contacts.Add(Contact);
+	FSovHolographicHUDTestAccess::SetSnapshot(*Widget, Snapshot);
+
+	const FVector2D SafeSize(1600.f, 900.f);
+	const FSovHolographicHUDView View = FSovHolographicHUDTestAccess::View(*Widget, SafeSize);
+	TestTrue(TEXT("A live protagonist produces a usable frame"), View.bValid);
+	TestEqual(TEXT("Health is divided once, for the surface"), View.Health.Fraction, .5f);
+	// Dividing by a zero maximum would report an absent resource as completely full.
+	TestEqual(TEXT("An absent shield reads as empty rather than full"), View.Shield.Fraction, 0.f);
+	TestEqual(TEXT("Echo is divided from its own reading"), View.Echo.Fraction, .35f);
+	TestFalse(TEXT("A magazine-less weapon publishes no ammo"), View.bHasAmmo);
+
+	// The rectangles must be the ones the subtitle and caption surfaces are told to avoid, or an
+	// authored HUD would sit somewhere the rest of the presentation does not expect it.
+	const auto Layout = SovHolographicHUDLayout::Compute(SafeSize, 1.f);
+	TestTrue(TEXT("The plate matches the shared layout"), View.Plate.Min.Equals(Layout.Plate.Min) && View.Plate.Max.Equals(Layout.Plate.Max));
+	TestTrue(TEXT("The radar matches the shared layout"), View.Radar.Min.Equals(Layout.Radar.Min) && View.Radar.Max.Equals(Layout.Radar.Max));
+	TestEqual(TEXT("The radar radius is the shared one"), View.RadarRadius, Layout.RadarRadius);
+
+	// Screen up is the player's facing, so a contact due right sits on the +X axis of the disc.
+	if (TestEqual(TEXT("The contact is published"), View.Contacts.Num(), 1))
+	{
+		TestTrue(TEXT("A contact to the right lands right of the radar centre"),
+			View.Contacts[0].Offset.X > View.RadarRadius * .9f && FMath::Abs(View.Contacts[0].Offset.Y) < 1.f);
+	}
+
+	// With a surface installed the painter must stand down, or every readout would be drawn twice.
+	auto* Surface = NewObject<USovHolographicHUDTestSurface>(F.Player);
+	if (!TestNotNull(TEXT("Test surface"), Surface)) { return true; }
+	Surface->ApplyHolographicHUDView(View);
+	TestEqual(TEXT("A surface keeps the frame it was handed"), Surface->Applied().Health.Fraction, .5f);
+	TestTrue(TEXT("The arc point walks the authored curve"),
+		Surface->ArcPoint(0.f).Equals(View.ArcStart) && Surface->ArcPoint(1.f).Equals(View.ArcEnd));
+	TestTrue(TEXT("A non-finite arc parameter falls back to the start rather than a NaN position"),
+		Surface->ArcPoint(std::numeric_limits<float>::quiet_NaN()).Equals(View.ArcStart));
 	return true;
 }
 #endif

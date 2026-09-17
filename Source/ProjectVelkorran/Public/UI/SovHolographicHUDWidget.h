@@ -13,6 +13,8 @@
 class ASovPlayerController;
 class UMaterialInstanceDynamic;
 class USovAccessibilityPresentation;
+class USovHolographicHUDSurface;
+struct FSovHolographicHUDView;
 
 /** One reading of everything the surface draws, taken together so the frame is internally consistent. */
 struct FSovHolographicHUDSnapshot
@@ -61,6 +63,14 @@ public:
 	/** The subtitle surface whose safe area this HUD paints inside, so both share one set of coordinates. */
 	void SetSafeAreaSource(USovAccessibilityPresentation* Presentation);
 
+	/** Hands presentation to an authored widget, which then draws everything. Null restores the painter.
+	 * The reading of resources, grants, contacts and layout stays here either way. */
+	void SetSurfaceClass(TSubclassOf<USovHolographicHUDSurface> InSurfaceClass);
+	const USovHolographicHUDSurface* GetSurface() const { return Surface; }
+
+	/** One frame for an authored surface, in the coordinates of the safe area the HUD occupies. */
+	FSovHolographicHUDView BuildView(const FVector2D& SafeSize) const;
+
 	/** Compact paint diagnostics, readable from a capture session rather than inferred from symptoms. */
 	UFUNCTION(BlueprintPure, Category = "Sovereign|HUD")
 	FString GetPaintDiagnostics() const;
@@ -99,6 +109,13 @@ private:
 
 	/** Resolves the torn edge material once. Absence is normal: the surface falls back to drawn lines. */
 	void EnsureEdgeMaterial();
+	/** Creates or retires the authored surface, then publishes the current frame to it. */
+	void UpdateSurface();
+	/** The safe area in this widget's local space, falling back to the whole surface when unknown. */
+	FVector2D ResolveSafeSize() const;
+
+	UPROPERTY(Transient) TObjectPtr<USovHolographicHUDSurface> Surface;
+	TSubclassOf<USovHolographicHUDSurface> SurfaceClass;
 
 	FSovHolographicHUDSnapshot Displayed;
 	TWeakObjectPtr<USovAccessibilityPresentation> SafeAreaSource;

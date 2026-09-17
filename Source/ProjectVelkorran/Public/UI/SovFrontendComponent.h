@@ -33,6 +33,10 @@ public:
     UPROPERTY(EditDefaultsOnly, Category="Sovereign|Combat HUD") bool bShowCombatVitals = false;
     /** The holographic surface for both protagonists. It replaces the plain resource readout. */
     UPROPERTY(EditDefaultsOnly, Category="Sovereign|Combat HUD") bool bShowHolographicHUD = true;
+    /** An authored widget that draws the holographic HUD. Unset keeps the painted surface.
+     * The HUD keeps reading the resources, grants, contacts and layout either way. */
+    UPROPERTY(EditDefaultsOnly, Category="Sovereign|Combat HUD")
+    TSoftClassPtr<class USovHolographicHUDSurface> HolographicHUDSurfaceClass;
     const class USovHolographicHUDWidget* GetHolographicHUD() const { return HolographicHUD; }
     virtual void Deactivate() override;
     UFUNCTION(BlueprintCallable, Category="Accessibility") bool OpenAccessibilitySettings();

@@ -2,6 +2,7 @@
 #include "UI/SovFrontendComponent.h"
 #include "UI/SovCombatVitalsWidget.h"
 #include "UI/SovHolographicHUDWidget.h"
+#include "UI/SovHolographicHUDSurface.h"
 #include "UI/SovAccessibilityPresentation.h"
 #include "UI/SovAccessibilitySettingsMenu.h"
 #include "Framework/SovPlayerController.h"
@@ -59,7 +60,14 @@ void USovFrontendComponent::RefreshFrontend()
             // excluding UI, not the depth.
             if (HolographicHUD) { HolographicHUD->AddToPlayerScreen(-2); }
         }
-        if (HolographicHUD) { HolographicHUD->RefreshHolographicHUD(); }
+        if (HolographicHUD)
+        {
+            // Resolved each refresh rather than cached: a soft class is not loaded when the HUD is created,
+            // and an author swapping the widget should take effect without restarting the session.
+            HolographicHUD->SetSurfaceClass(HolographicHUDSurfaceClass.IsNull()
+                ? nullptr : TSubclassOf<USovHolographicHUDSurface>(HolographicHUDSurfaceClass.LoadSynchronous()));
+            HolographicHUD->RefreshHolographicHUD();
+        }
     }
     else { RemoveHolographicHUD(); }
     if (bShowCombatVitals && !bShowHolographicHUD)
