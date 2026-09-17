@@ -138,12 +138,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovSaveBankFailureTest, "ProjectVelkorran.Camp
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovSaveBankFailureTest::RunTest(const FString& Parameters)
 {
-    // The deliberately truncated bank is decoded during fallback, repair preflight,
-    // and recovery preservation. Keep these expected field-specific diagnostics counted.
-    AddExpectedMessage(TEXT("Failed loading tagged StructProperty /Script/ProjectVelkorran.SovCampaignSaveGame:Header. Read [0-9]+B, expected [0-9]+B. Package: FMemoryReader"),
-        ELogVerbosity::Error, EAutomationExpectedMessageFlags::Contains, 3);
-    AddExpectedMessage(TEXT("Failed loading tagged TextProperty /Script/ProjectVelkorran.SovSaveSlotHeader:MissionLabel. Read 0B, expected [0-9]+B. Package: FMemoryReader"),
-        ELogVerbosity::Error, EAutomationExpectedMessageFlags::Contains, 3);
+    // The deliberately truncated bank fails its storage frame, so it is rejected during fallback, repair preflight
+    // and recovery preservation without Unreal ever decoding it (and without the decode diagnostics that produced).
     TStrongObjectPtr<UGameInstance> Instance(NewObject<UGameInstance>());
     TStrongObjectPtr<USovSaveSubsystem> S(NewObject<USovSaveSubsystem>(Instance.Get()));
     auto* Storage = FSovSaveTestAccess::Initialize(*S); FString Error;
@@ -195,12 +191,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovSaveRepeatedFaultRecoveryTest, "ProjectVelk
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovSaveRepeatedFaultRecoveryTest::RunTest(const FString& Parameters)
 {
-    // Fifty torn-write cycles each decode the invalid bank three times. Only the
-    // known truncated header/text diagnostics are expected; every recovery assertion remains active.
-    AddExpectedMessage(TEXT("Failed loading tagged StructProperty /Script/ProjectVelkorran.SovCampaignSaveGame:Header. Read [0-9]+B, expected [0-9]+B. Package: FMemoryReader"),
-        ELogVerbosity::Error, EAutomationExpectedMessageFlags::Contains, 150);
-    AddExpectedMessagePlain(TEXT("Type mismatch in MissionLabel of SovSaveSlotHeader - Previous (None) Current(TextProperty) in package: FMemoryReader"),
-        ELogVerbosity::Warning, EAutomationExpectedMessageFlags::Contains, 150);
+    // Fifty torn-write cycles each meet the invalid bank three times. Its storage frame rejects it before Unreal
+    // decodes anything, so no decode diagnostics are expected; every recovery assertion remains active.
     TMap<FString, TArray<uint8>> Disk;
     int64 LastGoodGeneration = 0;
     for (int32 Cycle = 0; Cycle < 100; ++Cycle)

@@ -2,6 +2,7 @@
 #include "Tests/SovProtagonistPartitionTestSupport.h"
 #include "Campaign/SovEncounterSnapshotLibrary.h"
 #include "Save/SovCampaignSaveGame.h"
+#include "Save/SovSaveEnvelopeFrame.h"
 #include "Save/SovSaveSubsystem.h"
 
 #if WITH_AUTOMATION_TESTS
@@ -141,7 +142,6 @@ bool FSovCheckpointRollingAutosaveTest::RunTest(const FString& Parameters)
 		TestEqual(TEXT("Generation continues from disk, not from memory"), Generation, int64(5));
 
 		// Corrupted newest autosave: the next rotation target is slot 2 (generation 3), and its write tears.
-		AddExpectedError(TEXT("Failed loading tagged"), EAutomationExpectedErrorFlags::Contains, 0);
 		Restarted.Disk->bTearWrite = true;
 		TestFalse(TEXT("A torn autosave never reports success"), AutosaveThroughTick(Restarted, 5));
 		TestTrue(TEXT("The failed write waits for an explicit decision"), Restarted.Subsystem->IsAwaitingFailureDecision());
@@ -195,7 +195,6 @@ bool FSovCheckpointInterruptedWriteTest::RunTest(const FString& Parameters)
 
 		// Storage that claims success for a half-written file: an interrupted write the platform did not report.
 		Owner.Disk->bDenyWrite = false; Owner.Disk->bTearWrite = true; Owner.Disk->bAcknowledgeTornWrite = true;
-		AddExpectedError(TEXT("Failed loading tagged"), EAutomationExpectedErrorFlags::Contains, 0);
 		TestEqual(TEXT("A falsely acknowledged torn write fails readback"), FAccess::Capture(*Owner.Subsystem, ESovSaveSlotKind::Manual, 0, Error), ESovSaveResult::ReadbackFailed);
 		TestTrue(TEXT("Save A's bank is byte-for-byte untouched by the interrupted write"), Disk.FindRef(BankA) == AfterA.FindRef(BankA));
 		Owner.Subsystem->AcknowledgeSaveFailure();
@@ -454,8 +453,34 @@ bool FSovCheckpointCorruptSaveTest::RunTest(const FString& Parameters)
 	}
 	Disk.FindOrAdd(KeyB) = GoodB;
 
+	// Stored banks are framed; the raw envelope inside is what these cases mutate.
+	TArray<uint8> EnvelopeB;
+	TestEqual(TEXT("A stored bank is a framed envelope"), SovSaveEnvelopeFrame::Decode(GoodB, EnvelopeB), SovSaveEnvelopeFrame::EDecode::Framed);
+	{
+		// Damage the frame's own fields and a length field deep inside the envelope. Each is rejected on raw
+		// bytes, before Unreal decodes anything, and the previous generation still loads.
+		const int32 LengthOffset = 8, InnerOffset = SovSaveEnvelopeFrame::HeaderBytes + 40;
+		const TArray<TPair<FString, TFunction<void(TArray<uint8>&)>>> FrameDamage = {
+			{ TEXT("Frame length claims more than is stored"), [LengthOffset](TArray<uint8>& Bytes) { Bytes[LengthOffset + 3] = 0x7f; } },
+			{ TEXT("Inner length field overwritten with a huge value"), [InnerOffset](TArray<uint8>& Bytes) { for (int32 I = 0; I < 4; ++I) { Bytes[InnerOffset + I] = 0xff; } } },
+		};
+		for (const auto& Damage : FrameDamage)
+		{
+			TArray<uint8> Damaged = GoodB; Damage.Value(Damaged);
+			TArray<uint8> Ignored;
+			TestEqual(Damage.Key + TEXT(": the frame rejects it before decoding"), SovSaveEnvelopeFrame::Decode(Damaged, Ignored), SovSaveEnvelopeFrame::EDecode::Rejected);
+			Disk.FindOrAdd(KeyB) = Damaged;
+			bool bDamaged = false; FString LoadError; int64 Generation = 0; FNarrativeSavePlayer Records;
+			TestTrue(Damage.Key + TEXT(": the previous generation still loads"), Owner.Load(ESovSaveSlotKind::Manual, 0, Records, bDamaged, LoadError, &Generation) && bDamaged && Generation == 1);
+		}
+		Disk.FindOrAdd(KeyB) = GoodB;
+		TArray<uint8> Framed, Payload;
+		TestFalse(TEXT("An empty envelope cannot be framed"), SovSaveEnvelopeFrame::Encode(TArray<uint8>(), Framed));
+		TestEqual(TEXT("An unframed envelope from before the frame still decodes as legacy"), SovSaveEnvelopeFrame::Decode(EnvelopeB, Payload), SovSaveEnvelopeFrame::EDecode::Legacy);
+	}
+
 	// A well-formed, correctly checksummed envelope whose Narrative payload is incomplete.
-	TStrongObjectPtr<USovCampaignSaveGame> Incomplete(Cast<USovCampaignSaveGame>(UGameplayStatics::LoadGameFromMemory(GoodB)));
+	TStrongObjectPtr<USovCampaignSaveGame> Incomplete(Cast<USovCampaignSaveGame>(UGameplayStatics::LoadGameFromMemory(EnvelopeB)));
 	if (!TestNotNull(TEXT("The newest envelope decodes for mutation"), Incomplete.Get())) { return false; }
 	Incomplete->NarrativePayload.SetNum(Incomplete->NarrativePayload.Num() / 3);
 	Incomplete->IntegrityChecksum = Incomplete->CalculateChecksum();
@@ -464,7 +489,7 @@ bool FSovCheckpointCorruptSaveTest::RunTest(const FString& Parameters)
 	TestNull(TEXT("An incomplete Narrative payload is rejected before any world is touched"), FAccess::Decode(*Owner.Subsystem, Incomplete.Get(), Error));
 
 	// A complete payload that has lost its required canon-state record.
-	TStrongObjectPtr<USovCampaignSaveGame> Canonless(Cast<USovCampaignSaveGame>(UGameplayStatics::LoadGameFromMemory(GoodB)));
+	TStrongObjectPtr<USovCampaignSaveGame> Canonless(Cast<USovCampaignSaveGame>(UGameplayStatics::LoadGameFromMemory(EnvelopeB)));
 	TStrongObjectPtr<UNarrativeSave> Payload(Cast<UNarrativeSave>(UGameplayStatics::LoadGameFromMemory(Canonless->NarrativePayload)));
 	if (!TestNotNull(TEXT("The newest payload decodes for mutation"), Payload.Get())) { return false; }
 	const int32 Removed = Payload->PlayerData.ControllerData.SavedComponents.RemoveAll(

@@ -1,6 +1,9 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Save/SovSaveSubsystem.h"
 #include "Save/SovSavePolicy.h"
+#include "Save/SovSaveEnvelopeFrame.h"
+#include "Serialization/CustomVersion.h"
+#include "Serialization/ObjectAndNameAsStringProxyArchive.h"
 #include "Platform/SovPlatformServicesAdapter.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
@@ -55,18 +58,47 @@ namespace
         bool Exists(const FString& Slot, int32 User) override
         { return UGameplayStatics::DoesSaveGameExist(Slot, User); }
     };
-    USovCampaignSaveGame* LoadCampaignEnvelope(const TArray<uint8>& Bytes)
+    /** Strings and other size-checked reads cannot claim more than the envelope holds. */
+    class FBoundedEnvelopeReader final : public FMemoryReader
     {
-        // Campaign envelopes use the UE5 GVAS header (engine save format 3).
-        // The engine treats a missing tag as a pre-GVAS class-name string;
-        // damaged leading bytes can then trigger a fatal FName length check.
-        // Reject that unsupported legacy path before invoking UObject decoding.
-        if (Bytes.Num() < 2 * static_cast<int32>(sizeof(int32))) { return nullptr; }
-        FMemoryReader Reader(Bytes, true);
-        int32 Magic = 0, Version = 0;
-        Reader << Magic << Version;
-        if (Reader.IsError() || Magic != 0x53415647 || Version != 3) { return nullptr; }
-        return Cast<USovCampaignSaveGame>(UGameplayStatics::LoadGameFromMemory(Bytes));
+    public:
+        explicit FBoundedEnvelopeReader(const TArray<uint8>& Bytes) : FMemoryReader(Bytes, true) { ArMaxSerializeSize = Bytes.Num(); }
+    };
+    USovCampaignSaveGame* LoadCampaignEnvelope(const TArray<uint8>& Stored)
+    {
+        // Framed envelopes are length- and CRC-checked on raw bytes here, before any Unreal decoding.
+        TArray<uint8> Payload;
+        if (SovSaveEnvelopeFrame::Decode(Stored, Payload) == SovSaveEnvelopeFrame::EDecode::Rejected) { return nullptr; }
+        // The engine's save-game header, read as UGameplayStatics::LoadGameFromMemory does, except that the file never
+        // causes a class to load: only an already loaded campaign envelope class (or subclass) is accepted.
+        FBoundedEnvelopeReader Reader(Payload);
+        int32 Tag = 0, FileVersion = 0;
+        Reader << Tag << FileVersion;
+        if (Reader.IsError() || Tag != int32(SovSaveEnvelopeFrame::LegacyEngineTag) || FileVersion != SovSaveEnvelopeFrame::LegacyEngineVersion) { return nullptr; }
+        FPackageFileVersion PackageVersion; FEngineVersion EngineVersion; int32 CustomFormat = 0;
+        Reader << PackageVersion; Reader << EngineVersion; Reader << CustomFormat;
+        if (Reader.IsError() || CustomFormat <= int32(ECustomVersionSerializationFormat::Unknown)
+            || CustomFormat > int32(ECustomVersionSerializationFormat::Latest)) { return nullptr; }
+        Reader.SetUEVer(PackageVersion); Reader.SetEngineVer(EngineVersion);
+        FCustomVersionContainer CustomVersions;
+        CustomVersions.Serialize(Reader, static_cast<ECustomVersionSerializationFormat>(CustomFormat));
+        if (Reader.IsError()) { return nullptr; }
+        Reader.SetCustomVersions(CustomVersions);
+        FString ClassName;
+        Reader << ClassName;
+        if (Reader.IsError() || ClassName.IsEmpty() || ClassName.Len() > 1024) { return nullptr; }
+        UClass* const SaveClass = FindObject<UClass>(nullptr, *ClassName);
+        if (!SaveClass || !SaveClass->IsChildOf(USovCampaignSaveGame::StaticClass()) || SaveClass->HasAnyClassFlags(CLASS_Abstract)) { return nullptr; }
+        USovCampaignSaveGame* const Save = NewObject<USovCampaignSaveGame>(GetTransientPackage(), SaveClass);
+        FObjectAndNameAsStringProxyArchive Archive(Reader, true);
+        Save->Serialize(Archive);
+        return Reader.IsError() || Reader.IsCriticalError() || Archive.IsError() ? nullptr : Save;
+    }
+    /** Serializes and frames an envelope for storage. */
+    bool EncodeCampaignEnvelope(USovCampaignSaveGame* Save, TArray<uint8>& OutStored)
+    {
+        TArray<uint8> Payload;
+        return UGameplayStatics::SaveGameToMemory(Save, Payload) && SovSaveEnvelopeFrame::Encode(Payload, OutStored);
     }
     constexpr double LoadTimeoutSeconds = 120.0;
     SovSavePolicy::Kind PolicyKind(ESovSaveSlotKind Kind) { return static_cast<SovSavePolicy::Kind>(Kind); }
@@ -342,7 +374,7 @@ bool USovSaveSubsystem::ValidatePlatformSnapshot(const TArray<uint8>& Bytes, ESo
     FSovSaveSlotHeader& Header, FString& Error) const
 {
     // Size is checked before Unreal deserializes provider-controlled bytes.
-    if (Bytes.IsEmpty() || Bytes.Num() > 64 * 1024 * 1024)
+    if (Bytes.IsEmpty() || Bytes.Num() > SovSaveEnvelopeFrame::HeaderBytes + SovSaveEnvelopeFrame::MaximumPayloadBytes)
     { Error = TEXT("Cloud save is empty or exceeds the supported 64 MiB envelope limit."); return false; }
     const FOperationOwner Owner = CaptureOperationOwner();
     if (!IsOperationOwnerCurrent(Owner, Error)) { return false; }
@@ -578,7 +610,7 @@ ESovSaveResult USovSaveSubsystem::WriteEnvelope(USovCampaignSaveGame* Save, FStr
     Save->Header.Generation = Next; Save->IntegrityChecksum = Save->CalculateChecksum();
     if (!ValidateEnvelope(Save, false, Error)) { return ESovSaveResult::CaptureFailed; }
     TArray<uint8> Bytes;
-    if (!UGameplayStatics::SaveGameToMemory(Save, Bytes))
+    if (!EncodeCampaignEnvelope(Save, Bytes))
     { Error = TEXT("Campaign envelope serialization failed; previous save retained."); return ESovSaveResult::CaptureFailed; }
     if (!IsOperationOwnerCurrent(Owner, Error)) { return OwnershipFailureResult(); }
     const FString TargetName = BankName(Save->Header.Kind, Save->Header.SlotIndex, TargetBank);
