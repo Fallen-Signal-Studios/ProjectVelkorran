@@ -35,6 +35,15 @@ public:
 	UFUNCTION(BlueprintPure, Category="Feedback") class USovHapticFeedbackComponent* GetHapticFeedback() const { return HapticFeedback; }
 	UFUNCTION(BlueprintPure, Category="Accessibility") class USovFrontendComponent* GetFrontend() const { return Frontend; }
 	UFUNCTION(BlueprintPure, Category="Platform") class USovApplicationLifecycleComponent* GetApplicationLifecycle() const { return ApplicationLifecycle; }
+	/** The scene currently playing or paused for this player, if any. Published by the scene itself. */
+	UFUNCTION(BlueprintPure, Category="Campaign Cinematic")
+	class USovCampaignCinematicComponent* GetActiveCinematic() const { return ActiveCinematic.Get(); }
+	void PublishActiveCinematic(class USovCampaignCinematicComponent* Cinematic, bool bActive);
+	/** Skips the active scene when the campaign has already recorded a complete viewing of it. */
+	UFUNCTION(BlueprintCallable, Category="Campaign Cinematic") bool RequestCinematicSkip(FString& OutError);
+	/** How long Narrative.Input.SkipCinematic must be held, before the accessibility hold scale. */
+	UPROPERTY(EditDefaultsOnly, Category="Campaign Cinematic", meta=(ClampMin="0.1",ClampMax="5"))
+	float SkipHoldSeconds = .75f;
 	/** Named pause ownership composes first-boot, save failure and platform interruptions. */
 	bool AcquireSystemPause(FName PauseOwner);
 	void ReleaseSystemPause(FName PauseOwner);
@@ -75,6 +84,7 @@ protected:
 
 private:
 	friend struct FSovFatalPresentationTestAccess;
+	friend struct FSovCinematicSkipTestAccess;
 	void RetireFatalPresentation();
 	bool IsFatalPresentationCurrent(uint64 Serial) const;
 	void PollFatalPresentation(uint64 Serial);
@@ -100,6 +110,12 @@ private:
 	UPROPERTY(VisibleAnywhere, Category="Dialogue") TObjectPtr<class USovDialoguePresentationComponent> DialoguePresentation;
 	UPROPERTY(VisibleAnywhere, Category="Platform") TObjectPtr<class USovApplicationLifecycleComponent> ApplicationLifecycle;
 	bool CanReleaseSystemPause() const;
+	UFUNCTION() void HandleSkipCinematicInput(FGameplayTag InputTag, bool bPressed);
+	void CompleteSkipHold();
+	/** A paused scene must stop advancing too: world pause alone leaves the sequence player running. */
+	void SetActiveCinematicPaused(bool bPause);
+	UPROPERTY(Transient) TWeakObjectPtr<class USovCampaignCinematicComponent> ActiveCinematic;
+	FTimerHandle SkipHoldTimer;
 	bool RequestNativePause(FCanUnpause CanUnpauseDelegate);
 	TSet<FName> SystemPauseOwners;
 	bool bExternalPauseRequested = false;

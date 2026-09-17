@@ -28,6 +28,7 @@ public:
 	FGameplayTag Input_CycleTargetLeft;
 	FGameplayTag Input_CycleTargetRight;
 	FGameplayTag Input_Designate;
+	FGameplayTag Input_SkipCinematic;
 	FGameplayTag Input_AbilityModifier;
 	FGameplayTag Ability_Evade;
 	FGameplayTag State_Evading;

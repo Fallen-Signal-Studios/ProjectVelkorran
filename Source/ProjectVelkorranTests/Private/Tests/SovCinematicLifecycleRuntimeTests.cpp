@@ -36,6 +36,7 @@
 #include "UObject/Script.h"
 #include "Serialization/MemoryWriter.h"
 #include "Serialization/ObjectAndNameAsStringProxyArchive.h"
+#include "Framework/SovPlayerController.h"
 #include "Sovereign/SovGameplayTags.h"
 #include "EngineUtils.h"
 #include "Tests/SovTrackedContentPaths.h"
@@ -58,6 +59,14 @@ struct FNarrativeSequenceLifecycleTestAccess
 	static bool Active(const ANarrativeLevelSequenceActor* Actor) { return Actor->bSessionActive; }
 	static bool Pending(const ANarrativeLevelSequenceActor* Actor) { return Actor->bPendingPlayback; }
 	static int32 LeaseCount(const ANarrativeLevelSequenceActor* Actor) { return Actor->OwnedParticipantTags.Num(); }
+};
+/** The skip hold is a timer the controller owns; nothing else about it is observable from outside. */
+struct FSovCinematicSkipTestAccess
+{
+	static bool HoldRunning(const ASovPlayerController* PC)
+	{ return PC && PC->GetWorldTimerManager().IsTimerActive(PC->SkipHoldTimer); }
+	/** The exact call AcquireSystemPause and ReleaseSystemPause make; this world has no game mode. */
+	static void PauseAsPauseOwnerWould(ASovPlayerController* PC, bool bPause) { PC->SetActiveCinematicPaused(bPause); }
 };
 struct FSovCinematicTestAccess
 {
@@ -115,7 +124,7 @@ struct FSovCinematicTestAccess
 		C->HandleFinished();
 	}
 	static void StagePlaying(USovCampaignCinematicComponent* C, uint64 Generation)
-	{ C->Phase = ESovCinematicPhase::Playing; C->ExpectedPlaybackGeneration = Generation; }
+	{ C->ExpectedPlaybackGeneration = Generation; C->ChangePhase(ESovCinematicPhase::Playing); }
 	static void RestartDuringCommit(USovCampaignCinematicComponent* C, ANarrativeLevelSequenceActor* Actor)
 	{
 		C->ExpectedPlaybackGeneration = Actor->GetPlaybackGeneration(); C->Phase = ESovCinematicPhase::Committing;
@@ -989,4 +998,56 @@ bool FSovCinematicDetachedBodyExitTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCinematicSkipRoutingTest, "ProjectVelkorran.Campaign.Cinematic.SkipAndPauseReachThePlayer",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCinematicSkipRoutingTest::RunTest(const FString& Parameters)
+{
+	// RequestSkip and SetCinematicPaused were reachable only from tests: no input reached skip, and a
+	// pause menu froze the world while the scene's own player kept running (audit UX2-06).
+	FManagedSequenceWorld F; if (!TestNotNull(TEXT("Managed cinematic component"), F.Component)) { return false; }
+	// The controller subscribes to its own semantic input when it begins play, as it does in a level.
+	if (!F.PC->HasActorBegunPlay()) { F.PC->DispatchBeginPlay(); }
+	const FGameplayTag SkipTag = FSovGameplayTags::Get().Input_SkipCinematic;
+	FString Error;
+	TestFalse(TEXT("With no scene on screen there is nothing to skip"), F.PC->RequestCinematicSkip(Error));
+	TestNull(TEXT("No scene is published before one plays"), F.PC->GetActiveCinematic());
+	F.PC->OnSemanticInputChanged.Broadcast(SkipTag, true);
+	TestFalse(TEXT("Holding skip outside a scene starts nothing"), FSovCinematicSkipTestAccess::HoldRunning(F.PC));
+
+	FSovCinematicTestAccess::StageOwnedSession(F.Component, F.PC, F.Pawn, F.ASC);
+	F.Base.Actor->GetSequencePlayer()->Play();
+	FSovCinematicTestAccess::StagePlaying(F.Component, F.Base.Actor->GetPlaybackGeneration());
+	TestEqual(TEXT("A playing scene publishes itself to its player"), F.PC->GetActiveCinematic(), F.Component);
+
+	// A pause menu has to stop the sequence as well: world pause does not reach its clock, and a scene
+	// that ran on past the pause would fail its own progress check and lose the first viewing. This
+	// transient world has no game mode, so the system pause owner's own call is made directly.
+	FSovCinematicSkipTestAccess::PauseAsPauseOwnerWould(F.PC, true);
+	TestTrue(TEXT("Pausing the game pauses the scene's own player"), F.Base.Actor->GetSequencePlayer()->IsPaused());
+	TestEqual(TEXT("The component records the pause"), F.Component->GetPhase(), ESovCinematicPhase::Paused);
+	FSovCinematicSkipTestAccess::PauseAsPauseOwnerWould(F.PC, false);
+	TestFalse(TEXT("Releasing the pause resumes the scene"), F.Base.Actor->GetSequencePlayer()->IsPaused());
+	TestEqual(TEXT("The component records the resume"), F.Component->GetPhase(), ESovCinematicPhase::Playing);
+
+	// Skip now routes to the component, which still owns the rule: a first viewing cannot be skipped.
+	TestFalse(TEXT("A scene never seen in full cannot be skipped"), F.PC->RequestCinematicSkip(Error));
+	TestTrue(TEXT("The refusal explains itself"), Error.Contains(TEXT("prior complete viewing")));
+
+	// Skipping is a hold, so a stray press must not consume a scene.
+	F.PC->OnSemanticInputChanged.Broadcast(SkipTag, true);
+	TestTrue(TEXT("Holding skip during a scene starts the hold"), FSovCinematicSkipTestAccess::HoldRunning(F.PC));
+	TestEqual(TEXT("The press alone changes nothing"), F.Component->GetPhase(), ESovCinematicPhase::Playing);
+	F.PC->OnSemanticInputChanged.Broadcast(SkipTag, false);
+	TestFalse(TEXT("Letting go cancels the hold"), FSovCinematicSkipTestAccess::HoldRunning(F.PC));
+	F.PC->OnSemanticInputChanged.Broadcast(FSovGameplayTags::Get().Input_ThreatFocus, true);
+	TestFalse(TEXT("An unrelated input never starts a skip"), FSovCinematicSkipTestAccess::HoldRunning(F.PC));
+
+	// A scene that leaves the screen stops being skippable, and takes any live hold with it.
+	F.PC->OnSemanticInputChanged.Broadcast(SkipTag, true);
+	F.Component->Abort(TEXT("Test teardown"));
+	TestNull(TEXT("A retired scene unpublishes itself"), F.PC->GetActiveCinematic());
+	TestFalse(TEXT("A retired scene cancels its hold"), FSovCinematicSkipTestAccess::HoldRunning(F.PC));
+	TestFalse(TEXT("Skip finds nothing once the scene is gone"), F.PC->RequestCinematicSkip(Error));
+	return true;
+}
 #endif

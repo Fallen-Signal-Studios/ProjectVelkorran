@@ -38,6 +38,8 @@ ACTIONS = [
      ['RightBracket', 'B', 'Period'], ['Gamepad_DPad_Right']),
     ('Narrative.Input.Designate', 'IA_Designate', 'Designate Target',
      ['ThumbMouseButton2', 'Z', 'Backslash'], ['Gamepad_RightThumbstick', 'Gamepad_LeftShoulder']),
+    ('Narrative.Input.SkipCinematic', 'IA_SkipCinematic', 'Skip Scene',
+     ['Backspace', 'Z', 'Backslash'], ['Gamepad_FaceButton_Right', 'Gamepad_Special_Right']),
 ]
 
 report = {'status': 'running', 'actions': {}, 'context_before': [], 'context_after': [], 'saved': []}

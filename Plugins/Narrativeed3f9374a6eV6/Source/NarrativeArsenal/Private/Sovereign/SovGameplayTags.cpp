@@ -34,6 +34,7 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 	AddTag(Input_CycleTargetLeft, "Narrative.Input.CycleTargetLeft", "Cycle to the visible threat on the left.");
 	AddTag(Input_CycleTargetRight, "Narrative.Input.CycleTargetRight", "Cycle to the visible threat on the right.");
 	AddTag(Input_Designate, "Narrative.Input.Designate", "Designate the focused threat for the protagonist's reward window and order the companion onto it.");
+	AddTag(Input_SkipCinematic, "Narrative.Input.SkipCinematic", "Hold to skip a scene that has already been viewed in full.");
 	AddTag(Input_AbilityModifier, "Narrative.Input.AbilityModifier", "Semantic alternate-ability modifier.");
 	AddTag(Ability_Evade, "Sov.Ability.Evade", "Native campaign runtime contract.");
 	AddTag(State_Evading, "Sov.State.Evading", "Native campaign runtime contract.");

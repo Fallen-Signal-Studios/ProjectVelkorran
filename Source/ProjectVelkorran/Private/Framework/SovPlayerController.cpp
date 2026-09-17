@@ -19,6 +19,8 @@
 #include "Engine/GameInstance.h"
 #include "Campaign/SovCampaignPolicy.h"
 #include "Campaign/SovCampaignStateComponent.h"
+#include "Cinematics/SovCampaignCinematicComponent.h"
+#include "Sovereign/SovGameplayTags.h"
 #include "Companions/SovConvergenceCompanionState.h"
 #include "Campaign/SovEncounterDirector.h"
 #include "Characters/SovPlayerCharacterBase.h"
@@ -141,7 +143,50 @@ void ASovPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 	EnsureGameplayHUDCreated();
+	OnSemanticInputChanged.AddUniqueDynamic(this, &ThisClass::HandleSkipCinematicInput);
 	if (Frontend) { Frontend->RefreshFrontend(); }
+}
+
+void ASovPlayerController::PublishActiveCinematic(USovCampaignCinematicComponent* Cinematic, bool bActive)
+{
+	if (bActive) { ActiveCinematic = Cinematic; }
+	else if (ActiveCinematic.Get() == Cinematic)
+	{
+		ActiveCinematic.Reset();
+		if (GetWorld()) { GetWorld()->GetTimerManager().ClearTimer(SkipHoldTimer); }
+	}
+}
+
+void ASovPlayerController::HandleSkipCinematicInput(FGameplayTag InputTag, bool bPressed)
+{
+	if (InputTag != FSovGameplayTags::Get().Input_SkipCinematic || !GetWorld()) { return; }
+	GetWorld()->GetTimerManager().ClearTimer(SkipHoldTimer);
+	// Skipping is a hold so that a scene is never lost to a stray press. The accessibility hold
+	// scale that already governs interaction holds governs this one too.
+	if (!bPressed || !ActiveCinematic.IsValid()) { return; }
+	const auto* Settings = UNarrativeGameUserSettings::GetSovSettings();
+	const float Scale = Settings && FMath::IsFinite(Settings->GetInteractionHoldScale())
+		? FMath::Clamp(Settings->GetInteractionHoldScale(), .25f, 4.f) : 1.f;
+	const float Hold = (FMath::IsFinite(SkipHoldSeconds) ? FMath::Clamp(SkipHoldSeconds, .1f, 5.f) : .75f) * Scale;
+	GetWorld()->GetTimerManager().SetTimer(SkipHoldTimer, FTimerDelegate::CreateUObject(this, &ThisClass::CompleteSkipHold), Hold, false);
+}
+
+void ASovPlayerController::CompleteSkipHold() { FString Unused; RequestCinematicSkip(Unused); }
+
+bool ASovPlayerController::RequestCinematicSkip(FString& OutError)
+{
+	OutError.Reset();
+	auto* Cinematic = ActiveCinematic.Get();
+	if (!Cinematic) { OutError = TEXT("No scene is playing."); return false; }
+	return Cinematic->RequestSkip(OutError);
+}
+
+void ASovPlayerController::SetActiveCinematicPaused(bool bPause)
+{
+	// World pause freezes gameplay time, but a Level Sequence player keeps its own clock: a scene
+	// left running behind a pause menu would advance past the point the player paused it, and its
+	// progress check would then refuse to count the viewing at all.
+	if (auto* Cinematic = ActiveCinematic.Get()) { Cinematic->SetCinematicPaused(bPause); }
 }
 bool ASovPlayerController::OpenAccessibilitySettings()
 {
@@ -180,12 +225,13 @@ bool ASovPlayerController::AcquireSystemPause(FName PauseOwner)
 	if (SystemPauseOwners.Contains(PauseOwner)) { return true; }
 	if (SystemPauseOwners.IsEmpty() && GetWorld()->IsPaused()) { bExternalPauseRequested = true; }
 	SystemPauseOwners.Add(PauseOwner);
-	if (RequestNativePause(FCanUnpause::CreateUObject(this, &ThisClass::CanReleaseSystemPause))) { return true; }
+	if (RequestNativePause(FCanUnpause::CreateUObject(this, &ThisClass::CanReleaseSystemPause)))
+	{ SetActiveCinematicPaused(true); return true; }
 	SystemPauseOwners.Remove(PauseOwner); return false;
 }
 void ASovPlayerController::ReleaseSystemPause(FName PauseOwner)
 {
-	if (SystemPauseOwners.Remove(PauseOwner) && CanReleaseSystemPause()) { Super::SetPause(false); }
+	if (SystemPauseOwners.Remove(PauseOwner) && CanReleaseSystemPause()) { Super::SetPause(false); SetActiveCinematicPaused(false); }
 }
 
 FGuid ASovPlayerController::GetActorGUID_Implementation() const

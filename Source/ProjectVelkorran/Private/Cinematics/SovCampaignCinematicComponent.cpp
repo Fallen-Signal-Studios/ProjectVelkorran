@@ -936,6 +936,10 @@ void USovCampaignCinematicComponent::Abort(const FString& Reason)
 void USovCampaignCinematicComponent::ChangePhase(ESovCinematicPhase NewPhase, const FString& Reason)
 {
     Phase = NewPhase;
+    // A player-facing skip or pause needs to find the scene that is actually on screen, so the scene
+    // publishes itself for exactly as long as it owns the view.
+    if (auto* Player = Controller.Get())
+    { Player->PublishActiveCinematic(this, Phase == ESovCinematicPhase::Playing || Phase == ESovCinematicPhase::Paused); }
     const FString Detail = bInventoryRollbackIncomplete && NewPhase == ESovCinematicPhase::Failed
         ? Reason + TEXT(" A later inventory/equipment owner was preserved; reload the pre-scene checkpoint before retrying.") : Reason;
     OnPhaseChanged.Broadcast(Phase, Detail);
