@@ -500,8 +500,16 @@ bool ASovEncounterDirector::CompleteEncounter()
 		if (USovEchoComponent* Echo = Player->GetEchoComponent()) { Echo->EndEncounter(CompletionEchoReserve); }
 	}
 	// Echo/resource callbacks may retire the world, load a checkpoint, or kill a protected NPC.
-	if (!IsValid(this) || IsActorBeingDestroyed() || State != ESovEncounterState::Active
-		|| AttemptId != CompletingAttempt || RestoreGeneration != Generation) { return false; }
+	const auto OwnsCompletion = [this, CompletingAttempt, Generation]()
+	{
+		return IsValid(this) && !IsActorBeingDestroyed() && State == ESovEncounterState::Active
+			&& AttemptId == CompletingAttempt && RestoreGeneration == Generation;
+	};
+	if (!OwnsCompletion()) { return false; }
+	const bool bProtectedAlive = AreProtectedParticipantsAlive() && (!Player || (IsValid(Player) && Player->IsAlive() && ResolvePlayer() == Player));
+	// Summoned adds are never victory participants, so nothing else ends them: a won arena would keep live
+	// hostiles through its safe-to-save boundary and handoff, and a failed one would let them fight on.
+	if (!RetireAttemptCombatants(bProtectedAlive, OwnsCompletion)) { return false; }
 	if (!AreProtectedParticipantsAlive() || (Player && (!IsValid(Player) || !Player->IsAlive() || ResolvePlayer() != Player)))
 	{
 		for (const FSovEncounterParticipant& Participant : Participants) { SuspendActor(Participant.Character); }
@@ -522,6 +530,8 @@ bool ASovEncounterDirector::FailEncounter()
 		if (USovEchoComponent* Echo = Player->GetEchoComponent()) { Echo->EndEncounter(CompletionEchoReserve); }
 	}
 	for (const FSovEncounterParticipant& Participant : Participants) { SuspendActor(Participant.Character); }
+	// Adds wait out a failure with the roster they fought beside; the retry's cleanup removes them.
+	if (!RetireAttemptCombatants(false, [this]() { return IsValid(this) && !IsActorBeingDestroyed() && State == ESovEncounterState::Active; })) { return false; }
 	SetActorTickEnabled(false);
 	SetState(ESovEncounterState::Failed);
 	return true;
@@ -837,6 +847,28 @@ bool ASovEncounterDirector::RegisterAttemptActor(AActor* SpawnedActor)
 		|| !IsAttributedTo(SpawnedActor, this, ResolvePlayer())) { return false; }
 	AttemptActors.AddUnique(SpawnedActor);
 	return true;
+}
+
+bool ASovEncounterDirector::RetireAttemptCombatants(bool bDestroy, TFunctionRef<bool()> CanContinue)
+{
+	UNarrativeSaveSubsystem* const Save = GetWorld() ? GetWorld()->GetSubsystem<UNarrativeSaveSubsystem>() : nullptr;
+	// Only fighters. Projectiles and sustain drops keep their existing lifetime until the retry cleanup.
+	const TArray<TObjectPtr<AActor>> Snapshot = AttemptActors;
+	for (AActor* Actor : Snapshot)
+	{
+		if (!CanContinue()) { return false; }
+		APawn* const Pawn = Cast<APawn>(Actor);
+		if (!IsValid(Pawn) || IsPersistentCharacterPresentation(Pawn)) { continue; }
+		if (!bDestroy) { SuspendActor(Pawn); continue; }
+		AttemptActors.Remove(Pawn);
+		if (Save && Pawn->Implements<UNarrativeSavableActor>()) { Save->RemoveSingleActor(Pawn); }
+		if (!CanContinue()) { return false; }
+		if (!IsValid(Pawn)) { continue; }
+		AController* const Controller = Pawn->GetController();
+		Pawn->Destroy();
+		if (IsValid(Controller) && !Controller->GetPawn()) { Controller->Destroy(); }
+	}
+	return CanContinue();
 }
 
 void ASovEncounterDirector::CleanupAttemptActors()

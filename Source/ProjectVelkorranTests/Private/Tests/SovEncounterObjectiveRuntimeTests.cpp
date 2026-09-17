@@ -1392,6 +1392,60 @@ bool FSovAurelionEliteSummonTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAurelionEliteSummonRetirementTest,
+    "ProjectVelkorran.Campaign.Aurelion.EliteSummonsEndWithTheirAttempt",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovAurelionEliteSummonRetirementTest::RunTest(const FString& Parameters)
+{
+    for (const bool bVictory : { true, false })
+    {
+        const FString Outcome = bVictory ? TEXT("victory") : TEXT("failure");
+        FEncounterObjectiveWorld F;
+        if (!TestNotNull(TEXT("Ready campaign"), F.ASC) || !F.Start()) { AddError(F.SetupError); return false; }
+        auto* Elite = F.Director->GetParticipant(TEXT("Formation.Guard"));
+        if (!TestNotNull(TEXT("Fixture supplies the elite participant"), Elite)) { return false; }
+        auto* EliteASC = Elite->GetNarrativeAbilitySystemComponent();
+        FGameplayAbilitySpecHandle Handle;
+        auto* Summon = GrantEliteAbility<USovGameplayAbility_AurelionEliteSummon>(EliteASC, Handle);
+        if (!TestNotNull(TEXT("Summon ability instance exists"), Summon)) { return false; }
+        auto* AddDefinition = NewObject<UNPCDefinition>(F.PC); F.PC->KeepAlive.Add(AddDefinition);
+        AddDefinition->NPCClassPath = ASovCampaignMassRoundTripNPC::StaticClass();
+        AddDefinition->bAllowMultipleInstances = true;
+        FSovAurelionEliteTestAccess::SetSummonDefinition(*Summon, AddDefinition);
+        SetEliteHealthFraction(EliteASC, .5f);
+        EliteASC->TryActivateAbility(Handle);
+        TArray<TWeakObjectPtr<ASovNPCCharacterBase>> Adds;
+        for (TActorIterator<ASovNPCCharacterBase> It(F.World); It; ++It)
+        { if (IsValid(*It) && F.Director->FindParticipantId(*It).IsNone()) { Adds.Add(*It); } }
+        if (!TestTrue(*(Outcome + TEXT(": the wounded elite brings in adds")), Adds.Num() > 0)) { return false; }
+
+        if (bVictory)
+        {
+            F.Kill(TEXT("Formation.Guard"));
+            TestEqual(TEXT("Killing the required elite wins"), F.Director->GetEncounterState(), ESovEncounterState::Succeeded);
+            TestFalse(TEXT("No summoned add outlives a won arena"), Adds.ContainsByPredicate([](const auto& Add) { return Add.IsValid(); }));
+            TestEqual(TEXT("The summon ability sees no living adds after victory"), Summon->GetLivingSummonCount(), 0);
+            continue;
+        }
+        TestTrue(TEXT("An ordinary failure resolves"), F.Director->FailEncounter());
+        for (const auto& Add : Adds)
+        {
+            const auto* AddASC = Add.IsValid() ? Add->GetNarrativeAbilitySystemComponent() : nullptr;
+            if (!TestNotNull(TEXT("A failure keeps its adds for the retry to remove"), AddASC)) { continue; }
+            TestTrue(TEXT("A failed attempt's add is suspended with the roster"),
+                AddASC->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_Busy)
+                && AddASC->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_Invulnerable));
+        }
+        FString Error;
+        if (!TestTrue(TEXT("Production retry starts"), F.Director->RetryEncounter(Error))) { AddError(Error); return false; }
+        for (int32 Step = 0; Step < 12 && F.Director->GetEncounterState() == ESovEncounterState::Restoring; ++Step)
+        { F.NextFrame(); FSovCrucibleRuntimeTestAccess::Step(F.Director, .016f); }
+        TestEqual(TEXT("Retry returns the encounter to active"), F.Director->GetEncounterState(), ESovEncounterState::Active);
+        TestFalse(TEXT("The retry removes the failed attempt's adds"), Adds.ContainsByPredicate([](const auto& Add) { return Add.IsValid(); }));
+    }
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAurelionElitePacingTest,
     "ProjectVelkorran.Campaign.Aurelion.ElitePressesHarderAsItsPhasesAdvance",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)

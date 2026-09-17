@@ -212,6 +212,8 @@ private:
 	void AbortRestore(const FString& Error);
 	void CleanupAttemptActors();
 	bool CleanupAttemptActors(TFunctionRef<bool()> CanContinue);
+	/** Summoned adds and other attempt-scoped fighters: destroyed on victory, suspended with the roster on failure. */
+	bool RetireAttemptCombatants(bool bDestroy, TFunctionRef<bool()> CanContinue);
 	void HandleActorSpawned(AActor* Actor);
 	void SuspendActor(AActor* Actor, bool bSuspendAbilitySystem = true);
 	void RefreshPreEntryHold();
