@@ -267,7 +267,12 @@ def stage_plan(args, run_dir, missions):
                        "-clientconfig=" + ("Shipping" if args.release else "Development"), "-unattended",
                        "-nop4", "-utf8output", "-build", "-cook", "-stage", "-pak", "-package", "-archive",
                        "-map=" + "+".join(args.map), f"-archivedirectory={run_dir / 'Archive'}",
-                       f"-stagingdirectory={run_dir / 'Staged'}"]})
+                       f"-stagingdirectory={run_dir / 'Staged'}",
+                       # As Cook-CombatPlaytest.ps1 does: the groom system both solvers load dynamically, and the two
+                       # MetaHuman authoring directories whose plugins this project restricts to the editor, which the
+                       # cooker would otherwise fail on. Runtime MetaHuman mesh/material/groom content still cooks.
+                       "-AdditionalCookerOptions=-PACKAGE=/HairStrands/Emitters/StableRodsSystem "
+                       "-NeverCookDir=/MetaHumanCharacter/BuildPipeline+/MetaHumanCoreTech/RealtimeMono"]})
     return [{**stage, "status": "not_run", "exit_code": None, "log": str(run_dir / (stage["name"] + ".log"))}
             for stage in stages]
 
