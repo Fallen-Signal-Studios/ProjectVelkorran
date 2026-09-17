@@ -21,6 +21,9 @@ PROTAGONIST = os.environ.get('SOV_HUD_PROTAGONIST', 'Sov.Character.Player.Tarrik
 # Optional: a UI scale to capture at, and a subtitle plus caption on screen, to check text stays clear of the HUD.
 UI_SCALE = os.environ.get('SOV_HUD_UI_SCALE')
 WITH_TEXT = os.environ.get('SOV_HUD_WITH_TEXT') == '1'
+# Optional: an authored surface to install before capturing, so the picture is of the widget rather
+# than the painter. The frontend resolves this class every refresh, which is what makes a live swap work.
+SURFACE = os.environ.get('SOV_HUD_SURFACE')
 READY_SECONDS = 180.
 SHOT_SECONDS = 45.
 SETTLE_SECONDS = 1.5
@@ -151,6 +154,17 @@ class Run:
                 if pawn is None or mission is None or str(mission.mission_id) != MISSION:
                     return
                 if not (pawn.is_character_ready() and pawn.is_alive()):
+                    return
+                if SURFACE and not self.report.get('surface_class'):
+                    frontend = pc.get_frontend() if isinstance(pc, unreal.SovPlayerController) else None
+                    surface_class = unreal.load_class(None, SURFACE)
+                    assert frontend and surface_class, 'Could not install the authored HUD surface ' + SURFACE
+                    frontend.set_holographic_hud_surface_class(surface_class)
+                    self.report['surface_class'] = SURFACE
+                    # The next refresh creates it; capture only once that has happened.
+                    return
+                if SURFACE and not [w for w in unreal.ObjectIterator(unreal.SovHolographicHUDSurface)
+                                    if w.get_world() == world]:
                     return
                 # The surface must actually be up before its picture means anything. Its snapshot
                 # reader is ordinary C++ with no reflection, so this observes the live widget instead.

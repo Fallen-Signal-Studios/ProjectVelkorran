@@ -37,6 +37,9 @@ public:
      * The HUD keeps reading the resources, grants, contacts and layout either way. */
     UPROPERTY(EditDefaultsOnly, Category="Sovereign|Combat HUD")
     TSoftClassPtr<class USovHolographicHUDSurface> HolographicHUDSurfaceClass;
+    /** Swaps the authored surface while playing, for previewing one without restarting. Null restores the painter. */
+    UFUNCTION(BlueprintCallable, Category="Sovereign|Combat HUD")
+    void SetHolographicHUDSurfaceClass(TSubclassOf<class USovHolographicHUDSurface> InSurfaceClass);
     const class USovHolographicHUDWidget* GetHolographicHUD() const { return HolographicHUD; }
     virtual void Deactivate() override;
     UFUNCTION(BlueprintCallable, Category="Accessibility") bool OpenAccessibilitySettings();

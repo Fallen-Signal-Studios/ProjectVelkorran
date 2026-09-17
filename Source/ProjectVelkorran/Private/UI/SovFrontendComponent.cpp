@@ -446,6 +446,13 @@ void USovFrontendComponent::RemoveCombatVitals()
 /** Kept separate from the vitals teardown: folding the two together made the plain readout's
  * every-tick stand-down destroy and rebuild the holographic surface on every frame, so it never
  * survived long enough to paint. */
+void USovFrontendComponent::SetHolographicHUDSurfaceClass(TSubclassOf<USovHolographicHUDSurface> InSurfaceClass)
+{
+    HolographicHUDSurfaceClass = InSurfaceClass ? TSoftClassPtr<USovHolographicHUDSurface>(InSurfaceClass) : nullptr;
+    // The next refresh resolves and installs it; refreshing here makes a preview swap immediate.
+    RefreshFrontend();
+}
+
 void USovFrontendComponent::RemoveHolographicHUD()
 {
     if (HolographicHUD) { HolographicHUD->RemoveFromParent(); HolographicHUD = nullptr; }
