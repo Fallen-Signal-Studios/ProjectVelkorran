@@ -6,6 +6,19 @@
 #include "SovMeleeAttackDefinition.generated.h"
 class UAnimMontage;
 class UGameplayAbility;
+class USkeletalMeshComponent;
+/** One swept blade edge: two socket (or bone) points on the trace mesh, each optionally offset in its socket's space. */
+USTRUCT(BlueprintType)
+struct PROJECTVELKORRAN_API FSovMeleeTraceSegment
+{
+    GENERATED_BODY()
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Melee") FName StartSocket;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Melee") FName EndSocket;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Melee") FVector StartOffset=FVector::ZeroVector;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Melee") FVector EndOffset=FVector::ZeroVector;
+    /** Component-space start/end of this edge on Mesh; false when a socket is missing or the result is not finite. */
+    bool ResolveComponentSpace(const USkeletalMeshComponent& Mesh,FVector& OutStart,FVector& OutEnd) const;
+};
 USTRUCT(BlueprintType)
 struct PROJECTVELKORRAN_API FSovMeleeAttackNode
 {
@@ -14,6 +27,13 @@ struct PROJECTVELKORRAN_API FSovMeleeAttackNode
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Melee") FName Section;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Melee") FName StartSocket=TEXT("blade_root");
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Melee") FName EndSocket=TEXT("blade_tip");
+    /** Offsets in each socket's own space, for weapon meshes that carry a grip socket but no blade-tip socket. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Melee") FVector StartOffset=FVector::ZeroVector;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Melee") FVector EndOffset=FVector::ZeroVector;
+    /** Further edges swept with the primary one and sharing its hit ledger, e.g. both ends of a double blade. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Melee") TArray<FSovMeleeTraceSegment> AdditionalSegments;
+    /** The primary edge followed by AdditionalSegments. */
+    TArray<FSovMeleeTraceSegment> TraceSegments() const;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Melee",meta=(ClampMin="2",ClampMax="60")) float TraceRadius=8.f;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Melee",meta=(ClampMin="0")) float Startup=.15f;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Melee",meta=(ClampMin="0.01")) float Active=.2f;

@@ -90,6 +90,7 @@ Content/
 /Content/Items/Weapons/*
 !/Content/Items/Weapons/WI_Cinderline.uasset
 !/Content/Items/Weapons/WI_Verity.uasset
+!/Content/Items/Weapons/WI_Velkorran.uasset
 
 # Project-owned Verity presentation and retargeted Twin Blade animation.
 !/Content/Characters/

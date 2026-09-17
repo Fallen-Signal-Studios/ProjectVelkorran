@@ -28,6 +28,8 @@ public:
         const FGameplayTagContainer* SourceTags=nullptr,const FGameplayTagContainer* TargetTags=nullptr,FGameplayTagContainer* Relevant=nullptr) const override;
     virtual void InputReleased(const FGameplayAbilitySpecHandle Handle,const FGameplayAbilityActorInfo* Info,const FGameplayAbilityActivationInfo Activation) override;
     bool IsCurrentNodeHeavy() const;
+    /** INDEX_NONE while no attack node is running. */
+    int32 GetCurrentNodeIndex() const { return NodeIndex; }
 protected:
     virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle,const FGameplayAbilityActorInfo* Info,
         const FGameplayAbilityActivationInfo Activation,const FGameplayEventData* Event) override;

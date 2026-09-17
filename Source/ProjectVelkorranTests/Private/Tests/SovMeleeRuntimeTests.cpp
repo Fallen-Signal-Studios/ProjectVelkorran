@@ -104,6 +104,28 @@ bool FSovMeleeSweepAndLedgerRuntimeTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("Last node cannot become an infinite held-input chain"),ASC->FindAbilitySpecFromHandle(Handle)->IsActive());
     return true;
 }
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovMeleeTraceSegmentsRuntimeTest,
+    "ProjectVelkorran.Campaign.Melee.OffsetAndAdditionalEdgesShareOneLedger",EAutomationTestFlags::EditorContext|EAutomationTestFlags::ProductFilter)
+bool FSovMeleeTraceSegmentsRuntimeTest::RunTest(const FString& Parameters)
+{
+    // Targets are capsules of radius 34 on one line the blade crosses. Near (Y=-50) touches only the
+    // offset primary edge, Far (Y=+50) only the added edge, and Middle (Y=0) is reached by both edges.
+    FMeleeWorld F; auto* Source=F.ReadyPlayer(FVector(0,0,100));
+    auto* Near=F.Character(FVector(90,-50,100),1); auto* Middle=F.Character(FVector(90,0,100),1); auto* Far=F.Character(FVector(90,50,100),1);
+    if (!Source||!Near||!Middle||!Far) { return false; }
+    auto* Mesh=NewObject<USovMeleeRuntimeTestMesh>(Source); Source->AddInstanceComponent(Mesh);
+    Mesh->SetupAttachment(Source->GetRootComponent()); Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision); Mesh->RegisterComponent();
+    auto* ASC=Source->GetNarrativeAbilitySystemComponent();
+    const auto Handle=ASC->GiveAbility(FGameplayAbilitySpec(USovMeleeRuntimeTestSegmentAbility::StaticClass(),1));
+    TestTrue(TEXT("A node with offset and added edges admits the attack"),ASC->TryActivateAbility(Handle,false));
+    auto* Ability=Cast<USovMeleeRuntimeTestSegmentAbility>(ASC->FindAbilitySpecFromHandle(Handle)->GetPrimaryInstance());
+    if (!TestNotNull(TEXT("Ability instance"),Ability)) { return false; }
+    F.Advance(Ability,.15f); Mesh->SetWorldLocation(FVector(180,0,100)); F.Advance(Ability,.1f);
+    TestEqual(TEXT("The offset primary edge reaches a target beyond its bare socket"),Near->ResolvedHitCount,1);
+    TestEqual(TEXT("The added edge is swept as well"),Far->ResolvedHitCount,1);
+    TestEqual(TEXT("A target reached by both edges is hit once"),Middle->ResolvedHitCount,1);
+    return true;
+}
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovMeleeDefinitionValidationTest,
     "ProjectVelkorran.Campaign.Melee.DefinitionValidation",EAutomationTestFlags::EditorContext|EAutomationTestFlags::ProductFilter)
 bool FSovMeleeDefinitionValidationTest::RunTest(const FString& Parameters)
@@ -118,6 +140,18 @@ bool FSovMeleeDefinitionValidationTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("Target correction is bounded by the native contract"),Definition->Validate(Error));
     Definition->Nodes[0]=FSovMeleeAttackNode(); Definition->Nodes[0].AttackClassifications.AddTag(FSovGameplayTags::Get().Damage_Fatal);
     TestFalse(TEXT("An ordinary melee definition cannot turn into an explicit fatal packet"),Definition->Validate(Error));
+    Definition->Nodes[0]=FSovMeleeAttackNode(); Definition->Nodes[0].EndOffset=FVector(0,0,400);
+    TestFalse(TEXT("A socket offset cannot reach beyond the weapon"),Definition->Validate(Error));
+    Definition->Nodes[0]=FSovMeleeAttackNode(); Definition->Nodes[0].StartOffset=FVector(std::numeric_limits<double>::quiet_NaN(),0,0);
+    TestFalse(TEXT("A non-finite socket offset rejects the definition"),Definition->Validate(Error));
+    Definition->Nodes[0]=FSovMeleeAttackNode(); Definition->Nodes[0].AdditionalSegments.AddDefaulted();
+    TestFalse(TEXT("An added edge must name both of its sockets"),Definition->Validate(Error));
+    Definition->Nodes[0]=FSovMeleeAttackNode();
+    FSovMeleeTraceSegment Edge; Edge.StartSocket=TEXT("blade_root"); Edge.EndSocket=TEXT("blade_tip");
+    Definition->Nodes[0].AdditionalSegments.Init(Edge,3);
+    TestTrue(TEXT("Up to three added edges validate"),Definition->Validate(Error));
+    Definition->Nodes[0].AdditionalSegments.Add(Edge);
+    TestFalse(TEXT("Added edges are bounded"),Definition->Validate(Error));
     return true;
 }
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovMeleeCoverRuntimeTest,

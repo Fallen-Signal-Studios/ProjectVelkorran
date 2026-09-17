@@ -3,6 +3,29 @@
 #include "Melee/SovMeleePolicy.h"
 #include "Exertion/SovGameplayAbility_Exertion.h"
 #include "Sovereign/SovGameplayTags.h"
+#include "Components/SkeletalMeshComponent.h"
+namespace
+{
+    constexpr double MaximumSocketOffset=300.;
+    constexpr int32 MaximumAdditionalSegments=3;
+    bool OffsetValid(const FVector& Offset) { return !Offset.ContainsNaN()&&Offset.Size()<=MaximumSocketOffset; }
+}
+bool FSovMeleeTraceSegment::ResolveComponentSpace(const USkeletalMeshComponent& Mesh,FVector& OutStart,FVector& OutEnd) const
+{
+    if (StartSocket.IsNone()||EndSocket.IsNone()||!Mesh.DoesSocketExist(StartSocket)||!Mesh.DoesSocketExist(EndSocket)) { return false; }
+    OutStart=Mesh.GetSocketTransform(StartSocket,RTS_Component).TransformPosition(StartOffset);
+    OutEnd=Mesh.GetSocketTransform(EndSocket,RTS_Component).TransformPosition(EndOffset);
+    return !OutStart.ContainsNaN()&&!OutEnd.ContainsNaN();
+}
+TArray<FSovMeleeTraceSegment> FSovMeleeAttackNode::TraceSegments() const
+{
+    TArray<FSovMeleeTraceSegment> Segments;
+    Segments.Reserve(1+AdditionalSegments.Num());
+    FSovMeleeTraceSegment& Primary=Segments.AddDefaulted_GetRef();
+    Primary.StartSocket=StartSocket; Primary.EndSocket=EndSocket; Primary.StartOffset=StartOffset; Primary.EndOffset=EndOffset;
+    Segments.Append(AdditionalSegments);
+    return Segments;
+}
 bool USovMeleeAttackDefinition::Validate(FString& Error) const
 {
     Error.Reset();
@@ -19,6 +42,9 @@ bool USovMeleeAttackDefinition::Validate(FString& Error) const
         const auto& N=Nodes[I];
         if (!SovMelee::ValidWindows(N.Startup,N.Active,N.Recovery,N.BranchOpen,N.BranchClose)
             || N.StartSocket.IsNone()||N.EndSocket.IsNone()||!SovMelee::SpatialSamples(0,N.TraceRadius)
+            || N.AdditionalSegments.Num()>MaximumAdditionalSegments
+            || N.TraceSegments().ContainsByPredicate([](const FSovMeleeTraceSegment& Segment)
+                { return Segment.StartSocket.IsNone()||Segment.EndSocket.IsNone()||!OffsetValid(Segment.StartOffset)||!OffsetValid(Segment.EndOffset); })
             || !FMath::IsFinite(N.Damage)||N.Damage<0.f||!FMath::IsFinite(N.PoiseDamage)||N.PoiseDamage<0.f
             || !FMath::IsFinite(N.ShieldCoefficient)||N.ShieldCoefficient<0.f||!FMath::IsFinite(N.HealthCoefficient)||N.HealthCoefficient<0.f
             || !FMath::IsFinite(N.HitConfirmAdvance)||N.HitConfirmAdvance<0.f||N.HitConfirmAdvance>.1f

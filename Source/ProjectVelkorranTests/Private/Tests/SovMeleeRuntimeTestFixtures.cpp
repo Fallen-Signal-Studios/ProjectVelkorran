@@ -20,6 +20,16 @@ USovMeleeRuntimeTestAbility::USovMeleeRuntimeTestAbility()
     First.FollowUpInput=FNarrativeGameplayTags::Get().Narrative_Input_Attack; First.NextNode=1;
     AttackDefinition->Nodes.Add(First); First.NextNode=INDEX_NONE; AttackDefinition->Nodes.Add(First);
 }
+USovMeleeRuntimeTestSegmentAbility::USovMeleeRuntimeTestSegmentAbility()
+{
+    // The test mesh's sockets sit at Y=-80 (root) and Y=+80 (tip). The primary edge covers only
+    // Y=-80..-20 through an offset from the root; the added edge covers Y=+20..+80 from the tip.
+    FSovMeleeAttackNode Node; Node.Damage=20.f; Node.PoiseDamage=10.f;
+    Node.StartSocket=TEXT("blade_root"); Node.EndSocket=TEXT("blade_root"); Node.EndOffset=FVector(0,60,0);
+    FSovMeleeTraceSegment Far; Far.StartSocket=TEXT("blade_tip"); Far.EndSocket=TEXT("blade_tip"); Far.StartOffset=FVector(0,-60,0);
+    Node.AdditionalSegments.Add(Far);
+    AttackDefinition->Nodes.Reset(); AttackDefinition->Nodes.Add(Node);
+}
 USkeletalMeshComponent* USovMeleeRuntimeTestAbility::ResolveMeleeTraceMesh_Implementation() const
 { AActor* Source=GetAvatarActorFromActorInfo(); return Source?Source->FindComponentByClass<USovMeleeRuntimeTestMesh>():nullptr; }
 

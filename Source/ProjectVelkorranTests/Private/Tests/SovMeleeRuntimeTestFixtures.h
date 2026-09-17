@@ -22,6 +22,14 @@ public:
     USovMeleeRuntimeTestAbility();
     virtual USkeletalMeshComponent* ResolveMeleeTraceMesh_Implementation() const override;
 };
+/** One node whose primary edge is built from socket offsets and whose second, separate edge shares the ledger. */
+UCLASS(Transient,NotBlueprintable)
+class USovMeleeRuntimeTestSegmentAbility : public USovMeleeRuntimeTestAbility
+{
+    GENERATED_BODY()
+public:
+    USovMeleeRuntimeTestSegmentAbility();
+};
 
 /** A fully ready campaign player for the production player-only combo input gate. */
 UCLASS(Transient, NotBlueprintable)

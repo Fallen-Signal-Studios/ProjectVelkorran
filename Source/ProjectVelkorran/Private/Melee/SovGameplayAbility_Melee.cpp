@@ -124,10 +124,15 @@ void USovGameplayAbility_Melee::HandleInterruption(FGameplayTag Tag,int32 Count)
 bool USovGameplayAbility_Melee::NodeGeometryValid() const
 {
     if (!ContextValid()||!ActionMesh.IsValid()||SovSelenePayload::ResolveTarget(ActionMesh->GetOwner())!=ActionAvatar.Get()) { return false; }
-    const auto& Node=AttackDefinition->Nodes[NodeIndex];
-    return ActionMesh->DoesSocketExist(Node.StartSocket)&&ActionMesh->DoesSocketExist(Node.EndSocket)
-        &&FVector::DistSquared(ActionMesh->GetSocketLocation(Node.StartSocket),ActionAvatar->GetActorLocation())<=FMath::Square(450.f)
-        &&FVector::DistSquared(ActionMesh->GetSocketLocation(Node.EndSocket),ActionAvatar->GetActorLocation())<=FMath::Square(650.f);
+    const FTransform MeshTransform=ActionMesh->GetComponentTransform(); const FVector AvatarLocation=ActionAvatar->GetActorLocation();
+    for (const FSovMeleeTraceSegment& Segment:AttackDefinition->Nodes[NodeIndex].TraceSegments())
+    {
+        FVector Start,End;
+        if (!Segment.ResolveComponentSpace(*ActionMesh,Start,End)
+            ||FVector::DistSquared(MeshTransform.TransformPosition(Start),AvatarLocation)>FMath::Square(450.f)
+            ||FVector::DistSquared(MeshTransform.TransformPosition(End),AvatarLocation)>FMath::Square(650.f)) { return false; }
+    }
+    return true;
 }
 bool USovGameplayAbility_Melee::IsCurrentNodeHeavy() const
 {

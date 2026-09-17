@@ -29,13 +29,17 @@ protected:
 private:
     bool ContextValid() const;
     void StopInvalid();
-    void Sweep(float FromAlpha,float ToAlpha,const FTransform& CurrentTransform,const FVector& LocalStart,const FVector& LocalEnd);
+    struct FEdge { FVector Start=FVector::ZeroVector; FVector End=FVector::ZeroVector; };
+    /** Component-space edges for every trace segment; false when any is unresolved or degenerate. */
+    bool ResolveEdges(const FTransform& ComponentTransform,TArray<FEdge>& OutEdges) const;
+    void Sweep(float FromAlpha,float ToAlpha,const FTransform& CurrentTransform,const TArray<FEdge>& CurrentEdges);
     TWeakObjectPtr<USkeletalMeshComponent> Mesh;
     TWeakObjectPtr<AActor> Source;
     FGuid AttackId;
     FSovMeleeAttackNode Definition;
+    TArray<FSovMeleeTraceSegment> Segments;
     FTransform PreviousTransform;
-    FVector PreviousLocalStart,PreviousLocalEnd;
+    TArray<FEdge> PreviousEdges;
     TSet<TWeakObjectPtr<AActor>> HitActors;
     TSet<TWeakObjectPtr<UPrimitiveComponent>> EnvironmentContacts;
     float Elapsed=0.f;
