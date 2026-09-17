@@ -327,12 +327,11 @@ bool ASovPlayerController::HandoffToMission(USovCampaignDefinition* Destination,
 	return StartPawnHandoff(Destination, Destination->Protagonist, SpawnTransform, NAME_None, FGuid(), OutError);
 }
 
-bool ASovPlayerController::PrepareTransitionCheckpoint(FName BoundaryId, FString& OutError, bool bRequireDurable)
+bool ASovPlayerController::PrepareTransitionCheckpoint(FName BoundaryId, FString& OutError)
 {
 	USovSaveSubsystem* Slots = GetGameInstance() ? GetGameInstance()->GetSubsystem<USovSaveSubsystem>() : nullptr;
 	APawn* Source = GetPawn(); const uint64 ExpectedEpoch = TransitionEpoch;
-	if (!Slots || ((bRequireDurable || !Slots->ConsumeAcknowledgedBoundary(ESovSaveBoundary::LongTransition, BoundaryId))
-		&& Slots->WriteCheckpoint(ESovSaveBoundary::LongTransition, BoundaryId, OutError) != ESovSaveResult::Success))
+	if (!Slots || Slots->EnsureCheckpointBoundary(ESovSaveBoundary::LongTransition, BoundaryId, OutError) != ESovSaveResult::Success)
 	{ if (OutError.IsEmpty()) { OutError = TEXT("A safe transition checkpoint could not be written."); } return false; }
 	if (TransitionEpoch != ExpectedEpoch || GetPawn() != Source || TransitionState != ESovCampaignTransitionState::Idle)
 	{ OutError = TEXT("Campaign ownership changed during the transition checkpoint."); return false; }
@@ -768,7 +767,7 @@ bool ASovPlayerController::TravelToMission(USovCampaignDefinition* Destination, 
 	const FString MapPackage = Destination->Map.ToSoftObjectPath().GetLongPackageName();
 	if (MapPackage.IsEmpty() || !FPackageName::DoesPackageExist(MapPackage))
 	{ OutError = TEXT("Destination map is missing or not cooked."); return false; }
-	if (!PrepareTransitionCheckpoint(Destination->MissionId, OutError, true)) { return false; }
+	if (!PrepareTransitionCheckpoint(Destination->MissionId, OutError)) { return false; }
 	UNarrativeSaveSubsystem* Save = GetWorld()->GetSubsystem<UNarrativeSaveSubsystem>();
 	if (!Save) { OutError = TEXT("Narrative save subsystem is unavailable."); return false; }
 	USovSaveSubsystem* Slots = GetGameInstance() ? GetGameInstance()->GetSubsystem<USovSaveSubsystem>() : nullptr;

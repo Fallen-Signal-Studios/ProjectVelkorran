@@ -103,7 +103,7 @@ private:
 	bool RequestNativePause(FCanUnpause CanUnpauseDelegate);
 	TSet<FName> SystemPauseOwners;
 	bool bExternalPauseRequested = false;
-	bool PrepareTransitionCheckpoint(FName BoundaryId, FString& OutError, bool bRequireDurable = false);
+	bool PrepareTransitionCheckpoint(FName BoundaryId, FString& OutError);
 	bool CanTransitionTo(USovCampaignDefinition* Destination, FString& OutError, bool bRequireDifferentProtagonist = true) const;
 	ASovPlayerCharacterBase* SpawnCampaignPawn(USovCampaignDefinition* Mission, const FTransform& Transform, FGameplayTag Lead = FGameplayTag());
 	bool StartPawnHandoff(USovCampaignDefinition* Destination, FGameplayTag Lead, const FTransform& Transform, FName HandoffBeat, const FGuid& HandoffRequest, FString& OutError);

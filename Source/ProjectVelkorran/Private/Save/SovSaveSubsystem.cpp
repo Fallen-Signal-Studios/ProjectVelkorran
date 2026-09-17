@@ -685,7 +685,8 @@ ESovSaveResult USovSaveSubsystem::WriteCheckpoint(ESovSaveBoundary Boundary, FNa
     if (BoundaryId.IsNone()) { Error = TEXT("A stable checkpoint boundary ID is required."); return ESovSaveResult::InvalidSlot; }
     const auto Result = CaptureAndWrite(ESovSaveSlotKind::Checkpoint, 0, BoundaryId, Error,
         Boundary == ESovSaveBoundary::ArenaEntry || Boundary == ESovSaveBoundary::BossRetry, Boundary);
-    if (Result == ESovSaveResult::Success) { QueueAutosave(Boundary, BoundaryId); }
+    // A verified checkpoint supersedes any snapshot retained from an earlier continued failure.
+    if (Result == ESovSaveResult::Success) { ContinuedTravelOrigin = nullptr; ContinuedTravelWorld.Reset(); QueueAutosave(Boundary, BoundaryId); }
     return Result;
 }
 void USovSaveSubsystem::QueueAutosave(ESovSaveBoundary Boundary, FName Id)
@@ -1018,8 +1019,15 @@ bool USovSaveSubsystem::ConsumeAcknowledgedBoundary(ESovSaveBoundary Boundary, F
         || Id.IsNone() || AcknowledgedBoundary.BoundaryId != Id || !PC->GetCampaignState()->GetActiveMission()
         || PC->GetCampaignState()->GetActiveMission()->MissionId != AcknowledgedBoundary.MissionId
         || PC->GetCampaignState()->GetActiveProtagonist() != AcknowledgedBoundary.ActiveProtagonist) { return false; }
-    AcknowledgedWorld.Reset(); AcknowledgmentExpiresAt = 0;
+    if (Boundary == ESovSaveBoundary::LongTransition)
+    { ContinuedTravelOrigin = AcknowledgedSnapshot; ContinuedTravelOwner = AcknowledgedOwner; ContinuedTravelWorld = AcknowledgedWorld; ContinuedTravelBoundaryId = Id; }
+    AcknowledgedSnapshot = nullptr; AcknowledgedWorld.Reset(); AcknowledgmentExpiresAt = 0;
     return true;
+}
+ESovSaveResult USovSaveSubsystem::EnsureCheckpointBoundary(ESovSaveBoundary Boundary, FName BoundaryId, FString& Error)
+{
+    if (ConsumeAcknowledgedBoundary(Boundary, BoundaryId)) { Error.Reset(); return ESovSaveResult::Success; }
+    return WriteCheckpoint(Boundary, BoundaryId, Error);
 }
 void USovSaveSubsystem::AcknowledgeSaveFailure()
 {
@@ -1027,6 +1035,7 @@ void USovSaveSubsystem::AcknowledgeSaveFailure()
     {
         AcknowledgedBoundary = FailedWrite->Header;
         AcknowledgedOwner = FailedWriteOwner;
+        AcknowledgedSnapshot = FailedWrite;
         AcknowledgedWorld = Controller() ? Controller()->GetWorld() : nullptr;
         AcknowledgmentExpiresAt = (bPlatformSuspended ? PlatformSuspendedAt : FPlatformTime::Seconds()) + 60.0;
     }

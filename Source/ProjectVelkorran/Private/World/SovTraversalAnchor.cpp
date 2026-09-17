@@ -104,8 +104,7 @@ bool ASovTraversalAnchor::RequestTraverse(APawn* Pawn, FText& Error)
     if (bCheckpointTransition)
     {
         auto* Save = GetGameInstance() ? GetGameInstance()->GetSubsystem<USovSaveSubsystem>() : nullptr; FString Why;
-        if (!Save || (!Save->ConsumeAcknowledgedBoundary(ESovSaveBoundary::LongTransition, TraversalId)
-            && Save->WriteCheckpoint(ESovSaveBoundary::LongTransition, TraversalId, Why) != ESovSaveResult::Success))
+        if (!Save || Save->EnsureCheckpointBoundary(ESovSaveBoundary::LongTransition, TraversalId, Why) != ESovSaveResult::Success)
         { Error = FText::FromString(Why.IsEmpty() ? TEXT("Origin checkpoint is unavailable.") : Why); return false; }
     }
     if (!IsValid(Player) || PC->GetPawn() != Player || !BuildPath(Player, WorldPath, Error)) { return false; }

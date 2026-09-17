@@ -186,7 +186,7 @@ void ASovCampaignInteractionTerminal::ExecuteRequest(FRequest Request)
     if (Request.bCheckpoint)
     {
         auto* Saves = GetGameInstance() ? GetGameInstance()->GetSubsystem<USovSaveSubsystem>() : nullptr;
-        const bool bSaved = Saves && Saves->WriteCheckpoint(ESovSaveBoundary::ExplicitCheckpoint, Request.TerminalId, OperationError) == ESovSaveResult::Success;
+        const bool bSaved = Saves && Saves->EnsureCheckpointBoundary(ESovSaveBoundary::ExplicitCheckpoint, Request.TerminalId, OperationError) == ESovSaveResult::Success;
         if (!OwnsRequest(Request)) { return; }
         if (!bSaved)
         { PublishResult(false, OperationError.IsEmpty() ? LOCTEXT("SaveUnavailable", "Objective recorded. Checkpoint unavailable; try again") : FText::FromString(OperationError)); return; }

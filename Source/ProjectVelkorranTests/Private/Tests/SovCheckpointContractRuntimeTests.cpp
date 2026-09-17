@@ -24,6 +24,8 @@ struct FSovCheckpointContractTestAccess
 	static bool Validate(USovSaveSubsystem& S, USovCampaignSaveGame* Save, FString& Error) { return S.ValidateEnvelope(Save, false, Error); }
 	static UNarrativeSave* Decode(USovSaveSubsystem& S, USovCampaignSaveGame* Save, FString& Error) { return S.DecodeNarrative(Save, Error); }
 	static FString BankName(const USovSaveSubsystem& S, ESovSaveSlotKind Kind, int32 Index, int32 Bank) { return S.BankName(Kind, Index, Bank); }
+	static USovCampaignSaveGame* TravelOrigin(USovSaveSubsystem& S, const UWorld* World, FName Destination, FString& Error)
+	{ bool bDamaged = false; return S.SelectMissionTravelOrigin(World, Destination, S.CaptureOperationOwner(), bDamaged, Error); }
 	static int32 SchemaVersion(const USovCampaignStateComponent& State) { return State.SavedSchemaVersion; }
 	/** Schema 1 as the objective-lifecycle migration defines it: completed beats only, no lifecycle journal. */
 	static void MakeSchemaOne(USovCampaignStateComponent& State)
@@ -217,6 +219,66 @@ bool FSovCheckpointInterruptedWriteTest::RunTest(const FString& Parameters)
 		if (!TestNotNull(TEXT("Handoff from recovered Save A"), W.Handoff(C.Missions[2]))) { AddError(W.Error); return false; }
 		ExpectTarrik(*this, W, TEXT("Tarrik from recovered Save A"), { 3, 40, 5, 33.f });
 	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCheckpointContinuedBoundaryTest, "ProjectVelkorran.Campaign.CheckpointContract.ContinuingPastAFailedCheckpointPassesThatBoundaryOnce",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCheckpointContinuedBoundaryTest::RunTest(const FString& Parameters)
+{
+	using namespace SovPartitionTest;
+	FPartitionCampaign C;
+	TMap<FString, TArray<uint8>> Disk;
+	FPartitionWorld W(true); if (!W.IsValid()) { AddError(TEXT("Local save-owner world failed")); return false; }
+	if (!PlayBothProtagonists(*this, W, C) || !TestTrue(TEXT("Grounded for save admission"), W.Ground())) { return false; }
+	FSovCheckpointContractOwner Owner(W.Instance.Get(), Disk);
+	USovSaveSubsystem& Saves = *Owner.Subsystem;
+	const FName Scene(TEXT("Beat.CanonScene"));
+	FString Error;
+
+	// Storage keeps failing for the whole test, as a full disk would.
+	Owner.Disk->bDenyWrite = true;
+	TestEqual(TEXT("A failing canon-gate checkpoint does not pass its boundary"), Saves.EnsureCheckpointBoundary(ESovSaveBoundary::CanonGate, Scene, Error), ESovSaveResult::WriteFailed);
+	TestTrue(TEXT("The failure waits for the player's decision"), Saves.IsAwaitingFailureDecision());
+	Saves.AcknowledgeSaveFailure();
+	TestEqual(TEXT("A different boundary cannot use the player's choice"), Saves.EnsureCheckpointBoundary(ESovSaveBoundary::CanonGate, TEXT("Beat.OtherScene"), Error), ESovSaveResult::WriteFailed);
+	Saves.AcknowledgeSaveFailure();
+	TestEqual(TEXT("A later acknowledgement replaces the earlier boundary"), Saves.EnsureCheckpointBoundary(ESovSaveBoundary::CanonGate, Scene, Error), ESovSaveResult::WriteFailed);
+	Saves.AcknowledgeSaveFailure();
+	TestEqual(TEXT("A different boundary kind cannot use the player's choice"), Saves.EnsureCheckpointBoundary(ESovSaveBoundary::ExplicitCheckpoint, Scene, Error), ESovSaveResult::WriteFailed);
+	Saves.AcknowledgeSaveFailure();
+	TestEqual(TEXT("Retrying the scene fails once more, then the player continues"), Saves.EnsureCheckpointBoundary(ESovSaveBoundary::CanonGate, Scene, Error), ESovSaveResult::WriteFailed);
+	Saves.AcknowledgeSaveFailure();
+	TestTrue(TEXT("Nothing reached the disk"), Disk.IsEmpty());
+	TestEqual(TEXT("The acknowledged scene passes without another write"), Saves.EnsureCheckpointBoundary(ESovSaveBoundary::CanonGate, Scene, Error), ESovSaveResult::Success);
+	TestFalse(TEXT("Passing an acknowledged boundary raises no new failure"), Saves.IsAwaitingFailureDecision());
+	TestEqual(TEXT("The choice passes the boundary only once"), Saves.EnsureCheckpointBoundary(ESovSaveBoundary::CanonGate, Scene, Error), ESovSaveResult::WriteFailed);
+	Saves.AcknowledgeSaveFailure();
+
+	// Mission travel needs an origin to recover to. With nothing stored, the snapshot the player continued
+	// past is that origin; without the choice there is none. (Arming also loads the origin's map and mission
+	// assets, which a transient fixture mission does not have, so origin selection is checked directly.)
+	auto* Mission = W.PC->GetCampaignState()->GetActiveMission();
+	if (!TestNotNull(TEXT("Active mission"), Mission)) { return false; }
+	const FName Travel(TEXT("Mission.Destination"));
+	using FAccess = FSovCheckpointContractTestAccess;
+	TestNull(TEXT("Without a stored checkpoint or a continued snapshot there is no travel origin"), FAccess::TravelOrigin(Saves, W.World, Travel, Error));
+	TestEqual(TEXT("The travel checkpoint fails"), Saves.EnsureCheckpointBoundary(ESovSaveBoundary::LongTransition, Travel, Error), ESovSaveResult::WriteFailed);
+	Saves.AcknowledgeSaveFailure();
+	TestEqual(TEXT("The player continues past the travel checkpoint"), Saves.EnsureCheckpointBoundary(ESovSaveBoundary::LongTransition, Travel, Error), ESovSaveResult::Success);
+	TestNull(TEXT("The continued snapshot belongs to its own travel only"), FAccess::TravelOrigin(Saves, W.World, TEXT("Mission.Elsewhere"), Error));
+	TestEqual(TEXT("The travel checkpoint fails again"), Saves.EnsureCheckpointBoundary(ESovSaveBoundary::LongTransition, Travel, Error), ESovSaveResult::WriteFailed);
+	Saves.AcknowledgeSaveFailure();
+	TestEqual(TEXT("The player continues past it again"), Saves.EnsureCheckpointBoundary(ESovSaveBoundary::LongTransition, Travel, Error), ESovSaveResult::Success);
+	const USovCampaignSaveGame* Origin = FAccess::TravelOrigin(Saves, W.World, Travel, Error);
+	if (TestNotNull(TEXT("The continued snapshot is that travel's origin"), Origin))
+	{
+		FString Invalid;
+		TestTrue(TEXT("The origin is a sealed, valid envelope"), FAccess::Validate(Saves, const_cast<USovCampaignSaveGame*>(Origin), Invalid));
+		TestEqual(TEXT("The origin is the current mission"), Origin->Header.MissionId, Mission->MissionId);
+		TestEqual(TEXT("The origin is the acknowledged travel boundary"), Origin->Header.BoundaryId, Travel);
+	}
+	TestNull(TEXT("A continued origin is used once"), FAccess::TravelOrigin(Saves, W.World, Travel, Error));
 	return true;
 }
 

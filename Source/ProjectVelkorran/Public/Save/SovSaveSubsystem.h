@@ -73,6 +73,10 @@ public:
     ESovSaveResult RetryFailedWrite(FString& Error);
     /** Native irreversible owner may consume only the exact failed boundary the player acknowledged. */
     bool ConsumeAcknowledgedBoundary(ESovSaveBoundary Boundary, FName BoundaryId);
+    /** Every irreversible owner's pre-boundary write: Success after a verified checkpoint, or once for the exact
+     * failed boundary the player chose to continue past. Writing directly would ask the same failing storage
+     * again after that choice and block the boundary for as long as storage keeps failing. */
+    ESovSaveResult EnsureCheckpointBoundary(ESovSaveBoundary Boundary, FName BoundaryId, FString& Error);
     UFUNCTION(BlueprintPure, Category="Campaign|Save")
     bool IsAwaitingFailureDecision() const { return bAwaitingFailureDecision; }
     UFUNCTION(BlueprintPure, Category="Campaign|Save")
@@ -227,6 +231,14 @@ private:
     FSovSaveSlotHeader AcknowledgedBoundary;
     FOperationOwner AcknowledgedOwner;
     TWeakObjectPtr<UWorld> AcknowledgedWorld;
+    /** The sealed snapshot the acknowledged write failed to store; a consumed travel boundary keeps it as the travel origin. */
+    UPROPERTY(Transient) TObjectPtr<USovCampaignSaveGame> AcknowledgedSnapshot;
+    UPROPERTY(Transient) TObjectPtr<USovCampaignSaveGame> ContinuedTravelOrigin;
+    FOperationOwner ContinuedTravelOwner;
+    FName ContinuedTravelBoundaryId;
+    /** The travel origin: a snapshot the player continued past for this exact travel, else the stored checkpoint. Consumes the former. */
+    USovCampaignSaveGame* SelectMissionTravelOrigin(const UWorld* SourceWorld, FName DestinationId, const FOperationOwner& Owner, bool& bDamaged, FString& Error);
+    TWeakObjectPtr<UWorld> ContinuedTravelWorld;
     double AcknowledgmentExpiresAt = 0;
     FDelegateHandle InitialSaveHandle;
     FTSTicker::FDelegateHandle TickHandle;

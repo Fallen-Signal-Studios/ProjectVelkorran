@@ -189,8 +189,7 @@ bool ASovWorldTransitActor::RequestUse(APawn* Pawn, FText& Error)
     if (bIrreversibleTransition)
     {
         auto* Save = GetGameInstance() ? GetGameInstance()->GetSubsystem<USovSaveSubsystem>() : nullptr; FString SaveError;
-        if (!Save || (!Save->ConsumeAcknowledgedBoundary(ESovSaveBoundary::LongTransition, TransitId)
-            && Save->WriteCheckpoint(ESovSaveBoundary::LongTransition, TransitId, SaveError) != ESovSaveResult::Success))
+        if (!Save || Save->EnsureCheckpointBoundary(ESovSaveBoundary::LongTransition, TransitId, SaveError) != ESovSaveResult::Success)
         { Error = FText::FromString(SaveError.IsEmpty() ? TEXT("Checkpoint unavailable") : SaveError); return false; }
     }
     if (!IsValid(this) || !IsValid(Player) || PC->GetPawn() != Player || (bRequiresPower && !bPowered)

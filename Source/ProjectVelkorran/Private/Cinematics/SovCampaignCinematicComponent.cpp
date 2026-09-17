@@ -552,7 +552,7 @@ bool USovCampaignCinematicComponent::RequestPlay(ASovPlayerController* Player, F
     ReservedPlaybackGeneration = Actor->GetPlaybackGeneration();
     ExpectedPlaybackGeneration = 0;
     auto* Saves = GetWorld()->GetGameInstance() ? GetWorld()->GetGameInstance()->GetSubsystem<USovSaveSubsystem>() : nullptr;
-    if (!Saves || Saves->WriteCheckpoint(ESovSaveBoundary::CanonGate, BeatId, OutError) != ESovSaveResult::Success) { return false; }
+    if (!Saves || Saves->EnsureCheckpointBoundary(ESovSaveBoundary::CanonGate, BeatId, OutError) != ESovSaveResult::Success) { return false; }
     if (RequestEpoch != Epoch || !OwnsPlaybackGeneration() || !IsContextCurrent()) { return false; }
     StreamingLevels.Reset();
     for (FName Level : RequiredStreamingLevels)

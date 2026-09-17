@@ -83,7 +83,7 @@ bool ASovAurelionCheckpoint::RequestCheckpoint(ASovPlayerController* Controller,
     const uint64 Transition = Controller->GetCampaignTransitionEpoch();
     const int32 Ready = ASC->GetCharacterReadyEpoch(); const int32 JournalCount = State->GetJournal().Num();
     auto* Mission = State->GetActiveMission();
-    const bool bSaved = Saves->WriteCheckpoint(ESovSaveBoundary::ExplicitCheckpoint, Boundary, Error) == ESovSaveResult::Success;
+    const bool bSaved = Saves->EnsureCheckpointBoundary(ESovSaveBoundary::ExplicitCheckpoint, Boundary, Error) == ESovSaveResult::Success;
     if (!IsValid(this) || IsActorBeingDestroyed() || !IsValid(Controller) || !IsValid(Player) || !IsValid(ASC)
         || Controller->GetPawn() != Player || Player->GetAbilitySystemComponent() != ASC || ASC->GetAvatarActor() != Player
         || Controller->GetCampaignTransitionEpoch() != Transition || ASC->GetCharacterReadyEpoch() != Ready

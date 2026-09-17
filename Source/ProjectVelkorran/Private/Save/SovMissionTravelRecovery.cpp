@@ -55,6 +55,22 @@ void USovSaveSubsystem::ResetMissionTravelRecovery()
     MissionTravelDeadline = 0; bMissionTravelFailurePending = false; bMissionRecoveryAttempted = false; MissionTravelError.Reset();
 }
 
+USovCampaignSaveGame* USovSaveSubsystem::SelectMissionTravelOrigin(const UWorld* SourceWorld, FName DestinationId,
+    const FOperationOwner& Owner, bool& bDamaged, FString& Error)
+{
+    bDamaged = false;
+    // After the player continued past this travel's failed checkpoint, storage holds no origin for it; the
+    // snapshot that failed to store is the newest sealed state and becomes the origin instead.
+    USovCampaignSaveGame* const Continued = ContinuedTravelOrigin;
+    const bool bContinued = Continued && SourceWorld && ContinuedTravelWorld.Get() == SourceWorld && ContinuedTravelBoundaryId == DestinationId
+        && ContinuedTravelOwner.Namespace == Owner.Namespace && ContinuedTravelOwner.LocalUser == Owner.LocalUser
+        && ContinuedTravelOwner.SelectionEpoch == Owner.SelectionEpoch;
+    ContinuedTravelOrigin = nullptr; ContinuedTravelWorld.Reset();
+    if (bContinued) { return Continued; }
+    int32 Bank = INDEX_NONE;
+    return ReadBest(ESovSaveSlotKind::Checkpoint, 0, Bank, bDamaged, Error, &Owner);
+}
+
 bool USovSaveSubsystem::ArmMissionTravelRecovery(ASovPlayerController* Source, USovCampaignDefinition* Destination,
     FGuid& Request, FString& Error)
 {
@@ -73,8 +89,8 @@ bool USovSaveSubsystem::ArmMissionTravelRecovery(ASovPlayerController* Source, U
     TStrongObjectPtr<USovCampaignStateComponent> KeepCampaign(Source->GetCampaignState());
     const FOperationOwner Owner = CaptureOperationOwner();
     if (!IsOperationOwnerCurrent(Owner, Error)) { return false; }
-    int32 Bank = INDEX_NONE; bool bDamaged = false;
-    TStrongObjectPtr<USovCampaignSaveGame> Origin(ReadBest(ESovSaveSlotKind::Checkpoint, 0, Bank, bDamaged, Error, &Owner));
+    bool bDamaged = false;
+    TStrongObjectPtr<USovCampaignSaveGame> Origin(SelectMissionTravelOrigin(SourceWorld, Destination->MissionId, Owner, bDamaged, Error));
     // A damaged newest bank needs an explicit recovery-save choice, not an implicit rollback.
     if (!Origin.IsValid() || bDamaged || !ValidateEnvelope(Origin.Get(), true, Error, &Owner)
         || Origin->Header.MissionId != OriginMission->MissionId

@@ -167,7 +167,7 @@ void ASovAurelionPriorityTerminal::Execute(FRequest Request)
     auto* State = Request.State.Get(); const FName Outcome = ASovAurelionPrioritySupport::OutcomeBeat(Request.Priority);
     if (State->GetSelectedChoice(TEXT("M12_FireAndFrost"), TEXT("ImmediateProtection")).IsNone())
     {
-        if (!Saves || Saves->WriteCheckpoint(ESovSaveBoundary::ExplicitCheckpoint, TEXT("Aurelion.CP4b"), SaveError) != ESovSaveResult::Success)
+        if (!Saves || Saves->EnsureCheckpointBoundary(ESovSaveBoundary::ExplicitCheckpoint, TEXT("Aurelion.CP4b"), SaveError) != ESovSaveResult::Success)
         { LastResult = SaveError.IsEmpty() ? LOCTEXT("BeforeSave", "Save the recovery checkpoint before selecting priority") : FText::FromString(SaveError); return; }
         if (!OwnsRequest(Request) || !Validate(Request.Pawn.Get(), Error, true)) { LastResult = LOCTEXT("Changed", "Selection context changed; try again"); return; }
         const auto Result = State->ResolveChoice(TEXT("ImmediateProtection"), Outcome);
@@ -183,7 +183,7 @@ void ASovAurelionPriorityTerminal::Execute(FRequest Request)
     }
     if (!OwnsRequest(Request)) { return; }
     for (TActorIterator<ASovAurelionPrioritySupport> It(GetWorld()); It; ++It) { It->RefreshFromCampaign(); if (!OwnsRequest(Request)) { return; } }
-    const bool bSaved = Saves && Saves->WriteCheckpoint(ESovSaveBoundary::ExplicitCheckpoint, TEXT("Aurelion.CP5"), SaveError) == ESovSaveResult::Success;
+    const bool bSaved = Saves && Saves->EnsureCheckpointBoundary(ESovSaveBoundary::ExplicitCheckpoint, TEXT("Aurelion.CP5"), SaveError) == ESovSaveResult::Success;
     if (!OwnsRequest(Request)) { return; }
     LastResult = bSaved ? LOCTEXT("Acknowledged", "Priority acknowledged. Checkpoint saved.")
         : (SaveError.IsEmpty() ? LOCTEXT("Retry", "Priority recorded. Resolve the save failure before continuing.") : FText::FromString(SaveError));

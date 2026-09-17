@@ -438,8 +438,7 @@ bool ASovEncounterDirector::BeginEncounter()
 	{
 		USovSaveSubsystem* Slots = GetGameInstance()->GetSubsystem<USovSaveSubsystem>();
 		FString Error;
-		if (!Slots || (!Slots->ConsumeAcknowledgedBoundary(ESovSaveBoundary::ArenaEntry, EncounterId)
-			&& Slots->WriteCheckpoint(ESovSaveBoundary::ArenaEntry, EncounterId, Error) != ESovSaveResult::Success))
+		if (!Slots || Slots->EnsureCheckpointBoundary(ESovSaveBoundary::ArenaEntry, EncounterId, Error) != ESovSaveResult::Success)
 		{ OnEncounterRestoreFailed.Broadcast(Error); return false; }
 		if (State != ESovEncounterState::Inactive || ResolvePlayer() != Player || !Player->IsAlive()) { return false; }
 	}
