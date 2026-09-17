@@ -356,8 +356,11 @@ int32 USovValidateCampaignCommandlet::Main(const FString& Params)
 			}
 		}
 	}
-	if (!Missions.Contains(TEXT("M01_Mantle")) || !Missions.Contains(TEXT("M02_OneDegree")))
-	{ UE_LOG(LogSovMission, Error, TEXT("Opening campaign manifest must contain M01_Mantle and M02_OneDegree.")); ++Errors; }
+	// A vertical-slice manifest (-SliceManifest) validates a self-contained stretch of the campaign, such as M12-M13,
+	// and is not required to open the campaign. Every other rule, including prerequisite proof, still applies.
+	const bool bSliceManifest = FParse::Param(*Params, TEXT("SliceManifest"));
+	if (!bSliceManifest && (!Missions.Contains(TEXT("M01_Mantle")) || !Missions.Contains(TEXT("M02_OneDegree"))))
+	{ UE_LOG(LogSovMission, Error, TEXT("Opening campaign manifest must contain M01_Mantle and M02_OneDegree. Pass -SliceManifest to validate a vertical slice.")); ++Errors; }
 	TArray<FString> AdditionalPaths;
 	if (SovCampaignContentValidation::ParseAssetListArgument(Params, TEXT("AdditionalAssets="), AdditionalPaths))
 	{

@@ -22,7 +22,8 @@ param(
     [switch] $SkipBuild,
     [switch] $BuildGame,
     [switch] $NonUnity,
-    [switch] $DisableAura
+    [switch] $DisableAura,
+    [switch] $FailOnWarnings
 )
 
 Set-StrictMode -Version Latest
@@ -248,6 +249,9 @@ try {
         if ($null -eq $report.PSObject.Properties[$field]) { throw "Automation report is missing required field '$field'." }
     }
     $totalSucceeded = [int]$report.succeeded + [int]$report.succeededWithWarnings
+    if ($FailOnWarnings -and [int]$report.succeededWithWarnings -gt 0) {
+        throw "Automation passed $($report.succeededWithWarnings) tests only with warnings, which -FailOnWarnings does not accept."
+    }
     if ($totalSucceeded -le 0 -or [int]$report.failed -ne 0 -or [int]$report.notRun -ne 0 -or [int]$report.inProcess -ne 0) {
         throw "Automation did not complete successfully: passed=$totalSucceeded failed=$($report.failed) notRun=$($report.notRun) inProcess=$($report.inProcess)."
     }

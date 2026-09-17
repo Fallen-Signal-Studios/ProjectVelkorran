@@ -51,13 +51,15 @@ def nonnegative_int(obj, key, where):
     return value
 
 
-def verify(report, expected, prefix):
+def verify(report, expected, prefix, allow_warnings=True):
     if not isinstance(report, dict):
         raise ReportError("Report must be an object")
     counts = {key: nonnegative_int(report, key, "report") for key in
               ("succeeded", "succeededWithWarnings", "failed", "notRun", "inProcess")}
     if counts["failed"] or counts["notRun"] or counts["inProcess"]:
         raise ReportError("Report contains failed, unrun or incomplete tests")
+    if not allow_warnings and counts["succeededWithWarnings"]:
+        raise ReportError(f"{counts['succeededWithWarnings']} tests passed only with warnings, which this gate does not accept")
     rows = report.get("tests")
     if not isinstance(rows, list) or not rows:
         raise ReportError("Report must contain a nonempty tests array")

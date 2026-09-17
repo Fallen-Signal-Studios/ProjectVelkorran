@@ -233,12 +233,75 @@ class CampaignQualificationTests(unittest.TestCase):
             if log.stem == "package":
                 self.write(log.parent / "Archive/Mac/ProjectVelkorran.app/Contents/MacOS/ProjectVelkorran", "fake executable")
                 self.write(log.parent / "Archive/Mac/ProjectVelkorran/Content/Paks/Fake.pak", "fake container")
+                self.write(log.parent / "Staged/Mac/Manifest_UFSFiles_Mac.txt", "../../../ProjectVelkorran/Content/Aurelion/Maps/L_Aurelion_M12.umap	x")
             return result
         code, directory, summary = RUNNER.run(self.args("--package", "--map", "/Game/Maps/M12"), package, "Darwin")
         self.assertEqual(code, 0)
         self.assertEqual(len(RUNNER.read_json(directory / "archive-inventory.json")), 2)
         self.assertIn("unverified", summary["stages"][-1]["archive"]["fixture_exclusion"])
         self.assert_unqualified(summary)
+
+    def release_package(self, staged_lines):
+        def package(argv, cwd, log, timeout):
+            result = self.fake_engine(argv, cwd, log, timeout)
+            if log.stem == "package":
+                self.write(log.parent / "Archive/Mac/ProjectVelkorran.app/Contents/MacOS/ProjectVelkorran", "fake executable")
+                self.write(log.parent / "Archive/Mac/ProjectVelkorran/Content/Paks/Fake.pak", "fake container")
+                self.write(log.parent / "Staged/Mac/Manifest_UFSFiles_Mac.txt", "\n".join(staged_lines))
+            return result
+        return package
+
+    def test_engine_descriptors_with_trailing_commas_are_read_like_unreal_reads_them(self):
+        text = '{"Plugins": [{"Name": "A", "Enabled": true},\n ],\n "FriendlyName": "commas, ] and } in a string",}'
+        self.assertEqual(RUNNER.json.loads(RUNNER.descriptor_text(text)),
+                         {"Plugins": [{"Name": "A", "Enabled": True}], "FriendlyName": "commas, ] and } in a string"})
+
+    def test_release_builds_test_and_shipping_and_packages_shipping(self):
+        clean = ["../../../ProjectVelkorran/Content/Aurelion/Maps/L_Aurelion_M12.umap\t2026-09-17T00:00:00.000Z"]
+        code, _, summary = RUNNER.run(self.args("--package", "--release", "--map", "/Game/Maps/M12"), self.release_package(clean), "Darwin")
+        self.assertEqual(code, 0)
+        names = [stage["name"] for stage in summary["stages"]]
+        self.assertEqual(names[:4], ["editor-build", "game-build", "game-build-test", "game-build-shipping"])
+        self.assertEqual(summary["test_configuration"], "built")
+        self.assertIn("Shipping", self.calls[3][0])
+        self.assertIn("-clientconfig=Shipping", self.calls[-1][0])
+        self.assertEqual(summary["stages"][-1]["staged_content"]["prohibited"], 0)
+        self.assert_unqualified(summary)
+
+    def test_installed_engine_cannot_build_test_and_says_so(self):
+        self.write(self.engine / "Engine/Build/InstalledBuild.txt", "installed")
+        clean = ["../../../ProjectVelkorran/Content/Aurelion/Maps/L_Aurelion_M12.umap	x"]
+        code, _, summary = RUNNER.run(self.args("--package", "--release", "--map", "/Game/Maps/M12"), self.release_package(clean), "Darwin")
+        self.assertEqual(code, 0)
+        self.assertNotIn("game-build-test", [stage["name"] for stage in summary["stages"]])
+        self.assertIn("installed engine", summary["test_configuration"])
+
+    def test_release_package_with_demo_content_fails(self):
+        staged = ["../../../ProjectVelkorran/Plugins/Narrative/Content/Pro/Demo/Maps/OpenWorld/L_DemoMap_OpenWorld.umap\tx"]
+        code, directory, summary = RUNNER.run(self.args("--package", "--release", "--map", "/Game/Maps/M12"), self.release_package(staged), "Darwin")
+        self.assertEqual(code, 2)
+        self.assertIn("demo or template content", summary["error"])
+        self.assertEqual(len(RUNNER.read_json(directory / "staged-content-findings.json")), 1)
+
+    def test_release_requires_a_package_and_slice_reaches_the_commandlet(self):
+        self.assertEqual(RUNNER.run(self.args("--release"), self.fake_engine, "Darwin")[0], 2)
+        self.assertEqual(self.calls, [])
+        code, _, summary = RUNNER.run(self.args("--slice"), self.fake_engine, "Darwin")
+        self.assertEqual(code, 0)
+        self.assertIn("-SliceManifest", self.calls[3][0])
+
+    def test_fail_on_warnings_rejects_tests_that_pass_with_warnings(self):
+        def warned(argv, cwd, log, timeout):
+            result = self.fake_engine(argv, cwd, log, timeout)
+            if log.stem == "native-automation":
+                self.write(log.parent / "AutomationReport/index.json", json.dumps({"succeeded": 0, "succeededWithWarnings": 1,
+                    "failed": 0, "notRun": 0, "inProcess": 0,
+                    "tests": [{"fullTestPath": "ProjectVelkorran.Campaign.One", "state": "Success", "errors": 0}]}))
+            return result
+        self.assertEqual(RUNNER.run(self.args(), warned, "Darwin")[0], 0)
+        code, _, summary = RUNNER.run(self.args("--fail-on-warnings"), warned, "Darwin")
+        self.assertEqual(code, 2)
+        self.assertIn("only with warnings", summary["error"])
 
     def test_editor_test_module_in_archive_is_rejected(self):
         self.write(self.output / "Archive/Mac/ProjectVelkorranTests.dylib", "unexpected test module")

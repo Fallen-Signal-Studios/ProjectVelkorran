@@ -21,6 +21,10 @@ import uuid
 
 
 FILTER = "ProjectVelkorran"
+# Staged paths that mean Narrative's demo game, template front end or excluded systems reached a campaign package.
+PROHIBITED_STAGED_CONTENT = ("/Pro/Demo/", "/Pro/Core/CharCreator/", "/Pro/Core/Maps/MainMenu/", "GE_GiveXP", "NE_GiveXP",
+                             "W_NarrativeMenu_Looting", "WBP_Loot_TheirInventory", "WBP_Loot_YourInventory",
+                             "W_NarrativeMenu_MPMainMenu")
 
 
 def helper(filename):
@@ -30,8 +34,48 @@ def helper(filename):
     return module
 
 
+def descriptor_text(text):
+    """Unreal descriptors are read by a lenient JSON parser; several shipped engine .uplugin files carry trailing
+    commas that strict JSON rejects. Remove only commas that directly precede a closing bracket, outside strings."""
+    out, in_string, escaped, pending = [], False, False, None
+    for char in text:
+        if in_string:
+            out.append(char)
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            continue
+        if char == ",":
+            if pending is not None:
+                out.append(pending)
+            pending = ","
+            continue
+        if pending is not None:
+            if char in "]}":
+                pending = None
+            elif not char.isspace():
+                out.append(pending)
+                pending = None
+            else:
+                pending += char
+                continue
+        out.append(char)
+        if char == '"':
+            in_string = True
+    if pending is not None:
+        out.append(pending)
+    return "".join(out)
+
+
 def read_json(path):
     return json.loads(path.read_text(encoding="utf-8-sig"))
+
+
+def read_descriptor(path):
+    return json.loads(descriptor_text(path.read_text(encoding="utf-8-sig")))
 
 
 def write_json(path, data):
@@ -76,6 +120,10 @@ def applies(item, target):
     return target not in item.get("PlatformDenyList", [])
 
 
+def installed_engine(engine):
+    return (engine / "Engine/Build/InstalledBuild.txt").is_file()
+
+
 def plugins_for(project, descriptor, engine, target):
     roots = [project.parent / "Plugins"]
     roots += [(project.parent / item).resolve() for item in descriptor.get("AdditionalPluginDirectories", [])]
@@ -95,7 +143,7 @@ def plugins_for(project, descriptor, engine, target):
         if path is None:
             errors.append(f"Enabled plugin is unavailable for {target}: {name}")
             continue
-        data = read_json(path)
+        data = read_descriptor(path)
         if not isinstance(data, dict):
             raise ValueError(f"Plugin descriptor must be a JSON object: {path}")
         found[name] = path
@@ -127,6 +175,8 @@ def supplied_assets(args):
         raise ValueError("--mission-manifest with real authored mission assets is required")
     if args.package and (args.build_only or not args.map):
         raise ValueError("--package requires a mission manifest and explicit --map entries, without --build-only")
+    if args.release and not args.package:
+        raise ValueError("--release qualifies a Shipping package, so it requires --package")
     return missions
 
 
@@ -186,11 +236,18 @@ def stage_plan(args, run_dir, missions):
     def script(path):
         return ["/bin/bash", str(path)] if args.platform == "Mac" else [str(path)]
     stages = []
-    for target in ("ProjectVelkorranEditor", "ProjectVelkorran"):
-        argv = script(tools["build"]) + [target, args.platform, "Development", f"-Project={args.project}", "-WaitMutex"]
+    builds = [("editor-build", "ProjectVelkorranEditor", "Development"), ("game-build", "ProjectVelkorran", "Development")]
+    if args.release:
+        # Shipping compiles code paths Development never does (UE_BUILD_SHIPPING, stripped diagnostics). An installed
+        # (launcher) engine cannot build Test at all, so that configuration is gated on a source engine.
+        if not installed_engine(args.engine_root):
+            builds.append(("game-build-test", "ProjectVelkorran", "Test"))
+        builds.append(("game-build-shipping", "ProjectVelkorran", "Shipping"))
+    for name, target, configuration in builds:
+        argv = script(tools["build"]) + [target, args.platform, configuration, f"-Project={args.project}", "-WaitMutex"]
         if args.non_unity:
             argv.append("-DisableUnity")
-        stages.append({"name": "editor-build" if target.endswith("Editor") else "game-build", "argv": argv})
+        stages.append({"name": name, "argv": argv})
     common = [str(tools["editor"]), str(args.project), "-unattended", "-nop4", "-NullRHI",
               "-nosplash", "-stdout", "-FullStdOutLogOutput"]
     if not args.build_only:
@@ -199,12 +256,15 @@ def stage_plan(args, run_dir, missions):
                        f"-AbsLog={run_dir / 'native-editor.log'}"]})
         campaign = common + ["-run=SovValidateCampaign", "-ShippingValidation", "-Missions=" + ",".join(missions),
                              f"-AbsLog={run_dir / 'campaign-editor.log'}"]
+        if args.slice:
+            campaign.append("-SliceManifest")
         if args.additional_asset:
             campaign.append("-AdditionalAssets=" + ",".join(args.additional_asset))
         stages.append({"name": "campaign-preflight", "argv": campaign})
     if args.package:
         stages.append({"name": "package", "argv": script(tools["uat"]) + ["BuildCookRun", f"-project={args.project}",
-                       "-target=ProjectVelkorran", f"-platform={args.platform}", "-clientconfig=Development", "-unattended",
+                       "-target=ProjectVelkorran", f"-platform={args.platform}",
+                       "-clientconfig=" + ("Shipping" if args.release else "Development"), "-unattended",
                        "-nop4", "-utf8output", "-build", "-cook", "-stage", "-pak", "-package", "-archive",
                        "-map=" + "+".join(args.map), f"-archivedirectory={run_dir / 'Archive'}",
                        f"-stagingdirectory={run_dir / 'Staged'}"]})
@@ -293,6 +353,27 @@ def package_inventory(args, run_dir):
             "fixture_exclusion": "Only artifact names checked; reflected types/container contents remain unverified"}
 
 
+def staged_content_scan(run_dir):
+    """Fails a package whose staged file manifests carry Narrative demo or template content."""
+    manifests = sorted(path for path in (run_dir / "Staged").rglob("Manifest_*Files_*.txt") if path.is_file())
+    if not manifests:
+        raise ValueError("The package staged no file manifest to scan for prohibited content")
+    findings, entries = [], 0
+    for manifest in manifests:
+        for line in manifest.read_text(encoding="utf-8-sig", errors="replace").splitlines():
+            staged = line.split("\t", 1)[0].replace("\\", "/").strip()
+            if not staged:
+                continue
+            entries += 1
+            if any(marker.casefold() in staged.casefold() for marker in PROHIBITED_STAGED_CONTENT):
+                findings.append(staged)
+    write_json(run_dir / "staged-content-findings.json", findings)
+    if findings:
+        raise ValueError(f"{len(findings)} staged files are Narrative demo or template content (first: {findings[0]}); "
+                         "see staged-content-findings.json")
+    return {"manifests": [str(path) for path in manifests], "entries": entries, "prohibited": 0}
+
+
 def campaign_completion(stage, run_dir, mission_count):
     logs = [Path(stage["log"]), run_dir / "campaign-editor.log"]
     text = "\n".join(path.read_text(encoding="utf-8-sig", errors="replace") for path in logs if path.is_file())
@@ -310,7 +391,10 @@ def run(args, executor=execute, host=None):
     output = (args.output or args.project.parent / "Saved/CampaignQualification").resolve()
     run_dir = output / (datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ-") + uuid.uuid4().hex[:12])
     run_dir.mkdir(parents=True, exist_ok=False)
+    test_configuration = "built" if args.release and not installed_engine(args.engine_root) else (
+        "unavailable: an installed engine cannot build Test" if args.release else "not requested")
     summary = {"schema_version": 1, "status": "failed", "project": str(args.project), "platform": args.platform,
+               "test_configuration": test_configuration,
                "execution": "real_processes" if executor is execute else "test_double_engine_unexecuted",
                "engine_processes_started": False,
                "dry_run": args.dry_run, "source_integrity": "not_checked", "stages": [],
@@ -352,12 +436,14 @@ def run(args, executor=execute, host=None):
                         raise ValueError(f"{stage['name']} failed: exit={result.get('exit_code')}, timeout={result.get('timed_out')}")
                     if stage["name"] == "native-automation":
                         report = run_dir / "AutomationReport/index.json"
-                        stage["coverage"] = helper("Check-UnrealReport.py").verify(read_json(report), source_before["native_tests"], FILTER)
+                        stage["coverage"] = helper("Check-UnrealReport.py").verify(read_json(report), source_before["native_tests"], FILTER,
+                                                                                    allow_warnings=not args.fail_on_warnings)
                         stage["report_sha256"] = sha256(report)
                     if stage["name"] == "campaign-preflight":
                         stage["validation"] = campaign_completion(stage, run_dir, len(missions))
                     if stage["name"] == "package":
                         stage["archive"] = package_inventory(args, run_dir)
+                        stage["staged_content"] = staged_content_scan(run_dir)
                     stage["status"] = "passed"
                 except (OSError, ValueError, subprocess.SubprocessError) as error:
                     stage.update(status="failed", error=str(error))
@@ -382,7 +468,7 @@ def run(args, executor=execute, host=None):
                 summary.update(status="failed", source_integrity="failed", error=str(error))
         if summary["status"] == "passed" and summary["source_integrity"] == "unchanged":
             passed = {stage["name"] for stage in summary["stages"] if stage["status"] == "passed"}
-            summary.update(builds_passed={"editor-build", "game-build"} <= passed,
+            summary.update(builds_passed={stage["name"] for stage in summary["stages"] if stage["name"].endswith("build") or "-build-" in stage["name"]} <= passed,
                            native_tests_passed="native-automation" in passed,
                            campaign_preflight_passed="campaign-preflight" in passed, package_produced="package" in passed)
         persist()
@@ -403,6 +489,10 @@ def parser():
     result.add_argument("--package", action="store_true")
     result.add_argument("--build-only", action="store_true")
     result.add_argument("--dry-run", action="store_true")
+    result.add_argument("--release", action="store_true",
+                        help="Also build Test and Shipping, package Shipping, and fail on staged Narrative demo/template content")
+    result.add_argument("--fail-on-warnings", action="store_true", help="Automation tests that pass with warnings fail the gate")
+    result.add_argument("--slice", action="store_true", help="The mission manifest is a vertical slice that need not open the campaign")
     return result
 
 
