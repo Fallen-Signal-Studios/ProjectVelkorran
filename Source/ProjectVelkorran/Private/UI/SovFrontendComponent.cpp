@@ -242,6 +242,7 @@ void USovFrontendComponent::BindProducers(UTalesComponent* Tales, USovNarrativeC
             BoundTales->OnNPCDialogueLineFinished.AddUniqueDynamic(this, &ThisClass::OnNPCLineFinished);
             BoundTales->OnPlayerDialogueLineFinished.AddUniqueDynamic(this, &ThisClass::OnPlayerLineFinished);
             BoundTales->OnDialogueFinished.AddUniqueDynamic(this, &ThisClass::OnDialogueEnded);
+            BoundTales->OnDialogueSuspensionChanged.AddUniqueDynamic(this, &ThisClass::OnDialogueSuspensionChanged);
         }
         if (BoundCues.IsValid())
         {
@@ -297,6 +298,7 @@ void USovFrontendComponent::OnNPCLine(UDialogue* Dialogue, UDialogueNode_NPC* No
     const FText Name = Character ? Character->GetCharacterName()
         : Speaker.NPCDataAsset ? Speaker.NPCDataAsset->NPCName : FText::FromName(Speaker.GetSpeakerID());
     Presentation->PresentSpeech(Name, Text, -1.f, Avatar ? Avatar->GetActorLocation() : FVector::ZeroVector, true);
+    RememberLine(Dialogue, Node, Name, Text, Avatar ? Avatar->GetActorLocation() : FVector::ZeroVector);
 }
 void USovFrontendComponent::OnPlayerLine(UDialogue* Dialogue, UDialogueNode_Player* Node, const FDialogueLine& Line)
 {
@@ -309,8 +311,13 @@ void USovFrontendComponent::OnPlayerLine(UDialogue* Dialogue, UDialogueNode_Play
     if (bEnding || SpeechEpoch != Epoch || !SpeechDialogue.IsValid() || !BoundTales.IsValid()
         || BoundTales->GetCurrentDialogue() != Dialogue || !IsValid(Presentation)) { return; }
     AActor* Avatar = Dialogue->GetPlayerAvatar(); const auto* Character = Cast<ANarrativeCharacter>(Avatar);
-    Presentation->PresentSpeech(Character ? Character->GetCharacterName() : LOCTEXT("Player", "You"), Text,
-        -1.f, Avatar ? Avatar->GetActorLocation() : FVector::ZeroVector, true);
+    const FText Name = Character ? Character->GetCharacterName() : LOCTEXT("Player", "You");
+    Presentation->PresentSpeech(Name, Text, -1.f, Avatar ? Avatar->GetActorLocation() : FVector::ZeroVector, true);
+    RememberLine(Dialogue, Node, Name, Text, Avatar ? Avatar->GetActorLocation() : FVector::ZeroVector);
+}
+void USovFrontendComponent::RememberLine(UDialogue* Dialogue, UDialogueNode* Node, const FText& Speaker, const FText& Text, const FVector& Location)
+{
+    LineDialogue = Dialogue; LineNode = Node; LineSpeaker = Speaker; LineText = Text; LineLocation = Location; bLineInterrupted = false;
 }
 void USovFrontendComponent::OnNPCLineFinished(UDialogue* Dialogue, UDialogueNode_NPC* Node, const FDialogueLine& Line, const FSpeakerInfo& Speaker)
 {
@@ -330,12 +337,28 @@ void USovFrontendComponent::OnDialogueEnded(UDialogue* Dialogue, bool bStartingN
 }
 void USovFrontendComponent::OnCueStarted(USovNarrativeCue* Cue, AActor* Speaker, const FText& Caption, float Seconds)
 {
-    if (bEnding || !Presentation || !IsValid(Cue) || (BoundTales.IsValid() && BoundTales->GetCurrentDialogue())) { return; }
+    // A playing conversation owns the speech surface. A suspended one does not: the cue arbiter suspends it
+    // precisely so a bark can be heard, and a voiced bark with no subtitle is lost to players who read speech.
+    UDialogue* const Current = BoundTales.IsValid() ? BoundTales->GetCurrentDialogue() : nullptr;
+    if (bEnding || !Presentation || !IsValid(Cue) || (Current && !Current->IsPlaybackSuspended())) { return; }
+    if (Current && SpeechDialogue.Get() == Current && SpeechNode.IsValid() && LineDialogue.Get() == Current && LineNode == SpeechNode)
+    { bLineInterrupted = true; }
     RetirePreviousSpeech(nullptr);
     ++SpeechEpoch; SpeechDialogue.Reset(); SpeechNode.Reset(); SpeechCue = Cue;
     const auto* Character = Cast<ANarrativeCharacter>(Speaker);
     Presentation->PresentSpeech(Character ? Character->GetCharacterName() : FText::FromName(Cue->SpeakerId), Caption,
         Seconds, IsValid(Speaker) ? Speaker->GetActorLocation() : FVector::ZeroVector, false);
+}
+void USovFrontendComponent::OnDialogueSuspensionChanged(UDialogue* Dialogue, bool bSuspended)
+{
+    if (bEnding || bSuspended || !Presentation || !bLineInterrupted || LineDialogue.Get() != Dialogue) { return; }
+    bLineInterrupted = false;
+    UDialogueNode* const Node = LineNode.Get();
+    // Resume in place: only the same conversation, still on the line the bark displaced, is shown again.
+    if (!IsValid(Dialogue) || !IsValid(Node) || !BoundTales.IsValid() || BoundTales->GetCurrentDialogue() != Dialogue
+        || Dialogue->GetCurrentNode() != Node) { return; }
+    ++SpeechEpoch; SpeechDialogue = Dialogue; SpeechNode = Node; SpeechCue.Reset();
+    Presentation->PresentSpeech(LineSpeaker, LineText, -1.f, LineLocation, true);
 }
 void USovFrontendComponent::OnCueEnded(USovNarrativeCue* Cue, bool bInterrupted)
 {
@@ -381,6 +404,7 @@ void USovFrontendComponent::OnLoadCompleted(ESovSaveResult Result, const FSovSav
 void USovFrontendComponent::Unbind()
 {
     ++SpeechEpoch; SpeechDialogue.Reset(); SpeechNode.Reset(); SpeechCue.Reset();
+    LineDialogue.Reset(); LineNode.Reset(); bLineInterrupted = false;
     if (BoundTales.IsValid())
     {
         BoundTales->OnNPCDialogueLineStarted.RemoveDynamic(this, &ThisClass::OnNPCLine);
@@ -388,6 +412,7 @@ void USovFrontendComponent::Unbind()
         BoundTales->OnNPCDialogueLineFinished.RemoveDynamic(this, &ThisClass::OnNPCLineFinished);
         BoundTales->OnPlayerDialogueLineFinished.RemoveDynamic(this, &ThisClass::OnPlayerLineFinished);
         BoundTales->OnDialogueFinished.RemoveDynamic(this, &ThisClass::OnDialogueEnded);
+        BoundTales->OnDialogueSuspensionChanged.RemoveDynamic(this, &ThisClass::OnDialogueSuspensionChanged);
     }
     if (BoundCues.IsValid())
     {

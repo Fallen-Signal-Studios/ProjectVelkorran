@@ -166,6 +166,35 @@ bool FSovNativeHUDIntegrationTest::RunTest(const FString&)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovBarkDuringSuspendedDialogueTest, "ProjectVelkorran.UI.Frontend.BarkDuringSuspendedDialogueIsSubtitled",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovBarkDuringSuspendedDialogueTest::RunTest(const FString&)
+{
+	FFrontendWorld W; auto* Dialogue = W.Dialogue();
+	Dialogue->RootDialogue->Line.Text = FText::FromString(TEXT("Walk-and-talk line.")); W.Start(Dialogue);
+	auto* Cue = NewObject<USovNarrativeCue>(W.PC); Cue->SpeakerId = TEXT("Tarrik");
+	W.Cues->OnCueStarted.Broadcast(Cue, W.Pawn, FText::FromString(TEXT("Talking over the scene.")), 3.f);
+	TestEqual(TEXT("A playing conversation keeps the speech surface"), W.Presentation->GetCurrentSpeechText().ToString(), FString(TEXT("Walk-and-talk line.")));
+	W.Cues->OnCueEnded.Broadcast(Cue, false);
+
+	// The cue arbiter suspends the conversation so a bark can be heard; the bark must be readable too.
+	if (!TestTrue(TEXT("The authored walk-and-talk suspends"), Dialogue->SetPlaybackSuspended(true))) { return false; }
+	W.Cues->OnCueStarted.Broadcast(Cue, W.Pawn, FText::FromString(TEXT("Contact, left side!")), 3.f);
+	TestEqual(TEXT("A bark during a suspended conversation is subtitled"), W.Presentation->GetCurrentSpeechText().ToString(), FString(TEXT("Contact, left side!")));
+	W.Cues->OnCueEnded.Broadcast(Cue, false); W.Presentation->Advance(3.f);
+	TestTrue(TEXT("The finished bark retires after its readable time"), W.Presentation->GetCurrentSpeechText().IsEmpty());
+
+	if (!TestTrue(TEXT("The conversation resumes"), Dialogue->SetPlaybackSuspended(false))) { return false; }
+	TestEqual(TEXT("The displaced line is shown again under its own speaker"), W.Presentation->GetCurrentSpeechText().ToString(), FString(TEXT("Walk-and-talk line.")));
+	TestTrue(TEXT("The bark stays in recent dialogue review"), W.Presentation->GetSceneHistory().ContainsByPredicate(
+		[](const FSovSceneSubtitleEntry& Entry) { return Entry.Text.ToString() == TEXT("Contact, left side!"); }));
+	const int32 HistoryAfterResume = W.Presentation->GetSceneHistory().Num();
+	TestTrue(TEXT("Suspending again without a bark is accepted"), Dialogue->SetPlaybackSuspended(true));
+	TestTrue(TEXT("Resuming again is accepted"), Dialogue->SetPlaybackSuspended(false));
+	TestEqual(TEXT("A resume with no displaced line presents nothing new"), W.Presentation->GetSceneHistory().Num(), HistoryAfterResume);
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovFinalDialogueRetentionTest, "ProjectVelkorran.UI.Frontend.FinalLineSurvivesDialogueEnd",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovFinalDialogueRetentionTest::RunTest(const FString&)

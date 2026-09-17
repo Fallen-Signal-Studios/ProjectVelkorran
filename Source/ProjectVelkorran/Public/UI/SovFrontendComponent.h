@@ -62,6 +62,7 @@ private:
     UFUNCTION() void OnNPCLineFinished(UDialogue* Dialogue, UDialogueNode_NPC* Node, const FDialogueLine& Line, const FSpeakerInfo& Speaker);
     UFUNCTION() void OnPlayerLineFinished(UDialogue* Dialogue, UDialogueNode_Player* Node, const FDialogueLine& Line);
     UFUNCTION() void OnDialogueEnded(UDialogue* Dialogue, bool bStartingNew, EExitDialogueReason Reason);
+    UFUNCTION() void OnDialogueSuspensionChanged(UDialogue* Dialogue, bool bSuspended);
     UFUNCTION() void OnCueStarted(USovNarrativeCue* Cue, AActor* Speaker, const FText& Caption, float Seconds);
     UFUNCTION() void OnCueEnded(USovNarrativeCue* Cue, bool bInterrupted);
     UFUNCTION() void OnDamage(const FSovDamageResult& Result);
@@ -94,6 +95,14 @@ private:
     TWeakObjectPtr<UDialogueNode> SpeechNode;
     uint64 SpeechEpoch = 0;
     TWeakObjectPtr<USovNarrativeCue> SpeechCue;
+    /** The last dialogue line presented, shown again if a bark takes the surface while its conversation is suspended. */
+    TWeakObjectPtr<UDialogue> LineDialogue;
+    TWeakObjectPtr<UDialogueNode> LineNode;
+    FText LineSpeaker;
+    FText LineText;
+    FVector LineLocation = FVector::ZeroVector;
+    bool bLineInterrupted = false;
+    void RememberLine(UDialogue* Dialogue, UDialogueNode* Node, const FText& Speaker, const FText& Text, const FVector& Location);
     UPROPERTY(Transient) TObjectPtr<USovCombatVitalsWidget> CombatVitals;
     /** The holographic combat surface. Owns the resource readout when it is up, so the two never stack. */
     UPROPERTY(Transient) TObjectPtr<class USovHolographicHUDWidget> HolographicHUD;
