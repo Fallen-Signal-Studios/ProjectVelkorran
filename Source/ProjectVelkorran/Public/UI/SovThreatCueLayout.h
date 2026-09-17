@@ -69,7 +69,7 @@ namespace SovThreatCueLayout
         const TArray<FBox2D>& Panels, const FVector2D Size, FVector2D& Position)
     {
         if (ViewSize.ContainsNaN() || Size.ContainsNaN() || Position.ContainsNaN()
-            || Size.X <= 0 || Size.Y <= 0 || Panels.Num() > 9
+            || Size.X <= 0 || Size.Y <= 0 || Panels.Num() > 16
             || static_cast<uint8>(Side) > static_cast<uint8>(ESovThreatCueSide::Left)) { return false; }
         const FVector2D SafeMin = ViewSize * .1;
         const FVector2D SafeMax = ViewSize * .9 - Size;

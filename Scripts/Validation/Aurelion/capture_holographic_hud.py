@@ -18,6 +18,9 @@ MISSION = os.environ.get('SOV_HUD_MISSION', 'M12_FireAndFrost')
 # The run has to prove which protagonist it photographed rather than assume it. M13 opens on Tarrik
 # and only hands to Selene later, so pointing at her map is not the same as capturing her.
 PROTAGONIST = os.environ.get('SOV_HUD_PROTAGONIST', 'Sov.Character.Player.Tarrik')
+# Optional: a UI scale to capture at, and a subtitle plus caption on screen, to check text stays clear of the HUD.
+UI_SCALE = os.environ.get('SOV_HUD_UI_SCALE')
+WITH_TEXT = os.environ.get('SOV_HUD_WITH_TEXT') == '1'
 READY_SECONDS = 180.
 SHOT_SECONDS = 45.
 SETTLE_SECONDS = 1.5
@@ -172,6 +175,18 @@ class Run:
                 self.stage('settle')
                 return
             if self.phase == 'settle':
+                if WITH_TEXT and not self.report.get('text_presented'):
+                    surfaces = [w for w in unreal.ObjectIterator(unreal.SovAccessibilityPresentation) if w.get_world() == world]
+                    if surfaces:
+                        pc, pawn, _ = self.player(world)
+                        where = pawn.get_actor_location()
+                        surfaces[0].present_speech(unreal.Text('Lyessa'), unreal.Text(
+                            'Hold the line at the relay. If the carriers break through the east stair we lose the whole terrace, and the survivors with it.'),
+                            8.0, where, True)
+                        surfaces[0].present_caption(unreal.Text('Shield broken'), 8.0, where)
+                        self.report['text_presented'] = True
+                        self.phase_at = now
+                    return
                 # One breath so the surface has drawn at least one full frame before the shutter.
                 if now-self.phase_at >= SETTLE_SECONDS:
                     # Read at the shutter, so the paint count can be compared against first detection.
@@ -242,6 +257,11 @@ class Run:
             assert isinstance(settings, unreal.SovGameUserSettings)
             # The isolated profile would otherwise hold a first-boot accessibility prerequisite.
             assert settings.complete_accessibility_setup(), 'Cannot accept unchanged standard settings'
+            if UI_SCALE:
+                snapshot = settings.get_settings_snapshot()
+                snapshot.set_editor_property('ui_scale', float(UI_SCALE))
+                applied = settings.apply_settings_snapshot(snapshot)
+                self.report['ui_scale'] = dict(requested=float(UI_SCALE), applied=str(applied))
             editor = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
             assert not editor.is_in_play_in_editor()
             assert editor.load_level(MAP)

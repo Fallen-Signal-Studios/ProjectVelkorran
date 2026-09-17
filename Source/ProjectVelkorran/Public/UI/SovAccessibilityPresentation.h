@@ -46,6 +46,12 @@ public:
     const UBorder* GetObjectivePanel() const { return ObjectiveBackground; }
     const UBorder* GetSubtitlePanel() const { return SubtitleBackground; }
     const UBorder* GetCaptionPanel() const { return CaptionBackground; }
+    /** The title-safe text area in absolute space; false before the canvas has been arranged. */
+    bool GetSafeAreaAbsoluteRect(FSlateRect& Out) const;
+    /** While the holographic HUD is up, text keeps clear of the areas it draws in (see SovHolographicHUDLayout). */
+    void SetHolographicHUDClearance(bool bHUDShown, bool bAmmoShown);
+    /** The HUD's occupied areas in absolute space, for other overlays that must avoid them. Empty while it is down. */
+    void GetHolographicHUDRegions(TArray<FSlateRect>& OutAbsolute) const;
 	UFUNCTION(BlueprintCallable, Category="Sovereign|Accessibility") void PresentSpeech(const FText& Speaker, const FText& Text, float Duration, const FVector& SpeakerLocation, bool bCinematic);
 	UFUNCTION(BlueprintCallable, Category="Sovereign|Accessibility") void PresentCaption(const FText& Text, float Duration, const FVector& SourceLocation, ESovCaptionPriority CaptionPriority = ESovCaptionPriority::Important);
 	/** Line-end and normal dialogue completion preserve the remaining readable pages. */
@@ -93,6 +99,11 @@ private:
 	void RefreshObjectiveText();
 	void LayoutObjectives(float SafeWidth, float SafeHeight);
 	float GetSafeTextWidth() const;
+	/** The subtitle column's width: the safe width's centre band, narrowed only where the HUD requires it. */
+	float GetSubtitleTextWidth() const;
+	FVector2D GetSafeCanvasSize() const;
+	bool bHUDClearance = false;
+	bool bHUDAmmo = false;
 	FText DirectionText(const FVector& Location) const;
 	UFUNCTION() void SettingsChanged(const FSovUserSettingsSnapshot& Value);
 	UFUNCTION() void FoundInteractable(UNarrativeInteractableComponent* Value);

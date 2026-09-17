@@ -141,6 +141,16 @@ int32 USovAurelionThreatWidget::NativePaint(const FPaintArgs& Args, const FGeome
             AddPanel(Presentation, Presentation->GetObjectivePanel());
             AddPanel(Presentation, Presentation->GetSubtitlePanel());
             AddPanel(Presentation, Presentation->GetCaptionPanel());
+            // The holographic HUD paints its readouts rather than composing panels, so its areas come from
+            // the shared layout instead of widget geometry. Without them a warning lands on the health plate.
+            TArray<FSlateRect> HUDRegions;
+            Presentation->GetHolographicHUDRegions(HUDRegions);
+            for (const FSlateRect& Region : HUDRegions)
+            {
+                const FVector2D Min = Geometry.AbsoluteToLocal(FVector2D(Region.Left, Region.Top));
+                const FVector2D Max = Geometry.AbsoluteToLocal(FVector2D(Region.Right, Region.Bottom));
+                if (!Min.ContainsNaN() && !Max.ContainsNaN() && Max.X > Min.X && Max.Y > Min.Y) { OccupiedPanels.Emplace(Min, Max); }
+            }
         }
     }
     for (uint8 Index = 0; Index < 4; ++Index)

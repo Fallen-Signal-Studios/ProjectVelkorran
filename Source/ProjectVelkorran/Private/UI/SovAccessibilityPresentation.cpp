@@ -17,6 +17,7 @@
 #include "Components/SizeBox.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
+#include "UI/SovHolographicHUDLayout.h"
 #include "Components/SovWeakPointComponent.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -135,6 +136,49 @@ TSharedRef<SWidget> USovAccessibilityPresentation::RebuildWidget()
 	}
 	RefreshText(); return Super::RebuildWidget();
 }
+FVector2D USovAccessibilityPresentation::GetSafeCanvasSize() const
+{
+	const FVector2D Size = SafeTextCanvas ? FVector2D(SafeTextCanvas->GetCachedGeometry().GetLocalSize()) : FVector2D::ZeroVector;
+	return Size.X > 0. && Size.Y > 0. ? Size : FVector2D(GetCachedGeometry().GetLocalSize());
+}
+bool USovAccessibilityPresentation::GetSafeAreaAbsoluteRect(FSlateRect& Out) const
+{
+	if (!SafeTextCanvas) { return false; }
+	const FGeometry& Geometry = SafeTextCanvas->GetCachedGeometry();
+	if (Geometry.GetLocalSize().X <= 1. || Geometry.GetLocalSize().Y <= 1.) { return false; }
+	Out = Geometry.GetLayoutBoundingRect();
+	return true;
+}
+void USovAccessibilityPresentation::SetHolographicHUDClearance(bool bHUDShown, bool bAmmoShown)
+{
+	if (bHUDClearance == bHUDShown && bHUDAmmo == bAmmoShown) { return; }
+	bHUDClearance = bHUDShown; bHUDAmmo = bAmmoShown;
+	if (!ActiveSpeech.Text.IsEmpty() && SpeechPages.IsValidIndex(PageIndex)) { BeginEntry(ActiveSpeech); }
+	RefreshText();
+}
+void USovAccessibilityPresentation::GetHolographicHUDRegions(TArray<FSlateRect>& OutAbsolute) const
+{
+	OutAbsolute.Reset();
+	if (!bHUDClearance || !SafeTextCanvas) { return; }
+	const FGeometry& Geometry = SafeTextCanvas->GetCachedGeometry();
+	if (Geometry.GetLocalSize().X <= 1. || Geometry.GetLocalSize().Y <= 1.) { return; }
+	const auto Layout = SovHolographicHUDLayout::Compute(FVector2D(Geometry.GetLocalSize()), Settings.UIScale);
+	for (const FBox2D& Region : Layout.Regions(bHUDAmmo))
+	{
+		const FVector2D Min = Geometry.LocalToAbsolute(Region.Min), Max = Geometry.LocalToAbsolute(Region.Max);
+		OutAbsolute.Emplace(float(Min.X), float(Min.Y), float(Max.X), float(Max.Y));
+	}
+}
+float USovAccessibilityPresentation::GetSubtitleTextWidth() const
+{
+	const float Width = GetSafeTextWidth() * .84f;
+	if (!bHUDClearance) { return Width; }
+	const FVector2D Size = GetSafeCanvasSize();
+	if (Size.X <= 1. || Size.Y <= 1.) { return Width; }
+	const auto Layout = SovHolographicHUDLayout::Compute(Size, Settings.UIScale);
+	const float HeightBudget = SovHolographicHUDLayout::TextHeightBudget(Settings.SubtitleMaximumLines, Settings.SubtitleScale);
+	return FMath::Min(Width, SovHolographicHUDLayout::PlaceSubtitle(Layout, float(Size.Y) * .9f, Width, HeightBudget).MaximumWidth);
+}
 float USovAccessibilityPresentation::GetSafeTextWidth() const
 {
 	// Text uses the console safe area. NativePaint retains the full player viewport for world projections.
@@ -180,8 +224,8 @@ void USovAccessibilityPresentation::BeginEntry(const FSovSceneSubtitleEntry& Ent
 {
 	ActiveSpeech = Entry;
 	int32 Characters = Settings.SubtitleCharactersPerLine;
-	const float Width = GetSafeTextWidth();
-	if (Width > 0) { Characters = FMath::Min(Characters,FMath::Max(1,FMath::FloorToInt(Width * .84f / (27.f * Settings.SubtitleScale)))); }
+	const float Width = GetSubtitleTextWidth();
+	if (Width > 0) { Characters = FMath::Min(Characters,FMath::Max(1,FMath::FloorToInt(Width / (27.f * Settings.SubtitleScale)))); }
 	SpeechPages = PaginateText(Entry.Text.ToString(), Characters, Settings.SubtitleMaximumLines); PageIndex = 0;
 	PageRemaining = FMath::Max(2.f, Entry.Duration / FMath::Max(1,SpeechPages.Num())); RefreshText();
 }
@@ -306,7 +350,15 @@ void USovAccessibilityPresentation::LayoutObjectives(float SafeWidth, float Safe
 	if (!ObjectiveBackground || !ObjectiveSize || !ObjectiveOverflow) { return; }
 	constexpr float CornerInset = 12.f, RowGap = 8.f, PriorityGap = 12.f;
 	const FMargin ObjectivePadding = ObjectiveBackground->GetPadding();
-	const float Width = FMath::Max(1.f, FMath::Min(440.f * Settings.UIScale, SafeWidth * .38f) - 24.f);
+	float Width = FMath::Max(1.f, FMath::Min(440.f * Settings.UIScale, SafeWidth * .38f) - 24.f);
+	TArray<FBox2D> PriorityPanels;
+	if (bHUDClearance)
+	{
+		// The top-left panel stops short of the identity plate and sits above the radar.
+		const auto Layout = SovHolographicHUDLayout::Compute(FVector2D(SafeWidth, SafeHeight), Settings.UIScale);
+		Width = FMath::Max(1.f, FMath::Min(Width, SovHolographicHUDLayout::TopLeftPanelMaximumWidth(Layout, CornerInset) - 24.f));
+		PriorityPanels.Add(Layout.Radar); PriorityPanels.Add(Layout.Arc);
+	}
 	const auto Font = FCoreStyle::GetDefaultFontStyle("Regular", FMath::RoundToInt(20.f * Settings.UIScale));
 	ObjectiveOverflow->SetFont(Font); ObjectiveOverflow->SetWrapTextAt(Width);
 	ObjectiveOverflow->SetColorAndOpacity(FSlateColor(FLinearColor::White));
@@ -319,7 +371,6 @@ void USovAccessibilityPresentation::LayoutObjectives(float SafeWidth, float Safe
 		Label->SetVisibility(Objectives.IsValidIndex(Index) ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
 		if (Objectives.IsValidIndex(Index)) { Label->ForceLayoutPrepass(); }
 	}
-	TArray<FBox2D> PriorityPanels;
 	const auto MeasurePriorityPanel = [&](UBorder* Panel, UTextBlock* Text, const float WrapWidth)
 	{
 		if (!Panel || !Text) { return; }
@@ -405,7 +456,7 @@ void USovAccessibilityPresentation::RefreshText()
 {
 	if (!SubtitleText || !CaptionText) { RefreshObjectiveText(); return; }
 	const int32 Size = FMath::RoundToInt(26 * Settings.SubtitleScale);
-	SubtitleText->SetWrapTextAt(FMath::Max(1.f,GetSafeTextWidth() * .84f));
+	SubtitleText->SetWrapTextAt(FMath::Max(1.f,GetSubtitleTextWidth()));
 	SubtitleText->SetFont(FCoreStyle::GetDefaultFontStyle("Regular",Size)); CaptionText->SetFont(FCoreStyle::GetDefaultFontStyle("Bold",Size));
 	SubtitleText->SetColorAndOpacity(FSlateColor(FLinearColor::White)); CaptionText->SetColorAndOpacity(FSlateColor(FLinearColor::White));
 	const FLinearColor Background(0,0,0,Settings.bHighContrastHUD ? 1.f : Settings.SubtitleBackgroundOpacity);
@@ -419,7 +470,29 @@ void USovAccessibilityPresentation::RefreshText()
 		const FText Pattern=ActiveSpeech.Speaker.IsEmpty() ? FText::GetEmpty() : FText::FromString(FString::Chr(Patterns[FCrc::StrCrc32(*ActiveSpeech.Speaker.ToString())%4]));
 		const FText Speaker = FText::Format(LOCTEXT("SpeakerPattern","{0} {1}"),Pattern,Settings.bSubtitleSpeakerNames ? ActiveSpeech.Speaker : FText::GetEmpty());
 		SubtitleText->SetText(FText::Format(LOCTEXT("SpeechLayout","{0} {1}\n{2}"),Speaker,DirectionText(ActiveSpeech.Location),FText::FromString(SpeechPages[PageIndex])));
-		SubtitleSlot->SetAnchors(FAnchors(.5f,ActiveSpeech.bCinematic ? .9f : .8f));
+		float Anchor = ActiveSpeech.bCinematic ? .9f : .8f;
+		const FVector2D Safe = GetSafeCanvasSize();
+		if (bHUDClearance && Safe.X > 1. && Safe.Y > 1.)
+		{
+			// Above the Echo arc, and clear of the radar: text is never drawn through a HUD readout.
+			const auto Layout = SovHolographicHUDLayout::Compute(Safe, Settings.UIScale);
+			const float HeightBudget = SovHolographicHUDLayout::TextHeightBudget(Settings.SubtitleMaximumLines, Settings.SubtitleScale);
+			const auto Placement = SovHolographicHUDLayout::PlaceSubtitle(Layout, float(Safe.Y) * Anchor, GetSafeTextWidth() * .84f, HeightBudget);
+			Anchor = FMath::Clamp(Placement.Bottom / float(Safe.Y), .2f, 1.f);
+		}
+		SubtitleSlot->SetAnchors(FAnchors(.5f,Anchor));
+	}
+	if (auto* CaptionSlot = Cast<UCanvasPanelSlot>(CaptionBackground->Slot))
+	{
+		float Anchor = .13f;
+		const FVector2D Safe = GetSafeCanvasSize();
+		if (bHUDClearance && Safe.X > 1. && Safe.Y > 1.)
+		{
+			// Below the identity plate and the ammo readout, which would otherwise cover a raised-scale caption.
+			const auto Layout = SovHolographicHUDLayout::Compute(Safe, Settings.UIScale);
+			Anchor = FMath::Clamp(SovHolographicHUDLayout::PlaceCaptionTop(Layout, float(Safe.Y) * Anchor, GetSafeTextWidth() * .8f, bHUDAmmo) / float(Safe.Y), 0.f, .8f);
+		}
+		CaptionSlot->SetAnchors(FAnchors(.5f,Anchor));
 	}
 	CaptionText->SetWrapTextAt(FMath::Max(1.f,GetSafeTextWidth() * .8f));
 	CaptionText->SetText(FText::Format(LOCTEXT("CaptionLayout","[sound] {0}\n{1}"),DirectionText(ActiveCaption.Location),CaptionPages.IsValidIndex(CaptionPageIndex) ? FText::FromString(CaptionPages[CaptionPageIndex]) : FText::GetEmpty()));

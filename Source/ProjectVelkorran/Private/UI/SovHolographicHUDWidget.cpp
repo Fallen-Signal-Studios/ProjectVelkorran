@@ -16,6 +16,8 @@
 #include "Sovereign/SovGameplayTags.h"
 #include "Styling/CoreStyle.h"
 #include "Types/SlateEnums.h"
+#include "UI/SovAccessibilityPresentation.h"
+#include "UI/SovHolographicHUDLayout.h"
 #include "UI/SovHUDStyle.h"
 #include "UnrealFramework/NarrativeCharacter.h"
 #include "Widgets/Layout/SBox.h"
@@ -301,6 +303,8 @@ void USovHolographicHUDWidget::RefreshHolographicHUD()
 	SetVisibility(bReady ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
 }
 
+void USovHolographicHUDWidget::SetSafeAreaSource(USovAccessibilityPresentation* Presentation) { SafeAreaSource = Presentation; }
+
 FString USovHolographicHUDWidget::GetPaintDiagnostics() const
 {
 	// The palette is reported because a theme that resolves to zero alpha would draw nothing at any
@@ -440,11 +444,11 @@ int32 USovHolographicHUDWidget::PaintEdging(const FGeometry& Geometry, FSlateWin
 int32 USovHolographicHUDWidget::PaintIdentityPlate(const FGeometry& Geometry, FSlateWindowElementList& Elements, int32 Layer,
 	const FPalette& Palette, float Scale) const
 {
-	const FVector2D Size = Geometry.GetLocalSize();
 	const FPaintGeometry Paint = Geometry.ToPaintGeometry();
-	const float PlateWidth = FMath::Min(Size.X * .44f, 900.f * Scale);
-	const float PlateHeight = 96.f * Scale;
-	const FVector2D At((Size.X - PlateWidth) * .5f, Size.Y * .022f);
+	const SovHolographicHUDLayout::FHUDGeometry Layout = SovHolographicHUDLayout::Compute(Geometry.GetLocalSize(), Scale);
+	const float PlateWidth = static_cast<float>(Layout.Plate.GetSize().X);
+	const float PlateHeight = static_cast<float>(Layout.Plate.GetSize().Y);
+	const FVector2D At = Layout.Plate.Min;
 
 	DrawBlock(Elements, Layer, Geometry, At, FVector2D(PlateWidth, PlateHeight), Palette.Backing);
 	TArray<FVector2D> Frame;
@@ -504,7 +508,7 @@ int32 USovHolographicHUDWidget::PaintAbilityPips(const FGeometry& Geometry, FSla
 	const float Gap = 7.f * Scale;
 	const float Total = Slots * PipWidth + (Slots - 1) * Gap;
 	const float Left = (Size.X - Total) * .5f;
-	const float Top = Size.Y * .022f + 76.f * Scale;
+	const float Top = static_cast<float>(SovHolographicHUDLayout::Compute(Size, Scale).Plate.Min.Y) + 76.f * Scale;
 
 	for (int32 Index = 0; Index < Slots; ++Index)
 	{
@@ -537,10 +541,10 @@ int32 USovHolographicHUDWidget::PaintAmmo(const FGeometry& Geometry, FSlateWindo
 	const FPalette& Palette, float Scale) const
 {
 	if (Displayed.AmmoInClip < 0) { return Layer; }
-	const FVector2D Size = Geometry.GetLocalSize();
 	const FPaintGeometry Paint = Geometry.ToPaintGeometry();
-	const FVector2D Plate(232.f * Scale, 72.f * Scale);
-	const FVector2D At(Size.X - Plate.X - Size.X * .035f, Size.Y * .048f);
+	const SovHolographicHUDLayout::FHUDGeometry Layout = SovHolographicHUDLayout::Compute(Geometry.GetLocalSize(), Scale);
+	const FVector2D Plate = Layout.Ammo.GetSize();
+	const FVector2D At = Layout.Ammo.Min;
 
 	DrawBlock(Elements, Layer, Geometry, At, Plate, Palette.Backing);
 	TArray<FVector2D> Frame;
@@ -575,20 +579,13 @@ int32 USovHolographicHUDWidget::PaintEchoArc(const FGeometry& Geometry, FSlateWi
 	const FPalette& Palette, float Scale) const
 {
 	if (Displayed.MaxEcho <= KINDA_SMALL_NUMBER) { return Layer; }
-	const FVector2D Size = Geometry.GetLocalSize();
 	const FPaintGeometry Paint = Geometry.ToPaintGeometry();
 	const float Fraction = FMath::Clamp(Displayed.Echo / Displayed.MaxEcho, 0.f, 1.f);
 
 	// A long shallow sweep across the bottom, leaving the left end where the radar sits and lifting
 	// toward the right, as the references draw it. A quadratic curve is enough to describe it.
-	const FVector2D Start(Size.X * .175f, Size.Y * .862f);
-	const FVector2D Control(Size.X * .560f, Size.Y * .942f);
-	const FVector2D End(Size.X * .965f, Size.Y * .800f);
-	const auto PointAt = [&](float T)
-	{
-		const float U = 1.f - T;
-		return Start * (U * U) + Control * (2.f * U * T) + End * (T * T);
-	};
+	const SovHolographicHUDLayout::FHUDGeometry Layout = SovHolographicHUDLayout::Compute(Geometry.GetLocalSize(), Scale);
+	const auto PointAt = [&Layout](float T) { return Layout.ArcPoint(T); };
 
 	// Segmented so charge is countable rather than estimated.
 	const int32 Segments = 11;
@@ -632,10 +629,10 @@ int32 USovHolographicHUDWidget::PaintEchoArc(const FGeometry& Geometry, FSlateWi
 int32 USovHolographicHUDWidget::PaintRadar(const FGeometry& Geometry, FSlateWindowElementList& Elements, int32 Layer,
 	const FPalette& Palette, float Scale) const
 {
-	const FVector2D Size = Geometry.GetLocalSize();
 	const FPaintGeometry Paint = Geometry.ToPaintGeometry();
-	const float Radius = FMath::Min(Size.Y * .145f, 175.f * Scale);
-	const FVector2D Centre(Size.X * .060f + Radius, Size.Y * .735f);
+	const SovHolographicHUDLayout::FHUDGeometry Layout = SovHolographicHUDLayout::Compute(Geometry.GetLocalSize(), Scale);
+	const float Radius = Layout.RadarRadius;
+	const FVector2D Centre = Layout.RadarCentre;
 
 	// Its own colour rather than the shared veil. The backing alpha is tuned to sit behind text; a
 	// disc that large at .55 washes to mid grey over the entry floor and reads as a blob rather than
@@ -740,13 +737,24 @@ int32 USovHolographicHUDWidget::NativePaint(const FPaintArgs& Args, const FGeome
 	// Recorded rather than inferred: this is the last point before anything is submitted to draw.
 	LastPalette = Palette;
 	bLastPaintDrew = true;
-	const float Scale = FMath::IsFinite(Displayed.Settings.UIScale) ? FMath::Clamp(Displayed.Settings.UIScale, .75f, 2.f) : 1.f;
+	const float Scale = SovHolographicHUDLayout::ClampScale(Displayed.Settings.UIScale);
+	// The edging frames the whole screen; every readout sits inside the title-safe area the subtitle surface
+	// uses, so a TV that crops the frame never crops the HUD and both agree where the other is.
 	Result = PaintEdging(Geometry, Elements, Result, Palette);
-	Result = PaintIdentityPlate(Geometry, Elements, Result, Palette, Scale);
-	Result = PaintAbilityPips(Geometry, Elements, Result, Palette, Scale);
-	Result = PaintAmmo(Geometry, Elements, Result, Palette, Scale);
-	Result = PaintEchoArc(Geometry, Elements, Result, Palette, Scale);
-	Result = PaintRadar(Geometry, Elements, Result, Palette, Scale);
+	FGeometry Safe = Geometry;
+	FSlateRect SafeRect;
+	if (SafeAreaSource.IsValid() && SafeAreaSource->GetSafeAreaAbsoluteRect(SafeRect))
+	{
+		const FVector2D Min = Geometry.AbsoluteToLocal(FVector2D(SafeRect.Left, SafeRect.Top));
+		const FVector2D Max = Geometry.AbsoluteToLocal(FVector2D(SafeRect.Right, SafeRect.Bottom));
+		if (!Min.ContainsNaN() && !Max.ContainsNaN() && Max.X - Min.X > 1. && Max.Y - Min.Y > 1.)
+		{ Safe = Geometry.MakeChild(FVector2f(Max - Min), FSlateLayoutTransform(FVector2f(Min))); }
+	}
+	Result = PaintIdentityPlate(Safe, Elements, Result, Palette, Scale);
+	Result = PaintAbilityPips(Safe, Elements, Result, Palette, Scale);
+	Result = PaintAmmo(Safe, Elements, Result, Palette, Scale);
+	Result = PaintEchoArc(Safe, Elements, Result, Palette, Scale);
+	Result = PaintRadar(Safe, Elements, Result, Palette, Scale);
 	return Result;
 }
 

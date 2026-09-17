@@ -54,10 +54,10 @@ void USovFrontendComponent::RefreshFrontend()
         if (!HolographicHUD)
         {
             HolographicHUD = CreateWidget<USovHolographicHUDWidget>(PC, USovHolographicHUDWidget::StaticClass());
-            // Above the gameplay HUD rather than beneath it. The threat overlay sits at 60 and is the
-            // one surface observed to render in a capture; a combat readout is no less essential, and
-            // at a negative depth this drew nothing a player could see. Threat cues still win ties.
-            if (HolographicHUD) { HolographicHUD->AddToPlayerScreen(50); }
+            // Beneath the subtitle and caption surface (-1), so speech is never drawn under a readout.
+            // An earlier capture suggested a negative depth drew nothing; that was the screenshot path
+            // excluding UI, not the depth.
+            if (HolographicHUD) { HolographicHUD->AddToPlayerScreen(-2); }
         }
         if (HolographicHUD) { HolographicHUD->RefreshHolographicHUD(); }
     }
@@ -77,6 +77,13 @@ void USovFrontendComponent::RefreshFrontend()
         Presentation = CreateWidget<USovAccessibilityPresentation>(PC, USovAccessibilityPresentation::StaticClass());
         // HUD menus/modal layers render above this non-interactive gameplay overlay.
         if (Presentation) { Presentation->AddToPlayerScreen(-1); }
+    }
+    if (Presentation)
+    {
+        // Both surfaces share the text safe area, and text keeps clear of what the HUD draws.
+        if (HolographicHUD) { HolographicHUD->SetSafeAreaSource(Presentation); }
+        const bool bHUDShown = HolographicHUD && HolographicHUD->GetVisibility() != ESlateVisibility::Collapsed;
+        Presentation->SetHolographicHUDClearance(bHUDShown, bHUDShown && HolographicHUD->GetDisplayed().AmmoInClip >= 0);
     }
     auto* ASC = Cast<UNarrativeAbilitySystemComponent>(PC->GetAbilitySystemComponent());
     if (ASC && ASC->GetAvatarActor() != PC->GetPawn()) { ASC = nullptr; }

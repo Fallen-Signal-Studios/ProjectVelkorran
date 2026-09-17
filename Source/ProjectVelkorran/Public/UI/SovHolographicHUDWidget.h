@@ -12,6 +12,7 @@
 
 class ASovPlayerController;
 class UMaterialInstanceDynamic;
+class USovAccessibilityPresentation;
 
 /** One reading of everything the surface draws, taken together so the frame is internally consistent. */
 struct FSovHolographicHUDSnapshot
@@ -57,6 +58,9 @@ public:
 
 	const FSovHolographicHUDSnapshot& GetDisplayed() const { return Displayed; }
 
+	/** The subtitle surface whose safe area this HUD paints inside, so both share one set of coordinates. */
+	void SetSafeAreaSource(USovAccessibilityPresentation* Presentation);
+
 	/** Compact paint diagnostics, readable from a capture session rather than inferred from symptoms. */
 	UFUNCTION(BlueprintPure, Category = "Sovereign|HUD")
 	FString GetPaintDiagnostics() const;
@@ -97,6 +101,7 @@ private:
 	void EnsureEdgeMaterial();
 
 	FSovHolographicHUDSnapshot Displayed;
+	TWeakObjectPtr<USovAccessibilityPresentation> SafeAreaSource;
 	/** Advances only with real time, so the radar sweep reads as motion rather than a stutter. */
 	mutable float SweepSeconds = 0.f;
 	/** Two instances of one material, differing only by which side of the band is the screen edge. */
