@@ -18,6 +18,7 @@ import unreal
 RUN = Path(os.environ.get('SOV_AURELION_RUN_DIRECTORY', unreal.Paths.project_saved_dir()))
 OUT = RUN / 'enemy-aggression-pie.json'
 ATTACKING = 'Narrative.State.NPC.Activity.Attacking'
+E1 = 'M12_E1_PressureHall'
 IDLE = 'Narrative.State.NPC.Activity.Idle'
 READY_SECONDS, SETTLE_SECONDS, WATCH_SECONDS, SAMPLE_INTERVAL = 180., 45.0, 60.0, 2.0
 # Stand the player inside each authored group in turn so proximity cannot be the reason nothing fights.
@@ -150,6 +151,22 @@ class Probe:
                                            if row.get('missing_default_abilities')][:20])
                 except Exception as exc:
                     self.report['roster'] = {'error': type(exc).__name__ + ': ' + str(exc)}
+                # An encounter that was never entered refuses every attack its coordinator sees, so the
+                # first run measured a held encounter rather than the enemies. Enter E1 the way the level does.
+                entry = {'director': None, 'checkpoint': None, 'began': None, 'state': None}
+                for director in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.SovEncounterDirector):
+                    if str(director.get_editor_property('encounter_id')) != E1:
+                        continue
+                    entry['director'] = director.get_name()
+                    try:
+                        result = director.capture_entry_checkpoint(player)
+                        entry['checkpoint'] = str(result)
+                    except Exception as exc:
+                        entry['checkpoint'] = 'unavailable: ' + type(exc).__name__ + ': ' + str(exc)
+                    entry['began'] = bool(director.begin_encounter())
+                    entry['state'] = str(director.get_encounter_state())
+                    break
+                self.report['entry'] = entry
                 self.report['player_health_at_start'] = float(player.get_health())
                 self.stage('watch')
                 return
@@ -160,6 +177,9 @@ class Probe:
                     self.report['player_took_damage'] = health < self.report.get('player_health_at_start', health)
                     attacked = any(row.get('attacking') for sample in self.report['samples'] for row in sample['hostiles'])
                     self.report['any_hostile_entered_attacking'] = attacked
+                    for director in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.SovEncounterDirector):
+                        if str(director.get_editor_property('encounter_id')) == E1:
+                            self.report['e1_state_at_end'] = str(director.get_encounter_state())
                     self.finish('Attacking observed' if attacked else 'No hostile entered the attacking activity')
                     self.stage('end_play')
                     return
