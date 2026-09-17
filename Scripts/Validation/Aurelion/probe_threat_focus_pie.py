@@ -10,7 +10,9 @@ It starts M12, waits for Tarrik, spawns an Aurelion Linkbound in front of him, a
      key makes, and expects the lock to land on the spawned enemy;
   3. raises the weapon and confirms the lock survives aiming as a framing handover, which used to be
      reported as a Cinematic lock loss;
-  4. presses the tag again and expects the lock to clear.
+  4. presses Narrative.Input.Designate and expects the threat to carry the protagonist's own reward
+     window, which nothing in the project used to be able to produce;
+  5. presses the focus tag again and expects the lock to clear.
 
 Nothing is saved; the session is stopped at the end.
 """
@@ -24,6 +26,9 @@ RUN = Path(os.environ.get('SOV_AURELION_RUN_DIRECTORY', unreal.Paths.project_sav
 OUT = RUN / 'threat-focus-pie.json'
 TARGET_NPC = '/Game/Aurelion/Enemies/NPC_AurelionLinkbound'
 FOCUS_TAG = 'Narrative.Input.ThreatFocus'
+DESIGNATE_TAG = 'Narrative.Input.Designate'
+MARK_TAG = 'Sov.State.Target.Marked'
+COMMAND_TARGET_TAG = 'Sov.State.CommandTarget.Window'
 AIM_TAG = 'Narrative.State.Weapon.IsAiming'
 READY_SECONDS, TARGET_SECONDS, SETTLE_SECONDS, HOLD_SECONDS = 180., 25., 2.0, 1.5
 
@@ -121,6 +126,8 @@ class Probe:
                 cycles = [line for line in routing if line.startswith('IA_CycleTarget')]
                 self.report['steps']['threat_focus_bound'] = bool(focus) and 'keys=unbound' not in focus[0]
                 self.report['steps']['cycle_bound'] = len(cycles) == 2 and all('keys=unbound' not in line for line in cycles)
+                designate = [line for line in routing if line.startswith('IA_Designate ')]
+                self.report['steps']['designate_bound'] = bool(designate) and 'keys=unbound' not in designate[0]
                 component = self.targeting(pawn)
                 self.report['steps']['targeting_component'] = component is not None
                 if component is None:
@@ -180,6 +187,22 @@ class Probe:
                 if elapsed < HOLD_SECONDS:
                     return
                 self.report['steps']['locked_after_aim'] = self.locked(pawn)
+                unreal.SovMeleeValidationLibrary.press_and_release_semantic_input(controller, tag(DESIGNATE_TAG))
+                self.stage('confirm_designation')
+                return
+            if self.phase == 'confirm_designation':
+                if elapsed < 0.5:
+                    return
+                steps = self.report['steps']
+                target_asc = self.target.get_narrative_ability_system_component() if self.target else None
+                owned = unreal.GameplayTagLibrary.get_owned_gameplay_tags(target_asc).export_text() if target_asc else ''
+                component = self.targeting(pawn)
+                designated = component.get_designated_target() if component else None
+                steps['designated_target'] = designated.get_name() if designated else None
+                steps['target_marked'] = MARK_TAG in owned
+                steps['target_command_window'] = COMMAND_TARGET_TAG in owned
+                # Tarrik designates a command target; Selene marks. One of the two windows must be open.
+                steps['designation_window_open'] = steps['target_marked'] or steps['target_command_window']
                 unreal.SovMeleeValidationLibrary.press_and_release_semantic_input(controller, tag(FOCUS_TAG))
                 self.stage('confirm_release')
                 return
@@ -194,8 +217,10 @@ class Probe:
                 steps['aim_handover_exercised'] = bool(steps.get('aiming'))
                 steps['aim_handover_held_lock'] = bool(steps.get('aiming')) and steps.get('locked_while_aiming') == steps.get('locked_after_press')
                 passed = bool(steps.get('threat_focus_bound') and steps.get('cycle_bound')
-                              and steps.get('target_permits_hard_lock') and steps.get('lock_matches_target')
+                              and steps.get('designate_bound') and steps.get('target_permits_hard_lock')
+                              and steps.get('lock_matches_target')
                               and steps.get('locked_after_aim') == steps.get('locked_after_press')
+                              and steps.get('designation_window_open')
                               and steps.get('locked_after_second_press') is None)
                 self.finish(passed, 'Lock-on reachability: ' + json.dumps({k: v for k, v in steps.items() if k != 'routing'}))
                 self.stage('end_play')

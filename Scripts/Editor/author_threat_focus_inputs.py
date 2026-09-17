@@ -6,7 +6,7 @@ project produced them: DA_CombatInputs had no entry and IMC_Combat had no key. S
 component was unreachable no matter what the player pressed.
 
 This authors one Input Action per semantic tag beside the project's own IA_Evade/IA_Grenade,
-adds the three mapping rows to DA_CombatInputs (which BP_SovPlayerController already uses as
+adds the mapping rows to DA_CombatInputs (which BP_SovPlayerController already uses as
 its AbilityInputMappings), and maps keyboard/mouse and gamepad keys in IMC_Combat (its
 DefaultMappingContext). Keys come from a preference list and a key already bound in the
 context is never taken; if a whole preference list is exhausted the run fails rather than
@@ -36,6 +36,8 @@ ACTIONS = [
      ['LeftBracket', 'Z', 'Comma'], ['Gamepad_DPad_Left']),
     ('Narrative.Input.CycleTargetRight', 'IA_CycleTargetRight', 'Cycle Threat Right',
      ['RightBracket', 'B', 'Period'], ['Gamepad_DPad_Right']),
+    ('Narrative.Input.Designate', 'IA_Designate', 'Designate Target',
+     ['ThumbMouseButton2', 'Z', 'Backslash'], ['Gamepad_RightThumbstick', 'Gamepad_LeftShoulder']),
 ]
 
 report = {'status': 'running', 'actions': {}, 'context_before': [], 'context_after': [], 'saved': []}

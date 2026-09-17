@@ -9,6 +9,9 @@ class ANarrativeCharacter;
 
 UENUM(BlueprintType)
 enum class ESovLockLossReason : uint8 { None, Cancelled, InvalidTarget, Distance, Occluded, Navigation, Cinematic, OwnerUnavailable };
+/** What a designation press produced. Marked and CommandTarget are the two protagonist reward windows. */
+UENUM(BlueprintType)
+enum class ESovDesignationResult : uint8 { Refused, Marked, CommandTarget, Defended };
 /** Why camera framing is not being driven, which is not by itself a reason to lose the lock. */
 UENUM(BlueprintType)
 enum class ESovFramingSuspension : uint8 { None, Aiming, Occluded };
@@ -26,6 +29,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Sovereign|Targeting") bool ToggleHardLock();
 	UFUNCTION(BlueprintCallable, Category="Sovereign|Targeting") bool CycleTarget(bool bRight);
 	UFUNCTION(BlueprintCallable, Category="Sovereign|Targeting") void ClearHardLock();
+	/** Designates the focused threat and orders the companion onto it. With no threat focused, the
+	 * companion is instead ordered to defend the ally under the reticle, or the protagonist. */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Sovereign|Targeting")
+	ESovDesignationResult DesignateFocus(FString& Reason);
+	UFUNCTION(BlueprintPure, Category="Sovereign|Targeting") AActor* GetDesignatedTarget() const { return DesignatedTarget.Get(); }
 	/** Aiming keeps the threat focus and hands framing back to the weapon; it is never a lock loss. */
 	UFUNCTION(BlueprintPure, Category="Sovereign|Targeting") ESovFramingSuspension GetFramingSuspension() const { return FramingSuspension; }
 	UPROPERTY(BlueprintAssignable, Category="Sovereign|Targeting") FSovLockTargetChanged OnLockTargetChanged;
@@ -33,6 +41,8 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category="Sovereign|Targeting", meta=(ClampMin="0",ClampMax="2")) float OcclusionTimeoutSeconds = .4f;
 	UPROPERTY(EditDefaultsOnly, Category="Sovereign|Targeting", meta=(ClampMin="1",ClampMax="180")) float MaximumCameraDegreesPerSecond = 90.f;
 	UPROPERTY(EditDefaultsOnly, Category="Sovereign|Targeting") bool bRequireNavigationRelationship = true;
+	/** How closely the protagonist must be looking at an ally for a defend order to select them. */
+	UPROPERTY(EditDefaultsOnly, Category="Sovereign|Targeting", meta=(ClampMin="0.5",ClampMax="1")) float DefendReticleTightness = .93f;
 	static FName HardLockPermissionTag() { return TEXT("Sov.Target.HardLock"); }
 protected:
 	virtual void BeginPlay() override;
@@ -52,10 +62,13 @@ private:
 	TArray<ANarrativeCharacter*> CollectTargets() const;
 	void SetTarget(ANarrativeCharacter* Target, ESovLockLossReason Reason);
 	void TryAimSnap();
+	class ANarrativeCharacter* FindAllyUnderReticle() const;
+	class USovCompanionComponent* ResolveCompanionCommands() const;
 	void RotateCameraToward(const FVector& Point, float Delta, float Strength);
 	UFUNCTION() void HandleSemanticInput(FGameplayTag Tag, bool bPressed);
 	UPROPERTY(Transient) TWeakObjectPtr<ANarrativePlayerController> Controller;
 	UPROPERTY(Transient) TWeakObjectPtr<ANarrativeCharacter> LockedTarget;
+	UPROPERTY(Transient) TWeakObjectPtr<AActor> DesignatedTarget;
 	bool bHasPublishedLock = false;
 	bool bEndingPlay = false;
 	bool bWasAiming = false;

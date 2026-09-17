@@ -27,6 +27,7 @@ public:
 	FGameplayTag Input_ThreatFocus;
 	FGameplayTag Input_CycleTargetLeft;
 	FGameplayTag Input_CycleTargetRight;
+	FGameplayTag Input_Designate;
 	FGameplayTag Input_AbilityModifier;
 	FGameplayTag Ability_Evade;
 	FGameplayTag State_Evading;
@@ -117,6 +118,8 @@ public:
 	FGameplayTag State_Status_DeviceDisabled;
 	FGameplayTag State_Status_Exposed;
 	FGameplayTag State_Status_Corrupted;
+	FGameplayTag State_Status_Marked;
+	FGameplayTag State_Status_CommandTarget;
 	FGameplayTag State_Corruption;
 	FGameplayTag State_Weapon_VerityAbsent;
 	FGameplayTag Campaign_Value_Withheld;
@@ -173,6 +176,8 @@ public:
 	FGameplayTag Status_Apply_DeviceDisabled;
 	FGameplayTag Status_Apply_Exposed;
 	FGameplayTag Status_Apply_Corruption;
+	FGameplayTag Status_Apply_Mark;
+	FGameplayTag Status_Apply_CommandTarget;
 	FGameplayTag Status_Immunity;
 	FGameplayTag Status_Immunity_All;
 	FGameplayTag Status_Immunity_Burn;
@@ -181,6 +186,7 @@ public:
 	FGameplayTag Status_Immunity_DeviceDisable;
 	FGameplayTag Status_Immunity_Exposed;
 	FGameplayTag Status_Immunity_Corruption;
+	FGameplayTag Status_Immunity_Designation;
 	FGameplayTag Status_Cleanse;
 	FGameplayTag Status_Cleanse_All;
 	FGameplayTag Status_Cleanse_Burn;
@@ -189,6 +195,7 @@ public:
 	FGameplayTag Status_Cleanse_DeviceDisabled;
 	FGameplayTag Status_Cleanse_Exposed;
 	FGameplayTag Status_Cleanse_Corruption;
+	FGameplayTag Status_Cleanse_Designation;
 
 	FGameplayTag SetByCaller_Damage_AbilityScalar;
 	FGameplayTag SetByCaller_Damage_SourceModifier;

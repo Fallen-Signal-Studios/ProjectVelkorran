@@ -433,6 +433,34 @@ void USovStatusComponent::CreateBuiltInDefinitions()
 		Tags.Status_Immunity_Exposed,
 		Tags.Status_Cleanse_Exposed);
 	Exposed->UIPriority = 80;
+
+	// Player designations. Both reward windows are target-owned: Selene's priority mark and Tarrik's
+	// command target are the states their Echo components read from the target at the moment of the
+	// killing hit, and the Resonance SupportSever offer reads the mark. A status definition's own
+	// state tag must live under Sov.State.Status, so the authored designation states the rest of the
+	// project already reads are granted alongside it. Neither constrains the target it names: the
+	// window is the whole mechanic, so no movement or action constraint is granted with them.
+	USovStatusDefinition* Mark = MakeDefinition(
+		TEXT("BuiltInStatus_Mark"),
+		Tags.Status_Apply_Mark,
+		Tags.State_Status_Marked,
+		TEXT("Marked"),
+		8.0f,
+		Tags.Status_Immunity_Designation,
+		Tags.Status_Cleanse_Designation);
+	Mark->GrantedConstraintTags.AddTag(Tags.State_Target_Marked);
+	Mark->UIPriority = 60;
+
+	USovStatusDefinition* CommandTarget = MakeDefinition(
+		TEXT("BuiltInStatus_CommandTarget"),
+		Tags.Status_Apply_CommandTarget,
+		Tags.State_Status_CommandTarget,
+		TEXT("Command Target"),
+		8.0f,
+		Tags.Status_Immunity_Designation,
+		Tags.Status_Cleanse_Designation);
+	CommandTarget->GrantedConstraintTags.AddTag(Tags.State_CommandTarget_Window);
+	CommandTarget->UIPriority = 60;
 }
 
 USovStatusDefinition* USovStatusComponent::ResolveDefinition(

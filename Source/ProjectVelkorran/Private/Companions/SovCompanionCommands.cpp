@@ -1,4 +1,5 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
+#include "Companions/SovCompanionApproachPolicy.h"
 #include "Companions/SovCompanionComponent.h"
 #include "Companions/SovCompanionCommandActivity.h"
 #include "Companions/SovCoActionAnchor.h"
@@ -302,17 +303,15 @@ void USovCompanionComponent::TickContextCommand(USovCompanionCommandGoal* Goal)
 				{
 					// Respect explicit holds and the existing ten-metre defense area.
 					// Native attack ranges determine approach; range checks remain authoritative.
-					if (!bCombatApproach && Goal->Command != ESovCompanionCommand::HoldPosition
-						&& Candidate.bHasLineOfSight && !Candidate.bInRange
-						&& FVector::DistSquared(Focus->GetActorLocation(), Destination) <= FMath::Square(1000.f)
-						&& FVector::Dist(NPC->GetActorLocation(), Focus->GetActorLocation()) > Candidate.MaximumRange)
-					{
-						const FVector TowardCompanion = (NPC->GetActorLocation() - Focus->GetActorLocation()).GetSafeNormal2D();
-						const float ApproachRange = FMath::Clamp(Candidate.PreferredRange,
-							Candidate.MinimumRange, FMath::Lerp(Candidate.MinimumRange, Candidate.MaximumRange, .75f));
-						Destination = Focus->GetActorLocation() + TowardCompanion * ApproachRange;
-						bCombatApproach = true;
-					}
+					// Respect explicit holds. Native attack ranges determine approach; the leash keeps the
+					// companion within the distance the order itself admits. See SovCompanionApproachPolicy.
+					FVector ApproachPoint;
+					if (!bCombatApproach && Goal->Command != ESovCompanionCommand::HoldPosition && !Candidate.bInRange
+						&& SovCompanionApproachPolicy::SelectApproachPoint(NPC->GetActorLocation(), Focus->GetActorLocation(),
+							Leader->GetActorLocation(), Candidate.MinimumRange, Candidate.PreferredRange, Candidate.MaximumRange,
+							Goal->Command == ESovCompanionCommand::FocusTarget ? SovCompanionApproachPolicy::OrderedLeash
+								: SovCompanionApproachPolicy::UnorderedLeash, ApproachPoint))
+					{ Destination = ApproachPoint; bCombatApproach = true; }
 					continue;
 				}
 				OwnedCommandAttack = Candidate.Handle; CommandAttackStarted = GetWorld()->GetTimeSeconds(); NextCommandAttack = CommandAttackStarted + 2.f;

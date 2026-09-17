@@ -9,6 +9,12 @@
 #include "GAS/NarrativeAbilitySystemComponent.h"
 #include "GAS/NarrativeAttributeSetBase.h"
 #include "Sovereign/SovGameplayTags.h"
+#include "Characters/SovPlayerCharacterBase.h"
+#include "Companions/SovCompanionComponent.h"
+#include "Companions/SovConvergenceCompanionState.h"
+#include "Companions/SovProtagonistCompanionCharacter.h"
+#include "Components/SovStatusComponent.h"
+#include "Framework/SovPlayerController.h"
 #include "NarrativeGameplayTags.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "NavigationSystem.h"
@@ -240,6 +246,81 @@ void USovTargetingComponent::HandleSemanticInput(FGameplayTag Tag, bool bPressed
 	if (Tag == Tags.Input_ThreatFocus) { ToggleHardLock(); }
 	else if (Tag == Tags.Input_CycleTargetLeft) { CycleTarget(false); }
 	else if (Tag == Tags.Input_CycleTargetRight) { CycleTarget(true); }
+	else if (Tag == Tags.Input_Designate) { FString Reason; DesignateFocus(Reason); }
+}
+
+USovCompanionComponent* USovTargetingComponent::ResolveCompanionCommands() const
+{
+	const auto* PC = Cast<ASovPlayerController>(Controller.Get());
+	const auto* Companions = PC ? PC->GetConvergenceCompanionState() : nullptr;
+	auto* Companion = Companions ? Companions->GetActiveCompanion() : nullptr;
+	return IsValid(Companion) ? Companion->GetCompanionComponent() : nullptr;
+}
+
+ANarrativeCharacter* USovTargetingComponent::FindAllyUnderReticle() const
+{
+	// A defend order names a person, so the protagonist must be looking at one: this is a deliberate
+	// reticle selection, not the proximity sweep hostiles get. The companion itself is never the subject.
+	if (!CanHoldFocus() || !FMath::IsFinite(MaximumLockDistance) || MaximumLockDistance < 100.f) { return nullptr; }
+	const USovCompanionComponent* Commands = ResolveCompanionCommands();
+	const AActor* CompanionActor = Commands ? Commands->GetOwner() : nullptr;
+	TArray<FOverlapResult> Hits;
+	FCollisionObjectQueryParams Objects; Objects.AddObjectTypesToQuery(ECC_Pawn);
+	FCollisionQueryParams Query(SCENE_QUERY_STAT(SovDefendCandidates), false, GetOwner());
+	GetWorld()->OverlapMultiByObjectType(Hits, GetOwner()->GetActorLocation(), FQuat::Identity, Objects,
+		FCollisionShape::MakeSphere(MaximumLockDistance), Query);
+	FVector View; FRotator Rotation; Controller->GetPlayerViewPoint(View, Rotation);
+	const float Tightness = FMath::IsFinite(DefendReticleTightness) ? FMath::Clamp(DefendReticleTightness, .5f, 1.f) : .93f;
+	ANarrativeCharacter* Best = nullptr; float BestScore = Tightness;
+	for (const FOverlapResult& Hit : Hits)
+	{
+		ANarrativeCharacter* Candidate = Cast<ANarrativeCharacter>(Hit.GetActor());
+		const auto* ASC = IsValid(Candidate) ? Candidate->GetNarrativeAbilitySystemComponent() : nullptr;
+		if (!ASC || Candidate == GetOwner() || Candidate == CompanionActor || Candidate->IsHidden() || ASC->IsDead()
+			|| ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()) <= 0.f
+			|| UArsenalStatics::GetAttitude(GetOwner(), Candidate) != ETeamAttitude::Friendly
+			|| !HasLineOfSight(Candidate)) { continue; }
+		const float Score = FVector::DotProduct((Candidate->GetActorLocation() - View).GetSafeNormal(), Rotation.Vector());
+		if (Score > BestScore) { BestScore = Score; Best = Candidate; }
+	}
+	return Best;
+}
+
+ESovDesignationResult USovTargetingComponent::DesignateFocus(FString& Reason)
+{
+	Reason.Reset();
+	// Designation writes a target-owned reward window, so it belongs to the authority that owns damage.
+	if (!ResolveController() || !CanHoldFocus() || !GetOwner()->HasAuthority())
+	{ Reason = TEXT("The protagonist cannot designate a target right now."); return ESovDesignationResult::Refused; }
+	auto* Player = Cast<ASovPlayerCharacterBase>(GetOwner());
+	USovCompanionComponent* Commands = ResolveCompanionCommands();
+	// Designating without a focus acquires one first: one press is the whole gesture.
+	if (!LockedTarget.IsValid()) { ToggleHardLock(); }
+	if (ANarrativeCharacter* Threat = LockedTarget.Get())
+	{
+		auto* Status = Threat->FindComponentByClass<USovStatusComponent>();
+		if (!Status) { Reason = TEXT("That threat carries no status owner, so it cannot hold a designation."); return ESovDesignationResult::Refused; }
+		const FSovGameplayTags& Tags = FSovGameplayTags::Get();
+		const auto* OwnerASC = Player ? Player->GetNarrativeAbilitySystemComponent() : nullptr;
+		// Tarrik designates a command target for the companion; Selene marks a priority target. Each
+		// protagonist's own Echo component reads its window from the target at the killing hit.
+		const bool bCommandTarget = OwnerASC && OwnerASC->HasMatchingGameplayTag(Tags.Character_Player_Tarrik);
+		const FGameplayTag Request = bCommandTarget ? Tags.Status_Apply_CommandTarget : Tags.Status_Apply_Mark;
+		const ESovStatusApplicationResult Applied = Status->ApplyStatusByTag(Request, GetOwner());
+		if (Applied != ESovStatusApplicationResult::Applied && Applied != ESovStatusApplicationResult::Refreshed)
+		{ Reason = TEXT("The threat refused the designation."); return ESovDesignationResult::Refused; }
+		DesignatedTarget = Threat;
+		// The window stands on its own. A companion that cannot take the order does not undo it.
+		if (Commands && Player) { FString Unused; Commands->RequestCommand(Player, ESovCompanionCommand::FocusTarget, Threat, Unused); }
+		else { Reason = TEXT("Designated, but no companion is available to take the order."); }
+		return bCommandTarget ? ESovDesignationResult::CommandTarget : ESovDesignationResult::Marked;
+	}
+	if (!Commands || !Player) { Reason = TEXT("No companion is available to take a command."); return ESovDesignationResult::Refused; }
+	ANarrativeCharacter* Person = FindAllyUnderReticle();
+	if (!Commands->RequestCommand(Player, ESovCompanionCommand::DefendPerson, Person ? Cast<AActor>(Person) : Cast<AActor>(Player), Reason))
+	{ return ESovDesignationResult::Refused; }
+	DesignatedTarget = Person ? Cast<AActor>(Person) : Cast<AActor>(Player);
+	return ESovDesignationResult::Defended;
 }
 
 void USovTargetingComponent::TryAimSnap()

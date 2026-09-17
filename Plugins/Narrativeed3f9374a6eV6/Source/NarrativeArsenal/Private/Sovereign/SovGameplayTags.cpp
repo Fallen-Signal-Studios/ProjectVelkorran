@@ -33,6 +33,7 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 	AddTag(Input_ThreatFocus, "Narrative.Input.ThreatFocus", "Toggle native threat focus.");
 	AddTag(Input_CycleTargetLeft, "Narrative.Input.CycleTargetLeft", "Cycle to the visible threat on the left.");
 	AddTag(Input_CycleTargetRight, "Narrative.Input.CycleTargetRight", "Cycle to the visible threat on the right.");
+	AddTag(Input_Designate, "Narrative.Input.Designate", "Designate the focused threat for the protagonist's reward window and order the companion onto it.");
 	AddTag(Input_AbilityModifier, "Narrative.Input.AbilityModifier", "Semantic alternate-ability modifier.");
 	AddTag(Ability_Evade, "Sov.Ability.Evade", "Native campaign runtime contract.");
 	AddTag(State_Evading, "Sov.State.Evading", "Native campaign runtime contract.");
@@ -123,6 +124,8 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 	AddTag(State_Status_DeviceDisabled, "Sov.State.Status.DeviceDisabled", "Eligible combat systems are disabled by Disruption.");
 	AddTag(State_Status_Exposed, "Sov.State.Status.Exposed", "The target is temporarily vulnerable to an authored exposure payoff.");
 	AddTag(State_Status_Corrupted, "Sov.State.Status.Corrupted", "The target has nonzero persistent Eclipse corruption exposure.");
+	AddTag(State_Status_Marked, "Sov.State.Status.Marked", "A protagonist has designated this target as a priority mark.");
+	AddTag(State_Status_CommandTarget, "Sov.State.Status.CommandTarget", "A protagonist has designated this target as the companion's command target.");
 	AddTag(State_Corruption, "Sov.State.Corruption", "Parent tag for the target's exact corruption-pressure band.");
 	AddTag(State_Weapon_VerityAbsent, "Sov.State.Weapon.VerityAbsent", "Verity is committed to its authoritative Dispatch flight and cannot be drawn as a duplicate.");
 	AddTag(Campaign_Value_Withheld, "Sov.Campaign.Value.Withheld", "Authored immutable campaign fact or discrete value.");
@@ -178,6 +181,8 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 	AddTag(Status_Apply_DeviceDisabled, "Sov.Status.Apply.DeviceDisabled", "A resolved hit requests a device-disable status on eligible targets.");
 	AddTag(Status_Apply_Exposed, "Sov.Status.Apply.Exposed", "A resolved hit requests the project-owned Exposed status.");
 	AddTag(Status_Apply_Corruption, "Sov.Status.Apply.Corruption", "A resolved hit requests persistent corruption exposure.");
+	AddTag(Status_Apply_Mark, "Sov.Status.Apply.Mark", "The player designates a priority mark on a threat.");
+	AddTag(Status_Apply_CommandTarget, "Sov.Status.Apply.CommandTarget", "The player designates a command target for the companion.");
 	AddTag(Status_Immunity, "Sov.Status.Immunity", "Parent tag for project-owned status immunities.");
 	AddTag(Status_Immunity_All, "Sov.Status.Immunity.All", "The target rejects every project-owned status application.");
 	AddTag(Status_Immunity_Burn, "Sov.Status.Immunity.Burn", "The target rejects project-owned Burn effects.");
@@ -186,6 +191,7 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 	AddTag(Status_Immunity_DeviceDisable, "Sov.Status.Immunity.DeviceDisable", "The target rejects device-disable effects.");
 	AddTag(Status_Immunity_Exposed, "Sov.Status.Immunity.Exposed", "The target rejects project-owned Exposed effects.");
 	AddTag(Status_Immunity_Corruption, "Sov.Status.Immunity.Corruption", "The target rejects corruption exposure requests.");
+	AddTag(Status_Immunity_Designation, "Sov.Status.Immunity.Designation", "The target cannot be designated as a mark or command target.");
 	AddTag(Status_Cleanse, "Sov.Status.Cleanse", "Parent tag for project-owned status-removal requests.");
 	AddTag(Status_Cleanse_All, "Sov.Status.Cleanse.All", "Remove every cleansable project-owned status.");
 	AddTag(Status_Cleanse_Burn, "Sov.Status.Cleanse.Burn", "Remove active Burn.");
@@ -194,6 +200,7 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 	AddTag(Status_Cleanse_DeviceDisabled, "Sov.Status.Cleanse.DeviceDisabled", "Remove active device disable.");
 	AddTag(Status_Cleanse_Exposed, "Sov.Status.Cleanse.Exposed", "Remove active Exposed.");
 	AddTag(Status_Cleanse_Corruption, "Sov.Status.Cleanse.Corruption", "Request the authored corruption remedy instead of erasing exposure directly.");
+	AddTag(Status_Cleanse_Designation, "Sov.Status.Cleanse.Designation", "Remove an active mark or command-target designation.");
 
 	AddTag(SetByCaller_Damage_AbilityScalar, "Sov.SetByCaller.Damage.AbilityScalar", "Ability-specific damage scalar.");
 	AddTag(SetByCaller_Damage_SourceModifier, "Sov.SetByCaller.Damage.SourceModifier", "Authored source damage multiplier.");
