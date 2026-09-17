@@ -8,6 +8,7 @@
 #include "Tests/SovAxiomRuntimeTestFixtures.h"
 #include "Tests/SovSettingsTestFixtures.h"
 #include "UnrealFramework/NarrativePlayerController.h"
+#include "NarrativeGameplayTags.h"
 #include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
@@ -99,6 +100,29 @@ bool FSovTargetingWorldTest::RunTest(const FString& Parameters)
 	Targeting->TickComponent(.3f, LEVELTICK_All, nullptr);
 	TestNull(TEXT("Occlusion timeout releases lock"), Targeting->GetLockedTarget());
 	TestTrue(TEXT("Camera assistance never translates player"), Player->GetActorLocation().Equals(OriginalLocation));
+	// Aiming hands framing to the weapon. It is a framing handover, never a lock loss (audit PC2-07).
+	Cover->Destroy();
+	auto* PlayerASC = Player->GetNarrativeAbilitySystemComponent();
+	const FGameplayTag AimingTag = FNarrativeGameplayTags::Get().State_Weapon_IsAiming;
+	Targeting->SetTarget(Enemy, ESovLockLossReason::None);
+	Targeting->TickComponent(.016f, LEVELTICK_All, nullptr);
+	TestTrue(TEXT("Restored line of sight keeps the reacquired focus"), Targeting->GetLockedTarget() == Enemy);
+	TestEqual(TEXT("An unaimed focus drives native framing"), Targeting->GetFramingSuspension(), ESovFramingSuspension::None);
+	PlayerASC->AddLooseGameplayTag(AimingTag);
+	Targeting->TickComponent(.016f, LEVELTICK_All, nullptr);
+	TestTrue(TEXT("Aiming keeps the threat focus"), Targeting->GetLockedTarget() == Enemy);
+	TestEqual(TEXT("Aiming suspends framing only"), Targeting->GetFramingSuspension(), ESovFramingSuspension::Aiming);
+	const FRotator AimedRotation = Controller->GetControlRotation();
+	Targeting->TickComponent(.2f, LEVELTICK_All, nullptr);
+	TestTrue(TEXT("Native framing never steers the camera while the weapon is aimed"),
+		Controller->GetControlRotation().Equals(AimedRotation));
+	TestTrue(TEXT("Aiming still holds the focus after a full framing interval"), Targeting->GetLockedTarget() == Enemy);
+	Targeting->ClearHardLock();
+	TestTrue(TEXT("A threat focus can be acquired while aiming"), Targeting->ToggleHardLock() && Targeting->GetLockedTarget() == Enemy);
+	PlayerASC->RemoveLooseGameplayTag(AimingTag);
+	Targeting->TickComponent(.016f, LEVELTICK_All, nullptr);
+	TestEqual(TEXT("Lowering the weapon returns framing to the focus"), Targeting->GetFramingSuspension(), ESovFramingSuspension::None);
+	Targeting->ClearHardLock();
 	auto* LossProbe = NewObject<USovTargetingLossProbe>(Targeting);
 	Targeting->OnLockTargetChanged.AddDynamic(LossProbe, &USovTargetingLossProbe::OnTargetChanged);
 	Targeting->SetTarget(Enemy, ESovLockLossReason::None);

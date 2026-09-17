@@ -31,7 +31,7 @@ void USovTargetingComponent::EndPlay(const EEndPlayReason::Type Reason)
 	bEndingPlay = true;
 	if (Controller.IsValid()) { Controller->OnSemanticInputChanged.RemoveDynamic(this, &ThisClass::HandleSemanticInput); }
 	const bool bLostTarget = bHasPublishedLock;
-	LockedTarget.Reset(); Controller.Reset(); bHasPublishedLock = false;
+	LockedTarget.Reset(); Controller.Reset(); bHasPublishedLock = false; FramingSuspension = ESovFramingSuspension::None;
 	if (bLostTarget) { OnLockTargetChanged.Broadcast(nullptr, ESovLockLossReason::OwnerUnavailable); }
 	Super::EndPlay(Reason);
 }
@@ -46,6 +46,7 @@ bool USovTargetingComponent::ResolveController()
 		if (Controller.IsValid()) { Controller->OnSemanticInputChanged.RemoveDynamic(this, &ThisClass::HandleSemanticInput); }
 		const bool bLostPublishedTarget = bHasPublishedLock;
 		Controller = Current; LockedTarget.Reset(); bHasPublishedLock = false; bWasAiming = false; OccludedFor = 0.f;
+		FramingSuspension = ESovFramingSuspension::None;
 		if (Current) { Current->OnSemanticInputChanged.AddDynamic(this, &ThisClass::HandleSemanticInput); }
 		if (bLostPublishedTarget) { OnLockTargetChanged.Broadcast(nullptr, ESovLockLossReason::OwnerUnavailable); }
 		// A listener can start another possession during the loss notification.
@@ -54,16 +55,23 @@ bool USovTargetingComponent::ResolveController()
 	}
 	return Controller.IsValid();
 }
-bool USovTargetingComponent::CanControlCamera() const
+bool USovTargetingComponent::CanHoldFocus() const
 {
 	const ANarrativePlayerController* PC = Controller.Get();
 	const ANarrativeCharacter* Character = Cast<ANarrativeCharacter>(GetOwner());
 	const UNarrativeAbilitySystemComponent* ASC = Character ? Character->GetNarrativeAbilitySystemComponent() : nullptr;
 	return !bEndingPlay && PC && PC->GetPawn() == GetOwner() && PC->GetViewTarget() == GetOwner() && !PC->IsLookInputIgnored()
 		&& !PC->IsMoveInputIgnored() && GetWorld() && !GetWorld()->IsPaused() && ASC && ASC->GetCharacterReadyEpoch() > 0
-		&& !ASC->IsDead() && !ASC->HasMatchingGameplayTag(FSovGameplayTags::Get().State_Fatal)
-		&& !ASC->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_Weapon_IsAiming);
+		&& !ASC->IsDead() && !ASC->HasMatchingGameplayTag(FSovGameplayTags::Get().State_Fatal);
 }
+bool USovTargetingComponent::IsAiming() const
+{
+	const ANarrativeCharacter* Character = Cast<ANarrativeCharacter>(GetOwner());
+	const UNarrativeAbilitySystemComponent* ASC = Character ? Character->GetNarrativeAbilitySystemComponent() : nullptr;
+	return ASC && ASC->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_Weapon_IsAiming);
+}
+// Aiming is a framing handover, not a lock loss: the weapon owns the camera while the focus is retained.
+bool USovTargetingComponent::CanControlCamera() const { return CanHoldFocus() && !IsAiming(); }
 bool USovTargetingComponent::HasLineOfSight(ANarrativeCharacter* Target) const
 {
 	if (!Controller.IsValid() || !IsValid(Target)) { return false; }
@@ -106,7 +114,7 @@ bool USovTargetingComponent::IsValidTarget(ANarrativeCharacter* Target, bool bCh
 TArray<ANarrativeCharacter*> USovTargetingComponent::CollectTargets() const
 {
 	TArray<ANarrativeCharacter*> Candidates;
-	if (!CanControlCamera() || !FMath::IsFinite(MaximumLockDistance) || MaximumLockDistance < 100.f) { return Candidates; }
+	if (!CanHoldFocus() || !FMath::IsFinite(MaximumLockDistance) || MaximumLockDistance < 100.f) { return Candidates; }
 	TArray<FOverlapResult> Hits;
 	FCollisionObjectQueryParams Objects; Objects.AddObjectTypesToQuery(ECC_Pawn);
 	FCollisionQueryParams Query(SCENE_QUERY_STAT(SovHardLockCandidates), false, GetOwner());
@@ -125,6 +133,7 @@ void USovTargetingComponent::SetTarget(ANarrativeCharacter* Target, ESovLockLoss
 {
 	if (bEndingPlay || (LockedTarget.Get() == Target && Target) || (!Target && !bHasPublishedLock)) { return; }
 	LockedTarget = Target; bHasPublishedLock = Target != nullptr; OccludedFor = 0.f; NavigationElapsed = 0.f;
+	FramingSuspension = Target && IsAiming() ? ESovFramingSuspension::Aiming : ESovFramingSuspension::None;
 	if (!Target && Reason != ESovLockLossReason::Cancelled)
 	{ USovDiagnosticsSubsystem::Record(GetWorld(), ESovDiagnosticKind::LockFailure, TEXT("HardLock"), NAME_None, static_cast<float>(Reason)); }
 	OnLockTargetChanged.Broadcast(Target, Reason);
@@ -133,7 +142,7 @@ void USovTargetingComponent::ClearHardLock() { SetTarget(nullptr, ESovLockLossRe
 bool USovTargetingComponent::ToggleHardLock()
 {
 	if (LockedTarget.IsValid()) { ClearHardLock(); return true; }
-	if (!ResolveController() || !CanControlCamera()) { return false; }
+	if (!ResolveController() || !CanHoldFocus()) { return false; }
 	FVector Origin; FRotator Rotation; Controller->GetPlayerViewPoint(Origin, Rotation);
 	ANarrativeCharacter* Best = nullptr; float BestScore = -1.f;
 	for (ANarrativeCharacter* Candidate : CollectTargets())
@@ -147,7 +156,7 @@ bool USovTargetingComponent::ToggleHardLock()
 bool USovTargetingComponent::CycleTarget(bool bRight)
 {
 	if (!LockedTarget.IsValid()) { return ToggleHardLock(); }
-	if (!CanControlCamera()) { return false; }
+	if (!CanHoldFocus()) { return false; }
 	FVector Origin; FRotator Rotation; Controller->GetPlayerViewPoint(Origin, Rotation);
 	const FVector Right = FRotationMatrix(Rotation).GetUnitAxis(EAxis::Y);
 	const auto ScreenAngle = [&](const AActor* Target)
@@ -180,16 +189,15 @@ void USovTargetingComponent::RotateCameraToward(const FVector& Point, float Delt
 void USovTargetingComponent::TickComponent(float Delta, ELevelTick Type, FActorComponentTickFunction* TickFunction)
 {
 	Super::TickComponent(Delta, Type, TickFunction);
-	if (!ResolveController()) { return; }
-	const auto* OwnerCharacter = Cast<ANarrativeCharacter>(GetOwner());
-	const auto* OwnerASC = OwnerCharacter ? OwnerCharacter->GetNarrativeAbilitySystemComponent() : nullptr;
-	const bool bAiming = OwnerASC && OwnerASC->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_Weapon_IsAiming);
+	if (!ResolveController()) { FramingSuspension = ESovFramingSuspension::None; return; }
+	const bool bAiming = IsAiming();
 	const bool bAimStarted = bAiming && !bWasAiming;
 	bWasAiming = bAiming;
 	if (bAimStarted) { TryAimSnap(); }
 	if (bHasPublishedLock && !LockedTarget.IsValid()) { SetTarget(nullptr, ESovLockLossReason::InvalidTarget); }
-	if (!CanControlCamera())
+	if (!CanHoldFocus())
 	{
+		FramingSuspension = ESovFramingSuspension::None;
 		if (LockedTarget.IsValid()) { SetTarget(nullptr, ESovLockLossReason::Cinematic); }
 		return;
 	}
@@ -205,9 +213,15 @@ void USovTargetingComponent::TickComponent(float Delta, ELevelTick Type, FActorC
 		if (NavigationElapsed >= .25f) { NavigationElapsed = 0.f; }
 		OccludedFor = HasLineOfSight(LockedTarget.Get()) ? 0.f : OccludedFor + ElapsedDelta;
 		if (OccludedFor > (FMath::IsFinite(OcclusionTimeoutSeconds) ? FMath::Clamp(OcclusionTimeoutSeconds, 0.f, 2.f) : .4f)) { SetTarget(nullptr, ESovLockLossReason::Occluded); return; }
-		if (OccludedFor <= 0.f) { RotateCameraToward(LockedTarget->GetActorLocation() + FVector(0.f, 0.f, LockedTarget->GetSimpleCollisionHalfHeight() * .5f), SafeDelta, 1.f); }
+		FramingSuspension = bAiming ? ESovFramingSuspension::Aiming
+			: OccludedFor > 0.f ? ESovFramingSuspension::Occluded : ESovFramingSuspension::None;
+		if (FramingSuspension == ESovFramingSuspension::None)
+		{ RotateCameraToward(LockedTarget->GetActorLocation() + FVector(0.f, 0.f, LockedTarget->GetSimpleCollisionHalfHeight() * .5f), SafeDelta, 1.f); }
 		return;
 	}
+	// Assisted framing never competes with the weapon's own aim handling.
+	FramingSuspension = bAiming ? ESovFramingSuspension::Aiming : ESovFramingSuspension::None;
+	if (bAiming) { return; }
 	const UNarrativeGameUserSettings* Settings = UNarrativeGameUserSettings::GetSovSettings();
 	if (!Settings || Settings->GetAutoCameraStrength() <= 0.f
 		|| GetWorld()->GetTimeSeconds() - Controller->GetLastManualLookTime() < 1.f) { return; }
@@ -240,8 +254,10 @@ void USovTargetingComponent::TryAimSnap()
 		|| !ASC->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_Weapon_IsAiming)
 		|| ASC->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_SequencerControlled)) { return; }
 	FVector Origin; FRotator View; PC->GetPlayerViewPoint(Origin, View);
-	AActor* Target = nullptr; FVector Point;
-	if (!SovAimAssist::FindVisibleTarget(GetOwner(), Origin, View.Vector(), 5000.f, 8.f, Target, Point)) { return; }
+	AActor* Target = nullptr; FVector Point; ESovLockLossReason FocusReason;
+	if (LockedTarget.IsValid() && IsValidTarget(LockedTarget.Get(), true, false, FocusReason))
+	{ Point = LockedTarget->GetActorLocation() + FVector(0.f, 0.f, LockedTarget->GetSimpleCollisionHalfHeight() * .5f); }
+	else if (!SovAimAssist::FindVisibleTarget(GetOwner(), Origin, View.Vector(), 5000.f, 8.f, Target, Point)) { return; }
 	const FRotator Desired = (Point - Origin).Rotation();
 	const FQuat Current = FRotator(PC->GetControlRotation().Pitch, PC->GetControlRotation().Yaw, 0.f).Quaternion();
 	const float Angle = FMath::RadiansToDegrees(Current.AngularDistance(Desired.Quaternion()));

@@ -647,11 +647,12 @@ ASovAurelionSecurityDrone::ASovAurelionSecurityDrone(const FObjectInitializer& I
 { FormationLink = CreateDefaultSubobject<USovAurelionFreshCommandLink>(TEXT("AurelionFormation")); }
 
 ASovAurelionLinkbound::ASovAurelionLinkbound(const FObjectInitializer& Initializer) : Super(Initializer)
-{ if (auto* Blood = FindComponentByClass<USovBloodFeedbackComponent>()) { Blood->bBlackBlood = true; } }
+{ bPermitsHardLock = true; if (auto* Blood = FindComponentByClass<USovBloodFeedbackComponent>()) { Blood->bBlackBlood = true; } }
 ASovAurelionWallRunner::ASovAurelionWallRunner(const FObjectInitializer& Initializer) : Super(Initializer)
 { WallTraversal = CreateDefaultSubobject<USovAurelionWallTraversalComponent>(TEXT("AurelionWallTraversal")); }
 ASovAurelionWeaver::ASovAurelionWeaver(const FObjectInitializer& Initializer) : Super(Initializer)
 {
+    bPermitsHardLock = true;
     AnchorA = CreateDefaultSubobject<USovAurelionWeaverLink>(TEXT("AurelionAnchorA"));
     if (auto* Blood = FindComponentByClass<USovBloodFeedbackComponent>()) { Blood->bBlackBlood = true; }
     AnchorB = CreateDefaultSubobject<USovAurelionWeaverLink>(TEXT("AurelionAnchorB"));

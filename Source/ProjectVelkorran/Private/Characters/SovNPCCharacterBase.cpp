@@ -8,6 +8,7 @@
 #include "Components/SovCombatSustainDropComponent.h"
 #include "Components/SovDismembermentComponent.h"
 #include "Components/SovStatusComponent.h"
+#include "Targeting/SovTargetingComponent.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
 #include "Misc/SecureHash.h"
 #include "AI/NPCDefinition.h"
@@ -43,6 +44,9 @@ void ASovNPCCharacterBase::BeginPlay()
 	}
 
 	Super::BeginPlay();
+
+	// Declared combat roles are lockable threats. AddUnique keeps an authored tag idempotent.
+	if (bPermitsHardLock) { Tags.AddUnique(USovTargetingComponent::HardLockPermissionTag()); }
 
 	// Narrative initializes an NPC's pawn-owned ASC during its BeginPlay. The
 	// component also retains its OnASCInitialized fallback for unusual ordering.

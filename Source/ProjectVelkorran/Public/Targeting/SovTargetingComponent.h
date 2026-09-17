@@ -9,6 +9,9 @@ class ANarrativeCharacter;
 
 UENUM(BlueprintType)
 enum class ESovLockLossReason : uint8 { None, Cancelled, InvalidTarget, Distance, Occluded, Navigation, Cinematic, OwnerUnavailable };
+/** Why camera framing is not being driven, which is not by itself a reason to lose the lock. */
+UENUM(BlueprintType)
+enum class ESovFramingSuspension : uint8 { None, Aiming, Occluded };
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FSovLockTargetChanged, AActor*, Target, ESovLockLossReason, Reason);
 
 /** Native framing over Narrative's camera, never actor translation or a competing camera actor.
@@ -23,6 +26,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Sovereign|Targeting") bool ToggleHardLock();
 	UFUNCTION(BlueprintCallable, Category="Sovereign|Targeting") bool CycleTarget(bool bRight);
 	UFUNCTION(BlueprintCallable, Category="Sovereign|Targeting") void ClearHardLock();
+	/** Aiming keeps the threat focus and hands framing back to the weapon; it is never a lock loss. */
+	UFUNCTION(BlueprintPure, Category="Sovereign|Targeting") ESovFramingSuspension GetFramingSuspension() const { return FramingSuspension; }
 	UPROPERTY(BlueprintAssignable, Category="Sovereign|Targeting") FSovLockTargetChanged OnLockTargetChanged;
 	UPROPERTY(EditDefaultsOnly, Category="Sovereign|Targeting", meta=(ClampMin="100")) float MaximumLockDistance = 2500.f;
 	UPROPERTY(EditDefaultsOnly, Category="Sovereign|Targeting", meta=(ClampMin="0",ClampMax="2")) float OcclusionTimeoutSeconds = .4f;
@@ -36,7 +41,11 @@ protected:
 private:
 	friend class FSovTargetingWorldTest;
 	bool ResolveController();
+	/** Owner may hold and change a threat focus: possessed, viewing itself, alive, unpaused, accepting input. */
+	bool CanHoldFocus() const;
+	/** Owner additionally permits native framing. Aiming withdraws framing without withdrawing the focus. */
 	bool CanControlCamera() const;
+	bool IsAiming() const;
 	bool IsValidTarget(ANarrativeCharacter* Target, bool bCheckLOS, bool bCheckNavigation, ESovLockLossReason& Reason) const;
 	bool HasLineOfSight(ANarrativeCharacter* Target) const;
 	bool HasNavigationRelationship(ANarrativeCharacter* Target) const;
@@ -50,6 +59,7 @@ private:
 	bool bHasPublishedLock = false;
 	bool bEndingPlay = false;
 	bool bWasAiming = false;
+	ESovFramingSuspension FramingSuspension = ESovFramingSuspension::None;
 	float OccludedFor = 0.f;
 	float NavigationElapsed = 0.f;
 };

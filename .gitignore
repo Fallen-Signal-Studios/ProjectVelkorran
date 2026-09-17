@@ -65,6 +65,12 @@ Content/
 !/Content/Cues/
 !/Content/Cues/**/*.uasset
 
+# /Game/Input is entirely project-owned: BP_SovPlayerController names IMC_Combat as its
+# DefaultMappingContext and DA_CombatInputs as its AbilityInputMappings, so these assets decide
+# which keys reach gameplay at all. Threat focus and target cycling live here too.
+!/Content/Input/
+!/Content/Input/**/*.uasset
+
 # Project-owned Cinderline correction; retain the surrounding pack/template exclusions.
 !/Content/Abilities/
 /Content/Abilities/*

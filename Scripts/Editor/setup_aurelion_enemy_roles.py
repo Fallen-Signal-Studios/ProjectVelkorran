@@ -599,6 +599,9 @@ def build_enemy_assets(output_dir):
                 ai_controller = _load("/NarrativePro/Pro/Core/AI/BP/BP_NarrativeNPCController").generated_class()
             cdo.set_editor_property("ai_controller_class", ai_controller)
             cdo.set_editor_property("auto_possess_ai", unreal.AutoPossessAI.PLACED_IN_WORLD_OR_SPAWNED)
+            # Every authored combat role is a lockable threat, including roles whose parent is the plain
+            # native base. Roles that already declare it natively record no Blueprint delta.
+            cdo.set_editor_property("permits_hard_lock", True)
             if role == "Weaver":
                 cdo.get_anchor_a().set_editor_property("link_id", "Aurelion.Weaver.AnchorA")
                 cdo.get_anchor_b().set_editor_property("link_id", "Aurelion.Weaver.AnchorB")

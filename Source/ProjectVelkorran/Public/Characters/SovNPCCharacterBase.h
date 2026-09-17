@@ -29,6 +29,12 @@ public:
 	UFUNCTION(BlueprintPure, Category="Sovereign|Placed NPC")
 	class UNPCDefinition* GetAuthoredPlacedDefinition() const { return AuthoredPlacedDefinition; }
 
+	/** Combat roles declare themselves lockable threats; story and support NPCs stay unlockable.
+	 * BeginPlay publishes the authored actor tag USovTargetingComponent reads, so an author can
+	 * also grant it per Blueprint or per placed instance without touching code. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Sovereign|Targeting")
+	bool bPermitsHardLock = false;
+
 	/** Called on a deferred replacement before setting its NPC definition. */
 	void PrepareForEncounterRestore(const FNPCSpawnInfo& SavedSpawnInfo, const FGuid& SavedGUID);
 	const FNPCSpawnInfo& GetEncounterSpawnInfo() const { return SpawnInfo; }

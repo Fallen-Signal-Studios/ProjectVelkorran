@@ -40,6 +40,7 @@ ASovDroneNPCBase::ASovDroneNPCBase(const FObjectInitializer& ObjectInitializer)
 		USovDroneDismembermentComponent>(TEXT("SovDismembermentComponent")))
 {
 	PrimaryActorTick.bCanEverTick = true;
+	bPermitsHardLock = true;
     if (auto* Blood = FindComponentByClass<USovBloodFeedbackComponent>()) { Blood->bEnabled = false; }
 	DeathExplosionDamageEffectClass =
 		USovGameplayEffect_ReformationDroneDamage::StaticClass();

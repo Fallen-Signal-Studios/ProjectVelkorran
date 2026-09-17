@@ -8,6 +8,7 @@
 
 class UAbilitySystemComponent;
 class ANarrativeNPCCharacter;
+class ANarrativePlayerController;
 class UNPCDefinition;
 
 /** Editor-only, read-only answers a melee play probe needs that script bindings cannot reach. */
@@ -27,6 +28,15 @@ public:
     /** One line per granted native melee ability: class, active, current node, montage playing on the avatar. */
     UFUNCTION(BlueprintCallable, Category="Velkorran|Editor|Melee Validation")
     static TArray<FString> DescribeNativeMelee(UAbilitySystemComponent* AbilitySystem);
+
+    /** Presses a semantic input tag through the controller's own routing, exactly as a bound key does.
+     * A probe cannot reach ANarrativePlayerController::AbilityInputPressed, which is not reflected. */
+    UFUNCTION(BlueprintCallable, Category="Velkorran|Editor|Melee Validation")
+    static bool PressAndReleaseSemanticInput(ANarrativePlayerController* PlayerController, FGameplayTag InputTag);
+
+    /** One line per input action the live controller maps: action asset, semantic tag, bound keys. */
+    UFUNCTION(BlueprintCallable, Category="Velkorran|Editor|Melee Validation")
+    static TArray<FString> DescribeInputRouting(ANarrativePlayerController* PlayerController);
 
     /** Spawns an NPC through Narrative's own character subsystem in a play world, for a live melee target. */
     UFUNCTION(BlueprintCallable, Category="Velkorran|Editor|Melee Validation", meta=(WorldContext="WorldContext"))

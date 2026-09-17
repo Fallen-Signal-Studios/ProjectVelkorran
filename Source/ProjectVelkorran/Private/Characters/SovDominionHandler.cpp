@@ -60,6 +60,7 @@ ASovDominionHandler::ASovDominionHandler(
 	const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
+	bPermitsHardLock = true;
 	CommandLinkComponent = CreateDefaultSubobject<USovCommandLinkComponent>(
 		TEXT("SovCommandLinkComponent"));
 }

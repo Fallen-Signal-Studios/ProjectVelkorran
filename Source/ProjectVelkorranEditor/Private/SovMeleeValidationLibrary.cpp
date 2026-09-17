@@ -8,6 +8,12 @@
 #include "Animation/AnimInstance.h"
 #include "GAS/NarrativeGameplayAbility.h"
 #include "Melee/SovGameplayAbility_Melee.h"
+#include "EnhancedInputSubsystems.h"
+#include "GAS/NarrativeAbilityInputMapping.h"
+#include "InputAction.h"
+#include "InputMappingContext.h"
+#include "Framework/SovPlayerController.h"
+#include "UnrealFramework/NarrativePlayerController.h"
 
 TArray<FString> USovMeleeValidationLibrary::GrantedAbilityClassesForInput(UAbilitySystemComponent* AbilitySystem, FGameplayTag InputTag)
 {
@@ -33,6 +39,35 @@ void USovMeleeValidationLibrary::DescribeDamageSource(const FSovDamageResult& Re
     SourceObjectClass = Source->GetClass()->GetName();
     if (const UGameplayAbility* Owner = Source->GetTypedOuter<UGameplayAbility>()) { SourceAbilityClass = Owner->GetClass()->GetName(); }
     else if (const UGameplayAbility* Ability = Result.EffectContext.GetAbility()) { SourceAbilityClass = Ability->GetClass()->GetName(); }
+}
+
+bool USovMeleeValidationLibrary::PressAndReleaseSemanticInput(ANarrativePlayerController* PlayerController, FGameplayTag InputTag)
+{
+    if (!IsValid(PlayerController) || !InputTag.IsValid()) { return false; }
+    PlayerController->AbilityInputPressed(InputTag);
+    PlayerController->AbilityInputReleased(InputTag);
+    return true;
+}
+
+TArray<FString> USovMeleeValidationLibrary::DescribeInputRouting(ANarrativePlayerController* PlayerController)
+{
+    TArray<FString> Lines;
+    const auto* Campaign = Cast<ASovPlayerController>(PlayerController);
+    const UNarrativeAbilityInputMapping* Schema = Campaign ? Campaign->GetAbilityHUDInputMappings() : nullptr;
+    if (!Schema) { return Lines; }
+    const ULocalPlayer* LocalPlayer = PlayerController->GetLocalPlayer();
+    const auto* Input = LocalPlayer ? LocalPlayer->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>() : nullptr;
+    for (const FAbilityInputMappingData& Mapping : Schema->InputAbilities)
+    {
+        TArray<FString> Keys;
+        if (Input && Mapping.InputAction)
+        {
+            for (const FKey& Key : Input->QueryKeysMappedToAction(Mapping.InputAction)) { Keys.Add(Key.ToString()); }
+        }
+        Lines.Add(FString::Printf(TEXT("%s tag=%s keys=%s"), Mapping.InputAction ? *Mapping.InputAction->GetName() : TEXT("none"),
+            *Mapping.InputTag.ToString(), Keys.Num() ? *FString::Join(Keys, TEXT("+")) : TEXT("unbound")));
+    }
+    return Lines;
 }
 
 ANarrativeNPCCharacter* USovMeleeValidationLibrary::SpawnValidationNPC(UObject* WorldContext, UNPCDefinition* Definition, FTransform Transform)
