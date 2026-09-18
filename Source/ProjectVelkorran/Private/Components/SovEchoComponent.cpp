@@ -1,6 +1,7 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 
 #include "Components/SovEchoComponent.h"
+#include "ArsenalStatics.h"
 #include "Diagnostics/SovDiagnosticsSubsystem.h"
 
 #include "AbilitySystemBlueprintLibrary.h"
@@ -59,7 +60,7 @@ void USovEchoComponent::TickComponent(
 	// Equipment/spec replication can change readiness without changing Echo.
 	RefreshThresholdStates(GetEcho(), true);
 	const float CurrentWorldTime = GetWorldTimeSeconds();
-	if (!CanWriteEcho() || !bEncounterActive || DecayRate <= 0.0f)
+	if (!CanWriteEcho() || !IsCombatEngaged() || DecayRate <= 0.0f)
 	{
 		LastDecayUpdateWorldTime = CurrentWorldTime;
 		return;
@@ -216,7 +217,7 @@ float USovEchoComponent::GetSecondsSinceCombatActivity() const
 
 float USovEchoComponent::GetSecondsUntilDecay() const
 {
-	if (!bEncounterActive)
+	if (!IsCombatEngaged())
 	{
 		return 0.0f;
 	}
@@ -301,6 +302,20 @@ void USovEchoComponent::ResetCheckpointActivity()
 	LastDecayUpdateWorldTime = CurrentWorldTime;
 }
 
+namespace
+{
+	/** Far enough in the past that no window is open before the first exchange. */
+	constexpr float NoEngagementWorldTime = -1000.f;
+
+	/** Whether a damage counterpart is a living hostile actor rather than a hazard, a fall or scenery. */
+	bool IsHostileCounterpart(const AActor* Self, const UNarrativeAbilitySystemComponent* Other)
+	{
+		const AActor* const Avatar = IsValid(Other) ? Other->GetAvatarActor() : nullptr;
+		return IsValid(Self) && IsValid(Avatar) && Avatar != Self
+			&& UArsenalStatics::GetAttitude(Self, Avatar) == ETeamAttitude::Hostile;
+	}
+}
+
 void USovEchoComponent::BeginEncounter()
 {
 	if (!CanWriteEcho())
@@ -324,6 +339,8 @@ float USovEchoComponent::EndEncounter(const float ReserveOverride)
 
 	bEncounterActive = false;
 	LastActivityTag = FGameplayTag();
+	// A finished encounter ends combat rules immediately rather than leaving a window open behind it.
+	LastEngagementWorldTime = NoEngagementWorldTime;
 
 	const float CurrentWorldTime = GetWorldTimeSeconds();
 	LastActivityWorldTime = CurrentWorldTime;
@@ -338,6 +355,20 @@ float USovEchoComponent::EndEncounter(const float ReserveOverride)
 	return GetEcho();
 }
 
+bool USovEchoComponent::IsCombatEngaged() const
+{
+	if (bEncounterActive) { return true; }
+	const float Window = FMath::IsFinite(EngagementSeconds) ? FMath::Clamp(EngagementSeconds, 0.f, 60.f) : 0.f;
+	if (Window <= 0.f) { return false; }
+	return GetWorldTimeSeconds() - LastEngagementWorldTime < Window;
+}
+
+void USovEchoComponent::RecordHostileEngagement()
+{
+	if (!CanWriteEcho()) { return; }
+	LastEngagementWorldTime = GetWorldTimeSeconds();
+}
+
 void USovEchoComponent::RecordCombatActivity(const FGameplayTag& ActivityTag)
 {
 	if (!CanWriteEcho())
@@ -345,7 +376,6 @@ void USovEchoComponent::RecordCombatActivity(const FGameplayTag& ActivityTag)
 		return;
 	}
 
-	bEncounterActive = true;
 	LastActivityTag = ActivityTag;
 
 	const float CurrentWorldTime = GetWorldTimeSeconds();
@@ -479,12 +509,12 @@ void USovEchoComponent::HandleDealtDamage(
 	const float Damage,
 	const FGameplayEffectSpec& EffectSpec)
 {
-	static_cast<void>(DamagedAbilitySystem);
 	static_cast<void>(EffectSpec);
 
 	if (Damage > KINDA_SMALL_NUMBER)
 	{
 		RecordCombatActivity(FGameplayTag());
+		if (IsHostileCounterpart(GetOwner(), DamagedAbilitySystem)) { RecordHostileEngagement(); }
 	}
 }
 
@@ -493,7 +523,6 @@ void USovEchoComponent::HandleReceivedDamage(
 	const float Damage,
 	const FGameplayEffectSpec& EffectSpec)
 {
-	static_cast<void>(DamageSourceAbilitySystem);
 	static_cast<void>(EffectSpec);
 
 	if (Damage > KINDA_SMALL_NUMBER)
@@ -502,5 +531,7 @@ void USovEchoComponent::HandleReceivedDamage(
 		// grants no Echo. Protagonist rules decide whether a guarded/intercepted hit
 		// deserves a separate award.
 		RecordCombatActivity(FGameplayTag());
+		// Falling and hazards have no hostile behind them, so they are not a fight.
+		if (IsHostileCounterpart(GetOwner(), DamageSourceAbilitySystem)) { RecordHostileEngagement(); }
 	}
 }

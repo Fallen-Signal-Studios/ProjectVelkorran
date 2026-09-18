@@ -86,8 +86,20 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Echo")
 	float GetSignatureEchoRequirement() const;
 
+	/** True only inside a director-scoped encounter. Combat rules should ask IsCombatEngaged instead. */
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Echo")
 	bool IsEncounterActive() const { return bEncounterActive; }
+
+	/**
+	 * Whether the protagonist is in combat for rules that care: sprint drain, exhaustion, narrative cues.
+	 *
+	 * A director-scoped encounter counts for its whole duration. Outside one, an exchange with a hostile
+	 * opens a bounded window instead, so fighting off a director still applies combat rules and walking
+	 * away from it still ends them. Falling, hazards and striking scenery are not exchanges and open
+	 * nothing, which is what §4.1's "no out-of-combat stamina drain" requires.
+	 */
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Echo")
+	bool IsCombatEngaged() const;
 
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Echo")
 	float GetSecondsUntilDecay() const;
@@ -137,6 +149,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Sovereign|Echo", meta = (AutoCreateRefTerm = "ActivityTag"))
 	void RecordCombatActivity(const FGameplayTag& ActivityTag);
 
+	/** Opens or extends the out-of-encounter combat window. Only a real exchange with a hostile qualifies. */
+	UFUNCTION(BlueprintCallable, Category = "Sovereign|Echo")
+	void RecordHostileEngagement();
+
 	UPROPERTY(BlueprintAssignable, Category = "Sovereign|Echo")
 	FSovEchoChangedSignature OnEchoChanged;
 
@@ -175,6 +191,10 @@ protected:
 	/** Echo points removed per second while inactivity decay is active. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo|Tuning", meta = (ClampMin = "0.0"))
 	float DecayRate = 8.0f;
+
+	/** How long an exchange with a hostile keeps combat rules on when no encounter owns the fight. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo", meta = (ClampMin = "0.0", ClampMax = "60.0", ForceUnits = "s"))
+	float EngagementSeconds = 8.0f;
 
 	/** Mission-default reserve applied when an encounter ends. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo|Tuning", meta = (ClampMin = "0.0", ClampMax = "100.0"))
@@ -224,6 +244,8 @@ private:
 	FGameplayTag LastActivityTag;
 	float LastActivityWorldTime = 0.0f;
 	float LastDecayUpdateWorldTime = 0.0f;
+	/** Far enough in the past that no window is open before the first exchange. */
+	float LastEngagementWorldTime = -1000.0f;
 	bool bEncounterActive = false;
 	bool bIsResonant = false;
 	bool bIsSignatureReady = false;

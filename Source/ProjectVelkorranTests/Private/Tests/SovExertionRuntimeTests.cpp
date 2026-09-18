@@ -224,4 +224,64 @@ bool FSovInputReentryReleaseTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Old replicated release is not delivered to the new activation"), Ability->ReplicatedReleases, 0);
 	return true;
 }
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovExertionCombatScopeTest,
+	"ProjectVelkorran.Campaign.Exertion.CombatRulesFollowParticipationRatherThanLatching",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FSovExertionCombatScopeTest::RunTest(const FString& Parameters)
+{
+	static_cast<void>(Parameters);
+	// Any damage dealt or received used to latch the encounter scope true for the rest of the session,
+	// and only an encounter director could clear it. A fall on a map with no director therefore drained
+	// sprint stamina forever. Combat rules now follow participation, which ends (audit PC2-03).
+	FExertionWorld Test;
+	auto* Character = Test.Character();
+	auto* Exertion = Character->GetExertionComponent();
+	auto* Echo = Character->GetEchoComponent();
+	if (!TestNotNull(TEXT("Exertion owner"), Exertion) || !TestNotNull(TEXT("Echo owner"), Echo)) { return false; }
+
+	auto* Movement = Cast<UNarrativeCharacterMovement>(Character->GetCharacterMovement());
+	Movement->bWantsSprint = true; Movement->Velocity = FVector(600.f, 0.f, 0.f);
+	// WorldSettings clamps a single oversized frame, so step actual game time in ordinary frames.
+	const auto Advance = [&Test, this](float Seconds)
+	{
+		const double Started = Test.World->GetTimeSeconds();
+		for (int32 Frame = 0; Frame < FMath::CeilToInt32(Seconds / .05f); ++Frame)
+		{ Test.World->Tick(LEVELTICK_TimeOnly, .05f); }
+		TestTrue(TEXT("Actual world time advances for the engagement window"),
+			Test.World->GetTimeSeconds() - Started >= Seconds - .1);
+	};
+
+	// Resetting the inactivity clock is not the same as being in a fight. Spending Echo and guarding
+	// both call this, and neither starts combat.
+	Echo->RecordCombatActivity(FSovGameplayTags::Get().Echo_Source_GuardPressure);
+	TestFalse(TEXT("Recording activity alone is not combat"), Exertion->IsCombatActive());
+	SetStamina(Character, 50.f);
+	FSovExertionTestAccess::Step(Exertion, 0.5f);
+	TestEqual(TEXT("Activity outside a fight still costs no sprint stamina"), Stamina(Character), 50.f);
+
+	// An exchange with a hostile is a fight even with no director on the map.
+	Echo->RecordHostileEngagement();
+	TestTrue(TEXT("An exchange with a hostile puts the protagonist in combat"), Exertion->IsCombatActive());
+	FSovExertionTestAccess::Step(Exertion, 0.5f);
+	TestEqual(TEXT("Combat sprint drains while the fight is live"), Stamina(Character), 42.f);
+
+	// And it ends on its own, which is the whole point: the window is bounded.
+	Advance(12.f);
+	TestFalse(TEXT("The engagement window expires without a director closing it"), Exertion->IsCombatActive());
+	SetStamina(Character, 50.f);
+	FSovExertionTestAccess::Step(Exertion, 0.5f);
+	TestEqual(TEXT("Sprint is free again once the fight is over"), Stamina(Character), 50.f);
+
+	// A director-scoped encounter still governs its own fight for as long as it runs.
+	Echo->BeginEncounter();
+	TestTrue(TEXT("A director encounter is combat regardless of the window"), Exertion->IsCombatActive());
+	Advance(12.f);
+	TestTrue(TEXT("An encounter does not expire on the engagement window"), Exertion->IsCombatActive());
+	Echo->RecordHostileEngagement();
+	Echo->EndEncounter();
+	// A finished encounter ends combat rules immediately rather than leaving its last exchange running.
+	TestFalse(TEXT("Ending the encounter ends combat at once"), Exertion->IsCombatActive());
+	return true;
+}
 #endif

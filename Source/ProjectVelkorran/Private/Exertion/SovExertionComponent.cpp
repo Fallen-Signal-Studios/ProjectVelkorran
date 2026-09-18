@@ -185,7 +185,8 @@ bool USovExertionComponent::IsCombatActive() const
 {
 	const auto* Character = Cast<ASovPlayerCharacterBase>(GetOwner());
 	const auto* Echo = Character ? Character->GetEchoComponent() : nullptr;
-	return Echo && Echo->IsEncounterActive();
+	// Combat rules follow participation, not a director's scope: fights happen off directors too.
+	return Echo && Echo->IsCombatEngaged();
 }
 
 bool USovExertionComponent::CanSprint() const
