@@ -915,6 +915,10 @@ bool ASovPlayerController::RequestAuthoredHandoff(ASovCampaignHandoffAnchor* Anc
 		|| ASC->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_Busy)
 		|| ASC->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_SequencerControlled))
 	{ OutError = TEXT("Finish the active action before the authored handoff."); return false; }
+	// A handoff changes the active protagonist, which invalidates the context of an owned critical
+	// conversation and used to delete it mid-line. Let the line finish instead of losing it.
+	if (NarrativeCues && NarrativeCues->HasActiveCriticalConversation())
+	{ OutError = TEXT("Let the current conversation finish before the authored handoff."); return false; }
 	for (TActorIterator<ASovEncounterDirector> It(GetWorld()); It; ++It)
 	{
 		if (It->GetEncounterState() == ESovEncounterState::Active || It->GetEncounterState() == ESovEncounterState::Restoring)

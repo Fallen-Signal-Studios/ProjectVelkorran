@@ -26,6 +26,10 @@ struct FSovNarrativeCueTestAccess
 	static int32 Queued(USovNarrativeCueComponent* C) { return C->Pending.Num(); }
 	static void Interrupt(USovNarrativeCueComponent* C) { C->StopBark(true); }
 	static void DuplicateInFlight(USovNarrativeCueComponent* C) { C->Pending.Add(C->InFlightCriticalSave); }
+	/** Stages a playing conversation without a Dialogue asset, which a transient world cannot begin. */
+	static void StageConversation(USovNarrativeCueComponent* C, USovNarrativeCue* Cue)
+	{ C->CurrentConversation = Cue; C->CurrentRequest = FSovQueuedCue(); C->CurrentRequest.Cue = Cue; }
+	static USovNarrativeCue* SavedInFlight(USovNarrativeCueComponent* C) { return C->InFlightCriticalSave.Cue; }
 	static bool ControllerOutput(UAudioComponent* Audio, USoundClass* Class, float Volume)
 	{ return USovNarrativeCueComponent::ConfigureControllerOutput(Audio, Class, Volume); }
 	static bool ReviewContains(USovAccessibleRecordMenu* Menu, const FString& Text)
@@ -167,6 +171,67 @@ bool FSovCueControllerOutputTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Invalid update retains preceding gain"), Audio->VolumeMultiplier, .25f);
 	TestTrue(TEXT("Optional controller channel can be muted"), FSovNarrativeCueTestAccess::ControllerOutput(Audio, Class, 0.f));
 	TestEqual(TEXT("Mute applied without changing caption producer"), Audio->VolumeMultiplier, 0.f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCueCriticalRetentionTest,
+	"ProjectVelkorran.Campaign.Narrative.CriticalCuesAreHeldRatherThanDiscarded",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCueCriticalRetentionTest::RunTest(const FString& Parameters)
+{
+	static_cast<void>(Parameters);
+	FCueWorld F; auto* Cues = F.PC->GetNarrativeCues(); FString Error;
+
+	// Every pending cue whose context stopped matching was deleted outright. A protagonist handoff
+	// makes that true for every cue belonging to the other protagonist, so a critical line deferred
+	// by combat was lost the moment the player used a handoff anchor (audit CN2-05).
+	auto* Critical = F.Cue(TEXT("HeldCritical"), ESovNarrativeCuePriority::ObjectiveCritical);
+	Critical->bCritical = true;
+	auto* Ordinary = F.Cue(TEXT("DroppedAmbient"), ESovNarrativeCuePriority::Ambient);
+	// Both are queued while their context is valid, which is the only way a request is accepted.
+	TestTrue(TEXT("The critical cue queues"), Cues->RequestCue(Critical, F.Pawn, Error));
+	TestTrue(TEXT("The ordinary cue queues"), Cues->RequestCue(Ordinary, F.Pawn, Error));
+	// Then the context stops matching, exactly as a handoff to the other protagonist makes it.
+	const FGameplayTag Other = FSovGameplayTags::Get().Character_Player_Selene;
+	Critical->RequiredProtagonist = Other;
+	Ordinary->RequiredProtagonist = Other;
+	FSovNarrativeCueTestAccess::Tick(Cues);
+	TestEqual(TEXT("Only the critical cue survives a context it may re-enter"),
+		FSovNarrativeCueTestAccess::Queued(Cues), 1);
+
+	// And it is genuinely still playable, not merely retained: once the context matches it runs.
+	Critical->RequiredProtagonist = F.Pawn->GetProtagonistIdentityTag();
+	FSovNarrativeCueTestAccess::Tick(Cues);
+	TestTrue(TEXT("The held cue plays once its context returns"),
+		FSovNarrativeCueTestAccess::Playing(Cues) == Critical);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCueConversationSaveTest,
+	"ProjectVelkorran.Campaign.Narrative.CriticalConversationSurvivesASaveTakenDuringIt",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCueConversationSaveTest::RunTest(const FString& Parameters)
+{
+	static_cast<void>(Parameters);
+	// Saving captured only a critical bark. A critical conversation playing at save time was neither
+	// saved nor archived, so the reload discarded it silently and the beat its graph completes never
+	// committed (audit CN2-04).
+	FCueWorld F; auto* Cues = F.PC->GetNarrativeCues();
+	auto* Conversation = F.Cue(TEXT("CriticalConversation"), ESovNarrativeCuePriority::ObjectiveCritical);
+	Conversation->bCritical = true;
+	Conversation->bRecordUnheardSummary = true;
+	Conversation->RecordSummary = FText::FromString(TEXT("A conversation the player did not finish."));
+	FSovNarrativeCueTestAccess::StageConversation(Cues, Conversation);
+
+	Cues->PrepareForSave_Implementation();
+	TestTrue(TEXT("A critical conversation in flight is captured by the save"),
+		FSovNarrativeCueTestAccess::SavedInFlight(Cues) == Conversation);
+
+	Cues->Load_Implementation();
+	TestEqual(TEXT("The reload requeues it rather than discarding it"),
+		FSovNarrativeCueTestAccess::Queued(Cues), 1);
+	// Archived as well as requeued: the record exists even where the requeue cannot take it.
+	TestEqual(TEXT("The interrupted conversation leaves an unheard record"), Cues->GetUnheardRecords().Num(), 1);
 	return true;
 }
 #endif

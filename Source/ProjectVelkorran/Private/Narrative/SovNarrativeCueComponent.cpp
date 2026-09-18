@@ -220,7 +220,15 @@ void USovNarrativeCueComponent::TickComponent(float Delta, ELevelTick Type, FAct
 	for (int32 Index = Pending.Num() - 1; Index >= 0; --Index)
 	{
 		auto& Request = Pending[Index];
-		if (!IsValid(Request.Cue) || !MatchesContext(Request.Cue)) { Pending.RemoveAt(Index); continue; }
+		if (!IsValid(Request.Cue)) { Pending.RemoveAt(Index); continue; }
+		if (!MatchesContext(Request.Cue))
+		{
+			// A critical line is held rather than deleted. Every part of the context can become valid
+			// again - a load finishes, a handoff reverses, knowledge is gained - and dropping it loses
+			// canon with no archive and no replay. Ordinary cues still expire on a mismatch.
+			if (!Request.Cue->bCritical) { Pending.RemoveAt(Index); }
+			continue;
+		}
 		if (!Request.Cue->bCritical)
 		{
 			Request.RemainingContextSeconds -= Delta;
@@ -258,6 +266,12 @@ void USovNarrativeCueComponent::TickComponent(float Delta, ELevelTick Type, FAct
 		if (Pending.Num()<64 && !Pending.ContainsByPredicate([&Request](const auto& Item) { return Item.Cue==Request.Cue; })) { Pending.Add(Request); }
 	}
 }
+bool USovNarrativeCueComponent::HasActiveCriticalConversation() const
+{
+	return IsValid(CurrentConversation) && CurrentConversation->bCritical
+		&& IsValid(OwnedDialogue) && IsValid(Tales) && Tales->GetCurrentDialogue() == OwnedDialogue;
+}
+
 void USovNarrativeCueComponent::HandleDialogueBegan(UDialogue* Dialogue)
 {
 	if (bStartingConversation && CurrentConversation && Dialogue && Dialogue->GetClass() == CurrentConversation->Dialogue
@@ -284,13 +298,19 @@ void USovNarrativeCueComponent::HandleDialogueFinished(UDialogue* Dialogue, bool
 void USovNarrativeCueComponent::PrepareForSave_Implementation()
 {
 	InFlightCriticalSave = FSovQueuedCue();
-	if (CurrentBark && CurrentBark->bCritical) { InFlightCriticalSave = CurrentRequest; }
+	// Only the bark was captured, so a critical conversation playing at save time was discarded by the
+	// reload: not replayed, not archived, and the beat its graph completes never committed.
+	const USovNarrativeCue* const InFlight = CurrentConversation ? ToRawPtr(CurrentConversation) : ToRawPtr(CurrentBark);
+	if (InFlight && InFlight->bCritical && CurrentRequest.Cue == InFlight) { InFlightCriticalSave = CurrentRequest; }
 }
 void USovNarrativeCueComponent::Load_Implementation()
 {
 	TGuardValue<bool> Mutation(bMutation,true);
 	++Epoch; StopBark(true, false);
 	UDialogue* OldDialogue=OwnedDialogue;
+	// The load tears this conversation down without its finish notification, so archive it here or the
+	// interrupted line leaves no unheard record at all.
+	if (CurrentConversation && CurrentConversation->bCritical) { RememberUnheard(CurrentConversation); }
 	OwnedDialogue = nullptr; CurrentConversation = nullptr; NextAllowed.Reset();
 	if (IsValid(OldDialogue) && IsValid(Tales) && Tales->GetCurrentDialogue() == OldDialogue)
 	{ OldDialogue->SetPreserveOnInterruption(false); Tales->ExitDialogue(EExitDialogueReason::EDR_PlayerExited); }

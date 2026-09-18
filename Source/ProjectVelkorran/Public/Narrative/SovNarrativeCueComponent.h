@@ -50,6 +50,11 @@ private:
 	static bool ConfigureControllerOutput(UAudioComponent* Audio, USoundClass* Class, float Volume);
 	void StopBark(bool bInterrupted, bool bPreserveCritical = true);
 	void RememberUnheard(USovNarrativeCue* Cue);
+public:
+	/** True while this component owns a playing critical conversation, which must not be cut short. */
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Narrative")
+	bool HasActiveCriticalConversation() const;
+private:
 	UFUNCTION() void HandleDialogueFinished(UDialogue* Dialogue, bool bStartingNew, EExitDialogueReason Reason);
 	UFUNCTION() void HandleDialogueBegan(UDialogue* Dialogue);
 	UPROPERTY(SaveGame) TArray<FSovQueuedCue> Pending;
