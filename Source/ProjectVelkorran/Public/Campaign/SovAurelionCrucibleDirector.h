@@ -48,6 +48,27 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Aurelion|Crucible", meta=(ClampMin="0.01", ClampMax="0.5"))
     float EliteLethalFloorFraction = .12f;
     UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="Aurelion|Crucible") TArray<FSovAurelionCrucibleLink> RequiredLinks;
+
+    /**
+     * Carriers of required links the player still has to reach: active, unsevered, still alive.
+     *
+     * The objective says "sever the links" and the links are carried by enemies, so without this
+     * there was nothing on screen pointing at them and no way to find them but to search (reported
+     * from play). A navigation hint only - it authorizes nothing and grants no receipt.
+     */
+    UFUNCTION(BlueprintPure, Category="Aurelion|Crucible")
+    void GetOutstandingLinkCarriers(TArray<ASovNPCCharacterBase*>& OutCarriers, TArray<FName>& OutLinkIds) const;
+
+protected:
+    /**
+     * Fails the phase and tells the player why.
+     *
+     * The reasons were always written for a player - "retry the phase entry" is not a log line - and
+     * nothing read them, so every failure in this encounter was silent by construction and the player
+     * was left to guess what they had done (reported from play).
+     */
+    void FailPhaseWithReason(const FText& Reason);
+public:
     UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="Aurelion|Crucible") TObjectPtr<ASovCampaignHandoffAnchor> HandoffAnchor;
     UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="Aurelion|Crucible") TObjectPtr<ASovCampaignEncounterObjective> PhaseBObjective;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Aurelion|Crucible") bool bAutoRequestHandoff = false;

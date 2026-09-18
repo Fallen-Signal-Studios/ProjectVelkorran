@@ -4,6 +4,8 @@
 #include "Campaign/SovCampaignInteractionTerminal.h"
 #include "Campaign/SovCampaignEncounterObjective.h"
 #include "Campaign/SovCampaignRelayReceiver.h"
+#include "Campaign/SovAurelionCrucibleDirector.h"
+#include "Characters/SovNPCCharacterBase.h"
 #include "Campaign/SovEncounterDirector.h"
 #include "Campaign/SovEncounterCoordinationComponent.h"
 #include "World/SovWorldTransitActor.h"
@@ -138,6 +140,22 @@ bool SovObjectiveWaypoint::Resolve(const ASovPlayerController* PC, const TArray<
                             if (!Door->TransitId.IsNone() && Door->StructuralHealth > 0.f
                                 && (!Door->bRequiresPower || Door->bPowered) && Door->LockReason.IsEmpty())
                             { Add(Candidates, Source, Door, Door->MovingBody, Mission->MissionId, Entry.BeatId, FSovObjectiveWaypoint::EKind::Interaction); }
+                        }
+                    }
+                    // A command link is the same shape as an outstanding receiver: a physical thing
+                    // the player has to reach before an active encounter can advance. It is carried
+                    // by an enemy rather than bolted to a wall, so the hint tracks that enemy.
+                    if (const auto* Links = Cast<ASovAurelionLinkPhaseDirector>(Director))
+                    {
+                        TArray<ASovNPCCharacterBase*> Carriers; TArray<FName> LinkIds;
+                        Links->GetOutstandingLinkCarriers(Carriers, LinkIds);
+                        for (int32 Index = 0; Index < Carriers.Num(); ++Index)
+                        {
+                            AActor* const Carrier = Carriers[Index];
+                            if (!CurrentActor(Carrier, PC->GetWorld())) { continue; }
+                            Identity(TEXT("Link:") + LinkIds[Index].ToString());
+                            Add(Candidates, Source, Carrier, Carrier->GetRootComponent(),
+                                Mission->MissionId, Entry.BeatId, FSovObjectiveWaypoint::EKind::Receiver);
                         }
                     }
                     for (const auto& ReceiverPtr : Objective->RequiredReceivers)

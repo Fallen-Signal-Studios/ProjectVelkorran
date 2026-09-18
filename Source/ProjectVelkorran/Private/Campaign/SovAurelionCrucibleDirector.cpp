@@ -1,6 +1,9 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Campaign/SovAurelionCrucibleDirector.h"
 
+#include "UI/SovFrontendComponent.h"
+#include "UI/SovAccessibilityPresentation.h"
+
 #include "Campaign/SovLethalFloorComponent.h"
 #include "AI/SovAurelionEnemyRoles.h"
 #include "Campaign/SovEncounterCoordinationComponent.h"
@@ -32,6 +35,35 @@ USovCommandLinkComponent* ASovAurelionLinkPhaseDirector::ResolveLink(const FSovA
     for (auto* Link : Links)
     { if (Link->GetFName() == Binding.ComponentName && Link->GetLinkId() == Binding.LinkId) { return Link; } }
     return nullptr;
+}
+void ASovAurelionLinkPhaseDirector::FailPhaseWithReason(const FText& Reason)
+{
+    LastPhaseError = Reason.ToString();
+    // Straight to the caption channel the player already reads for warnings. A failure the player
+    // cannot see the cause of is indistinguishable from the game being broken.
+    if (const auto* PC = Cast<ASovPlayerController>(GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr))
+    {
+        const auto* Frontend = PC->GetFrontend();
+        if (auto* Presentation = Frontend ? Frontend->GetPresentation() : nullptr)
+        { Presentation->PresentCaption(Reason, 6.f, GetActorLocation(), ESovCaptionPriority::Critical); }
+    }
+    FailEncounter();
+}
+void ASovAurelionLinkPhaseDirector::GetOutstandingLinkCarriers(TArray<ASovNPCCharacterBase*>& OutCarriers,
+    TArray<FName>& OutLinkIds) const
+{
+    OutCarriers.Reset(); OutLinkIds.Reset();
+    if (GetEncounterState() != ESovEncounterState::Active || HasLinkProof()) { return; }
+    for (int32 Index = 0; Index < RequiredLinks.Num(); ++Index)
+    {
+        // A severed link is done with even if its carrier is still fighting, so the hint clears as
+        // each one is spent rather than when the whole phase resolves.
+        if (LinkReceipts.IsValidIndex(Index) && LinkReceipts[Index].TransactionId.IsValid()) { continue; }
+        auto* Carrier = GetParticipant(RequiredLinks[Index].ParticipantId);
+        const auto* Link = ResolveLink(RequiredLinks[Index]);
+        if (!IsValid(Carrier) || !Carrier->IsAlive() || !Link || !Link->IsCommandLinkActive()) { continue; }
+        OutCarriers.Add(Carrier); OutLinkIds.Add(RequiredLinks[Index].LinkId);
+    }
 }
 void ASovAurelionLinkPhaseDirector::UnbindLinks()
 {
@@ -284,7 +316,11 @@ void ASovAurelionLinkPhaseDirector::Tick(float DeltaSeconds)
                 !HasLinkProof() && !bSevered, EliteLethalFloorFraction);
         }
         if (!IsValid(Elite) || !Elite->IsAlive())
-        { LastPhaseError = TEXT("The phase A elite was defeated before its preserved phase B entry."); FailEncounter(); return; }
+        {
+            FailPhaseWithReason(NSLOCTEXT("SovCrucible", "EliteDefeatedEarly",
+                "The Elite was destroyed before the links were severed. Retry the phase."));
+            return;
+        }
         if (!LastPhaseError.IsEmpty()) { FailEncounter(); return; }
         if (!HasLinkProof())
         {
@@ -292,7 +328,11 @@ void ASovAurelionLinkPhaseDirector::Tick(float DeltaSeconds)
             {
                 auto* Link = ResolveLink(RequiredLinks[Index]);
                 if (!LinkReceipts.IsValidIndex(Index) || (!LinkReceipts[Index].TransactionId.IsValid() && (!IsValid(Link) || !Link->IsCommandLinkActive())))
-                { LastPhaseError = TEXT("A required link disappeared without its native Selene sever; retry the phase entry."); FailEncounter(); return; }
+                {
+                    FailPhaseWithReason(NSLOCTEXT("SovCrucible", "LinkLost",
+                        "A command link was destroyed instead of severed. Retry the phase."));
+                    return;
+                }
             }
             return;
         }
@@ -312,7 +352,10 @@ void ASovAurelionLinkPhaseDirector::Tick(float DeltaSeconds)
         }
         if (AreOwnedParticipantsQuiescent(true)) { CompleteEncounter(); }
         else if (GetWorld()->GetTimeSeconds() - SettleStartedAt > FMath::Clamp(BoundarySettleTimeout, 1.f, 60.f))
-        { LastPhaseError = TEXT("Crucible phase boundary did not settle safely; retry the phase entry."); FailEncounter(); }
+        {
+            FailPhaseWithReason(NSLOCTEXT("SovCrucible", "BoundaryUnsettled",
+                "The phase could not settle safely. Retry the phase."));
+        }
         return;
     }
     if (GetEncounterState() != ESovEncounterState::Succeeded || IsCampaignReceiptPending()) { return; }

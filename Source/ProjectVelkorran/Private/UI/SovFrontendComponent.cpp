@@ -209,7 +209,10 @@ void USovFrontendComponent::RefreshObjectives(bool bForce)
         FSovObjectivePresentationEntry Entry;
         Entry.BeatId = Id; Entry.Text = Beat->ObjectiveText; Entry.State = State;
         Entry.bOptional = Beat->bOptional; Entry.bCanonGate = Beat->bCanonGate;
-        if (Beat->bOptional && !Beat->FailureReasonId.IsNone()) { Entry.FailureRule = Beat->FailureRuleText; }
+        // Shown whenever it is authored. This used to require bOptional, so a required beat - the
+        // kind you cannot walk away from - displayed no rule at all, and the player had no way to
+        // learn what would fail them until it did (reported from play).
+        if (!Beat->FailureReasonId.IsNone()) { Entry.FailureRule = Beat->FailureRuleText; }
         Entries.Add(MoveTemp(Entry));
     }
     // Keep authored order within each priority. Empty/internal beats and undiscovered
