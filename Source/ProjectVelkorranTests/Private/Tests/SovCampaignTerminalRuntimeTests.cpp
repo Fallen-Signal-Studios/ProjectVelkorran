@@ -70,6 +70,14 @@ namespace
         { if (World) { World->DestroyWorld(false); if (GEngine) { GEngine->DestroyWorldContext(World); } } }
         void NextFrame()
         { TGuardValue<uint64> ScopedFrame(GFrameCounter, ++Frame); World->GetTimerManager().Tick(.016f); }
+        /** Art placed over the terminal: a separate actor, so "ignore self" does not cover it. */
+        AActor* Dressing()
+        {
+            auto* Actor = World->SpawnActor<AActor>(); auto* Shape = NewObject<UBoxComponent>(Actor);
+            Actor->SetRootComponent(Shape); Actor->AddInstanceComponent(Shape); Shape->SetBoxExtent(FVector(40, 60, 70));
+            Shape->SetCollisionEnabled(ECollisionEnabled::QueryOnly); Shape->SetCollisionResponseToAllChannels(ECR_Block);
+            Shape->RegisterComponent(); Actor->SetActorLocation(Terminal->GetActorLocation()); return Actor;
+        }
         AActor* Blocker()
         {
             auto* Actor = World->SpawnActor<AActor>(); auto* Shape = NewObject<UBoxComponent>(Actor);
@@ -110,6 +118,37 @@ bool FSovTerminalNativeInputTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Exactly one native fact is written"), F.PC->GetCampaignState()->GetJournal().Num(), 1);
     TestFalse(TEXT("Finished non-checkpoint terminal cannot replay"), F.Terminal->RequestUse(F.Player, Error));
     F.NextFrame(); TestEqual(TEXT("Repeated input grants no duplicate fact"), F.PC->GetCampaignState()->GetJournal().Num(), 1);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovTerminalOwnDressingTest,
+    "ProjectVelkorran.Campaign.Terminal.OwnArtDoesNotCountAsAnObstruction",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovTerminalOwnDressingTest::RunTest(const FString& Parameters)
+{
+    // Reported from play: terminals took ten seconds of pressing E to engage. The occlusion check
+    // traced to the actor origin and refused on any blocking hit, and a terminal's art in a built
+    // level is a separate mesh actor that "ignore self" does not cover - so the press failed silently
+    // until the player's own movement happened to find a gap.
+    FTerminalWorld F;
+    if (!TestNotNull(TEXT("Managed player initialized"), F.ASC)) { return false; }
+    FText Error;
+    if (!TestTrue(TEXT("An undressed terminal is usable to begin with"), F.Terminal->CanUse(F.Player, Error)))
+    { AddError(Error.ToString()); return false; }
+
+    AActor* const Art = F.Dressing();
+    TestTrue(TEXT("A console standing where the terminal is does not obstruct it"),
+        F.Terminal->CanUse(F.Player, Error));
+    if (!F.Terminal->CanUse(F.Player, Error)) { AddError(Error.ToString()); }
+
+    // The guard still has to do its job: something genuinely in the way is still in the way.
+    AActor* const Wall = F.Blocker();
+    TestFalse(TEXT("A wall between the player and the terminal still refuses"), F.Terminal->CanUse(F.Player, Error));
+    TestFalse(TEXT("...and says so"), Error.IsEmpty());
+    Wall->Destroy();
+
+    TestTrue(TEXT("Clearing the wall restores use while the art stays put"), F.Terminal->CanUse(F.Player, Error));
+    Art->Destroy();
     return true;
 }
 

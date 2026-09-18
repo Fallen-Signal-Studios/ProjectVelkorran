@@ -61,6 +61,12 @@ ASovCampaignInteractionTerminal::ASovCampaignInteractionTerminal()
 bool ASovCampaignInteractionTerminal::CanUse(const APawn* Pawn, FText& Error) const
 { return CanUseInternal(Pawn, Error, false); }
 
+namespace
+{
+    /** How far past its own bounds a terminal's presentation may sit before it counts as an obstruction. */
+    constexpr float TerminalOcclusionTolerance = 40.f;
+}
+
 bool ASovCampaignInteractionTerminal::CanUseInternal(const APawn* Pawn, FText& Error, bool bExecutingRequest) const
 {
     Error = FText::GetEmpty();
@@ -99,10 +105,22 @@ bool ASovCampaignInteractionTerminal::CanUseInternal(const APawn* Pawn, FText& E
         || !FMath::IsFinite(Interactable->InteractionDistance) || Interactable->InteractionDistance <= 0.f
         || FVector::DistSquared(Player->GetActorLocation(), GetActorLocation()) > FMath::Square(Interactable->InteractionDistance))
     { return Fail(LOCTEXT("Range", "Move closer to the terminal")); }
+    // Focused on the interactable's bounds, as Narrative's own reach check already does. This used the
+    // actor origin instead, and refused on any blocking hit at all - including the terminal's own art,
+    // which in a built level is usually a separate mesh actor that "ignore self" does not cover. The
+    // press then failed silently until the player's own movement happened to clear the line, which is
+    // what "ten seconds of spamming E" was (reported from play).
+    const FBox Bounds = Interactable->GetInteractableBounds();
+    const FVector Focus = Bounds.IsValid ? Bounds.GetCenter() : GetActorLocation();
     FCollisionQueryParams Query = Player->GetIgnoreCharacterParams(); Query.AddIgnoredActor(this);
     FHitResult Hit;
-    if (GetWorld()->LineTraceSingleByChannel(Hit, Player->GetPawnViewLocation(), GetActorLocation(), ECC_Visibility, Query))
-    { return Fail(LOCTEXT("Occluded", "The terminal is obstructed")); }
+    if (GetWorld()->LineTraceSingleByChannel(Hit, Player->GetPawnViewLocation(), Focus, ECC_Visibility, Query))
+    {
+        // Geometry the terminal is made of, or sitting in, is not between the player and the terminal.
+        // Only something short of it is, and that is still refused.
+        const FBox Reached = (Bounds.IsValid ? Bounds : FBox(Focus, Focus)).ExpandBy(TerminalOcclusionTolerance);
+        if (!Reached.IsInside(Hit.ImpactPoint)) { return Fail(LOCTEXT("Occluded", "The terminal is obstructed")); }
+    }
     for (TActorIterator<ASovCampaignInteractionTerminal> It(GetWorld()); It; ++It)
     { if (*It != this && !It->IsActorBeingDestroyed() && It->TerminalId == TerminalId && It->MissionId == MissionId)
         { return Fail(LOCTEXT("Duplicate", "Terminal identity is ambiguous")); } }
