@@ -77,6 +77,34 @@ bool FSovCameraArbitrationTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCameraProfileTest, "ProjectVelkorran.Camera.Arbitration.ProtagonistProfiles",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCameraProfileTest::RunTest(const FString& Parameters)
+{
+	const FSovGameplayTags& Tags = FSovGameplayTags::Get();
+	const FSovCameraProfile Tarrik = SovCameraPolicy::BuiltInProfile(Tags.Character_Player_Tarrik);
+	const FSovCameraProfile Selene = SovCameraPolicy::BuiltInProfile(Tags.Character_Player_Selene);
+
+	// The two protagonists must not rest at the same distance, or §4.4's distinction exists only in
+	// the design document. Tarrik needs room for mass and ordnance; Selene reads at the default.
+	TestEqual(TEXT("Tarrik rests far enough back to read mass and ordnance"), Tarrik.Style, ESovCameraStyle::Far);
+	TestEqual(TEXT("Selene rests where precision stays legible"), Selene.Style, ESovCameraStyle::Balanced);
+	TestNotEqual(TEXT("The protagonists differ at rest, not only under a claim"), Tarrik.Style, Selene.Style);
+	TestEqual(TEXT("Neither starts strafing"), Tarrik.Mode, ESovCameraMode::FreeCam);
+	TestEqual(TEXT("Both start over the same shoulder until a swap is authored"), Tarrik.Shoulder, Selene.Shoulder);
+
+	// A pawn with no identity still gets a real baseline rather than a silent default.
+	const FSovCameraProfile Unknown = SovCameraPolicy::BuiltInProfile(FGameplayTag());
+	TestEqual(TEXT("An unidentified pawn still gets a named baseline"), Unknown.Style, ESovCameraStyle::Balanced);
+
+	// Authored content overrides the built-in entirely, which is what makes these safe defaults.
+	FSovCameraProfile Authored;
+	Authored.Style = ESovCameraStyle::FirstPerson;
+	const TStrongObjectPtr<USovCameraControlComponent> Control(MakeControl({ Authored }));
+	TestEqual(TEXT("An authored profile overrides the built-in one"), Control->GetCameraState().Style, ESovCameraStyle::FirstPerson);
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCameraTieBreakTest, "ProjectVelkorran.Camera.Arbitration.TiesAndUpdates",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovCameraTieBreakTest::RunTest(const FString& Parameters)

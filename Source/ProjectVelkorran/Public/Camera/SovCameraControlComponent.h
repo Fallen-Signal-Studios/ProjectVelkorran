@@ -100,6 +100,16 @@ struct PROJECTVELKORRAN_API FSovCameraProfile
 	ESovCameraShoulder Shoulder = ESovCameraShoulder::Right;
 };
 
+namespace SovCameraPolicy
+{
+	/**
+	 * The framing a protagonist gets before any content says otherwise.
+	 *
+	 * Free of a component so §4.4's distinction can be asserted directly rather than through a pawn.
+	 */
+	PROJECTVELKORRAN_API FSovCameraProfile BuiltInProfile(const FGameplayTag& Identity);
+}
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FSovCameraStateChanged, const FSovCameraState&, State);
 
 /**
@@ -126,7 +136,10 @@ class PROJECTVELKORRAN_API USovCameraControlComponent : public UActorComponent
 public:
 	USovCameraControlComponent();
 
-	/** Baselines per protagonist. The first entry matching the current identity wins. */
+	/**
+	 * Baselines per protagonist, overriding the built-in ones. The first entry matching the current
+	 * identity wins; an entry with no protagonist tag is the fallback for anyone unmatched.
+	 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Camera")
 	TArray<FSovCameraProfile> Profiles;
 

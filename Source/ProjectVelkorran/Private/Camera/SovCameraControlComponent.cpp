@@ -3,9 +3,24 @@
 
 #include "Characters/SovPlayerCharacterBase.h"
 #include "Misc/ScopeExit.h"
+#include "Sovereign/SovGameplayTags.h"
 
 namespace SovCameraPolicy
 {
+	FSovCameraProfile BuiltInProfile(const FGameplayTag& Identity)
+	{
+		FSovCameraProfile Out;
+		Out.Protagonist = Identity;
+		// Tarrik's fight is mass and the space his ordnance needs, and both want room to read, so his
+		// camera rests further back. Selene's is precision, which reads at the default distance and
+		// would only be cramped by starting closer - the aim claim already pulls in on top of this.
+		Out.Style = Identity == FSovGameplayTags::Get().Character_Player_Tarrik
+			? ESovCameraStyle::Far : ESovCameraStyle::Balanced;
+		Out.Mode = ESovCameraMode::FreeCam;
+		Out.Shoulder = ESovCameraShoulder::Right;
+		return Out;
+	}
+
 	/**
 	 * Settles a set of claims into one state.
 	 *
@@ -120,13 +135,14 @@ void USovCameraControlComponent::RefreshProfile()
 	{
 		Match = Profiles.FindByPredicate([](const FSovCameraProfile& Profile) { return !Profile.Protagonist.IsValid(); });
 	}
-	if (Match)
-	{
-		Request.Style = Match->Style;
-		Request.Mode = Match->Mode;
-		Request.Shoulder = Match->Shoulder;
-		if (Match->Protagonist.IsValid()) { Request.Reason = Match->Protagonist.GetTagName(); }
-	}
+	// Authored profiles override, but a protagonist with no content at all still gets the framing §4.4
+	// asks for rather than a silent engine default.
+	const FSovCameraProfile BuiltIn = SovCameraPolicy::BuiltInProfile(Identity);
+	if (!Match) { Match = &BuiltIn; }
+	Request.Style = Match->Style;
+	Request.Mode = Match->Mode;
+	Request.Shoulder = Match->Shoulder;
+	if (Match->Protagonist.IsValid()) { Request.Reason = Match->Protagonist.GetTagName(); }
 
 	if (ProfileHandle.IsValid() && UpdateCamera(ProfileHandle, Request)) { return; }
 	ProfileHandle = RequestCamera(Request);
