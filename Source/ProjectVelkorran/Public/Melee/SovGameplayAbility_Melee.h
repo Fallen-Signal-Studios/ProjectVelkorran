@@ -75,6 +75,9 @@ private:
     bool bMeleeEndPending=false;
     bool bEndingMelee=false;
     int32 NodeIndex=INDEX_NONE;
+    /** True while this ability is holding the super-armour tag, so it is removed exactly once. */
+    bool bSuperArmorHeld=false;
+    void SetSuperArmor(bool bArmored);
     float ChargeStarted=0.f;
     float ChargeScalar=1.f;
     bool bMeleeCharging=false;

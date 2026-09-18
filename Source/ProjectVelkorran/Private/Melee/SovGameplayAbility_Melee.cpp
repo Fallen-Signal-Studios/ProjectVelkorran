@@ -197,6 +197,8 @@ bool USovGameplayAbility_Melee::BeginNode(int32 Index)
     InputWindow.Invalidate();
     if (SweepTask) { SweepTask->EndTask(); SweepTask=nullptr; }
     if (Index!=NodeIndex&&!BeginNextSovCombatAttack()) { FinishMelee(); return false; }
+    // Each node arms itself from zero; carrying armour across a branch would outlive its window.
+    SetSuperArmor(false);
     NodeIndex=Index; bHitConfirmed=false; ChargeScalar=1.f;
     if (!NodeGeometryValid()) { FinishMelee(); return false; }
     FGuid ExpectedAttack;
@@ -351,10 +353,24 @@ void USovGameplayAbility_Melee::OnEnvironment(const FHitResult& Hit,AActor* Targ
     if (IsValid(Hit.GetActor()) && Hit.GetActor()->Implements<USovEnvironmentDamageable>()) { PendingEnvironmentDamage.Add(Hit); }
     OnMeleeEnvironmentContact(Hit);
 }
+void USovGameplayAbility_Melee::SetSuperArmor(const bool bArmored)
+{
+    if (bSuperArmorHeld==bArmored) { return; }
+    auto* ASC=ActionASC.Get();
+    // Tracked rather than queried: another source may hold the same tag, and this ability must
+    // remove only its own contribution or it would strip armour something else is still owed.
+    if (!IsValid(ASC)) { bSuperArmorHeld=false; return; }
+    const FGameplayTag Tag=FSovGameplayTags::Get().State_Poise_SuperArmor;
+    if (bArmored) { ASC->AddLooseGameplayTag(Tag); } else { ASC->RemoveLooseGameplayTag(Tag); }
+    bSuperArmorHeld=bArmored;
+}
 void USovGameplayAbility_Melee::OnStep(float Elapsed)
 {
     if (!NodeGeometryValid()) { FinishMelee(); return; }
     const auto Node=AttackDefinition->Nodes[NodeIndex];
+    // Before the branch gate below: a window that opens during startup is the ordinary case, and
+    // the gate returns long before then.
+    SetSuperArmor(Node.IsSuperArmored(Elapsed));
     if (!PendingEnvironmentDamage.IsEmpty())
     {
         const TArray<FHitResult> Contacts=MoveTemp(PendingEnvironmentDamage); PendingEnvironmentDamage.Reset();
@@ -399,6 +415,9 @@ void USovGameplayAbility_Melee::EndAbility(const FGameplayAbilitySpecHandle Hand
     TStrongObjectPtr<USovGameplayAbility_Melee> ActionLifetime(this);
     TGuardValue<bool> Ending(bEndingMelee,true);
     UnbindInterruptions();
+    // Unconditional: a leaked super-armour tag leaves the protagonist permanently unstaggerable,
+    // which is far worse than never having armed it.
+    SetSuperArmor(false);
     if (GetWorld()) { GetWorld()->GetTimerManager().ClearTimer(ChargeTimer); }
     auto* ASC=Cast<UNarrativeAbilitySystemComponent>(ActionASC.Get());
     if (ASC) { ASC->ClearCombatInputWindow(this,InputWindow); }

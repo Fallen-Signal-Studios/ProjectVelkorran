@@ -23,6 +23,13 @@ struct FSovMeleeRuntimeTestAccess
 {
     static void Tick(USovGameplayAbility_Melee* Ability,float Delta) { if (Ability->SweepTask) { Ability->SweepTask->TickTask(Delta); } }
     static int32 Node(USovGameplayAbility_Melee* Ability) { return Ability->NodeIndex; }
+    static bool ArmSuperArmor(USovGameplayAbility_Melee* Ability,float Open,float Close)
+    {
+        if (!Ability||!Ability->AttackDefinition||Ability->AttackDefinition->Nodes.IsEmpty()) { return false; }
+        for (FSovMeleeAttackNode& Node : Ability->AttackDefinition->Nodes)
+        { Node.SuperArmorOpen=Open; Node.SuperArmorClose=Close; }
+        FString Error; return Ability->AttackDefinition->Validate(Error);
+    }
     static USovAbilityTask_MeleeSweep* AdditionalTask(USovGameplayAbility_Melee* Ability,USkeletalMeshComponent* Mesh)
     {
         auto* Task=USovAbilityTask_MeleeSweep::SweepMeleeSockets(Ability,Mesh,Ability->AttackDefinition->Nodes[Ability->NodeIndex]);
@@ -152,6 +159,79 @@ bool FSovMeleeDefinitionValidationTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Up to three added edges validate"),Definition->Validate(Error));
     Definition->Nodes[0].AdditionalSegments.Add(Edge);
     TestFalse(TEXT("Added edges are bounded"),Definition->Validate(Error));
+
+    // A super-armour window is optional, and absent has to stay valid or every node authored before
+    // the field existed would fail the day it was added (audit PC2-13).
+    Definition->Nodes[0]=FSovMeleeAttackNode();
+    TestTrue(TEXT("A node with no super-armour window is still a valid node"),Definition->Validate(Error));
+    Definition->Nodes[0].SuperArmorOpen=.05f; Definition->Nodes[0].SuperArmorClose=.3f;
+    TestTrue(TEXT("A window inside the node validates"),Definition->Validate(Error));
+    Definition->Nodes[0].SuperArmorClose=99.f;
+    TestFalse(TEXT("A window outliving its node is refused, since the ability that owns the tag ends first"),
+        Definition->Validate(Error));
+    Definition->Nodes[0].SuperArmorOpen=.4f; Definition->Nodes[0].SuperArmorClose=.2f;
+    TestFalse(TEXT("A window that closes before it opens is refused"),Definition->Validate(Error));
+    Definition->Nodes[0].SuperArmorOpen=-1.f; Definition->Nodes[0].SuperArmorClose=.2f;
+    TestFalse(TEXT("A window opening before the node does is refused"),Definition->Validate(Error));
+
+    // The predicate the ability consults, checked at its edges: half-open on close, so two adjacent
+    // windows can never both be active on the same frame.
+    FSovMeleeAttackNode Window; Window.SuperArmorOpen=.1f; Window.SuperArmorClose=.25f;
+    TestFalse(TEXT("Before the window opens there is no armour"),Window.IsSuperArmored(.099f));
+    TestTrue(TEXT("The opening edge is armoured"),Window.IsSuperArmored(.1f));
+    TestTrue(TEXT("The middle is armoured"),Window.IsSuperArmored(.2f));
+    TestFalse(TEXT("The closing edge is already unarmoured"),Window.IsSuperArmored(.25f));
+    FSovMeleeAttackNode None;
+    TestFalse(TEXT("A node with no window is never armoured"),None.IsSuperArmored(0.f));
+    TestFalse(TEXT("...at any time"),None.IsSuperArmored(10.f));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovMeleeSuperArmorTest,
+    "ProjectVelkorran.Campaign.Melee.CommittedAttacksHoldSuperArmor",
+    EAutomationTestFlags::EditorContext|EAutomationTestFlags::ProductFilter)
+bool FSovMeleeSuperArmorTest::RunTest(const FString& Parameters)
+{
+    FMeleeWorld F;
+    auto* Source=F.ReadyPlayer(FVector(0,0,100));
+    if (!TestNotNull(TEXT("Ready melee player"),Source)) { return false; }
+    auto* Mesh=NewObject<USovMeleeRuntimeTestMesh>(Source); Source->AddInstanceComponent(Mesh);
+    Mesh->SetupAttachment(Source->GetRootComponent()); Mesh->SetCollisionEnabled(ECollisionEnabled::NoCollision); Mesh->RegisterComponent();
+    auto* ASC=Source->GetNarrativeAbilitySystemComponent();
+    const FGameplayTag Armor=FSovGameplayTags::Get().State_Poise_SuperArmor;
+
+    const auto Handle=ASC->GiveAbility(FGameplayAbilitySpec(USovMeleeRuntimeTestAbility::StaticClass(),1));
+    if (!TestTrue(TEXT("The attack activates"),ASC->TryActivateAbility(Handle,false))) { return false; }
+    auto* Ability=Cast<USovMeleeRuntimeTestAbility>(ASC->FindAbilitySpecFromHandle(Handle)->GetPrimaryInstance());
+    if (!TestNotNull(TEXT("Ability instance"),Ability)) { return false; }
+
+    // Armour through the wind-up and the swing, released before recovery: the committed part of a
+    // committed action, which is what TDD 6.6 asks for and what nothing produced before (PC2-13).
+    if (!TestTrue(TEXT("The node arms with a window inside itself"),
+        FSovMeleeRuntimeTestAccess::ArmSuperArmor(Ability,.05f,.35f))) { return false; }
+    TestFalse(TEXT("An attack does not begin armoured"),ASC->HasMatchingGameplayTag(Armor));
+
+    // The failure that would matter most first, on its own activation: a tag left behind by a
+    // cancelled attack makes the protagonist unstaggerable for the rest of the run.
+    F.Advance(Ability,.1f);
+    TestTrue(TEXT("The wind-up is armoured once the window opens"),ASC->HasMatchingGameplayTag(Armor));
+    ASC->CancelAbilityHandle(Handle);
+    TestFalse(TEXT("Cancelling mid-window releases the armour rather than leaking it"),
+        ASC->HasMatchingGameplayTag(Armor));
+
+    // A fresh attack, run all the way through, for the shape of the window itself.
+    if (!TestTrue(TEXT("A later attack activates once the first has ended"),ASC->TryActivateAbility(Handle,false)))
+    { return false; }
+    auto* Second=Cast<USovMeleeRuntimeTestAbility>(ASC->FindAbilitySpecFromHandle(Handle)->GetPrimaryInstance());
+    if (!TestNotNull(TEXT("Second ability instance"),Second)) { return false; }
+    if (!TestTrue(TEXT("...and arms"),FSovMeleeRuntimeTestAccess::ArmSuperArmor(Second,.05f,.35f))) { return false; }
+    F.Advance(Second,.1f);
+    TestTrue(TEXT("The wind-up is armoured"),ASC->HasMatchingGameplayTag(Armor));
+    F.Advance(Second,.15f);
+    TestTrue(TEXT("The swing stays armoured"),ASC->HasMatchingGameplayTag(Armor));
+    F.Advance(Second,.15f);
+    TestFalse(TEXT("Recovery is unarmoured, so a committed attack stays punishable afterwards"),
+        ASC->HasMatchingGameplayTag(Armor));
     return true;
 }
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovMeleeCoverRuntimeTest,

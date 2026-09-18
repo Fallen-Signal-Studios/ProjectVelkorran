@@ -41,7 +41,7 @@ Each of these I read the current code for, and the finding's claim still holds.
 | EA2-08 | `SetDecisionTier` and `SetParticipantRepresentation` have no production caller outside their own definitions. |
 | EA2-09 | Nothing in the campaign directors references `SovDominionPackCoordinator`. |
 | PC2-09 | No grant of the finisher or resonance abilities in character or framework source. Content may grant them; not checked. |
-| PC2-13 | `State_Poise_SuperArmor` is read in five places and added in none. There is no producer. |
+| ~~PC2-13~~ | **Closed 18 Sep.** `FSovMeleeAttackNode` carries a super-armour window and the melee ability owns the tag for exactly its duration. Absent windows stay valid, so no existing node changed. The Echo base still has no window; that half of the audit's fix is open. |
 | PC2-14 | `FSovMeleeAttackNode` still has one `NextNode`, one `FollowUpInput`, one `DefensiveInput`. |
 | CN2-06 | `SovCampaignNarrativeAdapters.cpp:91` still calls `CompleteBeat` and discards the result. |
 | CN2-09 | `ScanTarget` and `RequestCompanionAnalysis` have no caller outside their own library. |

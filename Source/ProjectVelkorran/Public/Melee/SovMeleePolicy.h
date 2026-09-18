@@ -10,6 +10,19 @@ inline bool ValidWindows(double Startup,double Active,double Recovery,double Bra
         && Startup>=0. && Active>0. && Recovery>=0. && Startup+Active+Recovery<=5.
         && BranchOpen+1.e-6>=Startup+Active && BranchClose+1.e-6>=BranchOpen && BranchClose<=Startup+Active+Recovery+1.e-6;
 }
+/**
+ * A super-armour window is either absent or entirely inside the node it belongs to.
+ *
+ * Absent is the default and must stay valid, or every existing node would fail validation the day
+ * the field was added. A window running past the node would leave the tag owned by an ability that
+ * has already ended (audit PC2-13).
+ */
+inline bool ValidSuperArmor(double Open,double Close,double Startup,double Active,double Recovery)
+{
+    if (!std::isfinite(Open)||!std::isfinite(Close)) { return false; }
+    if (Open==0.&&Close==0.) { return true; }
+    return Open>=0. && Close>Open && Close<=Startup+Active+Recovery+1.e-6;
+}
 inline bool ValidFollowUp(int Current,int Next,int Count)
 { return Next>Current && Next<Count && Count>0 && Count<=8; }
 inline int SpatialSamples(double Length,double Radius)

@@ -41,6 +41,23 @@ struct PROJECTVELKORRAN_API FSovMeleeAttackNode
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Melee") float BranchOpen=.35f;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Melee") float BranchClose=.6f;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Melee",meta=(ClampMin="0",ClampMax="0.1")) float HitConfirmAdvance=.05f;
+    /**
+     * Seconds from node start during which the attacker's poise cannot break, in the same space as
+     * BranchOpen/BranchClose. A window exists only when Close is greater than Open, so a node with
+     * both left at zero has no super armour and behaves exactly as before.
+     *
+     * The tag this drives was already read by the damage resolver, the Cinder Slam, Selene's payload
+     * and the thermal fracture - and added by nothing at all, so the committed-action armour TDD 6.6
+     * asks for did not exist (audit PC2-13).
+     */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Melee",meta=(ClampMin="0")) float SuperArmorOpen=0.f;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Melee",meta=(ClampMin="0")) float SuperArmorClose=0.f;
+    /** Whether this node arms at all. Kept separate so the predicate below reads honestly. */
+    bool HasSuperArmorWindow() const
+    { return FMath::IsFinite(SuperArmorOpen) && FMath::IsFinite(SuperArmorClose) && SuperArmorClose > SuperArmorOpen; }
+    /** Half-open on the close edge, so a window ending exactly at another's start never overlaps it. */
+    bool IsSuperArmored(float Elapsed) const
+    { return HasSuperArmorWindow() && FMath::IsFinite(Elapsed) && Elapsed >= SuperArmorOpen && Elapsed < SuperArmorClose; }
     /** Negative means this finite combo ends. Otherwise must point to a later node. */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Melee") int32 NextNode=INDEX_NONE;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Melee") FGameplayTag FollowUpInput;

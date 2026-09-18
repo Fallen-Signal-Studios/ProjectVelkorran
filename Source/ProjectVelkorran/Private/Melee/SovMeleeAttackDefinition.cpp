@@ -41,6 +41,7 @@ bool USovMeleeAttackDefinition::Validate(FString& Error) const
     {
         const auto& N=Nodes[I];
         if (!SovMelee::ValidWindows(N.Startup,N.Active,N.Recovery,N.BranchOpen,N.BranchClose)
+            || !SovMelee::ValidSuperArmor(N.SuperArmorOpen,N.SuperArmorClose,N.Startup,N.Active,N.Recovery)
             || N.StartSocket.IsNone()||N.EndSocket.IsNone()||!SovMelee::SpatialSamples(0,N.TraceRadius)
             || N.AdditionalSegments.Num()>MaximumAdditionalSegments
             || N.TraceSegments().ContainsByPredicate([](const FSovMeleeTraceSegment& Segment)
