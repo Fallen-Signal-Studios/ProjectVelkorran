@@ -14,12 +14,18 @@
 #include "ICommonInputModule.h"
 #include "HAL/PlatformProperties.h"
 #include "Save/SovSaveSubsystem.h"
+#include "NarrativeSavePhases.h"
+#include "NarrativeSave.h"
+#include "CharacterCreator/NarrativeSaveWithCreatorData.h"
 #include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/AutomationTest.h"
 #include "Misc/Crc.h"
+#include "HAL/PlatformMisc.h"
+#include "Misc/Paths.h"
+#include "Misc/FileHelper.h"
 #include "Serialization/MemoryWriter.h"
 #include "Serialization/ObjectAndNameAsStringProxyArchive.h"
 #include "Settings/SovGameUserSettings.h"
@@ -564,6 +570,175 @@ bool FSovCampaignMalformedSavePreambleRecovery::RunTest(const FString&)
         Loaded.Reset(FSovSaveTestAccess::Read(*S, ESovSaveSlotKind::Checkpoint, 0, bDamaged));
         TestTrue(TEXT("Repaired newest generation is real and no longer damaged"), Loaded.IsValid() && !bDamaged
             && Loaded->Header.Generation == 2 && Loaded->Header.PlaySeconds == 42.);
+    }
+    return true;
+}
+
+namespace SovGoldenSave
+{
+    /**
+     * A save written by an earlier build, kept in the repository as bytes.
+     *
+     * Every other save test builds its fixture in process, so it can only ever prove that today's
+     * writer agrees with today's reader. Nothing caught a change that leaves both sides consistent
+     * while silently orphaning saves already on disk (audit AR2-08) - SovSavePolicy::CheckVersion
+     * only inspects SchemaMajor/SchemaMinor, which a developer has to remember to bump by hand.
+     *
+     * These constants are the fixture's identity and do not change. Changing one means regenerating
+     * the fixture, which is exactly the moment a format change should require a deliberate decision.
+     */
+    const FString Account = TEXT("00112233445566778899aabbccddeeff");
+    const FString MissionId = TEXT("M01_Mantle");
+    const FString MapPackage = TEXT("/Game/Missions/M01");
+    const FString MissionDefinition = TEXT("/Game/Missions/DA_M01.DA_M01");
+    const FString LevelName = TEXT("M01_Mantle");
+    const FString CreatorUsername = TEXT("golden-fixture");
+    const FString ActorGuid = TEXT("6E1B3C8A-4D2F-47A1-9E05-71C2A8F30B6D");
+    const FString BoundaryId = TEXT("Checkpoint_Mantle_Ingress");
+    const FName ActorName = TEXT("BP_GoldenInteractable_C_0");
+    constexpr double PlaySeconds = 3725.5;
+    constexpr int32 SchemaMajor = 1;
+    constexpr int32 SchemaMinor = 0;
+
+    FString FixturePath()
+    {
+        return FPaths::ProjectDir() / TEXT("Source/ProjectVelkorranTests/Fixtures/GoldenSaves/Campaign_Schema1_0.sovsave");
+    }
+
+    /** Built only when regenerating. The checked-in bytes are the contract; this is how they were made. */
+    USovCampaignSaveGame* Build(USovSaveSubsystem& S)
+    {
+        auto* Save = NewObject<USovCampaignSaveGame>(&S);
+        auto& H = Save->Header;
+        H.AccountNamespace = Account;
+        H.SchemaMajor = SchemaMajor; H.SchemaMinor = SchemaMinor;
+        H.Kind = ESovSaveSlotKind::Manual; H.SlotIndex = 0;
+        H.MissionId = FName(*MissionId);
+        // Culture-invariant: a keyless FText takes a fresh localization GUID on every write and the
+        // integrity checksum hashes the label, so a runtime FText would make the fixture unrepeatable.
+        H.MissionLabel = FText::AsCultureInvariant(TEXT("The Mantle"));
+        H.MapPackage = MapPackage;
+        H.MissionDefinition = FSoftObjectPath(MissionDefinition);
+        H.ActiveProtagonist = FSovGameplayTags::Get().Character_Player_Tarrik;
+        H.TimestampUtc = FDateTime(2026, 9, 18, 12, 0, 0);
+        H.PlaySeconds = PlaySeconds;
+        H.BoundaryId = FName(*BoundaryId);
+        H.Build = TEXT("golden-fixture");
+
+        // A record with a component and byte data, because the nested SaveGame structs are where an
+        // incompatible change actually lands: a field added to FNarrativeActorRecord reads as garbage
+        // in a save written before it existed, and nothing else in the suite would notice.
+        auto* Narrative = NewObject<UNarrativeSaveWithCreatorData>(&S);
+        Narrative->LevelName = LevelName;
+        Narrative->CharacterCreatorUsername = CreatorUsername;
+        FNarrativeActorRecord Record;
+        FGuid::Parse(ActorGuid, Record.ActorGUID);
+        Record.ActorName = ActorName;
+        Record.Transform = FTransform(FRotator(0.f, 90.f, 0.f), FVector(1200.f, -340.f, 88.f), FVector::OneVector);
+        Record.bHasTransform = true;
+        Record.RestorePhase = ENarrativeRestorePhase::Interactables;
+        FNarrativeSaveComponent Component;
+        Component.ComponentName = TEXT("GoldenComponent");
+        Component.RestorePhase = ENarrativeRestorePhase::Interactables;
+        Component.ByteData = { 1, 2, 3, 4, 5, 6, 7, 8 };
+        Record.SavedComponents.Add(Component);
+        Record.ByteData = { 9, 8, 7, 6 };
+        Narrative->RecordMap.Add(Record.ActorGUID, Record);
+        UGameplayStatics::SaveGameToMemory(Narrative, Save->NarrativePayload);
+
+        auto* Settings = NewObject<USovGameUserSettings>(&S);
+        Settings->CapturePortableSettings(Save->PortableSettings);
+        return Save;
+    }
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovGoldenCampaignSaveTest,
+    "ProjectVelkorran.Campaign.Save.GoldenCampaignEnvelopeStillLoads",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovGoldenCampaignSaveTest::RunTest(const FString& Parameters)
+{
+    TStrongObjectPtr<UGameInstance> Instance(NewObject<UGameInstance>());
+    TStrongObjectPtr<USovSaveSubsystem> S(NewObject<USovSaveSubsystem>(Instance.Get()));
+    auto* Storage = FSovSaveTestAccess::Initialize(*S);
+    FSovSaveTestAccess::SetAccount(*S, SovGoldenSave::Account);
+    const FString Path = SovGoldenSave::FixturePath();
+    const FString BankName = FSovSaveTestAccess::Name(*S, ESovSaveSlotKind::Manual, 0, 0);
+
+    // Regeneration is deliberate and explicit. A test that rewrote its own fixture on a mismatch could
+    // never fail, which is the whole point of keeping the bytes rather than rebuilding them.
+    if (!FPlatformMisc::GetEnvironmentVariable(TEXT("SOV_REGENERATE_GOLDEN_SAVES")).IsEmpty())
+    {
+        TStrongObjectPtr<USovCampaignSaveGame> Fresh(SovGoldenSave::Build(*S));
+        FString WriteError;
+        if (!TestEqual(TEXT("Regenerating writes through the real envelope writer"),
+            FSovSaveTestAccess::Write(*S, Fresh.Get(), WriteError), ESovSaveResult::Success)) { return false; }
+        TArray<uint8> Written;
+        if (!TestTrue(TEXT("The regenerated bank reads back"), Storage->Read(BankName, 0, Written))) { return false; }
+        TestTrue(TEXT("The regenerated fixture reaches disk"), FFileHelper::SaveArrayToFile(Written, *Path));
+        AddWarning(FString::Printf(TEXT("Golden save regenerated at %s (%d bytes). Replacing it discards the ")
+            TEXT("evidence that saves written before this change still load, so commit it deliberately."),
+            *Path, Written.Num()));
+        return true;
+    }
+
+    TArray<uint8> Golden;
+    if (!FFileHelper::LoadFileToArray(Golden, *Path))
+    {
+        AddError(FString::Printf(TEXT("The golden save fixture is missing at %s. Regenerate it by setting ")
+            TEXT("SOV_REGENERATE_GOLDEN_SAVES=1 and rerunning this test, then commit the bytes."), *Path));
+        return false;
+    }
+
+    Storage->Write(BankName, 0, Golden);
+    bool bDamaged = false;
+    TStrongObjectPtr<USovCampaignSaveGame> Loaded(FSovSaveTestAccess::Read(*S, ESovSaveSlotKind::Manual, 0, bDamaged));
+    if (!TestNotNull(TEXT("A save written by an earlier build still loads through the production read path"), Loaded.Get()))
+    {
+        AddError(TEXT("The envelope format changed incompatibly. Either restore compatibility, or bump ")
+            TEXT("SovSavePolicy::SchemaMajor/SchemaMinor, write the migration, and regenerate this fixture."));
+        return false;
+    }
+    TestFalse(TEXT("The golden bank is not reported as damaged"), bDamaged);
+    TestTrue(TEXT("Its integrity checksum still covers the same bytes"), Loaded->HasValidIntegrity());
+
+    const auto& H = Loaded->Header;
+    TestEqual(TEXT("The schema it was written at is still the schema we accept"), H.SchemaMajor, SovGoldenSave::SchemaMajor);
+    TestEqual(TEXT("...down to the minor version"), H.SchemaMinor, SovGoldenSave::SchemaMinor);
+    TestEqual(TEXT("The mission survives"), H.MissionId.ToString(), SovGoldenSave::MissionId);
+    TestEqual(TEXT("The map survives"), H.MapPackage, SovGoldenSave::MapPackage);
+    TestEqual(TEXT("The protagonist survives"), H.ActiveProtagonist, FSovGameplayTags::Get().Character_Player_Tarrik);
+    TestEqual(TEXT("Play time survives"), H.PlaySeconds, SovGoldenSave::PlaySeconds);
+    TestEqual(TEXT("The checkpoint boundary survives"), H.BoundaryId.ToString(), SovGoldenSave::BoundaryId);
+
+    FString SettingsError;
+    TestTrue(TEXT("Settings captured by the earlier build are still readable"),
+        USovGameUserSettings::ValidatePortableSettings(Loaded->PortableSettings, SettingsError));
+
+    // The nested payload is where a plugin-side record change would land, and UNarrativeSave::Serialize
+    // carries a version fixup hook that has never had to do anything. This is what would notice.
+    TStrongObjectPtr<UNarrativeSave> Narrative(Cast<UNarrativeSave>(UGameplayStatics::LoadGameFromMemory(Loaded->NarrativePayload)));
+    if (!TestNotNull(TEXT("The nested Narrative payload still deserializes"), Narrative.Get())) { return false; }
+    TestEqual(TEXT("The saved level survives"), Narrative->LevelName, SovGoldenSave::LevelName);
+    auto* const Creator = Cast<UNarrativeSaveWithCreatorData>(Narrative.Get());
+    if (TestNotNull(TEXT("The configured save subclass survives the round trip"), Creator))
+    { TestEqual(TEXT("Its own data survives"), Creator->CharacterCreatorUsername, SovGoldenSave::CreatorUsername); }
+
+    FGuid Guid; FGuid::Parse(SovGoldenSave::ActorGuid, Guid);
+    const FNarrativeActorRecord* const Record = Narrative->RecordMap.Find(Guid);
+    if (!TestNotNull(TEXT("The saved actor record is still keyed by the same GUID"), Record)) { return false; }
+    TestEqual(TEXT("The actor's identity survives"), Record->ActorName, SovGoldenSave::ActorName);
+    TestTrue(TEXT("The actor is still marked as having a transform"), Record->bHasTransform);
+    TestTrue(TEXT("Its transform survives intact"),
+        Record->Transform.GetLocation().Equals(FVector(1200.f, -340.f, 88.f))
+        && Record->Transform.GetRotation().Rotator().Equals(FRotator(0.f, 90.f, 0.f), .01f));
+    TestEqual(TEXT("Its restore phase survives"), Record->RestorePhase, ENarrativeRestorePhase::Interactables);
+    const TArray<uint8> ExpectedActorBytes = { 9, 8, 7, 6 };
+    TestTrue(TEXT("The actor's own SaveGame bytes survive unshifted"), Record->ByteData == ExpectedActorBytes);
+    if (TestEqual(TEXT("Its component record survives"), Record->SavedComponents.Num(), 1))
+    {
+        const TArray<uint8> ExpectedComponentBytes = { 1, 2, 3, 4, 5, 6, 7, 8 };
+        TestEqual(TEXT("The component's identity survives"), Record->SavedComponents[0].ComponentName, FName(TEXT("GoldenComponent")));
+        TestTrue(TEXT("The component's SaveGame bytes survive unshifted"), Record->SavedComponents[0].ByteData == ExpectedComponentBytes);
     }
     return true;
 }
