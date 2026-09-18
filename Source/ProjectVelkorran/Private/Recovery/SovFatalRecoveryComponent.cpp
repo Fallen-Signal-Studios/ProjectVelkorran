@@ -50,6 +50,7 @@ void USovFatalRecoveryComponent::InitializeWithAbilitySystem(UNarrativeAbilitySy
 	BoundASC = ASC;
 	ASC->OnDeathStateChanged.AddUniqueDynamic(this, &ThisClass::HandleDeath);
 	ASC->OnDamageResolvedAsTarget.AddUniqueDynamic(this, &ThisClass::HandleDamage);
+	ASC->OnDamageResolvedAsSource.AddUniqueDynamic(this, &ThisClass::HandleDealtDamage);
 }
 void USovFatalRecoveryComponent::Unbind()
 {
@@ -69,6 +70,7 @@ void USovFatalRecoveryComponent::Unbind()
 	{
 		OldASC->OnDeathStateChanged.RemoveDynamic(this, &ThisClass::HandleDeath);
 		OldASC->OnDamageResolvedAsTarget.RemoveDynamic(this, &ThisClass::HandleDamage);
+		OldASC->OnDamageResolvedAsSource.RemoveDynamic(this, &ThisClass::HandleDealtDamage);
 		if (OldProtection.IsValid()) { OldASC->RemoveActiveGameplayEffect(OldProtection); }
 		if (bReleaseBusy && IsValid(OldASC)) { OldASC->RemoveLooseGameplayTag(FNarrativeGameplayTags::Get().State_Busy, 1); }
 	}
@@ -170,6 +172,26 @@ void USovFatalRecoveryComponent::HandleDamage(const FSovDamageResult& Result)
 	// A canonical lethal hit and an environmental death must never be converted into rescue.
 	bExcludedFatal |= Result.bCanonicalFatal || Result.DamageChannels.HasTagExact(FSovGameplayTags::Get().Damage_Channel_Environmental);
 }
+void USovFatalRecoveryComponent::HandleDealtDamage(const FSovDamageResult& Result)
+{
+	// Protection buys a moment to reorient after a respawn, not a free opening attack. Any damage the
+	// protagonist actually lands ends it, which is what A.1's "or until offensive action" asks for.
+	if (Result.SourceActor != GetOwner() || Result.TargetActor == GetOwner()) { return; }
+	if (Result.AppliedHealthDamage + Result.AppliedShieldDamage + Result.AppliedPoiseDamage <= 0.f) { return; }
+	EndRespawnProtection();
+}
+
+bool USovFatalRecoveryComponent::EndRespawnProtection()
+{
+	UNarrativeAbilitySystemComponent* const ASC = BoundASC;
+	const FActiveGameplayEffectHandle Held = ProtectionHandle;
+	if (!Held.IsValid() || !IsValid(ASC)) { return false; }
+	// Retire ownership before the removal, which can run user code that establishes a newer grant.
+	ProtectionHandle.Invalidate();
+	ASC->RemoveActiveGameplayEffect(Held);
+	return true;
+}
+
 bool USovFatalRecoveryComponent::IsSafeRecoveryPosition(const ASovPlayerCharacterBase* P, const FVector& Position)
 {
 	if (!IsValid(P) || !P->GetWorld() || Position.ContainsNaN() || !P->GetCapsuleComponent() || !P->GetCharacterMovement()) { return false; }

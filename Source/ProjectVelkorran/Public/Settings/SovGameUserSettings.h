@@ -156,6 +156,15 @@ public:
 	/** Explicit opt-in import only: current local accessibility/comfort/consent settings are retained. */
 	bool RestorePortableSettings(const TArray<uint8>& Data, FString& Error);
 	static bool ValidateSnapshot(const FSovUserSettingsSnapshot& Value, bool bSovereignUnlocked, FString& Error);
+
+	/**
+	 * Repairs invalid fields individually, in place, and returns how many were repaired.
+	 *
+	 * An out-of-range value is clamped, so a subtitle scale saved above the maximum keeps the player's
+	 * intent at the maximum; a value that cannot be clamped at all, such as a NaN or an unknown enum,
+	 * returns to its default. Every other preference is left exactly as the player set it.
+	 */
+	static int32 SanitizeSnapshot(FSovUserSettingsSnapshot& Value, bool bSovereignUnlocked);
 protected:
 	/** Real engine adapter seams permit deterministic automation without driving the test machine's display. */
 	virtual FSovHDROutputStatus ReadHDROutput();

@@ -56,6 +56,10 @@ private:
 	ASovEncounterDirector* FindActiveEncounter() const;
 	UFUNCTION() void HandleDeath(AActor* Actor, UNarrativeAbilitySystemComponent* ASC, bool bDead);
 	UFUNCTION() void HandleDamage(const FSovDamageResult& Result);
+	/** A.1: respawn protection lasts 1.5 s or until the protagonist attacks, whichever comes first. */
+	UFUNCTION() void HandleDealtDamage(const FSovDamageResult& Result);
+	/** Drops respawn protection early. Returns true when protection was actually being held. */
+	bool EndRespawnProtection();
 	UPROPERTY(Transient) TObjectPtr<UNarrativeAbilitySystemComponent> BoundASC;
 	UPROPERTY(Transient) TObjectPtr<ASovEncounterDirector> PendingEncounter;
 	TWeakObjectPtr<APlayerController> LockedController;

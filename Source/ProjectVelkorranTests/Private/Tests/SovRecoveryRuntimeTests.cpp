@@ -166,4 +166,53 @@ bool FSovRecoveryReentryTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Reentrant detach releases only owned input suppression"), F.PC->IsMoveInputIgnored());
 	return true;
 }
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovRecoveryProtectionEndsOnAttackTest,
+	"ProjectVelkorran.Campaign.Recovery.RespawnProtectionEndsOnOffensiveAction",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovRecoveryProtectionEndsOnAttackTest::RunTest(const FString& Parameters)
+{
+	static_cast<void>(Parameters);
+	// A.1 grants respawn protection for 1.5 s "or until offensive action, whichever first". Nothing
+	// listened for the offensive action, so it always ran the full duration and a player could open
+	// with a free attack while invulnerable (audit PC2-11).
+	FRecoveryWorld F; if (!TestNotNull(TEXT("Real persistent ASC initialized"), F.ASC)) { return false; }
+	auto* Recovery = F.Pawn->GetRecoveryComponent();
+	const FGameplayTag Respawn = FSovGameplayTags::Get().State_Invulnerable_Respawn;
+	auto* Other = F.World->SpawnActor<AActor>();
+	if (!TestNotNull(TEXT("Someone to attack"), Other)) { return false; }
+
+	const auto Protect = [&]()
+	{
+		TestTrue(TEXT("Checkpoint protection applies"), Recovery->ProtectRestoredCheckpoint());
+		return F.ASC->HasMatchingGameplayTag(Respawn);
+	};
+	const auto Resolve = [&](AActor* Source, AActor* Target, float Health, float Shield, float Poise)
+	{
+		FSovDamageResult Result;
+		Result.SourceActor = Source; Result.TargetActor = Target;
+		Result.AppliedHealthDamage = Health; Result.AppliedShieldDamage = Shield; Result.AppliedPoiseDamage = Poise;
+		F.ASC->OnDamageResolvedAsSource.Broadcast(Result);
+	};
+
+	// A swing that lands nothing is not an offensive action for this purpose: the player has spent
+	// their opening on a miss, and taking the protection would punish them twice.
+	if (!TestTrue(TEXT("Protection is held before the attack"), Protect())) { return false; }
+	Resolve(F.Pawn, Other, 0.f, 0.f, 0.f);
+	TestTrue(TEXT("A hit that applies nothing keeps the protection"), F.ASC->HasMatchingGameplayTag(Respawn));
+
+	// Damage the protagonist receives is not an offensive action either.
+	Resolve(Other, F.Pawn, 10.f, 0.f, 0.f);
+	TestTrue(TEXT("Being hit keeps the protection"), F.ASC->HasMatchingGameplayTag(Respawn));
+
+	// Landing anything at all ends it, including a poise-only hit.
+	Resolve(F.Pawn, Other, 0.f, 0.f, 5.f);
+	TestFalse(TEXT("Landing a hit ends the protection early"), F.ASC->HasMatchingGameplayTag(Respawn));
+
+	// And it is genuinely released rather than merely hidden: the next respawn can grant it again.
+	TestTrue(TEXT("Protection can be granted again after it ended"), Protect());
+	Resolve(F.Pawn, Other, 12.f, 0.f, 0.f);
+	TestFalse(TEXT("The second protection also ends on an offensive action"), F.ASC->HasMatchingGameplayTag(Respawn));
+	return true;
+}
 #endif

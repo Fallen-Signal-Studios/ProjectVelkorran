@@ -123,4 +123,52 @@ bool FSovObjectiveSettingsPersistence::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Additive field does not reset legacy UI scale"), Legacy->GetSettingsSnapshot().UIScale, 1.5f);
 	return true;
 }
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovSettingsFieldRepair,
+	"ProjectVelkorran.Campaign.Settings.OneBadFieldDoesNotDiscardThePreferencesAroundIt",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+bool FSovSettingsFieldRepair::RunTest(const FString& Parameters)
+{
+	static_cast<void>(Parameters);
+	// Loading replaced the whole snapshot with defaults and re-armed first-boot setup if any single
+	// field failed validation, so one out-of-range value silently cost a player every other
+	// accessibility preference they had set (audit UX2-15).
+	FSovUserSettingsSnapshot Value;
+	Value.SubtitleScale = 9.f;              // Out of range, but the direction is unmistakable.
+	Value.UIScale = 1.75f;                  // Deliberate, and must survive untouched.
+	Value.bHighContrastHUD = true;          // Likewise.
+	Value.SubtitleMaximumLines = 3;
+	TestTrue(TEXT("A single bad field is repaired"), USovGameUserSettings::SanitizeSnapshot(Value, false) == 1);
+	TestEqual(TEXT("An out-of-range value is clamped, keeping the player's direction"), Value.SubtitleScale, 2.5f);
+	TestEqual(TEXT("Unrelated preferences are left exactly as they were"), Value.UIScale, 1.75f);
+	TestTrue(TEXT("Unrelated toggles are left alone"), Value.bHighContrastHUD);
+	FString Error;
+	TestTrue(TEXT("The repaired snapshot passes the project's own validation"),
+		USovGameUserSettings::ValidateSnapshot(Value, false, Error));
+
+	// A value that cannot be clamped has no direction to keep, so it returns to its default.
+	FSovUserSettingsSnapshot Broken;
+	Broken.InteractionHoldScale = std::numeric_limits<float>::quiet_NaN();
+	Broken.SubtitleCharactersPerLine = 5000;
+	Broken.TeamColor = FLinearColor(2.f, -1.f, .5f, .25f);
+	const int32 Repairs = USovGameUserSettings::SanitizeSnapshot(Broken, false);
+	TestEqual(TEXT("Each invalid field is counted once"), Repairs, 3);
+	TestEqual(TEXT("A non-finite value returns to its default"), Broken.InteractionHoldScale, 1.f);
+	TestEqual(TEXT("An out-of-range count is clamped"), Broken.SubtitleCharactersPerLine, 64);
+	TestTrue(TEXT("A colour is clamped channel by channel and made opaque"),
+		Broken.TeamColor.Equals(FLinearColor(1.f, 0.f, .5f, 1.f)));
+	TestTrue(TEXT("The repaired snapshot validates"), USovGameUserSettings::ValidateSnapshot(Broken, false, Error));
+
+	// Sovereign stays locked until the campaign is finished, whatever a config file claims.
+	FSovUserSettingsSnapshot Locked;
+	Locked.Preset = ESovDifficultyPreset::Sovereign;
+	TestEqual(TEXT("A locked preset is refused"), USovGameUserSettings::SanitizeSnapshot(Locked, false), 1);
+	TestTrue(TEXT("The refused preset returns to the default"), Locked.Preset == FSovUserSettingsSnapshot().Preset);
+	FSovUserSettingsSnapshot Unlocked;
+	Unlocked.Preset = ESovDifficultyPreset::Sovereign;
+	TestEqual(TEXT("The same preset is kept once it is unlocked"),
+		USovGameUserSettings::SanitizeSnapshot(Unlocked, true), 0);
+	TestTrue(TEXT("An already valid snapshot is untouched"), Unlocked.Preset == ESovDifficultyPreset::Sovereign);
+	return true;
+}
 #endif

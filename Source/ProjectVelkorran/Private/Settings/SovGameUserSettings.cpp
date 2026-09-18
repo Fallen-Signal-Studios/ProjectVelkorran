@@ -60,6 +60,61 @@ bool USovGameUserSettings::ValidateSnapshot(const FSovUserSettingsSnapshot& Valu
 	{ Error = TEXT("Settings contain unsupported values or locked Sovereign difficulty."); return false; }
 	Error.Reset(); return true;
 }
+int32 USovGameUserSettings::SanitizeSnapshot(FSovUserSettingsSnapshot& Value, const bool bUnlocked)
+{
+	const FSovUserSettingsSnapshot Defaults;
+	int32 Repairs = 0;
+	// A finite value outside its range is clamped, keeping the direction the player chose. A value that
+	// cannot be clamped meaningfully - NaN, infinity - goes back to its default instead.
+	const auto Number = [&Repairs](float& Field, const float Minimum, const float Maximum, const float Default)
+	{
+		if (SovSettingsPolicy::InRange(Field, Minimum, Maximum)) { return; }
+		Field = FMath::IsFinite(Field) ? FMath::Clamp(Field, Minimum, Maximum) : Default;
+		++Repairs;
+	};
+	const auto Count = [&Repairs](int32& Field, const int32 Minimum, const int32 Maximum)
+	{
+		if (Field >= Minimum && Field <= Maximum) { return; }
+		Field = FMath::Clamp(Field, Minimum, Maximum);
+		++Repairs;
+	};
+	const auto Colour = [&Repairs](FLinearColor& Field, const FLinearColor& Default)
+	{
+		if (SovAccessibilityPolicy::ValidColor(Field.R, Field.G, Field.B, Field.A)) { return; }
+		const bool bClampable = FMath::IsFinite(Field.R) && FMath::IsFinite(Field.G) && FMath::IsFinite(Field.B);
+		Field = bClampable ? FLinearColor(FMath::Clamp(Field.R, 0.f, 1.f), FMath::Clamp(Field.G, 0.f, 1.f),
+			FMath::Clamp(Field.B, 0.f, 1.f), 1.f) : Default;
+		++Repairs;
+	};
+
+	// Sovereign stays locked until the campaign is finished; an unlocked-looking save does not unlock it.
+	if (static_cast<uint8>(Value.Preset) > 4 || (static_cast<uint8>(Value.Preset) == 3 && !bUnlocked))
+	{ Value.Preset = Defaults.Preset; ++Repairs; }
+	Number(Value.IncomingDamageScale, .1f, 2.f, Defaults.IncomingDamageScale);
+	Number(Value.EnemyRecoveryScale, .5f, 2.f, Defaults.EnemyRecoveryScale);
+	Number(Value.DefenseWindowScale, 1.f, 2.f, Defaults.DefenseWindowScale);
+	Number(Value.ExertionCostScale, .1f, 1.f, Defaults.ExertionCostScale);
+	Number(Value.InputBufferAssistanceSeconds, 0.f, .2f, Defaults.InputBufferAssistanceSeconds);
+	Number(Value.MeleeAimAssistStrength, 0.f, 1.f, Defaults.MeleeAimAssistStrength);
+	Number(Value.RangedAimAssistStrength, 0.f, 1.f, Defaults.RangedAimAssistStrength);
+	Number(Value.AutoCameraStrength, 0.f, 1.f, Defaults.AutoCameraStrength);
+	Number(Value.InteractionHoldScale, .1f, 1.f, Defaults.InteractionHoldScale);
+	Number(Value.UIScale, 1.f, 2.f, Defaults.UIScale);
+	Number(Value.SubtitleScale, 1.f, 2.5f, Defaults.SubtitleScale);
+	Number(Value.SubtitleBackgroundOpacity, 0.f, 1.f, Defaults.SubtitleBackgroundOpacity);
+	Number(Value.OutlineThickness, 1.f, 6.f, Defaults.OutlineThickness);
+	Number(Value.DialogueMinimumReadSeconds, 2.f, 30.f, Defaults.DialogueMinimumReadSeconds);
+	Number(Value.DialoguePressureExtension, 1.f, 5.f, Defaults.DialoguePressureExtension);
+	Number(Value.ControllerAudioVolume, 0.f, 1.f, Defaults.ControllerAudioVolume);
+	Count(Value.SubtitleCharactersPerLine, 20, 64);
+	Count(Value.SubtitleMaximumLines, 1, 4);
+	if (static_cast<uint8>(Value.ColorVisionPreset) > 3) { Value.ColorVisionPreset = Defaults.ColorVisionPreset; ++Repairs; }
+	if (static_cast<uint8>(Value.DialoguePressureMode) > 2) { Value.DialoguePressureMode = Defaults.DialoguePressureMode; ++Repairs; }
+	Colour(Value.TeamColor, Defaults.TeamColor);
+	Colour(Value.ThreatColor, Defaults.ThreatColor);
+	return Repairs;
+}
+
 void USovGameUserSettings::LoadSettings(bool bForceReload)
 {
 	if (bHDRTransaction) { return; }
@@ -68,12 +123,25 @@ void USovGameUserSettings::LoadSettings(bool bForceReload)
 	if (!DisplayCalibration.IsValid()) { DisplayCalibration = FSovHDRCalibration(); bHasDisplayCalibration = false; }
 	if (!HapticSettings.IsValid()) { HapticSettings = FSovHapticSettings(); HapticSettings.Master = 0.f; SaveSettings(); }
 	FString Error;
-	if (SettingsSchemaVersion != 1 || !ValidateSnapshot(Settings, bCampaignCompleted, Error))
+	const auto Discard = [this]()
 	{
 		Settings = FSovUserSettingsSnapshot(); SettingsSchemaVersion = 1;
 		// Bad/unknown config never enables diagnostic collection.
 		bLocalDiagnosticsEnabled = false;
 		bAccessibilitySetupCompleted = false;
+		SaveSettings();
+	};
+	// An unknown schema has an unknown layout, so no individual field in it can be trusted.
+	if (SettingsSchemaVersion != 1) { Discard(); return; }
+	const int32 Repaired = SanitizeSnapshot(Settings, bCampaignCompleted);
+	// A field the repair does not know about still has to fail closed, or the rest of the game would
+	// read a value its own validation rejects.
+	if (!ValidateSnapshot(Settings, bCampaignCompleted, Error)) { Discard(); return; }
+	if (Repaired > 0)
+	{
+		// One bad field is not a reason to discard the preferences around it, nor to make a player who
+		// has already completed accessibility setup sit through it again.
+		bLocalDiagnosticsEnabled = false;
 		SaveSettings();
 	}
 }
