@@ -337,5 +337,10 @@ Landed, and relevant to you only where noted:
 - **UX2-08** — plural forms, culture-aware dates, grapheme-safe letterspacing on the identity plate,
   and the gather config, which is task 8 above.
 
-The adversarial audit's systems-side items are now closed. What remains under UX2-08 is listed in task
-8; everything else outstanding is content.
+**The adversarial audit is not closed.** An earlier version of this document said it was; that was
+wrong. The 2026-09-17 audit carries 76 findings across four files, and roughly twenty are done. Five
+are still rated P1 and none of those have been touched: AR2-01 (corrupt save bytes reaching unbounded
+deserialization), AR2-02 (the packaged boot configuration rooting Narrative's demo world and character
+creator), AR2-03 (no executable gate for a Test or Shipping build), PC2-01 (protagonist melee
+bypassing the native melee framework) and EA2-01 (elite summons outliving their encounter). Read
+`Docs/AdversarialAudit-2026-09-17/` rather than this list.
