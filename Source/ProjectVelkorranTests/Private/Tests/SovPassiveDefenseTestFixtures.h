@@ -6,6 +6,7 @@
 #include "Components/SovPoiseComponent.h"
 #include "Components/SovShieldComponent.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
+#include "GAS/NarrativeCombatAbility.h"
 #include "GameFramework/Actor.h"
 #include "SovPassiveDefenseTestFixtures.generated.h"
 
@@ -38,6 +39,50 @@ public:
 		RegenerationDelay = 0.2f; RegenerationPercentPerSecond = 0.5f; RegenerationTimerInterval = 0.05f;
 		BrokenFallbackDuration = 0.2f; RecoveryImmunityDuration = 0.2f;
 	}
+};
+
+/**
+ * An attack that overrides nothing.
+ *
+ * This is deliberately the least capable subclass that can exist, because that is exactly what an
+ * authored Blueprint attack is: it inherits whatever the base class enforces and adds no fences of
+ * its own. If break handling only works when a subclass implements it, this ability proves it.
+ */
+UCLASS(Transient, NotBlueprintable)
+class USovPlainCombatTestAbility : public UNarrativeCombatAbility
+{
+	GENERATED_BODY()
+public:
+	USovPlainCombatTestAbility()
+	{
+		InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
+		NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::ServerOnly;
+		bRequiresAmmo = false;
+	}
+	int32 Activations = 0;
+	int32 Cancellations = 0;
+protected:
+	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* Info,
+		const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* Event) override
+	{
+		++Activations;
+		Super::ActivateAbility(Handle, Info, ActivationInfo, Event);
+	}
+	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* Info,
+		const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicate, bool bWasCancelled) override
+	{
+		if (bWasCancelled) { ++Cancellations; }
+		Super::EndAbility(Handle, Info, ActivationInfo, bReplicate, bWasCancelled);
+	}
+};
+
+/** The authored super-armour case: a committed swing that should land through a stagger. */
+UCLASS(Transient, NotBlueprintable)
+class USovUnstoppableCombatTestAbility : public USovPlainCombatTestAbility
+{
+	GENERATED_BODY()
+public:
+	USovUnstoppableCombatTestAbility() { bHonoursCombatInterruptions = false; }
 };
 
 /** Content-free owner with a swappable canonical ASC, matching a retained pawn handoff. */

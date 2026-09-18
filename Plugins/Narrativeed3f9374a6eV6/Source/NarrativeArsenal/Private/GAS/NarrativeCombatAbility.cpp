@@ -54,11 +54,75 @@ void UNarrativeCombatAbility::CommitExecute(const FGameplayAbilitySpecHandle Han
 	Super::CommitExecute(Handle, ActorInfo, ActivationInfo);
 }
 
+const FGameplayTagContainer& UNarrativeCombatAbility::SharedCombatInterruptions()
+{
+	static const FGameplayTagContainer Tags = []()
+	{
+		const FNarrativeGameplayTags& N = FNarrativeGameplayTags::Get();
+		const FSovGameplayTags& S = FSovGameplayTags::Get();
+		FGameplayTagContainer Result;
+		// Deliberately not State_Busy or State_Interacting: those are ordinary contention an attack may
+		// legitimately share or queue behind. These are states in which attacking is incoherent.
+		for (const FGameplayTag& Tag : { N.State_IsDead, N.State_SequencerControlled, N.State_Movement_Ragdoll,
+			S.State_Fatal, S.State_Poise_Broken, S.State_Guard_Broken, S.State_Status_Frozen })
+		{ Result.AddTag(Tag); }
+		return Result;
+	}();
+	return Tags;
+}
+
+bool UNarrativeCombatAbility::IsInterruptedByCombatState() const
+{
+	const UAbilitySystemComponent* const ASC = CurrentActorInfo ? CurrentActorInfo->AbilitySystemComponent.Get() : nullptr;
+	return bHonoursCombatInterruptions && ASC && ASC->HasAnyMatchingGameplayTags(SharedCombatInterruptions());
+}
+
 bool UNarrativeCombatAbility::CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayTagContainer* SourceTags /*= nullptr*/, const FGameplayTagContainer* TargetTags /*= nullptr*/, OUT FGameplayTagContainer* OptionalRelevantTags /*= nullptr*/) const
 {
-	return ActorInfo && ActorInfo->AbilitySystemComponent.IsValid()
-		&& !ActorInfo->AbilitySystemComponent->HasMatchingGameplayTag(FSovGameplayTags::Get().State_Evading)
+	if (!ActorInfo || !ActorInfo->AbilitySystemComponent.IsValid()) { return false; }
+	// Swinging through a stagger is the defect this closes, and it has to hold for a Blueprint attack
+	// that overrides nothing, which is why it lives here rather than in each concrete attack.
+	if (bHonoursCombatInterruptions
+		&& ActorInfo->AbilitySystemComponent->HasAnyMatchingGameplayTags(SharedCombatInterruptions()))
+	{ return false; }
+	return !ActorInfo->AbilitySystemComponent->HasMatchingGameplayTag(FSovGameplayTags::Get().State_Evading)
 		&& Super::CanActivateAbility(Handle, ActorInfo, SourceTags, TargetTags, OptionalRelevantTags);
+}
+
+void UNarrativeCombatAbility::BindSharedCombatInterruptions()
+{
+	UnbindSharedCombatInterruptions();
+	if (!bHonoursCombatInterruptions || !bBindsSharedCombatInterruptions) { return; }
+	// A non-instanced ability is the class default object; binding it to one actor's tag events would
+	// make every other user of the ability answer for that actor's stagger.
+	if (HasAnyFlags(RF_ClassDefaultObject) || GetInstancingPolicy() == EGameplayAbilityInstancingPolicy::NonInstanced) { return; }
+	UAbilitySystemComponent* const ASC = CurrentActorInfo ? CurrentActorInfo->AbilitySystemComponent.Get() : nullptr;
+	if (!ASC) { return; }
+	SharedInterruptionASC = ASC;
+	for (const FGameplayTag& Tag : SharedCombatInterruptions())
+	{
+		SharedInterruptionHandles.Add(Tag, ASC->RegisterGameplayTagEvent(Tag, EGameplayTagEventType::NewOrRemoved)
+			.AddUObject(this, &ThisClass::HandleSharedCombatInterruption));
+	}
+}
+
+void UNarrativeCombatAbility::UnbindSharedCombatInterruptions()
+{
+	if (UAbilitySystemComponent* const ASC = SharedInterruptionASC.Get())
+	{
+		for (const TPair<FGameplayTag, FDelegateHandle>& Entry : SharedInterruptionHandles)
+		{ ASC->RegisterGameplayTagEvent(Entry.Key, EGameplayTagEventType::NewOrRemoved).Remove(Entry.Value); }
+	}
+	SharedInterruptionHandles.Reset();
+	SharedInterruptionASC.Reset();
+}
+
+void UNarrativeCombatAbility::HandleSharedCombatInterruption(FGameplayTag Tag, int32 Count)
+{
+	if (Count <= 0 || !IsActive() || bCombatEndPending) { return; }
+	// Cancelled, not ended: the attack did not complete, and the receipt and cue owners downstream
+	// distinguish the two. A committed elite swing opts out instead of being cancelled here.
+	CancelAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true);
 }
 
 bool UNarrativeCombatAbility::GetSovAttackIdentity(const AActor* ExpectedSource, FGuid& OutAttackId) const
@@ -149,6 +213,8 @@ void UNarrativeCombatAbility::ActivateAbility(const FGameplayAbilitySpecHandle H
 
 	//We use this method from lyra to avoid using targeting actors and just call the target datas ourselves 
 	OnTargetDataReadyCallbackDelegateHandle = MyAbilityComponent->AbilityTargetDataSetDelegate(CurrentSpecHandle, CurrentActivationInfo.GetActivationPredictionKey()).AddUObject(this, &ThisClass::FinalizeTargetData);
+	// Blocking activation is only half of it: a break that lands mid-swing has to stop the swing.
+	BindSharedCombatInterruptions();
 
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 }
@@ -165,6 +231,7 @@ void UNarrativeCombatAbility::EndAbility(const FGameplayAbilitySpecHandle Handle
 			return;
 		}
 
+		UnbindSharedCombatInterruptions();
 		CurrentCombatAttackId.Invalidate();
 		bChargedReleaseCommitted = false;
 		bDefensiveCancelCommitted = false;

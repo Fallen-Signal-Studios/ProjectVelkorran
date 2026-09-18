@@ -355,4 +355,90 @@ bool FSovPassiveDefenseRecoveryDamageReentryTest::RunTest(const FString& Paramet
 	TestEqual(TEXT("Only successful recovery is presented"), Actor->PoiseRecoveries, 1);
 	return true;
 }
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCombatInterruptionTest,
+    "ProjectVelkorran.Campaign.Combat.AttackRefusedAndCancelledOnPoiseBreak",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCombatInterruptionTest::RunTest(const FString& Parameters)
+{
+    const UWorld::InitializationValues Init = UWorld::InitializationValues().AllowAudioPlayback(false)
+        .RequiresHitProxies(false).CreatePhysicsScene(false).CreateNavigation(false).CreateAISystem(false)
+        .ShouldSimulatePhysics(false);
+    UWorld* World = UWorld::CreateWorld(EWorldType::Game, false, NAME_None, nullptr, true, ERHIFeatureLevel::Num, &Init);
+    if (!TestNotNull(TEXT("World"), World)) { return false; }
+    if (GEngine) { GEngine->CreateNewWorldContext(EWorldType::Game).SetCurrentWorld(World); }
+    const auto Teardown = [&World]
+    { World->DestroyWorld(false); if (GEngine) { GEngine->DestroyWorldContext(World); } };
+
+    FActorSpawnParameters Spawn; Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+    auto* Actor = World->SpawnActor<ASovPassiveDefenseTestActor>(ASovPassiveDefenseTestActor::StaticClass(), Spawn);
+    if (!TestNotNull(TEXT("Combatant"), Actor)) { Teardown(); return false; }
+    Actor->InitializeCombat();
+    const FSovGameplayTags& Tags = FSovGameplayTags::Get();
+
+    // The spec holds the class default object; the running ability is the per-actor instance, and only
+    // the instance knows whether it is active or how it ended.
+    const auto Instance = [Actor](const FGameplayAbilitySpecHandle Handle) -> USovPlainCombatTestAbility*
+    {
+        const FGameplayAbilitySpec* const Spec = Actor->ActiveASC->FindAbilitySpecFromHandle(Handle);
+        return Spec ? Cast<USovPlainCombatTestAbility>(Spec->GetPrimaryInstance()) : nullptr;
+    };
+
+    const FGameplayAbilitySpecHandle AttackHandle =
+        Actor->ActiveASC->GiveAbility(FGameplayAbilitySpec(USovPlainCombatTestAbility::StaticClass(), 1, INDEX_NONE));
+
+    TestTrue(TEXT("An attack that overrides nothing activates while the combatant is composed"),
+        Actor->ActiveASC->TryActivateAbility(AttackHandle, false));
+    USovPlainCombatTestAbility* const Attack = Instance(AttackHandle);
+    if (!TestNotNull(TEXT("Activation produced a running instance"), Attack)) { Teardown(); return false; }
+    TestTrue(TEXT("...and it stays running"), Attack->IsActive());
+
+    // A real break, driven through the poise component rather than by adding the tag by hand, so this
+    // fails if the component ever stops publishing the state the gate reads.
+    Actor->ActiveASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetPoiseAttribute(), 0.f);
+    TestEqual(TEXT("The break actually happened"), Actor->PoiseBreaks, 1);
+    TestTrue(TEXT("The break publishes the state the gate reads"),
+        Actor->ActiveASC->HasMatchingGameplayTag(Tags.State_Poise_Broken));
+
+    // The defect: an attack already in flight kept swinging through the stagger (audit PC2-02).
+    TestFalse(TEXT("A break cancels the attack that was already swinging"), Attack->IsActive());
+    TestEqual(TEXT("...as a cancellation, not a completion"), Attack->Cancellations, 1);
+
+    // Idle it explicitly before asking whether a new attack is refused. GAS declines to re-activate an
+    // instance that is already running, so without this the refusal below would pass whether the gate
+    // exists or not - it would be measuring the cancellation above a second time.
+    Actor->ActiveASC->CancelAbilityHandle(AttackHandle);
+    TestFalse(TEXT("The attack is idle before the activation gate is tested"), Attack->IsActive());
+    const int32 ActivationsBefore = Attack->Activations;
+    TestFalse(TEXT("A new attack is refused while staggered"), Actor->ActiveASC->TryActivateAbility(AttackHandle, false));
+    TestEqual(TEXT("...and never begins"), Attack->Activations, ActivationsBefore);
+
+    // Recovery has to give the attack back, or this is a soft lock rather than a stagger.
+    Actor->ActiveASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetPoiseAttribute(), 100.f);
+    Actor->ActiveASC->RemoveLooseGameplayTag(Tags.State_Poise_Broken);
+    if (TestFalse(TEXT("Recovery clears the state"), Actor->ActiveASC->HasMatchingGameplayTag(Tags.State_Poise_Broken)))
+    {
+        TestTrue(TEXT("Attacking is possible again once composed"), Actor->ActiveASC->TryActivateAbility(AttackHandle, false));
+        TestEqual(TEXT("...and that really was a fresh activation"), Attack->Activations, ActivationsBefore + 1);
+        Actor->ActiveASC->CancelAbilityHandle(AttackHandle);
+    }
+
+    // Super armour stays an authored decision. Without an opt-out, every committed elite swing would
+    // become cancellable the moment the player broke its poise, which is a different balance change.
+    const FGameplayAbilitySpecHandle ArmouredHandle =
+        Actor->ActiveASC->GiveAbility(FGameplayAbilitySpec(USovUnstoppableCombatTestAbility::StaticClass(), 1, INDEX_NONE));
+    Actor->ActiveASC->AddLooseGameplayTag(Tags.State_Poise_Broken);
+    TestTrue(TEXT("A committed attack may still begin while staggered"),
+        Actor->ActiveASC->TryActivateAbility(ArmouredHandle, false));
+    USovPlainCombatTestAbility* const Armoured = Instance(ArmouredHandle);
+    if (TestNotNull(TEXT("The committed attack is running"), Armoured))
+    {
+        TestTrue(TEXT("...and the break does not cancel it"), Armoured->IsActive());
+        TestEqual(TEXT("...nor count it as cancelled"), Armoured->Cancellations, 0);
+    }
+
+    Teardown();
+    return true;
+}
+
 #endif

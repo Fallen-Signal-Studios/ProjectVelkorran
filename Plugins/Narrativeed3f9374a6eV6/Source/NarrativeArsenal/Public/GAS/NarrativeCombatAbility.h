@@ -131,7 +131,20 @@ protected:
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 	virtual void EndAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled) override;
 
+	/**
+	 * Cleared by a native subclass that runs its own interruption transaction and needs to unwind more
+	 * than GAS cancellation does - melee ends a node graph rather than an activation. Those subclasses
+	 * still inherit the activation gate; only the running-attack binding is theirs.
+	 */
+	bool bBindsSharedCombatInterruptions = true;
+
+	void BindSharedCombatInterruptions();
+	void UnbindSharedCombatInterruptions();
+	void HandleSharedCombatInterruption(FGameplayTag Tag, int32 Count);
+
 private:
+	TMap<FGameplayTag, FDelegateHandle> SharedInterruptionHandles;
+	TWeakObjectPtr<UAbilitySystemComponent> SharedInterruptionASC;
 	FGuid CurrentCombatAttackId;
 	FGameplayAbilitySpecHandle CombatAttackSpecHandle;
 	bool bChargedReleaseCommitted = false;
@@ -171,6 +184,28 @@ public:
 	float ChargedReleaseStaminaCost = 20.f;
 
 	virtual bool CanActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, const FGameplayTagContainer* SourceTags = nullptr, const FGameplayTagContainer* TargetTags = nullptr, OUT FGameplayTagContainer* OptionalRelevantTags = nullptr) const;
+
+	/**
+	 * The states in which an attack cannot begin and a running one cannot continue: the character is
+	 * dead, being finished, staggered, guard-broken, frozen, ragdolled, or owned by a scene.
+	 *
+	 * This set existed only inside the two natively written attacks, so every Blueprint-derived combat
+	 * ability - which is most of what the protagonists actually swing and fire - inherited no break
+	 * handling at all, and the player kept attacking through a Poise break (audit PC2-02).
+	 */
+	static const FGameplayTagContainer& SharedCombatInterruptions();
+
+	/** Whether this attack is currently subject to that set, so a caller can explain a refusal. */
+	UFUNCTION(BlueprintPure, Category = "Sovereign|Combat")
+	bool IsInterruptedByCombatState() const;
+
+	/**
+	 * Cleared by an attack that is deliberately unstoppable, so a committed elite swing still lands
+	 * when the player breaks its poise mid-animation. Super armor is then an authored decision rather
+	 * than the accident of a base class that never checked.
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Combat")
+	bool bHonoursCombatInterruptions = true;
 
 protected:
 	/** Renew the receipt after a validated finite combo-node transition, without a second GAS activation. */

@@ -57,6 +57,9 @@ USovGameplayAbility_Melee::USovGameplayAbility_Melee()
     ActivationBlockedTags.AddTag(T.State_Fatal); ActivationBlockedTags.AddTag(T.State_Poise_Broken);
     ActivationBlockedTags.AddTag(T.State_Guarding); ActivationBlockedTags.AddTag(T.State_Deflecting);
     ActivationBlockedTags.AppendTags(MeleeTransactionInterruptions());
+    // Melee ends a node graph rather than an activation, so it keeps its own interruption binding;
+    // the shared activation gate above it still applies.
+    bBindsSharedCombatInterruptions = false;
 }
 bool USovGameplayAbility_Melee::CanActivateAbility(const FGameplayAbilitySpecHandle Handle,const FGameplayAbilityActorInfo* Info,
     const FGameplayTagContainer* SourceTags,const FGameplayTagContainer* TargetTags,FGameplayTagContainer* Relevant) const
