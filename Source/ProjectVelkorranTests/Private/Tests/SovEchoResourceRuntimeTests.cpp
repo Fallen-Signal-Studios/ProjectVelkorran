@@ -471,6 +471,9 @@ bool FSovLethalFloorTest::RunTest(const FString& Parameters)
 	Floor->MinimumHealth = 10.f;
 	Target->AddInstanceComponent(Floor); Floor->RegisterComponent();
 	Floor->SetFloorHeld(true);
+	// The floor publishes itself as a state, so presentation and AI can read it rather than infer it.
+	TestTrue(TEXT("A held floor publishes the unfinishable state"),
+		TargetASC->HasMatchingGameplayTag(FSovGameplayTags::Get().State_Target_Unfinishable));
 
 	// A blow that would comfortably kill it leaves it standing at the floor instead.
 	Hit(Source, Target, Starting * 4.f);
@@ -486,6 +489,8 @@ bool FSovLethalFloorTest::RunTest(const FString& Parameters)
 
 	// Releasing the floor is what makes it finishable, which is the phase mechanic's job.
 	Floor->SetFloorHeld(false);
+	TestFalse(TEXT("Releasing the floor retires the state with it"),
+		TargetASC->HasMatchingGameplayTag(FSovGameplayTags::Get().State_Target_Unfinishable));
 	Hit(Source, Target, Starting * 4.f);
 	TestTrue(TEXT("A released floor allows the finish"), Health() <= 0.f);
 	return true;

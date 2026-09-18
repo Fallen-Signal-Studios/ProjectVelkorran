@@ -1,7 +1,10 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Campaign/SovLethalFloorComponent.h"
 
+#include "AbilitySystemBlueprintLibrary.h"
+#include "AbilitySystemComponent.h"
 #include "Net/UnrealNetwork.h"
+#include "Sovereign/SovGameplayTags.h"
 
 USovLethalFloorComponent::USovLethalFloorComponent()
 {
@@ -18,9 +21,21 @@ void USovLethalFloorComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProper
 
 void USovLethalFloorComponent::SetFloorHeld(const bool bHeld)
 {
-	const AActor* const Owner = GetOwner();
+	AActor* const Owner = GetOwner();
 	if (!Owner || !Owner->HasAuthority() || bFloorHeld == bHeld) { return; }
 	bFloorHeld = bHeld;
+	// Published as a state the rest of the game can read - AI, HUD, presentation - and as a cue the
+	// owner can show. Both are authority-side; bFloorHeld replicates for a client's own presentation.
+	if (auto* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Owner))
+	{
+		const FGameplayTag State = FSovGameplayTags::Get().State_Target_Unfinishable;
+		if (bFloorHeld) { ASC->AddLooseGameplayTag(State); } else { ASC->RemoveLooseGameplayTag(State); }
+		if (FloorHeldGameplayCueTag.IsValid())
+		{
+			if (bFloorHeld) { ASC->AddGameplayCue(FloorHeldGameplayCueTag); }
+			else { ASC->RemoveGameplayCue(FloorHeldGameplayCueTag); }
+		}
+	}
 	OnLethalFloorChanged.Broadcast(bFloorHeld);
 }
 

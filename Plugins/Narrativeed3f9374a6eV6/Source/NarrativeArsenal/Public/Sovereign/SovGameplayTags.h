@@ -250,6 +250,7 @@ public:
 	FGameplayTag State_CommandTarget_Window;
 	FGameplayTag State_Target_Exposed;
 	FGameplayTag State_Target_Marked;
+	FGameplayTag State_Target_Unfinishable;
 	FGameplayTag Echo_Source_UndetectedBypass;
 	FGameplayTag Echo_Source_PrecisionChain;
 	FGameplayTag Echo_Source_MarkedKill;

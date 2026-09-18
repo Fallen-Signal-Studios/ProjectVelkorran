@@ -255,6 +255,7 @@ void FSovGameplayTags::AddAllTags(UGameplayTagsManager& Manager)
 	AddTag(State_CommandTarget_Window, "Sov.State.CommandTarget.Window", "Target-owned authored command-target reward window.");
 	AddTag(State_Target_Exposed, "Sov.State.Target.Exposed", "Target-owned authored exposure for precision reward eligibility.");
 	AddTag(State_Target_Marked, "Sov.State.Target.Marked", "Target-owned authored mark for precision reward eligibility.");
+	AddTag(State_Target_Unfinishable, "Sov.State.Target.Unfinishable", "The target is held above a lethal floor and cannot be finished yet.");
 	AddTag(Echo_Source_UndetectedBypass, "Sov.Echo.Source.UndetectedBypass", "Echo awarded for crossing a registered encounter without being perceived.");
 	AddTag(Echo_Source_PrecisionChain, "Sov.Echo.Source.PrecisionChain", "Echo awarded for a verified precision kill chain.");
 	AddTag(Echo_Source_MarkedKill, "Sov.Echo.Source.MarkedKill", "Echo awarded for killing a marked or exposed hostile.");

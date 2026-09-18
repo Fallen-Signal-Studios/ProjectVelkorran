@@ -3,6 +3,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "GameplayTagContainer.h"
 #include "GAS/SovDamageTargetPolicy.h"
 #include "SovLethalFloorComponent.generated.h"
 
@@ -34,6 +35,13 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Encounter")
 	bool IsFloorHeld() const { return bFloorHeld; }
+
+	/**
+	 * Cue played on the owner while the floor is held, so "cannot be finished yet" is visible on the
+	 * enemy rather than only true in the rules. Unset plays nothing; the cue itself is authored content.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Sovereign|Encounter", meta = (Categories = "GameplayCue"))
+	FGameplayTag FloorHeldGameplayCueTag;
 
 	/** Authority-only. The phase that requires a mechanic holds the floor until its receipt lands. */
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Sovereign|Encounter")

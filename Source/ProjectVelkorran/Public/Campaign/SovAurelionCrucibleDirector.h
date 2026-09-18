@@ -40,9 +40,13 @@ public:
     UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="Aurelion|Crucible") FName CompletionBeat = TEXT("SeverCrucibleLinks");
     UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="Aurelion|Crucible") FName HandoffBeat = TEXT("HandoffToTarrikCrucible");
     UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="Aurelion|Crucible") FName EliteParticipantId;
-    /** Health the Elite is held above while this phase's required mechanic is still outstanding. */
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Aurelion|Crucible", meta=(ClampMin="1.0"))
-    float EliteLethalFloorHealth = 1.f;
+    /**
+     * Fraction of the Elite's maximum health it is held above while this phase's required mechanic is
+     * outstanding. A fraction rather than a number so the floor stays right when the Elite is retuned,
+     * and high enough that it reads as badly hurt rather than as a health bar stuck at empty.
+     */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Aurelion|Crucible", meta=(ClampMin="0.01", ClampMax="0.5"))
+    float EliteLethalFloorFraction = .12f;
     UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="Aurelion|Crucible") TArray<FSovAurelionCrucibleLink> RequiredLinks;
     UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="Aurelion|Crucible") TObjectPtr<ASovCampaignHandoffAnchor> HandoffAnchor;
     UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="Aurelion|Crucible") TObjectPtr<ASovCampaignEncounterObjective> PhaseBObjective;
@@ -94,9 +98,13 @@ class PROJECTVELKORRAN_API ASovAurelionThermalPhaseDirector : public ASovEncount
 public:
     ASovAurelionThermalPhaseDirector();
     UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="Aurelion|Crucible") FName EliteParticipantId;
-    /** Health the Elite is held above while this phase's required mechanic is still outstanding. */
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Aurelion|Crucible", meta=(ClampMin="1.0"))
-    float EliteLethalFloorHealth = 1.f;
+    /**
+     * Fraction of the Elite's maximum health it is held above while this phase's required mechanic is
+     * outstanding. A fraction rather than a number so the floor stays right when the Elite is retuned,
+     * and high enough that it reads as badly hurt rather than as a health bar stuck at empty.
+     */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Aurelion|Crucible", meta=(ClampMin="0.01", ClampMax="0.5"))
+    float EliteLethalFloorFraction = .12f;
     virtual ESovEncounterProofType GetCampaignProofType() const override { return ESovEncounterProofType::AurelionThermalFracture; }
     virtual bool HasConfirmedVictory() const override;
     virtual bool CompleteEncounter() override;

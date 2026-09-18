@@ -237,7 +237,7 @@ namespace
 	 * A phase that requires a mechanic must not be losable by killing its boss first. Keeping the floor
 	 * here rather than in the damage path means each phase owns exactly the window it is responsible for.
 	 */
-	void HoldEliteLethalFloor(ASovNPCCharacterBase* Elite, const bool bHold, const float Floor)
+	void HoldEliteLethalFloor(ASovNPCCharacterBase* Elite, const bool bHold, const float Fraction)
 	{
 		if (!IsValid(Elite) || !Elite->HasAuthority()) { return; }
 		auto* Component = Elite->FindComponentByClass<USovLethalFloorComponent>();
@@ -246,10 +246,15 @@ namespace
 			// Nothing to release, and an unheld floor is not worth adding a component for.
 			if (!bHold) { return; }
 			Component = NewObject<USovLethalFloorComponent>(Elite);
-			Component->MinimumHealth = FMath::Max(Floor, 1.f);
 			Elite->AddInstanceComponent(Component);
 			Component->RegisterComponent();
 		}
+		// Resolved from the Elite's current maximum every time, so a phase that raises its health, or a
+		// retune, moves the floor with it rather than leaving a threshold that no longer means anything.
+		const auto* ASC = Elite->GetNarrativeAbilitySystemComponent();
+		const float Maximum = ASC ? ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetMaxHealthAttribute()) : 0.f;
+		const float Safe = FMath::IsFinite(Fraction) ? FMath::Clamp(Fraction, .01f, .5f) : .12f;
+		Component->MinimumHealth = FMath::IsFinite(Maximum) && Maximum > 0.f ? FMath::Max(Maximum * Safe, 1.f) : 1.f;
 		Component->SetFloorHeld(bHold);
 	}
 }
@@ -263,7 +268,7 @@ void ASovAurelionLinkPhaseDirector::Tick(float DeltaSeconds)
         auto* Elite = GetParticipant(EliteParticipantId);
         // Held until the links are proven, so a player who out-damages the mechanic cannot lose the run
         // to their own success. The failure below now only catches causes the player did not create.
-        HoldEliteLethalFloor(Elite, !HasLinkProof(), EliteLethalFloorHealth);
+        HoldEliteLethalFloor(Elite, !HasLinkProof(), EliteLethalFloorFraction);
         if (!IsValid(Elite) || !Elite->IsAlive())
         { LastPhaseError = TEXT("The phase A elite was defeated before its preserved phase B entry."); FailEncounter(); return; }
         if (!LastPhaseError.IsEmpty()) { FailEncounter(); return; }
@@ -464,9 +469,9 @@ void ASovAurelionThermalPhaseDirector::Tick(float DeltaSeconds)
         auto* Elite = GetParticipant(EliteParticipantId);
         // Released the moment this attempt's thermal fracture receipt lands, which is the point the
         // Elite is meant to become finishable.
-        HoldEliteLethalFloor(Elite, FractureAttemptId != GetAttemptId(), EliteLethalFloorHealth);
+        HoldEliteLethalFloor(Elite, FractureAttemptId != GetAttemptId(), EliteLethalFloorFraction);
         if ((!IsValid(Elite) || !Elite->IsAlive()) && FractureAttemptId != GetAttemptId()) { FailEncounter(); return; }
         BindFracture();
     }
-    else { HoldEliteLethalFloor(GetParticipant(EliteParticipantId), false, EliteLethalFloorHealth); }
+    else { HoldEliteLethalFloor(GetParticipant(EliteParticipantId), false, EliteLethalFloorFraction); }
 }
