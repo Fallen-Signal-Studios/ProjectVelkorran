@@ -879,6 +879,17 @@ bool ASovEncounterDirector::RegisterAttemptActor(AActor* SpawnedActor)
 	return true;
 }
 
+bool ASovEncounterDirector::HasLiveAttemptCombatants() const
+{
+	for (const TObjectPtr<AActor>& Actor : AttemptActors)
+	{
+		const APawn* const Pawn = Cast<APawn>(Actor);
+		// The same filter retirement uses, so the two can never disagree about what is still fighting.
+		if (IsValid(Pawn) && !IsPersistentCharacterPresentation(Pawn)) { return true; }
+	}
+	return false;
+}
+
 bool ASovEncounterDirector::RetireAttemptCombatants(bool bDestroy, TFunctionRef<bool()> CanContinue)
 {
 	UNarrativeSaveSubsystem* const Save = GetWorld() ? GetWorld()->GetSubsystem<UNarrativeSaveSubsystem>() : nullptr;

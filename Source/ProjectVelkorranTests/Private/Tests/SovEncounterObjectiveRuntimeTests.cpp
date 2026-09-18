@@ -1450,6 +1450,91 @@ bool FSovAurelionEliteSummonRetirementTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAurelionSummonsDoNotCrossThePhaseBoundaryTest,
+    "ProjectVelkorran.Campaign.Aurelion.EliteSummonsDoNotCrossThePhaseBoundary",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovAurelionSummonsDoNotCrossThePhaseBoundaryTest::RunTest(const FString& Parameters)
+{
+    // The audit's exact sequence (EA2-01): the wounded elite summons adds in link phase A, both links
+    // are severed, the phase completes and hands its roster to phase B. Victory and failure and retry
+    // are each covered elsewhere; this is the fourth path, and it is the one where an add that
+    // survived would follow the player into a phase it was never part of.
+    FEncounterObjectiveWorld F(true);
+    if (!TestNotNull(TEXT("Ready Selene campaign"), F.ASC) || !F.Start()) { AddError(F.SetupError); return false; }
+    auto* Crucible = CastChecked<ASovAurelionLinkPhaseDirector>(F.Director);
+    auto* Elite = Crucible->GetParticipant(TEXT("Formation.Guard"));
+    if (!TestNotNull(TEXT("Fixture supplies the elite participant"), Elite)) { return false; }
+    auto* EliteASC = Elite->GetNarrativeAbilitySystemComponent();
+
+    FGameplayAbilitySpecHandle Handle;
+    auto* Summon = GrantEliteAbility<USovGameplayAbility_AurelionEliteSummon>(EliteASC, Handle);
+    if (!TestNotNull(TEXT("Summon ability instance exists"), Summon)) { return false; }
+    auto* AddDefinition = NewObject<UNPCDefinition>(F.PC); F.PC->KeepAlive.Add(AddDefinition);
+    AddDefinition->NPCClassPath = ASovCampaignMassRoundTripNPC::StaticClass();
+    AddDefinition->bAllowMultipleInstances = true;
+    FSovAurelionEliteTestAccess::SetSummonDefinition(*Summon, AddDefinition);
+
+    // Below two thirds the summon unlocks; the elite has to survive the phase, so wound it rather
+    // than killing it.
+    EliteASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetMaxHealthAttribute(), 100.f);
+    EliteASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetHealthAttribute(), 50.f);
+    EliteASC->TryActivateAbility(Handle);
+    TArray<TWeakObjectPtr<ASovNPCCharacterBase>> Adds;
+    for (TActorIterator<ASovNPCCharacterBase> It(F.World); It; ++It)
+    { if (IsValid(*It) && Crucible->FindParticipantId(*It).IsNone()) { Adds.Add(*It); } }
+    if (!TestTrue(TEXT("The wounded elite brings in adds during phase A"), Adds.Num() > 0)) { return false; }
+
+    // The boundary check reads owned participants, which adds are deliberately not. Until this was
+    // guarded it would have called a phase quiescent with hostiles still swinging, so assert the
+    // predicate the boundary now consults rather than the boundary alone - the boundary is also false
+    // here for the ordinary reason that the phase has not finished.
+    TestTrue(TEXT("Live adds are visible to the boundary as attempt combatants"),
+        Crucible->HasLiveAttemptCombatants());
+    TestFalse(TEXT("The save boundary is refused while the phase is still fighting"),
+        Crucible->IsCompletedPhaseBoundaryQuiescentForSave(F.Player));
+
+    for (int32 Index = 0; Index < Crucible->RequiredLinks.Num(); ++Index)
+    {
+        auto* Node = Crucible->GetParticipant(Crucible->RequiredLinks[Index].ParticipantId);
+        auto* Link = Node ? Node->FindComponentByClass<USovCommandLinkComponent>() : nullptr;
+        if (!TestNotNull(TEXT("Each required link has a severable component"), Link)) { return false; }
+        FSovCommandLinkSeverResult Result;
+        TestEqual(TEXT("Selene severs a real command link"),
+            Link->TrySeverCommandLink(F.Player, Result), ESovCommandLinkSeverResolution::NewlySevered);
+    }
+    FSovCrucibleRuntimeTestAccess::Step(Crucible, .016f);
+    TestEqual(TEXT("Both severs settle the phase"), Crucible->GetEncounterState(), ESovEncounterState::Succeeded);
+    TestTrue(TEXT("The elite survives its own phase, as the handoff requires"), Elite->IsAlive());
+
+    // The defect this guards: adds owned by phase A outliving the phase that spawned them.
+    TestFalse(TEXT("No summoned add outlives the completed phase"),
+        Adds.ContainsByPredicate([](const auto& Add) { return Add.IsValid(); }));
+    TestEqual(TEXT("The summon ability agrees nothing of its own is left"), Summon->GetLivingSummonCount(), 0);
+    TestFalse(TEXT("...and the boundary can see that nothing of the attempt is still fighting"),
+        Crucible->HasLiveAttemptCombatants());
+    F.NextFrame();
+    TestTrue(TEXT("Only a phase with nothing of its own still fighting is safe to save at"),
+        Crucible->IsCompletedPhaseBoundaryQuiescentForSave(F.Player));
+
+    auto* PhaseB = F.World->SpawnActor<ASovAurelionThermalPhaseDirector>();
+    PhaseB->EncounterId = TEXT("Test.CrucibleB");
+    PhaseB->EliteParticipantId = TEXT("Formation.Guard");
+    FString Error;
+    if (!TestTrue(TEXT("The completed phase transfers its frozen roster"),
+        FSovCrucibleRuntimeTestAccess::Transfer(Crucible, PhaseB, Error))) { AddError(Error); return false; }
+    TestTrue(TEXT("Phase B receives the same living elite"), PhaseB->GetParticipant(TEXT("Formation.Guard")) == Elite);
+
+    // Nothing unowned may be left in the world for phase B to inherit by accident.
+    int32 Unowned = 0;
+    for (TActorIterator<ASovNPCCharacterBase> It(F.World); It; ++It)
+    {
+        if (IsValid(*It) && PhaseB->FindParticipantId(*It).IsNone() && Crucible->FindParticipantId(*It).IsNone())
+        { ++Unowned; }
+    }
+    TestEqual(TEXT("No unowned hostile crosses into phase B"), Unowned, 0);
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAurelionElitePacingTest,
     "ProjectVelkorran.Campaign.Aurelion.ElitePressesHarderAsItsPhasesAdvance",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)

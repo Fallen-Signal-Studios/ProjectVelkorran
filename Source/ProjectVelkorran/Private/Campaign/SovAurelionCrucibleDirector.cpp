@@ -150,7 +150,10 @@ bool ASovAurelionLinkPhaseDirector::IsCompletedPhaseBoundaryQuiescentForSave(con
     return HasConfirmedVictory() && !IsCampaignReceiptPending() && HasEncounterPlayer(Player)
         && IsValid(Player) && Player->IsCharacterReady() && Player->IsAlive() && Campaign && Campaign->IsStateValid()
         && Mission && Mission->MissionId == MissionId && Campaign->IsBeatComplete(MissionId, CompletionBeat)
-        && AreOwnedParticipantsQuiescent(true);
+        && AreOwnedParticipantsQuiescent(true)
+        // Owned participants are only half the roster. Summoned adds are attempt-scoped, so a boundary
+        // that ignored them could admit a save with live hostiles still swinging (audit EA2-01).
+        && !HasLiveAttemptCombatants();
 }
 bool ASovAurelionLinkPhaseDirector::HasHandoffJournal(const ASovPlayerCharacterBase* Player) const
 {

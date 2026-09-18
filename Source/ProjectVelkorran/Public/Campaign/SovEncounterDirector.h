@@ -214,6 +214,17 @@ private:
 	bool CleanupAttemptActors(TFunctionRef<bool()> CanContinue);
 	/** Summoned adds and other attempt-scoped fighters: destroyed on victory, suspended with the roster on failure. */
 	bool RetireAttemptCombatants(bool bDestroy, TFunctionRef<bool()> CanContinue);
+public:
+	/**
+	 * Whether anything this attempt spawned is still alive and able to fight.
+	 *
+	 * Counts only what RetireAttemptCombatants would act on, because the attempt list also holds
+	 * projectiles and sustain drops that legitimately outlive the fight - a plain "is the list empty"
+	 * check would refuse boundaries that are perfectly safe.
+	 */
+	UFUNCTION(BlueprintPure, Category="Sovereign|Encounter")
+	bool HasLiveAttemptCombatants() const;
+protected:
 	void HandleActorSpawned(AActor* Actor);
 	void SuspendActor(AActor* Actor, bool bSuspendAbilitySystem = true);
 	void RefreshPreEntryHold();

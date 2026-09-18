@@ -57,8 +57,14 @@ now needs to know why the branch is there, not what it does.
 
 ## 5. Write the test, then prove it can fail
 
-Write the test. Then **disable the fix, rebuild, and confirm the test fails.** A test written after a
-fix usually passes for the wrong reason, and you cannot tell which by reading it.
+Write the test. Then **disable the fix, rebuild, and confirm the test fails.** That bar holds for
+every P1 and P2. For a P3 whose fix is small and obvious, implementing and testing is enough - skip
+the disable-and-prove step unless the fix is subtle enough that you cannot tell by reading whether
+the test would catch its absence. The point is proof where a silent regression would cost something,
+not ceremony on a one-line change.
+
+Where the bar applies, it applies because a test written after a fix usually passes for the wrong
+reason, and you cannot tell which by reading it.
 
 Keep a small toggle script in the scratchpad that comments the fix out and back in, so the round trip
 is two commands rather than hand edits you might not fully revert.
