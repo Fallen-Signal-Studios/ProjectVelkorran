@@ -1,6 +1,7 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
-#include "Campaign/SovLethalFloorComponent.h"
 #include "Campaign/SovAurelionCrucibleDirector.h"
+
+#include "Campaign/SovLethalFloorComponent.h"
 #include "AI/SovAurelionEnemyRoles.h"
 #include "Campaign/SovEncounterCoordinationComponent.h"
 #include "Campaign/SovCampaignEncounterObjective.h"
