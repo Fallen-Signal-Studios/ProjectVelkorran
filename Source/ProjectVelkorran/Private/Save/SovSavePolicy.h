@@ -30,6 +30,22 @@ inline Compatibility CheckVersion(int Major, int Minor, bool ProductMatches, boo
     return Compatibility::Compatible; // Patch/build strings do not invalidate shipped schema 1.0.
 }
 struct Bank { bool Valid = false; std::int64_t Generation = 0; };
+/**
+ * Redirects a chosen write target away from a bank that has to be preserved.
+ *
+ * A reserved bank holds a save a newer build wrote. Its bytes are real progress, and this build
+ * simply cannot read them, so treating it as spare space is silent loss the player only discovers
+ * after upgrading again. When both banks are reserved one of them has to be given up to let the
+ * player save at all; the further-along save is the one kept.
+ */
+inline int PreserveReserved(int Target, bool ReservedA, bool ReservedB,
+    std::int64_t GenerationA, std::int64_t GenerationB)
+{
+    if (Target != 0 && Target != 1) { return Target; }
+    if (!(Target == 0 ? ReservedA : ReservedB)) { return Target; }
+    if (!(Target == 0 ? ReservedB : ReservedA)) { return 1 - Target; }
+    return GenerationA <= GenerationB ? 0 : 1;
+}
 inline int LatestBank(Bank A, Bank B)
 {
     if (A.Valid && A.Generation <= 0) { A.Valid = false; }

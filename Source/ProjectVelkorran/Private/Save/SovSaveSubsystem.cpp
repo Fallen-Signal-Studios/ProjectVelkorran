@@ -359,10 +359,14 @@ bool USovSaveSubsystem::ExportPlatformSnapshot(ESovSaveSlotKind Kind, int32 Inde
     const FOperationOwner Owner = CaptureOperationOwner();
     TGuardValue<bool> Mutation(bBusy, true);
     int32 Bank; bool Damaged;
-    TStrongObjectPtr<USovCampaignSaveGame> Save(ReadBest(Kind, Index, Bank, Damaged, Error, &Owner));
+    FSovSlotBanks SlotBanks;
+    TStrongObjectPtr<USovCampaignSaveGame> Save(ReadBest(Kind, Index, Bank, Damaged, Error, &Owner, &SlotBanks));
     if (!IsOperationOwnerCurrent(Owner, Error)) { return false; }
     // Do not turn a damaged local slot into an apparently empty cloud-import target.
     if (Damaged) { Error = TEXT("Recover the damaged local save before comparing cloud copies."); return false; }
+    // Nor a newer one: reporting the slot empty is what would let a cloud copy overwrite it.
+    if (SlotBanks.HasNewerVersion())
+    { Error = TEXT("This slot holds a save made by a newer version of the game; update before syncing it."); return false; }
     if (!Save.IsValid()) { Error.Reset(); return true; }
     if (!ReadOwned(Owner, BankName(Kind, Index, Bank), Owner.LocalUser, Bytes, Error)
         || !ValidatePlatformSnapshot(Bytes, Kind, Index, Header, Error))
@@ -552,10 +556,20 @@ bool USovSaveSubsystem::ValidateEnvelope(USovCampaignSaveGame* Save, bool bValid
     }
     return true;
 }
+bool USovSaveSubsystem::IsNewerVersionBank(const USovCampaignSaveGame* Save) const
+{
+    // Integrity first: corrupt bytes can claim any schema they like, and those are damaged, not future.
+    if (!Save || !Save->HasValidIntegrity()) { return false; }
+    const auto& H = Save->Header;
+    return SovSavePolicy::CheckVersion(H.SchemaMajor, H.SchemaMinor,
+        H.Product == TEXT("SovereignCall.Origins.Campaign"), H.AccountNamespace == AccountNamespace)
+        == SovSavePolicy::Compatibility::NewerSchema;
+}
 USovCampaignSaveGame* USovSaveSubsystem::ReadBest(ESovSaveSlotKind Kind, int32 Index, int32& OutBank, bool& bDamaged, FString& Error,
-    const FOperationOwner* Operation)
+    const FOperationOwner* Operation, FSovSlotBanks* OutBanks)
 {
     OutBank = -1; bDamaged = false;
+    if (OutBanks) { *OutBanks = FSovSlotBanks(); }
     const FOperationOwner Owner = Operation ? *Operation : CaptureOperationOwner();
     if (!IsOperationOwnerCurrent(Owner, Error) || !SovSavePolicy::ValidSlot(PolicyKind(Kind), Index)) { return nullptr; }
     TGuardValue<bool> Mutation(bBusy, true);
@@ -573,7 +587,18 @@ USovCampaignSaveGame* USovSaveSubsystem::ReadBest(ESovSaveSlotKind Kind, int32 I
         FString ValidationError;
         if (ValidateEnvelope(Banks[Bank].Get(), false, ValidationError)
             && Banks[Bank]->Header.Kind == Kind && Banks[Bank]->Header.SlotIndex == Index)
-        { Valid[Bank] = { true, Banks[Bank]->Header.Generation }; }
+        {
+            Valid[Bank] = { true, Banks[Bank]->Header.Generation };
+            if (OutBanks) { OutBanks->bValid[Bank] = true; OutBanks->Generation[Bank] = Banks[Bank]->Header.Generation; }
+        }
+        else if (IsNewerVersionBank(Banks[Bank].Get()))
+        {
+            // A save this build cannot read is not a damaged one. Calling it damaged is what let the
+            // repair path archive it and reuse its position, so a downgrade consumed both banks of a
+            // slot and the player's newer progress survived only as a support file (audit AR2-17).
+            if (OutBanks) { OutBanks->bNewerVersion[Bank] = true; OutBanks->Generation[Bank] = Banks[Bank]->Header.Generation; }
+            Error = ValidationError;
+        }
         else { bDamaged = true; Error = ValidationError; }
     }
     OutBank = SovSavePolicy::LatestBank(Valid[0], Valid[1]);
@@ -590,7 +615,8 @@ ESovSaveResult USovSaveSubsystem::WriteEnvelope(USovCampaignSaveGame* Save, FStr
     TGuardValue<bool> Mutation(bBusy, true);
     TStrongObjectPtr<USovCampaignSaveGame> KeepSave(Save);
     int32 OldBank = -1; bool Damaged = false;
-    TStrongObjectPtr<USovCampaignSaveGame> Previous(ReadBest(Save->Header.Kind, Save->Header.SlotIndex, OldBank, Damaged, Error, &Owner));
+    FSovSlotBanks SlotBanks;
+    TStrongObjectPtr<USovCampaignSaveGame> Previous(ReadBest(Save->Header.Kind, Save->Header.SlotIndex, OldBank, Damaged, Error, &Owner, &SlotBanks));
     if (!IsOperationOwnerCurrent(Owner, Error)) { return OwnershipFailureResult(); }
     int64 Generation = Previous.IsValid() ? Previous->Header.Generation : 0;
     // Generation is global within the rolling autosave group so rotation remains deterministic after restart.
@@ -605,6 +631,11 @@ ESovSaveResult USovSaveSubsystem::WriteEnvelope(USovCampaignSaveGame* Save, FStr
     const SovSavePolicy::Bank A { OldBank == 0, Generation }, B { OldBank == 1, Generation };
     if (!SovSavePolicy::NextWrite(A, B, TargetBank, Next))
     { Error = TEXT("Save generation limit reached."); return ESovSaveResult::WriteFailed; }
+    // Writing over a newer build's save discards progress this build merely cannot read. Where a
+    // slot holds one, the write goes to the other bank - which costs this slot its A/B alternation
+    // for as long as the newer save is present, and that is the cheaper of the two losses.
+    TargetBank = SovSavePolicy::PreserveReserved(TargetBank, SlotBanks.bNewerVersion[0], SlotBanks.bNewerVersion[1],
+        SlotBanks.Generation[0], SlotBanks.Generation[1]);
     if (Generation == MAX_int64) { Error = TEXT("Save generation limit reached."); return ESovSaveResult::WriteFailed; }
     if (OldBank < 0) { Next = Generation + 1; }
     Save->Header.Generation = Next; Save->IntegrityChecksum = Save->CalculateChecksum();
@@ -845,8 +876,15 @@ ESovSaveResult USovSaveSubsystem::LoadSlot(ESovSaveSlotKind Kind, int32 Index, F
     const TWeakObjectPtr<ASovPlayerController> SourceController(PC);
     const TWeakObjectPtr<UWorld> SourceWorld(PC->GetWorld());
     int32 Bank; bool Damaged;
-    PendingSave = ReadBest(Kind, Index, Bank, Damaged, Error, &Owner);
+    FSovSlotBanks SlotBanks;
+    PendingSave = ReadBest(Kind, Index, Bank, Damaged, Error, &Owner, &SlotBanks);
     if (!IsOperationOwnerCurrent(Owner, Error)) { PendingSave = nullptr; return OwnershipFailureResult(); }
+    if (!PendingSave && SlotBanks.HasNewerVersion())
+    {
+        // Telling the player this is corrupt invites them to delete it. It is intact and will open again.
+        Error = TEXT("This save was made by a newer version of the game. It has been left untouched; update to load it.");
+        return ESovSaveResult::NewerVersionSave;
+    }
     if (!PendingSave) { return Damaged ? ESovSaveResult::CorruptSave : ESovSaveResult::MissingSave; }
     if (Damaged && !bAcceptRecoveredBank)
     {

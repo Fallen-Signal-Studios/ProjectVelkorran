@@ -160,8 +160,19 @@ private:
         ESovSaveSlotKind Kind, int32 SlotIndex, FString& Error);
     bool RestorePlatformProfileHint(int32 LocalUserIndex);
     bool PersistPlatformProfileHint(const FString& Namespace, int32 LocalUserIndex, FString& Error);
+    /** What each bank of a slot holds. A caller that writes needs this to avoid discarding progress. */
+    struct FSovSlotBanks
+    {
+        bool bValid[2] = { false, false };
+        /** Intact, but written by a build with a newer save schema. Not damaged, and not spare space. */
+        bool bNewerVersion[2] = { false, false };
+        int64 Generation[2] = { 0, 0 };
+        bool HasNewerVersion() const { return bNewerVersion[0] || bNewerVersion[1]; }
+    };
+    /** Intact bytes whose schema is ahead of this build. Corruption fails integrity first and is not this. */
+    bool IsNewerVersionBank(const USovCampaignSaveGame* Save) const;
     USovCampaignSaveGame* ReadBest(ESovSaveSlotKind Kind, int32 Index, int32& OutBank, bool& bDamaged, FString& Error,
-        const FOperationOwner* Operation = nullptr);
+        const FOperationOwner* Operation = nullptr, FSovSlotBanks* OutBanks = nullptr);
     bool ValidateEnvelope(USovCampaignSaveGame* Save, bool bValidateAssets, FString& Error, const FOperationOwner* Operation = nullptr) const;
     bool MatchesPendingLoadRequest(const FString& Options) const;
     void CompletePendingLoad(bool bSucceeded, const FString& Error);

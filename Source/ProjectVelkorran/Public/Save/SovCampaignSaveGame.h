@@ -18,7 +18,9 @@ enum class ESovSaveResult : uint8
 {
     Success, LoadStarted, Busy, UnsafeState, InvalidSlot, MissingAccount, MissingSave, CorruptSave,
     IncompatibleSave, MissingRequiredAsset, CaptureFailed, WriteFailed, ReadbackFailed,
-    TravelFailed, RecoveryAvailable, AwaitingFailureDecision
+    TravelFailed, RecoveryAvailable, AwaitingFailureDecision,
+    /** The slot holds a save written by a newer version of the game. It is intact, just unreadable here. */
+    NewerVersionSave
 };
 
 USTRUCT(BlueprintType)

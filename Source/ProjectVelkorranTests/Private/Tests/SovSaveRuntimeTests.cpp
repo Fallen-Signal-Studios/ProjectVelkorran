@@ -14,6 +14,7 @@
 #include "ICommonInputModule.h"
 #include "HAL/PlatformProperties.h"
 #include "Save/SovSaveSubsystem.h"
+#include "Save/SovSaveEnvelopeFrame.h"
 #include "NarrativeSavePhases.h"
 #include "NarrativeSave.h"
 #include "CharacterCreator/NarrativeSaveWithCreatorData.h"
@@ -89,6 +90,16 @@ struct FSovSaveTestAccess
     static void Tick(USovSaveSubsystem& S) { S.Tick(0.1f); }
     static bool IsFailed(const USovSaveSubsystem& S) { return S.bPendingLoadFailed; }
     static void Complete(USovSaveSubsystem& S, bool bSucceeded) { S.CompletePendingLoad(bSucceeded, TEXT("Test completion")); }
+    /** The per-bank state is private to the subsystem; this friend is what makes it nameable in a test. */
+    using FBanks = USovSaveSubsystem::FSovSlotBanks;
+    static USovCampaignSaveGame* ReadBanks(USovSaveSubsystem& S, ESovSaveSlotKind Kind, int32 Index,
+        bool& Bad, FBanks& Banks)
+    { int32 Bank; FString Error; return S.ReadBest(Kind, Index, Bank, Bad, Error, nullptr, &Banks); }
+    static bool Frame(USovCampaignSaveGame* Save, TArray<uint8>& OutStored)
+    {
+        TArray<uint8> Payload;
+        return UGameplayStatics::SaveGameToMemory(Save, Payload) && SovSaveEnvelopeFrame::Encode(Payload, OutStored);
+    }
     static USovCampaignSaveGame* Envelope(USovSaveSubsystem& S)
     {
         auto* Save = NewObject<USovCampaignSaveGame>(&S);
@@ -740,6 +751,101 @@ bool FSovGoldenCampaignSaveTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("The component's identity survives"), Record->SavedComponents[0].ComponentName, FName(TEXT("GoldenComponent")));
         TestTrue(TEXT("The component's SaveGame bytes survive unshifted"), Record->SavedComponents[0].ByteData == ExpectedComponentBytes);
     }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovNewerVersionSaveTest,
+    "ProjectVelkorran.Campaign.Save.NewerVersionBankIsPreservedNotReused",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovNewerVersionSaveTest::RunTest(const FString& Parameters)
+{
+    TStrongObjectPtr<UGameInstance> Instance(NewObject<UGameInstance>());
+    TStrongObjectPtr<USovSaveSubsystem> S(NewObject<USovSaveSubsystem>(Instance.Get()));
+    auto* Storage = FSovSaveTestAccess::Initialize(*S);
+    const FString BankA = FSovSaveTestAccess::Name(*S, ESovSaveSlotKind::Manual, 0, 0);
+    const FString BankB = FSovSaveTestAccess::Name(*S, ESovSaveSlotKind::Manual, 0, 1);
+
+    // A save a later build wrote: intact bytes this build simply cannot read.
+    const auto Place = [&S, &Storage](const FString& Name, int32 Major, int64 Generation, TArray<uint8>& OutBytes)
+    {
+        TStrongObjectPtr<USovCampaignSaveGame> Save(FSovSaveTestAccess::Envelope(*S));
+        Save->Header.SchemaMajor = Major; Save->Header.Generation = Generation;
+        Save->IntegrityChecksum = Save->CalculateChecksum();
+        const bool bFramed = FSovSaveTestAccess::Frame(Save.Get(), OutBytes);
+        Storage->Write(Name, 0, OutBytes);
+        return bFramed;
+    };
+
+    TArray<uint8> Future, Current;
+    TestTrue(TEXT("A newer-schema bank can be staged"), Place(BankA, 2, 11, Future));
+    TestTrue(TEXT("A readable bank can be staged beside it"), Place(BankB, 1, 2, Current));
+
+    bool bDamaged = true;
+    FSovSaveTestAccess::FBanks Banks;
+    TStrongObjectPtr<USovCampaignSaveGame> Best(FSovSaveTestAccess::ReadBanks(*S, ESovSaveSlotKind::Manual, 0, bDamaged, Banks));
+    // Telling the player a newer save is corrupt invites them to delete it, and it is not corrupt.
+    TestFalse(TEXT("A save from a newer build is not reported as damage"), bDamaged);
+    TestTrue(TEXT("It is reported as what it is"), Banks.bNewerVersion[0] && Banks.HasNewerVersion());
+    TestFalse(TEXT("The readable bank beside it is not mistaken for one"), Banks.bNewerVersion[1]);
+    TestTrue(TEXT("The readable bank is still what loads"), Best.IsValid() && Best->Header.Generation == 2);
+
+    {
+        TStrongObjectPtr<USovCampaignSaveGame> Save(FSovSaveTestAccess::Envelope(*S));
+        FString Error;
+        TestEqual(TEXT("The downgraded build can still save"),
+            FSovSaveTestAccess::Write(*S, Save.Get(), Error), ESovSaveResult::Success);
+    }
+    TArray<uint8> AfterA, AfterB;
+    Storage->Read(BankA, 0, AfterA); Storage->Read(BankB, 0, AfterB);
+    // The whole point: the newer save is still in the slot, where re-upgrading will find it, rather
+    // than only in a support file the player would never look for (audit AR2-17).
+    TestTrue(TEXT("The newer build's save is left byte-for-byte alone"), AfterA == Future);
+    TestTrue(TEXT("The write went to the bank it was allowed to reuse"), AfterB != Current);
+
+    // Saving repeatedly must not eventually come back around to it.
+    for (int32 Index = 0; Index < 3; ++Index)
+    {
+        TStrongObjectPtr<USovCampaignSaveGame> Save(FSovSaveTestAccess::Envelope(*S));
+        FString Error; FSovSaveTestAccess::Write(*S, Save.Get(), Error);
+    }
+    Storage->Read(BankA, 0, AfterA);
+    TestTrue(TEXT("Repeated saves never come back around to it"), AfterA == Future);
+
+    // Both banks from the future: one has to be given up so the player can save at all, and the
+    // further-along save is the one worth keeping.
+    TStrongObjectPtr<UGameInstance> SecondInstance(NewObject<UGameInstance>());
+    TStrongObjectPtr<USovSaveSubsystem> T(NewObject<USovSaveSubsystem>(SecondInstance.Get()));
+    auto* SecondStorage = FSovSaveTestAccess::Initialize(*T);
+    const auto PlaceIn = [&T, &SecondStorage](const FString& Name, int64 Generation, TArray<uint8>& OutBytes)
+    {
+        TStrongObjectPtr<USovCampaignSaveGame> Save(FSovSaveTestAccess::Envelope(*T));
+        Save->Header.SchemaMajor = 2; Save->Header.Generation = Generation;
+        Save->IntegrityChecksum = Save->CalculateChecksum();
+        FSovSaveTestAccess::Frame(Save.Get(), OutBytes);
+        SecondStorage->Write(Name, 0, OutBytes);
+    };
+    // The further-along save is put in bank A deliberately: bank A is the one the ordinary rotation
+    // would pick anyway, so a test that put it in B would pass without the rule being applied at all.
+    TArray<uint8> Older, Newer;
+    PlaceIn(BankA, 9, Newer);
+    PlaceIn(BankB, 5, Older);
+    {
+        TStrongObjectPtr<USovCampaignSaveGame> Save(FSovSaveTestAccess::Envelope(*T));
+        FString Error;
+        TestEqual(TEXT("A slot with nothing readable in it can still be saved to"),
+            FSovSaveTestAccess::Write(*T, Save.Get(), Error), ESovSaveResult::Success);
+    }
+    TArray<uint8> BothA, BothB;
+    SecondStorage->Read(BankA, 0, BothA); SecondStorage->Read(BankB, 0, BothB);
+    TestTrue(TEXT("The further-along of the two newer saves is the one kept"), BothA == Newer);
+    TestTrue(TEXT("The other is the one given up"), BothB != Older);
+    int32 Preserved = 0;
+    for (const auto& File : SecondStorage->Slots)
+    {
+        if (File.Key.StartsWith(TEXT("0") + BankB + TEXT("_Recovery_")))
+        { ++Preserved; TestTrue(TEXT("The save given up is preserved byte-for-byte"), File.Value == Older); }
+    }
+    TestEqual(TEXT("Exactly one preservation copy is kept"), Preserved, 1);
     return true;
 }
 
