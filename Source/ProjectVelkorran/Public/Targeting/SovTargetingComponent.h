@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "GameplayTagContainer.h"
+#include "Camera/SovCameraControlComponent.h"
 #include "SovTargetingComponent.generated.h"
 class ANarrativePlayerController;
 class ANarrativeCharacter;
@@ -65,6 +66,9 @@ private:
 	class ANarrativeCharacter* FindAllyUnderReticle() const;
 	class USovCompanionComponent* ResolveCompanionCommands() const;
 	void RotateCameraToward(const FVector& Point, float Delta, float Strength);
+	/** Keeps this component's single camera claim matching what it is actually doing. */
+	void PublishCameraClaim();
+	class USovCameraControlComponent* ResolveCameraControl() const;
 	UFUNCTION() void HandleSemanticInput(FGameplayTag Tag, bool bPressed);
 	UPROPERTY(Transient) TWeakObjectPtr<ANarrativePlayerController> Controller;
 	UPROPERTY(Transient) TWeakObjectPtr<ANarrativeCharacter> LockedTarget;
@@ -75,4 +79,7 @@ private:
 	ESovFramingSuspension FramingSuspension = ESovFramingSuspension::None;
 	float OccludedFor = 0.f;
 	float NavigationElapsed = 0.f;
+	/** The lease this component holds on the camera, and the request it currently stands for. */
+	FGuid CameraClaim;
+	FSovCameraRequest HeldRequest;
 };

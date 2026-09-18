@@ -4,6 +4,7 @@
 #include "Framework/SovPlayerState.h"
 #include "Targeting/SovTargetingComponent.h"
 #include "Targeting/SovAimAssist.h"
+#include "Camera/SovCameraControlComponent.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Tests/SovAxiomRuntimeTestFixtures.h"
 #include "Tests/SovSettingsTestFixtures.h"
@@ -108,10 +109,20 @@ bool FSovTargetingWorldTest::RunTest(const FString& Parameters)
 	Targeting->TickComponent(.016f, LEVELTICK_All, nullptr);
 	TestTrue(TEXT("Restored line of sight keeps the reacquired focus"), Targeting->GetLockedTarget() == Enemy);
 	TestEqual(TEXT("An unaimed focus drives native framing"), Targeting->GetFramingSuspension(), ESovFramingSuspension::None);
+	// Framing and camera ownership are separate answers (audit PC2-08): suspending framing must not be
+	// the same thing as letting go of the camera, and both have to be visible on the one owner.
+	USovCameraControlComponent* const Camera = Player->FindComponentByClass<USovCameraControlComponent>();
+	if (!TestNotNull(TEXT("The protagonist owns a camera arbiter"), Camera))
+	{ World->DestroyWorld(false); if (GEngine) { GEngine->DestroyWorldContext(World); } return false; }
+	TestEqual(TEXT("Holding a threat claims the camera"), Camera->GetCameraState().Priority, ESovCameraPriority::ThreatFocus);
+	TestEqual(TEXT("Threat focus asks the rig to strafe"), Camera->GetCameraState().Mode, ESovCameraMode::Strafe);
 	PlayerASC->AddLooseGameplayTag(AimingTag);
 	Targeting->TickComponent(.016f, LEVELTICK_All, nullptr);
 	TestTrue(TEXT("Aiming keeps the threat focus"), Targeting->GetLockedTarget() == Enemy);
 	TestEqual(TEXT("Aiming suspends framing only"), Targeting->GetFramingSuspension(), ESovFramingSuspension::Aiming);
+	TestEqual(TEXT("Raising the weapon escalates the same claim to aim"), Camera->GetCameraState().Priority, ESovCameraPriority::Aim);
+	TestEqual(TEXT("Aim pulls the camera in"), Camera->GetCameraState().Style, ESovCameraStyle::Close);
+	TestEqual(TEXT("Escalating reuses the lease rather than stacking a second one"), Camera->GetClaimCount(), 2);
 	const FRotator AimedRotation = Controller->GetControlRotation();
 	Targeting->TickComponent(.2f, LEVELTICK_All, nullptr);
 	TestTrue(TEXT("Native framing never steers the camera while the weapon is aimed"),
@@ -122,12 +133,20 @@ bool FSovTargetingWorldTest::RunTest(const FString& Parameters)
 	PlayerASC->RemoveLooseGameplayTag(AimingTag);
 	Targeting->TickComponent(.016f, LEVELTICK_All, nullptr);
 	TestEqual(TEXT("Lowering the weapon returns framing to the focus"), Targeting->GetFramingSuspension(), ESovFramingSuspension::None);
+	TestEqual(TEXT("Lowering the weapon returns the camera to the focus too"),
+		Camera->GetCameraState().Priority, ESovCameraPriority::ThreatFocus);
 	Targeting->ClearHardLock();
+	Targeting->TickComponent(.016f, LEVELTICK_All, nullptr);
+	TestEqual(TEXT("Dropping the focus releases the camera back to the protagonist's profile"),
+		Camera->GetCameraState().Priority, ESovCameraPriority::Profile);
+	TestEqual(TEXT("...leaving only the profile's own claim"), Camera->GetClaimCount(), 1);
 	auto* LossProbe = NewObject<USovTargetingLossProbe>(Targeting);
 	Targeting->OnLockTargetChanged.AddDynamic(LossProbe, &USovTargetingLossProbe::OnTargetChanged);
 	Targeting->SetTarget(Enemy, ESovLockLossReason::None);
 	Controller->UnPossess(); Targeting->TickComponent(.016f, LEVELTICK_All, nullptr);
 	TestNull(TEXT("Unpossessed owner loses its lock"), Targeting->GetLockedTarget());
+	// A lease that outlives its claimant is the failure the owner exists to prevent.
+	TestEqual(TEXT("Losing the owner releases the camera claim"), Camera->GetClaimCount(), 1);
 	TestEqual(TEXT("Unpossess publishes one owner-unavailable loss"), LossProbe->LostCount, 1);
 	TestEqual(TEXT("Loss reason identifies unavailable owner"), LossProbe->LastLoss, ESovLockLossReason::OwnerUnavailable);
 	Targeting->TickComponent(.016f, LEVELTICK_All, nullptr);

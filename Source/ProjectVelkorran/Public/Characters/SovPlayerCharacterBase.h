@@ -30,6 +30,8 @@ public:
 	virtual bool ShouldResetAttributesOnRevive() const override { return false; }
 	UFUNCTION(BlueprintPure, Category="Sovereign|Components") class USovFatalRecoveryComponent* GetRecoveryComponent() const { return RecoveryComponent; }
 	UFUNCTION(BlueprintPure, Category="Sovereign|Components") class USovTargetingComponent* GetTargetingComponent() const { return TargetingComponent; }
+	/** The single owner of who is driving the camera. Systems claim it; the authored rig applies it. */
+	UFUNCTION(BlueprintPure, Category="Sovereign|Components") class USovCameraControlComponent* GetCameraControlComponent() const { return CameraControlComponent; }
 
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Components")
 	class USovEchoComponent* GetEchoComponent() const { return EchoComponent; }
@@ -122,6 +124,7 @@ protected:
 private:
 	UPROPERTY(VisibleAnywhere, Category="Sovereign|Components") TObjectPtr<class USovFatalRecoveryComponent> RecoveryComponent;
 	UPROPERTY(VisibleAnywhere, Category="Sovereign|Components") TObjectPtr<class USovTargetingComponent> TargetingComponent;
+	UPROPERTY(VisibleAnywhere, Category="Sovereign|Components") TObjectPtr<class USovCameraControlComponent> CameraControlComponent;
 	UPROPERTY(SaveGame) FGuid CampaignSaveGuid;
 	bool bCampaignManagedInitialization = false;
 	bool bCampaignInitializationFailed = false;

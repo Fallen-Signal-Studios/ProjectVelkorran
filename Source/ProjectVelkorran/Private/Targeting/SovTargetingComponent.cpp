@@ -1,5 +1,7 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Targeting/SovTargetingComponent.h"
+
+#include "Camera/SovCameraControlComponent.h"
 #include "Targeting/SovAimAssist.h"
 #include "Diagnostics/SovDiagnosticsSubsystem.h"
 #include "ArsenalStatics.h"
@@ -38,6 +40,9 @@ void USovTargetingComponent::EndPlay(const EEndPlayReason::Type Reason)
 	if (Controller.IsValid()) { Controller->OnSemanticInputChanged.RemoveDynamic(this, &ThisClass::HandleSemanticInput); }
 	const bool bLostTarget = bHasPublishedLock;
 	LockedTarget.Reset(); Controller.Reset(); bHasPublishedLock = false; FramingSuspension = ESovFramingSuspension::None;
+	// A lease outliving its claimant is exactly the failure the owner exists to prevent.
+	if (USovCameraControlComponent* const Camera = ResolveCameraControl()) { Camera->ReleaseCamera(CameraClaim); }
+	CameraClaim.Invalidate(); HeldRequest = FSovCameraRequest();
 	if (bLostTarget) { OnLockTargetChanged.Broadcast(nullptr, ESovLockLossReason::OwnerUnavailable); }
 	Super::EndPlay(Reason);
 }
@@ -192,10 +197,62 @@ void USovTargetingComponent::RotateCameraToward(const FVector& Point, float Delt
 	Current.Pitch += FMath::Clamp(FMath::FindDeltaAngleDegrees(Current.Pitch, Desired.Pitch), -Limit, Limit);
 	Current.Roll = 0.f; Controller->SetControlRotation(Current);
 }
+USovCameraControlComponent* USovTargetingComponent::ResolveCameraControl() const
+{
+	const AActor* const Owner = GetOwner();
+	return Owner ? Owner->FindComponentByClass<USovCameraControlComponent>() : nullptr;
+}
+
+void USovTargetingComponent::PublishCameraClaim()
+{
+	USovCameraControlComponent* const Camera = ResolveCameraControl();
+	if (!Camera) { return; }
+
+	// Losing the focus - death, a cinematic, a pause, a different view target - releases the claim, so
+	// the camera cannot be left strafing at a threat the protagonist is no longer allowed to hold.
+	FSovCameraRequest Desired;
+	if (!CanHoldFocus())
+	{
+		if (CameraClaim.IsValid()) { Camera->ReleaseCamera(CameraClaim); CameraClaim.Invalidate(); HeldRequest = FSovCameraRequest(); }
+		return;
+	}
+	if (IsAiming())
+	{
+		// The weapon owns the framing while aiming, and it wants the tighter, strafing composition the
+		// authored aim rig was built around. Style is named here because aim is a distance change.
+		Desired.Priority = ESovCameraPriority::Aim;
+		Desired.Mode = ESovCameraMode::Strafe;
+		Desired.Style = ESovCameraStyle::Close;
+		Desired.Reason = TEXT("Aim");
+	}
+	else if (bHasPublishedLock && LockedTarget.IsValid())
+	{
+		// Holding a threat wants strafing movement, but not a distance the protagonist's profile did not
+		// ask for: Style stays Unchanged so Tarrik and Selene keep framing that suits them.
+		Desired.Priority = ESovCameraPriority::ThreatFocus;
+		Desired.Mode = ESovCameraMode::Strafe;
+		Desired.Reason = TEXT("ThreatFocus");
+	}
+	else
+	{
+		if (CameraClaim.IsValid()) { Camera->ReleaseCamera(CameraClaim); CameraClaim.Invalidate(); HeldRequest = FSovCameraRequest(); }
+		return;
+	}
+
+	if (CameraClaim.IsValid())
+	{
+		if (Desired == HeldRequest) { return; }
+		if (Camera->UpdateCamera(CameraClaim, Desired)) { HeldRequest = Desired; return; }
+		CameraClaim.Invalidate();
+	}
+	CameraClaim = Camera->RequestCamera(Desired);
+	HeldRequest = Desired;
+}
+
 void USovTargetingComponent::TickComponent(float Delta, ELevelTick Type, FActorComponentTickFunction* TickFunction)
 {
 	Super::TickComponent(Delta, Type, TickFunction);
-	if (!ResolveController()) { FramingSuspension = ESovFramingSuspension::None; return; }
+	if (!ResolveController()) { FramingSuspension = ESovFramingSuspension::None; PublishCameraClaim(); return; }
 	const bool bAiming = IsAiming();
 	const bool bAimStarted = bAiming && !bWasAiming;
 	bWasAiming = bAiming;
@@ -204,9 +261,11 @@ void USovTargetingComponent::TickComponent(float Delta, ELevelTick Type, FActorC
 	if (!CanHoldFocus())
 	{
 		FramingSuspension = ESovFramingSuspension::None;
+		PublishCameraClaim();
 		if (LockedTarget.IsValid()) { SetTarget(nullptr, ESovLockLossReason::Cinematic); }
 		return;
 	}
+	PublishCameraClaim();
 	// Existing Narrative spring arm remains collision authority. Authored composition cannot disable its safety test.
 	if (USpringArmComponent* Arm = GetOwner()->FindComponentByClass<USpringArmComponent>()) { Arm->bDoCollisionTest = true; }
 	const float ElapsedDelta = FMath::IsFinite(Delta) ? FMath::Max(Delta, 0.f) : 0.f;

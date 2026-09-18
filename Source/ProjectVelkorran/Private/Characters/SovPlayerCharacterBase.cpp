@@ -11,6 +11,7 @@
 #include "FieldRecovery/SovFieldRecoveryComponent.h"
 #include "Resonance/SovResonanceComponent.h"
 #include "Recovery/SovFatalRecoveryComponent.h"
+#include "Camera/SovCameraControlComponent.h"
 #include "Targeting/SovTargetingComponent.h"
 #include "Components/SovCorruptionComponent.h"
 #include "Components/SovHealthRechargeComponent.h"
@@ -32,6 +33,7 @@ ASovPlayerCharacterBase::ASovPlayerCharacterBase(const FObjectInitializer& Objec
 	ResonanceComponent = CreateDefaultSubobject<USovResonanceComponent>(TEXT("SovResonanceComponent"));
 	RecoveryComponent = CreateDefaultSubobject<USovFatalRecoveryComponent>(TEXT("SovRecoveryComponent"));
 	TargetingComponent = CreateDefaultSubobject<USovTargetingComponent>(TEXT("SovTargetingComponent"));
+	CameraControlComponent = CreateDefaultSubobject<USovCameraControlComponent>(TEXT("SovCameraControl"));
 	// The radar reports only hostiles this protagonist has actually seen, and forgets them.
 	CreateDefaultSubobject<USovProximityDetectionComponent>(TEXT("SovProximityDetection"));
 	CorruptionComponent = CreateDefaultSubobject<USovCorruptionComponent>(TEXT("SovCorruptionComponent"));
