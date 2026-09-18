@@ -22,6 +22,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "NarrativeGameplayTags.h"
 #include "Campaign/SovAurelionCrucibleDirector.h"
+#include "Campaign/SovLethalFloorComponent.h"
 #include "Sovereign/SovGameplayTags.h"
 #include "Campaign/SovEncounterSnapshotLibrary.h"
 #include "Character/PlayerDefinition.h"
@@ -1447,6 +1448,60 @@ bool FSovAurelionEliteSummonRetirementTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("Retry returns the encounter to active"), F.Director->GetEncounterState(), ESovEncounterState::Active);
         TestFalse(TEXT("The retry removes the failed attempt's adds"), Adds.ContainsByPredicate([](const auto& Add) { return Add.IsValid(); }));
     }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCrucibleLinkCarrierTest,
+    "ProjectVelkorran.Campaign.Aurelion.KillingALinkCarrierCannotDeadEndThePhase",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCrucibleLinkCarrierTest::RunTest(const FString& Parameters)
+{
+    // Reported from play: the Fire and Frost phase kept failing with no explanation. Fighting the
+    // enemy in front of you is the most ordinary thing a player can do, and if that enemy carried a
+    // required link its death took the link with it and dead-ended the phase on the next tick.
+    FEncounterObjectiveWorld F(true);
+    if (!TestNotNull(TEXT("Ready Selene campaign"), F.ASC) || !F.Start()) { AddError(F.SetupError); return false; }
+    auto* Crucible = CastChecked<ASovAurelionLinkPhaseDirector>(F.Director);
+    if (!TestTrue(TEXT("The phase has required links to carry"), Crucible->RequiredLinks.Num() > 0)) { return false; }
+
+    const FName CarrierId = Crucible->RequiredLinks[0].ParticipantId;
+    auto* Carrier = Crucible->GetParticipant(CarrierId);
+    if (!TestNotNull(TEXT("The first link has a carrier"), Carrier)) { return false; }
+    auto* CarrierASC = Carrier->GetNarrativeAbilitySystemComponent();
+    if (!TestNotNull(TEXT("The carrier has an ability system"), CarrierASC)) { return false; }
+
+    FSovCrucibleRuntimeTestAccess::Step(Crucible, .016f);
+    TestEqual(TEXT("The phase starts active"), Crucible->GetEncounterState(), ESovEncounterState::Active);
+
+    // The floor is held while the link is still owed, so damage cannot take the carrier to zero.
+    auto* Floor = Carrier->FindComponentByClass<USovLethalFloorComponent>();
+    if (!TestNotNull(TEXT("An unsevered carrier is protected"), Floor)) { return false; }
+    TestTrue(TEXT("...and its floor is held"), Floor->IsFloorHeld());
+
+    // Everything the player could reasonably throw at it, short of a scripted execution.
+    CarrierASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetHealthAttribute(), 0.f);
+    FSovCrucibleRuntimeTestAccess::Step(Crucible, .016f);
+    TestTrue(TEXT("The carrier survives being fought"), IsValid(Carrier) && Carrier->IsAlive());
+    TestEqual(TEXT("...and the phase is still winnable"), Crucible->GetEncounterState(), ESovEncounterState::Active);
+
+    // And the intended route still resolves the phase.
+    for (int32 Index = 0; Index < Crucible->RequiredLinks.Num(); ++Index)
+    {
+        auto* Node = Crucible->GetParticipant(Crucible->RequiredLinks[Index].ParticipantId);
+        auto* Link = Node ? Node->FindComponentByClass<USovCommandLinkComponent>() : nullptr;
+        if (!TestNotNull(TEXT("Each required link is severable"), Link)) { return false; }
+        FSovCommandLinkSeverResult Result;
+        TestEqual(TEXT("Selene severs the link as the objective asks"),
+            Link->TrySeverCommandLink(F.Player, Result), ESovCommandLinkSeverResolution::NewlySevered);
+    }
+    FSovCrucibleRuntimeTestAccess::Step(Crucible, .016f);
+    TestEqual(TEXT("Severing both links still completes the phase"),
+        Crucible->GetEncounterState(), ESovEncounterState::Succeeded);
+
+    // Protection is for the mechanic, not for the enemy: once its link is spent the carrier is mortal.
+    auto* Spent = Carrier->FindComponentByClass<USovLethalFloorComponent>();
+    if (TestNotNull(TEXT("The carrier keeps its floor component"), Spent))
+    { TestFalse(TEXT("...but the floor is released once the link is severed"), Spent->IsFloorHeld()); }
     return true;
 }
 

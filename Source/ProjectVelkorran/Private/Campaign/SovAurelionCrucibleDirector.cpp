@@ -241,7 +241,7 @@ namespace
 	 * A phase that requires a mechanic must not be losable by killing its boss first. Keeping the floor
 	 * here rather than in the damage path means each phase owns exactly the window it is responsible for.
 	 */
-	void HoldEliteLethalFloor(ASovNPCCharacterBase* Elite, const bool bHold, const float Fraction)
+	void HoldLethalFloor(ASovNPCCharacterBase* Elite, const bool bHold, const float Fraction)
 	{
 		if (!IsValid(Elite) || !Elite->HasAuthority()) { return; }
 		auto* Component = Elite->FindComponentByClass<USovLethalFloorComponent>();
@@ -272,7 +272,17 @@ void ASovAurelionLinkPhaseDirector::Tick(float DeltaSeconds)
         auto* Elite = GetParticipant(EliteParticipantId);
         // Held until the links are proven, so a player who out-damages the mechanic cannot lose the run
         // to their own success. The failure below now only catches causes the player did not create.
-        HoldEliteLethalFloor(Elite, !HasLinkProof(), EliteLethalFloorFraction);
+        HoldLethalFloor(Elite, !HasLinkProof(), EliteLethalFloorFraction);
+        // The carriers need the same protection for the same reason. A carrier killed before its
+        // link is severed takes the link with it, and the check below then fails the phase - so the
+        // most ordinary thing a player can do, killing the enemy in front of them, ended the run
+        // with no way back and no explanation.
+        for (int32 Index = 0; Index < RequiredLinks.Num(); ++Index)
+        {
+            const bool bSevered = LinkReceipts.IsValidIndex(Index) && LinkReceipts[Index].TransactionId.IsValid();
+            HoldLethalFloor(GetParticipant(RequiredLinks[Index].ParticipantId),
+                !HasLinkProof() && !bSevered, EliteLethalFloorFraction);
+        }
         if (!IsValid(Elite) || !Elite->IsAlive())
         { LastPhaseError = TEXT("The phase A elite was defeated before its preserved phase B entry."); FailEncounter(); return; }
         if (!LastPhaseError.IsEmpty()) { FailEncounter(); return; }
@@ -473,9 +483,9 @@ void ASovAurelionThermalPhaseDirector::Tick(float DeltaSeconds)
         auto* Elite = GetParticipant(EliteParticipantId);
         // Released the moment this attempt's thermal fracture receipt lands, which is the point the
         // Elite is meant to become finishable.
-        HoldEliteLethalFloor(Elite, FractureAttemptId != GetAttemptId(), EliteLethalFloorFraction);
+        HoldLethalFloor(Elite, FractureAttemptId != GetAttemptId(), EliteLethalFloorFraction);
         if ((!IsValid(Elite) || !Elite->IsAlive()) && FractureAttemptId != GetAttemptId()) { FailEncounter(); return; }
         BindFracture();
     }
-    else { HoldEliteLethalFloor(GetParticipant(EliteParticipantId), false, EliteLethalFloorFraction); }
+    else { HoldLethalFloor(GetParticipant(EliteParticipantId), false, EliteLethalFloorFraction); }
 }
