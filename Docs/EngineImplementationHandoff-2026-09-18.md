@@ -36,7 +36,7 @@ Two other standing constraints:
 | 2 | Lay out the HUD widget | `WBP_SovHolographicHUD` | Bars, ammo, radar, arc |
 | 3 | Apply the camera state | `BP_SovTarrik`, `BP_SovSelene` | Aim and threat-focus framing |
 | 4 | Author the lethal-floor cue | Both Aurelion phase directors | "Cannot be finished yet" reads on the Elite |
-| 5 | Bind the five new inputs on gamepad | `IMC_Combat` | Threat focus on a controller |
+| 5 | Enter the decided gamepad chords | `IMC_Combat` | Threat focus on a controller |
 | 6 | Author a shoulder-swap rig parameter | Narrative camera rig | Shoulder swap (blocked until this exists) |
 | 7 | Raise `ContentRevision` when you revise a mission | Mission definitions | Saves surviving your content edits |
 | 8 | Localization gather **run**; pseudo-localization still open | `Content/Localization` | Text that can be translated at all |
@@ -99,6 +99,14 @@ modifier blackout. Blackout is asserted in `ProjectVelkorran.UI.HolographicHUD.*
 regresses a test will say so — but only content can prove it looks right.
 
 ### 3. Apply the camera state
+
+> **A checker is ready for this.** After wiring it, run:
+> ```powershell
+> .\Scripts\Validation\Aurelion\run-editor-script.ps1 -EngineRoot 'C:\Program Files\Epic Games\UE_5.7' -ScriptPath 'Scripts\Editor\check_camera_wiring_readonly.py'
+> ```
+> Read-only. It reports whether `ApplyCameraState` is implemented on each protagonist and whether
+> anything still references the camera interface or enums — the two-owner case described below. It
+> reads the asset's references, not the graph, so treat a report as "look here", not a verdict.
 
 This is the one with a real failure mode. Read the whole section before opening the Blueprint.
 
@@ -164,29 +172,50 @@ director if the floor reads wrong in play; it clamps to 0.01–0.5.
 invulnerability — but the Elite visibly cannot be finished, and the cue clears the moment the phase
 mechanic resolves.
 
-### 5. Bind the five new inputs on gamepad
+### 5. Enter the decided gamepad chords
 
-Five input actions exist and are bound **keyboard and mouse only**, because every gamepad key was
-already taken and I would not guess at a rebind:
+The design is settled; entering it is about ten minutes in the Input editor. I could not script it —
+see the note at the end — so `IMC_Combat` is **unmodified**.
 
-| Action | Semantic tag |
-|---|---|
-| `IA_ThreatFocus` | `Narrative.Input.ThreatFocus` |
-| `IA_CycleTargetLeft` | `Narrative.Input.CycleTargetLeft` |
-| `IA_CycleTargetRight` | `Narrative.Input.CycleTargetRight` |
-| `IA_Designate` | `Narrative.Input.Designate` |
-| `IA_SkipCinematic` | `Narrative.Input.SkipCinematic` |
+All 19 gamepad inputs were already bound, both shoulders included, so targeting gets a **layer held
+under the left shoulder** rather than buttons of its own. In `Content/Input/IMC_Combat.uasset`, add
+four mappings, each carrying an **Input Trigger Chord Action** whose Chord Action is
+`IA_WeaponWheel`:
 
-- Assets: `Content/Input/IMC_Combat.uasset`, `Content/Input/DA_CombatInputs.uasset`
-- Decide the gamepad chords and add the mappings.
+| Hold LB, then | Action | Semantic tag |
+|---|---|---|
+| Y / FaceButton_Top | `IA_ThreatFocus` | `Narrative.Input.ThreatFocus` |
+| X / FaceButton_Left | `IA_Designate` | `Narrative.Input.Designate` |
+| D-pad Left | `IA_CycleTargetLeft` | `Narrative.Input.CycleTargetLeft` |
+| D-pad Right | `IA_CycleTargetRight` | `Narrative.Input.CycleTargetRight` |
 
-> **UE 5.7 note:** `UInputMappingContext::Mappings` is deprecated and reads empty. The live rows are
-> in `DefaultKeyMappings.Mappings`. If you script this rather than doing it by hand, use the
-> `default_key_mappings` accessors, and read the asset back to confirm the count — a script that
-> writes the deprecated array reports success and changes nothing.
+Then add an **Input Trigger Chord Blocker** to the *existing* mappings on those same four keys —
+`IA_Ability3` (Y), `IA_Interact` and `IA_Reload` (X), `IA_OpenInventory` (D-pad Left),
+`IA_QuickUseItems` (D-pad Right). Without the blocker the base action and the chorded one both fire,
+which is not a layer, it is a double input. This does mean interact and reload are unavailable while
+LB is held; that is what a chord layer costs.
 
-**Done when:** threat focus, cycling and designation work on a controller without breaking an
-existing binding. Skip-cinematic is a hold, not a press.
+**`IA_SkipCinematic` is deliberately left off the pad.** It fires during cinematics, where a chord
+built on a combat weapon wheel is the wrong home for it. It wants its own context, which is a piece
+of design rather than a binding.
+
+> **Test the weapon wheel first.** LB opens the wheel, and I could not tell whether the wheel itself
+> claims the face buttons — nothing in C++ references it, so it is handled entirely in Blueprint and
+> the graph is not readable from script. If the wheel does claim them, the chord and the wheel's own
+> selection will fight, and the fix is to move the wheel's selection or split the two by context.
+> Check this before judging whether the layer feels right.
+
+> **UE 5.7 note:** `UInputMappingContext::Mappings` is deprecated and reads empty; the live rows are
+> in `DefaultKeyMappings.Mappings`. A script that writes the deprecated array reports success and
+> changes nothing. `Scripts/Editor/inspect_gamepad_bindings_readonly.py` prints the live map.
+
+> **Why this was not scripted:** an `InputTriggerChordAction` created inside the asset counts as a
+> template as far as Python is concerned, and the editor then refuses to set its `ChordAction`.
+> `Scripts/Editor/author_targeting_gamepad_chords.py` is kept because it encodes exactly the design
+> above and fails before writing anything; if a way past the template guard turns up, the rest works.
+
+**Done when:** holding LB and pressing Y takes a threat focus, the D-pad cycles, X designates, and
+releasing LB returns every button to its normal job.
 
 ### 6. Author a shoulder-swap rig parameter
 
