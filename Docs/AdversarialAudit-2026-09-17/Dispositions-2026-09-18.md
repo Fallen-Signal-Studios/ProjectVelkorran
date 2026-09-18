@@ -16,7 +16,7 @@ Three levels of confidence, and the difference matters:
 Where a finding turned out to be partly done or to rest on a wrong premise, that is said plainly,
 because "still open" and "open for a different reason than written" lead to different work.
 
-## P1 — four of five were already closed
+## P1 — all five were already closed
 
 | ID | Disposition | Evidence |
 |---|---|---|
@@ -24,7 +24,7 @@ because "still open" and "open for a different reason than written" lead to diff
 | AR2-02 | **Verified mostly closed** | `7e82c9cb`. `GameDefaultMap` is M12 and `GlobalDefaultGameMode` is `SovCampaignGameMode`, with a config comment explaining why. **Residual:** `GameInstanceClass` is still `/NarrativePro/.../BP_NarrativeGameInstance`. |
 | AR2-03 | **Verified substantially closed** | `7e82c9cb`. `Validate-Campaign.py --release` builds Test and Shipping, packages Shipping, runs `-ShippingValidation` and fails on staged Narrative demo content; a Shipping binary was built 17 Sep. **Residuals:** `Validate-Unreal.ps1` still counts `succeededWithWarnings` as passing and hard-codes `packagedBuild = 'not run'`. Whether the release gate has ever passed is unknown. |
 | EA2-01 | **Verified closed** | `cc30b7c8` (17 Sep) retires attempt combatants on completion and failure. `4ac0b0a7` (18 Sep) added the transfer regression the audit named as missing, and closed the second half: the phase boundary now consults live attempt combatants instead of owned participants alone. |
-| PC2-01 | **Verified open — and the fix is content** | Both protagonists' melee derives from Narrative's `GA_Attack_Combo_Melee`; the native framework is referenced only by the four Eclipse enemy abilities. Reparenting Blueprint abilities is editor work, not source work. The content references come from the audit and I have not re-checked them with an asset-registry query. |
+| PC2-01 | **Verified closed** | `WI_Velkorran` grants `GA_Tarrik_MeleeLight` and `GA_Tarrik_MeleeHeavy`; `WI_Verity` grants `GA_Selene_MeleeLight` and `GA_Selene_MeleeHeavy`. All four derive from `SovGameplayAbility_Melee` and have matching `SovMeleeAttackDefinition` data. Eight assets now use the framework, not four. **Residual:** the legacy `GA_Attack_Melee_Sword_1H_Tarrik` and `GA_SovVerityTwinAttack` still exist and are still referenced by `DA_M12_FireAndFrost`, `DA_M13_ContraryWitness` and `NWI_Velkorran` — worth checking whether those are vestigial or a second live grant path. |
 
 ## P2 — verified open
 
@@ -75,7 +75,17 @@ line above is what I actually checked, which is that a commit names them.
 
 ## What this says about the audit
 
-Of the five P1s, four were closed before anyone worked from this list. The audit was written the same
-day several of those fixes landed, so it was partly stale when it was filed rather than becoming so
-since. Verify before implementing — it is minutes against an hour, and it has twice now changed what
-the right work was.
+Every one of the five P1s was closed before anyone worked from this list. The audit was written the
+same day several of those fixes landed, so it was partly stale when it was filed rather than becoming
+so since.
+
+**PC2-01 is the cautionary one.** The first version of this file called it verified open, because I
+read the source, found the native framework used only by enemy abilities, and accepted the audit's
+content claim about what the protagonists' weapons grant. The weapons had been switched over. A claim
+about content has to be checked against content, and a second trap sat behind that: searching package
+dependencies for a C++ class name returns zero for every native parent, which looks exactly like a
+finding. Parentage comes from the registry's `ParentClass` and `NativeParentClass` tags, or from
+`isinstance` on a default object.
+
+Verify before implementing — it is minutes against an hour, and on this audit it has now changed the
+right answer more often than it has confirmed it.

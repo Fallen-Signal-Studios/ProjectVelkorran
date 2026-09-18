@@ -40,6 +40,7 @@ Two other standing constraints:
 | 6 | Author a shoulder-swap rig parameter | Narrative camera rig | Shoulder swap (blocked until this exists) |
 | 7 | Raise `ContentRevision` when you revise a mission | Mission definitions | Saves surviving your content edits |
 | 8 | Localization gather **run**; pseudo-localization still open | `Content/Localization` | Text that can be translated at all |
+| 9 | Check whether the legacy melee abilities are still granted | Mission definitions | Two melee paths, or one |
 
 ---
 
@@ -303,6 +304,30 @@ gather — converting those is source work and is queued. Width heuristics still
 character, which is wrong for any non-Latin script. Aurelion story cues still have no string-table
 keys; giving them keys is content work and is worth doing while you are in there.
 
+### 9. Check whether the legacy melee abilities are still granted
+
+Small, and only worth doing because two live paths would be worse than either one.
+
+Both protagonists' weapons now grant melee on the native framework: `WI_Velkorran` grants
+`GA_Tarrik_MeleeLight` and `GA_Tarrik_MeleeHeavy`, `WI_Verity` grants `GA_Selene_MeleeLight` and
+`GA_Selene_MeleeHeavy`, all four deriving from `SovGameplayAbility_Melee` with matching
+`SovMeleeAttackDefinition` data. That is the right state and nothing needs changing there.
+
+But the superseded abilities still exist and are still referenced:
+
+| Legacy ability | Still referenced by |
+|---|---|
+| `GA_Attack_Melee_Sword_1H_Tarrik` (Narrative demo content) | `DA_M12_FireAndFrost`, `DA_M13_ContraryWitness`, `NWI_Velkorran` |
+| `GA_SovVerityTwinAttack` | `DA_M12_FireAndFrost`, `DA_M13_ContraryWitness` |
+
+Open those three assets and see what the references are for. If a mission definition grants them
+alongside the weapon's abilities, a protagonist has two melee systems active at once — one with the
+swept socket path, per-attack ledger, 0.22 s buffer and Echo receipts, and one without — and which
+one answers an input is then a matter of activation order. If they are vestigial, clearing them keeps
+`NWI_Velkorran` from being mistaken for the live weapon item later.
+
+`Scripts/Editor/inspect_melee_grants_readonly.py` prints the current picture and is read-only.
+
 ## Hazards and things not to undo
 
 **The golden save.** `Source/ProjectVelkorranTests/Fixtures/GoldenSaves/Campaign_Schema1_0.sovsave`
@@ -337,10 +362,9 @@ Landed, and relevant to you only where noted:
 - **UX2-08** — plural forms, culture-aware dates, grapheme-safe letterspacing on the identity plate,
   and the gather config, which is task 8 above.
 
-**The adversarial audit is not closed.** An earlier version of this document said it was; that was
-wrong. The 2026-09-17 audit carries 76 findings across four files, and roughly twenty are done. Five
-are still rated P1 and none of those have been touched: AR2-01 (corrupt save bytes reaching unbounded
-deserialization), AR2-02 (the packaged boot configuration rooting Narrative's demo world and character
-creator), AR2-03 (no executable gate for a Test or Shipping build), PC2-01 (protagonist melee
-bypassing the native melee framework) and EA2-01 (elite summons outliving their encounter). Read
-`Docs/AdversarialAudit-2026-09-17/` rather than this list.
+**The adversarial audit's P1s are closed; the rest is not.** The 2026-09-17 audit carries 76 findings
+across four files. All five P1s are now verified closed, but seventeen P2s are verified still open and
+eleven P2s plus every P3 have not been looked at. Read
+`Docs/AdversarialAudit-2026-09-17/Dispositions-2026-09-18.md` first — it records what each finding is
+actually worth now, and the audit itself is a 17 September snapshot that was partly stale the day it
+was filed.
