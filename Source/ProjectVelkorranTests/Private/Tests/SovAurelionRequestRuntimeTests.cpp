@@ -31,6 +31,8 @@
 #include "UObject/StrongObjectPtr.h"
 #include "UObject/UnrealType.h"
 
+#include "Resonance/SovResonancePolicy.h"
+#include <limits>
 #if WITH_AUTOMATION_TESTS
 namespace
 {
@@ -427,5 +429,53 @@ bool FSovAurelionRequestFocusPriorityTest::RunTest(const FString& Parameters)
         Interaction->Viewed(), static_cast<const UNarrativeInteractableComponent*>(HostilePrompt));
     return true;
 }
-#endif
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCompanionContributionWindowTest,
+	"ProjectVelkorran.Campaign.Companion.ContributionOpensBeforeThePlayersFirstHit",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FSovCompanionContributionWindowTest::RunTest(const FString& Parameters)
+{
+	static_cast<void>(Parameters);
+	// Companion contribution is budgeted from the player's damage, so before the player's first hit the
+	// budget was zero and the companion attacked nothing - every encounter opening, and any stretch the
+	// player spent guarding or evading. §12.2 asks it to contribute visibly (audit EA2-05).
+	using namespace SovResonancePolicy;
+	const float Fraction = .2f;
+
+	// Without an allowance the old behaviour stands: no player damage, no budget, no attack.
+	TestFalse(TEXT("A zero-length allowance leaves the budget in charge"), WithinOpeningContribution(10., 10., 0.f));
+	TestFalse(TEXT("With no player damage and no allowance the companion may not commit"),
+		MayCommitAttack(false, 0.f, 0.f, Fraction, 5.f));
+
+	// Inside the allowance it fights regardless of the budget.
+	TestTrue(TEXT("The allowance is open at the moment the scope opens"), WithinOpeningContribution(100., 100., 8.f));
+	TestTrue(TEXT("The allowance is still open just before it lapses"), WithinOpeningContribution(107.9, 100., 8.f));
+	TestFalse(TEXT("The allowance closes on its own"), WithinOpeningContribution(108.1, 100., 8.f));
+	TestTrue(TEXT("Inside the allowance the companion may commit with no player damage"),
+		MayCommitAttack(true, 0.f, 0.f, Fraction, 5.f));
+
+	// Once it closes, the ordinary cap resumes - and the damage dealt during it still counts, so a
+	// companion that spent the opening freely waits for the player to catch up.
+	TestFalse(TEXT("After the allowance a spent companion waits for the player"),
+		MayCommitAttack(false, 40.f, 0.f, Fraction, 5.f));
+	TestTrue(TEXT("Player damage reopens the budget"), MayCommitAttack(false, 0.f, 100.f, Fraction, 5.f));
+
+	// Refuse rather than clamp: a budget too small to matter declines the attack instead of spending it
+	// on a swing that animates in full and lands for nothing.
+	const float Remaining = RemainingContribution(24.f, 100.f, Fraction);
+	TestTrue(TEXT("The remaining budget is genuinely small"), Remaining > 0.f && Remaining < 5.f);
+	TestFalse(TEXT("A budget below a meaningful amount refuses the attack"),
+		MayCommitAttack(false, 24.f, 100.f, Fraction, 5.f));
+	TestTrue(TEXT("The same budget is accepted when any amount counts"),
+		MayCommitAttack(false, 24.f, 100.f, Fraction, 0.f));
+
+	// Degenerate inputs fail closed rather than handing out an unbudgeted attack.
+	TestFalse(TEXT("A non-finite minimum refuses"),
+		MayCommitAttack(false, 0.f, 100.f, Fraction, std::numeric_limits<float>::quiet_NaN()));
+	TestFalse(TEXT("A non-finite clock is not inside any allowance"),
+		WithinOpeningContribution(std::numeric_limits<double>::quiet_NaN(), 100., 8.f));
+	TestFalse(TEXT("A clock behind the scope start is not inside the allowance"),
+		WithinOpeningContribution(99., 100., 8.f));
+	return true;
+}
+#endif

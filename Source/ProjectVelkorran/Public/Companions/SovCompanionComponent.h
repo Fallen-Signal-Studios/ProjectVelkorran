@@ -41,6 +41,14 @@ public:
 	/** Already-unlocked ability classes the authored AI is permitted to select. Empty means movement only. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Companion|Combat") TArray<TSubclassOf<UGameplayAbility>> CuratedAbilities;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Companion|Combat", meta=(ClampMin="0.15",ClampMax="0.25")) float ContributionFraction = .2f;
+	/** How long after an encounter scope opens the companion may fight before the player has dealt damage. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Companion|Combat", meta=(ClampMin="0",ClampMax="30",ForceUnits="s"))
+	float OpeningContributionSeconds = 8.f;
+	/** Budget below which a new attack is refused outright rather than clamped to a near-zero swing. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Companion|Combat", meta=(ClampMin="0"))
+	float MinimumMeaningfulContribution = 5.f;
+	/** True while the opening allowance is open; the ordinary budget governs once it closes. */
+	UFUNCTION(BlueprintPure, Category="Companion|Combat") bool IsInOpeningContribution() const;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Companion|Rescue") bool bMayRescue = true;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Companion|Rescue", meta=(ClampMin="100",ClampMax="2500")) float RescueRange = 1000.f;
 	/** Explicit mission mark used only for hidden recovery at 25 m separation. */
@@ -99,6 +107,7 @@ private:
 	FGameplayAbilitySpecHandle OwnedCommandAttack;
 	float PlayerContribution = 0.f;
 	float CompanionContribution = 0.f;
+	double ContributionScopeOpenedAt = 0.;
 	float CommandAttackStarted = 0.f;
 	float NextCommandAttack = 0.f;
 	float NextCommandDefense = 0.f;

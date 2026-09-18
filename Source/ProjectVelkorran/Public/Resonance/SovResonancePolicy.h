@@ -22,6 +22,35 @@ inline float RemainingContribution(float CompanionDamage, float PlayerDamage, fl
 	if (!WithinContributionBudget(CompanionDamage, PlayerDamage, Fraction)) { return 0.f; }
 	return PlayerDamage * Fraction / (1.f - Fraction) - CompanionDamage;
 }
+/**
+ * Whether the companion is inside the opening stretch of an encounter scope.
+ *
+ * Contribution is budgeted from the player's damage, so before the player's first hit the budget is
+ * zero and the companion attacks nothing - including every encounter's opening, and any stretch spent
+ * guarding or evading. §12.2 asks it to contribute visibly, so for a bounded opening it fights without
+ * a budget. Its damage still accrues, so the ordinary cap takes over as soon as the window closes.
+ */
+inline bool WithinOpeningContribution(double Now, double ScopeOpenedAt, float WindowSeconds)
+{
+	return std::isfinite(Now) && std::isfinite(ScopeOpenedAt) && std::isfinite(WindowSeconds)
+		&& WindowSeconds > 0. && Now >= ScopeOpenedAt && Now - ScopeOpenedAt < WindowSeconds;
+}
+
+/**
+ * Whether the companion may commit to a new attack.
+ *
+ * Refuses rather than clamps: an attack whose budget cannot cover a meaningful amount used to be
+ * selected anyway, animate in full, and land for a clamped or zero amount with no feedback. Declining
+ * to start it reads as the companion choosing its moment instead of swinging at nothing.
+ */
+inline bool MayCommitAttack(bool InOpening, float CompanionDamage, float PlayerDamage, float Fraction,
+	float MinimumMeaningful)
+{
+	if (InOpening) { return true; }
+	if (!std::isfinite(MinimumMeaningful) || MinimumMeaningful < 0.f) { return false; }
+	return RemainingContribution(CompanionDamage, PlayerDamage, Fraction) >= MinimumMeaningful;
+}
+
 inline bool MayRecoverSeparation(float SeparationSquared, float AnchorDistanceSquared, bool SplitPhase, bool ValidAnchor)
 {
 	return std::isfinite(SeparationSquared) && std::isfinite(AnchorDistanceSquared) && !SplitPhase && ValidAnchor

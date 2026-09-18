@@ -188,7 +188,18 @@ void USovCompanionComponent::ObserveContribution(const FSovDamageResult& Result)
 	else if (Result.SourceActor == Leader) { PlayerContribution += Damage; }
 }
 void USovCompanionComponent::ResetContribution(bool bStarted)
-{ PlayerContribution = 0.f; CompanionContribution = 0.f; }
+{
+	PlayerContribution = 0.f; CompanionContribution = 0.f;
+	// The opening allowance belongs to the scope, so it restarts with the budget it relaxes.
+	ContributionScopeOpenedAt = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.;
+}
+
+bool USovCompanionComponent::IsInOpeningContribution() const
+{
+	const UWorld* const World = GetWorld();
+	return World && SovResonancePolicy::WithinOpeningContribution(World->GetTimeSeconds(), ContributionScopeOpenedAt,
+		FMath::IsFinite(OpeningContributionSeconds) ? FMath::Clamp(OpeningContributionSeconds, 0.f, 30.f) : 0.f);
+}
 ANarrativeCharacter* USovCompanionComponent::ResolveCommandAttackTarget(ANarrativeCharacter* Character)
 {
 	if (!IsValid(Character)) { return nullptr; }
@@ -293,7 +304,9 @@ void USovCompanionComponent::TickContextCommand(USovCompanionCommandGoal* Goal)
 			}
 		}
 		if (!bProtected && GetWorld()->GetTimeSeconds() >= NextCommandAttack
-			&& SovResonancePolicy::WithinContributionBudget(CompanionContribution, PlayerContribution, FMath::Clamp(ContributionFraction, .15f, .25f)))
+			&& SovResonancePolicy::MayCommitAttack(IsInOpeningContribution(), CompanionContribution, PlayerContribution,
+				FMath::Clamp(ContributionFraction, .15f, .25f),
+				FMath::IsFinite(MinimumMeaningfulContribution) ? FMath::Max(MinimumMeaningfulContribution, 0.f) : 0.f))
 		{
 			for (const auto& Candidate : Abilities->GetBotAttackCandidates(Focus, FGameplayTag()))
 			{
@@ -390,7 +403,12 @@ bool USovCompanionComponent::LimitSovDamage(AActor* Target, const FGameplayEffec
 	const auto* TargetContext = IsValid(Target) ? Target->FindComponentByClass<USovResonanceTargetComponent>() : nullptr;
 	if (!IsValid(Leader) || !HasMissionPermission(Leader) || (TargetContext && TargetContext->bRequiresPlayerFinish))
 	{ ShieldDamage = HealthDamage = PoiseDamage = 0.f; return false; }
+	// Inside the opening allowance the companion is not budgeted at all. Its damage still accrues, so
+	// the ordinary cap resumes the moment the window closes.
+	if (IsInOpeningContribution()) { return true; }
 	const float Fraction = FMath::Clamp(ContributionFraction, .15f, .25f);
+	// Still a backstop for an attack already in flight when the budget ran out. Starting one that cannot
+	// land meaningfully is refused at selection instead, which is where the decision belongs.
 	const float Remaining = SovResonancePolicy::RemainingContribution(CompanionContribution, PlayerContribution, Fraction);
 	const float Requested = FMath::Max(0.f, ShieldDamage) + FMath::Max(0.f, HealthDamage);
 	ShieldDamage = FMath::Min(ShieldDamage, Remaining);
