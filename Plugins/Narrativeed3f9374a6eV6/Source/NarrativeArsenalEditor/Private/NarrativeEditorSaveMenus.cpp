@@ -716,7 +716,7 @@ void FNarrativeEditorSaveMenus::BeginShareSave(const int32 OptionIndex)
 		.AutoHeight()
 		[
 			SNew(STextEntryPopup)
-			.Label(LOCTEXT("NarrativeEditorSaveMenus_NewLabelName", "Shared Save Label Name:"))
+			.Label(LOCTEXT("NarrativeEditorSaveMenus_SharedSaveLabelName", "Shared Save Label Name:"))
 			.DefaultText(SaveSlotLabels[OptionIndex])
 			.OnTextCommitted_Raw(this, &FNarrativeEditorSaveMenus::SharedSaveLabelChanged)
 			.SelectAllTextWhenFocused(true)

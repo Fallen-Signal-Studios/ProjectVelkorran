@@ -186,7 +186,7 @@ FFixResult FNarrativeProjectSetupHandler::FIniSingleKeyUndoFixer::ApplyFix(int32
 		return FFixResult::Failure(FailureToWriteText);
 	}
 	
-	const FText SuccessText = FText::Format(LOCTEXT("NarrativeProjectSetupHandler_FixerApplySuccess_Format",
+	const FText SuccessText = FText::Format(LOCTEXT("NarrativeProjectSetupHandler_FixerRevertSuccess_Format",
 		"update to key \"{0}\" for \"{1}\" reset back to \"{2}\""),
 		FText::FromString(Key),
 		FText::FromString(FPaths::GetCleanFilename(IniPath)),

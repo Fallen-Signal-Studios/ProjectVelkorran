@@ -774,3 +774,5 @@ void ANarrativePlayerCharacter::SetPlayerDefinition(class UPlayerDefinition* PDe
 		OnRep_PlayerDefinition();
 	}
 }
+
+#undef LOCTEXT_NAMESPACE

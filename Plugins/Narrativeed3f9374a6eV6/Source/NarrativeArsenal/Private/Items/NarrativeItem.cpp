@@ -60,7 +60,7 @@ UNarrativeItem::UNarrativeItem()
 	}
 
 	Stats.Add(FNarrativeItemStat(LOCTEXT("WeightStatDisplayText", "Weight"), ItemStat_Weight, LOCTEXT("WeightStatTooltip", "The weight of the item.")));
-	Stats.Add(FNarrativeItemStat(LOCTEXT("QuantityStatDisplayText", "Quantity"), ItemStat_Quantity, LOCTEXT("WeightStatTooltip", "The amount of the item you have.")));
+	Stats.Add(FNarrativeItemStat(LOCTEXT("QuantityStatDisplayText", "Quantity"), ItemStat_Quantity, LOCTEXT("QuantityStatTooltip", "The amount of the item you have.")));
 
 	//Add a use action by default
 	//UseActions = {};

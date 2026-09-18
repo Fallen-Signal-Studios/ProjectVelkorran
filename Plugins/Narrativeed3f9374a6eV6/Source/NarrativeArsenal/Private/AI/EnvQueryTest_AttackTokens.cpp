@@ -69,7 +69,7 @@ FText UEnvQueryTest_AttackTokens::GetDescriptionTitle() const
 	}
 	else
 	{
-		return NSLOCTEXT("EnvQueryTest_AttackTokens", "DescriptionDetailsUsed", "Available Attack Tokens");
+		return NSLOCTEXT("EnvQueryTest_AttackTokens", "DescriptionDetailsAvailable", "Available Attack Tokens");
 	}
 }
 

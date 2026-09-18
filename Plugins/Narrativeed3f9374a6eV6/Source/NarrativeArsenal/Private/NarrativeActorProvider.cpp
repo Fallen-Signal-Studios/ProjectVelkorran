@@ -132,7 +132,7 @@ FText UNarrativeActorProvider_LevelReference::GetDescription() const
 {
 	if (SoftActorReference.ToString().Len())
 	{
-		return FText::Format(LOCTEXT("NPCProviderDescription", "Actor Ref {0}"), FText::FromString(SoftActorReference.ToString()));
+		return FText::Format(LOCTEXT("ActorReferenceProviderDescription", "Actor Ref {0}"), FText::FromString(SoftActorReference.ToString()));
 	}
 
 	return FText::GetEmpty();
@@ -193,7 +193,7 @@ FText UNarrativeActorProvider_ActorOfClass::GetDescription() const
 {
 	if (IsValid(ActorClassToFind))
 	{
-		return FText::Format(LOCTEXT("POIProviderDescription", "Actor of Class {0}"), FText::FromString(*GetNameSafe(ActorClassToFind)));
+		return FText::Format(LOCTEXT("ActorClassProviderDescription", "Actor of Class {0}"), FText::FromString(*GetNameSafe(ActorClassToFind)));
 	}
 
 

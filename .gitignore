@@ -71,6 +71,16 @@ Content/
 !/Content/Input/
 !/Content/Input/**/*.uasset
 
+# The localization manifest and archives are where translation work is stored and edited, so they
+# are source rather than build output and losing them would lose real work. The compiled .locres is
+# regenerated from them by the gather in seconds and is deliberately left ignored.
+!/Content/Localization/
+!/Content/Localization/**/*.manifest
+!/Content/Localization/**/*.archive
+# Compiled outputs of the gather. Un-ignoring the folder above would otherwise let them in.
+/Content/Localization/**/*.locres
+/Content/Localization/**/*.locmeta
+
 # Project-owned Cinderline correction; retain the surrounding pack/template exclusions.
 !/Content/Abilities/
 /Content/Abilities/*

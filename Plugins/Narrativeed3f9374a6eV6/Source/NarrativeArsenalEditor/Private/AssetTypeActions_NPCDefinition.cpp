@@ -55,7 +55,7 @@ FText FAssetTypeActions_NPCDefinition::GetOpenNPCDialogueTooltip(TWeakObjectPtr<
 		}
 		else
 		{
-			return LOCTEXT("NPCNoDialogueTooltip", "Open the NPCs dialogue asset.");
+			return LOCTEXT("NPCOpenDialogueTooltip", "Open the NPCs dialogue asset.");
 		}
 	}
 	return FText::GetEmpty();
@@ -110,7 +110,7 @@ const TArray<FText>& FAssetTypeActions_CreatorOptionMesh::GetSubMenus() const
 {
 	static const TArray<FText> SubMenus
 	{
-		LOCTEXT("CharacterCreatorSubMenu", "Creator Options"),
+		LOCTEXT("CharacterCreatorOptionsSubMenu", "Creator Options"),
 	};
 
 	return SubMenus;
@@ -126,7 +126,7 @@ const TArray<FText>& FAssetTypeActions_CreatorOptionGroom::GetSubMenus() const
 {
 	static const TArray<FText> SubMenus
 	{
-		LOCTEXT("CharacterCreatorSubMenu", "Creator Options"),
+		LOCTEXT("CharacterCreatorOptionsSubMenu", "Creator Options"),
 	};
 
 	return SubMenus;
@@ -143,7 +143,7 @@ const TArray<FText>& FAssetTypeActions_CreatorOptionScalar::GetSubMenus() const
 {
 	static const TArray<FText> SubMenus
 	{
-		LOCTEXT("CharacterCreatorSubMenu", "Creator Options"),
+		LOCTEXT("CharacterCreatorOptionsSubMenu", "Creator Options"),
 	};
 
 	return SubMenus;
@@ -160,7 +160,7 @@ const TArray<FText>& FAssetTypeActions_CreatorOptionVector::GetSubMenus() const
 {
 	static const TArray<FText> SubMenus
 	{
-		LOCTEXT("CharacterCreatorSubMenu", "Creator Options"),
+		LOCTEXT("CharacterCreatorOptionsSubMenu", "Creator Options"),
 	};
 
 	return SubMenus;
@@ -176,7 +176,7 @@ const TArray<FText>& FAssetTypeActions_CreatorItemMesh::GetSubMenus() const
 {
 	static const TArray<FText> SubMenus
 	{
-		LOCTEXT("CharacterCreatorSubMenu", "Creator Items"), 
+		LOCTEXT("CharacterCreatorItemsSubMenu", "Creator Items"), 
 	};
 
 	return SubMenus;
@@ -191,7 +191,7 @@ const TArray<FText>& FAssetTypeActions_CreatorItemGroom::GetSubMenus() const
 {
 	static const TArray<FText> SubMenus
 	{
-		LOCTEXT("CharacterCreatorSubMenu", "Creator Items"), 
+		LOCTEXT("CharacterCreatorItemsSubMenu", "Creator Items"), 
 	};
 
 	return SubMenus;
