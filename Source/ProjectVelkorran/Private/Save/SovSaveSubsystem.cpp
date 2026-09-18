@@ -185,6 +185,8 @@ bool USovSaveSubsystem::WriteOwned(const FOperationOwner& Owner, const FString& 
     const TArray<uint8>& Bytes, FString& Error, bool bRequireAvailable)
 {
     if (!IsOperationOwnerCurrent(Owner, Error, bRequireAvailable)) { return false; }
+    // Dropped before the write, not after: a write that fails partway has still changed the bank.
+    ForgetBankSummary(Slot);
     const bool bWritten = Storage->Write(Slot, LocalUser, Bytes);
     return IsOperationOwnerCurrent(Owner, Error, bRequireAvailable) && bWritten;
 }
@@ -204,6 +206,7 @@ void USovSaveSubsystem::Initialize(FSubsystemCollectionBase& Collection)
     // Offline startup must find the previous campaign even if network identity is temporarily absent.
     if (PLATFORM_DESKTOP)
     {
+        ForgetAllBankSummaries();
         AccountNamespace = FMD5::HashAnsiString(TEXT("Offline.LocalProfile.0")); UserIndex = 0;
         RestorePlatformProfileHint(UserIndex);
     }
@@ -211,6 +214,7 @@ void USovSaveSubsystem::Initialize(FSubsystemCollectionBase& Collection)
     {
         // A local-player array position is not a console storage identity. Never touch a user-0
         // compartment before the actual owning local platform account has been resolved.
+        ForgetAllBankSummaries();
         AccountNamespace.Reset(); UserIndex = INDEX_NONE; bPlatformStorageOwnerAvailable = false;
     }
     InitialSaveHandle = UNarrativeSaveSubsystem::OnInitialSaveRequested.AddUObject(this, &USovSaveSubsystem::ResolveInitialSave);
@@ -250,6 +254,7 @@ bool USovSaveSubsystem::SelectPlatformUser(const FString& Id, int32 LocalUserInd
         AcknowledgedWorld.Reset(); AcknowledgmentExpiresAt = 0;
     }
     if (!IsOperationOwnerCurrent(Owner, Error, false)) { return false; }
+    ForgetAllBankSummaries();
     AccountNamespace = NewNamespace; UserIndex = LocalUserIndex;
     if (bChangingProfile) { ++SelectionEpoch; }
     bPlatformStorageOwnerAvailable = true;
@@ -270,6 +275,7 @@ bool USovSaveSubsystem::RestorePlatformProfileHint(int32 LocalUserIndex)
     }
     if (Best.Generation <= 0) { return false; }
     if (AccountNamespace != Best.Namespace || UserIndex != LocalUserIndex) { ++SelectionEpoch; }
+    ForgetAllBankSummaries();
     AccountNamespace = Best.Namespace; UserIndex = LocalUserIndex; return true;
 }
 bool USovSaveSubsystem::PersistPlatformProfileHint(const FString& Namespace, int32 LocalUserIndex, FString& Error)
@@ -580,7 +586,7 @@ USovCampaignSaveGame* USovSaveSubsystem::ReadBest(ESovSaveSlotKind Kind, int32 I
         TArray<uint8> Bytes; const FString Name = BankName(Kind, Index, Bank);
         bool bExists = false;
         if (!ExistsOwned(Owner, Name, bExists, Error)) { return nullptr; }
-        if (!bExists) { continue; }
+        if (!bExists) { BankSummaries.Add(Name, FSovBankSummary{}); continue; }
         if (ReadOwned(Owner, Name, Owner.LocalUser, Bytes, Error))
         { Banks[Bank].Reset(LoadCampaignEnvelope(Bytes)); }
         if (!IsOperationOwnerCurrent(Owner, Error)) { return nullptr; }
@@ -590,6 +596,7 @@ USovCampaignSaveGame* USovSaveSubsystem::ReadBest(ESovSaveSlotKind Kind, int32 I
         {
             Valid[Bank] = { true, Banks[Bank]->Header.Generation };
             if (OutBanks) { OutBanks->bValid[Bank] = true; OutBanks->Generation[Bank] = Banks[Bank]->Header.Generation; }
+            BankSummaries.Add(Name, FSovBankSummary{ Banks[Bank]->Header, true });
         }
         else if (IsNewerVersionBank(Banks[Bank].Get()))
         {
@@ -599,7 +606,7 @@ USovCampaignSaveGame* USovSaveSubsystem::ReadBest(ESovSaveSlotKind Kind, int32 I
             if (OutBanks) { OutBanks->bNewerVersion[Bank] = true; OutBanks->Generation[Bank] = Banks[Bank]->Header.Generation; }
             Error = ValidationError;
         }
-        else { bDamaged = true; Error = ValidationError; }
+        else { bDamaged = true; Error = ValidationError; BankSummaries.Add(Name, FSovBankSummary{}); }
     }
     OutBank = SovSavePolicy::LatestBank(Valid[0], Valid[1]);
     return OutBank >= 0 ? Banks[OutBank].Get() : nullptr;
@@ -772,6 +779,18 @@ TArray<FSovSaveSlotHeader> USovSaveSubsystem::ListSlots()
         const int32 Count = Type == ESovSaveSlotKind::Manual ? SovSavePolicy::ManualSlots : Type == ESovSaveSlotKind::Auto ? SovSavePolicy::AutoSlots : 1;
         for (int32 Index = 0; Index < Count; ++Index)
         {
+            // Both banks already known: answer from the summaries rather than reading and decoding
+            // several hundred kilobytes twice to print one line (audit AR2-06).
+            const FSovBankSummary* const A = BankSummaries.Find(BankName(Type, Index, 0));
+            const FSovBankSummary* const B = BankSummaries.Find(BankName(Type, Index, 1));
+            if (A && B)
+            {
+                const FSovBankSummary* Best = nullptr;
+                if (A->bUsable && (!B->bUsable || A->Header.Generation >= B->Header.Generation)) { Best = A; }
+                else if (B->bUsable) { Best = B; }
+                if (Best) { Result.Add(Best->Header); }
+                continue;
+            }
             int32 Bank; bool Bad; FString Error;
             if (auto* Save = ReadBest(Type, Index, Bank, Bad, Error, &Owner)) { Result.Add(Save->Header); }
             if (!IsOperationOwnerCurrent(Owner, Error)) { Result.Reset(); return Result; }

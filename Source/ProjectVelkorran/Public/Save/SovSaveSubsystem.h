@@ -171,6 +171,26 @@ private:
     };
     /** Intact bytes whose schema is ahead of this build. Corruption fails integrity first and is not this. */
     bool IsNewerVersionBank(const USovCampaignSaveGame* Save) const;
+
+    /**
+     * What a bank's header said the last time this subsystem read it.
+     *
+     * A pause-menu refresh listed up to 28 banks by reading and fully deserializing each one, and an
+     * envelope is several hundred kilobytes, so printing a column of mission names cost megabytes of
+     * work on the game thread (audit AR2-06).
+     *
+     * Deliberately used for listing only. Loading, writing and bank selection always re-read and
+     * re-validate, so a stale entry can misdescribe a slot in a menu and can never decide anything.
+     */
+    struct FSovBankSummary
+    {
+        FSovSaveSlotHeader Header;
+        /** False records "read, and not a usable bank", which is worth remembering too. */
+        bool bUsable = false;
+    };
+    TMap<FString, FSovBankSummary> BankSummaries;
+    void ForgetBankSummary(const FString& BankSlot) { BankSummaries.Remove(BankSlot); }
+    void ForgetAllBankSummaries() { BankSummaries.Reset(); }
     USovCampaignSaveGame* ReadBest(ESovSaveSlotKind Kind, int32 Index, int32& OutBank, bool& bDamaged, FString& Error,
         const FOperationOwner* Operation = nullptr, FSovSlotBanks* OutBanks = nullptr);
     bool ValidateEnvelope(USovCampaignSaveGame* Save, bool bValidateAssets, FString& Error, const FOperationOwner* Operation = nullptr) const;

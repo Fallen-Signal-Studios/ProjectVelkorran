@@ -53,8 +53,9 @@ namespace
         bool bFailWrite = false;
         bool bTornWrite = false;
         bool bAcknowledgeTornWrite = false;
+        int32 Reads = 0;
         bool Read(const FString& Slot, int32 User, TArray<uint8>& Bytes) override
-        { const auto* Found = Slots.Find(FString::FromInt(User) + Slot); if (!Found) { return false; } Bytes = *Found; return true; }
+        { ++Reads; const auto* Found = Slots.Find(FString::FromInt(User) + Slot); if (!Found) { return false; } Bytes = *Found; return true; }
         bool Write(const FString& Slot, int32 User, const TArray<uint8>& Bytes) override
         {
             if (bFailWrite) { return false; }
@@ -846,6 +847,69 @@ bool FSovNewerVersionSaveTest::RunTest(const FString& Parameters)
         { ++Preserved; TestTrue(TEXT("The save given up is preserved byte-for-byte"), File.Value == Older); }
     }
     TestEqual(TEXT("Exactly one preservation copy is kept"), Preserved, 1);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovSlotListingCostTest,
+    "ProjectVelkorran.Campaign.Save.ListingSlotsDoesNotRereadEveryBank",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovSlotListingCostTest::RunTest(const FString& Parameters)
+{
+    TStrongObjectPtr<UGameInstance> Instance(NewObject<UGameInstance>());
+    TStrongObjectPtr<USovSaveSubsystem> S(NewObject<USovSaveSubsystem>(Instance.Get()));
+    auto* Storage = FSovSaveTestAccess::Initialize(*S);
+
+    // Several occupied slots, because the cost this addresses scales with them: a full save menu is
+    // up to 28 banks, each several hundred kilobytes read and fully deserialized to print one line.
+    FString Error;
+    constexpr int32 OccupiedSlots = 4;
+    for (int32 Slot = 0; Slot < OccupiedSlots; ++Slot)
+    {
+        TStrongObjectPtr<USovCampaignSaveGame> Save(FSovSaveTestAccess::Envelope(*S));
+        Save->Header.SlotIndex = Slot;
+        if (!TestEqual(TEXT("Each slot is occupied to list"),
+            FSovSaveTestAccess::Write(*S, Save.Get(), Error), ESovSaveResult::Success)) { return false; }
+    }
+
+    Storage->Reads = 0;
+    const TArray<FSovSaveSlotHeader> First = S->ListSlots();
+    const int32 ColdReads = Storage->Reads;
+    TestTrue(TEXT("The first listing has to read every occupied bank"), ColdReads >= OccupiedSlots);
+    TestEqual(TEXT("Every occupied slot is listed"), First.Num(), OccupiedSlots);
+
+    Storage->Reads = 0;
+    const TArray<FSovSaveSlotHeader> Second = S->ListSlots();
+    TestEqual(TEXT("Listing again reads nothing"), Storage->Reads, 0);
+    TestEqual(TEXT("...and says the same thing"), Second.Num(), First.Num());
+    if (Second.Num() == First.Num())
+    {
+        for (int32 Index = 0; Index < Second.Num(); ++Index)
+        {
+            TestEqual(TEXT("...down to the generation"), Second[Index].Generation, First[Index].Generation);
+            TestEqual(TEXT("...and the mission"), Second[Index].MissionId, First[Index].MissionId);
+        }
+    }
+
+    // A summary that survived a write would describe a bank that no longer exists.
+    TStrongObjectPtr<USovCampaignSaveGame> Next(FSovSaveTestAccess::Envelope(*S));
+    Next->Header.SlotIndex = 0;
+    TestEqual(TEXT("A second save is written"), FSovSaveTestAccess::Write(*S, Next.Get(), Error), ESovSaveResult::Success);
+    const TArray<FSovSaveSlotHeader> Third = S->ListSlots();
+    if (TestEqual(TEXT("Every slot is still listed"), Third.Num(), OccupiedSlots))
+    {
+        const auto* const Rewritten = Third.FindByPredicate([](const FSovSaveSlotHeader& H) { return H.SlotIndex == 0; });
+        if (TestNotNull(TEXT("The rewritten slot is among them"), Rewritten))
+        { TestEqual(TEXT("Writing invalidates what listing remembered"), Rewritten->Generation, First[0].Generation + 1); }
+    }
+
+    // The cache is for display. Loading must never trust it, because nothing else guarantees the bytes
+    // on disk still match what was read - a cloud sync or a support copy could have replaced them.
+    Storage->Reads = 0;
+    bool bDamaged = false;
+    TStrongObjectPtr<USovCampaignSaveGame> Loaded(FSovSaveTestAccess::Read(*S, ESovSaveSlotKind::Manual, 0, bDamaged));
+    TestTrue(TEXT("Reading a bank for real still goes to storage"), Storage->Reads > 0);
+    TestTrue(TEXT("...and returns the newest generation"),
+        Loaded.IsValid() && Loaded->Header.Generation == First[0].Generation + 1);
     return true;
 }
 
