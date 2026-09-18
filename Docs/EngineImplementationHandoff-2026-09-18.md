@@ -32,24 +32,31 @@ Two other standing constraints:
 
 | # | Task | Asset | What it unblocks |
 |---|---|---|---|
-| 1 | Point the frontend at the HUD widget | `BP_SovPlayerController` | The entire holographic HUD |
+| 1 | ~~Point the frontend at the HUD widget~~ **done** | `BP_SovPlayerController` | The entire holographic HUD |
 | 2 | Lay out the HUD widget | `WBP_SovHolographicHUD` | Bars, ammo, radar, arc |
 | 3 | Apply the camera state | `BP_SovTarrik`, `BP_SovSelene` | Aim and threat-focus framing |
 | 4 | Author the lethal-floor cue | Both Aurelion phase directors | "Cannot be finished yet" reads on the Elite |
 | 5 | Bind the five new inputs on gamepad | `IMC_Combat` | Threat focus on a controller |
 | 6 | Author a shoulder-swap rig parameter | Narrative camera rig | Shoulder swap (blocked until this exists) |
 | 7 | Raise `ContentRevision` when you revise a mission | Mission definitions | Saves surviving your content edits |
-| 8 | Run the localization gather, check pseudo-localization | `Content/Localization` | Text that can be translated at all |
+| 8 | Localization gather **run**; pseudo-localization still open | `Content/Localization` | Text that can be translated at all |
 
 ---
 
-### 1. Point the frontend at the HUD widget
+### 1. Point the frontend at the HUD widget — done
 
-`USovFrontendComponent::HolographicHUDSurfaceClass` is a `TSoftClassPtr<USovHolographicHUDSurface>`
-and is currently unset, so the HUD never spawns.
+`USovFrontendComponent::HolographicHUDSurfaceClass` was unset, so the HUD never spawned. It is now
+set to `WBP_SovHolographicHUD` on `Content/Framework/BP_SovPlayerController.uasset`.
 
-- Asset: `Content/Framework/BP_SovPlayerController.uasset`
-- Set **Holographic HUD Surface Class** to `Content/Aurelion/UI/HUD/WBP_SovHolographicHUD`.
+Done by script (`Scripts/Editor/bind_holographic_hud_surface.py`) rather than by hand, because the
+frontend is a C++ default subobject and this is a default-value set — no graph was touched. The
+script verifies the widget really derives from `USovHolographicHUDSurface` before assigning, and
+re-reads the asset from disk afterwards, because an assignment that silently did not take looks
+exactly like one that did until the HUD fails to appear. The readback reported `None` before and
+`WBP_SovHolographicHUD_C` after.
+
+That asset is gitignored, so this is an untracked change in the working tree. A backup of the
+original was taken first and can be restored on request.
 
 **Done when:** entering PIE shows the surface at all. It will look unfinished until task 2 — that is
 expected, and it is the right order, because a surface that never spawns and a surface with nothing
@@ -224,27 +231,39 @@ the journal references beats by ID. Raise the revision anyway if you are unsure;
 revision with no migration registered is caught immediately by the test suite, whereas a missed one is
 found by a player.
 
-### 8. Run the localization gather, and look at the result
+### 8. Localization — the gather is run; the expansion check is still open
 
-The project had **no localization pipeline at all** — no gather config, no `Content/Localization`, no
-cultures. The source already wraps its strings in `LOCTEXT`, so the text was always ready to gather;
-there was simply nothing to gather it. `Config/Localization/Game.ini` now exists and defines the
-target. Running it is an editor step.
+The project had **no localization pipeline at all**. `Config/Localization/Game.ini` now defines the
+target, and **the gather has been run**: `Content/Localization/Game/` holds the manifest, the `en`
+archive and a compiled `en/Game.locres`, from **897 gathered entries**. It can be re-run headlessly:
 
-From the editor: **Tools ▸ Localization Dashboard**, pick the **Game** target, then **Gather Text**
-followed by **Compile Text**. It writes `Content/Localization/Game/` — manifest, archives per culture
-and the compiled `.locres`.
+```powershell
+& 'C:\Program Files\Epic Games\UE_5.7\Engine\Binaries\Win64\UnrealEditor-Cmd.exe' 'F:\ProjectVelkorran\ProjectVelkorran.uproject' -run=GatherText -config=Config/Localization/Game.ini -unattended -nop4 -NullRHI -nosplash -DisablePlugins=Fab,Aura
+```
 
-Two cultures are configured. `en` is native. **`qla` is pseudo-localization**: it expands every string
-and brackets it, which is the point. Switch to it and walk the menus and HUD, and two classes of bug
-appear immediately:
+Or from the editor: **Tools ▸ Localization Dashboard**, the **Game** target, **Gather Text** then
+**Compile Text**.
 
-- **Any string that does not change** is not being gathered — a literal that escaped `LOCTEXT`, or an
-  asset outside the gather paths. Those are the ones a translator would never see.
-- **Any string that overflows or clips** will do the same in German or Russian, which run 30–40%
-  longer than English. Better to find it now than in a translated build.
+**`Content/Localization/` is generated and gitignored, and has not been committed.** Whether it
+belongs in the repository is the creator's call.
 
-Note what you find rather than fixing layouts immediately; several will be the same root cause.
+**Pseudo-localization is still to do, and my first attempt at it was wrong.** I configured `qla` as a
+culture; it gathers and archives fine and then crashes `GenerateTextLocalizationResource` outright,
+because Unreal applies pseudo-localization at runtime over a real culture rather than compiling it as
+one of its own. The culture is removed from the config. Doing the expansion check properly needs the
+engine's own mechanism, which I have not verified — please find it rather than trusting a guess from
+me. It is worth doing, because it is what surfaces:
+
+- **Any string that does not change** — a literal that escaped `LOCTEXT`, or an asset outside the
+  gather paths. Those are the ones a translator would never see.
+- **Any string that overflows or clips** — German and Russian run 30–40% longer than English.
+
+**The gather already found nine real problems** without any of that: nine `Text conflict` warnings,
+where two different strings share one namespace and key, so one silently wins and the other can never
+be translated. All nine are in the Narrative plugin (`EnvQueryTest_AttackTokens`, `NarrativeItem`,
+`NarrativeActorProvider`, `AssetTypeActions_NPCDefinition`, `NarrativeEditorSaveMenus`). They are
+pre-existing and none are ours, but the plugin is customised and tracked, so they are fixable. Search
+the gather log for `Text conflict` for the exact lines.
 
 **Do not commit `Content/Localization/` without asking.** It is generated, it is large, and whether it
 belongs in the repository is a call for the creator, not a default.
