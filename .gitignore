@@ -267,3 +267,6 @@ Content/TwinBladesBundle/TwinBladesAndTwinSword/Map/Materials/Texture/T_Ground_O
 # NVIDIA DLSS 4.5 plugin (DLSS + StreamlineNGXCommon only), installed locally and deliberately kept out of
 # version control: about 1.2 GB of NVIDIA binaries under NVIDIA's license. Machines without it fall back to TSR.
 /Plugins/NVIDIA/
+
+# Local Claude Code permissions are per-machine; the shared guidance and skills are tracked.
+.claude/settings.local.json
