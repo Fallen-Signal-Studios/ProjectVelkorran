@@ -96,6 +96,18 @@ class PROJECTVELKORRAN_API USovCampaignDefinition : public UPrimaryDataAsset
 	GENERATED_BODY()
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Campaign") int32 SchemaVersion = 1;
+	/**
+	 * Which revision of this mission's authored content this is. Raise it whenever a change would
+	 * alter what an existing journal recorded - a beat's consequences, its relationship memories, its
+	 * required protagonist, or a removed beat.
+	 *
+	 * The journal is replayed against the current definition and demands exact equality, so before
+	 * this existed any such edit silently invalidated every save taken in the mission and there was no
+	 * way to tell an authored revision from a tampered file (audit CN2-10). Raising this, and
+	 * registering a migration for the step, is that way.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Campaign", meta=(ClampMin="1"))
+	int32 ContentRevision = 1;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Campaign") FName MissionId;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Campaign") FText DisplayName;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Campaign") FGameplayTag Protagonist;

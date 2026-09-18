@@ -6,6 +6,7 @@
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "Misc/AutomationTest.h"
+#include "Misc/ScopeExit.h"
 #include "UObject/Script.h"
 #include "Sovereign/SovGameplayTags.h"
 
@@ -15,6 +16,11 @@ struct FSovCampaignStateTestAccess
 	static void SetFirstSequence(USovCampaignStateComponent& State, int32 Sequence) { State.Journal[0].Sequence = Sequence; }
 	static void SetEvidenceGuid(USovCampaignStateComponent& State, FGuid Guid) { State.Evidence[0].SourceId = Guid; }
 	static void SetFact(USovCampaignStateComponent& State, FGameplayTag Key, FGameplayTag Value) { State.StateValues.Add(Key, Value); }
+	static int32 MissionRevision(const USovCampaignStateComponent& State, FName MissionId)
+	{ const auto* Record = State.Missions.Find(MissionId); return Record ? Record->ContentRevision : -1; }
+	static void SetMissionRevision(USovCampaignStateComponent& State, FName MissionId, int32 Revision)
+	{ if (auto* Record = State.Missions.Find(MissionId)) { Record->ContentRevision = Revision; } }
+	static const TArray<FString>& History(const USovCampaignStateComponent& State) { return State.MigrationHistory; }
 };
 namespace
 {
@@ -206,4 +212,110 @@ bool FSovCampaignSaveValidationTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("Canon fact contradicting committed journal fails restore"), State->IsStateValid());
 	return true;
 }
+
+namespace SovCampaignRevisionTests
+{
+    /**
+     * The migration an author would ship beside the content change: a consequence was reworded, so a
+     * journal that recorded the old wording is brought up to what the mission now authors. Rewriting
+     * the recorded definition to match is the whole job.
+     */
+    bool RewordConsequenceForRevisionTwo(USovCampaignStateComponent::FSovMissionRevisionContext& Context)
+    {
+        if (!Context.Definition) { return false; }
+        for (FSovCampaignJournalEntry& Entry : Context.Journal)
+        {
+            if (Entry.MissionId != Context.MissionId) { continue; }
+            const FSovCampaignBeatDefinition* const Beat = Context.Definition->FindBeat(Entry.BeatId);
+            if (!Beat || Beat->Consequences.Num() != Entry.Consequences.Num()) { return false; }
+            for (int32 Index = 0; Index < Entry.Consequences.Num(); ++Index)
+            { Entry.Consequences[Index].Definition = Beat->Consequences[Index]; }
+        }
+        return true;
+    }
+
+    /** A migration that declines, standing for a step whose author could not carry the save over. */
+    bool Refuse(USovCampaignStateComponent::FSovMissionRevisionContext&) { return false; }
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCampaignContentRevisionTest,
+    "ProjectVelkorran.Campaign.Story.MissionContentRevisionMigratesSaves",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovCampaignContentRevisionTest::RunTest(const FString& Parameters)
+{
+    FCampaignWorld F; if (!F.PC || !F.Pawn) { AddError(TEXT("Fixture failed")); return false; }
+    auto* State = F.PC->State.Get(); const auto& Tags = FSovGameplayTags::Get();
+    USovCampaignStateComponent::ResetMissionRevisionMigrations();
+    ON_SCOPE_EXIT { USovCampaignStateComponent::ResetMissionRevisionMigrations(); };
+
+    auto* Mission = F.Mission(TEXT("MissionRevision"), Tags.Character_Player_Tarrik, false);
+    // A fact the beat records. The tags are arbitrary valid ones: this test is about revisions, not
+    // about what the consequence means.
+    FSovConsequenceDefinition Authored;
+    Authored.ConsequenceId = TEXT("MantleBreached");
+    Authored.SubjectIds.Add(TEXT("Aurelion"));
+    Authored.ChoiceTag = Tags.Character_Player_Tarrik;
+    Authored.OutcomeTag = Tags.Character_Player_Selene;
+    Authored.ConsumerIds.Add(TEXT("MissionRevision"));
+    Mission->Beats[0].Consequences.Add(Authored);
+    FString DefinitionError;
+    if (!TestTrue(TEXT("The authored mission is well formed before anything is revised"),
+        Mission->ValidateDefinition(DefinitionError)))
+    { AddError(DefinitionError); return false; }
+    TestEqual(TEXT("The mission begins"), State->BeginMission(Mission), ESovCampaignResult::Applied);
+    TestEqual(TEXT("A beat commits and is journalled"), State->CompleteBeat(TEXT("Start")), ESovCampaignResult::Applied);
+    if (!TestEqual(TEXT("...producing exactly one entry to migrate"), State->GetJournal().Num(), 1)) { return false; }
+    TestEqual(TEXT("The record names the revision it was played against"),
+        FSovCampaignStateTestAccess::MissionRevision(*State, TEXT("MissionRevision")), 1);
+
+    State->Load_Implementation();
+    TestTrue(TEXT("An untouched save restores"), State->IsStateValid());
+    TestEqual(TEXT("...with nothing to explain"), State->GetRestoreFailure(), ESovCampaignRestoreFailure::None);
+
+    // The content change: the consequence is reworded. Replay demands the recorded definition equal the
+    // authored one, so before revisions this silently invalidated every save in the mission (CN2-10).
+    Mission->Beats[0].Consequences[0].SubjectIds.Add(TEXT("TheMantleItself"));
+    Mission->ContentRevision = 2;
+
+    State->Load_Implementation();
+    TestFalse(TEXT("An unbridged content revision still refuses the save"), State->IsStateValid());
+    // The distinction is the point: a player told their save is damaged deletes it.
+    TestEqual(TEXT("...as a content revision, not as damage"),
+        State->GetRestoreFailure(), ESovCampaignRestoreFailure::MissionContentRevisionUnsupported);
+    TestEqual(TEXT("...naming the mission whose content moved on"),
+        State->GetRestoreFailureMission(), FName(TEXT("MissionRevision")));
+
+    // A registered step that declines is still a refusal, not a half-migrated journal.
+    USovCampaignStateComponent::RegisterMissionRevisionMigration(TEXT("MissionRevision"), 1, &SovCampaignRevisionTests::Refuse);
+    State->Load_Implementation();
+    TestFalse(TEXT("A migration that declines refuses the save"), State->IsStateValid());
+    TestEqual(TEXT("...for the same reason"),
+        State->GetRestoreFailure(), ESovCampaignRestoreFailure::MissionContentRevisionUnsupported);
+
+    // The path the audit says does not exist: a registered migration carries the save over.
+    USovCampaignStateComponent::RegisterMissionRevisionMigration(TEXT("MissionRevision"), 1, &SovCampaignRevisionTests::RewordConsequenceForRevisionTwo);
+    State->Load_Implementation();
+    TestTrue(TEXT("A registered migration carries the save across the revision"), State->IsStateValid());
+    TestEqual(TEXT("...and nothing is left to explain"), State->GetRestoreFailure(), ESovCampaignRestoreFailure::None);
+    TestEqual(TEXT("...and the record now names the new revision"),
+        FSovCampaignStateTestAccess::MissionRevision(*State, TEXT("MissionRevision")), 2);
+    TestTrue(TEXT("...and the migration is recorded, as the schema migration already was"),
+        FSovCampaignStateTestAccess::History(*State).Contains(TEXT("MissionRevision 1->2")));
+
+    // Tamper detection has to survive all of this, or the fix has traded one defect for a worse one.
+    FSovCampaignStateTestAccess::SetFirstSequence(*State, 99);
+    State->Load_Implementation();
+    TestFalse(TEXT("A journal that disagrees with itself is still refused"), State->IsStateValid());
+    TestEqual(TEXT("...as invalid, never as a content revision"),
+        State->GetRestoreFailure(), ESovCampaignRestoreFailure::Invalid);
+    FSovCampaignStateTestAccess::SetFirstSequence(*State, 1);
+
+    // A save from a build whose content is ahead of this one, which is not damage either.
+    FSovCampaignStateTestAccess::SetMissionRevision(*State, TEXT("MissionRevision"), 5);
+    State->Load_Implementation();
+    TestFalse(TEXT("Content from a newer build is refused"), State->IsStateValid());
+    TestEqual(TEXT("...and says so"), State->GetRestoreFailure(), ESovCampaignRestoreFailure::MissionContentNewer);
+    return true;
+}
+
 #endif

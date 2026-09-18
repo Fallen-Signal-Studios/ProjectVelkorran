@@ -4,7 +4,7 @@ Everything here is a **content and editor task**. The C++ side is finished, comm
 tests; none of it does anything visible until the work below lands. Nothing in this document requires
 source changes, and if a task seems to, stop and say so rather than editing C++ to fit the content.
 
-Current at `29d44739` on `codex/aurelion-tdd-content-20260913`. 709 automation tests pass:
+Current at `HEAD` on `codex/aurelion-tdd-content-20260913`. 712 automation tests pass:
 
 ```powershell
 .\Scripts\Validate-Unreal.ps1 -EngineRoot 'C:\Program Files\Epic Games\UE_5.7' -DisableAura
@@ -38,6 +38,7 @@ Two other standing constraints:
 | 4 | Author the lethal-floor cue | Both Aurelion phase directors | "Cannot be finished yet" reads on the Elite |
 | 5 | Bind the five new inputs on gamepad | `IMC_Combat` | Threat focus on a controller |
 | 6 | Author a shoulder-swap rig parameter | Narrative camera rig | Shoulder swap (blocked until this exists) |
+| 7 | Raise `ContentRevision` when you revise a mission | Mission definitions | Saves surviving your content edits |
 
 ---
 
@@ -190,6 +191,38 @@ claim plumbing. Say so and the input and claim can be added in an hour.
 
 ---
 
+### 7. Raise `ContentRevision` when you revise a mission
+
+**This one is ongoing, not a one-off, and it is the task most likely to cost a player their save.**
+
+A campaign save records a journal of what happened, and loading replays that journal against the
+*current* mission definition demanding exact equality. So an edit to a mission that has already been
+played — rewording a consequence, changing a beat's relationship memories or required protagonist,
+removing a beat — invalidates every save taken in that mission. Until today there was no way to tell
+that apart from a tampered file, and no way to carry a save across it at all.
+
+`USovCampaignDefinition` now carries **Content Revision** (default 1). When you make a change of that
+kind:
+
+1. Raise `ContentRevision` by one on that mission definition.
+2. Tell whoever is on the C++ side, so a migration is registered for that step. A migration is a small
+   function that rewrites what the journal recorded into what the mission now authors — for a reworded
+   consequence, it is a couple of lines.
+
+If you raise the revision and no migration is registered, saves in that mission are refused — but
+refused *legibly*: the player is told their save predates a change to this mission rather than that it
+is damaged, and `GetRestoreFailure()` returns `MissionContentRevisionUnsupported` with the mission
+named. That is the safe failure, not the goal.
+
+If you change content **without** raising the revision, you get the old behaviour: saves silently
+refuse and report as invalid, indistinguishable from corruption. Raising it costs nothing and is the
+only signal the system has.
+
+Additive changes are usually safe — a new optional beat nobody has reached, a new mission — because
+the journal references beats by ID. Raise the revision anyway if you are unsure; an unnecessary
+revision with no migration registered is caught immediately by the test suite, whereas a missed one is
+found by a player.
+
 ## Hazards and things not to undo
 
 **The golden save.** `Source/ProjectVelkorranTests/Fixtures/GoldenSaves/Campaign_Schema1_0.sovsave`
@@ -208,8 +241,17 @@ a regeneration.
 **Aura is off** and should stay off — its indexing crashed the editor and it force-enables remote
 Python. Pass `-DisableAura` to the validation script, as the commands here do.
 
-## What remains on the source side
+## What changed on the source side since this was written
 
-Not your tasks, listed so you know what is coming and do not duplicate it: AR2-17 (newer-schema
-saves, unblocked by the golden fixture), CN2-10, PC2-02 combat state gating, AR2-06 checkpoint reads
-off the game thread, UX2-08 localization.
+Landed, and relevant to you only where noted:
+
+- **AR2-17** — a save from a newer build is no longer treated as damage and its bank is no longer
+  reused. Nothing for you to do.
+- **PC2-02** — Poise break, Fatal and Frozen now gate and interrupt *every* combat ability, including
+  Blueprint ones, rather than only the two written in C++. **If an attack is meant to have super
+  armour, clear `bHonoursCombatInterruptions` on it**; otherwise breaking its poise will now cancel it
+  mid-animation, which is a real behaviour change for authored enemy attacks.
+- **CN2-10** — mission content revisions, which is task 7 above.
+
+Still to come, listed so you do not duplicate it: AR2-06 checkpoint reads off the game thread, UX2-08
+localization.

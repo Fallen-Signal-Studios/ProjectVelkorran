@@ -194,7 +194,9 @@ ESovCampaignResult USovCampaignStateComponent::BeginMission(USovCampaignDefiniti
 	TGuardValue<bool> Mutation(bMutating, true);
 	ActiveMission = Definition;
 	ActiveProtagonist = Definition->Protagonist;
-	Missions.FindOrAdd(Definition->MissionId);
+	// Stamped on entry so the record names the content it was actually played against. Without this a
+	// later revision cannot tell an authored change from a journal that never matched (audit CN2-10).
+	Missions.FindOrAdd(Definition->MissionId).ContentRevision = FMath::Max(Definition->ContentRevision, 1);
 	MissionDefinitions.Add(Definition->MissionId, Definition);
 	OnMissionChanged.Broadcast(Definition->MissionId, IsMissionComplete(Definition->MissionId));
 	return ESovCampaignResult::Applied;
@@ -845,8 +847,18 @@ void USovCampaignStateComponent::Load_Implementation()
 {
 	if (!GetOwner() || !GetOwner()->HasAuthority() || bMutating) { return; }
 	TGuardValue<bool> Mutation(bMutating, true);
-	if (SavedSchemaVersion == 1 && !MigrateLegacyObjectives()) { bStateValid = false; OnCampaignStateRestored.Broadcast(false); return; }
+	RestoreFailure = ESovCampaignRestoreFailure::None; RestoreFailureMission = NAME_None;
+	if (SavedSchemaVersion == 1 && !MigrateLegacyObjectives())
+	{
+		bStateValid = false; RestoreFailure = ESovCampaignRestoreFailure::Invalid;
+		OnCampaignStateRestored.Broadcast(false); return;
+	}
+	// Content revisions are bridged before the journal is replayed, because replay compares against the
+	// current definition and would otherwise reject a save the migration is there to carry over.
+	if (!MigrateMissionRevisions()) { bStateValid = false; OnCampaignStateRestored.Broadcast(false); return; }
 	bStateValid = ValidateSavedState();
+	if (!bStateValid && RestoreFailure == ESovCampaignRestoreFailure::None)
+	{ RestoreFailure = ESovCampaignRestoreFailure::Invalid; }
 	OnCampaignStateRestored.Broadcast(bStateValid);
 }
 
@@ -890,6 +902,64 @@ void USovCampaignStateComponent::Serialize(FArchive& Ar)
 	}
 	Super::Serialize(Ar);
 	if (Ar.IsSaveGame() && Ar.IsLoading() && SavedSchemaVersion == 1 && !MigrateLegacyObjectives()) { Ar.SetError(); }
+}
+
+namespace
+{
+	/** Keyed by mission and by the revision being left behind, so each step is registered once. */
+	TMap<TPair<FName, int32>, USovCampaignStateComponent::FSovMissionRevisionMigration>& MissionRevisionMigrations()
+	{
+		static TMap<TPair<FName, int32>, USovCampaignStateComponent::FSovMissionRevisionMigration> Registry;
+		return Registry;
+	}
+}
+
+void USovCampaignStateComponent::RegisterMissionRevisionMigration(const FName MissionId, const int32 FromRevision,
+	const FSovMissionRevisionMigration Migration)
+{
+	if (MissionId.IsNone() || FromRevision < 1 || !Migration) { return; }
+	MissionRevisionMigrations().Add(TPair<FName, int32>(MissionId, FromRevision), Migration);
+}
+
+void USovCampaignStateComponent::ResetMissionRevisionMigrations() { MissionRevisionMigrations().Reset(); }
+
+bool USovCampaignStateComponent::MigrateMissionRevisions()
+{
+	RestoreFailureMission = NAME_None;
+	for (auto& Pair : Missions)
+	{
+		const auto* DefinitionPtr = MissionDefinitions.Find(Pair.Key);
+		const USovCampaignDefinition* const Definition = DefinitionPtr ? DefinitionPtr->Get() : nullptr;
+		if (!Definition) { continue; }
+		const int32 Authored = FMath::Max(Definition->ContentRevision, 1);
+		// Zero means the save predates revisions entirely, which is the first revision, not a fault.
+		int32 Recorded = Pair.Value.ContentRevision <= 0 ? 1 : Pair.Value.ContentRevision;
+		if (Recorded > Authored)
+		{
+			// The same shape as a newer-schema save: intact, and simply ahead of this build's content.
+			RestoreFailure = ESovCampaignRestoreFailure::MissionContentNewer;
+			RestoreFailureMission = Pair.Key;
+			return false;
+		}
+		while (Recorded < Authored)
+		{
+			const FSovMissionRevisionMigration* const Step =
+				MissionRevisionMigrations().Find(TPair<FName, int32>(Pair.Key, Recorded));
+			FSovMissionRevisionContext Context{ Pair.Key, Recorded, Definition, Journal, Pair.Value };
+			if (!Step || !(*Step)(Context))
+			{
+				// Refusing is still correct - a half-migrated journal is worse than a refused one - but
+				// the player is told their save predates a content change rather than that it is damaged.
+				RestoreFailure = ESovCampaignRestoreFailure::MissionContentRevisionUnsupported;
+				RestoreFailureMission = Pair.Key;
+				return false;
+			}
+			MigrationHistory.Add(FString::Printf(TEXT("%s %d->%d"), *Pair.Key.ToString(), Recorded, Recorded + 1));
+			++Recorded;
+		}
+		Pair.Value.ContentRevision = Authored;
+	}
+	return true;
 }
 
 bool USovCampaignStateComponent::MigrateLegacyObjectives()

@@ -15,6 +15,19 @@ enum class ESovCampaignResult : uint8
 	KnowledgeMissing, ProtectedStateConflict, SkipUnavailable, ObjectiveClosed
 };
 
+/** Why a campaign restore was refused. Tampering and an authored revision are not the same event. */
+UENUM(BlueprintType)
+enum class ESovCampaignRestoreFailure : uint8
+{
+	None,
+	/** The journal does not agree with itself or with the definition at its own revision. */
+	Invalid,
+	/** The mission's content moved on and no registered migration bridges the gap. */
+	MissionContentRevisionUnsupported,
+	/** The save records a revision this build's content does not have yet. */
+	MissionContentNewer
+};
+
 USTRUCT(BlueprintType)
 struct PROJECTVELKORRAN_API FSovCampaignMissionRecord
 {
@@ -24,6 +37,11 @@ struct PROJECTVELKORRAN_API FSovCampaignMissionRecord
 	/** Only accepted transitions and terminal results are cached; availability is derived from current knowledge. */
 	UPROPERTY(SaveGame, BlueprintReadOnly) TMap<FName, ESovObjectiveState> ObjectiveStates;
 	UPROPERTY(SaveGame, BlueprintReadOnly) TMap<FName, FName> SelectedChoices;
+	/**
+	 * The mission's ContentRevision when this record was written. Zero means a save taken before
+	 * revisions existed, which is treated as revision 1 rather than as a fault.
+	 */
+	UPROPERTY(SaveGame, BlueprintReadOnly) int32 ContentRevision = 0;
 };
 
 USTRUCT(BlueprintType)
@@ -122,6 +140,39 @@ public:
 	UFUNCTION(BlueprintPure, Category="Campaign") USovCampaignDefinition* GetActiveMission() const { return ActiveMission; }
 	bool IsMutationInProgress() const { return bMutating; }
 	UFUNCTION(BlueprintPure, Category="Campaign") bool IsStateValid() const { return bStateValid; }
+
+	/** Why a restore was refused, so an authored revision is never reported as a damaged save. */
+	UFUNCTION(BlueprintPure, Category="Campaign")
+	ESovCampaignRestoreFailure GetRestoreFailure() const { return RestoreFailure; }
+
+	/** The mission whose content revision could not be bridged, when that is the reason. */
+	UFUNCTION(BlueprintPure, Category="Campaign")
+	FName GetRestoreFailureMission() const { return RestoreFailureMission; }
+
+	/**
+	 * Everything a migration may read and change: the journal entries it is carrying forward and the
+	 * mission's own record. Deliberately narrow - a migration rewrites what was recorded to match what
+	 * is now authored, and has no business touching evidence, knowledge or another mission.
+	 */
+	struct FSovMissionRevisionContext
+	{
+		FName MissionId;
+		int32 FromRevision = 1;
+		const USovCampaignDefinition* Definition = nullptr;
+		TArray<FSovCampaignJournalEntry>& Journal;
+		FSovCampaignMissionRecord& Record;
+	};
+
+	/**
+	 * Bridges one mission across one revision step, returning false if it cannot. Registered per
+	 * mission and per step, so a content change ships with the migration that carries saves over it.
+	 *
+	 * A plain function pointer rather than a delegate: a migration is a pure rewrite of restored state
+	 * with nothing to capture and nothing to outlive.
+	 */
+	using FSovMissionRevisionMigration = bool (*)(FSovMissionRevisionContext&);
+	static void RegisterMissionRevisionMigration(FName MissionId, int32 FromRevision, FSovMissionRevisionMigration Migration);
+	static void ResetMissionRevisionMigrations();
 	/** Deterministic record of schema migrations applied to this campaign, oldest first (TDD 15.9). */
 	const TArray<FString>& GetMigrationHistory() const { return MigrationHistory; }
 	UFUNCTION(BlueprintPure, Category="Campaign") const TArray<FSovCampaignJournalEntry>& GetJournal() const { return Journal; }
@@ -165,6 +216,8 @@ private:
 	ESovCampaignResult CompleteBeatInternal(FName BeatId, bool bSkipPresentation, class ASovCoActionAnchor* CoActionSource, const FGuid& HandoffRequestId = FGuid(), class USovCampaignCinematicComponent* CinematicSource = nullptr, class ASovCampaignEncounterObjective* EncounterSource = nullptr);
 	bool ValidateSavedState() const;
 	bool MigrateLegacyObjectives();
+	/** Carries every mission from the revision its record names to the revision its definition names. */
+	bool MigrateMissionRevisions();
 	bool HasAuthorityOwner() const;
 	bool DoesCurrentPawnMatch(FGameplayTag Protagonist) const;
 	bool StateWritesValid(const TArray<FSovCampaignStateWrite>& Writes) const;
@@ -186,5 +239,7 @@ private:
 	UPROPERTY(SaveGame) TArray<FSovObjectiveJournalEntry> ObjectiveJournal;
 	UPROPERTY(SaveGame) TArray<FSovEvidenceAcquisition> Evidence;
 	bool bStateValid = true;
+	ESovCampaignRestoreFailure RestoreFailure = ESovCampaignRestoreFailure::None;
+	FName RestoreFailureMission;
 	bool bMutating = false;
 };
