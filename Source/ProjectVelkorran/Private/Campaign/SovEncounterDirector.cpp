@@ -578,10 +578,22 @@ void ASovEncounterDirector::UnbindDeaths()
 
 void ASovEncounterDirector::HandleDeath(AActor* KilledActor, UNarrativeAbilitySystemComponent* ASC, bool bIsDead)
 {
-	if (!HasAuthority() || !bIsDead || State != ESovEncounterState::Active || bMutationInProgress
+	if (!HasAuthority() || !bIsDead || State != ESovEncounterState::Active
 		|| !IsValid(KilledActor) || !IsValid(ASC) || !BoundDeathASCs.Contains(ASC)
 		|| ASC->GetAvatarActor() != KilledActor || UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(KilledActor) != ASC
 		|| ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()) > 0.f) { return; }
+	if (bMutationInProgress)
+	{
+		// Mutation guards are held across callback-rich work - releasing suspension, re-enabling
+		// collision, resuming a brain - and OnDeathStateChanged fires exactly once. Dropping the
+		// receipt here loses the defeat for good, and a required participant that dies inside a guard
+		// leaves an encounter that can never complete. Keep it until the guard releases.
+		const bool bAlreadyHeld = DeferredDefeats.ContainsByPredicate(
+			[KilledActor](const FDeferredDefeat& Held) { return Held.Actor.Get() == KilledActor; });
+		if (!bAlreadyHeld && DeferredDefeats.Num() < 64)
+		{ DeferredDefeats.Add({ AttemptId, RestoreGeneration, KilledActor }); }
+		return;
+	}
 	if (KilledActor == ResolvePlayer())
 	{
 		USovFatalRecoveryComponent* Recovery = ResolvePlayer()->GetRecoveryComponent();
@@ -678,6 +690,25 @@ bool ASovEncounterDirector::HasConfirmedVictory() const
 	return HasAuthority() && !IsActorBeingDestroyed() && State == ESovEncounterState::Succeeded
 		&& bHasEntryCheckpoint && AttemptId.IsValid() && bCompleteWhenRequiredParticipantsDefeated
 		&& HasConfirmedRequiredDefeats() && AreProtectedParticipantsAlive();
+}
+
+void ASovEncounterDirector::DrainDeferredDefeats()
+{
+	if (bMutationInProgress || DeferredDefeats.IsEmpty()) { return; }
+	TArray<FDeferredDefeat> Held;
+	// Taken before replaying, because recording a defeat can complete or fail the encounter, and that
+	// runs user code which may defer further deaths into this same list.
+	Swap(Held, DeferredDefeats);
+	for (const FDeferredDefeat& Entry : Held)
+	{
+		// A defeat belongs to the attempt and lifecycle that saw it. A retry or a restore starts a new
+		// roster, and replaying an old receipt into it would credit a kill that attempt never made.
+		if (State != ESovEncounterState::Active || Entry.Attempt != AttemptId || Entry.Generation != RestoreGeneration) { continue; }
+		AActor* const Actor = Entry.Actor.Get();
+		auto* const ASC = Cast<UNarrativeAbilitySystemComponent>(UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Actor));
+		if (!IsValid(Actor) || !IsValid(ASC)) { continue; }
+		HandleDeath(Actor, ASC, true);
+	}
 }
 
 void ASovEncounterDirector::EvaluateCompletionConditions()
@@ -1046,6 +1077,9 @@ bool ASovEncounterDirector::RetryEncounter(FString& Error)
 void ASovEncounterDirector::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	// The guards are scoped, so there is no release hook to hang this on; the next tick is the first
+	// moment they are reliably gone.
+	DrainDeferredDefeats();
 	if (bMaintainLoadedParticipantHold)
 	{
 		if (State != ESovEncounterState::Failed || RestoreGeneration != LoadedParticipantHoldGeneration)

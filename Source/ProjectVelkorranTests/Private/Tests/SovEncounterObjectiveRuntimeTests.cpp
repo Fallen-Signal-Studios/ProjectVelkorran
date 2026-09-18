@@ -83,6 +83,10 @@ struct FSovCrucibleRuntimeTestAccess
     static void WaveStep(ASovEncounterDirector* Director)
     { Director->GetCoordinationComponent()->TickComponent(.1f, LEVELTICK_All, nullptr); }
     static void RetireWaveContext(ASovEncounterDirector* Director) { ++Director->RestoreGeneration; }
+    /** Delivers a death receipt with a mutation guard held, as callback-rich mutation work does. */
+    static void KillInsideMutation(ASovEncounterDirector* Director, AActor* Killed, UNarrativeAbilitySystemComponent* ASC)
+    { TGuardValue<bool> Mutation(Director->bMutationInProgress, true); Director->HandleDeath(Killed, ASC, true); }
+    static int32 DeferredDefeats(const ASovEncounterDirector* Director) { return Director->DeferredDefeats.Num(); }
     static void ResetWaveForLoad(ASovEncounterDirector* Director) { Director->GetCoordinationComponent()->CurrentWave = 0; }
     static bool Transfer(ASovAurelionLinkPhaseDirector* Source, ASovAurelionThermalPhaseDirector* Destination, FString& Error)
     { return Source->TransferFrozenParticipants(Destination, Error); }
@@ -1545,4 +1549,38 @@ bool FSovAurelionEliteSlamTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovEncounterDeferredDefeatTest,
+    "ProjectVelkorran.Campaign.EncounterObjective.ADefeatDuringAMutationIsNotLost",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovEncounterDeferredDefeatTest::RunTest(const FString& Parameters)
+{
+    static_cast<void>(Parameters);
+    // A death receipt arriving while a mutation guard was held was dropped, and OnDeathStateChanged
+    // fires once. Mutation guards are held across work that can kill a participant synchronously -
+    // re-enabling collision inside a hazard, for instance - so a required defeat could be lost and the
+    // encounter could never complete (audit EA2-10).
+    FEncounterObjectiveWorld F; if (!TestNotNull(TEXT("Ready campaign"), F.ASC)) { return false; }
+    if (!TestTrue(TEXT("Production entry capture and encounter begin succeed"), F.Start())) { AddError(F.SetupError); return false; }
+
+    auto* NPC = F.Director->GetParticipant(TEXT("Formation.Guard"));
+    if (!TestNotNull(TEXT("The required participant"), NPC)) { return false; }
+    auto* NPCASC = CastChecked<USovCoordinationTestASC>(NPC->GetNarrativeAbilitySystemComponent());
+    NPCASC->SetNumericAttributeBase(UNarrativeAttributeSetBase::GetHealthAttribute(), 0.f);
+    NPCASC->SeedDead(true);
+
+    FSovCrucibleRuntimeTestAccess::KillInsideMutation(F.Director, NPC, NPCASC);
+    // The guard is still the reason nothing is recorded yet; the receipt must not have been discarded.
+    TestEqual(TEXT("A defeat taken during a mutation is held"), FSovCrucibleRuntimeTestAccess::DeferredDefeats(F.Director), 1);
+    TestEqual(TEXT("The encounter does not resolve inside the guard"), F.Director->GetEncounterState(), ESovEncounterState::Active);
+    TestEqual(TEXT("The defeat is not recorded inside the guard"), FSovCrucibleRuntimeTestAccess::SavedDefeats(F.Director).Num(), 0);
+
+    FSovCrucibleRuntimeTestAccess::Step(F.Director, .016f);
+    TestEqual(TEXT("The held defeat is replayed once the guard releases"),
+        FSovCrucibleRuntimeTestAccess::DeferredDefeats(F.Director), 0);
+    TestTrue(TEXT("The defeat is recorded"),
+        FSovCrucibleRuntimeTestAccess::SavedDefeats(F.Director).Contains(TEXT("Formation.Guard")));
+    TestEqual(TEXT("The encounter resolves on the replayed defeat"), F.Director->GetEncounterState(), ESovEncounterState::Succeeded);
+    TestTrue(TEXT("Victory still has confirmed hostile and survivor proof"), F.Director->HasConfirmedVictory());
+    return true;
+}
 #endif

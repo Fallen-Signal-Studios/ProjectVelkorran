@@ -231,6 +231,11 @@ private:
 	bool RemoveTimedEffects(UAbilitySystemComponent* ASC, TFunctionRef<bool()> CanContinue);
 	UFUNCTION() void HandleDeath(AActor* KilledActor, UNarrativeAbilitySystemComponent* ASC, bool bIsDead);
 	void EvaluateCompletionConditions();
+	/** A death that arrived while a mutation guard was held, kept until the guard releases. */
+	struct FDeferredDefeat { FGuid Attempt; uint64 Generation = 0; TWeakObjectPtr<AActor> Actor; };
+	/** Records the defeats deferred by a guard and re-evaluates completion once. */
+	void DrainDeferredDefeats();
+	TArray<FDeferredDefeat> DeferredDefeats;
 	bool AreProtectedParticipantsAlive() const;
 	bool AreOwnedParticipantsQuiescent(bool bAllowConfirmedDeaths) const;
 	bool HasConfirmedRequiredDefeats() const;
