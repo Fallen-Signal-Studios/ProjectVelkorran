@@ -8,9 +8,9 @@ true now. **The audit is not edited** — it stays as the reviewer wrote it.
 Three levels of confidence, and the difference matters:
 
 - **Verified closed / Verified open** — I read the current code and checked the finding's own claim.
-- **Commit claims it** — a commit names the ID in its body, but I have not re-read the code. A commit
-  naming an item is not proof it closed it: `PC2-01` is named by a commit and is still open, and
-  `UX2-08` is named by none although work landed for it today.
+- **Commit claims it** — a commit names the ID in its body, but I have not re-read the code. The two
+  do not track each other: `UX2-08` is named by no commit although work landed for it today, and
+  `PC2-01` was named by one commit while being closed by content changes that named none.
 - **Not swept** — nobody has looked since the audit.
 
 Where a finding turned out to be partly done or to rest on a wrong premise, that is said plainly,
