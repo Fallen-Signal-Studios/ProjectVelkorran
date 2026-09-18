@@ -80,4 +80,43 @@ bool FSovHolographicHUDTextClearanceTest::RunTest(const FString& Parameters)
     }
     return true;
 }
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovIdentityLetterspacingTest,
+    "ProjectVelkorran.UI.HolographicHUD.IdentityLetterspacingIsGraphemeSafe",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovIdentityLetterspacingTest::RunTest(const FString& Parameters)
+{
+    using SovHolographicHUDLayout::Letterspace;
+
+    TestEqual(TEXT("A plain name is spaced out as the references show it"),
+        Letterspace(TEXT("TARRIK")), FString(TEXT("T A R R I K")));
+    TestEqual(TEXT("The identity is cut at its qualifier, as the plate has always done"),
+        Letterspace(TEXT("SELENE/Vanguard")), FString(TEXT("S E L E N E")));
+    TestEqual(TEXT("Surrounding whitespace is not spaced out"),
+        Letterspace(TEXT("  TARRIK  ")), FString(TEXT("T A R R I K")));
+    TestEqual(TEXT("An empty identity stays empty"), Letterspace(FString()), FString());
+    TestEqual(TEXT("A single letter needs no separator"), Letterspace(TEXT("T")), FString(TEXT("T")));
+
+    // The defect: stepping one UTF-16 unit at a time splits a surrogate pair down the middle, and the
+    // two halves are not characters - the name renders as replacement marks (audit UX2-08).
+    const FString Astral = FString(TEXT("A")) + FString(TEXT("\U0001F701")) + FString(TEXT("B"));
+    const FString SpacedAstral = Letterspace(Astral);
+    TestEqual(TEXT("An astral character survives as one character"), SpacedAstral, Astral);
+
+    // A combining mark belongs to the letter before it and must not be separated from it.
+    const FString Combining = FString(TEXT("A")) + FString(TEXT("\u0301")) + FString(TEXT("B"));
+    TestEqual(TEXT("A combining mark stays attached to its letter"), Letterspace(Combining), Combining);
+
+    // Letterspacing is Latin typography. Spacing Arabic breaks the joining that makes a word a word,
+    // and spacing CJK is simply not done, so those names are left exactly as authored.
+    const FString Arabic = TEXT("\u0637\u0627\u0631\u0643");
+    TestEqual(TEXT("An Arabic name is left alone"), Letterspace(Arabic), Arabic);
+    const FString Japanese = TEXT("\u30BF\u30EA\u30C3\u30AF");
+    TestEqual(TEXT("A Japanese name is left alone"), Letterspace(Japanese), Japanese);
+    const FString Accented = TEXT("SEL\u00C8NE");
+    TestEqual(TEXT("...and so is a Latin name carrying an accent, rather than being split badly"),
+        Letterspace(Accented), Accented);
+    return true;
+}
+
 #endif

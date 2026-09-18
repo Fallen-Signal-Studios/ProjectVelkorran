@@ -121,7 +121,7 @@ void USovAurelionPauseMenu::RefreshCheckpoint()
     if (!bHasCheckpoint) { Present(LOCTEXT("Missing", "No Aurelion checkpoint is available in this profile.")); return; }
     Present(FText::Format(LOCTEXT("Checkpoint", "Aurelion — paused\nCheckpoint: {0}\nSaved {1} UTC\nLoading discards progress since this checkpoint. An encounter entry may require the nearby Retry encounter control after loading."),
         DisplayedCheckpoint.MissionLabel.IsEmpty() ? FText::FromName(DisplayedCheckpoint.MissionId) : DisplayedCheckpoint.MissionLabel,
-        FText::FromString(DisplayedCheckpoint.TimestampUtc.ToString(TEXT("%Y-%m-%d %H:%M:%S")))));
+        FText::AsDateTime(DisplayedCheckpoint.TimestampUtc)));
 }
 void USovAurelionPauseMenu::NativeOnActivated()
 {
@@ -169,7 +169,7 @@ void USovAurelionPauseMenu::OnLoadResult(ESovSaveResult Result, const FSovSaveSl
     if (LoadLabel) { LoadLabel->SetText(LOCTEXT("Recover", "Recover displayed checkpoint")); LoadButton->SetAccessibleLabel(LoadLabel->GetText()); }
     Present(FText::Format(LOCTEXT("Recovery", "{0}\nVerified checkpoint: {1}\nSaved {2} UTC\nChoose Recover displayed checkpoint to accept this previous state."),
         FText::FromString(Error), Header.MissionLabel.IsEmpty() ? FText::FromName(Header.MissionId) : Header.MissionLabel,
-        FText::FromString(Header.TimestampUtc.ToString(TEXT("%Y-%m-%d %H:%M:%S")))));
+        FText::AsDateTime(Header.TimestampUtc)));
 }
 void USovAurelionPauseMenu::LoadCheckpoint()
 {

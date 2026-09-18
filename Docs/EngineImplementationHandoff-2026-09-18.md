@@ -4,7 +4,7 @@ Everything here is a **content and editor task**. The C++ side is finished, comm
 tests; none of it does anything visible until the work below lands. Nothing in this document requires
 source changes, and if a task seems to, stop and say so rather than editing C++ to fit the content.
 
-Current at `HEAD` on `codex/aurelion-tdd-content-20260913`. 712 automation tests pass:
+Current at `HEAD` on `codex/aurelion-tdd-content-20260913`. 714 automation tests pass:
 
 ```powershell
 .\Scripts\Validate-Unreal.ps1 -EngineRoot 'C:\Program Files\Epic Games\UE_5.7' -DisableAura
@@ -39,6 +39,7 @@ Two other standing constraints:
 | 5 | Bind the five new inputs on gamepad | `IMC_Combat` | Threat focus on a controller |
 | 6 | Author a shoulder-swap rig parameter | Narrative camera rig | Shoulder swap (blocked until this exists) |
 | 7 | Raise `ContentRevision` when you revise a mission | Mission definitions | Saves surviving your content edits |
+| 8 | Run the localization gather, check pseudo-localization | `Content/Localization` | Text that can be translated at all |
 
 ---
 
@@ -223,6 +224,37 @@ the journal references beats by ID. Raise the revision anyway if you are unsure;
 revision with no migration registered is caught immediately by the test suite, whereas a missed one is
 found by a player.
 
+### 8. Run the localization gather, and look at the result
+
+The project had **no localization pipeline at all** — no gather config, no `Content/Localization`, no
+cultures. The source already wraps its strings in `LOCTEXT`, so the text was always ready to gather;
+there was simply nothing to gather it. `Config/Localization/Game.ini` now exists and defines the
+target. Running it is an editor step.
+
+From the editor: **Tools ▸ Localization Dashboard**, pick the **Game** target, then **Gather Text**
+followed by **Compile Text**. It writes `Content/Localization/Game/` — manifest, archives per culture
+and the compiled `.locres`.
+
+Two cultures are configured. `en` is native. **`qla` is pseudo-localization**: it expands every string
+and brackets it, which is the point. Switch to it and walk the menus and HUD, and two classes of bug
+appear immediately:
+
+- **Any string that does not change** is not being gathered — a literal that escaped `LOCTEXT`, or an
+  asset outside the gather paths. Those are the ones a translator would never see.
+- **Any string that overflows or clips** will do the same in German or Russian, which run 30–40%
+  longer than English. Better to find it now than in a translated build.
+
+Note what you find rather than fixing layouts immediately; several will be the same root cause.
+
+**Do not commit `Content/Localization/` without asking.** It is generated, it is large, and whether it
+belongs in the repository is a call for the creator, not a default.
+
+**What is deliberately not done yet**, so you do not think it is missing by accident: save and
+settings error messages still reach the UI as raw `FString`, so they will not translate even after a
+gather — converting those is source work and is queued. Width heuristics still assume 27 px per
+character, which is wrong for any non-Latin script. Aurelion story cues still have no string-table
+keys; giving them keys is content work and is worth doing while you are in there.
+
 ## Hazards and things not to undo
 
 **The golden save.** `Source/ProjectVelkorranTests/Fixtures/GoldenSaves/Campaign_Schema1_0.sovsave`
@@ -253,5 +285,9 @@ Landed, and relevant to you only where noted:
   mid-animation, which is a real behaviour change for authored enemy attacks.
 - **CN2-10** — mission content revisions, which is task 7 above.
 
-Still to come, listed so you do not duplicate it: AR2-06 checkpoint reads off the game thread, UX2-08
-localization.
+- **AR2-06** — listing save slots no longer re-reads and re-deserializes every bank. Internal only.
+- **UX2-08** — plural forms, culture-aware dates, grapheme-safe letterspacing on the identity plate,
+  and the gather config, which is task 8 above.
+
+The adversarial audit's systems-side items are now closed. What remains under UX2-08 is listed in task
+8; everything else outstanding is content.

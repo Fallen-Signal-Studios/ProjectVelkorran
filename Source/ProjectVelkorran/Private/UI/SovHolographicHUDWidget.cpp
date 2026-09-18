@@ -154,18 +154,7 @@ void DrawLabel(FSlateWindowElementList& Elements, int32 Layer, const FGeometry& 
 /** The references title the plate with the bare name, spaced out: T A R R I K. */
 FText Letterspaced(const FText& Identity)
 {
-	FString Name = Identity.ToString();
-	int32 Slash = INDEX_NONE;
-	if (Name.FindChar(TEXT('/'), Slash)) { Name.LeftInline(Slash); }
-	Name.TrimStartAndEndInline();
-	FString Spaced;
-	Spaced.Reserve(Name.Len() * 2);
-	for (int32 Index = 0; Index < Name.Len(); ++Index)
-	{
-		if (Index > 0) { Spaced.AppendChar(TEXT(' ')); }
-		Spaced.AppendChar(Name[Index]);
-	}
-	return FText::FromString(Spaced);
+	return FText::FromString(SovHolographicHUDLayout::Letterspace(Identity.ToString()));
 }
 
 void DrawShieldGlyph(FSlateWindowElementList& Elements, int32 Layer, const FPaintGeometry& Paint,

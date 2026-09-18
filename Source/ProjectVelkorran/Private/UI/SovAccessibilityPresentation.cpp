@@ -403,7 +403,9 @@ void USovAccessibilityPresentation::LayoutObjectives(float SafeWidth, float Safe
 	for (int32 Count = Objectives.Num(); Count >= 0; --Count)
 	{
 		const int32 Remaining = AdditionalObjectiveCount + Objectives.Num() - Count;
-		ObjectiveOverflow->SetText(FText::Format(LOCTEXT("AdditionalObjectives", "{0} more objectives in Accessibility > Review current objectives"), FText::AsNumber(Remaining)));
+		ObjectiveOverflow->SetText(FText::Format(
+			LOCTEXT("AdditionalObjectives", "{0} more {0}|plural(one=objective,other=objectives) in Accessibility > Review current objectives"),
+			Remaining));
 		ObjectiveOverflow->SetVisibility(Remaining > 0 ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
 		float Height = 0.f, ContentWidth = 0.f;
 		for (int32 Index = 0; Index < Count; ++Index)

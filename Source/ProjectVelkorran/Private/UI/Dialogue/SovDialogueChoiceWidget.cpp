@@ -96,7 +96,8 @@ void USovDialogueChoiceWidget::RebuildChoices()
 	Buttons.Reset();
 	Panel->SetBrushColor(FLinearColor(0.f, 0.f, 0.f, bContrast ? 1.f : .9f));
 	SpeakerText = WidgetTree->ConstructWidget<UTextBlock>();
-	SpeakerText->SetText(FText::Format(LOCTEXT("SpeakerCount", "{0} — {1} choices"), PresentedSpeaker, FText::AsNumber(PresentedChoices.Num())));
+	SpeakerText->SetText(FText::Format(LOCTEXT("SpeakerCount", "{0} — {1} {1}|plural(one=choice,other=choices)"),
+		PresentedSpeaker, PresentedChoices.Num()));
 	SpeakerText->SetAutoWrapText(true);
 	FSlateFontInfo Font = SpeakerText->GetFont();
 	Font.Size = FMath::RoundToInt(22.f * FontScale);

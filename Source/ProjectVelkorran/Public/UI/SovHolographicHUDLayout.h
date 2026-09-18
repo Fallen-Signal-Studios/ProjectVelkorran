@@ -1,5 +1,7 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #pragma once
+
+#include "Internationalization/BreakIterator.h"
 #include "CoreMinimal.h"
 
 /**
@@ -9,6 +11,43 @@
  */
 namespace SovHolographicHUDLayout
 {
+    /**
+     * Spaces a protagonist's name out across the identity plate: T A R R I K.
+     *
+     * Walks grapheme clusters rather than TCHARs. Stepping one UTF-16 unit at a time splits surrogate
+     * pairs down the middle and tears combining marks off the letters they belong to, which turns a
+     * name into replacement characters (audit UX2-08).
+     *
+     * Scripts outside Basic Latin are returned untouched. Inserting spaces between Arabic letters
+     * breaks the joining that makes the word a word, and between CJK it is simply not done - the
+     * effect is Latin typography, so it applies where Latin typography applies.
+     */
+    inline FString Letterspace(const FString& Identity)
+    {
+        FString Name = Identity;
+        int32 Slash = INDEX_NONE;
+        if (Name.FindChar(TEXT('/'), Slash)) { Name.LeftInline(Slash); }
+        Name.TrimStartAndEndInline();
+        if (Name.IsEmpty()) { return Name; }
+        for (const TCHAR Character : Name)
+        {
+            if (Character > 0x7F) { return Name; }
+        }
+
+        const TSharedRef<IBreakIterator> Graphemes = FBreakIterator::CreateCharacterBoundaryIterator();
+        Graphemes->SetString(Name);
+        FString Spaced;
+        Spaced.Reserve(Name.Len() * 2);
+        int32 Previous = Graphemes->ResetToBeginning();
+        for (int32 Current = Graphemes->MoveToNext(); Current != INDEX_NONE; Current = Graphemes->MoveToNext())
+        {
+            if (!Spaced.IsEmpty()) { Spaced.AppendChar(TEXT(' ')); }
+            Spaced.Append(Name.Mid(Previous, Current - Previous));
+            Previous = Current;
+        }
+        return Spaced;
+    }
+
     struct FHUDGeometry
     {
         FVector2D Size = FVector2D::ZeroVector;
