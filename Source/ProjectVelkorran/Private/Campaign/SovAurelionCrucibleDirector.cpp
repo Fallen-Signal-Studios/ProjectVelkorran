@@ -1,4 +1,5 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
+#include "Campaign/SovLethalFloorComponent.h"
 #include "Campaign/SovAurelionCrucibleDirector.h"
 #include "AI/SovAurelionEnemyRoles.h"
 #include "Campaign/SovEncounterCoordinationComponent.h"
@@ -228,13 +229,41 @@ bool ASovAurelionLinkPhaseDirector::TransferFrozenParticipants(ASovAurelionTherm
     ForceNetUpdate(); Destination->ForceNetUpdate();
     return true;
 }
+namespace
+{
+	/**
+	 * Holds or releases the Elite's lethal floor, creating the component the first time a phase needs it.
+	 *
+	 * A phase that requires a mechanic must not be losable by killing its boss first. Keeping the floor
+	 * here rather than in the damage path means each phase owns exactly the window it is responsible for.
+	 */
+	void HoldEliteLethalFloor(ASovNPCCharacterBase* Elite, const bool bHold, const float Floor)
+	{
+		if (!IsValid(Elite) || !Elite->HasAuthority()) { return; }
+		auto* Component = Elite->FindComponentByClass<USovLethalFloorComponent>();
+		if (!Component)
+		{
+			// Nothing to release, and an unheld floor is not worth adding a component for.
+			if (!bHold) { return; }
+			Component = NewObject<USovLethalFloorComponent>(Elite);
+			Component->MinimumHealth = FMath::Max(Floor, 1.f);
+			Elite->AddInstanceComponent(Component);
+			Component->RegisterComponent();
+		}
+		Component->SetFloorHeld(bHold);
+	}
+}
+
 void ASovAurelionLinkPhaseDirector::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
     if (!HasAuthority() || IsActorBeingDestroyed() || bPhaseMutation) { return; }
     if (GetEncounterState() == ESovEncounterState::Active)
     {
-        const auto* Elite = GetParticipant(EliteParticipantId);
+        auto* Elite = GetParticipant(EliteParticipantId);
+        // Held until the links are proven, so a player who out-damages the mechanic cannot lose the run
+        // to their own success. The failure below now only catches causes the player did not create.
+        HoldEliteLethalFloor(Elite, !HasLinkProof(), EliteLethalFloorHealth);
         if (!IsValid(Elite) || !Elite->IsAlive())
         { LastPhaseError = TEXT("The phase A elite was defeated before its preserved phase B entry."); FailEncounter(); return; }
         if (!LastPhaseError.IsEmpty()) { FailEncounter(); return; }
@@ -432,8 +461,12 @@ void ASovAurelionThermalPhaseDirector::Tick(float DeltaSeconds)
     Super::Tick(DeltaSeconds);
     if (GetEncounterState() == ESovEncounterState::Active)
     {
-        const auto* Elite = GetParticipant(EliteParticipantId);
+        auto* Elite = GetParticipant(EliteParticipantId);
+        // Released the moment this attempt's thermal fracture receipt lands, which is the point the
+        // Elite is meant to become finishable.
+        HoldEliteLethalFloor(Elite, FractureAttemptId != GetAttemptId(), EliteLethalFloorHealth);
         if ((!IsValid(Elite) || !Elite->IsAlive()) && FractureAttemptId != GetAttemptId()) { FailEncounter(); return; }
         BindFracture();
     }
+    else { HoldEliteLethalFloor(GetParticipant(EliteParticipantId), false, EliteLethalFloorHealth); }
 }

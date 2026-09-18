@@ -16,6 +16,7 @@
 #include "GAS/SovCombatTransactionPolicy.h"
 #include "GAS/SovAttackReceiptSource.h"
 #include "GAS/SovDamageSourcePolicy.h"
+#include "GAS/SovDamageTargetPolicy.h"
 #include "GameplayEffect.h"
 #include "GameplayEffectExtension.h"
 #include "ProfilingDebugging/CpuProfilerTrace.h"
@@ -703,6 +704,32 @@ void UNarrativeAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffect
 				HealthDamageLimit = Result.AppliedHealthDamage;
 				if (Result.AppliedHealthDamage < HealthLimit)
 				{ Result.HealthOverkillDamage = 0.f; }
+				if (Result.AppliedShieldDamage <= 0.f && ShieldLimit > 0.f) { Result.bShieldWasTargeted = false; }
+			}
+		}
+
+		// The mirror of the source policies, asked of the actor being damaged. A rule such as "this
+		// boss cannot be killed before its phase mechanic" holds whoever the attacker is, including the
+		// environment, so it cannot be expressed on the source side without implementing it on every
+		// possible attacker. Reductions only; the clamps below are identical to the source loop's.
+		if (IsValid(TargetActor))
+		{
+			TInlineComponentArray<UActorComponent*> TargetPolicies(TargetActor);
+			for (UActorComponent* Component : TargetPolicies)
+			{
+				const auto* Policy = IsValid(Component) ? Cast<ISovDamageTargetPolicy>(Component) : nullptr;
+				if (!Policy) { continue; }
+				const float ShieldLimit = Result.AppliedShieldDamage, HealthLimit = Result.AppliedHealthDamage;
+				const float PoiseLimit = FMath::Min(RoutedPoiseDamage, PoiseAtRouting);
+				float LimitedShield = ShieldLimit, LimitedHealth = HealthLimit, LimitedPoise = PoiseLimit;
+				bSourceAllowsStatus &= Policy->LimitSovIncomingDamage(DamageInstigator, Context, HealthAtRouting,
+					LimitedShield, LimitedHealth, LimitedPoise);
+				Result.AppliedShieldDamage = FMath::IsFinite(LimitedShield) ? FMath::Clamp(LimitedShield, 0.f, ShieldLimit) : 0.f;
+				Result.AppliedHealthDamage = FMath::IsFinite(LimitedHealth) ? FMath::Clamp(LimitedHealth, 0.f, HealthLimit) : 0.f;
+				RoutedPoiseDamage = FMath::IsFinite(LimitedPoise) ? FMath::Clamp(LimitedPoise, 0.f, PoiseLimit) : 0.f;
+				HealthDamageLimit = Result.AppliedHealthDamage;
+				// A survivable hit is not an overkill, and a floored target was never overkilled.
+				if (Result.AppliedHealthDamage < HealthLimit) { Result.HealthOverkillDamage = 0.f; }
 				if (Result.AppliedShieldDamage <= 0.f && ShieldLimit > 0.f) { Result.bShieldWasTargeted = false; }
 			}
 		}

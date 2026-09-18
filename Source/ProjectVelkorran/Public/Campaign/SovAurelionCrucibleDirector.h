@@ -40,6 +40,9 @@ public:
     UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="Aurelion|Crucible") FName CompletionBeat = TEXT("SeverCrucibleLinks");
     UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="Aurelion|Crucible") FName HandoffBeat = TEXT("HandoffToTarrikCrucible");
     UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="Aurelion|Crucible") FName EliteParticipantId;
+    /** Health the Elite is held above while this phase's required mechanic is still outstanding. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Aurelion|Crucible", meta=(ClampMin="1.0"))
+    float EliteLethalFloorHealth = 1.f;
     UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="Aurelion|Crucible") TArray<FSovAurelionCrucibleLink> RequiredLinks;
     UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="Aurelion|Crucible") TObjectPtr<ASovCampaignHandoffAnchor> HandoffAnchor;
     UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="Aurelion|Crucible") TObjectPtr<ASovCampaignEncounterObjective> PhaseBObjective;
@@ -91,6 +94,9 @@ class PROJECTVELKORRAN_API ASovAurelionThermalPhaseDirector : public ASovEncount
 public:
     ASovAurelionThermalPhaseDirector();
     UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="Aurelion|Crucible") FName EliteParticipantId;
+    /** Health the Elite is held above while this phase's required mechanic is still outstanding. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Aurelion|Crucible", meta=(ClampMin="1.0"))
+    float EliteLethalFloorHealth = 1.f;
     virtual ESovEncounterProofType GetCampaignProofType() const override { return ESovEncounterProofType::AurelionThermalFracture; }
     virtual bool HasConfirmedVictory() const override;
     virtual bool CompleteEncounter() override;

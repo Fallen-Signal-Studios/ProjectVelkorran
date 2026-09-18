@@ -19,6 +19,7 @@
 #include "Sovereign/SovGameplayTags.h"
 #include <limits>
 
+#include "Campaign/SovLethalFloorComponent.h"
 #if WITH_AUTOMATION_TESTS
 struct FSovEchoResourceTestAccess
 {
@@ -443,6 +444,50 @@ bool FSovCinderlineCadenceTest::RunTest(const FString& Parameters)
 	// Precision keeps a floor of one, so a misconfigured zero never makes weak points worthless.
 	TestEqual(TEXT("A precision hit is never worth nothing"), Contribution(true, 0, 0), 1);
 	TestEqual(TEXT("A negative body cadence reads as none"), Contribution(false, 2, -5), 0);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovLethalFloorTest,
+	"ProjectVelkorran.Campaign.Encounter.ALethalFloorPreventsAFinishWithoutBluntingTheFight",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FSovLethalFloorTest::RunTest(const FString& Parameters)
+{
+	static_cast<void>(Parameters);
+	// The Aurelion Elite could be killed conventionally before the phase mechanic meant to resolve it,
+	// and the encounter then failed and reloaded - the player lost the run for doing too much damage
+	// (audit EA2-06). Nothing protected it, because damage policies were only ever asked of the
+	// attacker, and "this target cannot be finished yet" is a rule about the target.
+	FEchoWorld F;
+	auto* Source = F.Character(0.f, 0);
+	auto* Target = F.Character(300.f, 1);
+	if (!TestNotNull(TEXT("Attacker"), Source) || !TestNotNull(TEXT("Protected target"), Target)) { return false; }
+	auto* TargetASC = Target->GetNarrativeAbilitySystemComponent();
+	const auto Health = [TargetASC]()
+	{ return TargetASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()); };
+	const float Starting = Health();
+	if (!TestTrue(TEXT("The target starts alive"), Starting > 20.f)) { return false; }
+
+	auto* Floor = NewObject<USovLethalFloorComponent>(Target);
+	Floor->MinimumHealth = 10.f;
+	Target->AddInstanceComponent(Floor); Floor->RegisterComponent();
+	Floor->SetFloorHeld(true);
+
+	// A blow that would comfortably kill it leaves it standing at the floor instead.
+	Hit(Source, Target, Starting * 4.f);
+	TestEqual(TEXT("A held floor stops the finish exactly at its threshold"), Health(), 10.f);
+	TestTrue(TEXT("The target is still alive"), Target->IsAlive());
+	// The floor governs the finish, not the fight: the hit still landed and still cost health.
+	TestTrue(TEXT("Damage below the floor still applies"), Health() < Starting);
+
+	// Repeated hits against a floored target neither kill it nor drive health negative.
+	Hit(Source, Target, Starting * 4.f);
+	TestEqual(TEXT("A target already at the floor takes no further health damage"), Health(), 10.f);
+	TestTrue(TEXT("It remains alive under sustained fire"), Target->IsAlive());
+
+	// Releasing the floor is what makes it finishable, which is the phase mechanic's job.
+	Floor->SetFloorHeld(false);
+	Hit(Source, Target, Starting * 4.f);
+	TestTrue(TEXT("A released floor allows the finish"), Health() <= 0.f);
 	return true;
 }
 #endif
