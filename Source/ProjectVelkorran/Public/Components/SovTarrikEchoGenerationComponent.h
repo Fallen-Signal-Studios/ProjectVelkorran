@@ -16,6 +16,24 @@ class URangedWeaponItem;
 class USovEchoComponent;
 class USovProtectionInterceptReceipt;
 
+/** Pure Cinderline cadence rule, shared with its tests.
+ *
+ * §7.2 earns Echo through defined actions rather than damage volume, and §5.2.6 keeps the ranged tool
+ * from replacing melee engagement. A body hit therefore contributes nothing by default: paying for
+ * volume let a player fill the meter by holding distance and firing, without guarding, countering or
+ * breaking poise, while the melee rewards that are supposed to carry the economy went unused.
+ */
+namespace SovCinderlineCadencePolicy
+{
+	/** Cadence a single confirmed hit contributes. Zero means the hit does not advance a cadence at all. */
+	inline int32 Contribution(const bool bPrecisionHit, const int32 PrecisionHitCadence, const int32 BodyHitCadence)
+	{
+		// Precision keeps a floor of one: a configured weak-point hit always counts for something.
+		return bPrecisionHit ? (PrecisionHitCadence > 1 ? PrecisionHitCadence : 1)
+			: (BodyHitCadence > 0 ? BodyHitCadence : 0);
+	}
+}
+
 UENUM(BlueprintType)
 enum class ESovTarrikEchoAwardType : uint8 { PoiseBreak, HeavyMultiHit, CommandTargetKill, ProtectionIntercept };
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FSovTarrikEchoAwardedSignature,
@@ -116,9 +134,16 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo|Cinderline|Identification")
 	TArray<TSubclassOf<URangedWeaponItem>> AllowedCinderlineWeaponClasses;
 
-	/** Cadence contributed by an ordinary confirmed body hit. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo|Cinderline|Tuning", meta = (ClampMin = "1"))
-	int32 BodyHitCadence = 1;
+	/**
+	 * Cadence contributed by an ordinary confirmed body hit. Zero by default, and zero means a body hit
+	 * contributes nothing at all rather than nothing this frame.
+	 *
+	 * §7.2 earns Echo through defined actions rather than damage volume, and §5.2.6 keeps the ranged
+	 * tool from replacing melee engagement. Paying for body-shot volume inverted both: holding distance
+	 * and firing filled the meter without guarding, countering or breaking poise.
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo|Cinderline|Tuning", meta = (ClampMin = "0"))
+	int32 BodyHitCadence = 0;
 
 	/** Cadence contributed by a configured weak-point hit. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo|Cinderline|Tuning", meta = (ClampMin = "1"))

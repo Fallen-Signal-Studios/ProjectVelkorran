@@ -408,4 +408,41 @@ bool FSovSeleneExposureMergeTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCinderlineCadenceTest,
+	"ProjectVelkorran.Campaign.Echo.CinderlineCadenceIsEarnedByPrecisionNotVolume",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FSovCinderlineCadenceTest::RunTest(const FString& Parameters)
+{
+	static_cast<void>(Parameters);
+	// Cadence accrued on every confirmed body hit, so Tarrik could fill Echo by holding distance and
+	// firing - no guarding, no counters, no poise breaks - while the melee rewards meant to carry the
+	// economy went unused. §7.2 earns Echo through defined actions; §5.2.6 keeps the rifle from
+	// replacing melee engagement (audit PC2-05).
+	using namespace SovCinderlineCadencePolicy;
+	// The tunables are protected, so the shipped defaults are read the way any tool would read them.
+	const UClass* const Class = USovTarrikEchoGenerationComponent::StaticClass();
+	const auto Authored = [Class](const TCHAR* Name)
+	{
+		const auto* Property = CastField<FIntProperty>(Class->FindPropertyByName(FName(Name)));
+		return Property ? Property->GetPropertyValue_InContainer(Class->GetDefaultObject()) : -1;
+	};
+	const int32 BodyDefault = Authored(TEXT("BodyHitCadence"));
+	const int32 PrecisionDefault = Authored(TEXT("PrecisionHitCadence"));
+	TestEqual(TEXT("A body hit is worth no cadence by default"), BodyDefault, 0);
+	TestTrue(TEXT("A precision hit still carries the cadence"), PrecisionDefault > 0);
+
+	// Zero means the hit does not advance a cadence at all, rather than advancing it by nothing: a body
+	// hit must not keep an unfinished run of precision hits alive on the player's behalf.
+	TestEqual(TEXT("Body hits contribute nothing at the shipped defaults"),
+		Contribution(false, PrecisionDefault, BodyDefault), 0);
+	TestEqual(TEXT("Precision hits contribute their authored value"),
+		Contribution(true, PrecisionDefault, BodyDefault), PrecisionDefault);
+
+	// Body cadence stays authorable for a deliberate retune; it is a default, not a prohibition.
+	TestEqual(TEXT("An authored body cadence is honoured"), Contribution(false, 2, 3), 3);
+	// Precision keeps a floor of one, so a misconfigured zero never makes weak points worthless.
+	TestEqual(TEXT("A precision hit is never worth nothing"), Contribution(true, 0, 0), 1);
+	TestEqual(TEXT("A negative body cadence reads as none"), Contribution(false, 2, -5), 0);
+	return true;
+}
 #endif

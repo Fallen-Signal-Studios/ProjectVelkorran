@@ -773,14 +773,18 @@ void USovTarrikEchoGenerationComponent::HandleDealtDamage(
 	const bool bPrecisionHit = IsPrecisionHit(EffectSpec);
 	const bool bBossTarget = IsBossTarget(DamagedAbilitySystem);
 	const FHitResult* HitResult = EffectSpec.GetContext().GetHitResult();
-	AddCinderlineCadence(
-		bPrecisionHit
-			? FMath::Max(PrecisionHitCadence, 1)
-			: FMath::Max(BodyHitCadence, 1),
-		SourceWeapon,
-		bBossTarget,
-		bPrecisionHit,
-		HitResult ? HitResult->BoneName : NAME_None);
+	const int32 Contribution = SovCinderlineCadencePolicy::Contribution(bPrecisionHit, PrecisionHitCadence, BodyHitCadence);
+	// A body hit worth no cadence must not keep an open cadence alive either, or volume would still
+	// carry a run of precision hits that the player never finished.
+	if (Contribution > 0)
+	{
+		AddCinderlineCadence(
+			Contribution,
+			SourceWeapon,
+			bBossTarget,
+			bPrecisionHit,
+			HitResult ? HitResult->BoneName : NAME_None);
+	}
 
 	if (bPrecisionHit && DamagedAbilitySystem->IsDead())
 	{
