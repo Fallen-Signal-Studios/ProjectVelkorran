@@ -9,6 +9,8 @@
 /**
  * Interaction component that exists on the player controller, and contains all the interaction tracing stuff NPCs dont need
  */
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnInteractRefused, UNarrativeInteractableComponent*, Interactable, const FText&, Reason);
+
 UCLASS( ClassGroup=(Narrative), DisplayName = "Narrative Player Interaction", meta=(BlueprintSpawnableComponent) )
 class NARRATIVEARSENAL_API UPlayerInteractionComponent : public UNarrativeInteractionComponent
 {
@@ -37,6 +39,16 @@ public:
 	//[local + server] Called when we release the interact key 
 	UPROPERTY(EditDefaultsOnly, BlueprintAssignable, Category = "Interaction")
 	FOnInteractReleased OnInteractReleased;
+
+	/**
+	 * [local + server] The player pressed interact and the interactable said no, with its reason.
+	 *
+	 * A refused press produced nothing at all before this: no sound, no message, no state change.
+	 * That is indistinguishable from the input being dropped, and it is how a working refusal reads
+	 * as a broken game. The reasons already existed; nothing carried them anywhere.
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintAssignable, Category = "Interaction")
+	FOnInteractRefused OnInteractRefused;
 
 	virtual void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction *ThisTickFunction) override;
 	virtual void Load_Implementation() override;

@@ -121,6 +121,54 @@ bool FSovTerminalNativeInputTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovTerminalRefusalIsAudibleTest,
+    "ProjectVelkorran.Campaign.Terminal.ARefusedPressSaysWhy",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovTerminalRefusalIsAudibleTest::RunTest(const FString& Parameters)
+{
+    // A refused press produced nothing at all: no sound, no message, no state change. That is
+    // indistinguishable from the input being dropped, which is how a working refusal came to be
+    // reported as the terminal not responding.
+    FTerminalWorld F;
+    if (!TestNotNull(TEXT("Managed player initialized"), F.ASC)) { return false; }
+    auto* Probe = NewObject<USovRefusalProbe>(F.PC);
+    F.Interaction->OnInteractRefused.AddUniqueDynamic(Probe, &USovRefusalProbe::OnRefused);
+    // This test is about whether a refusal is reported, not about reach geometry, so take the view
+    // angle out of it. Being out of reach is deliberately silent - it is not an answer the
+    // interactable gave - and would otherwise mask what is being measured.
+    F.Terminal->Interactable->MaxViewAngleDegrees = 360.f;
+    F.Player->SetActorRotation(FRotator::ZeroRotator);
+    F.Terminal->Interactable->SetActive(true);
+    AddInfo(FString::Printf(TEXT("reach inputs: active=%d ownerValid=%d pawnMatches=%d dist=%.0f"),
+        F.Terminal->Interactable->IsActive(), IsValid(F.Terminal->Interactable->GetOwner()),
+        F.PC->GetPawn() == F.Player,
+        FVector::Dist(F.Player->GetActorLocation(), F.Terminal->GetActorLocation())));
+
+    FText Error;
+    if (!TestTrue(TEXT("The terminal is usable before anything blocks it"), F.Terminal->CanUse(F.Player, Error)))
+    { AddError(Error.ToString()); return false; }
+    F.Interaction->BeginInteract();
+    TestEqual(TEXT("A press that can succeed says nothing"), Probe->Count, 0);
+    F.Interaction->EndInteract();
+
+    // A refusal the player can see and reach, which is the baffling kind: the terminal is right
+    // there, the prompt is up, and pressing does nothing. A wall is not that case - reach fails
+    // first and no interaction is attempted at all, which is correct and deliberately silent.
+    F.ASC->AddLooseGameplayTag(FNarrativeGameplayTags::Get().State_Busy);
+    TestTrue(TEXT("The terminal is still in reach, so the refusal is its own answer"),
+        F.Interaction->IsInteractableInReach(F.Terminal->Interactable));
+    TestFalse(TEXT("A busy protagonist is refused"), F.Terminal->CanUse(F.Player, Error));
+    F.Interaction->BeginInteract();
+    if (TestEqual(TEXT("A refused press reports exactly once"), Probe->Count, 1))
+    { TestFalse(TEXT("...and carries the reason the terminal already had"), Probe->Last.IsEmpty()); }
+
+    F.Interaction->EndInteract();
+    F.Interaction->BeginInteract();
+    TestEqual(TEXT("A second press reports again, because the player asked again"), Probe->Count, 2);
+    F.ASC->RemoveLooseGameplayTag(FNarrativeGameplayTags::Get().State_Busy);
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovTerminalOwnDressingTest,
     "ProjectVelkorran.Campaign.Terminal.OwnArtDoesNotCountAsAnObstruction",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)

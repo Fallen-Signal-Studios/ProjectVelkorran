@@ -29,3 +29,15 @@ public:
     UFUNCTION() void OnInteracted(APawn* Pawn, UNarrativeInteractionComponent* Interaction) { ++InteractedCount; }
     UFUNCTION() void OnUse(AActor* Actor, UNarrativeInteractableComponent* Component) { if (Callback) { Callback(); } }
 };
+
+/** Records what a refused press would have told the player, without needing a widget to render it. */
+UCLASS(Transient, NotBlueprintable)
+class USovRefusalProbe : public UObject
+{
+    GENERATED_BODY()
+public:
+    UFUNCTION() void OnRefused(UNarrativeInteractableComponent* Interactable, const FText& Reason)
+    { ++Count; Last = Reason; }
+    int32 Count = 0;
+    FText Last;
+};

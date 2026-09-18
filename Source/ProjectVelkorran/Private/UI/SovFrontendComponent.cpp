@@ -4,6 +4,8 @@
 #include "UI/SovHolographicHUDWidget.h"
 #include "UI/SovHolographicHUDSurface.h"
 #include "UI/SovAccessibilityPresentation.h"
+#include "Interaction/InteractableComponent.h"
+#include "Interaction/PlayerInteractionComponent.h"
 #include "UI/SovAccessibilitySettingsMenu.h"
 #include "Framework/SovPlayerController.h"
 #include "Narrative/SovNarrativeCueComponent.h"
@@ -151,7 +153,22 @@ void USovFrontendComponent::BindObjectives(ASovPlayerController* Controller, USo
     Campaign->OnEvidenceRecorded.AddUniqueDynamic(this, &ThisClass::OnObjectiveEvidenceRecorded);
     Campaign->OnMissionChanged.AddUniqueDynamic(this, &ThisClass::OnObjectiveMissionChanged);
     Campaign->OnCampaignStateRestored.AddUniqueDynamic(this, &ThisClass::OnObjectiveStateRestored);
+    // A refused interaction was silent, so a working refusal read as a dropped input.
+    if (auto* Interaction = Controller->FindComponentByClass<UPlayerInteractionComponent>())
+    { Interaction->OnInteractRefused.AddUniqueDynamic(this, &ThisClass::OnInteractionRefused); }
     if (Platform) { Platform->OnPlatformAccountChanged.AddUniqueDynamic(this, &ThisClass::OnObjectiveAccountChanged); }
+}
+void USovFrontendComponent::OnInteractionRefused(UNarrativeInteractableComponent* Interactable, const FText& Reason)
+{
+    if (bEnding || Reason.IsEmpty() || !IsValid(Presentation)) { return; }
+    const UWorld* const World = GetWorld();
+    const double Now = World ? World->GetTimeSeconds() : 0.;
+    // Holding the key against something that will keep saying no should say it once, not stutter.
+    if (Reason.EqualTo(LastRefusal) && Now - LastRefusalTime < 2.) { return; }
+    LastRefusal = Reason; LastRefusalTime = Now;
+    const AActor* const Owner = IsValid(Interactable) ? Interactable->GetOwner() : nullptr;
+    Presentation->PresentCaption(Reason, 3.f, Owner ? Owner->GetActorLocation() : FVector::ZeroVector,
+        ESovCaptionPriority::Important);
 }
 void USovFrontendComponent::UnbindObjectives()
 {

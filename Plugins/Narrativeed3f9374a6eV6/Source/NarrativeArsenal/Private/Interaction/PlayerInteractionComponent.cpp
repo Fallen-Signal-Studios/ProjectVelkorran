@@ -142,6 +142,12 @@ void UPlayerInteractionComponent::Load_Implementation()
 	//}
 }
 
+namespace NarrativeInteraction
+{
+	/** How far past its own bounds an interactable's presentation may sit before it obstructs it. */
+	static constexpr float ReachBoundsTolerance = 40.f;
+}
+
 bool UPlayerInteractionComponent::IsInteractableInReach(UNarrativeInteractableComponent* Target) const
 {
 	if (!IsValid(Target) || !Target->IsActive() || !IsValid(Target->GetOwner()) || !OwningController || !OwningPawn
@@ -164,7 +170,11 @@ bool UPlayerInteractionComponent::IsInteractableInReach(UNarrativeInteractableCo
 	FHitResult Hit;
 	const bool Blocked = GetWorld()->LineTraceSingleByChannel(Hit, Eye, Focus,
 		Settings ? Settings->InteractionTraceChannel.GetValue() : ECC_Visibility, Query);
-	return !Blocked || Hit.GetActor() == Target->GetOwner();
+	// Hitting the interactable's own actor was already forgiven, but a built level dresses an
+	// interactable with separate mesh actors - a console around a terminal - and those are not
+	// obstructions between the player and it. Anything landing inside its own bounds is arrival.
+	return !Blocked || Hit.GetActor() == Target->GetOwner()
+		|| Bounds.ExpandBy(NarrativeInteraction::ReachBoundsTolerance).IsInside(Hit.ImpactPoint);
 }
 void UPlayerInteractionComponent::PerformInteractionCheck(float DeltaTime)
 {
@@ -247,8 +257,14 @@ void UPlayerInteractionComponent::BeginInteract()
 	TWeakObjectPtr<UNarrativeInteractableComponent> Target = ViewedInteractable;
 	ANarrativeCharacter* Pawn = OwningPawn;
 	FText Error;
-	if (!IsInteractableInReach(Target.Get()) || !Target->CanInteract(Pawn, this, Error)
-		|| !Target.IsValid() || Target.Get() != ViewedInteractable || OwningController->GetPawn() != Pawn) { return; }
+	const bool bAdmits = IsInteractableInReach(Target.Get()) && Target->CanInteract(Pawn, this, Error);
+	if (!bAdmits || !Target.IsValid() || Target.Get() != ViewedInteractable || OwningController->GetPawn() != Pawn)
+	{
+		// Only a refusal that came with a reason is worth reporting. Losing the target mid-press is a
+		// race, not an answer, and saying something about it would be noise.
+		if (!bAdmits && !Error.IsEmpty()) { OnInteractRefused.Broadcast(Target.Get(), Error); }
+		return;
+	}
 	const UNarrativeGameUserSettings* Settings = UNarrativeGameUserSettings::GetSovPlayerSettings(Pawn);
 	const float Scale = Settings ? FMath::Clamp(Settings->GetInteractionHoldScale(), 0.1f, 1.f) : 1.f;
 	RemainingInteractTime = Settings && Settings->UseTapInteractions() ? 0.f : FMath::Max(0.f, Target->InteractionTime) * Scale;

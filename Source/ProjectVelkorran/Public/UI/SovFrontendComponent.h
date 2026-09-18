@@ -114,5 +114,10 @@ private:
     /** The holographic combat surface. Owns the resource readout when it is up, so the two never stack. */
     UPROPERTY(Transient) TObjectPtr<class USovHolographicHUDWidget> HolographicHUD;
     UPROPERTY(Transient) TObjectPtr<USovAccessibilityPresentation> Presentation;
+    /** Turns a refused interaction into the caption the player already watches for warnings. */
+    UFUNCTION() void OnInteractionRefused(class UNarrativeInteractableComponent* Interactable, const FText& Reason);
+    /** The last refusal shown, so holding the key against a locked door does not stutter the caption. */
+    FText LastRefusal;
+    double LastRefusalTime = 0.;
     UPROPERTY(Transient) TObjectPtr<USovAccessibilitySettingsMenu> SetupMenu;
 };
