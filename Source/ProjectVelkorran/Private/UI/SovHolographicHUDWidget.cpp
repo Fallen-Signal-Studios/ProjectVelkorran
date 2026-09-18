@@ -252,9 +252,14 @@ bool USovHolographicHUDWidget::ReadSnapshot(const ASovPlayerController* Controll
 		Out.AmmoInClip = Weapon->GetAmmoInClip();
 		Out.AmmoReserve = Weapon->GetSpareAmmo();
 	}
-	if (const auto* Detection = Pawn->FindComponentByClass<USovProximityDetectionComponent>())
+	// Blackout removes navigation and threat markers, and the radar's contacts are threat markers.
+	// Dropped at the read so every surface that draws from this snapshot honours it, not just the painter.
+	if (!Out.Settings.bModifierBlackout)
 	{
-		Out.Contacts = Detection->GetContacts();
+		if (const auto* Detection = Pawn->FindComponentByClass<USovProximityDetectionComponent>())
+		{
+			Out.Contacts = Detection->GetContacts();
+		}
 	}
 	Out.bValid = true;
 	return true;

@@ -13,6 +13,9 @@
 #include "Misc/AutomationTest.h"
 #include "UObject/Script.h"
 
+#include "UI/SovHolographicHUDWidget.h"
+#include "Settings/SovGameUserSettings.h"
+#include "Misc/ScopeExit.h"
 #if WITH_AUTOMATION_TESTS
 
 /** Drives observation directly, so each test controls exactly how much time passes. */
@@ -145,6 +148,50 @@ bool FSovDetectionMemoryTest::RunTest(const FString& Parameters)
 
 	F.ObserveFor(Policy::MemorySeconds);
 	TestEqual(TEXT("Past its memory window the contact is forgotten entirely"), F.Detection->GetContactCount(), 0);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovProximityBlackoutTest,
+	"ProjectVelkorran.Campaign.Detection.BlackoutRemovesRadarContactsFromTheHUD",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FSovProximityBlackoutTest::RunTest(const FString& Parameters)
+{
+	static_cast<void>(Parameters);
+	// Blackout is "no navigation or threat markers", and the presentation honoured it everywhere except
+	// the holographic radar, which drew hostile contacts regardless (audit UX2-04). The snapshot drops
+	// them at the read, so every surface built from it honours the modifier rather than just the painter.
+	FDetectionWorld F;
+	if (!TestTrue(TEXT("Ready detection fixture"), F.Valid())) { return false; }
+	auto* Settings = USovGameUserSettings::Get();
+	if (!TestNotNull(TEXT("Project settings"), Settings)) { return false; }
+	const FSovUserSettingsSnapshot Restore = Settings->GetSettingsSnapshot();
+	ON_SCOPE_EXIT { FString Ignored; Settings->ApplySettingsSnapshot(Restore, Ignored); };
+
+	// The protagonist already owns a detection component as a default subobject, and that is the one the
+	// HUD finds. The fixture's own instance is a second component, so driving it would prove nothing here.
+	auto* const Native = F.Player->FindComponentByClass<USovProximityDetectionComponent>();
+	if (!TestNotNull(TEXT("The protagonist's own detection component"), Native)) { return false; }
+	for (float Elapsed = 0.f; Elapsed < 1.f; Elapsed += .1f)
+	{ FSovProximityDetectionTestAccess::Observe(*Native, .1f); }
+	if (!TestTrue(TEXT("The hostile is detected before the modifier is considered"), Native->GetContacts().Num() > 0))
+	{ return false; }
+
+	FString Error;
+	FSovUserSettingsSnapshot Clear = Restore;
+	Clear.bModifierBlackout = false;
+	if (!TestTrue(TEXT("Settings without the modifier apply"), Settings->ApplySettingsSnapshot(Clear, Error))) { return false; }
+	FSovHolographicHUDSnapshot Seen;
+	TestTrue(TEXT("The HUD reads a live protagonist"), USovHolographicHUDWidget::ReadSnapshot(F.Controller, Seen));
+	TestTrue(TEXT("Without the modifier the radar receives the contact"), Seen.Contacts.Num() > 0);
+
+	FSovUserSettingsSnapshot Blackout = Restore;
+	Blackout.bModifierBlackout = true;
+	if (!TestTrue(TEXT("Blackout applies"), Settings->ApplySettingsSnapshot(Blackout, Error))) { return false; }
+	FSovHolographicHUDSnapshot Hidden;
+	TestTrue(TEXT("The HUD still reads a live protagonist under Blackout"), USovHolographicHUDWidget::ReadSnapshot(F.Controller, Hidden));
+	TestEqual(TEXT("Blackout removes the radar contacts"), Hidden.Contacts.Num(), 0);
+	// The modifier hides the marker; it does not blind the protagonist's own detection.
+	TestTrue(TEXT("Detection itself still tracks the hostile"), Native->GetContacts().Num() > 0);
 	return true;
 }
 #endif
