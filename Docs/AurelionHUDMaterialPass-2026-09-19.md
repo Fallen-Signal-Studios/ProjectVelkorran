@@ -1,5 +1,13 @@
 # Holographic HUD material pass, 19 September 2026
 
+## Gameplay-driven radar sweep
+
+The saved HUD EventGraph now routes `OnHolographicHUDUpdated.UpdatedView.SweepSeconds` into the RadarDisc dynamic material parameter `SweepSeconds`. The material draws a clockwise beam with a fading sector at 70 degrees/second, matching the native presentation clock. No autonomous material time or decorative enemy contacts were added. The UMG graph compiled and was explicitly saved in `HUDSweepGraph-20260919-093959-d1504fbb`.
+
+Live M12 PIE verification in `radar-sweep-live.json` measured identical view/material values at 36.844929 and 37.875427 seconds. `Tarrik-RadarSweep.png` captures the amber sector in actual play. Fresh saved-asset validation `HUDSweepVerify-20260919-095828-84135d2b` passed the existing ten native bindings, material references, health brush and compass checks. This establishes the sweep connection only; live radar contacts, named cap, functional ability pips, Selene switching, drawn-weapon ammo, high contrast, alternate scales and full reference fidelity remain incomplete.
+
+The first material author attempt (`HUDSweepMaterial-20260919-093843-9c61bc27`) failed its single-expression assertion: the asset contains an unused older custom expression. The corrected script follows the connected emissive graph and saved successfully through the retained editor. The initial live probe used an unavailable Python method spelling; the corrected `get_scalar_parameter_value` probe passed. These failed attempts are not qualifying evidence. Full validation baseline before this change is `20260919-093425-1b849158`. Post-change full validation `20260919-095940-30c55de2` passed the build invocation, all 719 matching automation tests, report coverage and source integrity; it does not establish full visual or gameplay acceptance.
+
 ## Reference housing follow-up
 
 Glyph validation: `HUDGlyphVerify-20260919-093307-13c58e89` exited 0, verifying saved material references, ten native bindings and the revised content padding, with no material compile failures, Python errors or ensures. Full validation `20260919-093425-1b849158` passed the build invocation, all 719 matching automation tests, report coverage and source integrity (95 warnings; packaged build not run). Baseline was full passing run `20260919-092119-35559ad7` immediately before this work. These gates do not establish complete HUD reference alignment or character gameplay correctness.
