@@ -2,6 +2,10 @@
 
 ## Reference housing follow-up
 
+Palette follow-up validation: `Saved/Validation/20260919-085830-07151a8b/summary.json` passed the full build invocation, all 719 matching automation tests, report coverage and source-integrity comparison. This qualifies the saved ArcFill/RadarDisc binding changes for this gate; it does not qualify Selene switching, live radar contacts, high contrast or reference fidelity.
+
+Live palette follow-up: ArcFill and RadarDisc now bind Color and Opacity to `View.Palette.Accent` in UMG. Both bindings were compiled and saved in `HUDPalette-20260919-085107-cca6c339`. The actual M12 PIE entry with Tarrik shows warm amber radar/band colors, shield and health filled, and the otherwise open center. `Tarrik-HUD.png` in that run directory was captured using `Shot showui` and includes editor chrome. It is partial visual evidence, not combat or Selene qualification. The existing Narrative compass overlaps the health plate; health currently reads as a flat orange rectangle and needs a beveled gradient closer to the red reference. Ammo was hidden with the weapon stowed. No live radar contacts or ability pips have been authored yet.
+
 The subsequent `author_hud_reference_housings.py` pass replaces the 56-tick arc with eight broad inset cells, a translucent dark body, bevel lines and a central split with chevrons. Radar now has a dark circular backing, three rings, cardinal ticks and a forward-facing player arrow. New `M_SovPlateHousing` and `M_SovAmmoHousing` UI materials supply angular backings without changing the widget tree. Plate padding was adjusted to fit the shield and health bars into those housings.
 
 ShieldBar and HealthBar now have UMG property bindings to `View.Palette.ShieldTo` and `View.Palette.HealthTo`. Both compiled in the designer and were explicitly saved through EditorAssetLibrary; initial toolbar save attempts had not written the asset. Other colors are still fixed and need palette bindings. These two bindings are not yet proven through protagonist switching in PIE.
