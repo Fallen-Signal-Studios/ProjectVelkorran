@@ -1,10 +1,12 @@
-# Engine implementation handoff, 18 September 2026
+# Engine implementation handoff
+
+Written 18 September 2026, revised 19 September.
 
 Everything here is a **content and editor task**. The C++ side is finished, committed and covered by
 tests; none of it does anything visible until the work below lands. Nothing in this document requires
 source changes, and if a task seems to, stop and say so rather than editing C++ to fit the content.
 
-Current at `HEAD` on `codex/aurelion-tdd-content-20260913`. 714 automation tests pass:
+Current at `eb6e28ab` on `codex/aurelion-tdd-content-20260913`. 719 automation tests pass:
 
 ```powershell
 .\Scripts\Validate-Unreal.ps1 -EngineRoot 'C:\Program Files\Epic Games\UE_5.7' -DisableAura
@@ -12,7 +14,21 @@ Current at `HEAD` on `codex/aurelion-tdd-content-20260913`. 714 automation tests
 
 Run that **without** `-SkipBuild` at least once before you start and once when you finish. A
 `-SkipBuild` run will not recompile untouched files, which is how an include-order break sat on the
-branch green for an hour today (fixed in `29d44739`).
+branch green for an hour (fixed in `29d44739`).
+
+## If you have an hour, do these two
+
+The creator is playing the M12 slice and reporting what breaks. Two things in this list affect that
+loop directly, and the rest can wait:
+
+1. **Task 2, the HUD layout.** He is currently playing with no health, no shield, no ammo, no radar
+   and no pips. Everything else he reports is filtered through flying blind.
+2. **Task 4, the lethal-floor cue.** On 18 September the floor was widened from the Elite to the
+   command-link carriers, so there are now several enemies that visibly refuse to die with no
+   explanation at all. This fixed a worse bug - killing a carrier used to dead-end the encounter -
+   but it traded an unexplained failure for an unexplained invulnerability, and he will hit it.
+
+Tasks 3, 5, 6, 7 and 9 are real but nothing is waiting on them today.
 
 ## Read this first
 
@@ -154,6 +170,13 @@ reason and handle, strongest first.
 
 ### 4. Author the lethal-floor cue
 
+> **Raised in priority on 19 September.** The floor now applies to the command-link carriers as well
+> as the Elite. That fixed a dead end - killing a carrier destroyed its link and failed the encounter
+> outright - but it means several ordinary enemies now shrug off damage with nothing on screen saying
+> why. Of everything in this document, this is the one most likely to be the next thing reported as
+> broken. It is not broken; it is unexplained, which plays the same.
+
+
 `USovLethalFloorComponent` holds the Aurelion Elite above a health floor while the phase mechanic is
 still outstanding, so the player can no longer lose a run by out-damaging the boss. The rule works;
 it is currently invisible.
@@ -174,6 +197,12 @@ invulnerability — but the Elite visibly cannot be finished, and the cue clears
 mechanic resolves.
 
 ### 5. Enter the decided gamepad chords
+
+> **Note on 19 September.** This design was settled before the interaction work landed on the 18th.
+> The chord layout below still stands - the button map has not changed - but nothing has re-checked
+> whether the weapon wheel claims the same face buttons, which is the open question flagged further
+> down. Check that first; it decides whether the layer works at all.
+
 
 The design is settled; entering it is about ten minutes in the Input editor. I could not script it —
 see the note at the end — so `IMC_Combat` is **unmodified**.
