@@ -40,8 +40,11 @@ def run(output_directory=None):
         report['default_abilities'] = abilities
         report['missing_effects'] = [e for e in EXPECTED_EFFECTS if not any(e in str(n) for n in effects)]
         report['missing_abilities'] = [a for a in EXPECTED_ABILITIES if not any(a in str(n) for n in abilities)]
+        report['parasite_melee_granted_once'] = abilities.count('GA_EclipseElite_Melee_C') == 1
+        report['legacy_humanoid_punch_absent'] = 'GA_Melee_Punch_Unarmed_C' not in abilities
         report['status'] = ('passed: the elite carries its boss durability and repertoire'
                             if not report['missing_effects'] and not report['missing_abilities']
+                            and report['parasite_melee_granted_once'] and report['legacy_humanoid_punch_absent']
                             else 'failed: authored configuration is missing entries')
     except Exception as exc:
         report['error'] = str(exc)
