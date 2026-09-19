@@ -16,6 +16,7 @@ import time
 import traceback
 import unreal
 from aurelion_wheel_input import Selector
+from aurelion_shot_progress import record_shot_progress
 import continue_aurelion_e1_input as e1
 import validate_owned_weapon_hud_readonly as hud_readonly
 
@@ -97,7 +98,8 @@ class Run(e1.Run):
         self.last_health_progress=self.started
         self.last_health_signature=None
         self.report.update(native_damage=[],firing_requests=[],aim_candidates=[],combat_tactics=[],reloads=[])
-        self.script_files = [Path(__file__).resolve(), Path(e1.__file__).resolve(), Path(hud_readonly.__file__).resolve()]
+        self.script_files = [Path(__file__).resolve(), Path(e1.__file__).resolve(), Path(hud_readonly.__file__).resolve(),
+                             Path(__file__).with_name('aurelion_shot_progress.py')]
         self.report['scripts_before'] = self.script_hashes()
 
     def owned_hud_gate(self, key):
@@ -469,13 +471,10 @@ class Run(e1.Run):
             if consumed or matched or seconds-pending['seconds']>=1.:
                 self.report['shot_outcomes'].append(dict(request=pending,consumed=consumed,
                     native_transactions=[row['transaction'] for row in matched],seconds=seconds))
-                control['misses']=0 if matched else control['misses']+consumed
                 control['shot']=None
-                if control['misses']>=2:
-                    control['flanks']+=1
-                    assert control['flanks']<=3, 'Three native-path flanks failed to produce damage; stop without wasting remaining ammunition'
+                if record_shot_progress(control, consumed, bool(matched)):
                     control['flank_origin']=e1._xyz(position);control['settle_since']=None
-                    control['misses']=0;self.path_target=None;self.path_points=[]
+                    self.path_target=None;self.path_points=[]
                     self.report['combat_tactics'].append(dict(kind='flank_after_two_consumed_rounds_without_damage',
                         position=e1._xyz(position),target=pending['target'],seconds=seconds))
         candidates=[p.character for p in self.e2.participants if p.required_for_victory
