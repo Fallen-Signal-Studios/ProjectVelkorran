@@ -535,6 +535,25 @@ class Run:
         actor = matches[0]
         interaction = pc.get_interaction_component()
         component = actor.interactable
+        # Kitbash/layout revisions can move the physical terminal away from the
+        # coarse traversal waypoint. Approach its current location through the
+        # same navigation/input path before asking for focus or holding interact.
+        position = pawn.get_actor_location()
+        destination = actor.get_actor_location()
+        interaction_range = float(component.get_editor_property('interaction_distance'))
+        if isinstance(actor, unreal.SovCampaignHandoffAnchor):
+            interaction_range = min(interaction_range, float(actor.get_editor_property('request_range')))
+        assert math.isfinite(interaction_range) and interaction_range > 0., 'Invalid authored interaction range'
+        dx, dy = position.x-destination.x, position.y-destination.y
+        distance = math.hypot(dx, dy)
+        if distance > interaction_range*.8:
+            assert distance > 1.
+            stand_off = interaction_range*.55
+            approach = (destination.x+dx/distance*stand_off, destination.y+dy/distance*stand_off)
+            self.report.setdefault('authored_interaction_approaches', []).append(dict(
+                actor=_path(actor), position=_xyz(destination), range=interaction_range, approach=approach))
+            self.start_route([approach], self.phase)
+            return
         look, error = self.look(world, pc, actor.get_actor_location())
         self.inject(look=look)
         admission = component.can_interact(pawn, interaction)

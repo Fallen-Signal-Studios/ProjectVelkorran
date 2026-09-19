@@ -145,7 +145,28 @@ def _capture(row):
     if _valid(shield) and shield.is_initialized():
         values = [float(shield.get_shield()), float(shield.get_max_shield())]
         row["shield"].update(current=values[0], maximum=values[1])
-        if shield_text:
+        surfaces = [widget for widget in unreal.ObjectIterator(unreal.SovHolographicHUDSurface)
+                    if widget.get_world() == world and widget.is_in_viewport()
+                    and widget.get_owning_player() == pc]
+        assert len(surfaces) <= 1, "Ambiguous current-player holographic HUD surfaces"
+        if surfaces:
+            surface = surfaces[0]
+            view = surface.get_holographic_hud_view()
+            bar = surface.get_editor_property('ShieldBar')
+            assert isinstance(bar, unreal.ProgressBar), "Holographic ShieldBar is missing"
+            expected = max(0., min(1., values[0]/values[1])) if values[1] > 0 else 0.
+            displayed = float(bar.get_editor_property('percent'))
+            agrees = (view.valid and abs(view.shield.current-values[0]) < .01
+                      and abs(view.shield.maximum-values[1]) < .01
+                      and abs(view.shield.fraction-expected) < .001
+                      and abs(displayed-expected) < .001
+                      and bar.get_visibility() not in (unreal.SlateVisibility.COLLAPSED, unreal.SlateVisibility.HIDDEN))
+            row['shield'].update(surface=_path(surface), bar=_path(bar), displayed_fraction=displayed,
+                                 expected_fraction=expected,
+                                 qualification='fraction_matches' if agrees else 'mismatch')
+            if not agrees:
+                row['not_ready_reasons'].append('Holographic ShieldBar differs from current pawn')
+        elif shield_text:
             # Native widget formats floats with zero fractional digits. Accept only that rounded value.
             parts = shield_text["text"].rsplit("/", 1)
             numbers = [re.findall(r"\d[\d\s,.\u00a0\u202f]*", part) for part in parts]

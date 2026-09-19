@@ -108,7 +108,7 @@ class Run(e1.Run):
         gate['elapsed'] = time.monotonic() - gate['started']
         assert observed['status'] != 'failed', 'Owned HUD structural failure: '+str(observed)
         assert gate['elapsed'] <= 1., 'Owned HUD did not settle within one second: '+str(observed)
-        gate['passed'] = observed['status'] == 'passed' and observed.get('shield', {}).get('qualification') == 'rounded_value_matches'
+        gate['passed'] = observed['status'] == 'passed' and observed.get('shield', {}).get('qualification') in ('fraction_matches', 'rounded_value_matches')
         return gate['passed']
 
     def inject(self, *args, wheel=0., **kwargs):

@@ -316,11 +316,21 @@ def inspect_enemies(world, output_path, require_initialized=True):
                         fail(identity+': unarmed role unexpectedly has an authored item loadout')
                     startup(not any('equipped' in item for item in row['inventory']),
                             identity+': unarmed role unexpectedly has a weapon in its inventory')
-                # Enforcer still intentionally carries its existing ranged placeholder.
-                expected_weapon = 'Weapon_DemoPistol_C' if role == 'Enforcer' else None
-                if expected_weapon:
-                    startup(any(item['class'].endswith('.'+expected_weapon) and item.get('equipped') for item in row['inventory']),
-                            identity+': authored weapon is not present/equipped in its normal inventory')
+                # Resolve the actual authored loadout: Enforcers now carry a rifle.
+                # A fixed historical pistol name strands a healthy roster in startup.
+                if role == 'Enforcer' and definition:
+                    required_weapons = []
+                    for grant in definition.get_editor_property('default_item_loadout'):
+                        for entry in grant.get_editor_property('items_to_grant'):
+                            item_class = entry.get_editor_property('item')
+                            if item_class and isinstance(unreal.get_default_object(item_class), unreal.WeaponItem):
+                                required_weapons.append(_path(item_class))
+                    row['required_authored_weapons'] = required_weapons
+                    if not required_weapons:
+                        fail(identity+': Enforcer has no explicit authored weapon grant')
+                    for expected_weapon in required_weapons:
+                        startup(any(item['class'] == expected_weapon and item.get('equipped') for item in row['inventory']),
+                                identity+': authored weapon is not present/equipped: '+expected_weapon)
             if isinstance(controller, unreal.NarrativeNPCController):
                 read(row, 'current_tree', controller.get_current_tree)
         owned_actors = [a for a in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.SovNPCCharacterBase)
