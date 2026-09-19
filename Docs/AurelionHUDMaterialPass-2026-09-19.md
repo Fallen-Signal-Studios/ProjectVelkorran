@@ -19,3 +19,9 @@ Evidence:
 Next: implement the named identity plate, resource labels, ability pips, dynamic protagonist/accessibility palettes and live/memory radar contacts in UMG. Python reflection does not expose the editor binding structures. Use the Blueprint editor for that pass; do not add another runtime HUD owner or substitute decorative contacts. The current fixed colors are temporary, not evidence of either protagonist palette working. Verify both protagonists, Blackout, high contrast and UI scaling in actual PIE with `Shot showui` captures. The transparent backings are not yet suitable for high-contrast mode; its opaque palette binding is required before acceptance.
 
 The lethal-floor cue remains the next handoff priority after HUD completion.
+
+## Supplied visual references
+
+The creator reattached the actual references after the material pass. They are retained as design references at `Art/References/Aurelion/HUD/Tarrik.jpg` and `Selene.jpg`; do not import them as flat HUD textures. Both were visually inspected in the conversation.
+
+The current material pass is too skeletal. The references show dark translucent housings, a substantial beveled health plate, a thin separate shield trough, six inset pip cells, a named top cap, angular ammo housing, a backed circular radar with a directional sweep, and a substantial bottom band split by central chevrons. The arc has broad insets rather than the current 56 fine ticks. Match these silhouettes, stroke weights and proportions before calling this a reference-aligned pass. Tarrik's health is red inside warm gold trim; Selene's health is teal inside pale cyan trim. Preserve the large unobstructed center. Faint framing follows the screen edge; noisy plasma must not overwhelm those clean housings.
