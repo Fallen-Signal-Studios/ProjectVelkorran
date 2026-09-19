@@ -1,5 +1,17 @@
 # Holographic HUD material pass, 19 September 2026
 
+## Reference housing follow-up
+
+The subsequent `author_hud_reference_housings.py` pass replaces the 56-tick arc with eight broad inset cells, a translucent dark body, bevel lines and a central split with chevrons. Radar now has a dark circular backing, three rings, cardinal ticks and a forward-facing player arrow. New `M_SovPlateHousing` and `M_SovAmmoHousing` UI materials supply angular backings without changing the widget tree. Plate padding was adjusted to fit the shield and health bars into those housings.
+
+ShieldBar and HealthBar now have UMG property bindings to `View.Palette.ShieldTo` and `View.Palette.HealthTo`. Both compiled in the designer and were explicitly saved through EditorAssetLibrary; initial toolbar save attempts had not written the asset. Other colors are still fixed and need palette bindings. These two bindings are not yet proven through protagonist switching in PIE.
+
+The normal editor pass is recorded in `Saved/Validation/Aurelion/HUDDesigner-20260919-082919-f568ce0a/ReferenceHousings/result.json`; all ten native bindings still match. Designer inspection confirms the broader arc, backed radar and angular housings render. This is not a gameplay capture or reference-match qualification. The first component-mask connection attempt failed before saving; changing its input to the default unnamed pin resolved it. Intermediate graph reconstruction produced missing-input shader warnings, so a fresh-process load must verify the completed graphs separately.
+
+Remaining reference work includes the named cap, health/shield glyphs, six functional ability pips, actual radar contacts and sweep, full palette/high-contrast handling, frame-edge detail, and proportions/overlap checks at runtime. In the designer, the arc still passes beneath the right side of the radar and the plate needs further contour refinement. The historical pass below describes the earlier state, superseded by this follow-up where noted.
+
+Follow-up validation: fresh editor `HUDHousingVerify-20260919-084805-db8414d8` exited 0, verified all four material references and ten native bindings, and logged no material compile failures, Python errors or compiler ensures. Full validation `20260919-084931-06ec192b` passed the build invocation, all 719 tests and source-integrity check. The preceding `20260919-084615-a04738e3` run passed build/tests but was rejected because verification scripts changed during the run; it is not qualifying evidence. These checks still do not prove live palette switching or visual/gameplay acceptance.
+
 This is an incomplete presentation pass on handoff task 2. It does not qualify the reference match or the 90% visual/gameplay goal.
 
 `WBP_SovHolographicHUD` now uses a procedural UI material for the segmented Echo sweep, driven by the existing native `ArcFill` scalar `Fill`. The opaque rectangular Echo overlay is collapsed. The radar background is a transparent concentric reticle rather than a solid square. The survival bars have thinner shield/stamina strokes around a heavier health stroke, with transparent region backings. Their existing native value bindings and automatic region placement remain intact.

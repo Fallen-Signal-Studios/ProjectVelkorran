@@ -11,9 +11,9 @@ author = unreal.SovWidgetTreeAuthoringLibrary
 bindings = list(author.describe_widget_bindings(bp))
 assert len(bindings) == 10 and all('typeMatches=1' in row for row in bindings)
 materials = {}
-for widget_name, material_name in [('ArcFill', 'M_SovEchoSegmentedArc'), ('RadarDisc', 'M_SovRadarReticle')]:
+for widget_name, material_name in [('ArcFill', 'M_SovEchoSegmentedArc'), ('RadarDisc', 'M_SovRadarReticle'), ('PlateRegion', 'M_SovPlateHousing'), ('AmmoRegion', 'M_SovAmmoHousing')]:
     widget = author.find_widget_in_tree(bp, widget_name)
-    material = widget.get_editor_property('brush').get_editor_property('resource_object')
+    material = widget.get_editor_property('background' if widget_name.endswith('Region') else 'brush').get_editor_property('resource_object')
     expected = '/Game/Aurelion/UI/HUD/' + material_name
     assert material.get_path_name() == expected + '.' + material_name
     assert material.get_editor_property('material_domain') == unreal.MaterialDomain.MD_UI
