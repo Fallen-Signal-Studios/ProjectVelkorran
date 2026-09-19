@@ -22,6 +22,7 @@ mat = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
 mat.set_editor_property('blend_mode', unreal.BlendMode.BLEND_TRANSLUCENT)
 mat.set_editor_property('shading_model', unreal.MaterialShadingModel.MSM_UNLIT)
 mat.set_editor_property('two_sided', True)
+mat.set_editor_property('used_with_skeletal_mesh', True)
 shape = edit.create_material_expression(mat, unreal.MaterialExpressionCustom, -200, 0)
 shape.set_editor_property('output_type', unreal.CustomMaterialOutputType.CMOT_FLOAT4)
 inputs = []
