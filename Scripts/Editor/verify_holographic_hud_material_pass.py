@@ -23,6 +23,12 @@ assert author.find_widget_in_tree(bp, 'EchoBar').get_visibility() == unreal.Slat
 plate_padding = author.find_widget_in_tree(bp, 'PlateBars').slot.get_editor_property('padding')
 ammo_padding = author.find_widget_in_tree(bp, 'AmmoText').slot.get_editor_property('padding')
 assert plate_padding.left == 90.0
+identity = author.find_widget_in_tree(bp, 'ProtagonistName')
+assert isinstance(identity, unreal.TextBlock)
+assert isinstance(identity.slot, unreal.OverlaySlot)
+assert identity.get_parent() == author.find_widget_in_tree(bp, 'PlateBars').get_parent()
+assert identity.get_editor_property('font').get_editor_property('letter_spacing') == 1400
+assert identity.get_editor_property('font').get_editor_property('size') == 12
 assert (ammo_padding.left, ammo_padding.top, ammo_padding.right, ammo_padding.bottom) == (62.0, 8.0, 18.0, 8.0)
 health = author.find_widget_in_tree(bp, 'HealthBar')
 assert health.get_editor_property('bar_fill_style') == unreal.ProgressBarFillStyle.MASK

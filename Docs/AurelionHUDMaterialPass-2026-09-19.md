@@ -1,5 +1,16 @@
 # Holographic HUD material pass, 19 September 2026
 
+## Protagonist nameplate
+
+The plate now contains an Overlay with the existing survival bars and a centered ProtagonistName TextBlock. The text binding reads GetHolographicHUDView.Protagonist, exactly matches Sov.Character.Player.Selene, and selects localized SELENE or TARRIK text. Color and Opacity binds to View.Palette.Accent. The 12-point type uses 1400 letter spacing; the original bar padding remains on PlateBars, so adding the cap does not move the bars. This is authored in the existing UMG asset, with no C++ changes or widget reconstruction.
+
+Normal editor session `HUDIdentity-20260919-100145-6cf19d70` compiled and explicitly saved the Blueprint. M12 PIE showed TARRIK above the shield without overlap; widening the initial 350 spacing to 1400 and binding the palette produced the amber cap in `UserData/Saved/Screenshots/WindowsEditor/ScreenShot00000.png`. The read-only probe retrieved TARRIK from the live TextBlock. Its first attempt used an unavailable TextBlock color getter; the corrected probe reports color as visually inspected rather than claiming an evaluated color equality. Its opaque GameplayTag string is not identity evidence. Selene gameplay, switching and high contrast remain unverified.
+
+Fresh process `HUDIdentityVerify-20260919-102124-bb7bbf2e` exited 0, verified the name widget's type, overlay parent, font settings, all ten native bindings and existing material references, with no compiler ensures or Python errors. Full validation `20260919-102235-58ede5ae` passed the build invocation without SkipBuild, 719 matching automation tests, coverage and source-integrity checks. The pre-change full baseline was `20260919-095940-30c55de2`. These gates do not establish reference fidelity or full HUD/gameplay completion.
+
+Remaining priority HUD work includes functional ability pips, live radar contacts and blackout behavior, both-protagonist runtime validation, high-contrast presentation, and further housing/frame polish. The lethal-floor gameplay cue remains the next handoff priority after HUD visibility. Creator-owned M12 and Cinder Sticky Grenade changes were not staged with this pass.
+
+
 ## Gameplay-driven radar sweep
 
 The saved HUD EventGraph now routes `OnHolographicHUDUpdated.UpdatedView.SweepSeconds` into the RadarDisc dynamic material parameter `SweepSeconds`. The material draws a clockwise beam with a fading sector at 70 degrees/second, matching the native presentation clock. No autonomous material time or decorative enemy contacts were added. The UMG graph compiled and was explicitly saved in `HUDSweepGraph-20260919-093959-d1504fbb`.
