@@ -87,9 +87,22 @@ def tick(delta):
             container=children[0].get_parent()
             assert container.get_name()=='VerticalBox_0'
             container.set_visibility(unreal.SlateVisibility.VISIBLE)
+            minimaps=[w for w in unreal.WidgetLibrary.get_all_widgets_of_class(world,unreal.UserWidget,False)
+                      if w.get_name()=='WBP_Navigator_Map_Minimap' and w.get_path_name().startswith(hud.get_path_name()+'.')]
+            assert len(minimaps)==1, 'Expected the retained legacy minimap under the actual HUD'
+            minimap=minimaps[0]
+            assert minimap.get_parent().get_name()=='RetiredMinimapContainer'
+            minimap.get_parent().set_visibility(unreal.SlateVisibility.VISIBLE)
+            report['legacy_minimap_restore_stress']=dict(parent=str(minimap.get_parent().get_visibility()),
+                child=str(minimap.get_visibility()))
+            assert minimap.get_visibility()==unreal.SlateVisibility.COLLAPSED, 'Restore exposed legacy minimap'
             report['restore_stress_method']='Explicit visible legacy parent after SetHUDHidden events; controlled UI state only'
             stage('hud_restored');return
         if phase=='hud_restored' and elapsed>2:
+            hud=pc.get_narrative_gameplay_hud()
+            minimaps=[w for w in unreal.WidgetLibrary.get_all_widgets_of_class(world,unreal.UserWidget,False)
+                      if w.get_name()=='WBP_Navigator_Map_Minimap' and w.get_path_name().startswith(hud.get_path_name()+'.')]
+            assert len(minimaps)==1 and minimaps[0].get_visibility()==unreal.SlateVisibility.COLLAPSED, 'Legacy minimap resurfaced after restore'
             readout=owned_hud.sample()
             report['after_cinematic_restore']=readout
             assert readout['legacy_readout_retired'], 'Visible legacy parent re-enabled weapon readout'

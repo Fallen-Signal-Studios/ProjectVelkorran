@@ -1,5 +1,17 @@
 # Holographic HUD material pass, 19 September 2026
 
+## Legacy minimap retirement across cinematic restores
+
+The full `PhaseRecoveryRoute-20260919-144545-43c03dbe` replay exposed an empty legacy minimap ring below the holographic ammo panel. The old minimap was a collapsed direct child of `CanvasPanel_Base`, so the cinematic restore boundary could reveal it. `retire_legacy_aurelion_minimap.py` preserves the minimap widget and its graph references beneath a new `RetiredMinimapContainer` overlay. Its original canvas layout, auto-size and Z order move to that wrapper; the minimap stays collapsed even when the wrapper becomes visible. No native layout or mission content is changed.
+
+Authoring `MinimapRetire-20260919-150455-a189eafb` saved the asset after nesting/layout checks. Unreal emitted a handled missing-widget-GUID ensure and a dependency compile enqueue ensure during this authoring run. The engine's WidgetBlueprintCompiler assigns the missing GUID in that recovery path. These warnings are recorded rather than treating an exit-zero authoring run as clean compilation; a fresh saved-asset compile is required below.
+
+Fresh visible `MinimapRestoreFixture-20260919-150613-4ac381c6` passed the controlled restore, ammo and Blackout fixture. With both legacy containers explicitly made Visible, the minimap and weapon children remained Collapsed. Actual Cinderline readback was 32/218; one native detector contact was presented normally, zero under Blackout, and one after restoring the setting. Direct inspection of `hud-firearm-live-contact.png` shows the actual Tarrik HUD with no upper-right legacy ring or lower-right ammo duplicate. It includes editor chrome and is a controlled fixture, not proof of subsequent mission handoffs or complete reference fidelity. The continuous route observer now also records minimap visibility so a later full replay can check that lifecycle.
+
+Saved-asset checks `MinimapSavedVerify-20260919-150807-8a0d5f35` and `MinimapSavedPreloaded-20260919-150931-4bfc2d7f` confirmed nesting and no recurring missing-GUID warning, but hit lazy controller-data compile enqueue ensures for keyboard and then Xbox respectively. The final verifier explicitly loads both classes configured in DefaultGame.ini before compiling the HUD. Fresh `MinimapSavedAllInputs-20260919-151049-92a20ab9` passed with no Python error or compiler ensure. It compiles in memory and exports the saved widget; it never saves assets.
+
+Full post-change validation `20260919-151130-03d3c571` passed the build invocation without SkipBuild, all 719 automation tests, report coverage and source integrity. No tracked files changed during the gate. The pre-change baseline was `20260919-144405-b6f7fbcb`. The creator-owned M12 map retained SHA256 `B7CEEAB512272FC80FE1E3B3454B08DF40BF40BC0E065C3C90993B910D6780D5`; the grenade assets were untouched. The expanded continuous observer still needs a new full mission run for the minimap-specific handoff check.
+
 ## Nested legacy readout retirement
 
 `WBP_AurelionGameplayHUD.WBP_WeaponInfo` is now explicitly collapsed in addition to its `VerticalBox_0` parent. The nested child has no self-visibility binding or SetVisibility writer in the exported owned weapon Blueprint. The gameplay HUD graph has a SetHUDHidden loop over direct CanvasPanel_Base children which can restore their visibility; a nested retirement survives a visible parent without altering menus, interaction, weapon data or the holographic surface. This changes the owned HUD asset only, preserving its tree and graph references.
