@@ -14,6 +14,8 @@ assert cdo.get_editor_property('OverlayMaterial') == material
 assert cdo.get_editor_property('Apply to Character?')
 assert not cdo.get_editor_property('Apply to Mainhand Weapon?')
 assert not cdo.get_editor_property('Apply to Offhand Weapon?')
+assert cdo.get_editor_property('auto_destroy_on_remove')
+assert cdo.get_editor_property('auto_destroy_delay') == 0.0
 assert material.get_editor_property('blend_mode') == unreal.BlendMode.BLEND_TRANSLUCENT
 assert material.get_editor_property('shading_model') == unreal.MaterialShadingModel.MSM_UNLIT
 assert material.get_editor_property('used_with_skeletal_mesh')

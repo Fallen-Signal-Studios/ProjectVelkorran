@@ -1,10 +1,22 @@
 # Aurelion phase-protection cue
 
+## Deferred startup application
+
+The content graph now starts a looping 0.05-second `TryApplyFloorOverlay` timer from WhileActive. That parameterless function casts the cue owner to NarrativeCharacter and guards `GetCharacterVisual` before calling GetMeshes. It assigns overlays to each returned mesh and clears the retry only after an assignment executes. An empty mesh array leaves the retry running. Loop completion returns without clearing it. Auto Destroy on Remove is enabled with zero delay; the engine's cue recycling cancels object timers with the default `AbilitySystem.ClearCueNotifyTimers=1`.
+
+The normal Blueprint editor compiled and saved this graph in `LethalCueMeshes-20260919-110822-eebeb48e`. Its native T3D export confirms looping and Max Once Per Frame are enabled and that the timer is cleared from the mesh-assignment path. The previous unreachable WhileActive mesh chain remains disconnected; the actual entry starts the timer.
+
+The first early-start probe (`LethalCueStartup-20260919-110659-e1bdd6f4`) activated all four actors before their visuals existed, but found a missing Weaver overlay. That intermediate graph cleared the timer on loop completion even with no meshes. The final graph fixes that case. The probe also now allows 0.2 seconds after meshes first appear before checking the 0.05-second retry, avoiding an assertion in the loading tick itself. The preserved startup probe tests held and immediately cancelled cases for both classes, then a second activation/removal cycle for all four actors.
+
+Fresh process `LethalCueStartup-20260919-111152-0bb59ffd` passed. All four actors were activated at game time 0.4 seconds with absent character visuals. Both held actors later received the lattice; both cancelled actors remained clear. All four then passed reactivation and removal. No Python errors, Accessed None messages or ensures appeared. This is isolated lifecycle evidence, not visual, damage, poise, multiplayer or campaign-phase acceptance.
+
+Full post-change validation `20260919-111327-f7c31141` passed the build invocation without SkipBuild, all 719 automation tests, coverage and source integrity. No tracked files changed during validation. The pre-change full baseline was `20260919-104827-e58010bd`.
+
 ## Runtime findings and material correction
 
-`LethalCueRuntime-20260919-104249-81ddb385` assigned the existing Elite and Weaver NPC definitions through `AuthoredPlacedDefinition` before simulation. Unlike raw spawns, these actors initialize their Narrative character visuals. The test exposed a real startup race: activating the floor at four seconds entered `GC_AurelionLethalFloor.GetMeshes` before the Weaver visual existed, logged `Accessed None`, and left the Weaver without its overlay. This cue is not campaign-ready. Its content graph needs to tolerate an absent visual and apply when `CharacterVisualInitialized` fires, with removal cancelling that deferred application.
+`LethalCueRuntime-20260919-104249-81ddb385` assigned the existing Elite and Weaver NPC definitions through `AuthoredPlacedDefinition` before simulation. Unlike raw spawns, these actors initialize their Narrative character visuals. The test exposed a real startup race: activating the floor at four seconds entered `GC_AurelionLethalFloor.GetMeshes` before the Weaver visual existed, logged `Accessed None`, and left the Weaver without its overlay. At that point the cue was not campaign-ready: its graph needed deferred application with cancellation on removal. The timer-based content fix and limited runtime evidence are recorded above.
 
-The same run reported a missing skeletal-mesh usage flag on the lattice material. `LethalCueUsage-20260919-104546-9fcb87ed` explicitly enabled and saved that flag, recompiled the material, and passed configuration verification. The authoring and verification scripts now require the flag. The copied cue graph's initialization race remains unfixed.
+The same run reported a missing skeletal-mesh usage flag on the lattice material. `LethalCueUsage-20260919-104546-9fcb87ed` explicitly enabled and saved that flag, recompiled the material, and passed configuration verification. The authoring and verification scripts now require the flag. The copied cue graph's initialization race was still unfixed at that point; the deferred startup pass above supersedes it.
 
 `LethalCueReadyRuntime-20260919-104652-451dddfc` then waited for both initialized visuals before activation. Both classes received the correct lattice material and cleared all visual mesh overlays through two activation/removal cycles. No missing skeletal usage warning or Python error was reported. `Scripts/Validation/Aurelion/probe_lethal_floor_cue_lifecycle.py` preserves this limited simulation probe. It does not test the startup race, visual appearance, phase resolution, damage or poise.
 
