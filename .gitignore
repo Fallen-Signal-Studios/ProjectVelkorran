@@ -286,3 +286,9 @@ Content/TwinBladesBundle/TwinBladesAndTwinSword/Map/Materials/Texture/T_Ground_O
 /Content/Items/Loadouts/*
 !/Content/Items/Loadouts/IC_Tarrik.uasset
 !/Content/Items/Loadouts/IC_Selene.uasset
+
+# Owned protagonist graphs, including camera integration with the Sovereign controller.
+!/Content/PlayerCharacters/
+/Content/PlayerCharacters/*
+!/Content/PlayerCharacters/BP_SovTarrik.uasset
+!/Content/PlayerCharacters/BP_SovSelene.uasset

@@ -17,6 +17,8 @@ states = {}
 saw_world = False
 damage_bindings = {}
 report = dict(status='observing', read_only=True, transitions=[], damage=[], findings=[])
+cue_class = unreal.load_class(None, '/Game/Cues/Aurelion/GC_AurelionLethalFloor.GC_AurelionLethalFloor_C')
+assert cue_class
 
 def write():
     out.write_text(json.dumps(report, indent=2))
@@ -32,7 +34,9 @@ def finish(reason):
             except TypeError as exc:
                 # PIE teardown can invalidate the Python wrapper before IsValid
                 # can marshal it. Its native delegate no longer exists either.
-                if 'ObjectInstance is null' not in str(exc):
+                message = str(exc)
+                if ('ObjectInstance is null' not in message
+                        and "Cannot nativize 'NarrativeAbilitySystemComponent' as 'Object'" not in message):
                     raise
     finally:
         damage_bindings.clear()
@@ -73,6 +77,14 @@ def tick(delta):
         if not world:
             return
         saw_world = True
+        cues_by_owner = {}
+        for cue in unreal.GameplayStatics.get_all_actors_of_class(world, cue_class):
+            owner = cue.get_owner()
+            if owner:
+                mid = cue.get_editor_property('OverlayMID')
+                cues_by_owner.setdefault(owner.get_path_name(), []).append(dict(
+                    actor=cue.get_path_name(), timer_active=unreal.SystemLibrary.is_timer_active(cue, 'TryApplyFloorOverlay'),
+                    material=mid.get_path_name() if mid else None))
         for actor in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.SovNPCCharacterBase):
             floor = actor.get_component_by_class(unreal.SovLethalFloorComponent)
             if not floor or actor.get_editor_property('hidden') or actor.is_character_pending_load():
@@ -87,12 +99,15 @@ def tick(delta):
                     parent = material.get_editor_property('parent') if isinstance(material, unreal.MaterialInstance) else material
                     overlays.append(dict(mesh=mesh.get_path_name(), material=material.get_path_name(), parent=parent.get_path_name() if parent else ''))
             held = floor.is_floor_held()
-            key = (held, tuple((r['mesh'], r['parent']) for r in overlays))
             path = actor.get_path_name()
+            mesh_paths = sorted(m.get_path_name() for m in meshes)
+            cues = sorted(cues_by_owner.get(path, []), key=lambda r: r['actor'])
+            key = (held, tuple(mesh_paths), tuple((r['mesh'], r['parent']) for r in overlays),
+                   tuple((r['actor'], r['timer_active'], r['material']) for r in cues))
             if states.get(path) != key:
                 states[path] = key
                 report['transitions'].append(dict(actor=path, held=held, health=actor.get_health(),
-                    overlays=overlays, elapsed=now-started))
+                    overlays=overlays, meshes=mesh_paths, cues=cues, elapsed=now-started))
                 write()
     except Exception as exc:
         report['findings'].append(str(exc))
