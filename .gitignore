@@ -280,3 +280,9 @@ Content/TwinBladesBundle/TwinBladesAndTwinSword/Map/Materials/Texture/T_Ground_O
 
 # Local Claude Code permissions are per-machine; the shared guidance and skills are tracked.
 .claude/settings.local.json
+
+# Project-owned starting loadouts: grant ammo before weapons for native initial reload.
+!/Content/Items/Loadouts/
+/Content/Items/Loadouts/*
+!/Content/Items/Loadouts/IC_Tarrik.uasset
+!/Content/Items/Loadouts/IC_Selene.uasset
