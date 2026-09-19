@@ -98,15 +98,24 @@ def _capture(row):
     child = children[0]
     assert _path(child.get_class()) == WEAPON_CLASS, "Current HUD still contains an unowned weapon child"
     assert child.get_owning_player() == pc, "Weapon child has another owning player"
+    container = child.get_parent()
+    retired = (container is not None and container.get_name() == 'VerticalBox_0'
+               and container.get_visibility() == unreal.SlateVisibility.COLLAPSED)
+    surfaces = [widget for widget in unreal.ObjectIterator(unreal.SovHolographicHUDSurface)
+                if widget.get_world() == world and widget.is_in_viewport()
+                and widget.get_owning_player() == pc]
+    assert len(surfaces) <= 1, "Ambiguous current-player holographic HUD surfaces"
     row.update(hud=_path(hud), hud_class=_path(hud.get_class()), weapon_widget=_path(child),
-               weapon_widget_class=_path(child.get_class()), visible=bool(hud.is_visible() and child.is_visible()))
+               weapon_widget_class=_path(child.get_class()), legacy_readout_retired=retired,
+               visible=bool(surfaces[0].is_visible() if retired and surfaces else hud.is_visible() and child.is_visible() and not retired))
     if not row["visible"]:
         row["not_ready_reasons"].append("HUD/weapon child is not visible")
-    _check(row, "owner", _path(child.get_editor_property("Owner")), _path(pawn))
-    _check(row, "mainhand", _path(child.get_editor_property("MainhandWeapon")), initial_inventory["mainhand"])
-    _check(row, "offhand", _path(child.get_editor_property("OffhandWeapon")), initial_inventory["offhand"])
-    _check(row, "wielded", sorted(_path(item) for item in child.get_editor_property("OurWeapons")), initial_inventory["wielded"])
-    _check(row, "dual_wielding", bool(child.get_editor_property("DualWielding")), len(initial_inventory["wielded"]) > 1)
+    if not retired:
+        _check(row, "owner", _path(child.get_editor_property("Owner")), _path(pawn))
+        _check(row, "mainhand", _path(child.get_editor_property("MainhandWeapon")), initial_inventory["mainhand"])
+        _check(row, "offhand", _path(child.get_editor_property("OffhandWeapon")), initial_inventory["offhand"])
+        _check(row, "wielded", sorted(_path(item) for item in child.get_editor_property("OurWeapons")), initial_inventory["wielded"])
+        _check(row, "dual_wielding", bool(child.get_editor_property("DualWielding")), len(initial_inventory["wielded"]) > 1)
     vitals = [widget for widget in widgets if _valid(widget) and widget.get_world() == world
               and widget.get_owning_player() == pc and isinstance(widget, unreal.SovCombatVitalsWidget)]
     assert len(vitals) <= 1, "Ambiguous current-player native vitals widgets"
@@ -122,14 +131,37 @@ def _capture(row):
             assert shield_text is None, "Ambiguous native Shield label"
             shield_text = {"path": path, "text": str(text.get_text()), "visibility": str(text.get_visibility())}
     row["bound_weapon_text"] = child_text
+    if retired:
+        assert surfaces, 'Retired legacy readout requires the actual holographic surface'
+        surface = surfaces[0]
+        view = surface.get_holographic_hud_view()
+        assert view.valid, 'Holographic view is not ready'
+        expected_ammo = main is not None and main['ammo_in_clip'] >= 0
+        _check(row, 'holographic_has_ammo', view.has_ammo, expected_ammo)
+        region = surface.get_editor_property('AmmoRegion')
+        visible_ammo = region.get_visibility() not in (unreal.SlateVisibility.COLLAPSED, unreal.SlateVisibility.HIDDEN)
+        _check(row, 'holographic_ammo_visible', visible_ammo, expected_ammo)
+        actual_text = str(surface.get_editor_property('AmmoText').get_text())
+        if expected_ammo:
+            _check(row, 'holographic_clip', view.ammo_in_clip, main['ammo_in_clip'])
+            _check(row, 'holographic_reserve', view.ammo_reserve, main['spare_ammo'])
+            numbers = [int(''.join(c for c in part if c.isdecimal()))
+                       for part in actual_text.split('/') if any(c.isdecimal() for c in part)]
+            _check(row, 'holographic_ammo_text', numbers, [main['ammo_in_clip'], main['spare_ammo']])
+        else:
+            _check(row, 'holographic_ammo_text_empty', actual_text, '')
     expected_name = (main["single_weapon_display_name"] if main else "")
     if len(initial_inventory["wielded"]) > 1:
         expected_name = (main["display_name"] if main else "") + " | " + (off["display_name"] if off else "")
-    if "TextBlock_WeaponName" in child_text:
+    if retired:
+        pass  # Collapsed legacy text is not the visible presentation contract.
+    elif "TextBlock_WeaponName" in child_text:
         _check(row, "weapon_name_text", child_text["TextBlock_WeaponName"]["text"], expected_name)
     else:
         row["not_ready_reasons"].append("Weapon name TextBlock unavailable")
     for item, suffix in ((main, ""), (off, "_Alt")):
+        if retired:
+            break
         if item is None or not item["required_ammo"]:
             continue  # The original graph has distinct non-ammunition/absent-item display branches.
         for label, key in (("TextBlock_AmmoInClip", "ammo_in_clip"), ("TextBlock_SpareAmmo", "spare_ammo")):

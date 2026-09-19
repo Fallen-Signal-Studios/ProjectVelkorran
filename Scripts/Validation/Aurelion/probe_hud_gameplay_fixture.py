@@ -2,8 +2,10 @@
 Uses Narrative wield API and a spawned validation NPC, not physical input or mission progress.
 Run in the isolated visible Aurelion editor runner. Writes no content assets.
 """
-import unreal, os, json, time
+import unreal, os, json, time, sys
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import validate_owned_weapon_hud_readonly as owned_hud
 OUT=Path(os.environ['SOV_AURELION_RUN_DIRECTORY'])
 settings=unreal.GameUserSettings.get_game_user_settings()
 original_settings=settings.get_settings_snapshot()
@@ -64,6 +66,10 @@ def tick(delta):
             ammo_text=str(surface.get_editor_property('AmmoText').get_text())
             assert ammo_text==f'{clip} / {reserve}',ammo_text
             assert surface.get_editor_property('AmmoRegion').get_visibility()!=unreal.SlateVisibility.COLLAPSED
+            readout = owned_hud.sample()
+            assert readout['status'] == 'passed', str(readout)
+            assert readout['legacy_readout_retired'], 'Legacy bottom-right ammo is still present'
+            report['owned_hud_readback'] = readout
             report['samples'].append(dict(phase='ammo',weapon=item.get_class().get_path_name(),clip=clip,reserve=reserve,text=ammo_text,protagonist=str(unreal.GameplayTagLibrary.get_tag_name(view.protagonist))))
             location=pawn.get_actor_location()+pawn.get_actor_forward_vector()*350
             target=unreal.SovMeleeValidationLibrary.spawn_validation_npc(world,unreal.load_asset('/Game/Aurelion/Enemies/NPC_AurelionEnforcer'),unreal.Transform(location,unreal.Rotator(),unreal.Vector(1,1,1)))
