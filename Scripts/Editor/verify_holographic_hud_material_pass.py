@@ -20,6 +20,16 @@ for widget_name, material_name in [('ArcFill', 'M_SovEchoSegmentedArc'), ('Radar
     assert material.get_editor_property('blend_mode') == unreal.BlendMode.BLEND_TRANSLUCENT
     materials[widget_name] = material.get_path_name()
 assert author.find_widget_in_tree(bp, 'EchoBar').get_visibility() == unreal.SlateVisibility.COLLAPSED
+health = author.find_widget_in_tree(bp, 'HealthBar')
+assert health.get_editor_property('bar_fill_style') == unreal.ProgressBarFillStyle.MASK
+for field in ('fill_image', 'background_image'):
+    resource = health.get_editor_property('widget_style').get_editor_property(field).get_editor_property('resource_object')
+    assert resource.get_path_name() == '/Game/Aurelion/UI/HUD/M_SovHealthBeveledFill.M_SovHealthBeveledFill'
+    materials['HealthBar.'+field] = resource.get_path_name()
+gameplay_hud = unreal.load_asset('/Game/Aurelion/UI/WBP_AurelionGameplayHUD')
+compass = author.find_widget_in_tree(gameplay_hud, 'WBP_Navigator_Compass')
+assert isinstance(compass.slot, unreal.CanvasPanelSlot)
+assert compass.slot.get_offsets().top == 148.0
 assert not unreal.EditorLoadingAndSavingUtils.get_dirty_map_packages()
 (out / 'hud-material-verification.json').write_text(json.dumps({
     'status': 'passed', 'bindings': bindings, 'materials': materials,
