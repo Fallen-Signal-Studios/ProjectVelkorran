@@ -1,4 +1,4 @@
-"""Collapse only the legacy vitals/weapon container now covered by the holographic HUD."""
+"""Retire legacy ammo through cinematic hide/show as well as initial construction."""
 import json
 import os
 import shutil
@@ -13,6 +13,8 @@ container = author.find_widget_in_tree(bp, 'VerticalBox_0')
 assert isinstance(container, unreal.VerticalBox)
 assert {w.get_name() for w in container.get_all_children()} == {'WBP_WeaponInfo', 'WBP_PlayerInfo_HUD'}
 assert author.find_widget_in_tree(bp, 'WBP_PlayerInfo_HUD').get_visibility() == unreal.SlateVisibility.COLLAPSED
+weapon = author.find_widget_in_tree(bp, 'WBP_WeaponInfo')
+assert weapon.get_parent() == container
 source = Path(unreal.Paths.project_dir()) / 'Content/Aurelion/UI/WBP_AurelionGameplayHUD.uasset'
 backup = out / 'WBP_AurelionGameplayHUD.before-retire-readout.uasset'
 assert not backup.exists()
@@ -20,8 +22,12 @@ shutil.copy2(source, backup)
 tree = list(author.describe_widget_tree(bp))
 before = str(container.get_visibility())
 container.set_visibility(unreal.SlateVisibility.COLLAPSED)
+# SetHUDHidden deliberately restores direct canvas children after cinematics.
+# Retire this nested child too; its own visibility has no binding or graph writer.
+weapon.set_visibility(unreal.SlateVisibility.COLLAPSED)
 unreal.BlueprintEditorLibrary.compile_blueprint(bp)
 assert author.find_widget_in_tree(bp, 'VerticalBox_0').get_visibility() == unreal.SlateVisibility.COLLAPSED
+assert author.find_widget_in_tree(bp, 'WBP_WeaponInfo').get_visibility() == unreal.SlateVisibility.COLLAPSED
 assert list(author.describe_widget_tree(bp)) == tree
 assert unreal.EditorAssetLibrary.save_loaded_asset(bp, only_if_is_dirty=False)
 (out / 'legacy-readout-retired.json').write_text(json.dumps(dict(

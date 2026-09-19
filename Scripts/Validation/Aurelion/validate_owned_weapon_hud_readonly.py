@@ -100,13 +100,16 @@ def _capture(row):
     assert child.get_owning_player() == pc, "Weapon child has another owning player"
     container = child.get_parent()
     retired = (container is not None and container.get_name() == 'VerticalBox_0'
-               and container.get_visibility() == unreal.SlateVisibility.COLLAPSED)
+               and (container.get_visibility() == unreal.SlateVisibility.COLLAPSED
+                    or child.get_visibility() == unreal.SlateVisibility.COLLAPSED))
     surfaces = [widget for widget in unreal.ObjectIterator(unreal.SovHolographicHUDSurface)
                 if widget.get_world() == world and widget.is_in_viewport()
                 and widget.get_owning_player() == pc]
     assert len(surfaces) <= 1, "Ambiguous current-player holographic HUD surfaces"
     row.update(hud=_path(hud), hud_class=_path(hud.get_class()), weapon_widget=_path(child),
                weapon_widget_class=_path(child.get_class()), legacy_readout_retired=retired,
+               legacy_container_visibility=str(container.get_visibility()),
+               legacy_weapon_visibility=str(child.get_visibility()),
                visible=bool(surfaces[0].is_visible() if retired and surfaces else hud.is_visible() and child.is_visible() and not retired))
     if not row["visible"]:
         row["not_ready_reasons"].append("HUD/weapon child is not visible")

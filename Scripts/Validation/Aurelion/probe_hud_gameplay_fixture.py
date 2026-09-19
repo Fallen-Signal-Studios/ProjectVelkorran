@@ -71,6 +71,29 @@ def tick(delta):
             assert readout['legacy_readout_retired'], 'Legacy bottom-right ammo is still present'
             report['owned_hud_readback'] = readout
             report['samples'].append(dict(phase='ammo',weapon=item.get_class().get_path_name(),clip=clip,reserve=reserve,text=ammo_text,protagonist=str(unreal.GameplayTagLibrary.get_tag_name(view.protagonist))))
+            # The real cinematic event restores direct canvas children. Exercise
+            # both modes; authored retirement must survive the restore callback.
+            hud=pc.get_narrative_gameplay_hud()
+            for essential in (False, True):
+                hud.set_hud_hidden(True,essential)
+                hud.set_hud_hidden(False,essential)
+            report['after_hide_show_events']=owned_hud.sample()
+            # Those calls alone may not reproduce the full route's timing.
+            # Explicitly exercise its observed visible-parent state as a separate
+            # controlled presentation stress case, not a mission/handoff claim.
+            children=[w for w in unreal.WidgetLibrary.get_all_widgets_of_class(world,unreal.UserWidget,False)
+                      if w.get_path_name()==readout['weapon_widget']]
+            assert len(children)==1
+            container=children[0].get_parent()
+            assert container.get_name()=='VerticalBox_0'
+            container.set_visibility(unreal.SlateVisibility.VISIBLE)
+            report['restore_stress_method']='Explicit visible legacy parent after SetHUDHidden events; controlled UI state only'
+            stage('hud_restored');return
+        if phase=='hud_restored' and elapsed>2:
+            readout=owned_hud.sample()
+            report['after_cinematic_restore']=readout
+            assert readout['legacy_readout_retired'], 'Visible legacy parent re-enabled weapon readout'
+            assert readout['status']=='passed', str(readout)
             location=pawn.get_actor_location()+pawn.get_actor_forward_vector()*350
             target=unreal.SovMeleeValidationLibrary.spawn_validation_npc(world,unreal.load_asset('/Game/Aurelion/Enemies/NPC_AurelionEnforcer'),unreal.Transform(location,unreal.Rotator(),unreal.Vector(1,1,1)))
             assert target,'Validation Enforcer did not spawn'

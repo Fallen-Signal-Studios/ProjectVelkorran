@@ -1,5 +1,17 @@
 # Holographic HUD material pass, 19 September 2026
 
+## Nested legacy readout retirement
+
+`WBP_AurelionGameplayHUD.WBP_WeaponInfo` is now explicitly collapsed in addition to its `VerticalBox_0` parent. The nested child has no self-visibility binding or SetVisibility writer in the exported owned weapon Blueprint. The gameplay HUD graph has a SetHUDHidden loop over direct CanvasPanel_Base children which can restore their visibility; a nested retirement survives a visible parent without altering menus, interaction, weapon data or the holographic surface. This changes the owned HUD asset only, preserving its tree and graph references.
+
+Read-only graph export: `HUDLifecycleAudit-20260919-141107-87e61449`. Direct SetHUDHidden hide/show calls alone **did not reproduce** the later mission failure in controlled run `HUDRestoreRepro-20260919-141648-9bb49ac2`; they left the parent collapsed. The exact full-route restoring caller/timing is therefore not certified. The expanded fixture separately makes the actual legacy parent visible as an explicit UI stress case, not a mission-state or handoff simulation. Old content failed this case in `HUDVisibleParentBefore-20260919-142128-1140ab58` with parent Visible and weapon SelfHitTestInvisible.
+
+`HUDNestedRetire-20260919-142253-46c60fd6` saved the authored nested collapse after compilation and tree-preservation checks. Fresh visible run `HUDVisibleParentAfter-20260919-142403-0bc2369b` passed the same stress case: parent Visible, weapon Collapsed, actual holographic ammo 32/218. Native hostile detection, Blackout contact suppression, and restoration also passed. The actual `hud-firearm-live-contact.png` was visually inspected and contains the HUD with no lower-right ammo duplicate. It is a controlled spawned-enemy editor screenshot, not mission completion or a clean reference-comparison capture. A full late-handoff route replay remains pending.
+
+The fixture's initial non-retained launch exited at `ready`; a subsequent temporary runner used an incorrect keep-alive API; an early stress case tried an unavailable reflected widget property. Those attempts are not acceptance evidence. The corrected fixture locates the actual nested widget through the existing read-only validator's returned path. `Scripts/Validation/Aurelion/run_hud_gameplay_fixture.py` preserves the ExecutePythonScript keep-alive/end-PIE wrapper using EditorPythonScripting. Run it through run-editor-script.ps1 without KeepEntryOpen; the fresh successful run used the equivalent temporary wrapper. The read-only validator now reports both parent and child visibility and recognizes retirement at either level.
+
+Pre-change full baseline: `20260919-140839-d6658baf`, build without SkipBuild and 719 tests. Post-change `20260919-142619-2a7a91a7` passed the build without SkipBuild, all 719 tests, coverage and source integrity; no tracked files changed while it ran. Creator-owned map and grenade assets were excluded, and the M12 map retained its prior SHA256.
+
 ## Protagonist nameplate
 
 The plate now contains an Overlay with the existing survival bars and a centered ProtagonistName TextBlock. The text binding reads GetHolographicHUDView.Protagonist, exactly matches Sov.Character.Player.Selene, and selects localized SELENE or TARRIK text. Color and Opacity binds to View.Palette.Accent. The 12-point type uses 1400 letter spacing; the original bar padding remains on PlateBars, so adding the cap does not move the bars. This is authored in the existing UMG asset, with no C++ changes or widget reconstruction.
