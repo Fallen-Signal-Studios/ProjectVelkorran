@@ -363,7 +363,8 @@ class Run(prior.Run):
         owned_tags=unreal.GameplayTagLibrary.get_owned_gameplay_tags(asc).export_text()
         tag_names=re.findall(r'TagName="([^"]+)"',owned_tags)
         blocking_roots=('Narrative.State.Weapon.BlockFiring',
-            'Narrative.State.Weapon.Equipping','Narrative.State.Weapon.Reloading')
+            'Narrative.State.Weapon.Equipping','Narrative.State.Weapon.Reloading',
+            'Narrative.State.Busy','Sov.State.EchoAbility.Active')
         blockers=sorted(name for name in tag_names
             if any(name==root or name.startswith(root+'.') for root in blocking_roots))
         input_ready=not blockers
