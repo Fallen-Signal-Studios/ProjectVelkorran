@@ -80,6 +80,18 @@ def tick(dt):
                 report['wayfinding']=[dict(actor=a.get_actor_label(),transform=a.get_actor_transform().export_text(),
                     mesh=a.static_mesh_component.static_mesh.get_path_name(),
                     collision=str(a.static_mesh_component.get_collision_enabled())) for a in housings]
+            if globals().get('M13_EXPECT_WAYFINDING_LIGHTING',False):
+                washes=[a for a in unreal.GameplayStatics.get_all_actors_of_class(world,unreal.RectLight)
+                        if a.get_actor_label().startswith('ENVL_M13_WayfindingWash_')]
+                assert {a.get_actor_label() for a in washes}=={'ENVL_M13_WayfindingWash_Z11','ENVL_M13_WayfindingWash_Z12'}
+                report['wayfinding_lighting']=[]
+                for a in washes:
+                    c=a.get_component_by_class(unreal.RectLightComponent)
+                    assert abs(c.intensity-12)<.01 and abs(c.attenuation_radius-480)<.01
+                    assert abs(c.get_editor_property('specular_scale')-.15)<.001
+                    assert c.get_editor_property('cast_shadows')
+                    report['wayfinding_lighting'].append(dict(actor=a.get_actor_label(),lumens=c.intensity,
+                        radius_cm=c.attenuation_radius,specular_scale=c.get_editor_property('specular_scale')))
             pc=unreal.GameplayStatics.get_player_controller(world,0)
             pose=review_pose()
             # Reposition only the PIE copy of a finished scene's existing camera.
