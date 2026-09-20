@@ -22,15 +22,21 @@ wheel_action=next(iter(wheel_actions))
 wheel_class=unreal.load_class(None,WHEEL_CLASS)
 report=dict(status='running',scope=__doc__,samples=[],selections=[],banks=[],callbacks=[])
 state=dict(phase='ready',hero='Tarrik',case=0,at=time.monotonic(),start=time.monotonic(),busy=False)
-cases=('waypoint','wheel','wheel_contrast','wheel_return','wheel_scale_150','wheel_scale_200')
+cases=('waypoint','waypoint_rear','waypoint_rear_scale_200','wheel','wheel_contrast','wheel_return','wheel_scale_150','wheel_scale_200')
 
 def write(): (out/'weapon-wheel-review.json').write_text(json.dumps(report,indent=2))
 def loaded(result,header,message):report['callbacks'].append(dict(result=str(result),message=str(message)))
 def configure(world,pawn,case):
     snap=settings.get_settings_snapshot();snap.set_editor_property('high_contrast_hud',case=='wheel_contrast')
     snap.set_editor_property('navigation_contrast',False)
-    snap.set_editor_property('ui_scale',2. if case=='wheel_scale_200' else 1.5 if case=='wheel_scale_150' else 1.)
+    snap.set_editor_property('ui_scale',2. if case.endswith('scale_200') else 1.5 if case=='wheel_scale_150' else 1.)
     settings.apply_settings_snapshot(snap)
+    pc=unreal.GameplayStatics.get_player_controller(world,0)
+    if case=='waypoint':state['forward_rotation']=pc.get_control_rotation()
+    if case.startswith('waypoint_rear'):
+        forward=state['forward_rotation']
+        pc.set_control_rotation(unreal.Rotator(pitch=0.,yaw=forward.yaw+180.,roll=0.))
+    elif case=='wheel':pc.set_control_rotation(state['forward_rotation'])
     if case=='waypoint':
         for p in unreal.ObjectIterator(unreal.SovAccessibilityPresentation):
             if p.get_world()==world:
@@ -44,6 +50,14 @@ def clearance(world,wheel):
     presentation=next(p for p in unreal.ObjectIterator(unreal.SovAccessibilityPresentation)
         if p.get_world()==world and p.get_owning_player()==wheel.get_owning_player())
     rect=bounds(wheel.get_editor_property('WheelSafeFrame'))
+    frame=wheel.get_editor_property('WheelSafeFrame')
+    chain=[];cursor=frame
+    while cursor:
+        chain.append(dict(name=cursor.get_name(),bounds=bounds(cursor),transform=cursor.get_editor_property('render_transform').export_text()))
+        cursor=cursor.get_parent()
+    (out/'wheel-layout-observation.json').write_text(json.dumps(dict(chain=chain,
+        position=frame.slot.get_position().export_text(),size=frame.slot.get_size().export_text(),
+        alignment=frame.slot.get_alignment().export_text(),anchors=frame.slot.get_anchors().export_text()),indent=2))
     if rect[2]-rect[0]<1:
         widgets=[dict(name=item.get_name(),type=item.get_class().get_name(),bounds=bounds(item),visibility=str(item.get_visibility()),
             parent=item.get_parent().get_name() if item.get_parent() else None)
@@ -92,7 +106,7 @@ def tick(delta):
         if state['phase']=='failure_capture':
             if now-state['at']>3:stop(state['error'])
             return
-        assert now-state['start']<260,'Wheel review timed out'
+        assert now-state['start']<300,'Wheel review timed out'
         world=unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_game_world()
         pawn=unreal.GameplayStatics.get_player_pawn(world,0) if world else None
         if not isinstance(pawn,unreal.SovPlayerCharacterBase) or not pawn.is_character_ready() or pawn.is_character_pending_load():return

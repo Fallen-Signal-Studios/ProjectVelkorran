@@ -95,3 +95,36 @@ The editor-only `GetWidgetPaintBounds` helper now reads native paint geometry di
 reflected numeric bounds instead of transporting `FGeometry` through Python. Earlier probe failures
 are not counted as acceptance. Caption arrival and removal are covered by the layout unit test;
 the visible acceptance fixture keeps dialogue active throughout rather than claiming those transitions.
+
+## Windowed viewport and rear-objective clearance
+
+World labels now reserve the rendered vitals, ammo (when present), radar and Echo arc in addition
+to dialogue and the weapon wheel. Their complete padded footprint moves clear; the directional
+glyph retains its actual bearing. A regression covers rear objectives across four viewport sizes,
+100/150/200% UI scale and ranged/melee HUD configurations.
+
+Windowed testing exposed a coordinate-space mismatch in the existing clearance implementation:
+`GetCachedGeometry()` returns tick geometry with the desktop window offset, while the panel
+measurements and NativePaint use window-relative paint geometry. The safe-area and HUD-region
+readers, and the wheel's canvas conversion, now consistently use paint geometry. This fixes both
+the wheel/subtitle overlap and incorrect HUD reservations in a moved, compact editor window.
+
+Final full gate `20260920-153419-4667c832` passed the editor build, 722 matching tests, report
+coverage and source integrity (95 existing warnings). Visible acceptance is
+`Saved/Validation/Aurelion/HolographicUIFinal-20260920-153647-96952e4b`.
+All sixteen presentation states and both real inventory selections passed. The compact embedded
+viewport measured approximately 844 x 550 physical pixels; ten wheel states stayed clear of
+live dialogue and objective panels inside the safe area. Both normal wheels, the high-contrast
+fallback, rear objective labels and 200% wheel captures were visually reviewed. The rear marker
+camera is rotated only for the fixture, then restored before wheel input. No Python errors,
+material warnings or ensures appeared in this final run. These are editor checks, not a packaged
+build certification.
+
+Objective glyph strokes also occlude behind the same priority panels, including speech and the
+Echo arc. Their anchor/bearing is not shifted; the repositioned distance label remains visible.
+This prevents the symbol itself from drawing across subtitle letters at enlarged UI scale.
+
+Earlier `ObjectiveHUDClearance` / `WheelResizeAcceptance` runs exposed the compact-window
+overlap and are not acceptance evidence. A diagnostic attempt stopped on an unavailable Python
+accessor; the corrected bounds probe confirmed valid slot geometry before the coordinate fix.
+No map or gameplay asset was saved in this increment; protected M12's hash is unchanged.

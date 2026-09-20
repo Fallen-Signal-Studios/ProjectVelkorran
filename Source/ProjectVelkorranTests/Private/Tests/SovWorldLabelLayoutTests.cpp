@@ -1,6 +1,7 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "UI/SovWorldLabelLayout.h"
 #include "UI/SovThreatCueLayout.h"
+#include "UI/SovHolographicHUDLayout.h"
 #include "Misc/AutomationTest.h"
 
 #if WITH_AUTOMATION_TESTS
@@ -47,6 +48,43 @@ bool FSovWorldLabelClearanceTest::RunTest(const FString& Parameters)
         FVector2D Unused;
         TestFalse(TEXT("A fully occupied screen omits only the secondary label instead of covering speech"),
             SovWorldLabelLayout::Place(View*.5, FVector2D(100,26), Safe, {Safe}, Unused));
+    }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovWorldLabelHUDClearanceTest,
+    "ProjectVelkorran.UI.WorldLabels.KeepBehindPlayerObjectiveClearOfEchoArcAndRadar",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovWorldLabelHUDClearanceTest::RunTest(const FString& Parameters)
+{
+    for (const FVector2D View : {FVector2D(844,550), FVector2D(1280,720), FVector2D(1920,1080), FVector2D(2560,1080)})
+    {
+        const FBox2D Safe(View * .05, View * .95);
+        for (const float Scale : {1.f, 1.5f, 2.f})
+        {
+            const auto HUD = SovHolographicHUDLayout::Compute(Safe.GetSize(), Scale);
+            for (const bool bAmmoShown : {false, true})
+            {
+                TArray<FBox2D> Panels;
+                for (const auto& Region : HUD.Regions(bAmmoShown))
+                {
+                    Panels.Emplace(Region.Min + Safe.Min, Region.Max + Safe.Min);
+                }
+                const FVector2D LabelSize = FVector2D(180,36) * Scale;
+                // A rear objective projects to the lower screen edge, inside the Echo arc.
+                const FVector2D Desired = Safe.Min + HUD.ArcPoint(.5f);
+                FVector2D Placed;
+                if (!TestTrue(TEXT("Rear objective fits around the rendered HUD"),
+                    SovWorldLabelLayout::Place(Desired, LabelSize, Safe, Panels, Placed))) { return false; }
+                TestTrue(TEXT("Complete objective label stays within the safe area"),
+                    Safe.IsInsideOrOn(Placed) && Safe.IsInsideOrOn(Placed + LabelSize));
+                for (const auto& Panel : Panels)
+                {
+                    TestFalse(TEXT("Objective label clears vitals, ammo, radar and Echo arc"),
+                        SovThreatCueLayout::OverlapsPanel(Placed, LabelSize, Panel, 7.99));
+                }
+            }
+        }
     }
     return true;
 }

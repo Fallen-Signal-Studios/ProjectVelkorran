@@ -160,9 +160,11 @@ bool USovAccessibilityPresentation::GetWeaponWheelAbsoluteRect(FSlateRect& Out) 
 bool USovAccessibilityPresentation::GetSafeAreaAbsoluteRect(FSlateRect& Out) const
 {
 	if (!SafeTextCanvas) { return false; }
-	const FGeometry& Geometry = SafeTextCanvas->GetCachedGeometry();
+	const FGeometry& Geometry = SafeTextCanvas->GetPaintSpaceGeometry();
 	if (Geometry.GetLocalSize().X <= 1. || Geometry.GetLocalSize().Y <= 1.) { return false; }
-	Out = Geometry.GetLayoutBoundingRect();
+	const FVector2D Min = Geometry.LocalToAbsolute(FVector2D::ZeroVector);
+	const FVector2D Max = Geometry.LocalToAbsolute(Geometry.GetLocalSize());
+	Out = FSlateRect(Min.X, Min.Y, Max.X, Max.Y);
 	return true;
 }
 void USovAccessibilityPresentation::SetHolographicHUDClearance(bool bHUDShown, bool bAmmoShown)
@@ -176,7 +178,9 @@ void USovAccessibilityPresentation::GetHolographicHUDRegions(TArray<FSlateRect>&
 {
 	OutAbsolute.Reset();
 	if (!bHUDClearance || !SafeTextCanvas) { return; }
-	const FGeometry& Geometry = SafeTextCanvas->GetCachedGeometry();
+	// Other overlays supply paint geometry too. Tick geometry includes the desktop
+	// window offset, which differs from paint space in a moved/windowed viewport.
+	const FGeometry& Geometry = SafeTextCanvas->GetPaintSpaceGeometry();
 	if (Geometry.GetLocalSize().X <= 1. || Geometry.GetLocalSize().Y <= 1.) { return; }
 	const auto Layout = SovHolographicHUDLayout::Compute(FVector2D(Geometry.GetLocalSize()), Settings.UIScale);
 	for (const FBox2D& Region : Layout.Regions(bHUDAmmo))
@@ -710,6 +714,13 @@ int32 USovAccessibilityPresentation::NativePaint(const FPaintArgs& Args, const F
 	// Use arranged paint geometry, including padding, wrapping, DPI and the safe-area offset.
 	// Hidden panels reserve no space; labels return to their projected location when speech ends.
 	TArray<FBox2D> TextPanels;
+    TArray<FSlateRect> HUDAbsolute;
+    GetHolographicHUDRegions(HUDAbsolute);
+    for (const FSlateRect& Region : HUDAbsolute)
+    {
+        TextPanels.Emplace(Geometry.AbsoluteToLocal(FVector2D(Region.Left, Region.Top)),
+            Geometry.AbsoluteToLocal(FVector2D(Region.Right, Region.Bottom)));
+    }
     FSlateRect WheelAbsolute;
     FBox2D WheelBounds(ForceInit);
     if (GetWeaponWheelAbsoluteRect(WheelAbsolute))
@@ -786,8 +797,12 @@ int32 USovAccessibilityPresentation::NativePaint(const FPaintArgs& Args, const F
                 const double Radius = 17. * Settings.UIScale;
                 auto Hologram = [&](const TArray<FVector2D>& Points)
                 {
-                    // World markers are occluded by the menu, rather than drawn over its weapon text.
-                    if (WheelBounds.bIsValid && WheelBounds.ExpandBy(Radius).IsInside(Point)) { return; }
+                    // Keep the actual bearing, but occlude its strokes behind priority UI.
+                    // The relocated label remains available when a glyph is behind speech or HUD.
+                    for (const FBox2D& Panel : TextPanels)
+                    {
+                        if (Panel.bIsValid && Panel.ExpandBy(Radius * 1.6).IsInside(Point)) { return; }
+                    }
                     TArray<FVector2f> Line; for (const auto& P : Points) { Line.Add(FVector2f(P)); }
                     if (!Settings.bHighContrastHUD)
                     {

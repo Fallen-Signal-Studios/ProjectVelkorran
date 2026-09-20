@@ -58,7 +58,7 @@ void USovWeaponWheelGlass::UpdatePlacement(UUserWidget* Menu)
     auto* PC = Cast<ASovPlayerController>(GetOwningPlayer());
     auto* Presentation = PC && PC->GetFrontend() ? PC->GetFrontend()->GetPresentation() : nullptr;
     if (!FrameSlot || !Frame->GetParent() || !Presentation) { return; }
-    const FGeometry& Canvas = Frame->GetParent()->GetCachedGeometry();
+    const FGeometry& Canvas = Frame->GetParent()->GetPaintSpaceGeometry();
     if (Canvas.GetLocalSize().IsNearlyZero()) { return; }
     FSlateRect AbsoluteSafe;
     if (!Presentation->GetSafeAreaAbsoluteRect(AbsoluteSafe)) { return; }
