@@ -9,9 +9,10 @@ out = Path(os.environ['SOV_AURELION_RUN_DIRECTORY'])
 level = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 assert not level.is_in_play_in_editor()
 assert unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world().get_name() == 'L_Aurelion_M13'
-assert not unreal.EditorLoadingAndSavingUtils.get_dirty_map_packages()
+assert globals().get('ALLOW_DIRTY_PREVIEW', False) or not unreal.EditorLoadingAndSavingUtils.get_dirty_map_packages()
 actors = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
-views = [('chamber', (0, 33600, -1570)), ('lift', (0, 37500, -1570)), ('gallery', (0, 41900, 170))]
+views = globals().get('M13_ROUTE_VIEWS', [('chamber', (0, 33600, -1570)), ('lift', (0, 37500, -1570)), ('gallery', (0, 41900, 170))])
+yaws = globals().get('M13_ROUTE_YAWS', {})
 camera = actors.spawn_actor_from_class(unreal.CameraActor, unreal.Vector(*views[0][1]), unreal.Rotator(yaw=90))
 camera.get_component_by_class(unreal.CameraComponent).set_field_of_view(80)
 level.editor_set_game_view(True)
@@ -43,6 +44,7 @@ def tick(delta):
         name, position = views[state['index']]
         if state['stage'] == 0:
             camera.set_actor_location(unreal.Vector(*position), False, False)
+            camera.set_actor_rotation(unreal.Rotator(yaw=yaws.get(name, 90)), False)
             state.update(stage=1, next=time.monotonic()+10)
         else:
             state['task'] = unreal.AutomationLibrary.take_high_res_screenshot(1600, 900, str(out / (name+'.png')), camera)

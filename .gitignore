@@ -129,6 +129,8 @@ SourceArt/
 *.blend
 *.exr
 *.fbx
+!Art/Source/Aurelion/Z10ChamberWall/Aurelion-Chamber-Coffer.blend
+!Art/Source/Aurelion/Z10ChamberWall/SM_Aurelion_KIT_Z10ChamberCoffer.fbx
 *.flac
 *.hdr
 *.mov
