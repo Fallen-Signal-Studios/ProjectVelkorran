@@ -11,7 +11,7 @@ public class ProjectVelkorranEditor : ModuleRules
         }
         PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
         PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine" });
-        PrivateDependencyModuleNames.AddRange(new string[] { "AnimGraph", "AnimGraphRuntime" });
+        PrivateDependencyModuleNames.AddRange(new string[] { "AnimGraph", "AnimGraphRuntime", "ProjectVelkorranAnimGraph" });
         PrivateDependencyModuleNames.AddRange(new string[] { "ProjectVelkorran", "AIModule", "GameplayAbilities", "GameplayTags", "AssetRegistry", "UnrealEd", "Kismet", "KismetCompiler", "BlueprintGraph", "UMG", "UMGEditor", "LevelSequence", "MovieScene", "NavigationSystem", "NarrativeArsenal", "NarrativeSaveSystem", "InputCore", "EnhancedInput", "ApplicationCore", "Niagara", "Slate", "SlateCore" });
     }
 }

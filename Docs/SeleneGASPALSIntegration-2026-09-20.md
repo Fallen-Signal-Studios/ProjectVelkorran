@@ -147,3 +147,87 @@ UTF-16 BOM and otherwise reads UTF-8. This was a checker fix, not an asset chang
 Full post-asset gate `20260920-070258-b90b6ed1` passed the build, all 719 tests,
 coverage and source integrity. Python compilation and whitespace checks passed.
 M12 retains the protected hash recorded above; existing user edits remain intact.
+
+## Authorized native integration — implemented and checked in PIE
+
+The user explicitly authorized C++ for Selene's animations. New source adds
+`FAnimNode_SovSelenePosture`, an editor graph node, and the narrowly scoped
+`ConfigureSeleneFemininePosture` authoring operation. The runtime node samples
+character identity, movement, weapon and ability state on the game thread,
+then evaluates the additive posture on the animation thread. It applies only
+to Selene players/companions on the ground, unarmed and alive, outside cover,
+equipping, sequencer and root-motion control. Blending takes approximately
+0.167 seconds. Existing motion matching and weapon overlays remain authoritative.
+
+The original ABP_Biped class must be preserved: weapon overlays cast to that
+class, so replacing it with an unrelated duplicate would break their contract.
+The helper inserts the posture between the existing lean output and PreLookAt
+slot, before subsequent montage and foot-placement processing. It refuses an
+unexpected graph edge, duplicate insertion, wrong asset or incompatible blend.
+
+Build attempt `20260920-073526-b97cc7d6` compiled the new source but failed at
+linking because creator editor PID 49944 holds the project DLLs open (LNK1104).
+Automation did not run; this is not a passing build. The editor was left open
+to preserve unsaved work. The user was asked to save and close it.
+`bind_selene_feminine_posture.py` passed Python syntax checking but has NOT run.
+No animation graph asset has been changed. At that point, the source was uncommitted pending
+successful linking, Blueprint authoring and live validation.
+
+Resume with the full build/automation gate after the editor closes, run the
+scoped binding script in an isolated M13 editor, then verify actual Selene
+idle/walk/crouch, stow/draw and Verity attacks using the authentic CP2 save.
+Check Tarrik bypass and companion identity separately. Do not count this
+source-only increment as completed gameplay integration.
+
+### Completed after the editor closed
+
+The user closed the creator editor, releasing the DLL lock. Build/test gate
+`20260920-074049-f694392d` passed all 719 tests. Initial Blueprint authoring
+reported an Editor-only graph-node module warning. The graph node now resides
+in the dedicated `ProjectVelkorranAnimGraph` UncookedOnly module; runtime
+implementation remains in ProjectVelkorran. The isolated backup was restored
+before rebinding, preserving the original ABP_Biped identity and other graph edges.
+Final binding `SelenePostureBindingFinal-20260920-074903-94b6ced5` compiled with
+zero errors and zero warnings and saved only ABP_Biped. The first module build
+needed an explicit BlueprintGraph dependency; the subsequent build passed.
+This fixes the compiler classification warning; a packaged build is not claimed.
+
+A PIE-only `PreviewSeleneFemininePosture` helper provides live blend diagnostics
+and permits temporary A/B bypass on a live ABP_Biped instance. It does not save
+or change the asset. Python cannot directly access the protected generated node
+property. The first A/B test caught that access restriction, and a later test
+caught a checker-only repeated UnCrouch/Crouch request in the same frame. The
+canonical checker preserves crouch between adjacent crouch cases and uses a
+fixed movement direction for its walk test.
+
+Final run `SelenePostureVerified-20260920-080035-d8d1d482` restored the unchanged,
+authentically earned CP2 save through the public save API. All eight cases passed:
+
+| Case | Posture weight | Observation |
+|---|---:|---|
+| Unarmed idle | 1 | Feminine posture active |
+| Idle bypass | 0 | Original posture comparison |
+| Crouch | 1 | Crouch amount 1 |
+| Crouch bypass | 0 | Same foot placement visible in comparison |
+| Movement | 1 | Actual speed 210 cm/s |
+| Verity drawn | 0 | AM_VerityTwin_01 observed after Narrative attack input |
+| Staccato drawn | 0 | Firearm owns the stance |
+| Re-stowed | 1 | Feminine posture returns |
+
+Idle, bypass, crouch, crouch-bypass and movement screenshots were visually
+inspected. The change is visible in the upper-body posture without a new collapsed
+limb or changed crouch foot placement. The embedded viewport is small; this is
+not full-screen cinematic quality approval. Existing stowed-weapon protrusion
+and the Verity 0/0 ammunition HUD bug remain visible and are not fixed here.
+
+Build/test gate `20260920-075540-7a5a5c6a` passed all 719 tests after the diagnostic
+helper. Final post-checker gate `20260920-080421-63f9ba55` passed the build, all 719 tests, report coverage and source integrity.
+Protected M12 SHA256 remains B7CEEAB512272FC80FE1E3B3454B08DF40BF40BC0E065C3C90993B910D6780D5.
+No user ability assets, map, GASPALS plugin files, or save banks were overwritten.
+
+Scope limits: this integrates the supplied GASPALS feminine posture library over
+existing motion matching, not a separate female motion-matching database. The
+companion identity branch exists but Selene-as-companion combat was not exercised
+in this checkpoint. Airborne, traversal, full attack chains, damage delivery,
+controller input, full-route acceptance and packaged execution remain outside
+this narrow verification. This does not establish 90% TDD or AAA completion.

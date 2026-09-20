@@ -5,6 +5,11 @@
 	"Description": "",
 	"Modules": [
 		{
+			"Name": "ProjectVelkorranAnimGraph",
+			"Type": "UncookedOnly",
+			"LoadingPhase": "Default"
+		},
+		{
 			"Name": "ProjectVelkorran",
 			"Type": "Runtime",
 			"LoadingPhase": "Default"

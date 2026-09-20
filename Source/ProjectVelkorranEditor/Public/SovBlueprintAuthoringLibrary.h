@@ -21,6 +21,12 @@ class PROJECTVELKORRANEDITOR_API USovBlueprintAuthoringLibrary : public UBluepri
 {
     GENERATED_BODY()
 public:
+    /** Insert the Selene-only posture before PreLookAt in the existing Narrative base class. No save. */
+    UFUNCTION(BlueprintCallable, Category="Velkorran|Editor")
+    static FSovBlueprintAuthoringResult ConfigureSeleneFemininePosture(UObject* Asset, UObject* Blend);
+    /** PIE-only A/B preview and live node diagnostics. Never changes an asset. */
+    UFUNCTION(BlueprintCallable, Category="Velkorran|Editor")
+    static FSovBlueprintAuthoringResult PreviewSeleneFemininePosture(UObject* Instance, bool bEnabled);
     /** Bake a short braced discharge from an existing weapon idle, preserving the grip. No save. */
     UFUNCTION(BlueprintCallable, Category="Velkorran|Editor")
     static FSovBlueprintAuthoringResult AuthorBracedCastClip(UObject* Asset, UObject* Source,
