@@ -283,6 +283,18 @@ Content/TwinBladesBundle/TwinBladesAndTwinSword/Map/Materials/Texture/T_Ground_O
 /Plugins/NVIDIA/
 
 # Local Claude Code permissions are per-machine; the shared guidance and skills are tracked.
+# Project-owned weapon wheel skin and its retained radial-menu behavior.
+!/Content/UI/
+/Content/UI/*
+!/Content/UI/Narrative/
+/Content/UI/Narrative/*
+!/Content/UI/Narrative/Menus/
+/Content/UI/Narrative/Menus/*
+!/Content/UI/Narrative/Menus/RadialMenus/
+/Content/UI/Narrative/Menus/RadialMenus/*
+!/Content/UI/Narrative/Menus/RadialMenus/W_NarrativeMenu_RadialMenuBase.uasset
+!/Content/UI/Narrative/Menus/RadialMenus/WBP_RadialLRCenter.uasset
+!/Content/UI/Narrative/Menus/RadialMenus/WM_WeaponWheel_LR.uasset
 .claude/settings.local.json
 
 # Project-owned starting loadouts: grant ammo before weapons for native initial reload.

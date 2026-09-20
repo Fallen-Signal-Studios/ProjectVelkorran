@@ -7,6 +7,38 @@
 #include "Components/Widget.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "WidgetBlueprint.h"
+#include "EdGraph/EdGraph.h"
+#include "EdGraph/EdGraphSchema.h"
+#include "K2Node_CallFunction.h"
+#include "Materials/MaterialInterface.h"
+
+bool USovWidgetTreeAuthoringLibrary::ReplaceMaterialFactoryParent(UWidgetBlueprint* Blueprint,
+    UMaterialInterface* Expected, UMaterialInterface* Replacement)
+{
+    if (!IsValid(Blueprint) || !IsValid(Expected) || !IsValid(Replacement)) { return false; }
+    TArray<UEdGraph*> Graphs;
+    Blueprint->GetAllGraphs(Graphs);
+    TArray<UEdGraphPin*> Parents;
+    for (UEdGraph* Graph : Graphs)
+    {
+        for (UEdGraphNode* Node : Graph->Nodes)
+        {
+            auto* Call = Cast<UK2Node_CallFunction>(Node);
+            if (!Call || Call->FunctionReference.GetMemberName() != TEXT("CreateDynamicMaterialInstance")) { continue; }
+            UEdGraphPin* Parent = Call->FindPin(TEXT("Parent"));
+            if (!Parent || !Parent->LinkedTo.IsEmpty() || (Parent->DefaultObject != Expected && Parent->DefaultObject != Replacement)) { return false; }
+            Parents.Add(Parent);
+        }
+    }
+    if (Parents.Num() != 1) { return false; }
+    UEdGraphPin* Parent = Parents[0];
+    if (Parent->DefaultObject == Replacement) { return true; }
+    Blueprint->Modify();
+    Parent->GetOwningNode()->GetSchema()->TrySetDefaultObject(*Parent, Replacement);
+    if (Parent->DefaultObject != Replacement) { return false; }
+    FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
+    return true;
+}
 
 UWidget* USovWidgetTreeAuthoringLibrary::AddWidgetToTree(UWidgetBlueprint* Blueprint, UClass* WidgetClass,
 	FName WidgetName, UWidget* Parent)
@@ -36,6 +68,7 @@ UWidget* USovWidgetTreeAuthoringLibrary::AddWidgetToTree(UWidgetBlueprint* Bluep
 		Tree->RemoveWidget(Created);
 		return nullptr;
 	}
+	Blueprint->OnVariableAdded(WidgetName);
 	FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
 	return Created;
 }

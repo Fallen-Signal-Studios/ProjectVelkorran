@@ -703,7 +703,7 @@ int32 USovAccessibilityPresentation::NativePaint(const FPaintArgs& Args, const F
 		TextPanels.Emplace(Geometry.AbsoluteToLocal(PanelGeometry.LocalToAbsolute(FVector2D::ZeroVector)),
 			Geometry.AbsoluteToLocal(PanelGeometry.LocalToAbsolute(PanelGeometry.GetLocalSize())));
 	}
-	auto DrawLabel = [&](const FVector2D& Point,const FText& Text,const FLinearColor& Tint)
+	auto DrawLabel = [&](const FVector2D& Point,const FText& Text,const FLinearColor& Tint, bool bHolographic = false)
 	{
 		if (!SafeTextCanvas || !FSlateApplication::IsInitialized()) { return; }
 		const FGeometry& SafeGeometry=SafeTextCanvas->GetPaintSpaceGeometry();
@@ -711,11 +711,23 @@ int32 USovAccessibilityPresentation::NativePaint(const FPaintArgs& Args, const F
 		const FVector2D SafeMin=Geometry.AbsoluteToLocal(SafeGeometry.LocalToAbsolute(FVector2D::ZeroVector));
 		const FVector2D SafeMax=Geometry.AbsoluteToLocal(SafeGeometry.LocalToAbsolute(SafeGeometry.GetLocalSize()));
 		const FVector2D TextSize=FSlateApplication::Get().GetRenderer()->GetFontMeasureService()->Measure(Text,Font);
+		const FVector2D Padding = bHolographic ? FVector2D(8,5) * Settings.UIScale : FVector2D::ZeroVector;
+		const FVector2D PanelSize = TextSize + Padding * 2. + FVector2D(2,2);
 		FVector2D LabelPoint;
-		if (!SovWorldLabelLayout::Place(Point, TextSize + FVector2D(2,2), FBox2D(SafeMin,SafeMax), TextPanels, LabelPoint))
+		if (!SovWorldLabelLayout::Place(Point, PanelSize, FBox2D(SafeMin,SafeMax), TextPanels, LabelPoint))
 		{ return; }
 		// Move only the label into the safe area; the weak point/interactable outline stays on its target.
 		Elements.PushClip(FSlateClippingZone(SafeGeometry));
+		if (bHolographic)
+		{
+			static const FSlateColorBrush Glass(FLinearColor::White);
+			FSlateDrawElement::MakeBox(Elements,++Layer,Geometry.ToPaintGeometry(PanelSize,FSlateLayoutTransform(LabelPoint)),
+				&Glass,ESlateDrawEffect::None,Settings.bHighContrastHUD ? FLinearColor::Black : FLinearColor(.008f,.016f,.025f,.78f));
+			TArray<FVector2f> Lip = {FVector2f(LabelPoint+FVector2D(0,PanelSize.Y)),FVector2f(LabelPoint),
+				FVector2f(LabelPoint+FVector2D(PanelSize.X*.65,0))};
+			FSlateDrawElement::MakeLines(Elements,++Layer,Geometry.ToPaintGeometry(),MoveTemp(Lip),ESlateDrawEffect::None,Tint,true,1.f);
+			LabelPoint += Padding;
+		}
 		FSlateDrawElement::MakeText(Elements,++Layer,Geometry.ToPaintGeometry(FVector2D(1,1),FSlateLayoutTransform(LabelPoint+FVector2D(2,2))),Text,Font,ESlateDrawEffect::None,FLinearColor::Black);
 		FSlateDrawElement::MakeText(Elements,++Layer,Geometry.ToPaintGeometry(FVector2D(1,1),FSlateLayoutTransform(LabelPoint)),Text,Font,ESlateDrawEffect::None,Tint);
 		Elements.PopClip();
@@ -748,24 +760,41 @@ int32 USovAccessibilityPresentation::NativePaint(const FPaintArgs& Args, const F
                 const auto Theme = SovHUDStyle::ForProtagonist(CurrentVitals.Protagonist, Settings.bHighContrastHUD);
                 FLinearColor Tint = Settings.bNavigationContrast ? FLinearColor::White : Theme.Accent;
                 Tint.A = SovAccessibilityPolicy::Pulse(GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f, Settings.bNavigationPulse);
-                const double Radius = 12. * Settings.UIScale;
+                const double Radius = 17. * Settings.UIScale;
+                auto Hologram = [&](const TArray<FVector2D>& Points)
+                {
+                    TArray<FVector2f> Line; for (const auto& P : Points) { Line.Add(FVector2f(P)); }
+                    if (!Settings.bHighContrastHUD)
+                    {
+                        FLinearColor Halo = Tint; Halo.A *= .12f;
+                        FSlateDrawElement::MakeLines(Elements,++Layer,Geometry.ToPaintGeometry(),Line,ESlateDrawEffect::None,Halo,true,8.f*Settings.UIScale);
+                    }
+                    FSlateDrawElement::MakeLines(Elements,++Layer,Geometry.ToPaintGeometry(),Line,ESlateDrawEffect::None,FLinearColor(.005f,.012f,.018f,.88f),true,Settings.OutlineThickness+3.f);
+                    FSlateDrawElement::MakeLines(Elements,++Layer,Geometry.ToPaintGeometry(),MoveTemp(Line),ESlateDrawEffect::None,Tint,true,Settings.OutlineThickness);
+                };
                 if (bAtEdge)
                 {
                     const FVector2D Direction = (Point - (Min + Max) * .5).GetSafeNormal();
                     const FVector2D Side(-Direction.Y, Direction.X);
-                    DrawOutline({Point + Direction*Radius, Point - Direction*Radius + Side*Radius*.7,
-                        Point - Direction*Radius - Side*Radius*.7, Point + Direction*Radius}, Tint);
+                    Hologram({Point + Direction*Radius, Point - Direction*Radius + Side*Radius*.7,
+                        Point - Direction*Radius - Side*Radius*.7, Point + Direction*Radius});
+                    Hologram({Point-Direction*Radius*1.5+Side*Radius*.45,Point-Direction*Radius*.8,
+                        Point-Direction*Radius*1.5-Side*Radius*.45});
                 }
                 else if (Theme.Frame == SovHUDStyle::EFrame::Shield)
                 {
-                    DrawOutline({Point+FVector2D(-Radius,-Radius), Point+FVector2D(Radius,-Radius),
+                    Hologram({Point+FVector2D(-Radius,-Radius), Point+FVector2D(Radius,-Radius),
                         Point+FVector2D(Radius,Radius*.45), Point+FVector2D(0,Radius),
-                        Point+FVector2D(-Radius,Radius*.45), Point+FVector2D(-Radius,-Radius)}, Tint);
+                        Point+FVector2D(-Radius,Radius*.45), Point+FVector2D(-Radius,-Radius)});
+                    Hologram({Point+FVector2D(-Radius*.55,-Radius*.35),Point+FVector2D(0,Radius*.35),
+                        Point+FVector2D(Radius*.55,-Radius*.35)});
                 }
                 else
                 {
-                    DrawOutline({Point+FVector2D(0,-Radius), Point+FVector2D(Radius,0),
-                        Point+FVector2D(0,Radius), Point+FVector2D(-Radius,0), Point+FVector2D(0,-Radius)}, Tint);
+                    Hologram({Point+FVector2D(-Radius*.2,-Radius*.8),Point+FVector2D(-Radius,0),Point+FVector2D(-Radius*.2,Radius*.8)});
+                    Hologram({Point+FVector2D(Radius*.2,-Radius*.8),Point+FVector2D(Radius,0),Point+FVector2D(Radius*.2,Radius*.8)});
+                    Hologram({Point+FVector2D(0,-Radius*.25),Point+FVector2D(Radius*.25,0),
+                        Point+FVector2D(0,Radius*.25),Point+FVector2D(-Radius*.25,0),Point+FVector2D(0,-Radius*.25)});
                 }
                 FNumberFormattingOptions DistanceFormat; DistanceFormat.SetMaximumFractionalDigits(0);
                 const FText Distance = FText::AsNumber(FVector::Dist(Location, PC->GetPawn()->GetActorLocation()) / 100., &DistanceFormat);
@@ -775,12 +804,13 @@ int32 USovAccessibilityPresentation::NativePaint(const FPaintArgs& Args, const F
                 const FText Label = FText::Format(SovHUDStyle::Text(Key), Distance);
                 if (FSlateApplication::IsInitialized())
                 {
-                    const FVector2D LabelSize = FSlateApplication::Get().GetRenderer()->GetFontMeasureService()->Measure(Label, Font);
+                    const FVector2D LabelSize = FSlateApplication::Get().GetRenderer()->GetFontMeasureService()->Measure(Label, Font)
+                        + FVector2D(16,10)*Settings.UIScale + FVector2D(2,2);
                     const FVector2D Center = (Min + Max) * .5;
                     // Text grows inward, rather than covering the outer threat-indicator band.
                     const FVector2D LabelPoint(Point.X > Center.X ? Point.X-Radius-6.-LabelSize.X : Point.X+Radius+6.,
                         Point.Y > Center.Y ? Point.Y-Radius-6.-LabelSize.Y : Point.Y+Radius+6.);
-                    DrawLabel(LabelPoint, Label, Tint);
+                    DrawLabel(LabelPoint, Label, Tint, true);
                 }
             }
         }

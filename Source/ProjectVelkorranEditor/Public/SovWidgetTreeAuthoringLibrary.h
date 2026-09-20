@@ -6,6 +6,7 @@
 
 class UWidget;
 class UWidgetBlueprint;
+class UMaterialInterface;
 
 /** Editor-only widget tree construction, which script bindings cannot reach: UWidgetTree::ConstructWidget
  * is a template and UMG offers no reflected equivalent. Authors assets only; never runs a widget. */
@@ -14,6 +15,11 @@ class PROJECTVELKORRANEDITOR_API USovWidgetTreeAuthoringLibrary : public UBluepr
 {
 	GENERATED_BODY()
 public:
+    /** Replace the sole CreateDynamicMaterialInstance parent literal matching Expected or Replacement.
+     * Refuses linked inputs, ambiguous factories and other material parents. Never changes graph wiring. */
+    UFUNCTION(BlueprintCallable, Category = "Velkorran|Editor|Widgets")
+    static bool ReplaceMaterialFactoryParent(UWidgetBlueprint* Blueprint, UMaterialInterface* Expected, UMaterialInterface* Replacement);
+
 	/**
 	 * Adds a widget of WidgetClass named WidgetName to the Blueprint's tree.
 	 *
