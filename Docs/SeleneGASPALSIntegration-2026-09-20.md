@@ -6,7 +6,8 @@ the earlier equipped-Verity Twin Blade stance and attack requirements.
 
 Status: feminine/reference poses retargeted and visually reviewed in Unreal;
 **not assigned to Selene, not gameplay qualified**. No character, plugin, or map
-asset was saved. Ten project-owned pose/rig assets have been created.
+asset was saved. Ten project-owned pose/rig assets and five additive posture
+assets have been created. Live graph wiring remains unfinished.
 
 ## Verified integration boundary
 
@@ -103,3 +104,46 @@ gate `20260920-064038-145895ad` passed the build without SkipBuild, all 719 matc
 automation tests, report coverage and source integrity. Python syntax and
 whitespace checks passed. Protected M12 hash is unchanged. These checks do not
 prove gameplay integration of the new unbound assets.
+
+## Additive posture preparation
+
+`author_selene_feminine_deltas.py` creates four local-space additive sequences:
+standing idle/moving and crouching idle/moving. Each uses its matching retargeted
+neutral pose as the reference. The two crouching deltas share the feminine crouch
+target but use distinct idle/moving references. Control curves are removed from
+these deltas, and root-motion extraction is disabled. The blend's axes are speed
+(0–100 cm/s, clamped above that) and crouch amount (0–1). These are posture
+corrections, not replacement walk cycles or an alternate motion-matching database.
+
+The initial authoring run `SelenePostureDeltas-20260920-065558-b1fdd829` saved
+incorrect null reference-pose assignments. The independent reload check
+`SeleneDeltaEvaluation-20260920-065718-0082ec51` correctly failed. Unreal clears
+RefPoseSeq while additive mode is AAT_None; the canonical authoring script now
+sets additive mode and reference type before the reference asset, with readback.
+The guarded repair `SeleneDeltaReferenceRepair-20260920-065936-c6a4bd5d` backs up
+and corrects only these four newly created assets.
+
+`SeleneBlendResample-20260920-070043-030d6e59` opens the owned Blend Space in its
+asset editor to build runtime interpolation data, saves that asset, then verifies
+the repaired poses. Assigning SampleData through Python alone does not resample
+the blend. Its export contains two triangles covering all four samples. All four
+additive reference reconstructions match their target across 361 bones within
+0.1 cm / 0.1 degrees (measured maximum errors below 1e-12 cm / 1e-5 degrees).
+`verify_selene_feminine_deltas.py` checks those references, reconstruction, removed
+curves, sample types and serialized runtime triangles in a fresh editor session.
+
+The existing editor-only authoring helpers are explicitly scoped to Verity and
+Eclipse. Python can read persistent animation-node structs but cannot access graph
+pins or protected graph node lists. A request for a narrowly scoped editor-only
+Selene graph helper is pending under the repository handoff's source restriction.
+No C++ changes, appearance binding, graph changes or runtime qualification have
+been made in this increment. Do not count these assets as a playable integration.
+
+Final fresh reload `SeleneDeltaVerifiedReload-20260920-070517-337cf44a` passed
+all four 361-bone reconstructions and confirmed two persisted interpolation
+triangles. The preceding final-reload attempt caught a verifier encoding issue
+(Unreal exported this ASCII-only asset as UTF-8); the verifier now detects the
+UTF-16 BOM and otherwise reads UTF-8. This was a checker fix, not an asset change.
+Full post-asset gate `20260920-070258-b90b6ed1` passed the build, all 719 tests,
+coverage and source integrity. Python compilation and whitespace checks passed.
+M12 retains the protected hash recorded above; existing user edits remain intact.
