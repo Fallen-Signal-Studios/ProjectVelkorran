@@ -1,0 +1,80 @@
+{
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z10Guardrail_1",
+      "triangles": 14420,
+      "nominal_dimensions_m": [
+        2.3398001194000244,
+        0.2199999988079071,
+        1.2999999523162842
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None: native chamber barriers remain authoritative",
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z10Guardrail_2",
+      "triangles": 18500,
+      "nominal_dimensions_m": [
+        4.123100280761719,
+        0.2199999988079071,
+        1.2999999523162842
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None: native chamber barriers remain authoritative",
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z10Guardrail_3",
+      "triangles": 14420,
+      "nominal_dimensions_m": [
+        2.5,
+        0.2199999988079071,
+        1.2999999523162842
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None: native chamber barriers remain authoritative",
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z10Guardrail_4",
+      "triangles": 18500,
+      "nominal_dimensions_m": [
+        4.999999046325684,
+        0.699999988079071,
+        1.7999998331069946
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None: native chamber barriers remain authoritative",
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    }
+  ]
+}
