@@ -14,6 +14,10 @@ UE 5.7 note: UInputMappingContext::Mappings is deprecated and reads empty. The l
 DefaultKeyMappings.Mappings, and a script that writes the deprecated array reports success and
 changes nothing.
 """
+import json
+import os
+import shutil
+from pathlib import Path
 import unreal
 
 CONTEXT_PATH = "/Game/Input/IMC_Combat"
@@ -36,6 +40,20 @@ def fail(message):
 context = unreal.EditorAssetLibrary.load_asset(CONTEXT_PATH)
 if not context:
     fail("missing %s" % CONTEXT_PATH)
+
+assert not unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_game_world()
+out = Path(os.environ['SOV_AURELION_RUN_DIRECTORY']) / 'TargetingChordAuthoring'
+out.mkdir(exist_ok=False)
+shutil.copy2(Path(unreal.Paths.project_dir()) / 'Content/Input/IMC_Combat.uasset', out / 'IMC_Combat.uasset')
+
+def make_trigger(cls, action, name):
+    # EditInstanceOnly rejects mutation after a trigger belongs to an asset.
+    # Configure a transient instance, then move it into the owned context.
+    trigger = unreal.new_object(cls)
+    trigger.set_editor_property('chord_action', action)
+    assert trigger.rename(name, context)
+    assert trigger.get_editor_property('chord_action') == action
+    return trigger
 
 default_mappings = context.get_editor_property("default_key_mappings")
 if not default_mappings:
@@ -95,8 +113,7 @@ for action_asset_name, host_key in CHORDS.items():
     if not host:
         fail("%s is not bound to anything in this context, so its FKey cannot be reused" % host_key)
     mapping.set_editor_property("key", host)
-    chord = unreal.new_object(unreal.InputTriggerChordAction, outer=context)
-    chord.set_editor_property("chord_action", chord_source)
+    chord = make_trigger(unreal.InputTriggerChordAction, chord_source, 'TargetingChord_' + action_asset_name)
     mapping.set_editor_property("triggers", [chord])
     new_rows.append(mapping)
     unreal.log("  chord: hold %s + %s -> %s" % (CHORD_ACTION, host_key, action_asset_name))
@@ -107,21 +124,25 @@ for row in rows:
     if key_name(row) not in blocked_keys or action_name(row) in CHORDS:
         continue
     triggers = list(row.get_editor_property("triggers") or [])
-    triggers.append(unreal.new_object(unreal.InputTriggerChordBlocker, outer=context))
+    # The handoff requires these base actions blocked throughout the LB hold,
+    # including before a target button triggers. Engine-generated blockers only
+    # mask a lower mapping once its matching chorded action triggers.
+    triggers.append(make_trigger(unreal.InputTriggerChordBlocker, chord_source, 'TargetingBlock_' + action_name(row)))
     row.set_editor_property("triggers", triggers)
     blocked += 1
     unreal.log("  blocked while held: %s on %s" % (action_name(row), key_name(row)))
 
-default_mappings.set_editor_property("mappings", rows + new_rows)
+assert blocked == 5, 'Unexpected displaced base actions; refusing to save'
+default_mappings.set_editor_property("mappings", new_rows + rows)
 if not unreal.EditorAssetLibrary.save_asset(CONTEXT_PATH, only_if_is_dirty=False):
     fail("the context could not be saved")
 
-# Read back from disk; an assignment that did not take looks exactly like one that did.
-unreal.EditorAssetLibrary.load_asset(CONTEXT_PATH)
+# This is an in-memory post-save readback. A separate fresh editor must verify
+# serialization and trigger references before this increment is qualified.
 reloaded = unreal.EditorAssetLibrary.load_asset(CONTEXT_PATH)
 after = list(reloaded.get_editor_property("default_key_mappings").get_editor_property("mappings") or [])
 chorded = [r for r in after
-           if any(isinstance(t, unreal.InputTriggerChordAction) for t in (r.get_editor_property("triggers") or []))]
+           if any(type(t) == unreal.InputTriggerChordAction for t in (r.get_editor_property("triggers") or []))]
 blockers = [r for r in after
             if any(isinstance(t, unreal.InputTriggerChordBlocker) for t in (r.get_editor_property("triggers") or []))]
 unreal.log("")
@@ -130,5 +151,11 @@ unreal.log("Chorded mappings on disk: %d (expected %d)" % (len(chorded), len(CHO
 unreal.log("Blocked base mappings on disk: %d (expected %d)" % (len(blockers), blocked))
 if len(chorded) != len(CHORDS) or len(blockers) != blocked:
     fail("the readback does not match what was written")
+
+assert all(t.get_editor_property('chord_action') == chord_source for r in chorded + blockers
+           for t in r.triggers if isinstance(t, unreal.InputTriggerChordAction))
+(out / 'authoring.json').write_text(json.dumps(dict(status='saved_requires_fresh_runtime_review',
+    mappings_before=len(rows), mappings_after=len(after), chorded=len(chorded), blocked=len(blockers),
+    qualification='In-memory readback after scoped save; fresh reload and actual gamepad input remain required.'), indent=2))
 
 unreal.log("CHORD AUTHORING COMPLETE")
