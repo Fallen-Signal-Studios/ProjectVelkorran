@@ -43,3 +43,69 @@ runtime observations of both protagonists and companions with firearms:
 third-person hip/aim/reload, first-person entry/exit, and aim-override fallback.
 A cleared compiler warning alone is insufficient. No animation repair or visual
 improvement is claimed by this diagnostic increment.
+
+## Implemented owned hierarchy
+
+The two authored 3P transitions now use the local Boolean `ResolvedFirstPerson`.
+Hip-to-ADS reads it directly; ADS-to-hip keeps the existing four-input AND,
+including NOT firing, NOT aiming, NOT camera-inside-head and NOT first-person.
+The 0.4-second entry and 1.5-second cubic return blends are preserved.
+
+`ABP_SovFirearmBase`, `ABP_SovRifle` and `ABP_SovDualFirearm` live under
+`/Game/Characters/Animation/Firearms`. Project-owned Cinderline and Staccato
+visuals reference those overlays, and their project weapon items reference the
+owned visuals. Vendor templates retain their reflected fingerprints.
+
+The base maps `Camera.Perspective.FirstPerson` to the new Boolean. Reloading
+retains its existing gameplay tag but uses the copied Blueprint variable GUID:
+duplicating a Blueprint regenerates variable GUIDs, so retaining the vendor GUID
+silently clears the reload property during compilation. The authoring script
+now resolves both GUIDs from the owned base and verifies both bindings afterward.
+
+Authoring receipt: `FirearmOverlayDocked-20260919-215802-81f3a089/firearm-repair.json`.
+All seven affected Blueprints compile with zero errors and zero warnings.
+Only those seven packages were saved; no mission map or vendor asset was saved.
+The M12 creator worktree hash remains B7CEEAB512272FC80FE1E3B3454B08DF40BF40BC0E065C3C90993B910D6780D5.
+
+Runtime qualification is separate from compilation. The initial controlled
+probe called GetCharacterRef on a class default animation object and triggered
+a native checked-cast failure. The probe now filters for PIE skeletal-mesh-owned
+instances before querying their character. This was an inspection error, not
+an observed ordinary-play failure. Full visual pose acceptance remains open.
+
+Fresh-load inspection also found that reparenting preserves child CDO tag-map
+overrides. The rifle retained the vendor reload GUID and the dual-firearm map
+was empty. Both owned child maps therefore receive the two audited bindings
+explicitly, followed by compilation and equality checks against the owned base.
+
+The cold-editor source fingerprint guard initially withheld this save because
+compilation garbage-collected ten already-unreferenced vendor graph objects.
+The diff contained removals only, with no changed live objects or dirty state.
+The authoring script now compiles existing owned dependencies and collects unreachable objects before taking its
+baseline; the strict before/after comparison remains in place.
+
+
+The final cold-editor authoring run
+`FirearmChildBindings-20260919-222356-47cfac0b` passed the unchanged-vendor
+fingerprint guard and saved all seven owned packages. Both child tag maps match
+the corrected base exactly; all seven compiles have zero errors and warnings.
+
+Fresh PIE `FirearmPerspectiveRuntime-20260919-222511-e507e0c8` passed five
+controlled camera changes on Tarrik with the starting Cinderline explicitly
+wielded through Narrative's normal wield API. Both live linked rifle instances
+reported false/true/false/true/false for Far/FirstPerson/Balanced/FirstPerson/Close.
+Their live maps resolved both actual Reloading and ResolvedFirstPerson properties.
+All three saved overlay defaults retained the corrected map after a cold load.
+This proves the active linked-instance binding on Tarrik, not physical-input
+routing, Selene/companion coverage, reload playback, or visual pose quality.
+
+Full gate `20260919-222729-f5af0b47` passed the build invocation (without SkipBuild),
+all 719 automation tests, report coverage and before/after source integrity.
+The fresh runtime still logs the original vendor base's CameraStyle warning when
+that template is loaded elsewhere. The repaired owned hierarchy is clean and
+Tarrik's sampled instances use it; global vendor-consumer migration is not claimed.
+
+Next qualification: Selene/Staccato and firearm-equipped companions; ordinary
+hip/aim/fire/reload poses; aim-priority entry and fallback. The broader HUD/M12/M13
+visual and gameplay goal remains active, including the separately reproduced
+M13 lift co-rider collision blocker.

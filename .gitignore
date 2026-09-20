@@ -292,3 +292,10 @@ Content/TwinBladesBundle/TwinBladesAndTwinSword/Map/Materials/Texture/T_Ground_O
 /Content/PlayerCharacters/*
 !/Content/PlayerCharacters/BP_SovTarrik.uasset
 !/Content/PlayerCharacters/BP_SovSelene.uasset
+
+# Owned firearm perspective overlays and visuals
+!/Content/Characters/Animation/Firearms/
+!/Content/Characters/Animation/Firearms/**/*.uasset
+!/Content/Weapons/Visuals/BP_SovCinderlineVisual.uasset
+!/Content/Weapons/Visuals/BP_SovStaccatoVisual.uasset
+!/Content/Items/Weapons/WI_Staccato.uasset
