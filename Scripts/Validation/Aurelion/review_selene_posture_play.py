@@ -175,6 +175,8 @@ def tick(delta):
                 assert state['item'] in wielded
             if case == 'restowed':
                 assert not wielded
+            if globals().get('POSTURE_SAMPLE_HOOK'):
+                globals()['POSTURE_SAMPLE_HOOK'](pawn,case,world)
             report['samples'].append(dict(case=case, anim_class=anim.get_class().get_path_name(),
                 posture=preview.report, speed=speed, crouched=pawn.get_editor_property('is_crouched'),
                 position=pawn.get_actor_location().export_text(),airborne=movement.is_falling(),

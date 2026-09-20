@@ -270,3 +270,7 @@ Full baseline gate `20260920-115622-4390b09b` and post-checker gate
 automation tests, report coverage and source integrity. This increment changes
 only validation scripts and this evidence document, not production animation
 assets or native source.
+
+Subsequent refinement: the saved Staccato BackB fit now carries the rifle more
+upright along Selene's back. See [holster fit evidence](SeleneStaccatoHolsterFit-2026-09-20.md)
+for the scoped asset change and fresh movement/draw/stow validation.
