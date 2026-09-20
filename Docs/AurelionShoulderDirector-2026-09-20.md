@@ -41,8 +41,25 @@ gate under `Saved/Validation`. The reusable rendered check is
 
 ## Remaining acceptance
 
-The rendered check covers stationary Tarrik in Strafe, using controlled camera
-claims. It does not qualify physical input, Selene's live handoff, weapon aiming,
+The initial rendered check covers stationary Tarrik in Strafe, using controlled camera
+claims. It does not qualify physical input, weapon aiming,
 cover/crouch, first-person transitions, corner collision, or the complete mission
 route. Both protagonist bindings are implemented; those gameplay checks remain
 open. This does not establish 90% TDD alignment or final visual acceptance.
+
+## Selene handoff follow-up
+
+`SeleneShoulderHandoff-20260920-043213-8124ab93` completed the ordinary E1 route
+with Cinderline combat and the two native interaction holds in 153.313 seconds.
+The driver reported unchanged assets and a ready, naturally possessed Selene.
+Only after the input driver finished did the controlled rendered probe begin.
+All six Selene measurements passed: Far +/-80 cm, Balanced +/-60 cm and Close
++/-80 cm, with 90-degree FOV. PIE ended and the isolated editor was closed.
+This adds real handoff and Selene Strafe evidence; it does not add aim, collision,
+physical-controller or later-mission acceptance. No companion animation samples
+were recorded in this opening route, so it provides no companion combat verdict.
+
+`check_selene_shoulder_handoff.py` composes the existing normal E1 input route
+and the camera probe. Run with Visible, KeepEntryOpen and ContinueE1, without
+ContinueRoute. `check_shoulder_camera_output.py` also supports attachment to an
+already-running PIE session and checks the requested protagonist class.

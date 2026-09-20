@@ -2,6 +2,7 @@
 import unreal,os,json,time,math,traceback
 from pathlib import Path
 out=Path(os.environ['SOV_AURELION_RUN_DIRECTORY'])
+assert not (out/'shoulder-runtime.json').exists(), 'Preserve previous camera evidence'
 report=dict(status='running',scope=__doc__,samples=[])
 started=time.monotonic(); stage_at=started; claim=None; pawn=None; component=None; index=-1; ending=False
 cases=[(s,h) for s in ('FAR','BALANCED','CLOSE') for h in ('RIGHT','LEFT')]
@@ -27,6 +28,8 @@ def tick(dt):
   active=unreal.GameplayStatics.get_player_pawn(world,0)
   if not isinstance(active,unreal.SovPlayerCharacterBase) or not active.is_character_ready():return
   if pawn is None:
+   expected=globals().get('EXPECTED_PAWN_CLASS')
+   assert not expected or active.get_class().get_name()==expected, active.get_class().get_name()
    pawn=active;component=pawn.get_component_by_class(unreal.SovCameraControlComponent)
    cam=pawn.get_component_by_class(unreal.GameplayCameraComponent)
    reference=cam.get_editor_property('CameraReference').export_text()
@@ -54,8 +57,13 @@ def tick(dt):
   stage_at=now
  except Exception:finish(traceback.format_exc())
 unreal.EditorPythonScripting.set_keep_python_script_alive(True)
-settings=unreal.SovGameUserSettings.get_game_user_settings()
-assert settings.complete_accessibility_setup()
-assert editor.load_level('/Game/Aurelion/Maps/L_Aurelion_M12')
+attached=globals().get('ATTACH_TO_EXISTING_PIE',False)
+if attached:
+ assert editor.is_in_play_in_editor()
+else:
+ settings=unreal.SovGameUserSettings.get_game_user_settings()
+ assert settings.complete_accessibility_setup()
+ assert editor.load_level('/Game/Aurelion/Maps/L_Aurelion_M12')
 handle=unreal.register_slate_post_tick_callback(tick)
-write();editor.editor_request_begin_play()
+write()
+if not attached:editor.editor_request_begin_play()
