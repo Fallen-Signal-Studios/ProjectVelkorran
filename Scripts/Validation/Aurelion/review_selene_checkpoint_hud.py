@@ -25,7 +25,21 @@ settings = unreal.SovGameUserSettings.get_game_user_settings()
 assert settings.complete_accessibility_setup()
 report = dict(status='running', scope=__doc__, source=str(source), banks=[], callbacks=[], samples=[], presentation_errors=[])
 state = dict(phase='bootstrap', started=time.monotonic(), at=time.monotonic(), busy=False, index=0)
-cases = ('restored', 'WI_Verity', 'WI_Staccato', 'WI_Verity')
+review_states=globals().get('HUD_REVIEW_STATES')
+cases = tuple(s['case'] for s in review_states) if review_states else ('restored', 'WI_Verity', 'WI_Staccato', 'WI_Verity')
+original_settings=settings.get_settings_snapshot()
+
+def apply_review_state(world,pawn):
+    if not review_states:return
+    requested=review_states[state['index']]
+    snapshot=settings.get_settings_snapshot()
+    snapshot.set_editor_property('ui_scale',requested['scale'])
+    snapshot.set_editor_property('high_contrast_hud',requested['contrast'])
+    settings.apply_settings_snapshot(snapshot)
+    for presentation in unreal.ObjectIterator(unreal.SovAccessibilityPresentation):
+        if presentation.get_world()==world:
+            presentation.present_speech(unreal.Text('Lyessa'),unreal.Text('Hold the relay. Keep the east stair clear while the survivors cross the terrace.'),10.,pawn.get_actor_location(),True)
+            presentation.present_caption(unreal.Text('Shield broken'),10.,pawn.get_actor_location())
 
 
 def write():
@@ -38,6 +52,7 @@ def completed(result, header, message):
 
 
 def stop(error=None):
+    if review_states:settings.apply_settings_snapshot(original_settings)
     report['status'] = 'failed' if error or report['presentation_errors'] else 'passed_requires_visual_review'
     if error:
         report['error'] = error
@@ -99,6 +114,7 @@ def tick(delta):
             if pawn.is_character_pending_load():
                 return
             assert pawn.get_class().get_name() == 'BP_SovSelene_C', pawn.get_class().get_name()
+            apply_review_state(world,pawn)
             state.update(phase='settle', at=now)
             return
         if state['phase'] == 'settle' and now - state['at'] > 6:
@@ -108,7 +124,29 @@ def tick(delta):
             surface = surfaces[0]
             view = surface.get_holographic_hud_view()
             assert view.valid and 'Selene' in str(unreal.GameplayTagLibrary.get_tag_name(view.protagonist))
-            assert view.palette.accent.g > view.palette.accent.r and view.palette.accent.b > view.palette.accent.r
+            if not view.palette.high_contrast:
+                assert view.palette.accent.g > view.palette.accent.r and view.palette.accent.b > view.palette.accent.r
+            if review_states:
+                requested=review_states[state['index']]
+                assert abs(view.scale-requested['scale'])<.001
+                assert view.palette.high_contrast==requested['contrast']
+            material_values={}
+            if globals().get('HUD_REQUIRE_MATERIAL_CONTRAST',False):
+                for name in ('PlateRegion','AmmoRegion','ArcFill','RadarDisc','AbilityPips'):
+                    widget=surface.get_editor_property(name)
+                    brush=widget.get_editor_property('background' if name.endswith('Region') else 'brush')
+                    material=brush.get_editor_property('resource_object')
+                    assert isinstance(material,unreal.MaterialInstanceDynamic),name
+                    value=material.get_scalar_parameter_value('HighContrast')
+                    assert abs(value-float(view.palette.high_contrast))<.001,(name,value)
+                    material_values[name]=value
+                health_style=surface.get_editor_property('HealthBar').get_editor_property('widget_style')
+                for name in ('background_image','fill_image'):
+                    material=health_style.get_editor_property(name).get_editor_property('resource_object')
+                    assert isinstance(material,unreal.MaterialInstanceDynamic),name
+                    value=material.get_scalar_parameter_value('HighContrast')
+                    assert abs(value-float(view.palette.high_contrast))<.001,(name,value)
+                    material_values['HealthBar.'+name]=value
             assert abs(view.health.current - pawn.get_health()) < .1
             for field, resource in [('HealthBar', view.health), ('ShieldBar', view.shield)]:
                 assert abs(surface.get_editor_property(field).get_editor_property('percent') - resource.fraction) < .001
@@ -131,7 +169,9 @@ def tick(delta):
                 health=view.health.export_text(), shield=view.shield.export_text(), palette=view.palette.export_text(),
                 ammo_visible=visible, clip=view.ammo_in_clip, reserve=view.ammo_reserve,
                 wielded=[w.get_class().get_path_name() for w in pawn.get_wielded_weapons()],
-                viewport_pixels=[pixels.x, pixels.y], pips=[p.export_text() for p in view.pips]))
+                viewport_pixels=[pixels.x, pixels.y], ui_scale=view.scale,high_contrast=view.palette.high_contrast,
+                material_high_contrast=material_values,
+                viewport_dpi_scale=unreal.WidgetLayoutLibrary.get_viewport_scale(world),pips=[p.export_text() for p in view.pips]))
             unreal.SystemLibrary.execute_console_command(world, 'Shot showui -nosuffix filename=' +
                 str(out / ('selene-' + str(state['index']) + '-' + cases[state['index']] + '.png')))
             state.update(phase='capture', at=now)
@@ -157,6 +197,7 @@ def tick(delta):
             wield.set_editor_property('equip_weapons', [item])
             wield.set_editor_property('wield_slots', hands)
             pawn.set_wield_state(wield)
+            apply_review_state(world,pawn)
             state.update(item=item, phase='settle', at=now)
     except Exception:
         stop(traceback.format_exc())

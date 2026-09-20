@@ -219,5 +219,9 @@ protected:
 
 private:
 	void PlaceRegion(UPanelWidget* Region, const FBox2D& Box) const;
+	/** Per-widget material instances; accessibility must never mutate a shared content asset. */
+	void InitializeAccessibilityMaterials();
+	UPROPERTY(Transient) TArray<TObjectPtr<class UMaterialInstanceDynamic>> AccessibilityMaterials;
+	TOptional<bool> AppliedHighContrast;
 	UPROPERTY(Transient) TObjectPtr<class UMaterialInstanceDynamic> ArcMaterial;
 };

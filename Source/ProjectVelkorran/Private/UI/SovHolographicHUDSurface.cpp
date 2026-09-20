@@ -2,6 +2,8 @@
 #include "UI/SovHolographicHUDSurface.h"
 
 #include "Blueprint/WidgetLayoutLibrary.h"
+#include "Blueprint/WidgetTree.h"
+#include "Components/Border.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/Image.h"
 #include "Components/PanelWidget.h"
@@ -22,8 +24,50 @@ FVector2D USovHolographicHUDSurface::ArcPoint(float T) const
 void USovHolographicHUDSurface::NativeConstruct()
 {
 	Super::NativeConstruct();
+	InitializeAccessibilityMaterials();
 	// Constructed after the widget tree exists, so a frame that arrived first is applied now.
 	ApplyBoundWidgets();
+}
+
+void USovHolographicHUDSurface::InitializeAccessibilityMaterials()
+{
+	AccessibilityMaterials.Reset();
+	AppliedHighContrast.Reset();
+	ArcMaterial = nullptr;
+	if (!WidgetTree) { return; }
+	WidgetTree->ForEachWidget([this](UWidget* Widget)
+	{
+		if (auto* Border = Cast<UBorder>(Widget))
+		{
+			if (auto* Material = Border->GetDynamicMaterial()) { AccessibilityMaterials.AddUnique(Material); }
+		}
+		else if (auto* Image = Cast<UImage>(Widget))
+		{
+			if (auto* Material = Image->GetDynamicMaterial()) { AccessibilityMaterials.AddUnique(Material); }
+		}
+		else if (auto* Bar = Cast<UProgressBar>(Widget))
+		{
+			FProgressBarStyle BarStyle = Bar->GetWidgetStyle();
+			bool bChanged = false;
+			for (FSlateBrush* Brush : {&BarStyle.BackgroundImage, &BarStyle.FillImage, &BarStyle.MarqueeImage})
+			{
+				auto* Parent = Cast<UMaterialInterface>(Brush->GetResourceObject());
+				float Value = 0.f;
+				if (!Parent || !Parent->GetScalarParameterValue(FMaterialParameterInfo(TEXT("HighContrast")), Value)) { continue; }
+				// Re-adding the same widget must not build a chain of dynamic parents.
+				if (auto* Existing = Cast<UMaterialInstanceDynamic>(Parent); Existing && Existing->GetOuter() == this)
+				{
+					AccessibilityMaterials.AddUnique(Existing);
+					continue;
+				}
+				auto* Material = UMaterialInstanceDynamic::Create(Parent, this);
+				Brush->SetResourceObject(Material);
+				AccessibilityMaterials.Add(Material);
+				bChanged = true;
+			}
+			if (bChanged) { Bar->SetWidgetStyle(BarStyle); }
+		}
+	});
 }
 
 void USovHolographicHUDSurface::ApplyHolographicHUDView(const FSovHolographicHUDView& InView)
@@ -52,6 +96,14 @@ void USovHolographicHUDSurface::PlaceRegion(UPanelWidget* Region, const FBox2D& 
 
 void USovHolographicHUDSurface::ApplyBoundWidgets()
 {
+	if (!AppliedHighContrast.IsSet() || AppliedHighContrast.GetValue() != View.Palette.bHighContrast)
+	{
+		for (const auto& Material : AccessibilityMaterials)
+		{
+			if (Material) { Material->SetScalarParameterValue(TEXT("HighContrast"), View.Palette.bHighContrast ? 1.f : 0.f); }
+		}
+		AppliedHighContrast = View.Palette.bHighContrast;
+	}
 	const auto Show = [](UWidget* Widget, bool bVisible)
 	{
 		if (IsValid(Widget))
