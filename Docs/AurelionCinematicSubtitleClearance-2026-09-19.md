@@ -42,3 +42,33 @@ performance fix or full visual-quality acceptance is claimed.
 
 Post-change full gate `20260919-211249-bd0f8c59` passed build invocation without
 SkipBuild, 719 matching automation tests, coverage and source integrity.
+
+## Controlled co-rider reproduction
+
+`LiftCoriderClearance-20260919-211725-26dd11cc` reproduced the collision using
+transient instances of the actual Selene and Tarrik companion Blueprints at the
+recorded failure positions in the current M13 editor world. Both capsules have
+radius 34 cm, half-height 88 cm and Pawn response Block. Pawn-profile upward
+capsule sweeps use the native clearance dimensions (radius/half-height minus
+2 cm), ignore the lift and current rider, and test rises of 0.1, 1 and 5 cm.
+
+All six sweeps hit the other rider's CollisionCylinder at time zero, with
+11.135914 cm penetration. Repeating the same six sweeps while ignoring both
+riders produced no blocking hit. No scenery was ignored beyond the lift itself.
+Transient actors were destroyed and the M13 disk hash remained unchanged.
+The first attempt failed before tracing because a Python capsule getter is not
+exposed; the corrected property accessor produced the complete receipt above.
+
+This proves the co-rider obstruction in the controlled Pawn-profile fixture.
+It strongly supports the suspected route failure mechanism, but is not a native
+OnTransitChanged cancellation receipt or a successful live lift replay.
+
+The appropriate engineering correction is to collect all characters based on
+MovingBody first, then ignore that complete rider set in each passenger sweep,
+as the existing body sweep already does. Keep unrelated characters, ceilings,
+walls and other obstacles blocking; retain the no-crushing and no-progress-on-
+failure policies. Regression coverage should include two overlapping co-riders,
+a real overhead obstruction, and an unrelated blocking character. Follow with
+an actual paired M13 ride and checkpoint restoration. The handoff forbids C++
+edits in this content pass, so no native correction or collision workaround was
+made. This item remains open for engineering.
