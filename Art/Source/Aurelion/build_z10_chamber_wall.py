@@ -10,26 +10,26 @@ ROOT.mkdir(exist_ok=True)
 box('Continuous coffer backing', (0,.06,0), (3.99,.12,3.99), stone, .009)
 for z in (-1.92,1.92):
     box('Dressed horizontal course', (0,.16,z), (3.99,.22,.15), stone, .012)
-    box('Inset course conductor', (0,.273,z), (3.72,.012,.026), gold, .003)
+    box('Inset course conductor', (0,.273,z), (3.72,.012,.055), gold, .003)
 for side in (-1,1):
     x=side*1.89
     box('Deep perimeter reveal', (x,.142,0), (.20,.045,3.66), dark, .006)
     box('Chamfered frame arris', (x,.204,0), (.105,.11,3.67), stone, .01)
     for j in (-1,1):
-        box('Arris fine flute', (x+j*.026,.263,0), (.012,.012,3.48), gold, .002)
+        box('Arris fine flute', (x+j*.028,.263,0), (.025,.012,3.48), gold, .002)
     x=side*.94
     box('Recessed panel bed', (x,.142,0), (1.59,.045,3.47), dark, .009)
     box('Floating carved coffer', (x,.185,0), (1.48,.058,3.34), stone, .016)
     points=[(x-.66,.219,-1.53),(x+.42,.219,-1.53),(x+.66,.219,-1.29),
             (x+.66,.219,1.53),(x-.42,.219,1.53),(x-.66,.219,1.29),(x-.66,.219,-1.53)]
-    path('Inset coffer moulding',points,.043,.028,stone,.005)
+    path('Inset coffer moulding',points,.07,.028,stone,.007)
     # Large oblique channels remain legible at chamber-scale viewing distances.
     points=[(x-side*.43,.25,-1.20),(x-side*.43,.25,.62),
             (x+side*.35,.25,1.20)]
     path('Recessed oblique channel',points,.14,.012,dark,.004)
-    path('Ancient gold conductor',[(px,py+.014,pz) for px,py,pz in points],.038,.012,gold,.004)
-    for j in range(5):
-        box('Lower relief register', (x+side*.29,.258,-1.22+j*.12), (.34,.018,.045), gold, .004)
+    path('Ancient gold conductor',[(px,py+.014,pz) for px,py,pz in points],.065,.012,gold,.004)
+    for j in range(4):
+        box('Lower relief register', (x+side*.29,.258,-1.22+j*.16), (.34,.018,.075), gold, .004)
     for z in (-1.72,1.72):
         box('Recessed keyed joint',(x,.227,z),(.20,.026,.06),dark,.004)
         box('Keyed joint cap',(x,.251,z),(.105,.025,.041),gold,.003)
