@@ -1,6 +1,7 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "UI/SovAccessibilityPresentation.h"
 #include "UI/SovWorldLabelLayout.h"
+#include "CommonActivatableWidget.h"
 #include "UI/SovCombatVitalsWidget.h"
 #include "UI/SovHUDStyle.h"
 #include "Characters/SovPlayerCharacterBase.h"
@@ -141,6 +142,20 @@ FVector2D USovAccessibilityPresentation::GetSafeCanvasSize() const
 {
 	const FVector2D Size = SafeTextCanvas ? FVector2D(SafeTextCanvas->GetCachedGeometry().GetLocalSize()) : FVector2D::ZeroVector;
 	return Size.X > 0. && Size.Y > 0. ? Size : FVector2D(GetCachedGeometry().GetLocalSize());
+}
+void USovAccessibilityPresentation::SetWeaponWheelSurface(UWidget* Surface, UCommonActivatableWidget* Menu)
+{
+    WeaponWheelSurface=Surface; WeaponWheelMenu=Menu;
+}
+bool USovAccessibilityPresentation::GetWeaponWheelAbsoluteRect(FSlateRect& Out) const
+{
+    const auto* Menu=WeaponWheelMenu.Get();
+    const auto* Surface=WeaponWheelSurface.Get();
+    if (!Menu || !Menu->IsActivated() || Menu->GetOwningPlayer()!=GetOwningPlayer() || !Surface || !Surface->IsRendered()) { return false; }
+    const auto& G=Surface->GetPaintSpaceGeometry();
+    if (G.GetLocalSize().IsNearlyZero()) { return false; }
+    const FVector2D Min=G.LocalToAbsolute(FVector2D::ZeroVector), Max=G.LocalToAbsolute(G.GetLocalSize());
+    Out=FSlateRect(Min.X,Min.Y,Max.X,Max.Y); return true;
 }
 bool USovAccessibilityPresentation::GetSafeAreaAbsoluteRect(FSlateRect& Out) const
 {
@@ -695,6 +710,14 @@ int32 USovAccessibilityPresentation::NativePaint(const FPaintArgs& Args, const F
 	// Use arranged paint geometry, including padding, wrapping, DPI and the safe-area offset.
 	// Hidden panels reserve no space; labels return to their projected location when speech ends.
 	TArray<FBox2D> TextPanels;
+    FSlateRect WheelAbsolute;
+    FBox2D WheelBounds(ForceInit);
+    if (GetWeaponWheelAbsoluteRect(WheelAbsolute))
+    {
+        WheelBounds=FBox2D(Geometry.AbsoluteToLocal(FVector2D(WheelAbsolute.Left,WheelAbsolute.Top)),
+            Geometry.AbsoluteToLocal(FVector2D(WheelAbsolute.Right,WheelAbsolute.Bottom)));
+        TextPanels.Add(WheelBounds);
+    }
 	for (const UBorder* Panel : {SubtitleBackground.Get(), CaptionBackground.Get(), ObjectiveBackground.Get()})
 	{
 		if (!Panel || !Panel->IsRendered()) { continue; }
@@ -763,6 +786,8 @@ int32 USovAccessibilityPresentation::NativePaint(const FPaintArgs& Args, const F
                 const double Radius = 17. * Settings.UIScale;
                 auto Hologram = [&](const TArray<FVector2D>& Points)
                 {
+                    // World markers are occluded by the menu, rather than drawn over its weapon text.
+                    if (WheelBounds.bIsValid && WheelBounds.ExpandBy(Radius).IsInside(Point)) { return; }
                     TArray<FVector2f> Line; for (const auto& P : Points) { Line.Add(FVector2f(P)); }
                     if (!Settings.bHighContrastHUD)
                     {

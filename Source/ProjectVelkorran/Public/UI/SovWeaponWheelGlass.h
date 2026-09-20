@@ -17,10 +17,15 @@ public:
     /** Turns each existing transparent weapon thumbnail into a legible projected silhouette. */
     UPROPERTY(EditAnywhere, Category = "Sovereign|Wheel") TObjectPtr<UMaterialInterface> WeaponGlyphMaterial;
 protected:
+    virtual void NativeConstruct() override;
+    virtual void NativeDestruct() override;
     virtual TSharedRef<SWidget> RebuildWidget() override;
     virtual void NativeTick(const FGeometry& Geometry, float DeltaSeconds) override;
     virtual int32 NativePaint(const FPaintArgs& Args, const FGeometry& Geometry, const FSlateRect& CullingRect,
         FSlateWindowElementList& Elements, int32 Layer, const FWidgetStyle& Style, bool bParentEnabled) const override;
 private:
+    void ResetLayout();
+    void UpdatePlacement(UUserWidget* Menu);
+    FBox2D PlacedWheel = FBox2D(ForceInit);
     SovHUDStyle::FTheme Theme;
 };

@@ -9,12 +9,17 @@ class UWidgetBlueprint;
 class UMaterialInterface;
 
 /** Editor-only widget tree construction, which script bindings cannot reach: UWidgetTree::ConstructWidget
- * is a template and UMG offers no reflected equivalent. Authors assets only; never runs a widget. */
+ * is a template and UMG offers no reflected equivalent. Also supports read-only rendered layout probes. */
 UCLASS()
 class PROJECTVELKORRANEDITOR_API USovWidgetTreeAuthoringLibrary : public UBlueprintFunctionLibrary
 {
 	GENERATED_BODY()
 public:
+    /** Actual painted absolute bounds (left, top, right, bottom); zero before arrangement.
+     * Keeps FGeometry native rather than copying its non-reflected members through Python. */
+    UFUNCTION(BlueprintCallable, Category = "Velkorran|Editor|Widgets")
+    static FVector4 GetWidgetPaintBounds(UWidget* Widget);
+
     /** Replace the sole CreateDynamicMaterialInstance parent literal matching Expected or Replacement.
      * Refuses linked inputs, ambiguous factories and other material parents. Never changes graph wiring. */
     UFUNCTION(BlueprintCallable, Category = "Velkorran|Editor|Widgets")

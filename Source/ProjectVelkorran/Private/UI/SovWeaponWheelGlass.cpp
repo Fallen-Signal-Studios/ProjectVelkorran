@@ -2,6 +2,10 @@
 #include "UI/SovWeaponWheelGlass.h"
 #include "Blueprint/WidgetTree.h"
 #include "CommonLazyImage.h"
+#include "CommonActivatableWidget.h"
+#include "Components/Border.h"
+#include "Components/CanvasPanelSlot.h"
+#include "Components/ScaleBox.h"
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
 #include "Components/PanelWidget.h"
@@ -16,6 +20,9 @@
 #include "Settings/SovGameUserSettings.h"
 #include "Styling/CoreStyle.h"
 #include "UI/SovCombatVitalsWidget.h"
+#include "UI/SovAccessibilityPresentation.h"
+#include "UI/SovFrontendComponent.h"
+#include "UI/SovWeaponWheelLayout.h"
 #include "Widgets/Layout/SBox.h"
 
 USovWeaponWheelGlass::USovWeaponWheelGlass(const FObjectInitializer& Initializer) : Super(Initializer)
@@ -26,6 +33,59 @@ USovWeaponWheelGlass::USovWeaponWheelGlass(const FObjectInitializer& Initializer
 TSharedRef<SWidget> USovWeaponWheelGlass::RebuildWidget()
 {
     return SNew(SBox).WidthOverride(600.f).HeightOverride(600.f);
+}
+
+void USovWeaponWheelGlass::ResetLayout() { PlacedWheel = FBox2D(ForceInit); }
+void USovWeaponWheelGlass::NativeConstruct()
+{
+    Super::NativeConstruct(); ResetLayout();
+    if (auto* Menu = GetTypedOuter<UCommonActivatableWidget>())
+    {
+        Menu->OnActivated().RemoveAll(this);
+        Menu->OnActivated().AddUObject(this, &USovWeaponWheelGlass::ResetLayout);
+    }
+}
+void USovWeaponWheelGlass::NativeDestruct()
+{
+    if (auto* Menu = GetTypedOuter<UCommonActivatableWidget>()) { Menu->OnActivated().RemoveAll(this); }
+    Super::NativeDestruct();
+}
+
+void USovWeaponWheelGlass::UpdatePlacement(UUserWidget* Menu)
+{
+    auto* Frame = Cast<UScaleBox>(Menu->WidgetTree->FindWidget(TEXT("WheelSafeFrame")));
+    auto* FrameSlot = Frame ? Cast<UCanvasPanelSlot>(Frame->Slot) : nullptr;
+    auto* PC = Cast<ASovPlayerController>(GetOwningPlayer());
+    auto* Presentation = PC && PC->GetFrontend() ? PC->GetFrontend()->GetPresentation() : nullptr;
+    if (!FrameSlot || !Frame->GetParent() || !Presentation) { return; }
+    const FGeometry& Canvas = Frame->GetParent()->GetCachedGeometry();
+    if (Canvas.GetLocalSize().IsNearlyZero()) { return; }
+    FSlateRect AbsoluteSafe;
+    if (!Presentation->GetSafeAreaAbsoluteRect(AbsoluteSafe)) { return; }
+    const auto LocalRect = [&](const FSlateRect& R)
+    {
+        return FBox2D(Canvas.AbsoluteToLocal(FVector2D(R.Left,R.Top)),Canvas.AbsoluteToLocal(FVector2D(R.Right,R.Bottom)));
+    };
+    FBox2D Safe = LocalRect(AbsoluteSafe);
+    Safe.Min += FVector2D(12,12); Safe.Max -= FVector2D(12,12);
+    TArray<FSlateRect> HUD;
+    Presentation->GetHolographicHUDRegions(HUD);
+    TArray<FBox2D> Panels;
+    for (const auto& R : HUD) { Panels.Add(LocalRect(R)); }
+    for (const UBorder* Panel : {Presentation->GetSubtitlePanel(),Presentation->GetCaptionPanel(),Presentation->GetObjectivePanel()})
+    {
+        if (!Panel || !Panel->IsRendered()) { continue; }
+        const FGeometry& G = Panel->GetPaintSpaceGeometry();
+        if (G.GetLocalSize().IsNearlyZero()) { continue; }
+        Panels.Emplace(Canvas.AbsoluteToLocal(G.LocalToAbsolute(FVector2D::ZeroVector)),Canvas.AbsoluteToLocal(G.LocalToAbsolute(G.GetLocalSize())));
+    }
+    FBox2D Result;
+    if (SovWeaponWheelLayout::Place(Safe,Panels,600.,PlacedWheel,Result))
+    {
+        PlacedWheel=Result;
+        FrameSlot->SetPosition(Result.Min); FrameSlot->SetSize(Result.GetSize());
+    }
+    Presentation->SetWeaponWheelSurface(Frame,Cast<UCommonActivatableWidget>(Menu));
 }
 
 void USovWeaponWheelGlass::NativeTick(const FGeometry& Geometry, float DeltaSeconds)
@@ -40,6 +100,7 @@ void USovWeaponWheelGlass::NativeTick(const FGeometry& Geometry, float DeltaSeco
     // Resolve the live brush each frame: Blueprint owns its MID and may rebuild it on activation.
     auto* Menu = GetTypedOuter<UUserWidget>();
     if (!Menu || !Menu->WidgetTree) { return; }
+    UpdatePlacement(Menu);
     if (auto* Image = Cast<UImage>(Menu->WidgetTree->FindWidget(TEXT("Image_WeaponWheel"))))
     {
         if (auto* Material = Image->GetDynamicMaterial())

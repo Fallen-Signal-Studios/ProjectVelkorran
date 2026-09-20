@@ -12,6 +12,16 @@
 #include "K2Node_CallFunction.h"
 #include "Materials/MaterialInterface.h"
 
+FVector4 USovWidgetTreeAuthoringLibrary::GetWidgetPaintBounds(UWidget* Widget)
+{
+    if (!IsValid(Widget)) { return FVector4(0,0,0,0); }
+    const FGeometry& Geometry = Widget->GetPaintSpaceGeometry();
+    if (Geometry.GetLocalSize().IsNearlyZero()) { return FVector4(0,0,0,0); }
+    const FVector2D Min = Geometry.LocalToAbsolute(FVector2D::ZeroVector);
+    const FVector2D Max = Geometry.LocalToAbsolute(Geometry.GetLocalSize());
+    return FVector4(Min.X,Min.Y,Max.X,Max.Y);
+}
+
 bool USovWidgetTreeAuthoringLibrary::ReplaceMaterialFactoryParent(UWidgetBlueprint* Blueprint,
     UMaterialInterface* Expected, UMaterialInterface* Replacement)
 {

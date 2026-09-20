@@ -22,18 +22,51 @@ wheel_action=next(iter(wheel_actions))
 wheel_class=unreal.load_class(None,WHEEL_CLASS)
 report=dict(status='running',scope=__doc__,samples=[],selections=[],banks=[],callbacks=[])
 state=dict(phase='ready',hero='Tarrik',case=0,at=time.monotonic(),start=time.monotonic(),busy=False)
-cases=('waypoint','wheel','wheel_contrast','wheel_return')
+cases=('waypoint','wheel','wheel_contrast','wheel_return','wheel_scale_150','wheel_scale_200')
 
 def write(): (out/'weapon-wheel-review.json').write_text(json.dumps(report,indent=2))
 def loaded(result,header,message):report['callbacks'].append(dict(result=str(result),message=str(message)))
 def configure(world,pawn,case):
     snap=settings.get_settings_snapshot();snap.set_editor_property('high_contrast_hud',case=='wheel_contrast')
-    snap.set_editor_property('navigation_contrast',False);snap.set_editor_property('ui_scale',1.)
+    snap.set_editor_property('navigation_contrast',False)
+    snap.set_editor_property('ui_scale',2. if case=='wheel_scale_200' else 1.5 if case=='wheel_scale_150' else 1.)
     settings.apply_settings_snapshot(snap)
     if case=='waypoint':
         for p in unreal.ObjectIterator(unreal.SovAccessibilityPresentation):
             if p.get_world()==world:
-                p.present_speech(unreal.Text('Lyessa'),unreal.Text('Hold the relay. Keep the east stair clear while the survivors cross the terrace.'),15.,pawn.get_actor_location(),True)
+                p.present_speech(unreal.Text('Lyessa'),unreal.Text('Hold the relay. Keep the east stair clear while the survivors cross the terrace.'),100.,pawn.get_actor_location(),True)
+
+def bounds(widget):
+    rect=unreal.SovWidgetTreeAuthoringLibrary.get_widget_paint_bounds(widget)
+    return [rect.x,rect.y,rect.z,rect.w]
+
+def clearance(world,wheel):
+    presentation=next(p for p in unreal.ObjectIterator(unreal.SovAccessibilityPresentation)
+        if p.get_world()==world and p.get_owning_player()==wheel.get_owning_player())
+    rect=bounds(wheel.get_editor_property('WheelSafeFrame'))
+    if rect[2]-rect[0]<1:
+        widgets=[dict(name=item.get_name(),type=item.get_class().get_name(),bounds=bounds(item),visibility=str(item.get_visibility()),
+            parent=item.get_parent().get_name() if item.get_parent() else None)
+            for item in unreal.ObjectIterator(unreal.Widget) if item.get_path_name().startswith(wheel.get_path_name()+'.')]
+        (out/'wheel-geometry-failure.json').write_text(json.dumps(widgets,indent=2))
+    prefix=presentation.get_path_name()+'.'
+    canvases=[widget for widget in unreal.ObjectIterator(unreal.CanvasPanel) if widget.get_path_name().startswith(prefix)]
+    assert len(canvases)==1
+    safe=bounds(canvases[0])
+    assert rect[2]-rect[0]>100 and rect[3]-rect[1]>100,rect
+    assert rect[0]>=safe[0] and rect[1]>=safe[1] and rect[2]<=safe[2] and rect[3]<=safe[3],(rect,safe)
+    panels={}
+    dialogue=False
+    for widget in unreal.ObjectIterator(unreal.Border):
+        if not widget.get_path_name().startswith(prefix):continue
+        name=widget.get_name()
+        if widget and widget.is_visible():
+            panel=bounds(widget);panels[name]=panel
+            assert not (rect[0]<panel[2] and rect[2]>panel[0] and rect[1]<panel[3] and rect[3]>panel[1]),(name,rect,panel)
+            child=widget.get_content()
+            if isinstance(child,unreal.TextBlock) and 'Lyessa' in str(child.get_text()):dialogue=True
+    assert dialogue,'The clearance fixture must include live dialogue'
+    return dict(wheel=rect,safe=safe,panels=panels)
 def owner(world,pc):
     engine=unreal.GameplayStatics.get_game_instance(world).get_outer()
     candidates=[s for s in unreal.ObjectIterator(unreal.EnhancedInputLocalPlayerSubsystem)
@@ -55,6 +88,9 @@ def tick(delta):
         if state['phase']=='stopping':
             if not level.is_in_play_in_editor():
                 unreal.unregister_slate_post_tick_callback(handle);unreal.EditorPythonScripting.set_keep_python_script_alive(False)
+            return
+        if state['phase']=='failure_capture':
+            if now-state['at']>3:stop(state['error'])
             return
         assert now-state['start']<260,'Wheel review timed out'
         world=unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_game_world()
@@ -124,6 +160,7 @@ def tick(delta):
                 wheels=[w for w in unreal.WidgetLibrary.get_all_widgets_of_class(world,wheel_class,False) if w.is_activated() and w.get_owning_player()==pc]
                 assert len(wheels)==1
                 w=wheels[0];image=w.get_editor_property('Image_WeaponWheel')
+                row['clearance']=clearance(world,w)
                 row['backgrounds']=[dict(name=b.get_name(),visibility=str(b.get_visibility()),opacity=b.get_render_opacity(),color=b.get_editor_property('brush_color').export_text())
                     for b in unreal.ObjectIterator(unreal.CommonBorder) if b.get_path_name().startswith(w.get_path_name()+'.')]
                 row['camera_rotation']=pc.player_camera_manager.get_camera_rotation().export_text()
@@ -164,7 +201,13 @@ def tick(delta):
                 state.update(phase='release',at=now)
             else:
                 configure(world,pawn,cases[state['case']]);state.update(phase='settle',at=now)
-    except Exception:stop(traceback.format_exc())
+    except Exception:
+        error=traceback.format_exc()
+        world=unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_game_world()
+        if world:
+            unreal.SystemLibrary.execute_console_command(world,'Shot showui -nosuffix filename='+str(out/'failure.png'))
+            state.update(phase='failure_capture',at=time.monotonic(),error=error)
+        else:stop(error)
     finally:state['busy']=False
 unreal.EditorPythonScripting.set_keep_python_script_alive(True)
 handle=unreal.register_slate_post_tick_callback(tick)

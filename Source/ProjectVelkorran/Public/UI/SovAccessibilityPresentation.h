@@ -15,6 +15,7 @@ class USizeBox;
 class UPlayerInteractionComponent;
 class UNarrativeInteractableComponent;
 class ANarrativeCharacter;
+class UCommonActivatableWidget;
 
 UENUM(BlueprintType)
 enum class ESovCaptionPriority : uint8 { Routine, Important, Critical };
@@ -52,6 +53,9 @@ public:
     void SetHolographicHUDClearance(bool bHUDShown, bool bAmmoShown);
     /** The HUD's occupied areas in absolute space, for other overlays that must avoid them. Empty while it is down. */
     void GetHolographicHUDRegions(TArray<FSlateRect>& OutAbsolute) const;
+    /** Live owning-player menu geometry. Weak references never keep a closed menu alive. */
+    void SetWeaponWheelSurface(UWidget* Surface, UCommonActivatableWidget* Menu);
+    bool GetWeaponWheelAbsoluteRect(FSlateRect& Out) const;
 	UFUNCTION(BlueprintCallable, Category="Sovereign|Accessibility") void PresentSpeech(const FText& Speaker, const FText& Text, float Duration, const FVector& SpeakerLocation, bool bCinematic);
 	UFUNCTION(BlueprintCallable, Category="Sovereign|Accessibility") void PresentCaption(const FText& Text, float Duration, const FVector& SourceLocation, ESovCaptionPriority CaptionPriority = ESovCaptionPriority::Important);
 	/** Line-end and normal dialogue completion preserve the remaining readable pages. */
@@ -83,6 +87,8 @@ protected:
 	virtual void NativeTick(const FGeometry& Geometry, float DeltaSeconds) override;
 	virtual int32 NativePaint(const FPaintArgs& Args, const FGeometry& Geometry, const FSlateRect& CullingRect, FSlateWindowElementList& Elements, int32 Layer, const FWidgetStyle& Style, bool bParentEnabled) const override;
 private:
+    TWeakObjectPtr<UWidget> WeaponWheelSurface;
+    TWeakObjectPtr<UCommonActivatableWidget> WeaponWheelMenu;
 	friend struct FSovFrontendTestAccess;
 	friend struct FSovAccessibilityFrontendTestAccess;
 	friend struct FSovObjectivePresentationTestAccess;
