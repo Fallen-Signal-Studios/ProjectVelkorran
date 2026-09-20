@@ -21,15 +21,22 @@ for widget_name, material_name in [('ArcFill', 'M_SovEchoSegmentedArc'), ('Radar
     materials[widget_name] = material.get_path_name()
 assert author.find_widget_in_tree(bp, 'EchoBar').get_visibility() == unreal.SlateVisibility.COLLAPSED
 plate_padding = author.find_widget_in_tree(bp, 'PlateBars').slot.get_editor_property('padding')
-ammo_padding = author.find_widget_in_tree(bp, 'AmmoText').slot.get_editor_property('padding')
 assert plate_padding.left == 90.0
+assert author.find_widget_in_tree(bp, 'PlateBars').get_visibility() == unreal.SlateVisibility.COLLAPSED
+for name in ('HealthBar', 'ShieldBar', 'StaminaBar'):
+    assert author.find_widget_in_tree(bp, name).get_parent().get_name() == 'PlateResourceChannels'
 identity = author.find_widget_in_tree(bp, 'ProtagonistName')
 assert isinstance(identity, unreal.TextBlock)
 assert isinstance(identity.slot, unreal.OverlaySlot)
 assert identity.get_parent() == author.find_widget_in_tree(bp, 'PlateBars').get_parent()
 assert identity.get_editor_property('font').get_editor_property('letter_spacing') == 1400
 assert identity.get_editor_property('font').get_editor_property('size') == 12
-assert (ammo_padding.left, ammo_padding.top, ammo_padding.right, ammo_padding.bottom) == (62.0, 8.0, 18.0, 8.0)
+assert author.find_widget_in_tree(bp, 'AmmoText').get_visibility() == unreal.SlateVisibility.COLLAPSED
+for name, size in [('AmmoClip', 32), ('AmmoReserve', 16)]:
+    text = author.find_widget_in_tree(bp, name)
+    assert text.get_parent().get_name() == 'AmmoTypography'
+    assert text.get_editor_property('font').get_editor_property('size') == size
+assert author.find_widget_in_tree(bp, 'AmmoOpticalScale').get_parent().get_name() == 'AmmoRegion'
 health = author.find_widget_in_tree(bp, 'HealthBar')
 assert health.get_editor_property('bar_fill_style') == unreal.ProgressBarFillStyle.MASK
 for field in ('fill_image', 'background_image'):
@@ -39,7 +46,8 @@ for field in ('fill_image', 'background_image'):
 gameplay_hud = unreal.load_asset('/Game/Aurelion/UI/WBP_AurelionGameplayHUD')
 compass = author.find_widget_in_tree(gameplay_hud, 'WBP_Navigator_Compass')
 assert isinstance(compass.slot, unreal.CanvasPanelSlot)
-assert compass.slot.get_offsets().top == 148.0
+assert compass.slot.get_offsets().top == -8.0
+assert compass.slot.get_anchors().minimum.y == 1.0
 assert not unreal.EditorLoadingAndSavingUtils.get_dirty_map_packages()
 (out / 'hud-material-verification.json').write_text(json.dumps({
     'status': 'passed', 'bindings': bindings, 'materials': materials,

@@ -151,6 +151,14 @@ def _capture(row):
             numbers = [int(''.join(c for c in part if c.isdecimal()))
                        for part in actual_text.split('/') if any(c.isdecimal() for c in part)]
             _check(row, 'holographic_ammo_text', numbers, [main['ammo_in_clip'], main['spare_ammo']])
+            # The visible split fields are the presentation contract. The
+            # collapsed combined binding remains only for native compatibility.
+            for name, expected in [('AmmoClip', main['ammo_in_clip']), ('AmmoReserve', main['spare_ammo'])]:
+                text = surface.get_editor_property(name)
+                _check(row, name + '_visible', text.get_visibility() not in
+                       (unreal.SlateVisibility.COLLAPSED, unreal.SlateVisibility.HIDDEN), True)
+                digits = ''.join(c for c in str(text.get_text()) if c.isdecimal())
+                _check(row, name + '_value', int(digits) if digits else None, expected)
         else:
             _check(row, 'holographic_ammo_text_empty', actual_text, '')
     expected_name = (main["single_weapon_display_name"] if main else "")
