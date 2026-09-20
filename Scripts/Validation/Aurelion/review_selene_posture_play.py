@@ -21,7 +21,12 @@ settings = unreal.SovGameUserSettings.get_game_user_settings()
 assert settings.complete_accessibility_setup()
 report = dict(status='running', scope=__doc__, source=str(source), banks=[], callbacks=[], samples=[], presentation_errors=[])
 state = dict(phase='bootstrap', started=time.monotonic(), at=time.monotonic(), busy=False, index=0)
-cases = ('restored', 'bypass', 'crouch', 'crouch_bypass', 'walk', 'WI_Verity', 'WI_Staccato', 'restowed')
+cases = globals().get('POSTURE_REVIEW_CASES',
+    ('restored', 'bypass', 'crouch', 'crouch_bypass', 'walk', 'WI_Verity', 'WI_Staccato', 'restowed'))
+assert cases and cases[0]=='restored'
+assert all(c in ('restored','bypass','crouch','crouch_bypass','walk','walk_reverse','stop','jump','landed',
+                 'WI_Verity','WI_Staccato','restowed') for c in cases)
+continuous_reversal = globals().get('POSTURE_CONTINUOUS_REVERSAL', False)
 
 
 def write():
@@ -34,6 +39,11 @@ def completed(result, header, message):
 
 
 def stop(error=None):
+    if state.get('jump_held'):
+        asc=state.get('jump_asc')
+        if asc and unreal.SystemLibrary.is_valid(asc):
+            asc.ability_input_tag_released(state['jump_tag'])
+        state['jump_held']=False
     report['status'] = 'failed' if error or report['presentation_errors'] else 'passed_requires_visual_review'
     if error:
         report['error'] = error
@@ -98,6 +108,19 @@ def tick(delta):
             state.update(phase='settle', at=now)
             return
         case = cases[state['index']]
+        movement=pawn.get_component_by_class(unreal.CharacterMovementComponent)
+        assert movement,'Character movement component is missing'
+        if case=='jump':
+            if state.get('jump_held') and now-state['at']>.2:
+                state['jump_asc'].ability_input_tag_released(state['jump_tag'])
+                state['jump_held']=False
+            airborne=movement.is_falling()
+            report.setdefault('jump_trace',[]).append(dict(
+                game_seconds=unreal.GameplayStatics.get_time_seconds(world),airborne=airborne,
+                z=pawn.get_actor_location().z,vertical_speed=pawn.get_velocity().z))
+            state['airborne_seen']=state.get('airborne_seen',False) or airborne
+            if state['phase']=='settle' and now-state['at']>10:
+                raise RuntimeError('Jump input did not produce a qualifying airborne posture within ten seconds')
         if state['phase'] == 'settle' and case == 'WI_Verity':
             if now - state['at'] > 1 and not state.get('attack_sent'):
                 attack = unreal.GameplayTag()
@@ -111,22 +134,40 @@ def tick(delta):
                 path = montage.get_path_name()
                 if path not in report.setdefault('verity_montages', []):
                     report['verity_montages'].append(path)
-        if state['phase'] == 'settle' and case == 'walk':
+        if (state['phase'] == 'settle' and case in ('walk','walk_reverse')) or (
+                continuous_reversal and state['phase']=='capture' and case=='walk'):
             pawn.add_movement_input(state['walk_direction'], 0.35, False)
-        if state['phase'] == 'settle' and now - state['at'] > (1.5 if case == 'walk' else 4):
+        capture_ready=now-state['at']>(1.5 if case in ('walk','walk_reverse') else 4)
+        if case=='jump':
+            capture_ready=False
+            if movement.is_falling():
+                diagnostic=unreal.SovBlueprintAuthoringLibrary.preview_selene_feminine_posture(
+                    pawn.get_editor_property('mesh').get_anim_instance(),True)
+                assert diagnostic.succeeded,diagnostic.report
+                values=dict(field.split('=') for field in diagnostic.report.split())
+                capture_ready=float(values['alpha'])<.01
+        if state['phase'] == 'settle' and capture_ready:
             mesh = pawn.get_editor_property('mesh')
             anim = mesh.get_anim_instance()
             assert anim and anim.get_class().get_name() == 'ABP_Biped_C'
             preview = unreal.SovBlueprintAuthoringLibrary.preview_selene_feminine_posture(anim, 'bypass' not in case)
             assert preview.succeeded, preview.report
             values = dict(field.split('=') for field in preview.report.split())
-            expected = 0.0 if 'bypass' in case or case.startswith('WI_') else 1.0
+            expected = 0.0 if 'bypass' in case or case.startswith('WI_') or case=='jump' else 1.0
             assert abs(float(values['alpha']) - expected) < .01, (case, preview.report)
             if case == 'WI_Verity':
                 assert any('Verity' in path for path in report.get('verity_montages', [])), 'Verity attack montage was not observed'
             speed = pawn.get_velocity().length()
-            if case == 'walk':
+            if case in ('walk','walk_reverse'):
                 assert speed > 5, 'Walking input produced no locomotion'
+                direction=state['walk_direction'];velocity=pawn.get_velocity()
+                assert velocity.x*direction.x+velocity.y*direction.y>5,'Movement did not follow the requested direction'
+            if case=='jump':
+                assert movement.is_falling() and state.get('airborne_seen')
+            if case in ('landed','stop'):
+                assert movement.is_moving_on_ground() and speed<5,'Grounded stop did not settle'
+            if case=='landed':
+                assert state.get('airborne_seen'),'Landing without a previously observed jump is not coverage'
             if case.startswith('crouch'):
                 assert pawn.get_editor_property('is_crouched'), 'Crouch request did not enter crouch'
             wielded = pawn.get_wielded_weapons()
@@ -136,6 +177,7 @@ def tick(delta):
                 assert not wielded
             report['samples'].append(dict(case=case, anim_class=anim.get_class().get_path_name(),
                 posture=preview.report, speed=speed, crouched=pawn.get_editor_property('is_crouched'),
+                position=pawn.get_actor_location().export_text(),airborne=movement.is_falling(),
                 wielded=[w.get_class().get_path_name() for w in wielded],
                 bones={str(b):mesh.get_socket_transform(b, unreal.RelativeTransformSpace.RTS_COMPONENT).export_text()
                     for b in ('root', 'pelvis', 'head', 'hand_l', 'hand_r', 'foot_l', 'foot_r')}))
@@ -150,7 +192,8 @@ def tick(delta):
             state.update(phase='capture', at=now)
             write()
             return
-        if state['phase'] == 'capture' and now - state['at'] > 3:
+        capture_delay=0 if continuous_reversal and case=='walk' else 3
+        if state['phase'] == 'capture' and now - state['at'] > capture_delay:
             state['index'] += 1
             if state['index'] == len(cases):
                 stop()
@@ -162,9 +205,26 @@ def tick(delta):
             anim = pawn.get_editor_property('mesh').get_anim_instance()
             preview = unreal.SovBlueprintAuthoringLibrary.preview_selene_feminine_posture(anim, 'bypass' not in name)
             assert preview.succeeded, preview.report
-            if name in ('walk', 'crouch', 'crouch_bypass', 'bypass', 'restowed'):
+            if name=='jump':
+                assert not pawn.get_wielded_weapons() and movement.is_moving_on_ground()
+                tag=unreal.GameplayTag();assert tag.import_text('(TagName="Narrative.Input.Jump")')
+                asc=pawn.get_narrative_ability_system_component()
+                state.update(jump_tag=tag,jump_asc=asc,jump_held=True,airborne_seen=False)
+                asc.ability_input_tag_pressed(tag)
+                state.update(phase='settle',at=now)
+                return
+            if name in ('walk', 'walk_reverse', 'landed', 'stop', 'crouch', 'crouch_bypass', 'bypass', 'restowed'):
                 if name == 'walk':
                     state['walk_direction'] = pawn.get_actor_right_vector()
+                if name=='walk_reverse':
+                    assert 'walk_direction' in state,'Reverse review requires a preceding walk'
+                    if continuous_reversal:
+                        velocity=pawn.get_velocity();direction=state['walk_direction']
+                        forward_speed=velocity.x*direction.x+velocity.y*direction.y
+                        assert forward_speed>5,'Continuous reversal must start while moving forward'
+                        report['reversal_entry']=dict(speed=velocity.length(),forward_speed=forward_speed,
+                            velocity=velocity.export_text(),game_seconds=unreal.GameplayStatics.get_time_seconds(world))
+                    state['walk_direction']=state['walk_direction']*-1.0
                 if name.startswith('crouch'):
                     pawn.crouch(False)
                 if name == 'restowed':

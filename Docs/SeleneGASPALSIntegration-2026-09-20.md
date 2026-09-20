@@ -4,10 +4,12 @@ Requested by the creator on 20 September: use the GASPALS feminine locomotion
 library for Selene when integrating remaining character animation work. Preserve
 the earlier equipped-Verity Twin Blade stance and attack requirements.
 
-Status: feminine/reference poses retargeted and visually reviewed in Unreal;
-**not assigned to Selene, not gameplay qualified**. No character, plugin, or map
-asset was saved. Ten project-owned pose/rig assets and five additive posture
-assets have been created. Live graph wiring remains unfinished.
+Status: the retargeted feminine posture layer is integrated into Narrative
+ABP_Biped and verified in controlled Selene PIE movement and weapon cases.
+The supplied library supplies posture corrections over existing motion matching.
+Full-route, companion combat and packaged acceptance remain outstanding.
+The preparation notes below are historical; the completed integration and
+subsequent transition checks are recorded in the final sections.
 
 ## Verified integration boundary
 
@@ -31,7 +33,7 @@ local/mesh-space locomotion deltas, linked weapon overlays, and FullBody,
 UpperBody, and DefaultSlot montage paths. The GASP sandbox AnimBP is not a
 drop-in replacement for these contracts.
 
-## Remaining content work
+## Original integration plan (historical)
 
 1. Retargeting and initial pose comparison are complete (details below). Confirm
    curve/additive behavior as part of the actual graph integration.
@@ -231,3 +233,40 @@ companion identity branch exists but Selene-as-companion combat was not exercise
 in this checkpoint. Airborne, traversal, full attack chains, damage delivery,
 controller input, full-route acceptance and packaged execution remain outside
 this narrow verification. This does not establish 90% TDD or AAA completion.
+
+## Airborne and continuous reversal qualification
+
+`review_selene_locomotion_transitions.py` restores the same earned CP2 through
+the public save API, then exercises jump, landing, walking, a continuous reversal
+and a stop. Jump uses Narrative's existing Jump input tag; walking uses the
+character movement input API. No teleport, ability grants or asset writes occur.
+This remains scripted input coverage, not physical keyboard/controller coverage.
+
+Final run `SeleneContinuousReversal-20260920-121143-21a5b01a` exited successfully
+and passed all six state assertions. Reversal began with 210 cm/s of forward
+velocity and reached 210 cm/s in the opposite requested direction. The posture
+weight reached zero while airborne, returned to one after landing, remained one
+through grounded movement, and settled at zero speed after stopping. Jump,
+reverse-movement and stopped screenshots were inspected at the embedded
+844 x 550 viewport size. They show the expected poses; they do not resolve every
+frame of the pivot or establish full-screen animation quality.
+
+The first attempt failed on a Python-only lookup (`get_character_movement` is
+not exposed); the corrected checker obtains CharacterMovementComponent by class.
+Intermediate run `SeleneTransitionReadback-20260920-120112-86f972f6` passed jump
+and landing, but paused between direction changes. It is not continuous-pivot
+evidence. The final checker removes that pause and asserts positive forward
+velocity immediately before requesting reverse input.
+
+Stowed weapon geometry still crowds Selene's head and shoulder in these frames.
+Read-only `SeleneHolsterInventory-20260920-120636-3b67fbd6` records project weapon
+CDO attachment maps. Staccato has BackA/BackB offsets with Z translations of
+28.73/22.69 cm, but live weapon/socket placement must be identified before
+choosing an offset correction. No holster configuration was changed here.
+The earlier Verity ammunition HUD defect was separately fixed in `606e4905`.
+
+Full baseline gate `20260920-115622-4390b09b` and post-checker gate
+`20260920-121358-b25465b3` both passed the build without SkipBuild, all 720 matching
+automation tests, report coverage and source integrity. This increment changes
+only validation scripts and this evidence document, not production animation
+assets or native source.
