@@ -301,3 +301,8 @@ Content/TwinBladesBundle/TwinBladesAndTwinSword/Map/Materials/Texture/T_Ground_O
 !/Content/Weapons/Visuals/BP_SovCinderlineVisual.uasset
 !/Content/Weapons/Visuals/BP_SovStaccatoVisual.uasset
 !/Content/Items/Weapons/WI_Staccato.uasset
+
+# Owned M13 chamber paving sources.
+!/Art/Source/Aurelion/Z10ChamberFloor/Aurelion-Chamber-Paving.blend
+!/Art/Source/Aurelion/Z10ChamberFloor/SM_Aurelion_KIT_Z10ChamberPaving.fbx
+!/Art/Source/Aurelion/Z10ChamberFloor/SM_Aurelion_KIT_Z10CrownmarkDais.fbx

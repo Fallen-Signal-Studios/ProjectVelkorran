@@ -1,0 +1,48 @@
+{
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z10ChamberPaving",
+      "triangles": 64764,
+      "nominal_dimensions_m": [
+        54.0,
+        54.0,
+        0.6000000238418579
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_Basalt",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None: retained native floor remains physical",
+      "source_instance": 0,
+      "surface_top_metres": 0.3,
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z10CrownmarkDais",
+      "triangles": 41084,
+      "nominal_dimensions_m": [
+        9.999411582946777,
+        9.999411582946777,
+        0.20000000298023224
+      ],
+      "materials": [
+        "M_Aurelion_Basalt",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_IvoryStone"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None: retained native dais remains physical",
+      "source_instance": 1,
+      "surface_top_metres": 0.1,
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    }
+  ],
+  "source_outline_vertices": 32
+}
