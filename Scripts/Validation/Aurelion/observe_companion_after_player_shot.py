@@ -143,12 +143,20 @@ class Observer:
                                 radius=node.get_editor_property('trace_radius'),
                                 startup=node.get_editor_property('startup'), active=node.get_editor_property('active'),
                                 weapon_mesh=weapon_mesh.get_path_name(), mesh_transform=weapon_mesh.get_world_transform().export_text()))
+            target_capsule = self.target.get_component_by_class(unreal.CapsuleComponent) if unreal.SystemLibrary.is_valid(self.target) else None
+            movement = self.companion.get_component_by_class(unreal.CharacterMovementComponent)
             self.report['samples'].append(dict(elapsed=now-self.started,
                 target_health=self.target.get_health() if unreal.SystemLibrary.is_valid(self.target) else None,
                 distance=self.companion.get_distance_to(self.target),
                 companion_position=self.companion.get_actor_location().export_text(),
                 companion_rotation=self.companion.get_actor_rotation().export_text(),
+                root_motion_rotation_allowed=movement.get_editor_property('allow_physics_rotation_during_anim_root_motion'),
+                controller_rotation=self.companion.get_controller().get_control_rotation().export_text()
+                    if self.companion.get_controller() else None,
                 target_position=self.target.get_actor_location().export_text() if unreal.SystemLibrary.is_valid(self.target) else None,
+                target_capsule=dict(center=target_capsule.get_world_location().export_text(),
+                    radius=target_capsule.get_scaled_capsule_radius(), half_height=target_capsule.get_scaled_capsule_half_height())
+                    if target_capsule else None,
                 blade_edges=blade_edges,
                 montage=montage.get_path_name() if montage else None,
                 montage_position=anim.montage_get_position(montage) if montage else None,

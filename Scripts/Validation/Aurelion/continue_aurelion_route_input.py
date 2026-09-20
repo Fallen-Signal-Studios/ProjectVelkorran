@@ -23,6 +23,8 @@ class Run:
         self.handle = None
         self.child = self.module = None
         self.index = -1
+        self.stop_after = os.environ.get('SOV_AURELION_ROUTE_STOP_AFTER', '')
+        assert not self.stop_after or self.stop_after in STAGES, 'Unknown diagnostic endpoint'
         self.started = time.monotonic()
         self.report = dict(status='running', stages=[], pie_left_running=True,
                            scope='Existing E1 pass through E2, E3 rescue, E4 phases, native M13 travel and separate departures; only passed child reports qualify their stages')
@@ -58,7 +60,7 @@ class Run:
         unreal.log('Aurelion route input chain: '+self.report['status']+': '+reason)
         # The earned CP9 reload must observe this same session. Drop this chain's driver references first,
         # so the probe's stale-world audit only sees retired observers.
-        if passed and os.environ.get('SOV_AURELION_ROUTE_CP9') == '1':
+        if passed and self.index == len(STAGES)-1 and os.environ.get('SOV_AURELION_ROUTE_CP9') == '1':
             self.child = self.module = None
             try:
                 import probe_m13_native_checkpoint_reload as cp9
@@ -80,6 +82,8 @@ class Run:
             self.report['stages'][-1].update(status=status, reason=self.child.report.get('reason'))
             if status != 'passed':
                 self.finish(False, 'Child stopped without a pass: '+STAGES[self.index])
+            elif STAGES[self.index] == self.stop_after:
+                self.finish(True, 'Requested diagnostic endpoint passed: '+self.stop_after+'. Later stages were not run or qualified.')
             elif self.index+1 == len(STAGES):
                 self.finish(True, 'All eight continuation drivers passed through native separate departures. Explicit checkpoint reload, packaged execution and rendered presentation require their own evidence.')
             else:
