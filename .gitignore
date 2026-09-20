@@ -116,6 +116,8 @@ Content/
 !/Content/Characters/Animation/ABP_SovVerityOverlay.uasset
 !/Content/Characters/Animation/VerityTwinBlades/
 !/Content/Characters/Animation/VerityTwinBlades/**/*.uasset
+!/Content/Characters/Animation/SeleneGASPALS/
+!/Content/Characters/Animation/SeleneGASPALS/**/*.uasset
 !/Content/Characters/Animation/ProtagonistCasts/
 !/Content/Characters/Animation/ProtagonistCasts/**/*.uasset
 !/Content/Weapons/
