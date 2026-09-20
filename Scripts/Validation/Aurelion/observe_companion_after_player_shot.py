@@ -15,8 +15,8 @@ _RUN = None
 
 
 class Observer:
-    def __init__(self):
-        self.out = Path(os.environ['SOV_AURELION_RUN_DIRECTORY']) / 'companion-after-shot.json'
+    def __init__(self, output_directory=None):
+        self.out = Path(output_directory or os.environ['SOV_AURELION_RUN_DIRECTORY']) / 'companion-after-shot.json'
         assert not self.out.exists()
         self.world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_game_world()
         assert self.world
@@ -28,10 +28,17 @@ class Observer:
             if a.is_alive() and not a.get_editor_property('hidden')]
         assert len(companions) == 1
         self.companion = companions[0]
-        targets = [a for a in unreal.GameplayStatics.get_all_actors_of_class(self.world, unreal.SovAurelionWallRunner)
-                   if a.is_alive() and not a.get_editor_property('hidden') and a.get_actor_enable_collision()
-                   and self.pawn.get_distance_to(a) < 1000.]
-        assert len(targets) == 1, 'Requires one nearby released WallRunner'
+        enemies = [a for a in unreal.GameplayStatics.get_all_actors_of_class(self.world, unreal.NarrativeNPCCharacter)
+                   if a.get_class().get_name().startswith('BP_Aurelion') and a.is_alive()
+                   and unreal.ArsenalStatics.get_attitude(self.pawn, a) == unreal.TeamAttitude.HOSTILE
+                   and not a.get_editor_property('hidden') and a.get_actor_enable_collision()]
+        census = [dict(actor=a.get_path_name(), distance=self.pawn.get_distance_to(a),
+                       health=a.get_health(), visible=self.pc.line_of_sight_to(a)) for a in enemies]
+        (self.out.parent / 'contact-target-census.json').write_text(json.dumps(census, indent=2))
+        targets = sorted([a for a in enemies if self.pawn.get_distance_to(a) < 3000.
+                          and self.pc.line_of_sight_to(a) and a.get_health() > 40
+                          and 'Elite' not in a.get_class().get_name()], key=self.pawn.get_distance_to)
+        assert targets, 'Requires a visible released non-Elite enemy; see contact-target-census.json'
         self.target = targets[0]
         assert self.target.get_health() > 40
         self.weapon = None
@@ -103,10 +110,31 @@ class Observer:
             anim = mesh.get_anim_instance()
             montage = anim.get_current_active_montage() if anim else None
             visual = self.companion.get_wielded_weapon_visual()
+            blade_edges = []
+            if visual and montage:
+                weapon_mesh = visual.get_editor_property('weapon_mesh')
+                for cls in self.companion.get_companion_component().get_editor_property('curated_abilities'):
+                    ability = unreal.get_default_object(cls)
+                    if not isinstance(ability, unreal.SovGameplayAbility_Melee):
+                        continue
+                    definition = ability.get_editor_property('attack_definition')
+                    for node in definition.get_editor_property('nodes'):
+                        if node.get_editor_property('montage') != montage:
+                            continue
+                        for edge_index, edge in enumerate([node] + list(node.get_editor_property('additional_segments'))):
+                            start = weapon_mesh.get_socket_transform(edge.get_editor_property('start_socket'), unreal.RelativeTransformSpace.RTS_WORLD).transform_location(edge.get_editor_property('start_offset'))
+                            end = weapon_mesh.get_socket_transform(edge.get_editor_property('end_socket'), unreal.RelativeTransformSpace.RTS_WORLD).transform_location(edge.get_editor_property('end_offset'))
+                            blade_edges.append(dict(edge_index=edge_index, start=start.export_text(), end=end.export_text(),
+                                radius=node.get_editor_property('trace_radius'),
+                                startup=node.get_editor_property('startup'), active=node.get_editor_property('active'),
+                                weapon_mesh=weapon_mesh.get_path_name(), mesh_transform=weapon_mesh.get_world_transform().export_text()))
             self.report['samples'].append(dict(elapsed=now-self.started,
                 target_health=self.target.get_health() if unreal.SystemLibrary.is_valid(self.target) else None,
                 distance=self.companion.get_distance_to(self.target),
                 companion_position=self.companion.get_actor_location().export_text(),
+                companion_rotation=self.companion.get_actor_rotation().export_text(),
+                target_position=self.target.get_actor_location().export_text() if unreal.SystemLibrary.is_valid(self.target) else None,
+                blade_edges=blade_edges,
                 montage=montage.get_path_name() if montage else None,
                 weapon_location=visual.get_actor_location().export_text() if visual else None,
                 capsules=[dict(name=c.get_name(), location=c.get_world_location().export_text(),
@@ -121,6 +149,8 @@ class Observer:
         self.out.write_text(json.dumps(self.report, indent=2), encoding='utf-8')
 
     def stop(self, reason):
+        if self.handle is None:
+            return
         self.input()
         for delegate, callback in self.delegates:
             delegate.remove_callable(callback)
@@ -129,9 +159,11 @@ class Observer:
         self.handle = None
         self.report.update(stopped=True, reason=reason)
         self.write()
+        self.world = self.pc = self.pawn = self.companion = self.target = self.weapon = self.owner = None
+        self.selector = None
 
 
-def start():
+def start(output_directory=None):
     global _RUN
     assert _RUN is None
-    _RUN = Observer()
+    _RUN = Observer(output_directory)
