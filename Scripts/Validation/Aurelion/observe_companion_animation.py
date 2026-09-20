@@ -30,7 +30,7 @@ class Observer:
         self.last = now
         try:
             world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_game_world()
-            if now - self.started > 900 or (not world and self.seen_world):
+            if now - self.started > 1800 or (not world and self.seen_world):
                 self.stop('PIE ended or observation time bound reached')
                 return
             if not world:
@@ -55,6 +55,12 @@ class Observer:
                         montage=ref(anim.get_current_active_montage()) if anim else None))
                 self.report['samples'].append(dict(elapsed=round(now-self.started, 3), actor=ref(actor),
                     identity=str(companion.get_editor_property('companion_id')),
+                    curated=[ref(cls) for cls in companion.get_editor_property('curated_abilities')],
+                    candidates=[candidate.export_text() for candidate in
+                        actor.get_narrative_ability_system_component().get_bot_attack_candidates(focus, unreal.GameplayTag())] if focus else [],
+                    command_state=str(companion.get_command_state()),
+                    owned_tags=unreal.GameplayTagLibrary.get_owned_gameplay_tags(actor).export_text(),
+                    focus_tags=unreal.GameplayTagLibrary.get_owned_gameplay_tags(focus).export_text() if focus else None,
                     position=actor.get_actor_location().export_text(), velocity=actor.get_velocity().export_text(),
                     weapon=ref(actor.get_weapon()), goal=ref(goal),
                     focus=ref(focus),

@@ -232,6 +232,13 @@ try:
                                   'input': input_tag, 'nodes': len(spec)}
     regrant('Tarrik', classes['Tarrik_MeleeLight'], classes['Tarrik_MeleeHeavy'])
     regrant('Selene', classes['Selene_MeleeLight'], classes['Selene_MeleeHeavy'])
+    # Mission snapshots only admit explicitly curated grants. Keep the primary
+    # attack in sync when replacing the weapon's old Blueprint combo.
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from align_companion_primary_grants import align
+    report['companion_primary_alignment'] = [row for hero in WEAPONS
+        for row in align(hero, RUN / 'companion-grant-backups')]
     report['status'] = 'authored_requires_play_validation'
 except Exception:
     import traceback
