@@ -249,6 +249,17 @@ releasing LB returns every button to its normal job.
 
 ### 6. Author a shoulder-swap rig parameter
 
+**20 September inspection update:** the shared `CameraRig_ThirdPerson` already
+exposes a vector `Offset` bound to its final `OffsetCameraNode_0.TranslationOffset`.
+Far, Balanced and Close aim rigs all override it with `(-100, 60, 60)` cm.
+The missing integration is propagating resolved `Shoulder` into that lateral
+offset, not absence of every usable rig parameter. The current camera director
+export contains no shoulder or native camera-state reader. The exported private
+variable ID is not a public runtime binding and must not be hardcoded as one.
+See [the current rig inspection](AurelionShoulderRigInspection-2026-09-20.md).
+Shoulder swapping remains unimplemented and unverified. The original note below
+is retained as historical context rather than a current statement about the rig.
+
 **Blocked, and deliberately so.** The camera arbiter already carries `Shoulder` in its resolved
 state, but the authored rig has no parameter that can act on it, so nothing is bound to a key — a
 bound key that visibly does nothing is worse than an unbound one.
