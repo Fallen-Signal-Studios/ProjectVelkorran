@@ -1,0 +1,70 @@
+{
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z10CeilingRing32",
+      "triangles": 10328,
+      "nominal_dimensions_m": [
+        6.3401408195495605,
+        0.8516518175601959,
+        1.0
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; existing gameplay collision untouched",
+      "radius_m": 32,
+      "sector_degrees": 11.25,
+      "instances": 32,
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z10CeilingRing40",
+      "triangles": 10328,
+      "nominal_dimensions_m": [
+        7.908414840698242,
+        0.890174001455307,
+        1.0
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; existing gameplay collision untouched",
+      "radius_m": 40,
+      "sector_degrees": 11.25,
+      "instances": 32,
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z10CeilingRing50",
+      "triangles": 10328,
+      "nominal_dimensions_m": [
+        9.868758201599121,
+        0.9383267462253571,
+        1.0
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; existing gameplay collision untouched",
+      "radius_m": 50,
+      "sector_degrees": 11.25,
+      "instances": 32,
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    }
+  ]
+}
