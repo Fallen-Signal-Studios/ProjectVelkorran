@@ -55,7 +55,7 @@ A concrete next lead is saved grant provenance. The generation-18 checkpoint
 was earned at 18:18 on 19 September, before
 `CompanionPrimaryRepair-20260919-183329-94f445f0` replaced Tarrik's curated legacy
 sword ability with `GA_Tarrik_MeleeLight`. `CaptureProxySnapshot` stores
-CopiedGrants and `PrepareProxyRestore` rebuilds CuratedAbilities from the saved
+CopiedGrants and `PrepareProxyFromSnapshot` rebuilds CuratedAbilities from the saved
 snapshot. Command dispatch requires exact membership in that list. The loaded
 companion's current list has not yet been recorded, so stale grants are a
 supported hypothesis, not a verified root cause. Inspect that list before
