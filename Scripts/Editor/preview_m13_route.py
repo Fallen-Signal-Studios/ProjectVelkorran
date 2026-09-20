@@ -11,6 +11,10 @@ assert not level.is_in_play_in_editor()
 assert unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world().get_name() == 'L_Aurelion_M13'
 assert globals().get('ALLOW_DIRTY_PREVIEW', False) or not unreal.EditorLoadingAndSavingUtils.get_dirty_map_packages()
 actors = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
+world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
+original_delay = unreal.SystemLibrary.get_console_variable_int_value('r.HighResScreenshotDelay')
+original_actor_count = len(actors.get_all_level_actors())
+unreal.SystemLibrary.execute_console_command(world, 'r.HighResScreenshotDelay 64')
 views = globals().get('M13_ROUTE_VIEWS', [('chamber', (0, 33600, -1570)), ('lift', (0, 37500, -1570)), ('gallery', (0, 41900, 170))])
 yaws = globals().get('M13_ROUTE_YAWS', {})
 pitches = globals().get('M13_ROUTE_PITCHES', {})
@@ -22,6 +26,7 @@ state = dict(index=0, stage=0, next=time.monotonic()+12, busy=False)
 unreal.EditorPythonScripting.set_keep_python_script_alive(True)
 
 def finish():
+    unreal.SystemLibrary.execute_console_command(world, 'r.HighResScreenshotDelay '+str(original_delay))
     level.eject_pilot_level_actor()
     actors.destroy_actor(camera)
     unreal.unregister_slate_post_tick_callback(handle)
@@ -41,6 +46,13 @@ def tick(delta):
                 qualification='Fixed editor game-view captures; no runtime mission or GPU-performance acceptance.'
             ), indent=2))
             finish()
+            assert len(actors.get_all_level_actors()) == original_actor_count
+            assert unreal.SystemLibrary.get_console_variable_int_value('r.HighResScreenshotDelay') == original_delay
+            (out / 'review-capture-settings.json').write_text(json.dumps(dict(
+                warmup_frames=64, original_warmup_frames=original_delay,
+                restored_warmup_frames=original_delay, actor_count=original_actor_count,
+                qualification='Editor screenshot preparation only; no game renderer settings saved.'
+            ), indent=2))
             return
         name, position = views[state['index']]
         if state['stage'] == 0:
