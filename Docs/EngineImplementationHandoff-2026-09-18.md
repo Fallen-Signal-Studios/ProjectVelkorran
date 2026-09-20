@@ -55,7 +55,7 @@ Two other standing constraints:
 | 5 | Enter the decided gamepad chords | `IMC_Combat` | Threat focus on a controller |
 | 6 | Author a shoulder-swap rig parameter | Narrative camera rig | Shoulder swap (blocked until this exists) |
 | 7 | Raise `ContentRevision` when you revise a mission | Mission definitions | Saves surviving your content edits |
-| 8 | Localization gather **run**; pseudo-localization still open | `Content/Localization` | Text that can be translated at all |
+| 8 | Gather/story keys verified; runtime pseudo-localization checked, expansion coverage partial | `Content/Localization` | Text that can be translated at all |
 | 9 | Check whether the legacy melee abilities are still granted | Mission definitions | Two melee paths, or one |
 
 ---
@@ -303,6 +303,15 @@ found by a player.
 
 ### 8. Localization — the gather is run; the expansion check is still open
 
+**20 September verification:** all 68 saved dialogue cues across M12/M13 already
+use string-table entries for both speaker and text. All 136 references match the
+78 expected keys and source strings in the existing gather manifest. The runtime
+`LEET` culture changes every speaker/text value without generating a synthetic
+culture resource. This supersedes the earlier statement below that the mechanism
+was unverified. LEET substitutes characters; separate long-text layout checks
+are still required. See [the saved-cue audit and departure correction](AurelionStoryLocalizationAndDeparture-2026-09-20.md)
+and [the limited HUD expansion review](AurelionHUDLocalizationReview-2026-09-20.md).
+
 The project had **no localization pipeline at all**. `Config/Localization/Game.ini` now defines the
 target, and **the gather has been run**: `Content/Localization/Game/` holds the manifest, the `en`
 archive and a compiled `en/Game.locres`, from **897 gathered entries**. It can be re-run headlessly:
@@ -341,8 +350,9 @@ belongs in the repository is a call for the creator, not a default.
 **What is deliberately not done yet**, so you do not think it is missing by accident: save and
 settings error messages still reach the UI as raw `FString`, so they will not translate even after a
 gather — converting those is source work and is queued. Width heuristics still assume 27 px per
-character, which is wrong for any non-Latin script. Aurelion story cues still have no string-table
-keys; giving them keys is content work and is worth doing while you are in there.
+character, which is wrong for any non-Latin script. Aurelion story cue string-table
+keys have subsequently been verified in both saved maps and the existing gather
+manifest (20 September); do not regenerate scenes merely to add keys they already have.
 
 ### 9. Check whether the legacy melee abilities are still granted
 

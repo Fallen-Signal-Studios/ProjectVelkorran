@@ -92,6 +92,23 @@ def tick(dt):
                     assert c.get_editor_property('cast_shadows')
                     report['wayfinding_lighting'].append(dict(actor=a.get_actor_label(),lumens=c.intensity,
                         radius_cm=c.attenuation_radius,specular_scale=c.get_editor_property('specular_scale')))
+            if globals().get('M13_EXPECT_DEPARTURE_DIRECTIONS',False):
+                targets={a.get_actor_label():a for a in unreal.GameplayStatics.get_all_actors_of_class(world,unreal.Actor)
+                         if a.get_actor_label() in ('Aurelion_Art_Sign_Z12_f79ad4','Z12_Dominion_Dock','Z12_Reformation_Dock')}
+                assert len(targets)==3
+                sign=targets['Aurelion_Art_Sign_Z12_f79ad4']
+                label=sign.get_component_by_class(unreal.TextRenderComponent).text
+                assert str(label)=='DEPARTURE CONCOURSE\n< REFORMATION   DOMINION >'
+                assert unreal.TextLibrary.text_is_from_string_table(label)
+                right=unreal.MathLibrary.get_right_vector(unreal.Rotator(yaw=90))
+                offsets={}
+                for faction,side in [('Reformation',-1),('Dominion',1)]:
+                    delta=targets['Z12_'+faction+'_Dock'].get_actor_location()-sign.get_actor_location()
+                    projection=delta.x*right.x+delta.y*right.y+delta.z*right.z
+                    assert projection*side>1000
+                    offsets[faction]=projection
+                report['departure_sign']=dict(text=str(label),table_key=str(unreal.TextLibrary.string_table_id_and_key_from_text(label)),
+                    dock_view_right_cm=offsets)
             pc=unreal.GameplayStatics.get_player_controller(world,0)
             pose=review_pose()
             # Reposition only the PIE copy of a finished scene's existing camera.
