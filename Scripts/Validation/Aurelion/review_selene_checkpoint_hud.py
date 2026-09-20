@@ -25,7 +25,7 @@ settings = unreal.SovGameUserSettings.get_game_user_settings()
 assert settings.complete_accessibility_setup()
 report = dict(status='running', scope=__doc__, source=str(source), banks=[], callbacks=[], samples=[], presentation_errors=[])
 state = dict(phase='bootstrap', started=time.monotonic(), at=time.monotonic(), busy=False, index=0)
-cases = ('restored', 'WI_Verity', 'WI_Staccato')
+cases = ('restored', 'WI_Verity', 'WI_Staccato', 'WI_Verity')
 
 
 def write():
@@ -133,7 +133,7 @@ def tick(delta):
                 wielded=[w.get_class().get_path_name() for w in pawn.get_wielded_weapons()],
                 viewport_pixels=[pixels.x, pixels.y], pips=[p.export_text() for p in view.pips]))
             unreal.SystemLibrary.execute_console_command(world, 'Shot showui -nosuffix filename=' +
-                str(out / ('selene-' + cases[state['index']] + '.png')))
+                str(out / ('selene-' + str(state['index']) + '-' + cases[state['index']] + '.png')))
             state.update(phase='capture', at=now)
             write()
             return

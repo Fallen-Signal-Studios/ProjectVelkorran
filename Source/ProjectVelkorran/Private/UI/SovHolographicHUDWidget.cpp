@@ -236,7 +236,7 @@ bool USovHolographicHUDWidget::ReadSnapshot(const ASovPlayerController* Controll
 		Out.MaxEcho = Echo->GetMaxEcho();
 	}
 	// Ammo is omitted rather than shown as zero when the wielded weapon has no magazine.
-	if (const auto* Weapon = Pawn->GetWeapon(true))
+	if (const auto* Weapon = Pawn->GetWeapon(true); Weapon && Weapon->UsesMagazine())
 	{
 		Out.AmmoInClip = Weapon->GetAmmoInClip();
 		Out.AmmoReserve = Weapon->GetSpareAmmo();

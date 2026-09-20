@@ -1,5 +1,9 @@
 # Current HUD scale review
 
+Update: the waypoint/subtitle overlap below is fixed in the reproduced framing;
+see [HUD native refinement](AurelionHUDNativeRefinement-2026-09-20.md) for the
+new rendered evidence and remaining coverage limits.
+
 ## Immersive review, 20 September
 
 `HUDImmersiveReview-20260920-061644-7d50a450` now provides UI-inclusive images

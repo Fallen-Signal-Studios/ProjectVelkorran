@@ -1,5 +1,9 @@
 # Protagonist HUD runtime review
 
+Update: the native magazine defect below is fixed and verified in
+[HUD native refinement](AurelionHUDNativeRefinement-2026-09-20.md).
+The original failing runs remain recorded below as historical evidence.
+
 This increment changes validation scripts only. No gameplay source, widget asset,
 character definition or map is changed. Selene's GASP posture assets remain
 unbound; the source-scope decision is still pending.

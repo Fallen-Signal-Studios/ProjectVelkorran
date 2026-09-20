@@ -14,6 +14,9 @@
 #include "Engine/World.h"
 #include "Misc/AutomationTest.h"
 #include "UObject/Script.h"
+#include "UObject/UnrealType.h"
+#include "Components/EquipmentComponent.h"
+#include "Tests/SovResourceTransactionRepairFixtures.h"
 
 #if WITH_AUTOMATION_TESTS
 
@@ -78,6 +81,25 @@ bool FSovHolographicSnapshotTest::RunTest(const FString& Parameters)
 	// An unarmed protagonist has no magazine to report. Showing "0 / 0" would state something false.
 	TestEqual(TEXT("No wielded weapon omits the ammo readout"), Snapshot.AmmoInClip, -1);
 	TestEqual(TEXT("No wielded weapon omits the reserve too"), Snapshot.AmmoReserve, -1);
+	// Inject equipment state only; the production character lookup and snapshot decide what to publish.
+	auto* Equipment = F.Player->FindComponentByClass<UEquipmentComponent>();
+	if (!TestNotNull(TEXT("Player equipment exists"), Equipment)) { return false; }
+	auto* Property = FindFProperty<FMapProperty>(UEquipmentComponent::StaticClass(), TEXT("WieldedWeapons"));
+	if (!TestNotNull(TEXT("Wield map exists"), Property)) { return false; }
+	auto* Wielded = Property->ContainerPtrToValuePtr<TMap<FGameplayTag, UWeaponItem*>>(Equipment);
+	auto* Weapon = NewObject<USovResourceRepairWeapon>(F.Player);
+	Wielded->Add(FNarrativeGameplayTags::Get().Weapon_WieldSlot_Mainhand, Weapon);
+	USovHolographicHUDWidget::ReadSnapshot(F.Controller, Snapshot);
+	TestEqual(TEXT("An exhausted firearm still publishes its empty magazine"), Snapshot.AmmoInClip, 0);
+	TestEqual(TEXT("An exhausted firearm still publishes its empty reserve"), Snapshot.AmmoReserve, 0);
+	Weapon->ConfigureMagazine(nullptr, 1);
+	USovHolographicHUDWidget::ReadSnapshot(F.Controller, Snapshot);
+	TestEqual(TEXT("Wielded ammo-free weapon omits ammo"), Snapshot.AmmoInClip, -1);
+	TestEqual(TEXT("Switching to melee clears the old reserve"), Snapshot.AmmoReserve, -1);
+	Weapon->ConfigureMagazine(USovResourceRepairAmmo::StaticClass(), 0);
+	USovHolographicHUDWidget::ReadSnapshot(F.Controller, Snapshot);
+	TestEqual(TEXT("Ammo use without a magazine does not invent one"), Snapshot.AmmoInClip, -1);
+	Wielded->Empty();
 	// Detection is present on every protagonist, and reports nothing with no hostiles in the world.
 	TestEqual(TEXT("An empty world produces no radar contacts"), Snapshot.Contacts.Num(), 0);
 	return true;

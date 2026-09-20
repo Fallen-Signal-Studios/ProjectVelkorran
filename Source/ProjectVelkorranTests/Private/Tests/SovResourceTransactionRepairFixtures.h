@@ -49,6 +49,8 @@ public:
 	USovResourceRepairWeapon()
 	{ RequiredAmmo = USovResourceRepairAmmo::StaticClass(); ClipSize = 1; bBotsConsumeAmmo = true; Weight = 0.f; }
 	using UWeaponItem::ConsumeAmmo;
+	void ConfigureMagazine(TSubclassOf<UNarrativeItem> AmmoClass, int32 Capacity)
+	{ RequiredAmmo = AmmoClass; ClipSize = Capacity; }
 	void SetLoaded(int32 Value) { WeaponClipState.AmmoInClip = Value; MarkDirtyForReplication(); }
 	int32 RawLoaded() const { return WeaponClipState.AmmoInClip; }
 	void SetAmmoSourceForTest(UNarrativeItem* Item)

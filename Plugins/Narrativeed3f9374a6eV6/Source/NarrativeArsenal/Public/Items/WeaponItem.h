@@ -385,6 +385,9 @@ public:
 	int32 GetClipSize()const;
 	virtual int32 GetClipSize_Implementation()const;
 
+	/** Configuration, not inventory availability: an exhausted firearm still has a magazine. */
+	bool UsesMagazine() const { return RequiredAmmo && GetClipSize() > 0; }
+
 	//Get the currently used ammo - either the one our mag is using or if the weapon requires equippable ammo, the one in our ammo slot. 
 	UFUNCTION(BlueprintCallable, Category = "Ammo")
 	virtual UNarrativeItem* GetAmmoSource() const;

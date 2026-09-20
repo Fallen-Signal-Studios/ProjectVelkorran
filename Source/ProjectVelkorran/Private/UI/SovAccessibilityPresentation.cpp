@@ -1,5 +1,6 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "UI/SovAccessibilityPresentation.h"
+#include "UI/SovWorldLabelLayout.h"
 #include "UI/SovCombatVitalsWidget.h"
 #include "UI/SovHUDStyle.h"
 #include "Characters/SovPlayerCharacterBase.h"
@@ -691,6 +692,17 @@ int32 USovAccessibilityPresentation::NativePaint(const FPaintArgs& Args, const F
 		FSlateDrawElement::MakeLines(Elements,++Layer,Geometry.ToPaintGeometry(),SlatePoints,ESlateDrawEffect::None,FLinearColor::Black,true,Settings.OutlineThickness+4);
 		FSlateDrawElement::MakeLines(Elements,++Layer,Geometry.ToPaintGeometry(),MoveTemp(SlatePoints),ESlateDrawEffect::None,Tint,true,Settings.OutlineThickness);
 	};
+	// Use arranged paint geometry, including padding, wrapping, DPI and the safe-area offset.
+	// Hidden panels reserve no space; labels return to their projected location when speech ends.
+	TArray<FBox2D> TextPanels;
+	for (const UBorder* Panel : {SubtitleBackground.Get(), CaptionBackground.Get(), ObjectiveBackground.Get()})
+	{
+		if (!Panel || !Panel->IsRendered()) { continue; }
+		const FGeometry& PanelGeometry = Panel->GetPaintSpaceGeometry();
+		if (PanelGeometry.GetLocalSize().IsNearlyZero()) { continue; }
+		TextPanels.Emplace(Geometry.AbsoluteToLocal(PanelGeometry.LocalToAbsolute(FVector2D::ZeroVector)),
+			Geometry.AbsoluteToLocal(PanelGeometry.LocalToAbsolute(PanelGeometry.GetLocalSize())));
+	}
 	auto DrawLabel = [&](const FVector2D& Point,const FText& Text,const FLinearColor& Tint)
 	{
 		if (!SafeTextCanvas || !FSlateApplication::IsInitialized()) { return; }
@@ -699,8 +711,9 @@ int32 USovAccessibilityPresentation::NativePaint(const FPaintArgs& Args, const F
 		const FVector2D SafeMin=Geometry.AbsoluteToLocal(SafeGeometry.LocalToAbsolute(FVector2D::ZeroVector));
 		const FVector2D SafeMax=Geometry.AbsoluteToLocal(SafeGeometry.LocalToAbsolute(SafeGeometry.GetLocalSize()));
 		const FVector2D TextSize=FSlateApplication::Get().GetRenderer()->GetFontMeasureService()->Measure(Text,Font);
-		const FVector2D LabelPoint(FMath::Clamp(Point.X,SafeMin.X,FMath::Max(SafeMin.X,SafeMax.X-TextSize.X-2)),
-			FMath::Clamp(Point.Y,SafeMin.Y,FMath::Max(SafeMin.Y,SafeMax.Y-TextSize.Y-2)));
+		FVector2D LabelPoint;
+		if (!SovWorldLabelLayout::Place(Point, TextSize + FVector2D(2,2), FBox2D(SafeMin,SafeMax), TextPanels, LabelPoint))
+		{ return; }
 		// Move only the label into the safe area; the weak point/interactable outline stays on its target.
 		Elements.PushClip(FSlateClippingZone(SafeGeometry));
 		FSlateDrawElement::MakeText(Elements,++Layer,Geometry.ToPaintGeometry(FVector2D(1,1),FSlateLayoutTransform(LabelPoint+FVector2D(2,2))),Text,Font,ESlateDrawEffect::None,FLinearColor::Black);
