@@ -20,6 +20,7 @@ class RetryInput:
         self.started = time.monotonic()
         self.samples = []
         self.last_sample = 0.
+        self.hold_started = None
 
     def stop(self):
         self.driver.inject()
@@ -40,6 +41,14 @@ class RetryInput:
         assert self.director.get_encounter_state() == unreal.SovEncounterState.FAILED
         actor, driver = self.actor, self.driver
         component, interaction = actor.interactable, pc.get_interaction_component()
+        if self.hold_started is not None:
+            # CanInteract may reject a *new* request while this admitted hold
+            # owns Interacting. Keep the existing input down until native retry
+            # begins; rechecking admission here prematurely cancels the hold.
+            assert time.monotonic()-self.hold_started < 10., 'Admitted retry hold did not begin native restore'
+            look, _ = driver.look(world, pc, actor.get_actor_location())
+            driver.inject(look=look, interact=1.)
+            return False
         admission = component.can_interact(pawn, interaction)
         focus = interaction.get_editor_property('viewed_interactable')
         now = time.monotonic()
@@ -60,5 +69,8 @@ class RetryInput:
                                  target.y+(position.y-target.y)/distance*reach*.5)], 'retry')
             return False
         look, error = driver.look(world, pc, target)
-        driver.inject(look=look, interact=1. if error < 3 and admission is not None and focus == component else 0.)
+        press = error < 3 and admission is not None and focus == component
+        if press:
+            self.hold_started = time.monotonic()
+        driver.inject(look=look, interact=1. if press else 0.)
         return False

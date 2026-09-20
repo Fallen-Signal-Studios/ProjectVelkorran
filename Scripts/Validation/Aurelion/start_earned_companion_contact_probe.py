@@ -18,7 +18,7 @@ OUT.mkdir(exist_ok=False)
 SOURCE = Path(os.environ.get('SOV_EARNED_COMPANION_SAVE_DIRECTORY', str(
     Path(unreal.Paths.project_dir()) / 'Saved/Validation/Aurelion/CompanionPrimaryRoute-20260919-183439-ce4bd05a/UserData/Saved/SaveGames'))).resolve()
 report = dict(status='bootstrapping', method='Unmodified earned checkpoint banks copied only into this isolated test profile; public native load; optional ordinary retry input and controlled companion command; explicit input owner recorded below', banks=[], callbacks=[])
-state = dict(phase='bootstrap', started=time.monotonic(), saves=None, delegate=None, handle=None)
+state = dict(phase='bootstrap', started=time.monotonic(), phase_started=time.monotonic(), saves=None, delegate=None, handle=None)
 
 def write():
     (OUT / 'earned-contact-probe.json').write_text(json.dumps(report, indent=2))
@@ -44,11 +44,20 @@ def finish(status, reason):
 
 def tick(delta):
     try:
-        if time.monotonic()-state['started'] > 210:
-            finish('timeout', 'Bootstrap or native checkpoint load exceeded its observation bound')
+        if time.monotonic()-state['phase_started'] > 210:
+            finish('timeout', state['phase'] + ' exceeded its separate observation bound; see readiness samples')
             return
         world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_game_world()
         pawn = unreal.GameplayStatics.get_player_pawn(world, 0) if world else None
+        now = time.monotonic()
+        if now-state.get('last_readiness', 0.) >= 2.:
+            state['last_readiness'] = now
+            report.setdefault('readiness', []).append(dict(phase=state['phase'], elapsed=now-state['started'],
+                world=world.get_name() if world else None, pawn=pawn.get_class().get_name() if pawn else None,
+                ready=pawn.is_character_ready() if isinstance(pawn, unreal.SovPlayerCharacterBase) else None,
+                pending=pawn.is_character_pending_load() if isinstance(pawn, unreal.SovPlayerCharacterBase) else None,
+                load_pending=state['saves'].is_load_pending() if state['saves'] else None))
+            write()
         if not isinstance(pawn, unreal.SovPlayerCharacterBase) or not pawn.is_character_ready() or pawn.is_character_pending_load():
             return
         pc = unreal.GameplayStatics.get_player_controller(world, 0)
@@ -90,6 +99,7 @@ def tick(delta):
             report.update(request_result=str(result), request_message=str(message), status='loading')
             assert result == unreal.SovSaveResult.LOAD_STARTED
             state['phase'] = 'load'
+            state['phase_started'] = time.monotonic()
             write()
         elif hash(world) != state['world_hash'] and not state['saves'].is_load_pending() and report['callbacks']:
             assert len(report['callbacks']) == 1 and 'SUCCESS' in report['callbacks'][0]['result']

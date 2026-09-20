@@ -52,6 +52,7 @@ class Observer:
         self.report = dict(diagnostic_only=True, route_qualification=False,
             direct_state_writes=False, player_damage=[], companion_damage=[], samples=[], errors=[],
             target=self.target.get_path_name())
+        self.report['opening_contribution_seconds'] = self.companion.get_companion_component().get_editor_property('opening_contribution_seconds')
         companion_mesh = next(m for m in self.companion.get_components_by_class(unreal.SkeletalMeshComponent)
                               if m.get_name() == 'CharacterMesh0')
         self.report['companion_mesh_frame'] = {key: companion_mesh.get_editor_property(key).export_text()
@@ -145,12 +146,20 @@ class Observer:
                                 weapon_mesh=weapon_mesh.get_path_name(), mesh_transform=weapon_mesh.get_world_transform().export_text()))
             target_capsule = self.target.get_component_by_class(unreal.CapsuleComponent) if unreal.SystemLibrary.is_valid(self.target) else None
             movement = self.companion.get_component_by_class(unreal.CharacterMovementComponent)
+            controller = self.companion.get_controller()
+            if now-self.started-self.report.get('last_candidate_elapsed', -10.) >= 1.:
+                self.report['last_candidate_elapsed'] = now-self.started
+                self.report.setdefault('candidate_checks', []).append(dict(elapsed=now-self.started,
+                    target=self.target.get_path_name(),
+                    direct_target=controller.can_directly_target_threat(self.target) if controller else False,
+                    candidates=[c.export_text() for c in self.companion.get_narrative_ability_system_component().get_bot_attack_candidates(self.target, unreal.GameplayTag())]))
             self.report['samples'].append(dict(elapsed=now-self.started,
                 game_seconds=unreal.GameplayStatics.get_time_seconds(self.world),
                 companion_tags=unreal.GameplayTagLibrary.get_owned_gameplay_tags(self.companion).export_text(),
                 target_tags=unreal.GameplayTagLibrary.get_owned_gameplay_tags(self.target).export_text()
                     if unreal.SystemLibrary.is_valid(self.target) else None,
                 command_state=str(self.companion.get_companion_component().get_command_state()),
+                opening_contribution=self.companion.get_companion_component().is_in_opening_contribution(),
                 companion_disabled=self.companion.get_companion_component().is_disabled(),
                 companion_velocity=self.companion.get_velocity().export_text(),
                 target_health=self.target.get_health() if unreal.SystemLibrary.is_valid(self.target) else None,
