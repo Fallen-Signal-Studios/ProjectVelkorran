@@ -30,8 +30,10 @@ for name, class_name in before.items():
 assert set(saved) - set(before) == set(expected) - set(before)
 for name in expected:
     c = saved[name].get_component_by_class(unreal.SpotLightComponent)
-    assert c and abs(c.intensity - 2000) < .01
+    assert c and abs(c.intensity - 3600) < .01
     assert abs(c.attenuation_radius - 4500) < .01
+    assert abs(c.outer_cone_angle - 24) < .01 and abs(c.source_radius - 15) < .01
+    assert abs(saved[name].get_actor_rotation().pitch - 82) < .01
     assert c.get_editor_property('cast_shadows')
 assert digest(m12) == m12_before
 assert not unreal.EditorLoadingAndSavingUtils.get_dirty_map_packages()
