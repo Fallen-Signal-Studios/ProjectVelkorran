@@ -1,0 +1,48 @@
+{
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_WayfindingGallery",
+      "triangles": 18096,
+      "nominal_dimensions_m": [
+        3.879999876022339,
+        0.30000001937150955,
+        3.0519819259643555
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_UplightLens"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 3,
+      "collision": "Two post hulls plus lintel; centre opening retained",
+      "opening_width_m": 3.36,
+      "opening_height_m": 2.24,
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_WayfindingChamber",
+      "triangles": 18096,
+      "nominal_dimensions_m": [
+        3.879999876022339,
+        0.30000001937150955,
+        4.0519819259643555
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_UplightLens"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 3,
+      "collision": "Two post hulls plus lintel; centre opening retained",
+      "opening_width_m": 3.36,
+      "opening_height_m": 3.24,
+      "position_precision": 10,
+      "preserve_fallback_geometry": true
+    }
+  ]
+}

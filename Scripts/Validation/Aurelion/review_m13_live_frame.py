@@ -10,8 +10,16 @@ out=Path(os.environ['SOV_AURELION_RUN_DIRECTORY']);level=unreal.get_editor_subsy
 assert unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world().get_name()=='L_Aurelion_M12'
 assert not level.is_in_play_in_editor() and not unreal.EditorLoadingAndSavingUtils.get_dirty_map_packages()
 settings=unreal.SovGameUserSettings.get_game_user_settings();assert settings.complete_accessibility_setup()
-state=dict(phase='bootstrap',started=time.monotonic(),at=time.monotonic(),busy=False)
+views=globals().get('M13_REVIEW_VIEWS',[('default',(0,33600,-1570),0)])
+assert views and len(views)<=4
+state=dict(phase='bootstrap',started=time.monotonic(),at=time.monotonic(),busy=False,view_index=0)
 report=dict(status='running',scope=__doc__,callbacks=[],banks=[])
+report['views']=[]
+def frame_path(name):
+    return out/((views[state['view_index']][0]+'-' if len(views)>1 else '')+name)
+def review_pose():
+    _,position,pitch=views[state['view_index']]
+    return unreal.Transform(location=unreal.Vector(*position),rotation=unreal.Rotator(pitch=pitch,yaw=90))
 def write(): (out/'live-frame.json').write_text(json.dumps(report,indent=2))
 def completed(result,header,message):
     report['callbacks'].append(dict(result=str(result),header=header.export_text(),message=str(message)));write()
@@ -32,7 +40,7 @@ def tick(dt):
             if not level.is_in_play_in_editor():
                 unreal.unregister_slate_post_tick_callback(handle);unreal.EditorPythonScripting.set_keep_python_script_alive(False)
             return
-        assert now-state['started']<240,'Live review timed out'
+        assert now-state['started']<240+60*(len(views)-1),'Live review timed out'
         assert level.is_in_play_in_editor() or now-state['started']<10,'PIE stopped before a playable M13 session was established; inspect the login failure in Editor.log'
         world=unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_game_world()
         if not world:return
@@ -65,8 +73,15 @@ def tick(dt):
             assert 'Aurelion.CP9' in report['callbacks'][0]['header']
             if not isinstance(pawn,unreal.SovPlayerCharacterBase) or not pawn.is_character_ready() or pawn.is_character_pending_load():return
             assert 'L_Aurelion_M13' in world.get_name(),world.get_name()
+            if globals().get('M13_EXPECT_WAYFINDING',False):
+                housings=[a for a in unreal.GameplayStatics.get_all_actors_of_class(world,unreal.StaticMeshActor)
+                          if a.get_actor_label().startswith('Aurelion_WayfindingPortal_')]
+                assert len(housings)==3,'Saved sign housings missing from the restored game world'
+                report['wayfinding']=[dict(actor=a.get_actor_label(),transform=a.get_actor_transform().export_text(),
+                    mesh=a.static_mesh_component.static_mesh.get_path_name(),
+                    collision=str(a.static_mesh_component.get_collision_enabled())) for a in housings]
             pc=unreal.GameplayStatics.get_player_controller(world,0)
-            pose=unreal.Transform(location=unreal.Vector(0,33600,-1570),rotation=unreal.Rotator(yaw=90))
+            pose=review_pose()
             # Reposition only the PIE copy of a finished scene's existing camera.
             cameras=[a for a in unreal.GameplayStatics.get_all_actors_of_class(world,unreal.CineCameraActor)
                      if 'LS_GrammarPropagation_CameraClose' in a.get_actor_label()]
@@ -82,27 +97,33 @@ def tick(dt):
         if state['phase']=='settle' and now-state['at']>12:
             manager=unreal.GameplayStatics.get_player_camera_manager(world,0)
             actual=manager.get_camera_location()
-            assert (actual-unreal.Vector(0,33600,-1570)).length()<1,actual
+            assert (actual-unreal.Vector(*views[state['view_index']][1])).length()<1,actual
             report['camera']=actual.export_text()
             report['fov']=manager.get_fov_angle()
             report['cvars']={n:unreal.SystemLibrary.get_console_variable_float_value(n) for n in ('r.AntiAliasingMethod','r.ScreenPercentage','r.ShadowQuality','r.Nanite','r.HighResScreenshotDelay')}
-            unreal.SystemLibrary.execute_console_command(world,'Shot -nosuffix filename='+str(out/'ordinary-game-frame.png'))
+            unreal.SystemLibrary.execute_console_command(world,'Shot -nosuffix filename='+str(frame_path('ordinary-game-frame.png')))
             state.update(phase='capture',at=now);return
-        if state['phase']=='capture' and (out/'ordinary-game-frame.png').exists():
-            width,height=struct.unpack('>II',(out/'ordinary-game-frame.png').read_bytes()[16:24])
+        if state['phase']=='capture' and frame_path('ordinary-game-frame.png').exists():
+            width,height=struct.unpack('>II',frame_path('ordinary-game-frame.png').read_bytes()[16:24])
             report['frame_dimensions']=[width,height]
             state['original_delay']=unreal.SystemLibrary.get_console_variable_int_value('r.HighResScreenshotDelay')
             unreal.SystemLibrary.execute_console_command(world,'r.HighResScreenshotDelay 64')
-            state['task']=unreal.AutomationLibrary.take_high_res_screenshot(width,height,str(out/'same-pie-highres.png'))
+            state['task']=unreal.AutomationLibrary.take_high_res_screenshot(width,height,str(frame_path('same-pie-highres.png')))
             state.update(phase='highres',at=now);return
         if state['phase']=='highres' and state['task'].is_task_done():
-            assert (out/'same-pie-highres.png').exists()
+            assert frame_path('same-pie-highres.png').exists()
             unreal.SystemLibrary.execute_console_command(world,'r.HighResScreenshotDelay '+str(state['original_delay']))
             state.update(phase='resettle',at=now);return
         if state['phase']=='resettle' and now-state['at']>12:
-            unreal.SystemLibrary.execute_console_command(world,'Shot -nosuffix filename='+str(out/'ordinary-after-highres.png'))
+            unreal.SystemLibrary.execute_console_command(world,'Shot -nosuffix filename='+str(frame_path('ordinary-after-highres.png')))
             state.update(phase='recapture',at=now);return
-        if state['phase']=='recapture' and (out/'ordinary-after-highres.png').exists():
+        if state['phase']=='recapture' and frame_path('ordinary-after-highres.png').exists():
+            report['views'].append(dict(name=views[state['view_index']][0],camera=report['camera'],
+                dimensions=report['frame_dimensions'],frame=str(frame_path('ordinary-game-frame.png'))))
+            if state['view_index']+1<len(views):
+                state['view_index']+=1
+                state['camera'].set_actor_transform(review_pose(),False,False)
+                state.update(phase='settle',at=now);write();return
             report['status']='ready_for_window_review';write();state.update(phase='review',at=now)
         if state['phase']=='review' and ((out/'release-review.txt').exists() or now-state['at']>30):end()
     except Exception:end(traceback.format_exc())
