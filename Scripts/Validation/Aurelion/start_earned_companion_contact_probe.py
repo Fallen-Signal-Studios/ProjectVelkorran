@@ -88,15 +88,41 @@ def tick(delta):
             write()
         elif hash(world) != state['world_hash'] and not state['saves'].is_load_pending() and report['callbacks']:
             assert len(report['callbacks']) == 1 and 'SUCCESS' in report['callbacks'][0]['result']
-            assert 'BoundaryId="M12_E4_QuarantineCrucibleB"' in report['callbacks'][0]['header']
-            assert isinstance(pawn, unreal.SovTarrikCharacter) and pawn.is_alive()
+            boundary = os.environ.get('SOV_CONTACT_BOUNDARY', 'M12_E4_QuarantineCrucibleB')
+            assert boundary in ('M12_E4_QuarantineCrucibleA', 'M12_E4_QuarantineCrucibleB'), 'Unsupported contact checkpoint'
+            assert ('BoundaryId="' + boundary + '"') in report['callbacks'][0]['header']
+            expected = unreal.SovSeleneCharacter if boundary == 'M12_E4_QuarantineCrucibleA' else unreal.SovTarrikCharacter
+            assert isinstance(pawn, expected) and pawn.is_alive()
+            if os.environ.get('SOV_CONTACT_FOLLOW_E4A') == '1':
+                objectives = [a for a in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.SovCampaignEncounterObjective)
+                    if a.encounter_director and str(a.encounter_director.encounter_id) == boundary]
+                assert len(objectives) == 1
+                objective = objectives[0]
+                director = objective.encounter_director
+                report['native_entry'] = dict(state=str(director.get_encounter_state()),
+                    player=pawn.get_actor_location().export_text(),
+                    overlap=objective.start_volume.is_overlapping_component(pawn.get_editor_property('capsule_component')),
+                    retry=objective.get_editor_property('retry_initial_entry_while_overlapping'),
+                    last_error=str(objective.get_editor_property('last_error')))
+                report.setdefault('native_entry_samples', []).append(dict(report['native_entry']))
+                state.setdefault('entry_wait_started', time.monotonic())
+                write()
+                if director.get_encounter_state() != unreal.SovEncounterState.ACTIVE:
+                    assert time.monotonic()-state['entry_wait_started'] < 8., 'Native E4A entry did not activate after restore: ' + str(report['native_entry'])
+                    return
             import observe_companion_after_player_shot as contact
             assert contact._RUN is None or contact._RUN.handle is None, 'A contact observer already owns this session'
             importlib.reload(contact)
-            contact.start(OUT)
-            companion = contact._RUN.companion.get_companion_component()
-            admitted = companion.request_command(pawn, unreal.SovCompanionCommand.FOCUS_TARGET, contact._RUN.target)
-            report['controlled_focus_request'] = str(admitted)
+            follow_route = os.environ.get('SOV_CONTACT_FOLLOW_E4A') == '1'
+            contact.start(OUT, passive=follow_route)
+            if follow_route:
+                import continue_aurelion_e4a_input as route
+                route.start(OUT / 'E4A')
+                report['input_owner'] = 'Existing normal E4A route driver; contact observer is passive'
+            else:
+                companion = contact._RUN.companion.get_companion_component()
+                admitted = companion.request_command(pawn, unreal.SovCompanionCommand.FOCUS_TARGET, contact._RUN.target)
+                report['controlled_focus_request'] = str(admitted)
             report['journal'] = [str(e.beat_id) for e in mission.get_journal()]
             finish('probe_started', 'Real checkpoint restored; live contact probe now owns its ordinary inputs')
     except Exception:

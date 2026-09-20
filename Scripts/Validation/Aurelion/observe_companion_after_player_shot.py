@@ -15,14 +15,15 @@ _RUN = None
 
 
 class Observer:
-    def __init__(self, output_directory=None):
+    def __init__(self, output_directory=None, passive=False):
+        self.passive = passive
         self.out = Path(output_directory or os.environ['SOV_AURELION_RUN_DIRECTORY']) / 'companion-after-shot.json'
         assert not self.out.exists()
         self.world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_game_world()
         assert self.world
         self.pc = unreal.GameplayStatics.get_player_controller(self.world, 0)
         self.pawn = self.pc.get_controlled_pawn()
-        assert isinstance(self.pawn, unreal.SovTarrikCharacter) and self.pawn.is_alive()
+        assert isinstance(self.pawn, (unreal.SovTarrikCharacter, unreal.SovSeleneCharacter)) and self.pawn.is_alive()
         companions = [a for a in unreal.GameplayStatics.get_all_actors_of_class(
             self.world, unreal.SovProtagonistCompanionCharacter)
             if a.is_alive() and not a.get_editor_property('hidden')]
@@ -42,7 +43,8 @@ class Observer:
         self.target = targets[0]
         assert self.target.get_health() > 40
         self.weapon = None
-        self.selector = wheel.Selector('/Game/Items/Weapons/WI_Cinderline.WI_Cinderline_C')
+        firearm = 'Cinderline' if isinstance(self.pawn, unreal.SovTarrikCharacter) else 'Staccato'
+        self.selector = wheel.Selector('/Game/Items/Weapons/WI_' + firearm + '.WI_' + firearm + '_C')
         self.owner = common.Run.get_input_owner(self, self.world)
         self.actions = {n: unreal.load_asset(common.ACTION_ROOT+n)
                         for n in ('IA_Look', 'IA_Attack', 'IA_AltAttack', 'IA_WeaponWheel')}
@@ -72,6 +74,8 @@ class Observer:
         self.report['companion_damage'].append(result.export_text())
 
     def input(self, look=(0., 0.), fire=0., aim=0., wheel_hold=0.):
+        if self.passive:
+            return
         for name, value in {'IA_Look': (*look, 0.), 'IA_Attack': (fire, 0., 0.),
                             'IA_AltAttack': (aim, 0., 0.), 'IA_WeaponWheel': (wheel_hold, 0., 0.)}.items():
             self.owner.inject_input_vector_for_action(self.actions[name], unreal.Vector(*value), [], [])
@@ -79,23 +83,30 @@ class Observer:
     def tick(self, delta):
         try:
             now = time.monotonic()
+            if self.passive and self.pc.get_controlled_pawn() != self.pawn:
+                self.stop('Normal protagonist handoff ended observation'); return
             assert unreal.SystemLibrary.is_valid(self.pawn) and self.pc.get_controlled_pawn() == self.pawn
             assert self.pawn.is_alive() and self.companion.is_alive()
             if now-self.started > 100 or self.report['companion_damage']:
                 self.stop('Observation ended'); return
-            if not self.selector.done:
+            if not self.passive and not self.selector.done:
                 held, report = self.selector.step(self.world)
                 self.report['wheel'] = report
                 self.input(wheel_hold=float(held))
                 self.write()
                 return
-            assert self.selector.report['status'] == 'passed', 'Normal wheel selection failed'
-            if self.weapon is None:
+            if not self.passive:
+                assert self.selector.report['status'] == 'passed', 'Normal wheel selection failed'
+            if not self.passive and self.weapon is None:
                 self.weapon = self.pawn.get_weapon()
                 assert self.weapon and self.weapon.get_ammo_in_clip() > 0
                 self.report['weapon'] = self.weapon.get_path_name()
                 self.aim_started = now
-            if self.triggered is None:
+            if self.passive:
+                focus = self.companion.get_controller().get_focus_actor() if self.companion.get_controller() else None
+                if isinstance(focus, unreal.NarrativeCharacter):
+                    self.target = focus
+            elif self.triggered is None:
                 assert now-self.aim_started < 20, 'Aim deadline; no trigger supplied'
                 assert self.target.is_alive() and self.pc.line_of_sight_to(self.target)
                 look, error = common.Run.look(self, self.world, self.pc, self.target.get_actor_location())
@@ -106,7 +117,7 @@ class Observer:
                 self.input(look, fire, 1.)
             else:
                 self.input(fire=float(now-self.triggered < .05 and not self.report['player_damage']))
-            if now-self.last < .1:
+            if now-self.last < .025:
                 return
             self.last = now
             mesh = next(m for m in self.companion.get_components_by_class(unreal.SkeletalMeshComponent)
@@ -140,6 +151,11 @@ class Observer:
                 target_position=self.target.get_actor_location().export_text() if unreal.SystemLibrary.is_valid(self.target) else None,
                 blade_edges=blade_edges,
                 montage=montage.get_path_name() if montage else None,
+                montage_position=anim.montage_get_position(montage) if montage else None,
+                native_melee=list(unreal.SovMeleeValidationLibrary.describe_native_melee(
+                    self.companion.get_narrative_ability_system_component())),
+                focus=self.companion.get_controller().get_focus_actor().get_path_name()
+                    if self.companion.get_controller() and self.companion.get_controller().get_focus_actor() else None,
                 weapon_location=visual.get_actor_location().export_text() if visual else None,
                 capsules=[dict(name=c.get_name(), location=c.get_world_location().export_text(),
                     radius=c.get_scaled_capsule_radius(), half_height=c.get_scaled_capsule_half_height())
@@ -167,7 +183,8 @@ class Observer:
         self.selector = None
 
 
-def start(output_directory=None):
+def start(output_directory=None, passive=False):
     global _RUN
     assert _RUN is None
-    _RUN = Observer(output_directory)
+    _RUN = Observer(output_directory, passive)
+    _RUN.report['passive'] = passive
