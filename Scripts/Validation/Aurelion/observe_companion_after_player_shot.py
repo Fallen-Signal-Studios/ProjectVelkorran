@@ -50,6 +50,10 @@ class Observer:
         self.report = dict(diagnostic_only=True, route_qualification=False,
             direct_state_writes=False, player_damage=[], companion_damage=[], samples=[], errors=[],
             target=self.target.get_path_name())
+        companion_mesh = next(m for m in self.companion.get_components_by_class(unreal.SkeletalMeshComponent)
+                              if m.get_name() == 'CharacterMesh0')
+        self.report['companion_mesh_frame'] = {key: companion_mesh.get_editor_property(key).export_text()
+            for key in ('relative_location', 'relative_rotation', 'relative_scale3d')}
         self.started = time.monotonic()
         self.aim_started = None
         self.triggered = None

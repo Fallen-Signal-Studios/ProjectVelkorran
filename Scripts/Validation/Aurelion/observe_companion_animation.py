@@ -52,6 +52,8 @@ class Observer:
                 for mesh in meshes:
                     anim = mesh.get_anim_instance()
                     animations.append(dict(mesh=ref(mesh), anim=ref(anim),
+                        relative_location=mesh.get_editor_property('relative_location').export_text(),
+                        relative_rotation=mesh.get_editor_property('relative_rotation').export_text(),
                         montage=ref(anim.get_current_active_montage()) if anim else None))
                 self.report['samples'].append(dict(elapsed=round(now-self.started, 3), actor=ref(actor),
                     identity=str(companion.get_editor_property('companion_id')),

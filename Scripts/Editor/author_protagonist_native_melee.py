@@ -196,10 +196,6 @@ def author_ability(name, input_tag, definition):
     cdo.set_editor_property('attack_definition', definition)
     cdo.set_editor_property('allow_unarmed', False)
     cdo.set_editor_property('input_tag', tag(input_tag))
-    if name == 'Selene_MeleeLight':
-        # The generic 180 cm AI range made the companion stop at ~138 cm;
-        # the live twin-blade pass requires a closer approach (~85 cm).
-        cdo.set_editor_property('default_bot_attack_range', 100.)
     blocked = tag_names(cdo.get_editor_property('activation_blocked_tags'))
     cdo.set_editor_property('activation_blocked_tags', container(blocked + [t for t in EXTRA_BLOCKS if t not in blocked]))
     unreal.BlueprintEditorLibrary.compile_blueprint(blueprint)

@@ -1,5 +1,11 @@
 # Companion melee contact investigation
 
+**Superseded:** the 100 cm range experiment below has been removed. Selene's
+native default is restored to 180 cm. A subsequent defaults census found both
+companion meshes missing the player mesh's authored offset and rotation; see
+`AurelionCompanionMeshRepair-2026-09-19.md`. The historical observations below
+remain evidence of the experiment, not the current configuration.
+
 Selene's native light-attack AI range is now 100 cm instead of the inherited
 180 cm. In the same earned E4B checkpoint, her observed attack stand-off fell
 from 138.11 cm to 84.60 cm. The authoring recipe preserves this range. This is

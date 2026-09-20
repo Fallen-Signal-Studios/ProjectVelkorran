@@ -306,6 +306,9 @@ def make_profiles():
         prop(cdo,ai_controller_class=controller,auto_possess_ai=unreal.AutoPossessAI.PLACED_IN_WORLD_OR_SPAWNED,
              tags=[unreal.Name('Aurelion_'+hero+'Actor')])
         compile_bp(companion_bp)
+        from align_companion_mesh_frames import align as align_companion_frame
+        report.setdefault('companion_mesh_frames', []).append(
+            align_companion_frame(hero, OUT / 'companion-mesh-frame-backups'))
         configuration=new_asset(BASE+'Characters/AC_Aurelion'+hero+'Companion',unreal.AbilityConfiguration)
         player_configuration=required('/Game/Abilities/Configurations/AC_'+hero)
         default_attributes=player_configuration.get_editor_property('default_attributes')
