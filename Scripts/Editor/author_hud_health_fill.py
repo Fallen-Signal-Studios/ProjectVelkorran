@@ -25,9 +25,10 @@ float body = smoothstep(0, aa, edge);
 float rim = (1-smoothstep(.025,.025+aa,edge))*body;
 float upper = exp(-abs(p.y-.09)*32)*.18;
 float lower = exp(-abs(p.y-.89)*24)*.07;
-float energy = lerp(.18,.78,smoothstep(0,1,p.x));
-float depth = lerp(.60,1.0,1-abs(p.y-.5)*2);
-float brightness = saturate(energy*depth+upper+lower+rim*.48);
+float energy = lerp(.30,.98,smoothstep(0,1,p.x));
+float depth = lerp(.72,1.0,1-abs(p.y-.5)*2);
+float core = exp(-abs(p.y-.46)*12)*.09;
+float brightness = saturate(energy*depth+upper+lower+core+rim*.65);
 return float4(brightness.xxx, body);
 '''
 

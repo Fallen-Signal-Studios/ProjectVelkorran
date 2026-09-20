@@ -8,14 +8,26 @@ out=Path(os.environ['SOV_AURELION_RUN_DIRECTORY'])
 unreal.EditorPythonScripting.set_keep_python_script_alive(True)
 report={'status':'running','samples':[],'qualification':'Controlled HUD scaling and text presentation, not mission progression.'}
 scales=[1.0,1.5,2.0]; index=0; phase='fixture'; at=time.monotonic(); ended=None
+# Optional operator gate allows an immersive viewport before measuring layout.
+# The dimensions recorded below, not the capture filename, establish coverage.
+require_immersive = os.environ.get('SOV_HUD_REQUIRE_IMMERSIVE') == '1'
+started = time.monotonic()
 
 def write(): (out/'hud-scale-review.json').write_text(json.dumps(report,indent=2))
 def tick(dt):
  global index,phase,at,ended
  try:
+  if time.monotonic()-started>300 and phase!='end':
+   raise RuntimeError('HUD scale review exceeded its bounded deadline')
   if phase=='fixture':
    if fixture.report['status']=='running':return
    assert fixture.report['status']=='passed',str(fixture.report)
+   phase='viewport' if require_immersive else 'apply'
+  if phase=='viewport':
+   if not (out/'viewport-ready.txt').exists():return
+   world=unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_game_world()
+   pixels=unreal.WidgetLayoutLibrary.get_viewport_size(world)
+   assert pixels.x>=1280 and pixels.y>=720, 'Viewport is below the requested minimum; do not qualify the editor window dimensions'
    phase='apply'
   if phase=='apply':
    if index==len(scales):
@@ -34,7 +46,11 @@ def tick(dt):
    surfaces=[w for w in unreal.ObjectIterator(unreal.SovHolographicHUDSurface) if w.is_in_viewport() and w.get_world()==world]
    assert len(surfaces)==1
    s=surfaces[0];view=s.get_holographic_hud_view();w=s.get_editor_property('AmmoText')
-   report['samples'].append({'scale_requested':scales[index],'scale_actual':view.scale,'ammo':str(w.get_text()),'desired_size':str(w.get_desired_size())})
+   pixels=unreal.WidgetLayoutLibrary.get_viewport_size(world)
+   report['samples'].append({'scale_requested':scales[index],'scale_actual':view.scale,'ammo':str(w.get_text()),
+    'viewport_pixels':[pixels.x,pixels.y], 'viewport_dpi_scale':unreal.WidgetLayoutLibrary.get_viewport_scale(world),
+    'visible_clip':str(s.get_editor_property('AmmoClip').get_text()),
+    'visible_reserve':str(s.get_editor_property('AmmoReserve').get_text())})
    unreal.SystemLibrary.execute_console_command(world,'Shot showui -nosuffix filename='+str(out/('hud-scale-'+str(scales[index])+'.png')))
    phase='capture';at=time.monotonic();write();return
   if phase=='capture' and time.monotonic()-at>3:index+=1;phase='apply';return
