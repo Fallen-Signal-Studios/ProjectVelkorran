@@ -43,7 +43,7 @@ def tick(delta):
             assert all((out / (name+'.png')).is_file() for name, _ in views)
             (out / 'route-views.json').write_text(json.dumps(dict(
                 views=[name for name, _ in views],
-                qualification='Fixed editor game-view captures; no runtime mission or GPU-performance acceptance.'
+                qualification='Fixed editor game-view captures; no runtime mission or GPU-performance acceptance. Validate apparent fine-edge defects in PIE: the earned M13 live-frame comparison did not reproduce the editor artifacts.'
             ), indent=2))
             finish()
             assert len(actors.get_all_level_actors()) == original_actor_count

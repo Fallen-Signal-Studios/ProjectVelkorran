@@ -1,5 +1,8 @@
 # M13 chamber edge-artifact investigation
 
+Current disposition: the stable earned-checkpoint PIE view did not reproduce
+the editor artifacts. See the live-frame evidence below before changing assets.
+
 The saved Crownmark preview shows broken dark edges around wall mouldings and
 small floor details. This pass did not fix that artifact. It tested proposed
 lighting causes without saving a map, light, material or renderer configuration.
@@ -39,3 +42,43 @@ coverage and source integrity without SkipBuild. M12 retains SHA256
 `B7CEEAB512272FC80FE1E3B3454B08DF40BF40BC0E065C3C90993B910D6780D5`.
 The prechange gate was `20260920-044133-a90ec85f`. Both map assets remain unchanged
 by this investigation. No packaged build was performed.
+# Live-frame disposition, 20 September
+
+The broken wall/floor edges from the editor previews were **not reproduced in
+the stable restored M13 game view**. `M13CaptureComparison-20260920-055639-6eca186f`
+loaded the unmodified earned CP9 banks through the public save owner, confirmed
+the success callback, and captured ordinary / high-resolution / ordinary frames
+from one camera at the same 1,696 x 862 resolution. All three were inspected:
+wall frames, the new supports and ring bands, and floor seams remain substantially
+cleaner than the editor captures. The high-resolution sample used the same
+64-frame preparation as the editor preview, so the high-resolution API alone
+does not explain the earlier difference. The original delay of four was restored.
+
+Live settings were TSR (`r.AntiAliasingMethod=4`), screen percentage 100,
+shadow quality 5 and Nanite enabled. Camera position was (0,33600,-1570), yaw 90,
+FOV approximately 80. The review temporarily moved only the PIE copy of the
+existing GrammarPropagation camera; no map, mesh, light or renderer setting was
+saved. Normal window inspection in the preceding successful run
+`M13EarnedFrameReview-20260920-055226-82b593c3` also showed Tarrik's live HUD.
+
+This does not prove every moving view is artifact-free, nor identify the exact
+editor/game difference. It changes the next action: do not continue modifying
+assets or global rendering to address this editor-only observation without a
+corresponding game-view reproduction. Use the live-frame review for visual
+acceptance and editor captures for placement. The earlier experiments below
+remain historical evidence, not a demonstrated live gameplay rendering defect.
+
+Harness: `Scripts/Validation/Aurelion/review_m13_live_frame.py`. Run visibly
+through `run-editor-script.ps1` on M12; direct M13 login intentionally rejects a
+missing inactive protagonist kit/anchor. The harness copies only the two real
+checkpoint banks into its isolated profile and verifies their hashes. It does
+not manufacture journal receipts or teleport the pawn. The first direct-entry
+attempt was stopped after that native rejection; the first checkpoint attempt
+restored successfully but failed on an unavailable Python spawn API. The final
+harness uses an existing cinematic camera and ends PIE before editor shutdown.
+
+Full gate `20260920-055955-7f4511a0` passed the build, all 719 matching automation
+tests, report coverage and source integrity without SkipBuild. M13 was unchanged
+on disk; M12 retains its protected SHA256
+`B7CEEAB512272FC80FE1E3B3454B08DF40BF40BC0E065C3C90993B910D6780D5`.
+The newly present untracked `Plugins/GASPALS` directory was not modified or staged.
