@@ -23,6 +23,7 @@ param(
     [switch] $BuildGame,
     [switch] $NonUnity,
     [switch] $DisableAura,
+    [switch] $UseFileSystemCache,
     [switch] $FailOnWarnings
 )
 
@@ -236,8 +237,19 @@ try {
     $pluginsToDisable = @('Fab')
     if ($DisableAura) { $pluginsToDisable += 'Aura' }
     $automationArguments += ('-DisablePlugins=' + ($pluginsToDisable -join ','))
-    $editorExit = Invoke-LoggedProcess -Executable $editorExecutable -LogName 'Automation' `
-        -TimeoutSeconds $AutomationTimeoutSeconds -Arguments $automationArguments
+    $previousValidationCache = [Environment]::GetEnvironmentVariable('UE-LocalDataCachePath', 'Process')
+    try {
+        if ($UseFileSystemCache) {
+            $automationArguments += '-ddc=InstalledNoZenLocalFallback'
+            $validationCachePath = (Join-Path (Split-Path -Parent $ProjectPath) 'DerivedDataCache\ValidationFallback').Replace('\', '/')
+            [Environment]::SetEnvironmentVariable('UE-LocalDataCachePath', $validationCachePath, 'Process')
+        }
+        $editorExit = Invoke-LoggedProcess -Executable $editorExecutable -LogName 'Automation' `
+            -TimeoutSeconds $AutomationTimeoutSeconds -Arguments $automationArguments
+    }
+    finally {
+        [Environment]::SetEnvironmentVariable('UE-LocalDataCachePath', $previousValidationCache, 'Process')
+    }
     $summary.automation = "process exit $editorExit; report not yet validated"
     $summary | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $script:RunDirectory 'summary.json') -Encoding UTF8
     if ($editorExit -ne 0) { Write-Warning "Unreal automation process failed with exit code $editorExit."; exit $editorExit }
