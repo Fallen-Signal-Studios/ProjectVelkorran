@@ -82,9 +82,14 @@ def tick(delta):
             owner = cue.get_owner()
             if owner:
                 mid = cue.get_editor_property('OverlayMID')
+                halo = cue.get_component_by_class(unreal.StaticMeshComponent)
                 cues_by_owner.setdefault(owner.get_path_name(), []).append(dict(
                     actor=cue.get_path_name(), timer_active=unreal.SystemLibrary.is_timer_active(cue, 'TryApplyFloorOverlay'),
-                    material=mid.get_path_name() if mid else None))
+                    material=mid.get_path_name() if mid else None,
+                    hidden=bool(cue.get_editor_property('hidden')),
+                    halo_visible=bool(halo and halo.is_visible()),
+                    halo_material=halo.get_material(0).get_path_name() if halo and halo.get_material(0) else None,
+                    attached=cue.get_attach_parent_actor()==owner))
         for actor in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.SovNPCCharacterBase):
             floor = actor.get_component_by_class(unreal.SovLethalFloorComponent)
             if not floor or actor.get_editor_property('hidden') or actor.is_character_pending_load():
@@ -103,11 +108,12 @@ def tick(delta):
             mesh_paths = sorted(m.get_path_name() for m in meshes)
             cues = sorted(cues_by_owner.get(path, []), key=lambda r: r['actor'])
             key = (held, tuple(mesh_paths), tuple((r['mesh'], r['parent']) for r in overlays),
-                   tuple((r['actor'], r['timer_active'], r['material']) for r in cues))
+                   tuple((r['actor'], r['timer_active'], r['material'],r['hidden'],r['halo_visible'],r['attached']) for r in cues))
             if states.get(path) != key:
                 states[path] = key
                 report['transitions'].append(dict(actor=path, held=held, health=actor.get_health(),
-                    overlays=overlays, meshes=mesh_paths, cues=cues, elapsed=now-started))
+                    overlays=overlays, meshes=mesh_paths, cues=cues, elapsed=now-started,
+                    game_seconds=unreal.GameplayStatics.get_time_seconds(world)))
                 write()
     except Exception as exc:
         report['findings'].append(str(exc))
