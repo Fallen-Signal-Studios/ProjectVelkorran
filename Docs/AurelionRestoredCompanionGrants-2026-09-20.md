@@ -30,7 +30,9 @@ grants, transforms or altered save bytes. No gameplay or content was edited.
 
 Reconcile restored companion permissions with the current mission's curated
 kit using validated evidence that the inactive protagonist already unlocked
-the ability. Do not blindly grant all current abilities or silently increase
+the ability **or owns the weapon supplying it**. The runtime follow-up below
+rules out using `GrantedAbilities` alone as complete weapon-kit evidence.
+Do not blindly grant all current abilities or silently increase
 ability levels. Apply the same rule to full campaign load and encounter retry;
 preserve actor identity, resources and the campaign journal. Missing unlocked-kit
 evidence must produce a clear diagnostic rather than invented progression.
@@ -65,3 +67,63 @@ Creator grenade assets and GASPALS remain untouched. The readback script is
 retained at `Saved/Validation/inspect_restored_companion_grants.py` and its
 successful JSON at the evidence directory above. The proposed native repair
 has been explicitly submitted for user approval; no repair is claimed yet.
+
+## Follow-up: saved weapon ownership is required
+
+`RestoredUnlockEvidence-20260920-112823-b1336333` repeated the public load of
+the original generation-18 checkpoint and its authored E4A retry. It used the
+engine's read-only `GETALL` command, restricted by exact player-state name and
+world outer, to export `ProtagonistSnapshots`. This property is reflected but
+not Python-exposed; no native API or gameplay data was changed to inspect it.
+The observer stopped immediately after the readback, ended PIE and exited.
+
+The loaded Tarrik snapshot has ten granted abilities: unarmed punch, crouch,
+jump, wield, reload, death, sprint, evade, cover and Cinder Sticky Grenade.
+Neither native light/heavy melee nor the superseded sword attack appears.
+Selene's eleven entries similarly contain no Verity attack. Thus neither a
+current-class intersection nor an old-sword-class alias would repair this save.
+
+The snapshots' serialized `InventoryComponent` records contain these weapon
+class paths:
+
+| Protagonist | Weapon classes in saved inventory bytes |
+|---|---|
+| Tarrik | WI_Cinderline, WI_Velkorran |
+| Selene | WI_Axiom, WI_Staccato, WI_Verity |
+
+The 2,141-byte Tarrik and 3,320-byte Selene inventory payloads were extracted
+from the native property export. This is evidence in a natively loaded snapshot,
+not a separate inventory restore or an independently validated byte decoder.
+The raw export and concise `saved-unlocks-summary.json` remain in the run.
+The read-only diagnostic is `Saved/Validation/inspect_restored_companion_unlocks.py`.
+
+Source explains the discrepancy: `UWeaponItem::HandleUnWield_Implementation`
+calls `RemoveWeaponAbilities`, whereas `ASovPlayerState::CaptureProtagonistSnapshot`
+enumerates currently activatable ASC specs. A holstered weapon can therefore
+be owned without appearing in `GrantedAbilities`; that list is not a complete
+weapon-unlock history.
+
+`ASovProtagonistCompanionCharacter::PrepareProxy` already accounts for this in
+the live outgoing-player path: it checks real inventory weapon grants against
+the explicit mission allowlist, uses an existing spec's level when available,
+otherwise level 1, and records weapon provenance. Restoration should follow
+that ownership rule using validated saved evidence. Merely adding everything
+on the NPC's default weapon would not establish the player's ownership.
+
+`USovConvergenceCompanionState::StageInitialCompanion` currently intersects
+only `Kit.GrantedAbilities`. Its handling of a legitimately holstered saved kit
+must be included in the repair and tests, alongside full load and encounter
+retry. This source path is a demonstrated coverage gap; the current follow-up
+did not run a fresh initial-convergence comparison.
+
+Required additional cases: owned/holstered versus wielded weapon parity,
+unowned weapon exclusion, malformed/missing inventory evidence, weapon-grant
+provenance and no duplicate grants. Preserve saved levels for non-weapon grants
+and use the existing level-1 weapon fallback only where ownership validates it.
+Do not deserialize untrusted saved bytes into the active player's inventory
+merely to query them, or overwrite the golden save to make validation pass.
+
+No native repair is implemented or approved by this follow-up. It corrects the
+earlier proposal before implementation; native companion approval is still
+pending. The unchanged-source full gate remains `20260920-112236-2f605927`,
+with build, 720 tests, coverage and source integrity passed.
