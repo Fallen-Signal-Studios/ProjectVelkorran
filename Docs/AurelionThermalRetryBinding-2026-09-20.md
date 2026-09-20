@@ -90,3 +90,19 @@ The terminal screenshot was reviewed: enemies crowd Tarrik in melee, with the HU
 critical-health vignette visible. A large corpse-interaction outline also warrants a
 separate player-facing visual polish pass. This screenshot does not qualify overall
 combat animation or AAA visual quality. The editor exited normally without saving M12.
+## Subsequent ordinary E4B victory
+
+`InteractionBracketsVisible-20260920-161801-848a4a9a/E4B/e4b-input-continuation.json`
+records a completed ordinary-input replay from the same generation-20 checkpoint.
+It finished in 33.344 seconds with the real frost/heat payoff, a subsequent Cinderline
+Core break, all five required hostiles defeated, all seven protected characters alive,
+and Tarrik alive at 100 health. Native journal sequence 20 is ThermalFracture for the
+same attempt (38C08B314FE077A6F1B269BFE590A68E). The content hash check passed.
+This verifies E4B victory after the binding repair. The earlier fatal run remains retained;
+it is not rewritten as a pass, and the intermittent movement stall is not claimed fixed.
+Later mission scenes, travel and M13 remain outside this replay's proof.
+
+The containing interaction-HUD observer reported failure because it found no fully
+on-screen corpse focus before the gameplay driver finished. That observer failure does
+not invalidate the independently completed gameplay report; it provides no bracket
+visual acceptance. A separate review restores this run's earned victory autosave.

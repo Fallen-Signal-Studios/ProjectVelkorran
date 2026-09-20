@@ -768,8 +768,9 @@ int32 USovAccessibilityPresentation::NativePaint(const FPaintArgs& Args, const F
 	};
     FSovCombatVitalsSnapshot CurrentVitals;
     const auto* SovPC = Cast<ASovPlayerController>(PC);
-    if (!Settings.bModifierBlackout && Settings.bShowObjectiveText && !IsCinematicControlled(SovPC) && SafeTextCanvas && USovCombatVitalsWidget::ReadCurrentVitals(SovPC, CurrentVitals)
-        && CurrentVitals.Values[0].Current > 0.f && SovObjectiveWaypoint::IsCurrent(SovPC, ObjectiveWaypoint))
+    const bool bLivingPlayer = USovCombatVitalsWidget::ReadCurrentVitals(SovPC, CurrentVitals) && CurrentVitals.Values[0].Current > 0.f;
+    if (!Settings.bModifierBlackout && Settings.bShowObjectiveText && !IsCinematicControlled(SovPC) && SafeTextCanvas && bLivingPlayer
+        && SovObjectiveWaypoint::IsCurrent(SovPC, ObjectiveWaypoint))
     {
         const auto& SafeGeometry = SafeTextCanvas->GetPaintSpaceGeometry();
         const FVector2D SafeSize = SafeGeometry.GetLocalSize();
@@ -855,7 +856,8 @@ int32 USovAccessibilityPresentation::NativePaint(const FPaintArgs& Args, const F
             }
         }
     }
-	if (Settings.bInteractableOutlines && FocusedInteractable.IsValid() && Interaction && Interaction->IsInteractableInReach(FocusedInteractable.Get()))
+	if (bLivingPlayer && !IsCinematicControlled(SovPC) && Settings.bInteractableOutlines && FocusedInteractable.IsValid()
+        && Interaction && Interaction->IsInteractableInReach(FocusedInteractable.Get()))
 	{
 		const FBox Bounds = FocusedInteractable->GetInteractableBounds(); FVector2D Min(FLT_MAX,FLT_MAX),Max(-FLT_MAX,-FLT_MAX); bool bValid = Bounds.IsValid != 0;
 		for (int32 Index=0; Index<8 && bValid; ++Index)
@@ -863,7 +865,31 @@ int32 USovAccessibilityPresentation::NativePaint(const FPaintArgs& Args, const F
 			FVector2D Point; const FVector Corner(Index&1 ? Bounds.Max.X : Bounds.Min.X,Index&2 ? Bounds.Max.Y : Bounds.Min.Y,Index&4 ? Bounds.Max.Z : Bounds.Min.Z);
 			bValid = Project(Corner,Point); if (bValid) { Min.X=FMath::Min(Min.X,Point.X); Min.Y=FMath::Min(Min.Y,Point.Y); Max.X=FMath::Max(Max.X,Point.X); Max.Y=FMath::Max(Max.Y,Point.Y); }
 		}
-		if (bValid) { DrawOutline({Min,FVector2D(Max.X,Min.Y),Max,FVector2D(Min.X,Max.Y),Min},TeamTint(Settings)); DrawLabel(FVector2D(Min.X,Max.Y+4),FText::Format(LOCTEXT("InteractLabel","Interact: {0}"),FocusedInteractable->GetInteractableNameText(PC->GetPawn(),Interaction)),FLinearColor::White); }
+        if (bValid)
+        {
+            const auto Theme = SovHUDStyle::ForProtagonist(CurrentVitals.Protagonist, Settings.bHighContrastHUD);
+            const FLinearColor Tint = Settings.bHighContrastHUD ? FLinearColor::White
+                : Settings.bOverrideTeamColor || Settings.ColorVisionPreset != ESovColorVisionPreset::Default ? TeamTint(Settings) : Theme.Accent;
+            // Preserve the real target bounds without drawing a screen-sized box through combat.
+            // Corner strokes stay on the target; priority HUD/text panels occlude them.
+            const double Arm = FMath::Min(24. * Settings.UIScale, FMath::Min(Max.X-Min.X, Max.Y-Min.Y) * .2);
+            for (int32 Corner = 0; Corner < 4; ++Corner)
+            {
+                const FVector2D At(Corner & 1 ? Max.X : Min.X, Corner & 2 ? Max.Y : Min.Y);
+                const FVector2D AlongX(Corner & 1 ? -Arm : Arm, 0);
+                const FVector2D AlongY(0, Corner & 2 ? -Arm : Arm);
+                FBox2D Stroke(ForceInit); Stroke += At; Stroke += At+AlongX; Stroke += At+AlongY;
+                Stroke = Stroke.ExpandBy(Settings.OutlineThickness + 4.);
+                bool bOccluded = false;
+                for (const FBox2D& Panel : TextPanels)
+                {
+                    if (Panel.bIsValid && Panel.Intersect(Stroke)) { bOccluded = true; break; }
+                }
+                if (!bOccluded) { DrawOutline({At+AlongY, At, At+AlongX}, Tint); }
+            }
+            DrawLabel(FVector2D(Min.X,Max.Y+8.*Settings.UIScale),
+                FText::Format(LOCTEXT("InteractLabel","Interact: {0}"),FocusedInteractable->GetInteractableNameText(PC->GetPawn(),Interaction)), Tint, true);
+        }
 	}
 	for (const FMarker& Marker : Markers)
 	{
