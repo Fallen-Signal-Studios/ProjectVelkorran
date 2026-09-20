@@ -461,10 +461,12 @@ void ASovAurelionThermalPhaseDirector::BindFracture()
     auto* Component = IsValid(Elite) ? Elite->FindComponentByClass<USovAurelionThermalFractureComponent>() : nullptr;
     if (FractureSource == Component) { return; }
     if (IsValid(FractureSource)) { FractureSource->OnThermalFractureCompleted.RemoveDynamic(this, &ThisClass::HandleFracture); }
-    FractureSource = Component;
-    if (IsValid(FractureSource))
+    FractureSource = nullptr;
+    // Keep an unready component retryable on the next active tick. Once bound,
+    // the identity guard above avoids repeating the world/ownership scan.
+    if (IsValid(Component) && Component->InitializeBindings())
     {
-        FractureSource->InitializeBindings();
+        FractureSource = Component;
         FractureSource->OnThermalFractureCompleted.AddUniqueDynamic(this, &ThisClass::HandleFracture);
     }
 }

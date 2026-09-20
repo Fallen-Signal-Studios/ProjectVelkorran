@@ -66,6 +66,9 @@ bool USovAurelionThermalFractureComponent::InitializeBindings()
     if (!IsValid(ASC) || ASC->GetAvatarActor() != GetOwner() || !Director || (EncounterDirector && EncounterDirector != Director)
         || Director->GetCampaignProofType() != ESovEncounterProofType::AurelionThermalFracture)
     { LastError = TEXT("Thermal Fracture needs its initialized elite ASC and unique encounter registration."); return false; }
+    // Restored pawns do not retain the level instance's optional authoring pointer.
+    // Publish only the uniquely validated owner so stable request controls can resolve it.
+    EncounterDirector = Director;
     if (BoundASC == ASC && BoundDirector == Director) { return true; }
     Unbind(); Retire(); BoundASC = ASC; BoundDirector = Director;
     ControlDelegate = ASC->OnActiveGameplayEffectAddedDelegateToSelf.AddUObject(this, &ThisClass::HandleControlApplied);

@@ -9,6 +9,10 @@
 #include "Tests/SovAxiomRuntimeTestFixtures.h"
 #include "Tests/SovCampaignMassRoundTripFixtures.h"
 #include "Components/SovAurelionThermalFractureComponent.h"
+#include "AI/SovAurelionEnemyRoles.h"
+#include "Serialization/MemoryReader.h"
+#include "Serialization/MemoryWriter.h"
+#include "Serialization/ObjectAndNameAsStringProxyArchive.h"
 #include "Companions/SovConvergenceCompanionState.h"
 #include "Cinematics/SovCampaignCinematicComponent.h"
 #include "LevelSequence.h"
@@ -219,26 +223,55 @@ bool FSovAurelionThermalRequestReplacementTest::RunTest(const FString& Parameter
     F.Mission->Beats[0].RequiredEncounterId = Director->EncounterId;
     F.Terminal->Story = nullptr; F.Terminal->Operation = ESovAurelionRequest::FrostSetup;
     F.Terminal->ThermalDirector = Director; F.Terminal->ThermalParticipantId = TEXT("E4.Elite");
-    auto* Anchor = F.World->SpawnActor<AActor>();
-    const auto MakeElite = [&F, Director, Anchor](FVector Position)
+    auto* Anchor = F.World->SpawnActor<AActor>(); Anchor->Tags.Add(TEXT("Test.Retry.CleanFrost"));
+    const auto MakeElite = [&F, Director, Anchor](FVector Position, bool bAuthored)
     {
         FActorSpawnParameters Spawn; Spawn.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
         auto* Actor = F.World->SpawnActor<ASovCampaignMassRoundTripNPC>(ASovCampaignMassRoundTripNPC::StaticClass(), Position, FRotator::ZeroRotator, Spawn);
         Actor->InitializeTestCombat();
-        auto* Component = NewObject<USovAurelionThermalFractureComponent>(Actor);
-        Actor->AddInstanceComponent(Component); Component->EncounterDirector = Director; Component->FrostAnchor = Anchor;
+        auto* Component = NewObject<USovAurelionEliteThermalFracture>(Actor);
+        Actor->AddInstanceComponent(Component);
+        if (bAuthored)
+        {
+            Component->EncounterDirector = Director; Component->FrostAnchor = Anchor;
+            Component->FrostAnchorId = TEXT("Test.Retry.CleanFrost");
+        }
         Component->RegisterComponent(); Component->Activate(); return Component;
     };
-    auto* Initial = MakeElite(FVector(650, 350, 0));
+    auto* Initial = MakeElite(FVector(650, 350, 0), true);
     if (!TestTrue(TEXT("Initial elite has exact director participant ownership"), Director->RegisterParticipant(TEXT("E4.Elite"), Cast<ASovNPCCharacterBase>(Initial->GetOwner()), true))) { return false; }
     Director->StartTestAttempt(F.Player);
-    TestEqual(TEXT("Stable authored binding resolves its current elite"), F.Terminal->GetCurrentThermalTarget(), Initial);
+    TestEqual(TEXT("Stable authored binding resolves its current elite"), F.Terminal->GetCurrentThermalTarget(), static_cast<USovAurelionThermalFractureComponent*>(Initial));
     if (!TestTrue(TEXT("A real request queues against the initial component"), F.Terminal->RequestUse(F.Player, Error))) { AddError(Error.ToString()); return false; }
-    auto* Replacement = MakeElite(FVector(650, 350, 0));
+    INarrativeSavableComponent::Execute_PrepareForSave(Initial);
+    TArray<uint8> Bytes;
+    {
+        FMemoryWriter Writer(Bytes); FObjectAndNameAsStringProxyArchive Archive(Writer, true);
+        Archive.ArIsSaveGame = true; Archive.ArNoDelta = true; Initial->Serialize(Archive);
+    }
+    auto* Replacement = MakeElite(FVector(650, 350, 0), false);
+    {
+        FMemoryReader Reader(Bytes); FObjectAndNameAsStringProxyArchive Archive(Reader, true);
+        Archive.ArIsSaveGame = true; Replacement->Serialize(Archive);
+    }
+    INarrativeSavableComponent::Execute_Load(Replacement);
+    TestTrue(TEXT("Saved anchor record is accepted"), Replacement->WasSaveRecordLoadAccepted());
+    TestEqual(TEXT("Saved anchor resolves without manual repair"), Replacement->FrostAnchor.Get(), Anchor);
+    TestNull(TEXT("SaveGame does not retain the authored director"), Replacement->EncounterDirector.Get());
+    TestFalse(TEXT("Unpublished replacement cannot bind early"), Replacement->InitializeBindings());
+    TestNull(TEXT("Failed early binding does not publish an owner"), Replacement->EncounterDirector.Get());
     // Supply the same roster publication a native restore performs. The old actor
     // deliberately remains live, proving identity fencing independent of destruction.
     Director->Participants[0].Character = Cast<ASovNPCCharacterBase>(Replacement->GetOwner());
-    TestEqual(TEXT("New input resolves the replacement even while the old component lives"), F.Terminal->GetCurrentThermalTarget(), Replacement);
+    TestTrue(TEXT("Published replacement recovers its validated director"), Replacement->InitializeBindings());
+    TestEqual(TEXT("Runtime binding publishes the exact director"), Replacement->EncounterDirector.Get(), static_cast<ASovEncounterDirector*>(Director));
+    for (const auto Operation : {ESovAurelionRequest::MoveFrostPartner, ESovAurelionRequest::FrostSetup, ESovAurelionRequest::HeatConfirm})
+    {
+        F.Terminal->Operation = Operation;
+        TestEqual(TEXT("Every thermal control resolves the restored elite"), F.Terminal->GetCurrentThermalTarget(), static_cast<USovAurelionThermalFractureComponent*>(Replacement));
+    }
+    F.Terminal->Operation = ESovAurelionRequest::FrostSetup;
+    TestEqual(TEXT("New input resolves the replacement even while the old component lives"), F.Terminal->GetCurrentThermalTarget(), static_cast<USovAurelionThermalFractureComponent*>(Replacement));
     F.NextFrame();
     TestFalse(TEXT("Retired queued input releases its slot"), F.Terminal->IsRequestPending());
     TestEqual(TEXT("Retired input reports ownership change rather than target acceptance"), F.Terminal->LastResult.ToString(), FString(TEXT("Interaction changed; try again")));
@@ -250,10 +283,22 @@ bool FSovAurelionThermalRequestReplacementTest::RunTest(const FString& Parameter
     TestNull(TEXT("Direct and stable bindings together are ambiguous"), F.Terminal->GetCurrentThermalTarget());
     TestFalse(TEXT("Ambiguous authored binding exposes no action"), F.Terminal->CanUse(F.Player, Error));
     F.Terminal->ThermalDirector = nullptr; F.Terminal->ThermalParticipantId = NAME_None;
-    TestEqual(TEXT("Legacy explicit component binding remains supported"), F.Terminal->GetCurrentThermalTarget(), Initial);
+    TestEqual(TEXT("Legacy explicit component binding remains supported"), F.Terminal->GetCurrentThermalTarget(), static_cast<USovAurelionThermalFractureComponent*>(Initial));
     Initial->Deactivate(); TestNull(TEXT("An explicitly deactivated component cannot be admitted"), F.Terminal->GetCurrentThermalTarget());
     F.Terminal->Thermal = nullptr; F.Terminal->ThermalDirector = Director; F.Terminal->ThermalParticipantId = TEXT("MissingElite");
     TestNull(TEXT("Missing exact participant never falls back to another elite"), F.Terminal->GetCurrentThermalTarget());
+    auto* OtherDirector = F.World->SpawnActor<ASovAurelionThermalTestDirector>();
+    Replacement->EncounterDirector = OtherDirector;
+    TestFalse(TEXT("Wrong explicit director is never repaired silently"), Replacement->InitializeBindings());
+    TestEqual(TEXT("Wrong explicit constraint remains intact"), Replacement->EncounterDirector.Get(), static_cast<ASovEncounterDirector*>(OtherDirector));
+    Replacement->EncounterDirector = nullptr;
+    OtherDirector->Participants = Director->Participants;
+    TestFalse(TEXT("Duplicate registration cannot choose an arbitrary director"), Replacement->InitializeBindings());
+    TestNull(TEXT("Ambiguous ownership publishes no director"), Replacement->EncounterDirector.Get());
+    OtherDirector->Participants.Empty();
+    TestTrue(TEXT("Binding recovers when ownership becomes unique"), Replacement->InitializeBindings());
+    TestEqual(TEXT("Existing bound ASC still republishes the validated reference"), Replacement->EncounterDirector.Get(), static_cast<ASovEncounterDirector*>(Director));
+    TestFalse(TEXT("Restoring bindings never fabricates fracture proof"), Replacement->GetFractureReceipt().IsComplete());
     TestEqual(TEXT("Request retirement fabricates no campaign journal facts"), F.PC->GetCampaignState()->GetJournal().Num(), 0);
     return true;
 }
