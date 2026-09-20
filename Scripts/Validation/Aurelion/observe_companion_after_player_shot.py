@@ -146,6 +146,13 @@ class Observer:
             target_capsule = self.target.get_component_by_class(unreal.CapsuleComponent) if unreal.SystemLibrary.is_valid(self.target) else None
             movement = self.companion.get_component_by_class(unreal.CharacterMovementComponent)
             self.report['samples'].append(dict(elapsed=now-self.started,
+                game_seconds=unreal.GameplayStatics.get_time_seconds(self.world),
+                companion_tags=unreal.GameplayTagLibrary.get_owned_gameplay_tags(self.companion).export_text(),
+                target_tags=unreal.GameplayTagLibrary.get_owned_gameplay_tags(self.target).export_text()
+                    if unreal.SystemLibrary.is_valid(self.target) else None,
+                command_state=str(self.companion.get_companion_component().get_command_state()),
+                companion_disabled=self.companion.get_companion_component().is_disabled(),
+                companion_velocity=self.companion.get_velocity().export_text(),
                 target_health=self.target.get_health() if unreal.SystemLibrary.is_valid(self.target) else None,
                 distance=self.companion.get_distance_to(self.target),
                 companion_position=self.companion.get_actor_location().export_text(),

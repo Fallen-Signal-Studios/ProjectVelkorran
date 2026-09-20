@@ -17,7 +17,7 @@ OUT = PROFILE / ('ContactProbe-' + datetime.now().strftime('%H%M%S-%f'))
 OUT.mkdir(exist_ok=False)
 SOURCE = Path(os.environ.get('SOV_EARNED_COMPANION_SAVE_DIRECTORY', str(
     Path(unreal.Paths.project_dir()) / 'Saved/Validation/Aurelion/CompanionPrimaryRoute-20260919-183439-ce4bd05a/UserData/Saved/SaveGames'))).resolve()
-report = dict(status='bootstrapping', method='Unmodified earned checkpoint banks copied only into this isolated test profile; public native load; controlled companion command and ordinary player trigger', banks=[], callbacks=[])
+report = dict(status='bootstrapping', method='Unmodified earned checkpoint banks copied only into this isolated test profile; public native load; optional ordinary retry input and controlled companion command; explicit input owner recorded below', banks=[], callbacks=[])
 state = dict(phase='bootstrap', started=time.monotonic(), saves=None, delegate=None, handle=None)
 
 def write():
@@ -29,6 +29,11 @@ def completed(result, header, message):
 
 def finish(status, reason):
     report.update(status=status, reason=reason)
+    if state.get('retry_input') is not None:
+        report['retry_input'] = dict(samples=state['retry_input'].samples,
+            frames=state['retry_input'].driver.report['input_frames'])
+        state['retry_input'].stop()
+        state['retry_input'] = None
     if state['delegate'] is not None:
         state['delegate'].remove_callable(completed)
         state['delegate'] = None
@@ -93,7 +98,7 @@ def tick(delta):
             assert ('BoundaryId="' + boundary + '"') in report['callbacks'][0]['header']
             expected = unreal.SovSeleneCharacter if boundary == 'M12_E4_QuarantineCrucibleA' else unreal.SovTarrikCharacter
             assert isinstance(pawn, expected) and pawn.is_alive()
-            if os.environ.get('SOV_CONTACT_FOLLOW_E4A') == '1':
+            if os.environ.get('SOV_CONTACT_FOLLOW_E4A') == '1' or os.environ.get('SOV_CONTACT_RETRY_ENTRY') == '1':
                 objectives = [a for a in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.SovCampaignEncounterObjective)
                     if a.encounter_director and str(a.encounter_director.encounter_id) == boundary]
                 assert len(objectives) == 1
@@ -108,13 +113,27 @@ def tick(delta):
                 state.setdefault('entry_wait_started', time.monotonic())
                 write()
                 if director.get_encounter_state() != unreal.SovEncounterState.ACTIVE:
-                    assert time.monotonic()-state['entry_wait_started'] < 8., 'Native E4A entry did not activate after restore: ' + str(report['native_entry'])
+                    # Arena-entry load deliberately parks participants in Failed.
+                    # Use the same authored interaction the player must use;
+                    # automatic initial-entry polling never retries an attempt.
+                    if state.get('retry_input') is None:
+                        assert director.get_encounter_state() == unreal.SovEncounterState.FAILED
+                        from aurelion_retry_input import RetryInput
+                        state['retry_input'] = RetryInput(world, director, OUT / 'RetryInput')
+                    state['retry_input'].step(world, pc, pawn)
                     return
+                if state.get('retry_input') is not None:
+                    assert state['retry_input'].step(world, pc, pawn)
+                    report['retry_input'] = dict(samples=state['retry_input'].samples,
+                        frames=state['retry_input'].driver.report['input_frames'])
+                    state['retry_input'].stop()
+                    state['retry_input'] = None
             import observe_companion_after_player_shot as contact
             assert contact._RUN is None or contact._RUN.handle is None, 'A contact observer already owns this session'
             importlib.reload(contact)
             follow_route = os.environ.get('SOV_CONTACT_FOLLOW_E4A') == '1'
-            contact.start(OUT, passive=follow_route)
+            command_only = os.environ.get('SOV_CONTACT_COMMAND_ONLY') == '1'
+            contact.start(OUT, passive=follow_route or command_only)
             if follow_route:
                 import continue_aurelion_e4a_input as route
                 route.start(OUT / 'E4A')
@@ -123,8 +142,10 @@ def tick(delta):
                 companion = contact._RUN.companion.get_companion_component()
                 admitted = companion.request_command(pawn, unreal.SovCompanionCommand.FOCUS_TARGET, contact._RUN.target)
                 report['controlled_focus_request'] = str(admitted)
+                report['command_only'] = command_only
+                report['input_owner'] = 'No player combat input; passive observation after public companion command' if command_only else 'Existing ordinary firearm trigger observer'
             report['journal'] = [str(e.beat_id) for e in mission.get_journal()]
-            finish('probe_started', 'Real checkpoint restored; live contact probe now owns its ordinary inputs')
+            finish('probe_started', 'Real checkpoint restored; contact observation started with the recorded input owner')
     except Exception:
         finish('failed', traceback.format_exc())
 
