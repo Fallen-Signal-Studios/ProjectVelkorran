@@ -41,6 +41,7 @@ class Observer:
                           and 'Elite' not in a.get_class().get_name()], key=self.pawn.get_distance_to)
         assert targets, 'Requires a visible released non-Elite enemy; see contact-target-census.json'
         self.target = targets[0]
+        self.player_target = self.target
         assert self.target.get_health() > 40
         self.weapon = None
         firearm = 'Cinderline' if isinstance(self.pawn, unreal.SovTarrikCharacter) else 'Staccato'
@@ -70,9 +71,21 @@ class Observer:
 
     def player_damage(self, result):
         self.report['player_damage'].append(result.export_text())
+        self.report.setdefault('player_damage_details', []).append(dict(
+            elapsed=time.monotonic()-self.started,
+            source=result.source_actor.get_path_name() if result.source_actor else None,
+            target=result.target_actor.get_path_name() if result.target_actor else None,
+            health=result.applied_health_damage,shield=result.applied_shield_damage,
+            fatal=result.fatal,
+            target_alive=result.target_actor.is_alive() if isinstance(result.target_actor,unreal.NarrativeCharacter) else None))
 
     def companion_damage(self, result):
         self.report['companion_damage'].append(result.export_text())
+        self.report.setdefault('companion_damage_details', []).append(dict(
+            elapsed=time.monotonic()-self.started,
+            source=result.source_actor.get_path_name() if result.source_actor else None,
+            target=result.target_actor.get_path_name() if result.target_actor else None,
+            health=result.applied_health_damage,shield=result.applied_shield_damage,fatal=result.fatal))
 
     def input(self, look=(0., 0.), fire=0., aim=0., wheel_hold=0.):
         if self.passive:
@@ -109,8 +122,8 @@ class Observer:
                     self.target = focus
             elif self.triggered is None:
                 assert now-self.aim_started < 20, 'Aim deadline; no trigger supplied'
-                assert self.target.is_alive() and self.pc.line_of_sight_to(self.target)
-                look, error = common.Run.look(self, self.world, self.pc, self.target.get_actor_location())
+                assert self.player_target.is_alive() and self.pc.line_of_sight_to(self.player_target)
+                look, error = common.Run.look(self, self.world, self.pc, self.player_target.get_actor_location())
                 fire = float(error < 1.5)
                 if fire:
                     self.triggered = now
@@ -204,6 +217,7 @@ class Observer:
         self.report.update(stopped=True, reason=reason)
         self.write()
         self.world = self.pc = self.pawn = self.companion = self.target = self.weapon = self.owner = None
+        self.player_target = None
         self.selector = None
 
 

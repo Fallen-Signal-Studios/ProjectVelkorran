@@ -12,7 +12,9 @@ level=unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 maps=[root/'Content/Aurelion/Maps'/n for n in ('L_Aurelion_M12.umap','L_Aurelion_M13.umap')]
 hashes={str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in maps}
 state=dict(phase='route',start=time.monotonic(),busy=False)
-report=dict(status='running',scope=__doc__)
+report=dict(status='running',scope=globals().get('CONTACT_SCOPE',__doc__))
+with_player_hit=bool(globals().get('PLAYER_CONTRIBUTION_PROBE',False))
+report['player_hit_probe']=with_player_hit
 def write(): (out/'fresh-tarrik-focus.json').write_text(json.dumps(report,indent=2))
 def finish(error=None):
     contact=sys.modules.get('observe_companion_after_player_shot')
@@ -37,10 +39,21 @@ def tick(dt):
             assert chain._RUN.report['status']=='passed',chain._RUN.report
             assert chain._RUN.handle is None and chain._RUN.child.handle is None
             import observe_companion_after_player_shot as contact
-            contact.start(out,passive=True)
+            contact.start(out,passive=not with_player_hit)
             probe=contact._RUN
             assert isinstance(probe.pawn,unreal.SovSeleneCharacter)
             assert 'Tarrik' in probe.companion.get_class().get_name()
+            if with_player_hit:
+                # Fund contribution on a durable enemy; leave the ordinary Linkbound
+                # intact for Tarrik. Both targets are real, living encounter actors.
+                elites=[a for a in unreal.GameplayStatics.get_all_actors_of_class(probe.world,unreal.NarrativeNPCCharacter)
+                        if 'AurelionElite' in a.get_class().get_name() and a.is_alive()
+                        and a.get_health()>150 and probe.pc.line_of_sight_to(a)
+                        and unreal.ArsenalStatics.get_attitude(probe.pawn,a)==unreal.TeamAttitude.HOSTILE
+                        and probe.pawn.get_distance_to(a)<5000]
+                assert len(elites)==1,'Requires a living visible Elite for the single ordinary player shot'
+                probe.player_target=elites[0]
+                report['player_target']=probe.player_target.get_path_name()
             tags=unreal.GameplayTagLibrary.get_owned_gameplay_tags(probe.target).export_text()
             assert 'Narrative.State.Invulnerable' not in tags and probe.target.is_alive(),tags
             report.update(target=probe.target.get_path_name(),initial_target_tags=tags,
@@ -51,8 +64,16 @@ def tick(dt):
         import observe_companion_after_player_shot as contact
         if contact._RUN.handle is not None:return
         report['damage_receipts']=contact._RUN.report['companion_damage']
+        report['player_damage_details']=contact._RUN.report.get('player_damage_details',[])
+        report['companion_damage_details']=contact._RUN.report.get('companion_damage_details',[])
         report['observer_errors']=contact._RUN.report['errors']
         assert not report['observer_errors'],report['observer_errors']
+        if with_player_hit:
+            player_hits=[r for r in report['player_damage_details'] if r['target']==report['player_target']
+                         and r['health']+r['shield']>0 and r['target_alive'] and not r['fatal']]
+            assert player_hits,'No verified nonlethal ordinary player hit; companion response is unqualified'
+            report['companion_health_damage_after_player_hit']=sum(r['health'] for r in report['companion_damage_details']
+                if r['target']==report['target'] and r['elapsed']>player_hits[0]['elapsed'])
         finish()
     except Exception:finish(traceback.format_exc())
     finally:state['busy']=False

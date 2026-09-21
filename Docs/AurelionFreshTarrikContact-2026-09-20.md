@@ -60,3 +60,44 @@ Validation: baseline full gate `20260920-193027-01279e57`; final full gate
 `20260920-195858-0c175ad0` passed build without SkipBuild, 722 matching tests,
 coverage and unchanged native-source integrity. These tests do not turn the
 no-damage contact observation into a gameplay pass.
+
+## Fresh native melee contact confirmed
+
+`FreshTarrikPlayerHit-20260920-200446-d5355980` subsequently earned E1, E2,
+meeting, rescue and quarantine entry in a fresh session. The new player-contribution
+variant selected Staccato through ordinary wheel input and attempted to arrange
+one player shot at the durable Elite while Tarrik focused the separate Linkbound.
+No weapon damage, health, range, grants, transforms or contribution values changed.
+
+**Tarrik landed a native melee hit before the player fired.** At 7.094 seconds the
+source callback recorded transaction `33A469E24B34643BC5FF35AB53E670C4`, attack
+`512612ED47245D9F485338AFCE2CD3F0`, from `BP_AurelionTarrikCompanion_C_0` to
+`BP_AurelionLinkbound_C_13`: 43.478264 applied health damage, zero shield damage,
+Edge channel accepted, no guard/deflection, nonfatal. The target's before-damage
+tags contained no invulnerability tag. Its initial health was 53.2.
+
+The observer recorded `AM_Sword_3P_1H_Attack_1_Tarrik` starting by 3.094 seconds
+at 158.92 cm. This run reached a melee opportunity during the opening allowance,
+unlike the preceding command-only run. Together, the montage samples and native
+receipt confirm that the fresh proxy can wield its sword, animate an attack and
+apply real health damage to an unprotected enemy. This closes that specific
+evidence gap; it does not qualify all follow behavior or older restored kits.
+
+The **player-contribution scenario itself remains failed**: the existing observer
+stops on the first companion receipt, so it stopped before the intended player hit.
+The wrapper correctly rejected the missing nonlethal player receipt rather than
+counting this as an after-player-hit response. The fresh damage finding above is
+independent evidence within that failed scenario, not a relabeling of its status.
+Keep this distinction if reusing `check_fresh_tarrik_player_contribution.py`:
+it can terminate early when Tarrik contributes first. A future after-player-hit
+qualification must observe past an earlier companion hit.
+
+Structured player/companion receipt fields were added to the shared observer;
+it now supports a separate ordinary player aim target so the firearm need not kill
+the companion's intended target. Default probes retain the same target for both.
+The editor exited normally (PID 56216), observers retired and map hashes remained
+unchanged. This run supplies no fresh screenshot-based animation-quality verdict.
+
+Post-observation gate `Saved/Validation/20260920-201613-9ad58d32` passed build
+without SkipBuild, all 722 matching tests, coverage and native-source integrity.
+The three diagnostic scripts also passed syntax parsing. No gameplay assets changed.
