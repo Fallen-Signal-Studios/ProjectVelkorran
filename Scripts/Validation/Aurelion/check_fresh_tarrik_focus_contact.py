@@ -14,10 +14,22 @@ hashes={str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in maps}
 state=dict(phase='route',start=time.monotonic(),busy=False)
 report=dict(status='running',scope=globals().get('CONTACT_SCOPE',__doc__))
 with_player_hit=bool(globals().get('PLAYER_CONTRIBUTION_PROBE',False))
+capture_blood=bool(globals().get('BLOOD_VISUAL_PROBE',False))
 report['player_hit_probe']=with_player_hit
+
+def blood_receipt(result):
+    if result.applied_health_damage <= 0 or 'blood_capture' in report:return
+    target=result.target_actor
+    report['blood_capture']=dict(receipt=result.export_text(),target=target.get_path_name() if target else None,
+        requested_at=time.monotonic(),image=str(out/'native-companion-hit.png'),
+        qualification='requires visual review; screenshot request alone does not prove blood')
+    state['capture_task']=unreal.AutomationLibrary.take_high_res_screenshot(1800,1000,str(out/'native-companion-hit.png'))
+    write()
 def write(): (out/'fresh-tarrik-focus.json').write_text(json.dumps(report,indent=2))
 def finish(error=None):
     contact=sys.modules.get('observe_companion_after_player_shot')
+    if state.get('blood_delegate'):
+        state['blood_delegate'].remove_callable(blood_receipt);state['blood_delegate']=None
     if contact and contact._RUN and contact._RUN.handle is not None:contact._RUN.stop('Wrapper finished')
     chain=sys.modules.get('continue_aurelion_route_input')
     if chain and chain._RUN and not chain._RUN.done:chain.stop()
@@ -32,6 +44,12 @@ def tick(dt):
             if not level.is_in_play_in_editor() and time.monotonic()-state['at']>3:
                 unreal.unregister_slate_post_tick_callback(handle);unreal.SystemLibrary.quit_editor()
             return
+        if state['phase']=='blood_capture':
+            task=state.get('capture_task')
+            if task and not task.is_task_done() and time.monotonic()-state['capture_wait']<15:return
+            report['blood_capture_file_exists']=(out/'native-companion-hit.png').exists()
+            finish(None if report['blood_capture_file_exists'] else 'No native hit screenshot was captured')
+            return
         assert time.monotonic()-state['start']<1500,'Bounded route/contact deadline exceeded'
         chain=sys.modules.get('continue_aurelion_route_input')
         if state['phase']=='route':
@@ -41,6 +59,9 @@ def tick(dt):
             import observe_companion_after_player_shot as contact
             contact.start(out,passive=not with_player_hit)
             probe=contact._RUN
+            if capture_blood:
+                state['blood_delegate']=probe.companion.get_narrative_ability_system_component().on_damage_resolved_as_source
+                state['blood_delegate'].add_callable(blood_receipt)
             assert isinstance(probe.pawn,unreal.SovSeleneCharacter)
             assert 'Tarrik' in probe.companion.get_class().get_name()
             if with_player_hit:
@@ -68,6 +89,8 @@ def tick(dt):
         report['companion_damage_details']=contact._RUN.report.get('companion_damage_details',[])
         report['observer_errors']=contact._RUN.report['errors']
         assert not report['observer_errors'],report['observer_errors']
+        if capture_blood:
+            state.update(phase='blood_capture',capture_wait=time.monotonic());write();return
         if with_player_hit:
             player_hits=[r for r in report['player_damage_details'] if r['target']==report['player_target']
                          and r['health']+r['shield']>0 and r['target_alive'] and not r['fatal']]

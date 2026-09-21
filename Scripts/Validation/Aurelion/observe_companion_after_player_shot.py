@@ -128,6 +128,10 @@ class Observer:
                 if fire:
                     self.triggered = now
                     self.report['trigger_elapsed'] = now-self.started
+                    self.report['trigger_state'] = dict(ammo=self.weapon.get_ammo_in_clip(),
+                        aim_error_degrees=error, aim_point=self.player_target.get_actor_location().export_text(),
+                        control_rotation=self.pc.get_control_rotation().export_text(),
+                        player_tags=unreal.GameplayTagLibrary.get_owned_gameplay_tags(self.pawn).export_text())
                 self.input(look, fire, 1.)
             else:
                 self.input(fire=float(now-self.triggered < .05 and not self.report['player_damage']))
@@ -167,6 +171,8 @@ class Observer:
                     direct_target=controller.can_directly_target_threat(self.target) if controller else False,
                     candidates=[c.export_text() for c in self.companion.get_narrative_ability_system_component().get_bot_attack_candidates(self.target, unreal.GameplayTag())]))
             self.report['samples'].append(dict(elapsed=now-self.started,
+                player_weapon_ammo=self.weapon.get_ammo_in_clip() if self.weapon else None,
+                player_tags=unreal.GameplayTagLibrary.get_owned_gameplay_tags(self.pawn).export_text(),
                 game_seconds=unreal.GameplayStatics.get_time_seconds(self.world),
                 companion_tags=unreal.GameplayTagLibrary.get_owned_gameplay_tags(self.companion).export_text(),
                 target_tags=unreal.GameplayTagLibrary.get_owned_gameplay_tags(self.target).export_text()
