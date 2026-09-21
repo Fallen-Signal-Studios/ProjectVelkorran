@@ -340,3 +340,5 @@ Content/TwinBladesBundle/TwinBladesAndTwinSword/Map/Materials/Texture/T_Ground_O
 # Owned, unit-scale departure wall modules.
 !/Art/Source/Aurelion/Z12DepartureWalls/Aurelion-Departure-Coffers.blend
 !/Art/Source/Aurelion/Z12DepartureWalls/SM_Aurelion_KIT_Z12Coffer*.fbx
+!/Art/Source/Aurelion/Z12DepartureSeat/Aurelion-Departure-Seat.blend
+!/Art/Source/Aurelion/Z12DepartureSeat/SM_Aurelion_KIT_DepartureSeat.fbx

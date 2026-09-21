@@ -1,0 +1,52 @@
+[
+  {
+    "actor": "Aurelion_Radiance_DepartureWestSeat",
+    "actor_path": "/Game/Aurelion/Maps/L_Aurelion_M13.L_Aurelion_M13:PersistentLevel.StaticMeshActor_1069",
+    "component": "StaticMeshComponent0",
+    "mesh": "/Game/Aurelion/Environment/ValidatedMeshes/SM_AurelionRadianceBench.SM_AurelionRadianceBench",
+    "mesh_origin": "(X=0.017548,Y=1.861572,Z=51.196016)",
+    "mesh_extent": "(X=132.090668,Y=221.157074,Z=51.293585)",
+    "actor_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-1750.017548,Y=47098.138428,Z=0.097570),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+    "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+    "actor_collision": false,
+    "materials": [
+      "/Game/Aurelion/Environment/RadianceMaterials/M_Radiance_wall.M_Radiance_wall",
+      "/Game/Aurelion/Environment/RadianceMaterials/M_Radiance_dark_trim.M_Radiance_dark_trim",
+      "/Game/Aurelion/Environment/RadianceMaterials/M_Radiance_wall.M_Radiance_wall",
+      "/Game/Aurelion/Environment/RadianceMaterials/M_Radiance_dark_trim.M_Radiance_dark_trim",
+      "/Game/Aurelion/Environment/RadianceMaterials/M_Radiance_dark_trim.M_Radiance_dark_trim",
+      "/Game/Aurelion/Environment/RadianceMaterials/M_Radiance_gold.M_Radiance_gold"
+    ],
+    "instances": [
+      {
+        "index": null,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-1750.017548,Y=47098.138428,Z=0.097570),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))"
+      }
+    ]
+  },
+  {
+    "actor": "Aurelion_Radiance_DepartureEastSeat",
+    "actor_path": "/Game/Aurelion/Maps/L_Aurelion_M13.L_Aurelion_M13:PersistentLevel.StaticMeshActor_1078",
+    "component": "StaticMeshComponent0",
+    "mesh": "/Game/Aurelion/Environment/ValidatedMeshes/SM_AurelionRadianceBench.SM_AurelionRadianceBench",
+    "mesh_origin": "(X=0.017548,Y=1.861572,Z=51.196016)",
+    "mesh_extent": "(X=132.090668,Y=221.157074,Z=51.293585)",
+    "actor_transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=1749.982452,Y=47098.138428,Z=0.097570),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))",
+    "collision": "<CollisionEnabled.NO_COLLISION: 0>",
+    "actor_collision": false,
+    "materials": [
+      "/Game/Aurelion/Environment/RadianceMaterials/M_Radiance_wall.M_Radiance_wall",
+      "/Game/Aurelion/Environment/RadianceMaterials/M_Radiance_dark_trim.M_Radiance_dark_trim",
+      "/Game/Aurelion/Environment/RadianceMaterials/M_Radiance_wall.M_Radiance_wall",
+      "/Game/Aurelion/Environment/RadianceMaterials/M_Radiance_dark_trim.M_Radiance_dark_trim",
+      "/Game/Aurelion/Environment/RadianceMaterials/M_Radiance_dark_trim.M_Radiance_dark_trim",
+      "/Game/Aurelion/Environment/RadianceMaterials/M_Radiance_gold.M_Radiance_gold"
+    ],
+    "instances": [
+      {
+        "index": null,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=1749.982452,Y=47098.138428,Z=0.097570),Scale3D=(X=1.000000,Y=1.000000,Z=1.000000))"
+      }
+    ]
+  }
+]
