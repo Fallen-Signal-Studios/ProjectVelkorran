@@ -14,8 +14,9 @@ class ASovSequenceLifecycleTestActor : public ANarrativeLevelSequenceActor
 public:
 	ASovSequenceLifecycleTestActor(const FObjectInitializer& Initializer) : Super(Initializer) {}
 	UPROPERTY() TArray<TObjectPtr<UObject>> TestParticipants;
+	bool bUseNativeBindings = false;
 	virtual TArray<UObject*> GetBoundObjects() const override
-	{ TArray<UObject*> Result; for (UObject* Participant : TestParticipants) { Result.Add(Participant); } return Result; }
+	{ if (bUseNativeBindings) { return Super::GetBoundObjects(); } TArray<UObject*> Result; for (UObject* Participant : TestParticipants) { Result.Add(Participant); } return Result; }
 	void InitializeTestSequence(ULevelSequence* Sequence) { SetSequence(Sequence); InitializePlayer(); }
 };
 UCLASS()
@@ -38,6 +39,8 @@ public:
 	}
 	UFUNCTION() void AbortManaged() { if (Managed) { Managed->Abort(TEXT("Reentrant pause interruption")); } }
 	int32 FinishedCount = 0;
+	int32 StartedCount = 0;
+	UFUNCTION() void Started() { ++StartedCount; }
 	int32 InterruptedCount = 0;
 	int32 FailedCount = 0;
 	int32 BlendCount = 0;

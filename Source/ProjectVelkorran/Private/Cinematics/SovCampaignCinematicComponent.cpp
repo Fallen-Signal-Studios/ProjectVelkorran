@@ -668,7 +668,7 @@ void USovCampaignCinematicComponent::StartPreparedPlayback()
     Player->OnFinished.AddUniqueDynamic(this, &USovCampaignCinematicComponent::HandleFinished);
     Player->OnStop.AddUniqueDynamic(this, &USovCampaignCinematicComponent::HandleStopped);
     Actor->OnPlaybackFailed.AddUniqueDynamic(this, &USovCampaignCinematicComponent::HandleFailed);
-    Player->Play();
+    Actor->PlaySequence();
 }
 
 bool USovCampaignCinematicComponent::ValidateBindings() const
@@ -929,7 +929,11 @@ void USovCampaignCinematicComponent::Abort(const FString& Reason)
     if (bFinishing || ((Phase == ESovCinematicPhase::Idle || Phase == ESovCinematicPhase::Failed || Phase == ESovCinematicPhase::Completed)
         && !bOwnInput && !bOwnSequenceTag && PartitionLeases.IsEmpty())) { return; }
     TGuardValue<bool> Finishing(bFinishing, true);
-    if (auto* Actor = Cast<ANarrativeLevelSequenceActor>(GetOwner()); OwnsPlaybackGeneration() && ExpectedPlaybackGeneration != 0 && Actor && Actor->GetSequencePlayer()) { Actor->GetSequencePlayer()->Stop(); }
+    if (auto* Actor = Cast<ANarrativeLevelSequenceActor>(GetOwner()); OwnsPlaybackGeneration() && ExpectedPlaybackGeneration != 0 && Actor && Actor->GetSequencePlayer())
+    {
+        Actor->CancelPendingPlayback(ExpectedPlaybackGeneration);
+        Actor->GetSequencePlayer()->Stop();
+    }
     RestoreParticipants(); ReleaseOwnership(); ChangePhase(ESovCinematicPhase::Failed, Reason.IsEmpty() ? TEXT("Cinematic preflight failed.") : Reason);
 }
 

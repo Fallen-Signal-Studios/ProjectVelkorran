@@ -18,6 +18,8 @@ public:
 	virtual FGameplayTag GetProtagonistIdentityTag() const override;
 	virtual void PossessedBy(AController* NewController) override { APawn::PossessedBy(NewController); }
 	bool StageTestReadiness(ASovPlayerState* State, bool bVisualReady);
+	void SetCinematicVisualForTest(ANarrativeCharacterVisual* Visual) { CharVisual = Visual; }
+	void ApplyCinematicStartupEffectsForTest() { AddStartupEffects(); }
 	void SetTestVisualReady(bool bReady)
 	{
 		bVisualReadyForGameplay = bReady;

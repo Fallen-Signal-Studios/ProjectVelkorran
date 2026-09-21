@@ -202,6 +202,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Playback")
 	virtual void BlendOutAndStop();
 	uint64 GetPlaybackGeneration() const { return PlaybackGeneration; }
+	/** Cancel an unstarted request only while the caller still owns its generation. */
+	void CancelPendingPlayback(uint64 ExpectedGeneration);
+	/** Start when bound participants are ready, or queue the existing bounded readiness wait. */
+	UFUNCTION()
+	virtual void PlaySequence();
 	bool CanAcceptPlayback() const { return !bIsEndingPlay && !bEndingPlayback && !bChangingSequence; }
 	/** Emitted after an explicit blend has stopped playback and released only this sequence's ownership. */
 	UPROPERTY(BlueprintAssignable, Category="Playback") FOnMovieSceneSequencePlayerEvent OnBlendOutFinished;
@@ -248,8 +253,6 @@ protected:
 	UFUNCTION()
 	void OnStop();
 
-	UFUNCTION()
-	virtual void PlaySequence();
 private:
 	friend struct FNarrativeSequenceLifecycleTestAccess;
 	bool ParticipantsReady() const;

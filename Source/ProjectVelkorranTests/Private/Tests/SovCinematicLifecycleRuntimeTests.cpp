@@ -70,6 +70,8 @@ struct FSovCinematicSkipTestAccess
 };
 struct FSovCinematicTestAccess
 {
+    static void StartPrepared(USovCampaignCinematicComponent* C) { C->StartPreparedPlayback(); }
+    static bool HasReceipt(const USovCampaignCinematicComponent* C) { return C->bReceiptAvailable; }
     static bool ValidateParticipantState(USovCampaignCinematicComponent* C, FString& Error)
     { return C->ValidateParticipants(false, Error); }
 	static bool ResolveParticipantSnapshot(USovCampaignCinematicComponent* C, FString& Error) { return C->ResolveParticipants(Error); }
@@ -178,6 +180,26 @@ namespace
 		ASovHandoffRuntimeTestPawn* Pawn = nullptr;
 		UNarrativeAbilitySystemComponent* ASC = nullptr;
 		USovCampaignCinematicComponent* Component = nullptr;
+		ASovNPCVisualLifecycleTestVisual* PendingVisual = nullptr;
+		bool PreparePendingVisual()
+		{
+			if (!Component || !ASC || !static_cast<ANarrativeCharacter*>(Pawn)->GetCharacterDefinition()) { return false; }
+			// Keep gameplay readiness intact while the real appearance producer is pending,
+			// matching the observed Selene startup window. Do not override ParticipantsReady.
+			static_cast<ANarrativeCharacter*>(Pawn)->GetCharacterDefinition()->AbilityConfiguration = NewObject<UAbilityConfiguration>(Pawn);
+			Pawn->ApplyCinematicStartupEffectsForTest();
+			FActorSpawnParameters Params; Params.Owner = Pawn;
+			PendingVisual = Base.World->SpawnActor<ASovNPCVisualLifecycleTestVisual>(Params);
+			if (!PendingVisual) { return false; }
+			PendingVisual->SetCharacterForTest(Pawn); Pawn->SetCinematicVisualForTest(PendingVisual);
+			Base.Actor->bUseNativeBindings = true;
+			auto* Scene = Base.Sequence->GetMovieScene();
+			const FGuid Binding = Scene->AddPossessable(TEXT("Player"), ANarrativeCharacter::StaticClass());
+			Scene->TagBinding(TEXT("Player"), UE::MovieScene::FFixedObjectBindingID(Binding, MovieSceneSequenceID::Root));
+			Base.Actor->GetSequencePlayer()->OnPlay.AddDynamic(Base.Probe, &USovSequenceLifecycleProbe::Started);
+			FSovCinematicTestAccess::StageOwnedSession(Component, PC, Pawn, ASC);
+			return Pawn->IsCharacterReady() && Pawn->IsCharacterPendingLoad() && ASC->bStartupEffectsApplied;
+		}
 		FManagedSequenceWorld(bool bIncludeReplayBeat = false, bool bSharedObserverMission = false)
 		{
 			if (!Base.World || !Base.Actor) { return; }
@@ -1048,6 +1070,116 @@ bool FSovCinematicSkipRoutingTest::RunTest(const FString& Parameters)
 	TestNull(TEXT("A retired scene unpublishes itself"), F.PC->GetActiveCinematic());
 	TestFalse(TEXT("A retired scene cancels its hold"), FSovCinematicSkipTestAccess::HoldRunning(F.PC));
 	TestFalse(TEXT("Skip finds nothing once the scene is gone"), F.PC->RequestCinematicSkip(Error));
+	return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovManagedPendingVisualStartupTest,
+	"ProjectVelkorran.Campaign.Cinematic.ManagedWaitsForRealVisualProducer",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovManagedPendingVisualStartupTest::RunTest(const FString& Parameters)
+{
+	FManagedSequenceWorld F;
+	if (!TestTrue(TEXT("Gameplay-ready player with native pending appearance"), F.PreparePendingVisual())) { return false; }
+	FSovCinematicTestAccess::StartPrepared(F.Component);
+	TestEqual(TEXT("Preparation remains Loading"), F.Component->GetPhase(), ESovCinematicPhase::Loading);
+	TestTrue(TEXT("Native actor queues readiness"), FNarrativeSequenceLifecycleTestAccess::Pending(F.Base.Actor));
+	TestFalse(TEXT("Player has not started"), F.Base.Actor->GetSequencePlayer()->IsPlaying());
+	TestFalse(TEXT("Waiting cannot issue proof"), FSovCinematicTestAccess::HasReceipt(F.Component));
+	F.Base.Actor->Tick(.01f);
+	TestEqual(TEXT("No premature OnPlay"), F.Base.Probe->StartedCount, 0);
+	F.PendingVisual->CompleteMeshesForTest();
+	TestFalse(TEXT("Actual visual completion retires pending load"), F.Pawn->IsCharacterPendingLoad());
+	F.Base.Actor->Tick(.01f);
+	TestEqual(TEXT("Managed callback enters Playing"), F.Component->GetPhase(), ESovCinematicPhase::Playing);
+	TestTrue(TEXT("Real resolved binding retains controlled pawn"), F.Base.Actor->GetBoundObjects().Contains(F.Pawn));
+	F.Base.Actor->Tick(.01f);
+	TestEqual(TEXT("Ready transition starts exactly once"), F.Base.Probe->StartedCount, 1);
+	TestFalse(TEXT("Starting alone cannot issue proof"), FSovCinematicTestAccess::HasReceipt(F.Component));
+	F.Component->Abort(TEXT("Test teardown"));
+	TestFalse(TEXT("Teardown releases managed ownership"), FSovCinematicTestAccess::OwnsAnything(F.Component));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovManagedPendingCancellationTest,
+	"ProjectVelkorran.Campaign.Cinematic.ManagedPendingCancellationAndWatchdog",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovManagedPendingCancellationTest::RunTest(const FString& Parameters)
+{
+	for (int32 Mode = 0; Mode < 3; ++Mode)
+	{
+		FManagedSequenceWorld F;
+		if (!TestTrue(TEXT("Pending appearance prerequisites"), F.PreparePendingVisual())) { return false; }
+		F.Base.Actor->NarrativeSequenceParams.ParticipantReadyTimeoutSeconds = .1f;
+		FSovCinematicTestAccess::StartPrepared(F.Component);
+		TestTrue(TEXT("Real preparation queued playback"), FNarrativeSequenceLifecycleTestAccess::Pending(F.Base.Actor));
+		if (Mode == 0) { F.Component->Abort(TEXT("Player canceled during load")); }
+		else if (Mode == 1) { FSovCinematicTestAccess::ExpireLoading(F.Component); }
+		else { F.Base.Actor->Tick(.11f); }
+		TestEqual(TEXT("Cancellation or timeout is terminal"), F.Component->GetPhase(), ESovCinematicPhase::Failed);
+		TestFalse(TEXT("Terminal path cancels queued playback"), FNarrativeSequenceLifecycleTestAccess::Pending(F.Base.Actor));
+		TestFalse(TEXT("Terminal path releases leases and receipt"), FSovCinematicTestAccess::OwnsAnything(F.Component));
+		TestFalse(TEXT("Movement input released"), F.PC->IsMoveInputIgnored());
+		TestFalse(TEXT("Look input released"), F.PC->IsLookInputIgnored());
+		F.PendingVisual->CompleteMeshesForTest(); F.Base.Actor->Tick(.2f); F.Base.Actor->Tick(.2f);
+		TestFalse(TEXT("Late visual completion cannot start canceled scene"), F.Base.Actor->GetSequencePlayer()->IsPlaying());
+		TestEqual(TEXT("No late OnPlay"), F.Base.Probe->StartedCount, 0);
+		TestEqual(TEXT("Participant timeout emits exactly one failure"), F.Base.Probe->FailedCount, Mode == 2 ? 1 : 0);
+		TestFalse(TEXT("No completion receipt after cancellation"), FSovCinematicTestAccess::HasReceipt(F.Component));
+	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovPendingGenerationCancellationTest,
+	"ProjectVelkorran.Campaign.Cinematic.PendingCancellationPreservesReplacementGeneration",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovPendingGenerationCancellationTest::RunTest(const FString& Parameters)
+{
+	FManagedSequenceWorld F;
+	if (!TestTrue(TEXT("Pending appearance prerequisites"), F.PreparePendingVisual())) { return false; }
+	FSovCinematicTestAccess::StartPrepared(F.Component);
+	const uint64 OldGeneration = F.Base.Actor->GetPlaybackGeneration();
+	auto Settings = F.Base.Actor->NarrativeSequenceParams;
+	Settings.bAutoPlay = false;
+	F.Base.Actor->UpdateSequence(F.Base.Sequence, Settings);
+	F.Base.Actor->PlaySequence();
+	const uint64 NewGeneration = F.Base.Actor->GetPlaybackGeneration();
+	TestTrue(TEXT("Replacement reserves a newer generation"), NewGeneration > OldGeneration);
+	TestTrue(TEXT("Replacement waits for same pending visual"), FNarrativeSequenceLifecycleTestAccess::Pending(F.Base.Actor));
+	F.Base.Actor->CancelPendingPlayback(OldGeneration);
+	F.Component->Abort(TEXT("Old owner canceled"));
+	TestTrue(TEXT("Old owner cannot cancel replacement"), FNarrativeSequenceLifecycleTestAccess::Pending(F.Base.Actor));
+	F.PendingVisual->CompleteMeshesForTest(); F.Base.Actor->Tick(.01f);
+	TestTrue(TEXT("Replacement can still start"), F.Base.Actor->GetSequencePlayer()->IsPlaying());
+	TestEqual(TEXT("Replacement starts once"), F.Base.Probe->StartedCount, 1);
+	TestFalse(TEXT("Old component issues no receipt"), FSovCinematicTestAccess::HasReceipt(F.Component));
+	F.Base.Actor->GetSequencePlayer()->Stop();
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovReadyManagedStartupReentryTest,
+	"ProjectVelkorran.Campaign.Cinematic.ReadyManagedStartupAndReentrantAbort",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovReadyManagedStartupReentryTest::RunTest(const FString& Parameters)
+{
+	for (bool bAbortOnPlay : {false, true})
+	{
+		FManagedSequenceWorld F;
+		if (!TestTrue(TEXT("Appearance producer prerequisites"), F.PreparePendingVisual())) { return false; }
+		F.PendingVisual->CompleteMeshesForTest();
+		if (bAbortOnPlay)
+		{
+			F.Base.Probe->Managed = F.Component;
+			F.Base.Actor->GetSequencePlayer()->OnPlay.AddDynamic(F.Base.Probe, &USovSequenceLifecycleProbe::AbortManaged);
+		}
+		FSovCinematicTestAccess::StartPrepared(F.Component);
+		TestEqual(TEXT("Ready path starts once"), F.Base.Probe->StartedCount, 1);
+		TestEqual(TEXT("Reentrant abort is preserved by preparation"), F.Component->GetPhase(),
+			bAbortOnPlay ? ESovCinematicPhase::Failed : ESovCinematicPhase::Playing);
+		if (!bAbortOnPlay) { F.Component->Abort(TEXT("Test teardown")); }
+		F.Base.Actor->Tick(.2f);
+		TestFalse(TEXT("No orphan queued request"), FNarrativeSequenceLifecycleTestAccess::Pending(F.Base.Actor));
+		TestFalse(TEXT("No late playback after teardown"), F.Base.Actor->GetSequencePlayer()->IsPlaying());
+		TestFalse(TEXT("No leaked managed ownership"), FSovCinematicTestAccess::OwnsAnything(F.Component));
+	}
 	return true;
 }
 #endif

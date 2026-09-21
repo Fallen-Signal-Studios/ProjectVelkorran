@@ -519,6 +519,13 @@ void ANarrativeLevelSequenceActor::PlaySequence()
 	}
 }
 
+void ANarrativeLevelSequenceActor::CancelPendingPlayback(uint64 ExpectedGeneration)
+{
+	if (PlaybackGeneration != ExpectedGeneration) { return; }
+	bPendingPlayback = false;
+	PendingPlaybackSeconds = 0.f;
+}
+
 void ANarrativeLevelSequenceActor::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
