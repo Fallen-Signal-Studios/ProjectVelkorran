@@ -539,6 +539,11 @@ def _scene(ctx, row, cast, logical_positions, carrier):
         shots = grammar_propagation_shots(station)
         wide_position, wide_target, wide_focal = shots['wide']
         close_position, target, close_focal = shots['close']
+    if beat == 'FifthWitness':
+        from aurelion_camera_profiles import fifth_witness_shots
+        shots = fifth_witness_shots(station)
+        wide_position, wide_target, wide_focal = shots['wide']
+        close_position, target, close_focal = shots['close']
     if beat == 'MeetingAndCarrierRescue':
         hull, start, ending = carrier
         binding = _existing_binding(sequence, 'Carrier')

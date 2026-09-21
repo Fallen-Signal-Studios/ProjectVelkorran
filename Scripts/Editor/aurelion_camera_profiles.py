@@ -15,3 +15,11 @@ def grammar_propagation_shots(station):
     target=add((75.,90.,45.))
     return dict(wide=(add((850.,-100.,200.)),target,38.),
                 close=(add((650.,120.,110.)),target,50.))
+
+def fifth_witness_shots(station):
+    def add(offset): return tuple(a+b for a,b in zip(station,offset))
+    # Tarrik's mark is west/north of Selene, unlike the generic partner mark.
+    # Look across both marks from the east so the close cut retains the speaker.
+    target=add((-75.,90.,35.))
+    return dict(wide=(add((600.,-350.,180.)),target,26.),
+                close=(add((550.,260.,100.)),target,32.))
