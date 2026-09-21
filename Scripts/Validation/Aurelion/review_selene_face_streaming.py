@@ -30,6 +30,8 @@ def end(error=None):
         command(world,'ShowFlag.VisualizeBuffer '+str(state['original_buffer_flag']))
         command(world,'r.BufferVisualizationTarget '+state['original_buffer_target'])
     if world and 'original_sss' in state:command(world,'r.SSS.Scale '+str(state['original_sss']))
+    if state.get('fuzz') and unreal.SystemLibrary.is_valid(state['fuzz']):
+        state['fuzz'].set_visibility(state['fuzz_visible'])
     write();level.editor_request_end_play();state['phase']='stopping'
 def command(world,text): unreal.SystemLibrary.execute_console_command(world,text)
 def capture(world,name):
@@ -93,7 +95,28 @@ def tick(dt):
             camera.get_component_by_class(unreal.CameraComponent).set_field_of_view(30)
             unreal.GameplayStatics.get_player_controller(world,0).set_view_target_with_blend(camera,0)
             state.update(phase='before',at=now,selene=selene,face=face,camera=camera)
+            if globals().get('FACE_GROOM_ISOLATION',False):
+                report['grooms']=[]
+                fuzz=[]
+                for groom in visual.get_components_by_class(unreal.GroomComponent):
+                    asset=groom.get_editor_property('groom_asset')
+                    report['grooms'].append(dict(component=groom.get_path_name(),asset=asset.get_path_name() if asset else None,
+                        visible=groom.is_visible(),materials=[m.get_path_name() if m else None for m in groom.get_materials()]))
+                    if asset and 'Peachfuzz' in asset.get_name():fuzz.append(groom)
+                assert len(fuzz)==1,'Expected one actual peach-fuzz groom'
+                state.update(phase='groom_before',fuzz=fuzz[0],fuzz_visible=fuzz[0].is_visible())
             command(world,'r.VT.ListPhysicalPools');write();return
+        if state['phase']=='groom_before' and now-state['at']>15:
+            capture(world,'groom-original');state.update(phase='groom_hide',at=now);return
+        if state['phase']=='groom_hide' and now-state['at']>3:
+            state['fuzz'].set_visibility(False);state.update(phase='groom_hidden',at=now);return
+        if state['phase']=='groom_hidden' and now-state['at']>10:
+            capture(world,'groom-fuzz-hidden');state.update(phase='groom_restore',at=now);return
+        if state['phase']=='groom_restore' and now-state['at']>3:
+            state['fuzz'].set_visibility(state['fuzz_visible']);state.update(phase='groom_restored',at=now);return
+        if state['phase']=='groom_restored' and now-state['at']>10:
+            capture(world,'groom-fuzz-restored');state.update(phase='groom_finish',at=now);return
+        if state['phase']=='groom_finish' and now-state['at']>3:end();return
         if state['phase']=='before' and now-state['at']>15:
             capture(world,'before-flush');state.update(phase='flush',at=now);return
         if state['phase']=='flush' and now-state['at']>3 and (out/'before-flush.png').exists():
