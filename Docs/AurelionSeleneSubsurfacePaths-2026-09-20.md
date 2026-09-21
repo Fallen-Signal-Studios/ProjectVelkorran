@@ -47,3 +47,10 @@ Validation: full build and 722 matching automation tests passed without SkipBuil
 unchanged during the gate. Prior gate was `20260920-190144-49587240`.
 The new script also passed Python syntax parsing. These checks do not qualify the
 intermittent rendering defect as fixed.
+
+Follow-up: the [held gameplay-color probe](AurelionSeleneHeldColorProbe-2026-09-20.md)
+has now captured a black face in a live process and completed the rendering
+comparisons against that faulty state. BaseColor is black too; none of the four
+SSS/MegaLights/profile-cache/checkerboard overrides corrected it. That evidence
+supersedes the need to keep collecting healthy-launch comparisons. The material
+color inputs and virtual-texture sampling remain the next unresolved investigation.
