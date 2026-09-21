@@ -1,0 +1,48 @@
+{
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_DepartureLoungePaving",
+      "triangles": 61112,
+      "nominal_dimensions_m": [
+        42.0,
+        24.0,
+        0.04623990133404732
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_Basalt",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_IvoryStone"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None: original native floor and dock collision retained",
+      "surface_top_metres": 0.0,
+      "position_precision": 10,
+      "preserve_fallback_geometry": true,
+      "group": "Lounge"
+    },
+    {
+      "asset": "SM_Aurelion_KIT_DepartureDockPaving",
+      "triangles": 27648,
+      "nominal_dimensions_m": [
+        28.0,
+        18.0,
+        0.04623990133404732
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_Basalt",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_IvoryStone"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None: original native floor and dock collision retained",
+      "surface_top_metres": 0.0,
+      "position_precision": 10,
+      "preserve_fallback_geometry": true,
+      "group": "Dock"
+    }
+  ]
+}

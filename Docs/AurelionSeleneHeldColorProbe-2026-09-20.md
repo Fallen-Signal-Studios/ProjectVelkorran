@@ -117,3 +117,10 @@ The completed material-probe changes passed the full build and 726-test gate
 `20260920-234211-dbea61d3`, including report coverage and source integrity. Later
 `DepartureSeatLive-20260920-233909-bee76ae5` passed the same earned-position check
 and showed normal skin; it does not erase the earlier transient movement sample.
+
+A later CP9 load, `DeparturePavingLive-20260921-000718-92eefc29`, failed at the
+same position check with Selene 30.209 cm toward Tarrik from her saved X position
+and zero sampled velocity, at game time 2.844 seconds. A fresh unchanged attempt
+passed and showed normal skin. See `AurelionM13DeparturePaving-2026-09-21.md`.
+The next companion investigation should observe the load-to-settle interval
+and its movement ownership without loosening the existing position test.

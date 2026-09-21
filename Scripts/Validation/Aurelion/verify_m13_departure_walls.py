@@ -66,7 +66,7 @@ def tick(dt):
             cleanup();original_finish();unreal.unregister_slate_post_tick_callback(handle);return
         name,position,yaw=views[state['index']]
         state['camera'].set_actor_location(unreal.Vector(*position),False,False)
-        state['camera'].set_actor_rotation(unreal.Rotator(yaw=yaw),False)
+        state['camera'].set_actor_rotation(unreal.Rotator(yaw=yaw,pitch=globals().get('DEPARTURE_VIEW_PITCHES',{}).get(name,0)),False)
         state['pc'].set_view_target_with_blend(state['camera'],0);state.update(at=now,shot=None)
     except Exception:cleanup();original_finish(traceback.format_exc());unreal.unregister_slate_post_tick_callback(handle)
 handle=unreal.register_slate_post_tick_callback(tick)
