@@ -15,7 +15,7 @@ assert not level.is_in_play_in_editor() and not unreal.EditorLoadingAndSavingUti
 assert unreal.SovGameUserSettings.get_game_user_settings().complete_accessibility_setup()
 maps=[root/'Content/Aurelion/Maps'/name for name in ('L_Aurelion_M12.umap','L_Aurelion_M13.umap')]
 hashes={str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in maps}
-report=dict(status='running',scope=__doc__,banks=[],callbacks=[],frames=[])
+report=dict(status='running',scope=globals().get('FACE_REVIEW_SCOPE',__doc__),banks=[],callbacks=[],frames=[])
 state=dict(phase='bootstrap',started=time.monotonic(),busy=False)
 
 def write(): (out/'face-streaming.json').write_text(json.dumps(report,indent=2))
@@ -54,6 +54,8 @@ def tick(dt):
         assert now-state['started']<300,'Portrait review exceeded its bounded deadline'
         world=unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_game_world()
         if not world:return
+        if state['phase']=='external_review':
+            globals()['FACE_REVIEW_HOOK'](world,state,report,capture,end);return
         if state['phase']=='bootstrap':
             pawn=unreal.GameplayStatics.get_player_pawn(world,0)
             if not isinstance(pawn,unreal.SovPlayerCharacterBase) or not pawn.is_character_ready():return
@@ -93,7 +95,9 @@ def tick(dt):
             camera.set_actor_location(position,False,False)
             camera.set_actor_rotation(unreal.MathLibrary.find_look_at_rotation(position,target),False)
             camera.get_component_by_class(unreal.CameraComponent).set_field_of_view(30)
-            unreal.GameplayStatics.get_player_controller(world,0).set_view_target_with_blend(camera,0)
+            pc=unreal.GameplayStatics.get_player_controller(world,0)
+            state['original_view_target']=pc.get_view_target()
+            pc.set_view_target_with_blend(camera,0)
             state.update(phase='before',at=now,selene=selene,face=face,camera=camera)
             if globals().get('FACE_GROOM_ISOLATION',False):
                 report['grooms']=[]
@@ -105,7 +109,9 @@ def tick(dt):
                     if asset and 'Peachfuzz' in asset.get_name():fuzz.append(groom)
                 assert len(fuzz)==1,'Expected one actual peach-fuzz groom'
                 state.update(phase='groom_before',fuzz=fuzz[0],fuzz_visible=fuzz[0].is_visible())
-            command(world,'r.VT.ListPhysicalPools');write();return
+            if globals().get('FACE_REVIEW_HOOK'):state['phase']='external_review'
+            else:command(world,'r.VT.ListPhysicalPools')
+            write();return
         if state['phase']=='groom_before' and now-state['at']>15:
             capture(world,'groom-original');state.update(phase='groom_hide',at=now);return
         if state['phase']=='groom_hide' and now-state['at']>3:
