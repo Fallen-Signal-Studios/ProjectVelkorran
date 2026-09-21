@@ -1,4 +1,4 @@
-"""Two public CP9 loads against the latest earned unpaced route, with HUD readback.
+"""Public CP9 loads against the latest earned unpaced route, with HUD readback.
 
 No manufactured progress, character transforms, inventory edits or asset saves.
 The first load compares against earned route evidence; the second additionally
@@ -10,6 +10,7 @@ from types import SimpleNamespace
 import unreal
 
 root=Path(unreal.Paths.project_dir());out=Path(os.environ['SOV_AURELION_RUN_DIRECTORY'])
+load_count=int(globals().get('M13_RELOAD_COUNT',2));assert load_count in (1,2)
 sys.path.insert(0,str(root/'Scripts/Validation/Aurelion'))
 import probe_m13_native_checkpoint_reload as check
 source=root/'Saved/Validation/Aurelion/CinematicStartupUnpaced-20260920-213727-1184bfea'
@@ -24,7 +25,7 @@ assert not level.is_in_play_in_editor() and not unreal.EditorLoadingAndSavingUti
 assert unreal.SovGameUserSettings.get_game_user_settings().complete_accessibility_setup()
 maps=[root/'Content/Aurelion/Maps'/n for n in ('L_Aurelion_M12.umap','L_Aurelion_M13.umap')]
 hashes={str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in maps}
-report=dict(status='running',scope=__doc__,source=str(source_file),source_sha256=hashlib.sha256(raw).hexdigest(),banks=[],callbacks=[],loads=[],checkpoint_refreshes=[])
+report=dict(status='running',scope=__doc__,requested_load_count=load_count,source=str(source_file),source_sha256=hashlib.sha256(raw).hexdigest(),banks=[],callbacks=[],loads=[],checkpoint_refreshes=[])
 state=dict(phase='bootstrap',start=time.monotonic(),busy=False,index=0)
 
 def write(): (out/'earned-m13-reload.json').write_text(json.dumps(report,indent=2))
@@ -135,7 +136,7 @@ def tick(dt):
             state['shot']=now;write();return
         if now-state['shot']<2:return
         assert (out/('reload-'+str(state['index'])+'.png')).exists()
-        if state['index']==1:finish();return
+        if state['index']+1==load_count:finish();return
         state.update(index=1,phase='request',shot=None)
     except Exception:finish(traceback.format_exc())
     finally:state['busy']=False
