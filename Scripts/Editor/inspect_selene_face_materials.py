@@ -25,4 +25,15 @@ for path in paths:
         for prop in ('scalar_parameter_values','vector_parameter_values','texture_parameter_values'):
             row[prop]=[v.export_text() for v in material.get_editor_property(prop)]
     rows.append(row)
-(out/'selene-face-materials.json').write_text(json.dumps(dict(read_only=True,materials=rows),indent=2))
+textures=[]
+for name in ('T_Head_BC_VT','T_Head_SRMF_VT','T_Head_N_VT','T_Head_Scatter_VT'):
+    texture=unreal.load_asset('/Game/MetaHumans/MHC_Selene/Face/Baked/'+name)
+    row=dict(path=texture.get_path_name(),properties={})
+    for prop in ('srgb','virtual_texture_streaming','compression_settings','filter','lod_group','never_stream'):
+        row['properties'][prop]=str(texture.get_editor_property(prop))
+    if name=='T_Head_BC_VT':
+        task=unreal.AssetExportTask();task.object=texture;task.filename=str(out/(name+'.tga'))
+        task.automated=True;task.prompt=False
+        row['source_exported']=unreal.Exporter.run_asset_export_task(task)
+    textures.append(row)
+(out/'selene-face-materials.json').write_text(json.dumps(dict(read_only=True,materials=rows,textures=textures),indent=2))

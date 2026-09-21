@@ -99,6 +99,7 @@ def capture(world,driver):
     row=dict(file=name,phase=key,world=world.get_path_name(),viewport=[pixels.x,pixels.y],
         pawn=pawn.get_path_name() if pawn else None,position=pawn.get_actor_location().export_text() if pawn else None)
     row['protagonist_animation']=[]
+    row['face_materials']=[]
     for actor in unreal.GameplayStatics.get_all_actors_of_class(world,unreal.NarrativeCharacter):
         if not isinstance(actor,(unreal.SovPlayerCharacterBase,unreal.SovProtagonistCompanionCharacter)):continue
         mesh=actor.get_editor_property('mesh')
@@ -107,6 +108,21 @@ def capture(world,driver):
             velocity=actor.get_velocity().export_text(),
             animation_mode=str(mesh.get_animation_mode()) if mesh else None,
             instance=instance.get_class().get_name() if instance else None))
+        visual=actor.get_character_visual()
+        if visual:
+            for part in visual.get_components_by_class(unreal.SkeletalMeshComponent):
+                asset=part.get_editor_property('skeletal_mesh_asset')
+                if not asset or 'FaceMesh' not in asset.get_name():continue
+                materials=[]
+                for index in range(part.get_num_materials()):
+                    material=part.get_material(index)
+                    values={}
+                    if isinstance(material,unreal.MaterialInstance):
+                        for prop in ('scalar_parameter_values','vector_parameter_values','texture_parameter_values'):
+                            values[prop]=[v.export_text() for v in material.get_editor_property(prop)]
+                        values['parent']=str(material.get_editor_property('parent'))
+                    materials.append(dict(slot=index,material=material.get_path_name() if material else None,values=values))
+                row['face_materials'].append(dict(actor=actor.get_path_name(),mesh=asset.get_path_name(),materials=materials))
     report['captures'].append(row);state['captured'].add(shot_key)
     unreal.SystemLibrary.execute_console_command(world,'Shot showui -nosuffix filename='+str(out/name))
     write()
