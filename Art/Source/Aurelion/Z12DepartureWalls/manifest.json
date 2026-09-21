@@ -1,0 +1,64 @@
+{
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z12CofferSouth",
+      "triangles": 9056,
+      "nominal_dimensions_m": [
+        4.489999771118164,
+        0.24899998307228088,
+        2.990000009536743
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_ChannelShadow"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None: departure art only; native room collision retained",
+      "position_precision": 10,
+      "preserve_fallback_geometry": true,
+      "wall_group": "South"
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z12CofferNorth",
+      "triangles": 9056,
+      "nominal_dimensions_m": [
+        4.190000057220459,
+        0.24899998307228088,
+        2.9900002479553223
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_ChannelShadow"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None: departure art only; native room collision retained",
+      "position_precision": 10,
+      "preserve_fallback_geometry": true,
+      "wall_group": "North"
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z12CofferSide",
+      "triangles": 9056,
+      "nominal_dimensions_m": [
+        3.990000009536743,
+        0.24899998307228088,
+        2.990000009536743
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_ChannelShadow"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None: departure art only; native room collision retained",
+      "position_precision": 10,
+      "preserve_fallback_geometry": true,
+      "wall_group": "Side"
+    }
+  ]
+}
