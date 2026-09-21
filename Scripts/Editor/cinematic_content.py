@@ -511,6 +511,11 @@ def _scene(ctx, row, cast, logical_positions, carrier):
     close_position = _add(station, (-340., -330., 145.))
     wide_target, wide_focal = target, 26.
     close_focal = 32.
+    if beat == 'SurvivorsClearAndQuarantine':
+        from aurelion_camera_profiles import quarantine_shots
+        shots = quarantine_shots(station)
+        wide_position, wide_target, wide_focal = shots['wide']
+        close_position, target, close_focal = shots['close']
     if beat == 'GrammarPropagation':
         from aurelion_camera_profiles import grammar_propagation_shots
         shots = grammar_propagation_shots(station)

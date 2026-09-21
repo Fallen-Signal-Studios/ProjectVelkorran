@@ -1,5 +1,13 @@
 """Reviewed scene-specific camera positions, relative to the unchanged Hero mark."""
 
+def quarantine_shots(station):
+    def add(offset): return tuple(a+b for a,b in zip(station,offset))
+    # Stay inside the ramp and north of the quarantine gates. Side shots from
+    # outside the narrow walkway look through its architecture.
+    target=add((75.,0.,35.))
+    return dict(wide=(add((0.,520.,180.)),target,26.),
+                close=(add((-150.,350.,100.)),target,32.))
+
 def grammar_propagation_shots(station):
     def add(offset): return tuple(a+b for a,b in zip(station,offset))
     # Both cameras stay east of the cylindrical terminal. The old southwest

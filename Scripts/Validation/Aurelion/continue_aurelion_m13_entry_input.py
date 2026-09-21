@@ -96,6 +96,7 @@ class Run(rescue.Run):
         self.save_delegate = self.save_callback = self.load_delegate = self.load_callback = None
         self.gates = {}; self.protected = {}; self.travel_armed = False
         self.travel_departed = False; self.destination_stable_at = None
+        self.restored_victory = None
         self.report.update(scope='Earned E4B victory through two full M12 scenes, physical CP6 and durable ordinary M13 travel only',
             pending=['M13 ContraryPosition and all subsequent M13 gameplay',
                      'Explicit reload/retry, physical keyboard input and rendered presentation review',
@@ -162,10 +163,22 @@ class Run(rescue.Run):
 
     def initialize(self,world,pc,pawn,state,events):
         assert [e['beat'] for e in events]==INITIAL and len(INITIAL)==20
-        previous = phase_b._RUN
-        assert previous and previous.done and previous.report['status']=='passed', 'Requires actual successful E4B observer, not a fresh map'
-        earned = previous.report['native_victory']
-        assert earned['journal']==events and earned['player']==_path(pawn)
+        if self.restored_victory is None:
+            previous = phase_b._RUN
+            assert previous and previous.done and previous.report['status']=='passed', 'Requires actual successful E4B observer, not a fresh map'
+            earned = previous.report['native_victory']
+            assert earned['player']==_path(pawn)
+        else:
+            restored = self.restored_victory
+            assert restored['load_result']==str(unreal.SovSaveResult.SUCCESS)
+            assert restored['boundary']==phase_b.ENCOUNTER and restored['boundary_kind']==str(unreal.SovSaveBoundary.ARENA_EXIT)
+            assert restored['mission']==MISSION and restored['map']=='/Game/Aurelion/Maps/L_Aurelion_M12'
+            assert restored['source_report']['status']=='passed' and restored['source_report']['assets_unchanged']
+            earned = restored['source_report']['native_victory']
+            assert all(not r['alive'] if r['required'] else r['alive'] for r in earned['roster'])
+            self.report['restored_victory_admission'] = {k:v for k,v in restored.items() if k!='source_report'}
+            self.report['scope'] = 'Public reload of earned E4B ArenaExit, then ordinary inputs through M12 aftermath and M13 travel'
+        assert earned['journal']==events
         assert isinstance(pawn,unreal.SovTarrikCharacter) and pawn.is_character_ready() and rescue.alive(pawn)
         assert pc.get_campaign_transition_state()==unreal.SovCampaignTransitionState.IDLE
         self.world,self.initial_controller,self.initial_pawn = world,pc,_path(pawn)
@@ -176,7 +189,9 @@ class Run(rescue.Run):
         assert not settings.tap_interactions and abs(settings.interaction_hold_scale-1.)<.001
         self.initial_events = events
         self.companion = self.companion_for(world,pc,pawn)
-        assert self.companion and _path(self.companion)==earned['companion']
+        assert self.companion
+        if self.restored_victory is None:
+            assert _path(self.companion)==earned['companion']
         self.initial_companion_path = _path(self.companion)
         self.director = self.unique(unreal.SovAurelionThermalPhaseDirector,'encounter_id',phase_b.ENCOUNTER)
         assert self.director.get_encounter_state()==unreal.SovEncounterState.SUCCEEDED and self.director.has_confirmed_victory()
@@ -463,7 +478,7 @@ class Run(rescue.Run):
             self.finish(False,self.report['error'])
 
 
-def start(output_directory=None):
+def start(output_directory=None,restored_victory=None):
     global _RUN
     assert _RUN is None or _RUN.done
     for name,module in list(sys.modules.items()):
@@ -472,7 +487,7 @@ def start(output_directory=None):
             assert run is None or not hasattr(run,'inject') or run.done, 'Stop the earlier input owner first: '+name
     output=Path(output_directory or os.environ['SOV_AURELION_RUN_DIRECTORY'])
     assert not (output/'m13-entry-input-continuation.json').exists(), 'Use a fresh evidence directory'
-    _RUN=Run(output);_RUN.write()
+    _RUN=Run(output);_RUN.restored_victory=restored_victory;_RUN.write()
     _RUN.handle=unreal.register_slate_post_tick_callback(_RUN.tick)
     return _RUN
 
