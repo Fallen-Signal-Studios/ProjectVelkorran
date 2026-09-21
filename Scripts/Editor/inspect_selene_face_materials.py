@@ -24,10 +24,19 @@ for path in paths:
         row['parent']=str(material.get_editor_property('parent'))
         for prop in ('scalar_parameter_values','vector_parameter_values','texture_parameter_values'):
             row[prop]=[v.export_text() for v in material.get_editor_property(prop)]
+        row['resolved_parameters']={}
+        for kind in ('scalar','vector','texture','static_switch'):
+            names=getattr(library,'get_'+kind+'_parameter_names')(material)
+            getter=getattr(library,'get_material_instance_'+kind+'_parameter_value')
+            row['resolved_parameters'][kind]={str(name):str(getter(material,name)) for name in names}
+        task=unreal.AssetExportTask();task.object=material;task.filename=str(out/(material.get_name()+'.copy'))
+        task.automated=True;task.prompt=False
+        row['instance_exported']=unreal.Exporter.run_asset_export_task(task)
     rows.append(row)
 textures=[]
 for name in ('T_Head_BC_VT','T_Head_SRMF_VT','T_Head_N_VT','T_Head_Scatter_VT'):
     texture=unreal.load_asset('/Game/MetaHumans/MHC_Selene/Face/Baked/'+name)
+    assert texture,'Missing baked face texture: '+name
     row=dict(path=texture.get_path_name(),properties={})
     for prop in ('srgb','virtual_texture_streaming','compression_settings','filter','lod_group','never_stream'):
         row['properties'][prop]=str(texture.get_editor_property(prop))
