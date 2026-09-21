@@ -27,6 +27,11 @@ are unobstructed and subtitles are readable. The two captures precede the close
 cut; rendered close-shot acceptance remains pending. Lighting, speaker coverage,
 character blocking and animation still need a broader cinematic polish pass.
 
+Follow-up `M13SynchronousFailure-20260920-170423-73f1a1bc/route-02.png` captures
+the close shot during Tarrik's line. Both protagonists are unobstructed, the subtitle
+is readable, and the protected map remained unchanged. This closes the previously
+pending rendered close-shot check, not the broader performance/lighting review.
+
 ## M13 failure retained
 
 `RestoredM13RouteChecked-20260920-164510-176b8ccf` passed M12 aftermath/travel and
@@ -49,6 +54,16 @@ transient required-character bindings at failure; it does not identify the offen
 participant. The sequence failure can occur between polling frames. Further diagnosis
 should observe the synchronous failure boundary rather than treating these incomplete
 samples as proof of a missing character.
+
+The synchronous-observer run `M13SynchronousFailure-20260920-170423-73f1a1bc`
+completed M13 in 284.015 seconds with all thirteen receipts, both handoffs, the
+paired lift, and CP7/8/9; its integrity check passed. No gameplay repair preceded
+that run. Selene's scene bound the real living, non-pending, configured player.
+The added failure callback was never invoked. Therefore the startup defect is
+intermittent, not fixed or explained by this pass. Both earlier failures remain
+valid evidence, and cold/warm loading and timing remain possible factors rather
+than proven causes. Native readiness flags are not reflected to Python; subsequent
+reports explicitly distinguish those unavailable checks from a missing ASC.
 
 `RestoredM13Route-20260920-164307-bcab30c8` stopped on an unavailable Python
 controller accessor; it is neither gameplay failure evidence nor an acceptance pass.

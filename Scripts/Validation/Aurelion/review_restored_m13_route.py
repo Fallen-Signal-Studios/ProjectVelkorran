@@ -29,10 +29,20 @@ state=dict(phase='bootstrap',start=time.monotonic(),busy=False,captured=set(),ca
 
 def write(): (out/'restored-m13-route.json').write_text(json.dumps(report,indent=2))
 
-def inspect_participants(driver):
+def inspect_participants(driver,force=False):
     if getattr(driver,'scene_beat',None)!='SeleneIndependentAssent' or not driver.scene:return
+    if not state.get('failure_delegate'):
+        def playback_failed():
+            try:
+                inspect_participants(driver,True)
+                write()
+            except Exception:
+                report['failure_observer_error']=traceback.format_exc();write()
+        state['failure_callback']=playback_failed
+        state['failure_delegate']=driver.scene.on_playback_failed
+        state['failure_delegate'].add_callable(playback_failed)
     now=time.monotonic()
-    if now-state.get('last_participant_sample',0)<.1:return
+    if not force and now-state.get('last_participant_sample',0)<.1:return
     state['last_participant_sample']=now
     def read(obj,prop):
         try:
@@ -43,15 +53,17 @@ def inspect_participants(driver):
     for obj in driver.scene.get_bound_objects():
         row=dict(path=obj.get_path_name(),class_name=obj.get_class().get_name())
         if isinstance(obj,unreal.NarrativeCharacter):
-            asc=obj.get_component_by_class(unreal.NarrativeAbilitySystemComponent)
             visual=obj.get_character_visual()
+            definition=obj.get_character_definition()
             row.update(alive=obj.is_alive(),pending=obj.is_character_pending_load(),
+                definition=definition.get_path_name() if definition else None,
+                configuration=read(definition,'ability_configuration') if definition else None,
                 tags=unreal.GameplayTagLibrary.get_owned_gameplay_tags(obj).export_text(),
-                startup_effects=read(asc,'startup_effects_applied') if asc else None,
+                player_ready=obj.is_character_ready() if isinstance(obj,unreal.SovPlayerCharacterBase) else None,
                 visual=visual.get_path_name() if visual else None,
-                appearance_loaded=read(visual,'base_appearance_loaded') if visual else None)
+                native_unexposed_checks=['ASC startup effects applied','ASC avatar identity','base appearance loaded'])
         rows.append(row)
-    report['participant_observations'].append(dict(elapsed=now-state['start'],phase=str(driver.scene_component.get_phase()),
+    report['participant_observations'].append(dict(elapsed=now-state['start'],synchronous_failure=force,phase=str(driver.scene_component.get_phase()),
         bound=rows,settings=driver.scene.narrative_sequence_params.export_text()))
 
 def loaded(result,header,message):
@@ -64,6 +76,8 @@ def finish(error=None):
     report.update(status='failed' if error else 'passed_requires_visual_review',error=error)
     if state.get('delegate'):
         state['delegate'].remove_callable(loaded);state['delegate']=None
+    if state.get('failure_delegate'):
+        state['failure_delegate'].remove_callable(state['failure_callback']);state['failure_delegate']=None
     driver=state.get('driver')
     if driver and not driver.done:
         driver.finish(False,'Review stopped; inputs released without state repair')
@@ -76,7 +90,7 @@ def capture(world,driver):
     if driver.phase not in ('wait_scene','wait_cp6','wait_evacuation_gate','wait_departure_checkpoint'):
         return
     elapsed=time.monotonic()-state['capture_at']
-    shot_key=key+('late' if elapsed>=9 else 'early',)
+    shot_key=key+(int(elapsed//7),)
     if shot_key in state['captured'] or elapsed<2:return
     name='route-'+str(len(report['captures'])).zfill(2)+'.png'
     pc=unreal.GameplayStatics.get_player_controller(world,0)
@@ -84,6 +98,15 @@ def capture(world,driver):
     pixels=unreal.WidgetLayoutLibrary.get_viewport_size(world)
     row=dict(file=name,phase=key,world=world.get_path_name(),viewport=[pixels.x,pixels.y],
         pawn=pawn.get_path_name() if pawn else None,position=pawn.get_actor_location().export_text() if pawn else None)
+    row['protagonist_animation']=[]
+    for actor in unreal.GameplayStatics.get_all_actors_of_class(world,unreal.NarrativeCharacter):
+        if not isinstance(actor,(unreal.SovPlayerCharacterBase,unreal.SovProtagonistCompanionCharacter)):continue
+        mesh=actor.get_editor_property('mesh')
+        instance=mesh.get_anim_instance() if mesh else None
+        row['protagonist_animation'].append(dict(actor=actor.get_path_name(),
+            velocity=actor.get_velocity().export_text(),
+            animation_mode=str(mesh.get_animation_mode()) if mesh else None,
+            instance=instance.get_class().get_name() if instance else None))
     report['captures'].append(row);state['captured'].add(shot_key)
     unreal.SystemLibrary.execute_console_command(world,'Shot showui -nosuffix filename='+str(out/name))
     write()

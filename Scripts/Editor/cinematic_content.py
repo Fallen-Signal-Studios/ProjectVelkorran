@@ -208,6 +208,23 @@ def _character_binding(sequence, tag):
     return binding
 
 
+def _stationary_partner_performance(binding, beat, frames):
+    # These three conversations keep Tarrik at a fixed mark. Give Sequencer
+    # an actual breathing idle instead of sampling the companion's follow gait.
+    if beat not in ('MeridianContainment', 'FifthWitness', 'GrammarPropagation'):
+        return
+    animation = unreal.load_asset('/NarrativePro/Pro/Core/Character/Biped/Animation/Sequences/GASP/M_Neutral_Stand_Idle_Loop')
+    assert isinstance(animation, unreal.AnimSequence)
+    assert animation.get_editor_property('additive_anim_type') == unreal.AdditiveAnimationType.AAT_NONE
+    section = binding.add_track(unreal.MovieSceneSkeletalAnimationTrack).add_section()
+    section.set_range(0, frames)
+    section.set_completion_mode(unreal.MovieSceneCompletionMode.RESTORE_STATE)
+    params = section.get_editor_property('params')
+    params.set_editor_property('animation', animation)
+    params.set_editor_property('force_custom_mode', True)
+    section.set_editor_property('params', params)
+
+
 def _camera(ctx, sequence, name, frames, position, target, focal=28., drift=(30., 0., 0.)):
     binding = _existing_binding(sequence, name)
     if binding is not None:
@@ -467,6 +484,7 @@ def _scene(ctx, row, cast, logical_positions, carrier):
         participants.append(_participant('Partner', actor_tag, exit_at=partner_exit))
         binding = _character_binding(sequence, 'Partner')
         _transform_track(binding, frames, partner_start, partner_exit, _rotation(-90.), _rotation(-90.))
+        _stationary_partner_performance(binding, beat, frames)
     for identity in EXTRA_CAST.get(beat, []):
         start = logical_positions[identity]
         ending = start
