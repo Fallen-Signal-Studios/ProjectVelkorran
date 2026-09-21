@@ -85,3 +85,35 @@ Validation: full build without SkipBuild, all 726 matching tests, report coverag
 and source integrity passed in `Saved/Validation/20260920-230607-4f9b6952`.
 The preceding full baseline was `20260920-221732-79c3404f`. Automation passing
 does not override the observed black-face failure.
+
+## Reversible material comparisons
+
+`probe_selene_material_binding.py` opts into temporary face-slot comparisons:
+VT cache flush, original-material rebind, a dynamic instance without overrides,
+and the existing simple `M_SeleneFace` texture sampler. Original assignments are
+retained and restored on stop, error or checkpoint travel. The normal portrait
+probe does not enable these commands. No material asset is saved by the probe.
+
+`SeleneMaterialBinding-20260920-231337-896cd4f2` showed healthy skin initially,
+after VT flush and after a public reload. It eventually reached its operator
+command timeout. Its healthy flush does not qualify a faulty-state repair.
+
+`SeleneSamplerBinding-20260920-232341-b033a082` verified all five portraits:
+healthy baseline, simple sampler, restored original, dynamic instance, original
+rebind. The simple sampler displays the expected tan texture with different
+surface shading; the original, restored and dynamic frames display normal skin.
+The run exited zero on operator stop, reported no error and verified original
+material assignments restored. This qualifies the diagnostic operations and
+cleanup, not a production fix or a faulty-state comparison.
+
+`SeleneBindingRepeat-20260920-232840-18d6e6b5` failed before any portrait at the
+existing earned-position check. Selene was at X=1341.599 instead of 1350 cm and
+moving at -148.932 cm/s on X; Tarrik remained at the expected exit. The check
+was not weakened. This separate transient movement sample needs follow-up;
+it is neither a skin reproduction nor proof that the final settled position
+is wrong. The earlier black-face evidence remains unresolved.
+
+The completed material-probe changes passed the full build and 726-test gate
+`20260920-234211-dbea61d3`, including report coverage and source integrity. Later
+`DepartureSeatLive-20260920-233909-bee76ae5` passed the same earned-position check
+and showed normal skin; it does not erase the earlier transient movement sample.

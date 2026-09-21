@@ -1,7 +1,9 @@
 """Hold an earned CP9 portrait for operator-selected same-process color isolation.
 
 Commands in this run's color-command.json: reload, isolate, ui, scene and stop.
-No character, material or saved-map edits. Render overrides are always restored.
+The opt-in material probe also supports flush, rebind, dynamic, simple, restore, close and wide.
+No gameplay-state or saved-asset edits. Transient material assignments and render
+overrides are restored before cleanup or travel.
 """
 import json,runpy,time,traceback
 from pathlib import Path
@@ -13,6 +15,7 @@ scope=scope['tick'].__globals__;original_finish=scope['finish']
 out=scope['out'];report=dict(status='loading',scope=__doc__,portraits=[],isolations=[])
 state=dict(phase='initial',index=0,start=time.monotonic())
 fixed_camera=globals().get('M13_COLOR_FIXED_CAMERA')
+material_probe=bool(globals().get('M13_COLOR_MATERIAL_PROBE',False))
 steps=(('BaseColor',{'ShowFlag.VisualizeBuffer':1,'r.BufferVisualizationTarget':'BaseColor'}),
     ('lit-restored',{}),('sss-off',{'r.SubsurfaceScattering':0}),('sss-restored',{}),
     ('megalights-off',{'r.MegaLights.Allowed':0}),('megalights-restored',{}),
@@ -30,11 +33,12 @@ def set_values(values):
             else unreal.SystemLibrary.get_console_variable_int_value(key))
         assert actual==value,(key,actual,value)
 def release_camera():
+    restore_materials()
     if state.get('pc') and unreal.SystemLibrary.is_valid(state['pc']):state['pc'].set_view_target_with_blend(state['view'],0)
     if state.get('camera') and unreal.SystemLibrary.is_valid(state['camera']):state['camera'].destroy_actor()
     for key in ('pc','view','camera','selene','face'):state.pop(key,None)
 def frame_face():
-    if fixed_camera:
+    if fixed_camera and not state.get('close'):
         state['camera'].set_actor_location(unreal.Vector(*fixed_camera['position']),False,False)
         state['camera'].set_actor_rotation(unreal.Rotator(yaw=fixed_camera['yaw']),False)
         state['camera'].get_component_by_class(unreal.CameraComponent).set_field_of_view(fixed_camera['fov'])
@@ -44,6 +48,41 @@ def frame_face():
     camera.get_component_by_class(unreal.CameraComponent).set_field_of_view(30.)
     camera.set_actor_location(target+state['selene'].get_actor_forward_vector()*140+unreal.Vector(0,0,10),False,False)
     camera.set_actor_rotation(unreal.MathLibrary.find_look_at_rotation(camera.get_actor_location(),target),False)
+
+def restore_materials():
+    originals=state.pop('material_originals',None)
+    if originals and state.get('face') and unreal.SystemLibrary.is_valid(state['face']):
+        for index,material in originals.items():state['face'].set_material(index,material)
+        assert all(state['face'].get_material(i)==m for i,m in originals.items())
+        report['material_assignments_restored']=True
+
+def material_action(action):
+    assert material_probe
+    face=state['face']
+    if action=='flush':
+        world=unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_game_world()
+        unreal.SystemLibrary.execute_console_command(world,'r.VT.ListPhysicalPools')
+        unreal.SystemLibrary.execute_console_command(world,'r.VT.Flush')
+    elif action in ('close','wide'):
+        assert action=='close' or fixed_camera
+        state['close']=action=='close'
+    elif action=='restore':restore_materials()
+    else:
+        if 'material_originals' not in state:
+            state['material_originals']={i:m for i,m in enumerate(face.get_materials()) if m and 'Face_Skin' in m.get_name()}
+        originals=state['material_originals'];assert originals and 0 in originals
+        report['material_assignments_restored']=False
+        for index,material in originals.items():
+            if action=='rebind':
+                face.set_material(index,None);face.set_material(index,material)
+            elif action=='simple':
+                simple=unreal.load_asset('/Game/MetaHumans/MHC_Selene/Face/Materials/M_SeleneFace')
+                assert isinstance(simple,unreal.Material), 'Simple face sampler material missing'
+                face.set_material(index,simple)
+            else:
+                assert action=='dynamic'
+                assert face.create_dynamic_material_instance(index,source_material=material)
+    report.setdefault('material_actions',[]).append(dict(action=action,elapsed=time.monotonic()-state['start']))
 def end(error=None):
     try:
         if state.get('originals'):set_values(state['originals']);report['settings_restored']=True
@@ -117,8 +156,12 @@ def tick(dt):
             command=out/'color-command.json'
             if now-state['at']<3 or not command.exists():return
             action=json.loads(command.read_text())['action'];command.unlink()
-            assert action in ('reload','isolate','ui','scene','stop')
+            assert action in ('reload','isolate','ui','scene','stop') or (material_probe and action in ('flush','rebind','dynamic','simple','restore','close','wide'))
             if action=='stop':end();return
+            if action in ('flush','rebind','dynamic','simple','restore','close','wide'):
+                assert state['index']<15,'Maximum sixteen material-probe portraits reached'
+                material_action(action);state['index']+=1
+                state.update(phase='settle',at=now);report['status']='material_probe';write();return
             if action in ('ui','scene'):
                 assert state['index']<5
                 state['show_ui']=action=='ui';state['index']+=1
@@ -147,7 +190,12 @@ def tick(dt):
             if now-state['shot_at']<2:return
             assert (out/report['isolations'][-1]['file']).exists()
             set_values(state['originals']);state['step']+=1
-            if state['step']==len(steps):end();return
+            if state['step']==len(steps):
+                if material_probe:
+                    report.update(status='awaiting_command',settings_restored=True)
+                    state.update(phase='wait',at=now);write()
+                else:end()
+                return
             set_values(steps[state['step']][1]);state.update(at=now,shot_at=None)
     except Exception:end(traceback.format_exc())
 handle=unreal.register_slate_post_tick_callback(tick);write()
