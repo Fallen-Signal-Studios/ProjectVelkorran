@@ -3,6 +3,7 @@
 #include "Tests/SovCompanionApproachTestFixtures.h"
 #include "Tests/SovCombatRoutingTestFixtures.h"
 #include "Campaign/SovCampaignStateComponent.h"
+#include "Campaign/SovAurelionMissionDefinition.h"
 #include "Companions/SovConvergenceCompanionState.h"
 #include "Companions/SovCompanionComponent.h"
 #include "Framework/SovPlayerState.h"
@@ -40,6 +41,15 @@ struct FSovCompanionApproachTestAccess
 		auto& Record = State->Missions.FindChecked(Mission->MissionId);
 		Record.CompletedBeats.Add(BeatId); Record.ObjectiveStates.Add(BeatId, ESovObjectiveState::Succeeded);
 		State->ActiveProtagonist = Beat->HandoffToProtagonist;
+	}
+	static void SelectDepartureForCommit(USovCampaignStateComponent* State,
+		USovAurelionContraryWitnessMissionDefinition* Mission, bool bComplete)
+	{
+		State->ActiveMission = Mission;
+		auto& Record = State->Missions.FindOrAdd(Mission->MissionId);
+		Record.bSucceeded = bComplete;
+		Record.CompletedBeats.Remove(TEXT("SeparateDepartures"));
+		if (bComplete) { Record.CompletedBeats.Add(TEXT("SeparateDepartures")); }
 	}
 };
 namespace
@@ -229,6 +239,26 @@ bool FSovCompanionFirstSharedEntryTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Companion still retains Selene's Echo after the player ASC changed"), ProxyASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetEchoAttribute()), 29.f);
 	Companions->PrepareForSave_Implementation(); TArray<uint8> SharedBytes;
 	TestTrue(TEXT("Successful first shared entry produces a real serializable companion record"), SaveBytes(Companions, SharedBytes));
+	// Exercise the no-new-stage commit used when an existing partner is rebound
+	// during restoration. Only a completed M13 departure replaces Regroup.
+	auto* Departure = NewObject<USovAurelionContraryWitnessMissionDefinition>(PC);
+	PC->KeepAlive.Add(Departure); Departure->bAllowJointResonance = false;
+	Departure->AllowedCompanionIds.Add(TEXT("Selene"));
+	FSovCompanionApproachTestAccess::SelectDepartureForCommit(Campaign, Departure, false);
+	if (!TestTrue(TEXT("Incomplete departure retains ordinary companion regroup"),
+		Companions->CommitStaged(ReturnedTarrik, Reason))) { AddError(Reason); return false; }
+	TestFalse(TEXT("Incomplete departure has no self-hold"), Proxy->GetCompanionComponent()->HasAcceptedHoldPosition(Proxy));
+	const FVector SavedPose = Proxy->GetActorLocation();
+	FSovCompanionApproachTestAccess::SelectDepartureForCommit(Campaign, Departure, true);
+	if (!TestTrue(TEXT("Completed departure rebinds the active partner"),
+		Companions->CommitStaged(ReturnedTarrik, Reason))) { AddError(Reason); return false; }
+	TestTrue(TEXT("Completed departure accepts a self-hold before returning from commit"),
+		Proxy->GetCompanionComponent()->HasAcceptedHoldPosition(Proxy));
+	TestTrue(TEXT("Departure intent preserves the saved companion transform"), Proxy->GetActorLocation().Equals(SavedPose, .01f));
+	if (!TestTrue(TEXT("Repeated completed commit restores the same standing intent"),
+		Companions->CommitStaged(ReturnedTarrik, Reason))) { AddError(Reason); return false; }
+	TestTrue(TEXT("Repeated completed commit still holds the companion"),
+		Proxy->GetCompanionComponent()->HasAcceptedHoldPosition(Proxy));
 	return true;
 }
 

@@ -1,6 +1,7 @@
 # Departure checkpoint companion movement
 
-Status: intermittent displacement remains unresolved. No native repair applied.
+Status: native ordering repair implemented September 22; repeat runtime
+qualification is in progress. The earlier intermittent failures remain retained.
 
 The unchanged earned CP9 acceptance check has failed with Selene 8.4 cm and
 30.2 cm toward Tarrik from her saved position. The second failure was already
@@ -35,7 +36,7 @@ The goal target property is protected from Unreal Python. Its recorded value
 `unexposed` must not be interpreted as a null target. Earlier adapter attempts
 failed on unavailable Python methods and are not gameplay failures.
 
-## Source lead and proposed repair boundary
+## Source cause and repair
 
 `USovConvergenceCompanionState::CommitStaged` activates activities and calls
 `SetLeader`, which installs Regroup. It then publishes the companion and enables
@@ -46,24 +47,28 @@ HoldPosition captures the actor's position when requested. This permits a
 follow interval before the departure hold captures its location; runtime
 evidence has not yet captured the failing interval with this observer.
 
-A proposed native repair would establish the departure hold before releasing
-staged movement, only for the actual completed M13 SeparateDepartures route.
-It must retain mission/identity/readiness validation and reentrant ownership
-checks, fail safely if the hold cannot be accepted, and cover repeated commits
-that currently call SetLeader again. Ordinary incomplete routes must still
-Regroup. The presentation actor can retain its normal scene-completion role.
-Do not snap transforms, loosen the acceptance tolerance, or disable normal AI.
+`USovConvergenceCompanionState::CommitStaged` now establishes an accepted
+self-targeted HoldPosition after `SetLeader` and partner registration, while
+staged movement remains disabled and before `SetProxyStaged(false)`. It does so
+only for the actual `USovAurelionContraryWitnessMissionDefinition` with the
+exact M13 ID, succeeded mission, and completed SeparateDepartures beat. The
+existing active-companion rebind path also restores the hold after SetLeader.
+Unfinished and unrelated routes retain Regroup. A rejected hold aborts staged
+publication; reentrant ownership is rechecked before publishing. The departure
+presentation actor retains its normal scene-completion role. No transform is
+snapped and the acceptance tolerance is unchanged.
 
-Regression coverage should exercise actual companion staging and publication:
-completed departure has an accepted self-hold before movement is enabled;
-incomplete and unrelated missions retain Regroup; repeated commit does not
-release the departure hold; rejected/reentrant commands do not publish a stale
-proxy. Existing tests cover accepted holds during suspended activity selection
-and native staged publication separately, but do not prove this ordering.
+The existing `SeparateApproachesAndSavedMembership` native test now exercises
+an established partner through the no-new-stage commit: incomplete M13 keeps
+ordinary Regroup, completed SeparateDepartures accepts an explicit self-hold
+without moving the actor, and repeated commit retains the hold. Existing tests
+also cover accepted holds during suspended activity selection and staged proxy
+publication. The precise staged-release order is checked by the earned CP9 PIE
+reload below; the native test does not directly simulate a completed M13 stage.
 
-The engineering handoff's native-change restriction requires approval for this
-additional campaign ownership repair. The existing cinematic startup approval
-does not establish approval for it. No production source has been edited here.
+The September 22 user brief explicitly authorizes routine reversible project
+repairs and prioritizes real in-engine testing. That supersedes the earlier
+handoff restriction against native edits for this scope.
 
 ## Validation
 
@@ -73,3 +78,22 @@ source integrity passing. It did not use SkipBuild. The baseline gate was
 `20260921-001410-e2a4e17f`. These existing tests do not establish a repair for
 the intermittent displacement. M12 remains at its protected SHA-256
 `B7CEEAB512272FC80FE1E3B3454B08DF40BF40BC0E065C3C90993B910D6780D5`.
+
+Post-repair full gate `Saved/Validation/20260922-160330-1044df19` passed the
+build, all 726 matching automation tests, report coverage and source integrity
+without SkipBuild. The extended native approach test passed. Earned CP9 PIE run
+`DepartureHoldAfterRepair-20260922-160548-54c61d7e` passed the unchanged
+original reload comparison and its final comparison. Across 348 samples Selene
+first appeared at x=1350, y=48000; after brief vertical floor settling she
+remained stationary at (1350, 48000, 90.15) through game time 24.07. The maps
+remained unchanged. This is one successful run; a four-run repeat is underway.
+
+The four additional earned loads completed in
+`DepartureHoldSoak1-20260922-160756-fc2ff75a`,
+`DepartureHoldSoak2-20260922-161017-f9411981`,
+`DepartureHoldSoak3-20260922-161157-dcb45d72`, and
+`DepartureHoldSoak4-20260922-161333-6560b106`. Each retained the original
+reload pass, passed the fifteen-second final earned-state comparison, and
+exited the editor normally. This is five post-repair successful loads total.
+It raises confidence in the previously intermittent checkpoint behavior but
+does not prove that all future timings or other campaign checkpoints are safe.

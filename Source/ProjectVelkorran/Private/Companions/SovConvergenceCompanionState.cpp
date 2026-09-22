@@ -2,6 +2,7 @@
 #include "Companions/SovConvergenceCompanionState.h"
 #include "Companions/SovCompanionComponent.h"
 #include "Campaign/SovCampaignDefinition.h"
+#include "Campaign/SovAurelionMissionDefinition.h"
 #include "Campaign/SovCampaignStateComponent.h"
 #include "Characters/SovPlayerCharacterBase.h"
 #include "Framework/SovPlayerState.h"
@@ -27,6 +28,26 @@ AActor* ResolveRecoveryAnchor(UWorld* World, FName Tag)
 	for (TActorIterator<AActor> It(World); It; ++It)
 	{ if (It->ActorHasTag(Tag)) { if (Found) { return nullptr; } Found = *It; } }
 	return Found;
+}
+
+bool RestoreDepartureHold(USovCampaignStateComponent* State, const USovCampaignDefinition* Mission,
+	ASovProtagonistCompanionCharacter* Companion, ASovPlayerCharacterBase* Leader, FString& Reason)
+{
+	if (!State || !State->IsStateValid() || !Mission
+		|| !Mission->IsA<USovAurelionContraryWitnessMissionDefinition>()
+		|| Mission->MissionId != TEXT("M13_ContraryWitness")
+		|| !State->IsMissionComplete(Mission->MissionId)
+		|| !State->IsBeatComplete(Mission->MissionId, TEXT("SeparateDepartures"))) { return true; }
+	if (!IsValid(Companion) || !IsValid(Leader))
+	{ Reason = TEXT("The completed departure has no valid companion or leader."); return false; }
+	auto* Commands = Companion->GetCompanionComponent();
+	if (!Commands)
+	{ Reason = TEXT("The completed departure companion has no command owner."); return false; }
+	if (Commands->HasAcceptedHoldPosition(Companion)) { return true; }
+	if (!Commands->RequestCommand(Leader, ESovCompanionCommand::HoldPosition, Companion, Reason)) { return false; }
+	if (!Commands->HasAcceptedHoldPosition(Companion))
+	{ Reason = TEXT("The completed departure companion did not accept its standing position."); return false; }
+	return true;
 }
 }
 
@@ -228,8 +249,10 @@ bool USovConvergenceCompanionState::CommitStaged(ASovPlayerCharacterBase* Leader
 		if (!Leader || Active->GetCompanionIdentity() == Leader->GetProtagonistIdentityTag())
 		{ Reason = TEXT("The established companion duplicates or has lost its controlled protagonist."); return false; }
 		auto* Resonance = Leader->FindComponentByClass<USovResonanceComponent>();
-		return Active->GetCompanionComponent()->SetLeader(Leader, Reason)
-			&& (!Mission->bAllowJointResonance || (Resonance && Resonance->RegisterPartner(Active->GetCompanionComponent(), Reason)));
+		if (!Active->GetCompanionComponent()->SetLeader(Leader, Reason)
+			|| (Mission->bAllowJointResonance && (!Resonance || !Resonance->RegisterPartner(Active->GetCompanionComponent(), Reason))))
+		{ return false; }
+		return RestoreDepartureHold(State, Mission, Active, Leader, Reason);
 	}
 	if (!IsValid(Leader) || !Leader->IsCharacterReady() || !StagedMission || !PollStaged(Reason)) { return false; }
 	auto* State = GetOwner()->FindComponentByClass<USovCampaignStateComponent>();
@@ -249,6 +272,11 @@ bool USovConvergenceCompanionState::CommitStaged(ASovPlayerCharacterBase* Leader
 	if (StagedMission->bAllowJointResonance && (!Resonance || !Resonance->RegisterPartner(ExpectedStage->GetCompanionComponent(), Reason)))
 	{ if (StillOwnsStage()) { ExpectedStage->GetCompanionComponent()->CancelContextCommand(); } return false; }
 	if (!StillOwnsStage()) { Reason = TEXT("Companion ownership changed while registering the paired action."); return false; }
+	// SetLeader installs Regroup. Restore the completed departure's self-hold while
+	// staged movement is still disabled, before Regroup can move the saved pose.
+	if (!RestoreDepartureHold(State, StagedMission, ExpectedStage, Leader, Reason))
+	{ if (StillOwnsStage()) { ExpectedStage->GetCompanionComponent()->CancelContextCommand(); } return false; }
+	if (!StillOwnsStage()) { Reason = TEXT("Companion ownership changed while restoring the departure hold."); return false; }
 	ASovProtagonistCompanionCharacter* Retiring = IncomingProxy;
 	ASovProtagonistCompanionCharacter* PreviousActive = Active;
 	Active = Staged; Staged = nullptr; IncomingProxy = nullptr; StagedMission = nullptr;
