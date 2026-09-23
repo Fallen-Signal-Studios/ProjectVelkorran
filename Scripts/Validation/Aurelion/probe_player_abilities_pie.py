@@ -58,6 +58,10 @@ if DISTANCE_OVERRIDE:
                     for name, weapon, action, _, cost, projectile in ROSTER[HERO]]
 CAPTURE = os.environ.get('SOV_PLAYER_ABILITY_CAPTURE') == '1'
 NEGATIVE_ECHO = os.environ.get('SOV_PLAYER_ABILITY_NEGATIVE_ECHO') == '1'
+INTERRUPT_CAST = os.environ.get('SOV_PLAYER_ABILITY_INTERRUPT_CAST') == '1'
+INTERRUPT_HELD = os.environ.get('SOV_PLAYER_ABILITY_INTERRUPT_HELD') == '1'
+assert not (NEGATIVE_ECHO and INTERRUPT_CAST)
+assert not INTERRUPT_HELD or (INTERRUPT_CAST and HERO == 'Selene' and ONLY == 'AxiomNullPulse')
 
 
 def tag(name):
@@ -341,7 +345,26 @@ class Probe:
                     self.row()['aim_rotation'] = control.export_text()
                     self.row()['player_location'] = pawn.get_actor_location().export_text()
                     self.row()['target_location'] = self.target.get_actor_location().export_text()
-                if NEGATIVE_ECHO:
+                if INTERRUPT_CAST:
+                    row = self.row()
+                    row['routed'] = bool(unreal.SovMeleeValidationLibrary.press_semantic_input(controller, tag(action))
+                                         if INTERRUPT_HELD else
+                                         unreal.SovMeleeValidationLibrary.press_and_release_semantic_input(controller, tag(action)))
+                    active = unreal.SovMeleeValidationLibrary.active_echo_ability_for_input(asc, tag(action))
+                    row['interrupt'] = {'active_instance': active.get_path_name() if active else None,
+                                        'echo_after_start': round(pawn.get_echo_component().get_echo(), 2)}
+                    if not active:
+                        self.finish('inconclusive', 'Ability had no live instance immediately after routed input')
+                        return
+                    active.finish_echo_ability(True)
+                    if INTERRUPT_HELD:
+                        row['interrupt']['input_released_after_cancel'] = bool(
+                            unreal.SovMeleeValidationLibrary.release_semantic_input(controller, tag(action)))
+                    row['interrupt']['active_after_cancel'] = bool(
+                        unreal.SovMeleeValidationLibrary.active_echo_ability_for_input(asc, tag(action)))
+                    row['interrupt']['echo_after_cancel'] = round(pawn.get_echo_component().get_echo(), 2)
+                    self.stage('observe_interrupt')
+                elif NEGATIVE_ECHO:
                     pawn.get_echo_component().restore_echo_from_checkpoint(0.)
                     self.row()['insufficient_echo'] = {
                         'before': round(pawn.get_echo_component().get_echo(), 2),
@@ -351,6 +374,44 @@ class Probe:
                     self.row()['routed'] = bool(unreal.SovMeleeValidationLibrary.press_and_release_semantic_input(controller, tag(action)))
                     self.sample(world, pawn)
                     self.stage('observe')
+                return
+            if self.phase == 'observe_interrupt':
+                if time.monotonic() - self.last_sample >= 0.01:
+                    self.sample(world, pawn)
+                    self.last_sample = time.monotonic()
+                if elapsed < .65:
+                    return
+                row = self.row()
+                interrupted = row['interrupt']
+                owned = unreal.GameplayTagLibrary.get_owned_gameplay_tags(asc).export_text()
+                interrupted['owned_tags_after'] = owned
+                interrupted['projectiles_before_recast'] = list(row['projectiles_seen'])
+                interrupted['target_damage_before_recast'] = [receipt for receipt in row.get('damage_receipts', [])
+                                                               if receipt['target'] == row['target_name']]
+                interrupted['passed'] = row['routed'] and interrupted['active_instance'] is not None \
+                    and not interrupted['active_after_cancel'] and abs(interrupted['echo_after_cancel'] - (100. - cost)) < .1 \
+                    and not interrupted['projectiles_before_recast'] and not interrupted['target_damage_before_recast'] \
+                    and 'Sov.State.EchoAbility.Active' not in owned and 'Narrative.State.Busy' not in owned
+                if INTERRUPT_HELD:
+                    interrupted['passed'] = interrupted['passed'] and interrupted['input_released_after_cancel']
+                if not interrupted['passed']:
+                    self.finish('failed', 'Cancelled cast did not release cleanly: ' + str(interrupted))
+                    return
+                row['projectiles_seen'].clear()
+                row['projectile_samples'] = []
+                interrupted['cast_montages'] = list(row['montages_seen'])
+                row['montages_seen'].clear()
+                row['niagara_seen'].clear()
+                row.pop('damage_receipts', None)
+                self.preexisting_niagara = {component.get_path_name()
+                                            for component in unreal.ObjectIterator(unreal.NiagaraComponent)
+                                            if component.get_world() == world}
+                pawn.get_echo_component().restore_echo_from_checkpoint(100.)
+                row['echo_before'] = round(pawn.get_echo_component().get_echo(), 2)
+                controller = unreal.GameplayStatics.get_player_controller(world, 0)
+                row['recast_routed'] = bool(unreal.SovMeleeValidationLibrary.press_and_release_semantic_input(controller, tag(action)))
+                self.sample(world, pawn)
+                self.stage('observe')
                 return
             if self.phase == 'observe_insufficient':
                 if time.monotonic() - self.last_sample >= 0.01:
@@ -406,7 +467,8 @@ class Probe:
                 row = self.row()
                 row['echo_after'] = round(pawn.get_echo_component().get_echo(), 2)
                 row['echo_spent'] = round(row['echo_before'] - row['echo_after'], 2)
-                row['expected_cast'] = 'AM_' + HERO + '_' + name + '_' + ('A' if self.repetition == 0 else 'B')
+                row['expected_cast'] = 'AM_' + HERO + '_' + name + '_' + (
+                    'B' if INTERRUPT_CAST else ('A' if self.repetition == 0 else 'B'))
                 row['cast_seen'] = row['expected_cast'] in row['montages_seen']
                 row['cast_fx_seen'] = row['expected_cast_fx'] in row['niagara_seen']
                 row['projectile_seen'] = bool(row['projectiles_seen']) if ROSTER[HERO][self.index][5] else None
@@ -414,6 +476,8 @@ class Probe:
                     and row['cast_seen'] and row['cast_fx_seen'] and (row['projectile_seen'] is not False)
                 if NEGATIVE_ECHO:
                     row['passed_smoke'] = row['passed_smoke'] and row['insufficient_echo']['passed']
+                if INTERRUPT_CAST:
+                    row['passed_smoke'] = row['passed_smoke'] and row['interrupt']['passed'] and row['recast_routed']
                 if self.target:
                     try:
                         self.target.destroy_actor()

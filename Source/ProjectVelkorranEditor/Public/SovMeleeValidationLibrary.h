@@ -10,8 +10,9 @@ class UAbilitySystemComponent;
 class ANarrativeNPCCharacter;
 class ANarrativePlayerController;
 class UNPCDefinition;
+class USovGameplayAbility_EchoBase;
 
-/** Editor-only, read-only answers a melee play probe needs that script bindings cannot reach. */
+/** Editor-only access to the live combat paths needed by PIE validation probes. */
 UCLASS()
 class PROJECTVELKORRANEDITOR_API USovMeleeValidationLibrary : public UBlueprintFunctionLibrary
 {
@@ -20,6 +21,10 @@ public:
     /** Class names of every ability granted on the component whose input tag is exactly InputTag. */
     UFUNCTION(BlueprintCallable, Category="Velkorran|Editor|Melee Validation")
     static TArray<FString> GrantedAbilityClassesForInput(UAbilitySystemComponent* AbilitySystem, FGameplayTag InputTag);
+
+    /** The live Echo instance for one semantic input, if the cast is still active. */
+    UFUNCTION(BlueprintCallable, Category="Velkorran|Editor|Echo Validation")
+    static USovGameplayAbility_EchoBase* ActiveEchoAbilityForInput(UAbilitySystemComponent* AbilitySystem, FGameplayTag InputTag);
 
     /** The damage packet's source object class and, when that object lives in an ability, the ability's class. */
     UFUNCTION(BlueprintCallable, Category="Velkorran|Editor|Melee Validation")
@@ -33,6 +38,13 @@ public:
      * A probe cannot reach ANarrativePlayerController::AbilityInputPressed, which is not reflected. */
     UFUNCTION(BlueprintCallable, Category="Velkorran|Editor|Melee Validation")
     static bool PressAndReleaseSemanticInput(ANarrativePlayerController* PlayerController, FGameplayTag InputTag);
+
+    /** Keep a charge input held so live PIE can interrupt it before release. */
+    UFUNCTION(BlueprintCallable, Category="Velkorran|Editor|Echo Validation")
+    static bool PressSemanticInput(ANarrativePlayerController* PlayerController, FGameplayTag InputTag);
+
+    UFUNCTION(BlueprintCallable, Category="Velkorran|Editor|Echo Validation")
+    static bool ReleaseSemanticInput(ANarrativePlayerController* PlayerController, FGameplayTag InputTag);
 
     /** One line per input action the live controller maps: action asset, semantic tag, bound keys. */
     UFUNCTION(BlueprintCallable, Category="Velkorran|Editor|Melee Validation")

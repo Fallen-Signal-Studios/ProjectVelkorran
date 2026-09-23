@@ -8,6 +8,7 @@
 #include "Animation/AnimInstance.h"
 #include "GAS/NarrativeGameplayAbility.h"
 #include "Melee/SovGameplayAbility_Melee.h"
+#include "Abilities/SovGameplayAbility_Echo.h"
 #include "EnhancedInputSubsystems.h"
 #include "GAS/NarrativeAbilityInputMapping.h"
 #include "InputAction.h"
@@ -25,6 +26,17 @@ TArray<FString> USovMeleeValidationLibrary::GrantedAbilityClassesForInput(UAbili
         if (Spec.Ability && Spec.GetDynamicSpecSourceTags().HasTagExact(InputTag)) { Classes.Add(Spec.Ability->GetClass()->GetName()); }
     }
     return Classes;
+}
+
+USovGameplayAbility_EchoBase* USovMeleeValidationLibrary::ActiveEchoAbilityForInput(UAbilitySystemComponent* AbilitySystem, FGameplayTag InputTag)
+{
+    if (!IsValid(AbilitySystem) || !InputTag.IsValid()) { return nullptr; }
+    for (const FGameplayAbilitySpec& Spec : AbilitySystem->GetActivatableAbilities())
+    {
+        if (!Spec.IsActive() || !Spec.GetDynamicSpecSourceTags().HasTagExact(InputTag)) { continue; }
+        if (auto* Ability = Cast<USovGameplayAbility_EchoBase>(Spec.GetPrimaryInstance())) { return Ability; }
+    }
+    return nullptr;
 }
 
 void USovMeleeValidationLibrary::DescribeDamageSource(const FSovDamageResult& Result, FString& SourceObjectClass, FString& SourceAbilityClass)
@@ -45,6 +57,20 @@ bool USovMeleeValidationLibrary::PressAndReleaseSemanticInput(ANarrativePlayerCo
 {
     if (!IsValid(PlayerController) || !InputTag.IsValid()) { return false; }
     PlayerController->AbilityInputPressed(InputTag);
+    PlayerController->AbilityInputReleased(InputTag);
+    return true;
+}
+
+bool USovMeleeValidationLibrary::PressSemanticInput(ANarrativePlayerController* PlayerController, FGameplayTag InputTag)
+{
+    if (!IsValid(PlayerController) || !InputTag.IsValid()) { return false; }
+    PlayerController->AbilityInputPressed(InputTag);
+    return true;
+}
+
+bool USovMeleeValidationLibrary::ReleaseSemanticInput(ANarrativePlayerController* PlayerController, FGameplayTag InputTag)
+{
+    if (!IsValid(PlayerController) || !InputTag.IsValid()) { return false; }
     PlayerController->AbilityInputReleased(InputTag);
     return true;
 }

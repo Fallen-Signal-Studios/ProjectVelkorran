@@ -240,8 +240,15 @@ their next runtime check. A passing build alone does not close any gameplay row.
   smoke checks. An earlier Stillpoint field hit other E2 enemies during three
   Selene negative windows, so those ambient receipts remain recorded and
   separate. See [the player ability audit](PlayerAbilityLiveAudit-2026-09-23.md).
-  Cast interruption, death, prediction and every combat impact angle remain
-  open.
+  Natural cast interruption, death, prediction and every combat impact angle
+  remain open.
+- **Player Echo cancellation:** direct live-instance cancellation during
+  Tarrik's delayed Hunger cast and Selene's held Axiom charge passed twice
+  each in visible PIE. No unreleased payload, duplicate debit or lingering
+  Busy tag remained; both ordinary B recasts damaged a validation target.
+  Wake releases synchronously and provided no active post-input window for
+  that probe. Natural enemy-hit, equipment-change and death interruption
+  remain unqualified. See [the interruption evidence](Validation/PlayerEchoInterruptPIE-2026-09-23.md).
 
 ## Readability and polish
 

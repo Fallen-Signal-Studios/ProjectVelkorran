@@ -126,3 +126,10 @@ were fixtures. These runs establish rejection at zero Echo and immediate
 activation after refill for the current roster. They do not establish every
 positive cast's impact, interruption/death behavior, or resource-state
 correctness under client prediction.
+
+Focused [live cancellation checks](Validation/PlayerEchoInterruptPIE-2026-09-23.md)
+subsequently passed Tarrik's delayed Hunger release and Selene's held Axiom
+charge twice each. They verified one committed debit, no payload before
+release, cleanup of active/Busy state, and a working B recast with target
+damage. Wake's instantaneous release offers no active post-input cancellation
+window. Natural damage, weapon-change and death interruptions remain open.
