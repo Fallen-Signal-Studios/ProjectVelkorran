@@ -138,7 +138,10 @@ their next runtime check. A passing build alone does not close any gameplay row.
   The passive observer completed without error and recorded 192 gunshots and
   81 rockets; the driver logged 83 player damage receipts and 11 cover
   attempts. Its first life almost cleared the initial wave, so this one failed
-  pilot is not evidence that enemy damage must be reduced. Compare cover use,
+  pilot is not evidence that enemy damage must be reduced. The same E1 pilot
+  source hash passed in `Z11WindowFreshM12M13-20260923-122626-8a9dad2e`
+  after one retry; the compared M12 map and E1 drone asset hashes were equal.
+  Compare cover use,
   exposure and player movement against the successful fresh route before any
   difficulty tuning; the saved E1 route is still playable but repeat
   reliability is not established.
