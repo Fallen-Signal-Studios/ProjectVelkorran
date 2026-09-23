@@ -44,6 +44,31 @@ their next runtime check. A passing build alone does not close any gameplay row.
   heat/Poise, Core follow-up and encounter victory with protected people
   alive. The screenshot needs visual review; this is one checkpoint/retry
   replay, not a death or mission-restart test. Neither map was saved.
+- **E4B thermal usability:** the uninterrupted
+  `FreshM12M13CompanionReconciliation-20260922-220907-80105bb3` passed E1
+  without retry, E2, E3 rescue and E4A, then stopped at E4B because the
+  moving Elite left no player standing point inside both HeatConfirm and the
+  control's reach once modest safety margins were applied. The native heat
+  reach now defaults to 450 cm instead of 350 cm, leaving a practical
+  overlap around the unchanged 300 cm interaction. The 730-test gate
+  `20260922-222110-f6ceabc7` passed. From that run's unchanged earned
+  ArenaEntry checkpoint, `E4BHeatReachCombatRetest-20260922-222629-3e3332fd`
+  read back 450 cm in live PIE and passed frost/heat/Poise, Core and ordinary
+  combat victory with all protected people alive and Tarrik at 100 health.
+  The first replay completed thermal/Core but Tarrik died during cleanup,
+  so conventional-combat reliability remains open.
+  A second uninterrupted run, `FreshM12M13HeatReachRetest-20260922-223009-f5d6a4a0`,
+  passed E1 after two native retries, E2, E3 and E4A. At E4B, Selene stayed
+  about 54 cm from the clean mark but the visibility-channel ground trace
+  intermittently struck crossing combat collision instead of the floor.
+  Grounding now queries the structural world-static walking surface while
+  retaining the slope and distance checks. A regression puts Pawn collision
+  across the old downward ray. Full build and 730 tests passed in
+  `20260922-224509-0ef03b7d`. The earned checkpoint replay
+  `E4BFrostGroundReplay-20260922-224645-7679ddc4` passed after one bounded
+  frost retry, including actual heat/Poise/Core proof and conventional victory
+  at 100 health with protected people alive. Neither checkpoint replay is a
+  current-build uninterrupted M12-to-M13 acceptance pass.
 
 ## Player and enemy combat
 

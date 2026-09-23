@@ -8,6 +8,7 @@
 #include "Components/SovAurelionThermalFractureComponent.h"
 #include "Components/SovPoiseComponent.h"
 #include "Components/BoxComponent.h"
+#include "Components/SphereComponent.h"
 #include "Components/SceneComponent.h"
 #include "Companions/SovCompanionComponent.h"
 #include "Companions/SovConvergenceCompanionState.h"
@@ -263,7 +264,23 @@ bool FSovAurelionThermalContextualInteractionTest::RunTest(const FString& Parame
     auto* Duplicate = F.World->SpawnActor<AActor>(); Duplicate->Tags.Add(F.Fracture->FrostAnchorId);
     TestFalse(TEXT("Duplicated authored mark identity is rejected"), F.Fracture->RequestFrostSetup(F.Player, Error));
     Duplicate->Destroy();
-    if (!TestTrue(TEXT("Physical Selene mark opens actual control at zero Echo"), F.Fracture->RequestFrostSetup(F.Player, Error))) { AddError(Error); return false; }
+    // A nearby hostile can block a visibility trace before the actual walkable floor.
+    // Its Pawn collision must not make Selene's clean mark intermittently unusable.
+    auto* CrossingPawn = F.World->SpawnActor<AActor>();
+    auto* CrossingBody = NewObject<USphereComponent>(CrossingPawn);
+    CrossingPawn->AddInstanceComponent(CrossingBody); CrossingPawn->SetRootComponent(CrossingBody);
+    CrossingBody->SetSphereRadius(40.f); CrossingBody->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+    CrossingBody->SetCollisionObjectType(ECC_Pawn); CrossingBody->SetCollisionResponseToAllChannels(ECR_Block);
+    CrossingBody->RegisterComponent();
+    CrossingPawn->SetActorLocation(F.Selene->GetActorLocation() + FVector(35.f, 0.f, -40.f));
+    FHitResult VisibilityBlock;
+    FCollisionQueryParams Probe(SCENE_QUERY_STAT(AurelionFrostGroundFixture), false, F.Selene);
+    TestTrue(TEXT("Pawn collision actually intercepts the old visibility ground ray"),
+        F.World->LineTraceSingleByChannel(VisibilityBlock, F.Selene->GetActorLocation()+FVector(0,0,20),
+            F.Selene->GetActorLocation()-FVector(0,0,250), ECC_Visibility, Probe)
+        && VisibilityBlock.GetActor()==CrossingPawn && VisibilityBlock.ImpactNormal.Z<.7f);
+    if (!TestTrue(TEXT("Physical Selene mark opens actual control through crossing Pawn collision at zero Echo"),
+        F.Fracture->RequestFrostSetup(F.Player, Error))) { AddError(Error); return false; }
     TestTrue(TEXT("Contextual setup applies real frozen or chilled state"),
         F.Elite->GetNarrativeAbilitySystemComponent()->HasMatchingGameplayTag(FSovGameplayTags::Get().State_Status_Frozen)
         || F.Elite->GetNarrativeAbilitySystemComponent()->HasMatchingGameplayTag(FSovGameplayTags::Get().State_Status_Chilled));

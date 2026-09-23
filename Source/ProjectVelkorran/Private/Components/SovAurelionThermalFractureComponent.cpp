@@ -135,7 +135,10 @@ bool USovAurelionThermalFractureComponent::ValidateCleanAnchor(const FContext& C
     SovSelenePayload::IgnoreSource(Params, C.Selene.Get()); SovSelenePayload::IgnoreSource(Params, C.Player.Get());
     SovSelenePayload::IgnoreSource(Params, GetOwner()); Params.AddIgnoredActor(FrostAnchor);
     const FVector Location = C.Selene->GetActorLocation(); FHitResult Ground;
-    if (!GetWorld()->LineTraceSingleByChannel(Ground, Location + FVector(0,0,20), Location - FVector(0,0,250), ECC_Visibility, Params)
+    // Combat pawns and their collision can cross the mark. Grounding must sample the
+    // structural walking floor, not whichever visible actor happens to be below Selene.
+    FCollisionObjectQueryParams GroundObjects; GroundObjects.AddObjectTypesToQuery(ECC_WorldStatic);
+    if (!GetWorld()->LineTraceSingleByObjectType(Ground, Location + FVector(0,0,20), Location - FVector(0,0,250), GroundObjects, Params)
         || !Ground.bBlockingHit || Ground.ImpactNormal.Z < .7f)
     { Error = TEXT("The clean frost mark requires a grounded, walkable position for Selene."); return false; }
     return IsContextCurrent(C, true);

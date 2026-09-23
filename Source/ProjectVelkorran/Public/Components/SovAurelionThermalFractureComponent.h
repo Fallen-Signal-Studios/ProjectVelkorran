@@ -52,7 +52,8 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Aurelion|Thermal Fracture", meta=(ClampMin="0.25", ClampMax="10.0")) float FractureWindowSeconds = 3.f;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Aurelion|Thermal Fracture", meta=(ClampMin="50", ClampMax="300")) float FrostAnchorReach = 150.f;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Aurelion|Thermal Fracture", meta=(ClampMin="100", ClampMax="2500")) float FrostSetupRange = 1500.f;
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Aurelion|Thermal Fracture", meta=(ClampMin="100", ClampMax="600")) float HeatConfirmRange = 350.f;
+    /** Leaves a usable approach area between the authored heat control and a moving Elite. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Aurelion|Thermal Fracture", meta=(ClampMin="100", ClampMax="600")) float HeatConfirmRange = 450.f;
     UPROPERTY(BlueprintReadOnly, Transient, Category="Aurelion|Thermal Fracture") FString LastError;
     UPROPERTY(BlueprintAssignable, Category="Aurelion|Thermal Fracture") FSovAurelionThermalFractureCompleted OnThermalFractureCompleted;
     /** Rebinds readiness/delegates only. It never opens a window or supplies a success receipt. */
