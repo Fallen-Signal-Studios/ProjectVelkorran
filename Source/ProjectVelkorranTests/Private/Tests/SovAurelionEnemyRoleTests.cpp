@@ -288,15 +288,19 @@ bool FSovAurelionWallSurfacePresentationTest::RunTest(const FString& Parameters)
     if (!TestTrue(TEXT("Physical wall admits normal traversal"), Lease != 0)) { return false; }
     double BestAlignment = 0.;
     bool PlayedGait = false;
+    bool PlayedGaitOnLedge = false;
     for (int32 Step=0; Step<100; ++Step)
     {
         if (Traversal->IsTraversing()) { Traversal->AdvanceTraversal(Task, Lease, .05f); }
         Traversal->TickComponent(.05f, LEVELTICK_All, nullptr);
         BestAlignment = FMath::Max(BestAlignment, FMath::Abs(Mesh->GetUpVector().Y));
         PlayedGait |= Mesh->GetAnimInstance() && Mesh->GetAnimInstance()->Montage_IsPlaying(Montage);
+        PlayedGaitOnLedge |= Traversal->IsTraversing() && F.Runner->GetActorLocation().X > 50.
+            && Mesh->GetAnimInstance() && Mesh->GetAnimInstance()->Montage_IsPlaying(Montage);
     }
     TestTrue(TEXT("Spider body up follows the physical wall normal"), BestAlignment > .95);
     TestTrue(TEXT("Traversal plays its authored gait"), PlayedGait);
+    TestTrue(TEXT("The ledge transition keeps gait while capsule motion has no AnimBP velocity"), PlayedGaitOnLedge);
     TestTrue(TEXT("Landing restores the original mesh transform"), Mesh->GetRelativeTransform().Equals(Ground, .01));
     TestFalse(TEXT("Landing stops only the wall gait"), Mesh->GetAnimInstance()->Montage_IsPlaying(Montage));
     return true;

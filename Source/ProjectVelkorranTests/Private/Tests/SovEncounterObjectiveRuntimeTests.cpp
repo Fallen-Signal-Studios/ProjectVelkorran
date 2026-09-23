@@ -68,6 +68,15 @@ struct FSovCrucibleRuntimeTestAccess
     { FString Error; return Director->ValidateProtectionConfiguration(Error); }
     static void CorruptSavedProtectionRole(ASovEncounterDirector* Director, FName Id)
     { for (auto& Record : Director->EntryParticipants) { if (Record.ParticipantId == Id) { Record.bRequiredForVictory = true; } } }
+    static bool CorruptSavedCommandSource(ASovEncounterDirector* Director, FName OwnerId, FName SourceId)
+    {
+        for (auto& Record : Director->EntryParticipants)
+        {
+            if (Record.ParticipantId == OwnerId && !Record.Links.IsEmpty())
+            { Record.Links[0].SourceParticipantId = SourceId; return true; }
+        }
+        return false;
+    }
     static void ClearEntryActorTags(ASovEncounterDirector* Director)
     { for (auto& Record : Director->EntryParticipants) { Record.ActorTags.Reset(); } }
     static bool EntryHasActorTag(const ASovEncounterDirector* Director, FName ParticipantId, FName Tag)
@@ -501,6 +510,66 @@ bool FSovWaveFormationRetryTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Old command-source defeat cannot satisfy a new attempt"), C->GetCurrentWave(), 0);
     F.Kill(TEXT("Formation.Guard")); FSovCrucibleRuntimeTestAccess::RetireWaveContext(F.Director); FSovCrucibleRuntimeTestAccess::WaveStep(F.Director);
     TestEqual(TEXT("Retired lifecycle cannot release even with a current-looking death set"), C->GetCurrentWave(), 0);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovLoadedFailedFormationRetryTest,
+    "ProjectVelkorran.Campaign.Encounter.Coordination.LoadedFailedFormationRetryRebindsSource",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovLoadedFailedFormationRetryTest::RunTest(const FString& Parameters)
+{
+    FEncounterObjectiveWorld F(false, true);
+    if (!TestNotNull(TEXT("Ready formation fixture"), F.ASC) || !ConfigureFormation(F) || !F.Start())
+    { AddError(F.SetupError); return false; }
+    auto* Save = F.World->GetSubsystem<UNarrativeSaveSubsystem>();
+    auto* Source = F.Director->GetParticipant(TEXT("Formation.Guard"));
+    if (!TestNotNull(TEXT("Native save subsystem"), Save) || !TestNotNull(TEXT("Authored source"), Source)) { return false; }
+    const FGuid FailedAttempt = F.Director->GetAttemptId();
+    F.Kill(TEXT("Formation.Guard"));
+    F.Director->FailEncounter();
+    FNarrativeActorRecord FailedRecord;
+    if (!TestTrue(TEXT("Serialize failed encounter with its valid entry checkpoint"), Save->CreateActorRecord(F.Director, FailedRecord))) { return false; }
+    Source->Destroy();
+    if (!TestTrue(TEXT("Load failed checkpoint without its dead command-source actor"), Save->LoadActorFromRecord(F.Director, FailedRecord))) { return false; }
+    TestEqual(TEXT("Loaded encounter requires explicit retry"), F.Director->GetEncounterState(), ESovEncounterState::Failed);
+    FString LiveError;
+    TestFalse(TEXT("Failed-world formation cannot be validated as a live attempt"), F.Director->GetCoordinationComponent()->ValidateComposition(LiveError));
+    FString Error;
+    auto* Observer = F.Observer();
+    F.Director->OnEncounterRestoreFailed.AddDynamic(Observer, &USovEncounterObjectiveTestObserver::RestoreFailed);
+    if (!TestTrue(TEXT("Saved entry admits retry before live link reconstruction"), F.Director->RetryEncounter(Error)))
+    { AddError(Error); return false; }
+    for (int32 Step = 0; Step < 16 && F.Director->GetEncounterState() == ESovEncounterState::Restoring; ++Step)
+    { F.NextFrame(); FSovCrucibleRuntimeTestAccess::Step(F.Director, .016f); }
+    if (!TestEqual(TEXT("Restored formation reaches a fresh active attempt"), F.Director->GetEncounterState(), ESovEncounterState::Active))
+    { AddError(Observer->RestoreError); return false; }
+    TestTrue(TEXT("Retry replaces the dead source"), F.Director->GetParticipant(TEXT("Formation.Guard")) != Source);
+    TestTrue(TEXT("Retry owns a new attempt"), F.Director->GetAttemptId() != FailedAttempt);
+    TestTrue(TEXT("Restored command source satisfies the live formation gate"), F.Director->GetCoordinationComponent()->ValidateComposition(Error));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovLoadedFailedFormationInvalidSourceTest,
+    "ProjectVelkorran.Campaign.Encounter.Coordination.RestoredFormationRejectsFutureWaveSource",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovLoadedFailedFormationInvalidSourceTest::RunTest(const FString& Parameters)
+{
+    FEncounterObjectiveWorld F(false, true);
+    if (!TestNotNull(TEXT("Ready formation fixture"), F.ASC) || !ConfigureFormation(F) || !F.Start())
+    { AddError(F.SetupError); return false; }
+    if (!TestTrue(TEXT("Corrupt only the saved command source to an existing future-wave participant"),
+        FSovCrucibleRuntimeTestAccess::CorruptSavedCommandSource(F.Director, TEXT("Formation.Guard"), TEXT("Reserve.A"))))
+    { return false; }
+    F.Director->FailEncounter();
+    FString Error;
+    auto* Observer = F.Observer();
+    F.Director->OnEncounterRestoreFailed.AddDynamic(Observer, &USovEncounterObjectiveTestObserver::RestoreFailed);
+    if (!TestTrue(TEXT("Snapshot identities admit reconstruction before live validation"), F.Director->RetryEncounter(Error)))
+    { AddError(Error); return false; }
+    for (int32 Step = 0; Step < 16 && F.Director->GetEncounterState() == ESovEncounterState::Restoring; ++Step)
+    { F.NextFrame(); FSovCrucibleRuntimeTestAccess::Step(F.Director, .016f); }
+    TestEqual(TEXT("A future-wave command source never activates the attempt"), F.Director->GetEncounterState(), ESovEncounterState::Failed);
+    TestTrue(TEXT("Restore explains the invalid formation"), Observer->RestoreError.Contains(TEXT("Formation gates require")));
     return true;
 }
 

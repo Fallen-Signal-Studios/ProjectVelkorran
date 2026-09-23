@@ -209,16 +209,25 @@ void USovAurelionWallTraversalComponent::TickComponent(float DeltaTime, ELevelTi
     if (!Mesh || !Mesh->GetSkeletalMeshAsset() || Mesh->IsSimulatingPhysics() || !NPC->IsAlive()) { return; }
     auto* Anim = Mesh->GetAnimInstance();
     const bool OnWall = bTraversing && bOnWall;
+    // MoveUpdatedComponent advances the authored route without contributing
+    // character velocity. Keep the spider gait alive across the ledge and drop;
+    // otherwise the AnimBP idles while the enemy visibly slides through space.
+    if (Anim && WallRunMontage)
+    {
+        if (bTraversing && !Anim->Montage_IsPlaying(WallRunMontage)
+            && Anim->Montage_Play(WallRunMontage, 1.15f) > 0.f)
+        {
+            const FName Section = WallRunMontage->GetSectionName(0);
+            Anim->Montage_SetNextSection(Section, Section, WallRunMontage);
+        }
+        else if (!bTraversing && Anim->Montage_IsPlaying(WallRunMontage))
+        { Anim->Montage_Stop(.15f, WallRunMontage); }
+    }
     if (OnWall && !bPresentingWall)
     {
         PresentedMesh = Mesh;
         GroundMeshTransform = Mesh->GetRelativeTransform();
         bPresentingWall = true;
-        if (Anim && WallRunMontage && Anim->Montage_Play(WallRunMontage, 1.15f) > 0.f)
-        {
-            const FName Section = WallRunMontage->GetSectionName(0);
-            Anim->Montage_SetNextSection(Section, Section, WallRunMontage);
-        }
     }
     if (!bPresentingWall || PresentedMesh.Get() != Mesh) { return; }
     FTransform Target = GroundMeshTransform;
@@ -236,7 +245,6 @@ void USovAurelionWallTraversalComponent::TickComponent(float DeltaTime, ELevelTi
         FQuat::Slerp(Mesh->GetRelativeRotation().Quaternion(), Target.GetRotation(), Alpha));
     if (!OnWall)
     {
-        if (Anim && WallRunMontage && Anim->Montage_IsPlaying(WallRunMontage)) { Anim->Montage_Stop(.15f, WallRunMontage); }
         if (Mesh->GetRelativeLocation().Equals(Target.GetLocation(), .5)
             && Mesh->GetRelativeRotation().Quaternion().AngularDistance(Target.GetRotation()) < .01)
         { Mesh->SetRelativeTransform(GroundMeshTransform); bPresentingWall = false; PresentedMesh.Reset(); }

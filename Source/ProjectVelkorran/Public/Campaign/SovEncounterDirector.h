@@ -206,7 +206,7 @@ private:
 	bool bPlayerAndControllerRestored = false;
 	void SetState(ESovEncounterState NewState);
 	ASovPlayerCharacterBase* ResolvePlayer() const;
-	bool ValidateEntry(FString& Error) const;
+	bool ValidateEntry(FString& Error, bool bValidateLiveComposition = true) const;
 	bool CaptureNPC(const FSovEncounterParticipant& Participant, FSovEncounterNPCRecord& OutRecord, FString& Error) const;
 	void FinishRestore();
 	void AbortRestore(const FString& Error);

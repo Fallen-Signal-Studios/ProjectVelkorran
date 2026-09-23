@@ -128,6 +128,7 @@ class Run:
         self.damage_binding = None
         self.recovery_started = None
         self.recovery_attempt = None
+        self.retry_input = None
         self.report = dict(status='running', scope='E1 combat, secure approach, first native handoff',
                            method='Ordinary Enhanced Input actions in an existing PIE world',
                            physical_keyboard_validation=False, rendered_image_review=False,
@@ -253,6 +254,18 @@ class Run:
         encounter = self.e1.get_encounter_state()
         row.update(last_e1_state=str(encounter), last_pawn=_path(pawn),
                    checkpoint_load=bool(row.get('load_transients') or row.get('checkpoint_world_replaced')))
+        if (encounter == unreal.SovEncounterState.FAILED and pawn.is_alive()
+                and pawn.get_health() > 0. and pawn.is_character_ready()
+                and (state is None or 'READY' in state.upper())):
+            # A loaded active encounter deliberately remains Failed until its
+            # physical retry hold. Follow that authored player action after
+            # fatal recovery falls back to a checkpoint.
+            from aurelion_retry_input import RetryInput
+            self.retry_input = RetryInput(world, self.e1,
+                self.out / ('AuthoredRetry'+str(len(self.report['native_retries']))))
+            row['authored_retry_required'] = True
+            self.stage('authored_retry')
+            return
         attempt = self.e1.get_attempt_id().export_text()
         resumed = (pawn.is_alive() and pawn.get_health() > 0. and pawn.is_character_ready()
                    and encounter == unreal.SovEncounterState.ACTIVE
@@ -281,12 +294,28 @@ class Run:
         self.last_motion_at = now
         self.stage('combat')
 
+    def follow_authored_retry(self, now, world, pc, pawn):
+        assert self.retry_input is not None and world == self.world
+        if not self.retry_input.step(world, pc, pawn):
+            return
+        row = self.report['native_retries'][-1]
+        row['authored_retry'] = dict(samples=self.retry_input.samples,
+            input_frames=self.retry_input.driver.report['input_frames'].copy(),
+            active_attempt=self.e1.get_attempt_id().export_text())
+        self.retry_input.stop()
+        self.retry_input = None
+        self.stage('native_recovery')
+        self.follow_native_recovery(now, world, pc, pawn)
+
     def relief_active(self):
         return _optional(lambda: bool(self.pressure.is_pressure_relief_active())) if self.pressure else None
 
     def release_world_references(self):
         # Completed input observers must not keep an old PIE world alive across
         # the mission's genuine map travel. Serialized evidence remains intact.
+        if self.retry_input is not None:
+            self.retry_input.stop()
+            self.retry_input = None
         if self.damage_binding is not None:
             _optional(lambda binding=self.damage_binding: binding[0].remove_callable(binding[1]))
             self.damage_binding = None
@@ -713,6 +742,9 @@ class Run:
                     return
             if self.phase == 'native_recovery':
                 self.follow_native_recovery(now, world, pc, pawn)
+                return
+            if self.phase == 'authored_retry':
+                self.follow_authored_retry(now, world, pc, pawn)
                 return
             assert isinstance(pc, unreal.SovPlayerController) and isinstance(pawn, unreal.SovPlayerCharacterBase)
             state = pc.get_campaign_state()

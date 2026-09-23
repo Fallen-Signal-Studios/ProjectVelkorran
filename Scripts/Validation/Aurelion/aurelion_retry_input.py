@@ -46,8 +46,7 @@ class RetryInput:
             # owns Interacting. Keep the existing input down until native retry
             # begins; rechecking admission here prematurely cancels the hold.
             assert time.monotonic()-self.hold_started < 10., 'Admitted retry hold did not begin native restore'
-            look, _ = driver.look(world, pc, actor.get_actor_location())
-            driver.inject(look=look, interact=1.)
+            driver.inject(interact=1.)
             return False
         admission = component.can_interact(pawn, interaction)
         focus = interaction.get_editor_property('viewed_interactable')
@@ -64,12 +63,19 @@ class RetryInput:
         distance = math.hypot(position.x-target.x, position.y-target.y)
         reach = float(component.get_editor_property('interaction_distance'))
         assert math.isfinite(reach) and reach > 0
-        if distance > reach*.75:
+        # Native admission is authoritative. A loaded checkpoint may place the
+        # player inside the interaction's full reach but outside this pilot's
+        # conservative 75% approach band; moving anyway can hit nearby cover
+        # and prevents a perfectly valid retry hold.
+        if admission is None and distance > reach*.75:
             driver.start_route([(target.x+(position.x-target.x)/distance*reach*.5,
                                  target.y+(position.y-target.y)/distance*reach*.5)], 'retry')
             return False
-        look, error = driver.look(world, pc, target)
-        press = error < 3 and admission is not None and focus == component
+        # The interactable's actual viewed component is the aim verdict. Actor
+        # origin can be offset from its projected prompt, so a camera-angle
+        # threshold against that origin can reject an already focused request.
+        press = admission is not None and focus == component
+        look = (0., 0.) if press else driver.look(world, pc, target)[0]
         if press:
             self.hold_started = time.monotonic()
         driver.inject(look=look, interact=1. if press else 0.)

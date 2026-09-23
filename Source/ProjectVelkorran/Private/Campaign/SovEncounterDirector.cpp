@@ -941,9 +941,11 @@ bool ASovEncounterDirector::CleanupAttemptActors(TFunctionRef<bool()> CanContinu
 	return true;
 }
 
-bool ASovEncounterDirector::ValidateEntry(FString& Error) const
+bool ASovEncounterDirector::ValidateEntry(FString& Error, bool bValidateLiveComposition) const
 {
-	if (!Coordination || !Coordination->ValidateComposition(Error) || !ValidateProtectionConfiguration(Error)) { return false; }
+	// A failed-world load may retain dead or unresolved command-source actors. Validate
+	// the saved entry now, then validate live formation/protection after reconstructing it.
+	if (!Coordination || (bValidateLiveComposition && (!Coordination->ValidateComposition(Error) || !ValidateProtectionConfiguration(Error)))) { return false; }
 	if (bInvalidEncounterIdentity || SnapshotSchemaVersion != 1 || !bHasEntryCheckpoint || !EntryPlayer.IsValid() || EntryParticipants.IsEmpty())
 	{
 		Error = TEXT("Missing, incompatible, or ambiguously named encounter checkpoint."); return false;
@@ -999,7 +1001,7 @@ bool ASovEncounterDirector::RetryEncounter(FString& Error)
 			&& IsValid(PS) && Player->GetPlayerState<ASovPlayerState>() == PS && IsValid(PlayerASC)
 			&& UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Player) == PlayerASC && PlayerASC->GetAvatarActor() == Player;
 	};
-	if (!SamePlayer() || !Player->IsCharacterReady() || !ValidateEntry(Error)) { return false; }
+	if (!SamePlayer() || !Player->IsCharacterReady() || !ValidateEntry(Error, false)) { return false; }
 	if (!SamePlayer() || State != PreviousState || RestoreGeneration != PreviousGeneration || AttemptId != RestoringAttempt)
 	{ Error = TEXT("Checkpoint ownership changed during validation."); return false; }
 	UClass* const EntryClass = EntryPlayer.PawnClass.LoadSynchronous();
@@ -1241,6 +1243,11 @@ void ASovEncounterDirector::FinishRestore()
 				if (!bRestored) { AbortRestore(TEXT("Checkpoint command link could not restore its participants.")); return; }
 			}
 		}
+		// Formation rules resolve their source from these replacement actors. Refuse
+		// a partial or misbound checkpoint before restoring or releasing the player.
+		if (!Coordination || !Coordination->ValidateComposition(Error) || !ValidateProtectionConfiguration(Error))
+		{ AbortRestore(Error); return; }
+		if (!OwnsRestore()) { StopStaleRestore(); return; }
 		if (Cast<ASovPlayerController>(Controller) && !USovFatalRecoveryComponent::IsSafeRecoveryPosition(Player, PlayerRecord.PawnRecord.Transform.GetLocation()))
 		{ AbortRestore(TEXT("Checkpoint spawn is obstructed or no longer has walkable ground.")); return; }
 		const bool bPlayerRestored = PS->RestoreProtagonistSnapshot(Player, PlayerRecord, true, Error);
