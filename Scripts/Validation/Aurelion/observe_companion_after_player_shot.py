@@ -17,7 +17,7 @@ _RUN = None
 class Observer:
     def __init__(self, output_directory=None, passive=False):
         self.passive = passive
-        self.continue_after_first = passive and os.environ.get('SOV_CONTACT_CONTINUE_AFTER_FIRST') == '1'
+        self.continue_after_first = os.environ.get('SOV_CONTACT_CONTINUE_AFTER_FIRST') == '1'
         self.out = Path(output_directory or os.environ['SOV_AURELION_RUN_DIRECTORY']) / 'companion-after-shot.json'
         assert not self.out.exists()
         self.world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_game_world()
@@ -171,6 +171,10 @@ class Observer:
                     self.report['trigger_state'] = attempt
                     self.report['trigger_states'].append(attempt)
                 self.input(look, fire, 1.)
+            elif self.continue_after_first and player_hits:
+                # The diagnostic supplied one ordinary trigger. Release every action
+                # while retaining the companion for a full repeat-contact observation.
+                self.input()
             else:
                 look_at = self.target if player_hits and self.target.is_alive() else self.player_target
                 look, _ = common.Run.look(self, self.world, self.pc, look_at.get_actor_location())
