@@ -20,3 +20,31 @@ Eclipse overlay and a second camera render had been built, but the visible
 Compose viewport remained an unreadable dark close-up and the page still
 reported invalid shared scene edits. The assistant was waiting on a render.
 No completed visual review, export, or Unreal import is claimed yet.
+
+## Completed Z08 image-guided study
+
+The [Z08 study](https://higgsfield.ai/3d-jutsu/f215d455-626c-4ad8-b251-fb1cd98f8876)
+finished at revision 18. I inspected the corrected 1920×1080 still and its
+actual GLB, preserved as [render](../../Art/References/Aurelion/Z08HiggsfieldPrevis/quarantine_crucible_final.png)
+and [geometry](../../Art/References/Aurelion/Z08HiggsfieldPrevis/scene-r18.glb).
+The corrected image puts the violet infection on the left and balcony on the
+right. Its ivory field, black base and gold registers fit the requested
+palette. The scene has separate `HERO_pylon_root`, `HERO_wall_root` and
+`INF_overlay_root` hierarchies, which is useful for an authored removable
+infection layer. The exported file is valid GLB 2.0, 338,728 bytes, SHA-256
+`c5af27aab017ccbbf0c1c33534cfd46b86bf17e4d5b1fba26830ea4f6590d8fb`.
+
+**Use it as previsualization, not as a production UE asset.** The GLB has 49
+unique meshes and 8,556 unique triangles, but the whole hero pylon is only
+728 instanced triangles; the wall is 2,356. It has nine constant-color
+materials, no embedded images or textures, UV0 on only 9 of 49 mesh
+primitives, and no UV1. The still crops the pylon crown and base and the
+infection reads as sparse beads and hairline violet strands rather than
+organic tissue. The browser also retains an invalid-shared-edits warning.
+Those findings make topology, surface detail, authored UVs, material quality,
+light response and player-eye composition insufficient for the requested
+high-detail Aurelion kit. No GLB was imported into the game, no collision or
+navigation was changed, and no 90% alignment credit is claimed. A detailed
+Blender rebuild can use the separable hierarchy and approximate 8 m height
+as a blockout guide, then must pass the project's normal export, lighting,
+collision, Nanite and PIE route checks.
