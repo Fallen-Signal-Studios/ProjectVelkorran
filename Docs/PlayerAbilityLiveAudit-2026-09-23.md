@@ -42,7 +42,9 @@ An exact projectile Blueprint class is checked where one should exist.
 | Selene Dispatch | Both A/B pairs spent 90 Echo, spawned the returning projectile with Ice flight/hit and Lightning recall FX, and dealt 70 shield damage. |
 | Tarrik universal Cinder Sticky Grenade with Velkorran | Both A/B casts spent 35 Echo, spawned the exact grenade and Fire explosion FX, and damaged the target. |
 | Tarrik Velkorran's Hunger | A focused fresh-mission replay spent 50 Echo twice, alternated A/B, spawned the exact projectile and Fire FX; the second cast dealt 75 shield damage. |
-| Tarrik Cinder Slam, Cinder Judgement, Cinderline Requiem | The M12 pass confirmed costs, A/B casts, Fire FX, and the exact Requiem line actor. The stationary target was not damaged in that obstructed test lane; native payload tests cover the gameplay results separately. |
+| Tarrik Cinder Slam | Both A/B casts spent 90 Echo, showed the Fire shockwave and dealt 75 shield damage to a close M12 Enforcer. |
+| Tarrik Cinder Judgement | Both A/B casts spent 50 Echo, showed the Fire muzzle effect and dealt a 90 direct shield hit plus 56.25 splash to a close M12 Enforcer. As an authored hitscan attack, no projectile actor is expected. |
+| Tarrik Cinderline Requiem | Both A/B casts spent 90 Echo, spawned the exact line actor with Fire node FX, and dealt a 100 direct hit, 60 chained hit, and two 5-point follow-up hits to a close M12 Enforcer. |
 | Tarrik grenade with Cinderline | After attached-weapon collision was ignored, both A/B casts spent 35 Echo, spawned the exact grenade and Fire explosion FX, and reduced the 900 cm target shield to 208.3/208.25, matching the Velkorran context. |
 
 The first full Tarrik pass was partial: a live knockdown/get-up animation
@@ -54,7 +56,13 @@ Evidence: `Saved/Validation/Aurelion/SeleneAbilityContextFinal-20260923-074741-8
 `Saved/Validation/Aurelion/WakeCenterlineFinal-20260923-080835-386d1089`,
 `Saved/Validation/Aurelion/TarrikAbilityContextFinal-20260923-081155-c14b9ab8`,
 `Saved/Validation/Aurelion/HungerFocusedPIE-20260923-081520-ec7637dc`,
-`Saved/Validation/Aurelion/CinderlineGrenadeWeaponFix-20260923-083212-edb992fc`.
+`Saved/Validation/Aurelion/CinderlineGrenadeWeaponFix-20260923-083212-edb992fc`,
+`Saved/Validation/Aurelion/SlamNearImpact-20260923-084710-f9ad60ca`,
+`Saved/Validation/Aurelion/JudgementNearImpact-20260923-084537-1dcf9134`,
+`Saved/Validation/Aurelion/RequiemNearImpact-20260923-084851-786df1af`.
+The initial full Tarrik lane placed some synthetic targets behind M12 cover;
+the focused close-range replays above are the impact qualification for those
+three abilities.
 
 Visible PIE captures were taken during Tarrik's Cinderline grenade cast and
 Selene's Verity's Wake cast:
