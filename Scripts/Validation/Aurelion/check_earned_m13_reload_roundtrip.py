@@ -1,8 +1,11 @@
-"""Public CP9 loads against the latest earned unpaced route, with HUD readback.
+"""Public CP9 loads against an earned route, with HUD readback.
 
 No manufactured progress, character transforms, inventory edits or asset saves.
 The first load compares against earned route evidence; the second additionally
 checks new native world identities against the first loaded world.
+Launch the editor in M12: direct M13 PIE cannot complete initial protagonist
+convergence without its earlier kit and companion entry anchor. The public
+CP9 load performs the actual travel to M13.
 """
 import hashlib,json,math,os,shutil,sys,time,traceback
 from pathlib import Path
