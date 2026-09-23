@@ -496,10 +496,15 @@ void USovAccessibilityPresentation::RefreshText()
 	if (!SubtitleText || !CaptionText) { RefreshObjectiveText(); return; }
 	const int32 Size = FMath::RoundToInt(26 * Settings.SubtitleScale);
 	SubtitleText->SetWrapTextAt(FMath::Max(1.f,GetSubtitleTextWidth()));
-	SubtitleText->SetFont(FCoreStyle::GetDefaultFontStyle("Regular",Size)); CaptionText->SetFont(FCoreStyle::GetDefaultFontStyle("Bold",Size));
+	SubtitleText->SetFont(FCoreStyle::GetDefaultFontStyle("Regular",Size)); CaptionText->SetFont(FCoreStyle::GetDefaultFontStyle(Settings.bHighContrastHUD ? "Bold" : "Regular",Size));
 	SubtitleText->SetColorAndOpacity(FSlateColor(FLinearColor::White)); CaptionText->SetColorAndOpacity(FSlateColor(FLinearColor::White));
 	const FLinearColor Background(0,0,0,Settings.bHighContrastHUD ? 1.f : Settings.SubtitleBackgroundOpacity);
-	SubtitleBackground->SetBrushColor(Background); CaptionBackground->SetBrushColor(Background);
+	SubtitleBackground->SetBrushColor(Background);
+	const auto* Player = GetOwningPlayer() ? Cast<ASovPlayerCharacterBase>(GetOwningPlayer()->GetPawn()) : nullptr;
+	const auto Theme = SovHUDStyle::ForProtagonist(Player ? Player->GetProtagonistIdentityTag() : FGameplayTag(), Settings.bHighContrastHUD);
+	FLinearColor CaptionGlass = Theme.Background;
+	CaptionGlass.A = Settings.SubtitleBackgroundOpacity;
+	CaptionBackground->SetBrushColor(Settings.bHighContrastHUD ? Background : CaptionGlass);
 	SubtitleBackground->SetVisibility(Settings.bSubtitles && SpeechPages.IsValidIndex(PageIndex) ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
 	CaptionBackground->SetVisibility(Settings.bClosedCaptions && CaptionRemaining > 0 ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
 	if (SpeechPages.IsValidIndex(PageIndex))
@@ -721,6 +726,29 @@ int32 USovAccessibilityPresentation::NativePaint(const FPaintArgs& Args, const F
             Elements.PopClip();
         }
     }
+	if (CaptionBackground && CaptionBackground->IsRendered() && !Settings.bHighContrastHUD)
+	{
+		const auto* Player = Cast<ASovPlayerCharacterBase>(PC->GetPawn());
+		const auto Theme = SovHUDStyle::ForProtagonist(Player ? Player->GetProtagonistIdentityTag() : FGameplayTag(), false);
+		const FGeometry& PanelGeometry = CaptionBackground->GetPaintSpaceGeometry();
+		const FVector2D PanelSize = PanelGeometry.GetLocalSize();
+		if (PanelSize.X > 16.f && PanelSize.Y > 16.f)
+		{
+			const FVector2D Min = Geometry.AbsoluteToLocal(PanelGeometry.LocalToAbsolute(FVector2D::ZeroVector));
+			const FVector2D Max = Geometry.AbsoluteToLocal(PanelGeometry.LocalToAbsolute(PanelSize));
+			const float AccentLength = FMath::Min(48.f * Settings.UIScale, PanelSize.X * .25f);
+			FLinearColor Tint = Theme.Accent * Style.GetColorAndOpacityTint();
+			Tint.A *= .8f * CaptionBackground->GetRenderOpacity();
+			Elements.PushClip(FSlateClippingZone(PanelGeometry));
+			FSlateDrawElement::MakeLines(Elements, ++Layer, Geometry.ToPaintGeometry(),
+				{FVector2f(Min.X, Min.Y + 14.f), FVector2f(Min.X, Min.Y), FVector2f(Min.X + AccentLength, Min.Y)},
+				ESlateDrawEffect::None, Tint, true, 1.f);
+			FSlateDrawElement::MakeLines(Elements, ++Layer, Geometry.ToPaintGeometry(),
+				{FVector2f(Max.X - AccentLength, Max.Y), FVector2f(Max.X, Max.Y), FVector2f(Max.X, Max.Y - 14.f)},
+				ESlateDrawEffect::None, Tint, true, 1.f);
+			Elements.PopClip();
+		}
+	}
 	auto Project = [&](const FVector& Location,FVector2D& Point) { return PC->ProjectWorldLocationToScreen(Location,Point,true) && (Point /= DPI, true) && Point.X >= 16 && Point.Y >= 16 && Point.X < Size.X-16 && Point.Y < Size.Y-16; };
 	auto DrawOutline = [&](const TArray<FVector2D>& Points,const FLinearColor& Tint)
 	{
