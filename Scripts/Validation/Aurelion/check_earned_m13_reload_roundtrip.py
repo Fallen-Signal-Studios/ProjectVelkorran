@@ -13,8 +13,10 @@ root=Path(unreal.Paths.project_dir());out=Path(os.environ['SOV_AURELION_RUN_DIRE
 load_count=int(globals().get('M13_RELOAD_COUNT',2));assert load_count in (1,2)
 sys.path.insert(0,str(root/'Scripts/Validation/Aurelion'))
 import probe_m13_native_checkpoint_reload as check
-source=root/'Saved/Validation/Aurelion/CinematicStartupUnpaced-20260920-213727-1184bfea'
-source_file=source/'M13/m13-input-continuation.json'
+source=Path(os.environ.get('SOV_AURELION_EARNED_RUN',
+    root/'Saved/Validation/Aurelion/CinematicStartupUnpaced-20260920-213727-1184bfea'))
+source_file=Path(os.environ.get('SOV_AURELION_EARNED_REPORT',
+    source/'M13/m13-input-continuation.json'))
 raw=source_file.read_bytes();earned=json.loads(raw)
 assert earned['status']=='passed' and earned['retained_gameplay_references_cleared']
 expected=earned['native_departure'];assert len(expected['journal'])==35

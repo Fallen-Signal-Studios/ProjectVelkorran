@@ -46,9 +46,16 @@ their next runtime check. A passing build alone does not close any gameplay row.
   All eight follow-on drivers passed; E4B ended at 100 health with protected
   people alive. The full native build and 730-test gate had passed in
   `20260922-230932-fb3dcf50`. The editor exited without saving either map;
-  both SHA-256 hashes remain at the baseline listed below. Current-build
-  explicit CP9 reload, packaged execution, repeated reliability, other
-  campaign choices and presentation acceptance remain separate checks.
+  both SHA-256 hashes remain at the baseline listed below. The run's earned
+  CP9 banks were then loaded twice through the public save owner in separate
+  M13 worlds by `FinalBuildEarnedCP9Reload-20260922-233520-65003e34`.
+  Both four-second stable snapshots passed the full 35-row journal/evidence,
+  identities, inventory/resources, completed lift and separate-exit checks;
+  controls were released and exactly one Tarrik HUD showed 100 health. Both
+  rendered frames were inspected: no duplicate HUD or cinematic overlay was
+  visible, while the departure area still needs the planned fidelity pass.
+  Packaged execution, repeated reliability, other campaign choices and
+  full-screen presentation acceptance remain separate checks.
 - **E4B retry:** `E4BRetryRegression-20260922-180448-2aadb797` loaded an
   older earned ArenaEntry checkpoint into Failed, used the authored retry
   interaction, restored the Elite's thermal bindings, then passed frost,
