@@ -3,19 +3,22 @@
 No actor, health, ability, collision or campaign proof writes. This is checkpoint
 replay coverage, not a new full mission run. Preserve terminal driver evidence.
 """
-import hashlib,json,os,shutil,sys,time,traceback
+import hashlib,json,math,os,shutil,sys,time,traceback
 from pathlib import Path
 import unreal
 
 project=Path(unreal.Paths.project_dir())
 sys.path.insert(0,str(project/'Scripts/Validation/Aurelion'))
 import continue_aurelion_e4b_input as pilot
+import observe_companion_contribution as companion_audit
 from aurelion_retry_input import RetryInput
 out=Path(os.environ['SOV_AURELION_RUN_DIRECTORY'])
 source=Path(os.environ.get('SOV_AURELION_E4B_SOURCE',
     str(project/'Saved/Validation/Aurelion/PhaseHaloMissionRoute-20260920-144741-b8a1800f'))).resolve()
-prior=json.loads((source/'E1Continuation/route-follow-on/continue_aurelion_e4a_input/e4a-input-continuation.json').read_text())
-assert prior['status']=='passed'
+prior_path=source/'E1Continuation/route-follow-on/continue_aurelion_e4a_input/e4a-input-continuation.json'
+if prior_path.exists():
+    prior=json.loads(prior_path.read_text())
+    assert prior['status']=='passed'
 level=unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 assert not level.is_in_play_in_editor()
 assert not unreal.EditorLoadingAndSavingUtils.get_dirty_map_packages()
@@ -31,6 +34,7 @@ def finish(error=None):
     if error:report['error']=error
     if state.get('delegate'):state['delegate'].remove_callable(loaded)
     if state.get('driver') and not state['driver'].done:pilot.stop()
+    if state.get('companion_audit'):state['companion_audit'].stop('E4B checkpoint replay finished')
     if state.get('retry'):state['retry'].stop();state['retry']=None
     write();level.editor_request_end_play();state['phase']='stopping'
 
@@ -55,6 +59,42 @@ def observe_obstruction(world,pawn,driver,now):
         actor=parts[9].get_path_name() if parts[9] else None,blocking=bool(parts[0]),
         initial_overlap=bool(parts[1]),hit=hits[0].export_text()))
     write()
+
+def capture_camera_context(world,pawn):
+    manager=unreal.GameplayStatics.get_player_camera_manager(world,0)
+    if not manager:return {'error':'No player camera manager at terminal capture'}
+    eye=manager.get_camera_location()
+    nearby=[]
+    for actor in unreal.GameplayStatics.get_all_actors_of_class(world,unreal.NarrativeCharacter):
+        distance=(actor.get_actor_location()-eye).length()
+        origin,extent=actor.get_actor_bounds(False)
+        gaps=[max(0.,abs(getattr(eye,axis)-getattr(origin,axis))-getattr(extent,axis)) for axis in ('x','y','z')]
+        bounds_distance=math.sqrt(sum(gap*gap for gap in gaps))
+        if bounds_distance>500 or actor.get_editor_property('hidden'):continue
+        capsule=actor.get_component_by_class(unreal.CapsuleComponent)
+        meshes=[]
+        for mesh in actor.get_components_by_class(unreal.SkeletalMeshComponent):
+            center,half,_=unreal.SystemLibrary.get_component_bounds(mesh)
+            visual_gaps=[max(0.,abs(getattr(eye,axis)-getattr(center,axis))-getattr(half,axis)) for axis in ('x','y','z')]
+            asset=mesh.get_skeletal_mesh_asset()
+            meshes.append(dict(component=mesh.get_name(),asset=asset.get_path_name() if asset else None,
+                bounds_distance=round(math.sqrt(sum(gap*gap for gap in visual_gaps)),1),
+                origin=center.export_text(),extent=half.export_text(),visible=mesh.is_visible()))
+        nearby.append(dict(actor=actor.get_path_name(),class_name=actor.get_class().get_name(),
+            eye_distance=round(distance,1),player_distance=round(actor.get_distance_to(pawn),1),
+            position=actor.get_actor_location().export_text(),alive=actor.is_alive(),
+            bounds_distance=round(bounds_distance,1),bounds_origin=origin.export_text(),bounds_extent=extent.export_text(),meshes=meshes,
+            capsule_profile=str(capsule.get_collision_profile_name()) if capsule else None,
+            capsule_camera_response=str(capsule.get_collision_response_to_channel(unreal.CollisionChannel.cast(4))) if capsule else None))
+    nearby.sort(key=lambda row:row['bounds_distance'])
+    forward=unreal.MathLibrary.get_forward_vector(manager.get_camera_rotation())
+    hit=unreal.SystemLibrary.line_trace_single(world,eye,eye+forward*500.,
+        unreal.TraceTypeQuery.TRACE_TYPE_QUERY1,False,[],unreal.DrawDebugTrace.NONE,True)
+    hits=[value for value in (hit if isinstance(hit,tuple) else (hit,)) if isinstance(value,unreal.HitResult)]
+    center_hit=hits[0].to_tuple()[9].get_path_name() if hits and hits[0].to_tuple()[9] else None
+    return dict(eye=eye.export_text(),rotation=manager.get_camera_rotation().export_text(),
+        player=pawn.get_actor_location().export_text(),player_eye_distance=round((pawn.get_actor_location()-eye).length(),1),
+        center_hit=center_hit,nearby=nearby)
 
 def tick(delta):
     if state['busy']:return
@@ -93,6 +133,7 @@ def tick(delta):
         if state['phase']=='load':
             if hash(world)==state['old_world'] or state['saves'].is_load_pending() or not report['callbacks']:return
             assert 'SUCCESS' in report['callbacks'][-1]['result'],report['callbacks']
+            assert 'BoundaryId="M12_E4_QuarantineCrucibleB"' in report['callbacks'][-1]['header'], 'Source is not an earned E4B checkpoint'
             assert isinstance(pawn,unreal.SovTarrikCharacter)
             directors=[a for a in unreal.GameplayStatics.get_all_actors_of_class(world,unreal.SovAurelionThermalPhaseDirector)
                 if str(a.encounter_id)==pilot.ENCOUNTER]
@@ -128,6 +169,8 @@ def tick(delta):
             if now-state['at']>.5:
                 state['at']=now;report.setdefault('binding_readiness',[]).append(row);write()
             if thermal and thermal.encounter_director==director and thermal.frost_anchor and len(controls)==3 and all(a.get_current_thermal_target()==thermal for a in controls):
+                if os.environ.get('SOV_E4B_COMPANION_AUDIT') == '1':
+                    state['companion_audit']=companion_audit.start(out/'companion-contribution.json')
                 state.update(driver=pilot.start(out/'E4B'),phase='drive');return
             if now-state['ready_at']>8:
                 state['error']='Native retry did not restore the Elite thermal director/anchor bindings within eight seconds: '+json.dumps(row)
@@ -139,6 +182,7 @@ def tick(delta):
             if driver.done:
                 report['driver_status']=driver.report['status'];report['driver_reason']=driver.report['reason']
                 state['error']=driver.report['reason'] if driver.report['status']!='passed' else None
+                report['camera_context']=capture_camera_context(world,pawn)
                 unreal.SystemLibrary.execute_console_command(world,'Shot showui -nosuffix filename='+str(out/'terminal.png'))
                 state.update(phase='capture',at=now);write();return
             observe_obstruction(world,pawn,driver,now)

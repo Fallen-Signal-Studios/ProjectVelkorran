@@ -235,6 +235,15 @@ their next runtime check. A passing build alone does not close any gameplay row.
 
 ## Readability and polish
 
+- **Companion camera collision:** both companion Blueprint capsules blocked
+  Camera in their saved defaults. They now ignore Camera while retaining Pawn
+  Block; a fresh editor reload confirmed both saved defaults. An earned E4B
+  PIE replay passed frost/heat/Core and conventional victory with 13 Selene
+  damage receipts and 248 live samples showing Camera Ignore. The terminal
+  view was still obscured where Tarrik stood near level geometry, so close
+  camera/wall readability stays open. See
+  [the camera and E4B validation](Validation/CompanionCameraAndE4B-2026-09-23.md).
+
 - **Eclipse blood in combat:** the first-hit failure was a native readiness
   gate: loaded black Niagara systems were not ready while compiling in PIE,
   and the blood component discarded the hit. The September 22 native repair
