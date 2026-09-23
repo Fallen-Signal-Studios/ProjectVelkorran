@@ -33,10 +33,10 @@ for key in ('Position', 'Seconds', 'Color'):
 shape.set_editor_property('inputs', inputs)
 shape.set_editor_property('code', '''
 float bandDistance = abs(frac(Position.z / 32.0) - 0.5);
-float line = 1.0 - smoothstep(0.025, 0.065, bandDistance);
+float bandLine = 1.0 - smoothstep(0.025, 0.065, bandDistance);
 float rung = 1.0 - smoothstep(0.025, 0.06, abs(frac((Position.x + Position.y) / 48.0) - 0.5));
 float pulse = 0.65 + 0.35 * sin(Seconds * 3.14159265);
-float lattice = saturate(line + rung * 0.32);
+float lattice = saturate(bandLine + rung * 0.32);
 return float4(Color.rgb * (1.2 + pulse) * lattice, lattice * (0.35 + pulse * 0.3));
 ''')
 position = edit.create_material_expression(mat, unreal.MaterialExpressionWorldPosition, -600, -150)

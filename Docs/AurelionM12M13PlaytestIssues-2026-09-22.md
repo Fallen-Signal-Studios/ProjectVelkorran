@@ -37,6 +37,14 @@ their next runtime check. A passing build alone does not close any gameplay row.
   attack range when no player damage funded contribution; repeat pressure,
   general following, and weapon presentation across protagonist swaps remain
   unqualified.
+  Earned E4A repeat probes on September 22 narrow this: one Selene health hit
+  funded a nonfatal 19.35-damage Tarrik strike, after which he stayed within
+  68 cm and had a clear target but the contribution budget was exhausted. A
+  second probe gave Selene three ordinary health hits; her third killed the
+  Elite before Tarrik reached attack range, ending the encounter. Neither run
+  proves a repeat-attack defect or sustained companion pressure. The test
+  harness' optional repeat-hit experiment was discarded; only the saved PIE
+  reports remain.
 - **Archetype and ability coverage:** each mission enemy and each available
   protagonist ability still need the complete input→effect→recovery check under
   normal play. Prior component tests and isolated authoring checks do not cover
@@ -54,6 +62,13 @@ their next runtime check. A passing build alone does not close any gameplay row.
   roles, reduced-effects quality, and sustained combat readability remain
   open. See
   `AurelionCombatBloodCapture-2026-09-20.md`.
+- **Elite protection cue shader:** earned E4A PIE logged a failed compile for
+  `M_AurelionPhaseLattice` and substituted Unreal's default material. The
+  custom HLSL declared `line`, a reserved modifier. The authored material and
+  its source script now use `bandLine`; an isolated editor pass saved only the
+  material, and a second earned E4A PIE replay showed the purple protection
+  lattice with no material compile failure in its log. Both map hashes stayed
+  unchanged. Other lethal-floor cue states still need visual coverage.
 - **Objective HUD capture:** the apparent top-left overlap in one live editor
   screenshot is the transient `Preparing Niagara System` compile message over
   the objective panel. A read-only PIE probe found one presentation, one
