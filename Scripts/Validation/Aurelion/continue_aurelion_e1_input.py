@@ -105,6 +105,7 @@ class Run:
         self.attempt = None
         self.e1 = None
         self.target = None
+        self.occluded_since = None
         self.last_sample = 0.
         self.last_write = 0.
         self.last_path = 0.
@@ -135,7 +136,8 @@ class Run:
                            direct_state_or_resource_or_transform_writes=False,
                            driver_source_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
                            samples=[], stages=[], holds=[], targets=[], input_frames={}, rocket_reactions=[],
-                           cover_attempts=[], cover_exposures=[], pickup_approaches=[], native_retries=[],
+                           cover_attempts=[], cover_exposures=[], occluded_target_switches=[],
+                           pickup_approaches=[], native_retries=[],
                            incoming_damage=[], pressure_observation='Read-only native damage receipts and coordination relief state',
                            assets_before=self.before)
         self.actions = {name: unreal.load_asset(ACTION_ROOT + name) for name in
@@ -288,6 +290,7 @@ class Run:
                    health=pawn.get_health(), position=_xyz(pawn.get_actor_location()))
         self.attempt = attempt
         self.target = self.cover_goal = self.last_pickup = self.path_target = None
+        self.occluded_since = None
         self.path_points = []
         self.cover_until = self.next_cover_search = -1000.
         self.last_position = None
@@ -481,10 +484,13 @@ class Run:
                 for enemy in enemies:
                     ignored = [pawn, enemy] + list(pawn.get_attached_actors())
                     ignored += [v for v in (pawn.get_character_visual(), enemy.get_character_visual()) if v]
-                    ray = unreal.SystemLibrary.line_trace_single(world,
-                        pawn.get_actor_location()+unreal.Vector(0.,0.,50.), enemy.get_actor_location(),
+                    # A low coffer can hide the torso while leaving the camera/head
+                    # exposed to flying drones. Both heights must actually be sheltered.
+                    rays = [unreal.SystemLibrary.line_trace_single(world,
+                        pawn.get_actor_location()+unreal.Vector(0.,0.,height), enemy.get_actor_location(),
                         unreal.TraceTypeQuery.TRACE_TYPE_QUERY1, False, ignored, unreal.DrawDebugTrace.NONE, True)
-                    if ray is None:
+                        for height in (50., 150.)]
+                    if any(ray is None for ray in rays):
                         exposed.append(_path(enemy))
                 if exposed:
                     self.report['cover_exposures'].append(dict(elapsed=time.monotonic()-self.started,
@@ -670,7 +676,7 @@ class Run:
             p = actor.get_actor_location()
             return (str(self.e1.find_participant_id(actor)) != 'E1.Drone2',
                     (p.x-location.x)**2+(p.y-location.y)**2)
-        # Keep tracking a living visible target. Re-ranking moving drones every
+        # Keep tracking a living target. Re-ranking moving drones every
         # frame made the driver switch 60 times in one failed run, often turning
         # away before it could fire. This changes only the ordinary-input pilot.
         target = self.target if self.target in candidates else min(candidates, key=ordering)
@@ -679,9 +685,30 @@ class Run:
             self.report['targets'].append(dict(elapsed=time.monotonic()-self.started,
                 participant=str(self.e1.find_participant_id(target)), actor=_path(target), health=target.get_health()))
         target_location = target.get_actor_location()
+        clear = self.clear_sight(world, pawn, target)
+        now = time.monotonic()
+        if clear:
+            self.occluded_since = None
+        else:
+            if self.occluded_since is None:
+                self.occluded_since = now
+            elif now-self.occluded_since > 2.:
+                visible = [actor for actor in candidates if actor != target and self.clear_sight(world, pawn, actor)]
+                if visible:
+                    replacement = min(visible, key=ordering)
+                    self.report['occluded_target_switches'].append(dict(
+                        elapsed=now-self.started, from_target=str(self.e1.find_participant_id(target)),
+                        to_target=str(self.e1.find_participant_id(replacement)),
+                        occluded_seconds=now-self.occluded_since))
+                    target = self.target = replacement
+                    target_location = target.get_actor_location()
+                    self.occluded_since = None
+                    clear = self.clear_sight(world, pawn, replacement)
+                    self.report['targets'].append(dict(elapsed=now-self.started,
+                        participant=str(self.e1.find_participant_id(target)),
+                        actor=_path(target), health=target.get_health()))
         distance = math.hypot(target_location.x-location.x, target_location.y-location.y)
         look, error = self.look(world, pc, target_location)
-        clear = self.clear_sight(world, pawn, target)
         # Walking along a queried path still goes through the player's real collision/movement input.
         in_range = distance < min(2400., max(500., weapon.get_attack_range()*.8))
         # Occlusion can persist inside 450 cm (for example across a ramp).

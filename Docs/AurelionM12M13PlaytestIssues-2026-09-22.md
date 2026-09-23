@@ -224,10 +224,14 @@ their next runtime check. A passing build alone does not close any gameplay row.
   ordinary-input E4A route; Tarrik drew Velkorran and played 38 sampled light
   attack frames. No companion damage hit landed in that short replay, so
   sustained restored-companion contact remains unqualified.
-- **Archetype and ability coverage:** each mission enemy and each available
-  protagonist ability still need the complete input→effect→recovery check under
-  normal play. Prior component tests and isolated authoring checks do not cover
-  that matrix. Next: inventory mission grants and exercise each in PIE.
+- **Archetype and ability coverage:** the [September 23 player ability audit](PlayerAbilityLiveAudit-2026-09-23.md)
+  exercised the current ten-ability roster in each M12 weapon context twice in
+  PIE, observing A/B cast playback, Echo spend, Niagara, projectile classes where
+  applicable, and real target hits in focused replays. Its synthetic Echo refill
+  and stationary target make it a focused validation rather than full encounter
+  proof. Interrupted actions, insufficient resources, death during casts,
+  checkpoint/handoff recovery, and each enemy archetype's attack impact still
+  need the broader normal-play matrix.
 
 ## Readability and polish
 
@@ -286,6 +290,7 @@ The M12 asset is modified; none of the tests in this pass saved either map.
 
 ## September 23 fresh-route follow-up
 
+- **Latest full-route and CP9 gate:** the [fresh route and earned reload report](Validation/AurelionFreshM12M13RouteAndCP9-2026-09-23.md) records a new visible CP0→M13 separate-departures pass through all eight ordinary-input continuation stages, followed by two public loads from its exact earned CP9 banks. Both reloads preserved 35 journal entries, evidence, equipment, resources and separate exits; the rendered HUD remained single and stable. An earlier E1 retry run died three times behind intentional cover, while this repeat passed E1 without retries or exercising the new occluded-target switch. E1 consistency and physical-device feel remain open. The live E3 frame still shows oversized world-space graybox signage during combat; replace it as part of the authored architecture/wayfinding pass.
 - **Enemy attack facing:** `5b2dc6d4` moves the Linkbound, Weaver, WallRunner and Elite's combat-facing turn after movement/mesh ticks and prevents Narrative's orient-to-movement setting from counter-turning an active target. Two earned E4B PIE replays completed the encounter; the longer replay sampled 18 WallRunner attack frames with a maximum 8.1-degree target-bearing error. The 14 native threat tests passed.
 - **E2 Enforcer facing follow-up:** A fresh ordinary-input route reached and completed E1 and E2 in `E2EnforcerFacingReplay-20260923-030228-c85d6e38`. A passive PIE observer sampled all four Enforcers 303 times during E2. Their authored Blueprint does not enable the native hard-lock combat turn, but Narrative's controller focus kept 288 focused samples within 11.1 degrees of the live target (95th percentile below 0.5 degrees; none over 45). Fifteen samples had no focus; the seven more than 90 degrees from the player were hit reactions, not attack montages. The 39 observed montages were hit reactions, rifle reloads or unholster, so this run does not certify a dedicated Enforcer firing montage or every payload frame. The earlier first fresh E1→E2 pass also completed, but its passive observer failed on an unsupported Python mesh accessor and is excluded from facing conclusions. No Enforcer rotation was changed without an attack-facing failure. This narrows the reported issue to roles or frames not represented by a focused Enforcer in this build; the existing drone and Eclipse fixes above remain in place.
 - **E2 Enforcer held retry:** `E2EnforcerPassiveFacing-20260923-034236-b96a9af2` publicly loaded the same earned E2 entry and used ordinary retry input, then held the arena Active for 30 seconds. After the restored world became active, four Enforcers provided 306 body-facing samples, 272 with controller focus. Their maximum body-to-focus error was 1.99 degrees (95th percentile 0.45; none over 45). The 36 montage frames in this active window were rifle reload or unholster, with no sampled character firing montage. This corroborates facing during target focus but leaves the visible rifle firing pose and shot-release frame unqualified; inspect the weapon/upper-body animation path before treating that absence as a missing montage. The observer and checkpoint runner both completed without errors.
