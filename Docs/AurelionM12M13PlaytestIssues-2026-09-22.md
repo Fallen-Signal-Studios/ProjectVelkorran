@@ -38,6 +38,17 @@ their next runtime check. A passing build alone does not close any gameplay row.
   at 100 health after 57 spaced trigger presses, 154 reserve rounds remained,
   and every protected person survived. This proves E4B checkpoint recovery;
   it does not replace an uninterrupted current-build M12-to-M13 pass.
+  `FreshM12M13FinalThermalChain-20260922-231542-7cf76772` now supplies that
+  pass on the final heat range, frost-ground query and pilot. Rendered PIE
+  used ordinary controls from a fresh E1 start through E1 with no retry, E2,
+  E3 rescue, both E4 phases, native M12 completion/travel, and all thirteen
+  M13 receipts including the physical lift, CP7/8/9 and separate departures.
+  All eight follow-on drivers passed; E4B ended at 100 health with protected
+  people alive. The full native build and 730-test gate had passed in
+  `20260922-230932-fb3dcf50`. The editor exited without saving either map;
+  both SHA-256 hashes remain at the baseline listed below. Current-build
+  explicit CP9 reload, packaged execution, repeated reliability, other
+  campaign choices and presentation acceptance remain separate checks.
 - **E4B retry:** `E4BRetryRegression-20260922-180448-2aadb797` loaded an
   older earned ArenaEntry checkpoint into Failed, used the authored retry
   interaction, restored the Elite's thermal bindings, then passed frost,
@@ -82,8 +93,9 @@ their next runtime check. A passing build alone does not close any gameplay row.
   The full 730-test native gate passed in `20260922-230932-fb3dcf50`, and
   `E4BMobileEliteWallRunnerRetest-20260922-231119-a6b1d7b4` read 550 cm in
   PIE, earned the thermal/Core receipts and defeated the whole encounter by
-  ordinary input at 100 health with all protected people alive. Uninterrupted
-  M12-to-M13 proof on this final range and pilot remains pending.
+  ordinary input at 100 health with all protected people alive. The fresh
+  uninterrupted M12-to-M13 proof on this final range and pilot also passed
+  in `FreshM12M13FinalThermalChain-20260922-231542-7cf76772` as above.
 
 ## Player and enemy combat
 
