@@ -113,6 +113,9 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Narrative|GAS|Bot Combat")
 	bool IsBotAttackExecutionValid(AActor* Target, FGameplayAbilitySpecHandle Handle) const;
 
+	/** Target reserved for this exact active attack; null when no selector-owned target exists. */
+	AActor* GetBotAttackTarget(FGameplayAbilitySpecHandle Handle) const;
+
 	/** A useful positioning range survives cooldown, LOS and temporary state blocks. */
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Narrative|GAS|Bot Combat")
 	float GetBotCombatMovementRange(AActor* Target, FGameplayTag InputFilter);

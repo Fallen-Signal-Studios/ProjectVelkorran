@@ -218,7 +218,20 @@ class Run:
         row['last_recovery_state'] = state
         assert state is None or 'FAILED' not in state.upper(), 'Native fatal recovery reported failure'
         assert now - self.recovery_started < NATIVE_RECOVERY_SECONDS, 'Native fatal recovery did not resume play in time'
-        assert world == self.world, 'Native recovery changed the world; this driver resumes only same-world recovery'
+        if world != self.world:
+            # Fatal recovery may take the authored checkpoint-load path. PIE
+            # keeps the M12 package name but replaces every actor and world
+            # object; rebind the input and damage observers to that world.
+            assert 'L_Aurelion_M12' in _path(world), 'Native recovery loaded a different map'
+            row['checkpoint_world_replaced'] = True
+            if self.damage_binding is not None:
+                _optional(lambda binding=self.damage_binding: binding[0].remove_callable(binding[1]))
+                self.damage_binding = None
+            self.damage_pawn = None
+            self.world = world
+            self.owner = self.get_input_owner(world)
+            self.e1 = None
+            self.pressure = None
         players_ready = isinstance(pc, unreal.SovPlayerController) and isinstance(pawn, unreal.SovPlayerCharacterBase)
         campaign = pc.get_campaign_state() if players_ready else None
         mission = campaign.get_active_mission() if campaign else None
@@ -236,7 +249,8 @@ class Run:
             self.e1 = matches[0]
             row['e1_director_replaced'] = True
         encounter = self.e1.get_encounter_state()
-        row.update(last_e1_state=str(encounter), last_pawn=_path(pawn), checkpoint_load=bool(row.get('load_transients')))
+        row.update(last_e1_state=str(encounter), last_pawn=_path(pawn),
+                   checkpoint_load=bool(row.get('load_transients') or row.get('checkpoint_world_replaced')))
         attempt = self.e1.get_attempt_id().export_text()
         resumed = (pawn.is_alive() and pawn.get_health() > 0. and pawn.is_character_ready()
                    and encounter == unreal.SovEncounterState.ACTIVE
@@ -601,6 +615,24 @@ class Run:
                       and not p.character.get_editor_property('hidden')]
         if not candidates:
             self.inject()
+            return
+        if os.environ.get('SOV_E1_DEATH_RECOVERY_PROBE') == '1' and not self.report['native_retries']:
+            # Stand in ordinary enemy fire until native fatal recovery runs.
+            # This optional probe supplies movement input only: no health,
+            # resource, damage, encounter, or checkpoint state is changed.
+            started = self.report.setdefault('death_probe_started', time.monotonic()-self.started)
+            exposure_bound = float(os.environ.get('SOV_E1_EXPOSURE_SECONDS', '150'))
+            assert 20. <= exposure_bound <= 150.
+            assert time.monotonic()-self.started-started < exposure_bound, 'No native player death during bounded E1 exposure'
+            position = pawn.get_actor_location()
+            nearest = min(candidates, key=lambda actor: pawn.get_distance_to(actor))
+            distance = pawn.get_distance_to(nearest)
+            clear = self.clear_sight(world, pawn, nearest)
+            movement = self.approach(world, pc, pawn, nearest) if distance > 1200. or not clear else (0., 0.)
+            self.report['death_probe'] = dict(target=_path(nearest), distance=distance,
+                clear_sight=clear, movement=movement, health=pawn.get_health(),
+                incoming_damage_count=len(self.report['incoming_damage']))
+            self.inject(move=movement)
             return
         location = pawn.get_actor_location()
         def ordering(actor):

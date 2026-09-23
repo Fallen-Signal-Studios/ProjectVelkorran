@@ -1,6 +1,7 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Tests/SovCombatInterruptionTestFixtures.h"
 #include "Tests/SovAxiomRuntimeTestFixtures.h"
+#include "AIController.h"
 #include "ArsenalSettings.h"
 #include "ArsenalStatics.h"
 #include "Components/BoxComponent.h"
@@ -82,6 +83,34 @@ template<class T> T* Activate(FAutomationTestBase& Test, ASovAxiomRuntimeTestCha
 	const auto* Granted = ASC->FindAbilitySpecFromHandle(Handle);
 	return Granted ? Cast<T>(Granted->GetPrimaryInstance()) : nullptr;
 }
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovDroneAttackTargetSurvivesMovementFocusTest,
+	"ProjectVelkorran.Campaign.CombatInterruption.Drone.SelectedTargetSurvivesMovementFocus",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovDroneAttackTargetSurvivesMovementFocusTest::RunTest(const FString& Parameters)
+{
+	SovCombatInterruptionTests::FWorld Fixture;
+	auto* Source = Fixture.Character(FVector::ZeroVector, 1);
+	auto* Target = Fixture.Character(FVector(500.f, 0.f, 0.f), 0);
+	auto* Controller = Fixture.World->SpawnActor<AAIController>();
+	if (!Source || !Target || !Controller) { return false; }
+	Controller->Possess(Source);
+	Controller->SetFocus(Target);
+	if (!TestEqual(TEXT("Selector focus precedes activation"), Controller->GetFocusActor(), static_cast<AActor*>(Target)))
+	{
+		return false;
+	}
+	auto* Gun = SovCombatInterruptionTests::Activate<USovCombatDroneGunTestAbility>(*this, Source);
+	if (!Gun) { return false; }
+	// BT travel can replace focus during the windup. The chosen attack should
+	// still fire toward its live hostile target rather than this movement point.
+	Controller->ClearFocus(EAIFocusPriority::Gameplay);
+	Controller->SetFocalPoint(FVector(0.f, -500.f, 0.f));
+	TestNull(TEXT("Movement has removed actor focus"), Controller->GetFocusActor());
+	Gun->FireGunBurstFromAim();
+	TestEqual(TEXT("Committed attack still hits the selected player"), Target->ResolvedHitCount, 1);
+	return true;
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovInterruptionDroneReleaseDisableTest,

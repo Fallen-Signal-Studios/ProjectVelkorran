@@ -7,15 +7,19 @@
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
+#include "AI/NarrativeNPCController.h"
 #include "AIController.h"
 #include "AISystem.h"
 #include "Animation/AnimMontage.h"
+#include "ArsenalSettings.h"
+#include "BehaviorTree/BlackboardComponent.h"
 #include "Character/NarrativeCharacterVisual.h"
 #include "Characters/SovDroneNPCBase.h"
 #include "CollisionQueryParams.h"
 #include "Combat/SovNativeDamageReceipt.h"
 #include "Combat/SovProtectionInterceptReceipt.h"
 #include "Combat/SovThreatTargeting.h"
+#include "Campaign/SovEncounterCoordinationComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Effects/SovGameplayEffect_ReformationDroneWeapons.h"
 #include "Engine/OverlapResult.h"
@@ -224,6 +228,13 @@ void USovGameplayAbility_ReformationDroneWeaponBase::ActivateAbility(
 		: nullptr;
 	ActionASC = ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
 	ActionAvatar = ActorInfo ? ActorInfo->AvatarActor.Get() : nullptr;
+	CommittedAttackTarget.Reset();
+	DirectAttackTokenController.Reset();
+	DirectAttackTokenTarget.Reset();
+	DirectEncounterCoordinator.Reset();
+	DirectEncounterReservation.Invalidate();
+	DirectAttackTokenSerial = 0;
+	bDirectAttackTokenNew = false;
 	ActionWorld = ActionAvatar.IsValid() ? ActionAvatar->GetWorld() : nullptr;
 	ActionAttributes = ActionASC.IsValid() ? ActionASC->GetSet<UNarrativeAttributeSetBase>() : nullptr;
 	const auto* NarrativeASC = Cast<UNarrativeAbilitySystemComponent>(ActionASC.Get());
@@ -236,6 +247,20 @@ void USovGameplayAbility_ReformationDroneWeaponBase::ActivateAbility(
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
+	}
+	// The selector's lease is the exact target admitted for this attack. AI
+	// movement may replace controller focus during the windup or even during
+	// token callbacks before activation, so focus is only a manual-attack fallback.
+	AActor* SelectedTarget = NarrativeASC ? NarrativeASC->GetBotAttackTarget(Handle) : nullptr;
+	if (!SelectedTarget)
+	{
+		const AAIController* AIController = Cast<AAIController>(GetOwningController());
+		SelectedTarget = AIController ? AIController->GetFocusActor() : nullptr;
+	}
+	UAbilitySystemComponent* TargetASC = ResolveAbilitySystemFromActor(SelectedTarget);
+	if (IsHostileTarget(TargetASC) && IsTargetAlive(TargetASC))
+	{
+		CommittedAttackTarget = TargetASC->GetAvatarActor();
 	}
 	BindInterruptions();
 	const bool bCommitted = CommitAbility(Handle, ActorInfo, ActivationInfo);
@@ -344,6 +369,9 @@ void USovGameplayAbility_ReformationDroneWeaponBase::EndAbility(
 		RetiredMontage->EndTask();
 	}
 	CleanupWeaponPayload();
+	ReleaseDirectAttackToken();
+	ReleaseDirectEncounterSlot();
+	CommittedAttackTarget.Reset();
 	ActionASC.Reset();
 	ActionAvatar.Reset();
 	ActionWorld.Reset();
@@ -487,6 +515,13 @@ bool USovGameplayAbility_ReformationDroneWeaponBase::
 		return false;
 	}
 
+	if (!ResolveCommittedAttackTarget()) { CaptureObservedAttackTarget(); }
+	if (!ReserveDirectEncounterSlot()) { return false; }
+	if (!ReserveDirectAttackToken())
+	{
+		ReleaseDirectEncounterSlot();
+		return false;
+	}
 	bPayloadStarted = true;
 	if (UWorld* World = GetWorld())
 	{
@@ -556,7 +591,15 @@ void USovGameplayAbility_ReformationDroneWeaponBase::CancelDroneWeaponAbility()
 
 bool USovGameplayAbility_ReformationDroneWeaponBase::CanContinueWeaponPayload() const
 {
-	return IsWeaponActivationCurrent(WeaponActivationEpoch) && !bPayloadFinished && HasCurrentWeaponOwner();
+	return IsWeaponActivationCurrent(WeaponActivationEpoch) && !bPayloadFinished && HasCurrentWeaponOwner()
+		&& (!DirectEncounterReservation.IsValid() || (DirectEncounterCoordinator.IsValid()
+			&& DirectEncounterCoordinator->IsAttackReservationCurrent(
+				DirectEncounterReservation, Cast<UNarrativeAbilitySystemComponent>(ActionASC.Get()),
+				CommittedAttackTarget.Get(), CurrentSpecHandle)))
+		&& (DirectAttackTokenSerial == 0 || (DirectAttackTokenController.IsValid()
+			&& DirectAttackTokenTarget.IsValid()
+			&& DirectAttackTokenController->IsAttackTokenLeaseCurrent(
+				DirectAttackTokenSerial, DirectAttackTokenTarget.Get())));
 }
 
 FTransform USovGameplayAbility_ReformationDroneWeaponBase::ResolveMuzzleTransform(
@@ -592,6 +635,132 @@ FTransform USovGameplayAbility_ReformationDroneWeaponBase::ResolveMuzzleTransfor
 	return MuzzleTransform;
 }
 
+void USovGameplayAbility_ReformationDroneWeaponBase::CaptureObservedAttackTarget()
+{
+	const ANarrativeNPCController* Controller = Cast<ANarrativeNPCController>(GetOwningController());
+	if (!IsValid(Controller)) { return; }
+	AActor* Source = GetAvatarActorFromActorInfo();
+	const auto IsDirectHostile = [this, Controller, Source](AActor* Candidate)
+	{
+		UAbilitySystemComponent* ASC = ResolveAbilitySystemFromActor(Candidate);
+		return IsHostileTarget(ASC) && IsTargetAlive(ASC)
+			&& Controller->CanDirectlyTargetThreat(ASC->GetAvatarActor())
+			&& SovThreatTargeting::CanTrack(Source, ASC->GetAvatarActor());
+	};
+	const UBlackboardComponent* Board = Controller->GetBlackboardComponent();
+	const UArsenalSettings* Settings = GetDefault<UArsenalSettings>();
+	AActor* Candidate = Board && Settings
+		? Cast<AActor>(Board->GetValueAsObject(Settings->BBKey_AttackTarget)) : nullptr;
+	if (!IsDirectHostile(Candidate))
+	{
+		Candidate = nullptr;
+		float BestScore = -1.f;
+		for (const FNarrativeThreatMemory& Memory : Controller->GetThreatDebugSnapshot())
+		{
+			AActor* Threat = Memory.Target.Get();
+			if (!Memory.bDirectObservation || !IsDirectHostile(Threat)) { continue; }
+			const float Score = Memory.Strength * Memory.Confidence;
+			if (Score > BestScore)
+			{
+				BestScore = Score;
+				Candidate = Threat;
+			}
+		}
+	}
+	if (Candidate)
+	{
+		CommittedAttackTarget = ResolveAbilitySystemFromActor(Candidate)->GetAvatarActor();
+	}
+}
+
+bool USovGameplayAbility_ReformationDroneWeaponBase::ReserveDirectEncounterSlot()
+{
+	AActor* Target = ResolveCommittedAttackTarget();
+	UNarrativeAbilitySystemComponent* SourceASC = Cast<UNarrativeAbilitySystemComponent>(ActionASC.Get());
+	if (!Target || !IsValid(SourceASC)) { return true; }
+	if (SourceASC->GetBotAttackTarget(CurrentSpecHandle))
+	{
+		// The selector already reserved this exact ability with the coordinator.
+		return true;
+	}
+	USovEncounterCoordinationComponent* Coordinator = Cast<USovEncounterCoordinationComponent>(
+		SourceASC->GetBotAttackCoordinator());
+	if (!IsValid(Coordinator)) { return true; }
+	const FGuid Reservation = Coordinator->ReserveActiveAttack(SourceASC, Target, this, CurrentSpecHandle);
+	if (!Reservation.IsValid()) { return false; }
+	DirectEncounterCoordinator = Coordinator;
+	DirectEncounterReservation = Reservation;
+	return CanContinueWeaponPayload();
+}
+
+void USovGameplayAbility_ReformationDroneWeaponBase::ReleaseDirectEncounterSlot()
+{
+	USovEncounterCoordinationComponent* Coordinator = DirectEncounterCoordinator.Get();
+	const FGuid Reservation = DirectEncounterReservation;
+	DirectEncounterCoordinator.Reset();
+	DirectEncounterReservation.Invalidate();
+	if (IsValid(Coordinator) && Reservation.IsValid())
+	{
+		Coordinator->ReleaseAttack(Reservation);
+	}
+}
+
+bool USovGameplayAbility_ReformationDroneWeaponBase::ReserveDirectAttackToken()
+{
+	if (!bBotRequiresAttackToken || ManagesBotAttackToken() || !ResolveCommittedAttackTarget())
+	{
+		return true;
+	}
+	const UNarrativeAbilitySystemComponent* SourceASC = Cast<UNarrativeAbilitySystemComponent>(ActionASC.Get());
+	if (SourceASC && SourceASC->GetBotAttackTarget(CurrentSpecHandle))
+	{
+		// TryActivateBotAttack already owns the selector's target and token lease.
+		return true;
+	}
+	ANarrativeNPCController* Controller = Cast<ANarrativeNPCController>(GetOwningController());
+	// Manual authority abilities and non-Narrative AI controllers have no
+	// Narrative attack-token budget to reserve.
+	if (!IsValid(Controller)) { return true; }
+	UNarrativeAbilitySystemComponent* TargetASC = Cast<UNarrativeAbilitySystemComponent>(
+		ResolveAbilitySystemFromActor(ResolveCommittedAttackTarget()));
+	if (!IsValid(TargetASC)) { return false; }
+	uint64 Serial = 0;
+	bool bNewlyAcquired = false;
+	if (!Controller->TryAcquireAttackTokenFor(TargetASC, Serial, bNewlyAcquired))
+	{
+		return false;
+	}
+	DirectAttackTokenController = Controller;
+	DirectAttackTokenTarget = TargetASC;
+	DirectAttackTokenSerial = Serial;
+	bDirectAttackTokenNew = bNewlyAcquired;
+	return CanContinueWeaponPayload();
+}
+
+void USovGameplayAbility_ReformationDroneWeaponBase::ReleaseDirectAttackToken()
+{
+	ANarrativeNPCController* Controller = DirectAttackTokenController.Get();
+	const uint64 Serial = DirectAttackTokenSerial;
+	const bool bReturnToken = bDirectAttackTokenNew;
+	DirectAttackTokenController.Reset();
+	DirectAttackTokenTarget.Reset();
+	DirectAttackTokenSerial = 0;
+	bDirectAttackTokenNew = false;
+	if (IsValid(Controller) && Serial != 0)
+	{
+		Controller->ReleaseAttackTokenLease(Serial, bReturnToken);
+	}
+}
+
+AActor* USovGameplayAbility_ReformationDroneWeaponBase::ResolveCommittedAttackTarget() const
+{
+	AActor* Target = CommittedAttackTarget.Get();
+	UAbilitySystemComponent* TargetASC = ResolveAbilitySystemFromActor(Target);
+	return IsHostileTarget(TargetASC) && IsTargetAlive(TargetASC)
+		&& SovThreatTargeting::CanTrack(GetAvatarActorFromActorInfo(), TargetASC->GetAvatarActor())
+		? TargetASC->GetAvatarActor() : nullptr;
+}
+
 FVector USovGameplayAbility_ReformationDroneWeaponBase::ResolveAuthorityAimPoint(
 	const float TraceDistance)
 {
@@ -604,7 +773,12 @@ FVector USovGameplayAbility_ReformationDroneWeaponBase::ResolveAuthorityAimPoint
 	FVector AimStart = Avatar->GetActorLocation();
 	FRotator AimRotation = Avatar->GetActorRotation();
 	Avatar->GetActorEyesViewPoint(AimStart, AimRotation);
-	if (const AController* Controller = GetOwningController())
+	if (AActor* AttackTarget = ResolveCommittedAttackTarget())
+	{
+		const FVector ToTarget = AttackTarget->GetActorLocation() - AimStart;
+		if (!ToTarget.IsNearlyZero()) { AimRotation = ToTarget.Rotation(); }
+	}
+	else if (const AController* Controller = GetOwningController())
 	{
 		if (const AAIController* AIController = Cast<AAIController>(Controller))
 		{
@@ -1015,7 +1189,8 @@ void USovGameplayAbility_ReformationDroneGunfire::FireNextBurstShot(uint64 Expec
 	const int32 ShotIndex = ShotsFired;
 	ANarrativeCharacter* SourceCharacter = Cast<ANarrativeCharacter>(GetAvatarActorFromActorInfo());
 	AAIController* SourceController = SourceCharacter ? Cast<AAIController>(SourceCharacter->GetController()) : nullptr;
-	AActor* IntendedFocus = SourceController ? SourceController->GetFocusActor() : nullptr;
+	AActor* IntendedFocus = ResolveCommittedAttackTarget();
+	if (!IntendedFocus) { IntendedFocus = SourceController ? SourceController->GetFocusActor() : nullptr; }
 	const FTransform MuzzleTransform = ResolveMuzzleTransform(ShotIndex);
 	const FVector TraceStart = MuzzleTransform.GetLocation();
 	const FVector AimPoint = ResolveAuthorityAimPoint(MaximumRange);
@@ -1432,6 +1607,7 @@ USovGameplayAbility_ReformationDroneRocketLauncher::ResolveRocketClass() const
 AActor* USovGameplayAbility_ReformationDroneRocketLauncher::
 	ResolveHomingTarget() const
 {
+	if (AActor* Target = ResolveCommittedAttackTarget()) { return Target; }
 	const AAIController* AIController = Cast<AAIController>(GetOwningController());
 	AActor* FocusActor = IsValid(AIController) ? AIController->GetFocusActor() : nullptr;
 	if (!IsValid(FocusActor))

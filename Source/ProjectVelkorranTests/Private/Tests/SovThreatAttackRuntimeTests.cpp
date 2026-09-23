@@ -138,6 +138,36 @@ bool FSovThreatNativeBurstTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("A concealed actor physically inside a shot is still damageable"), F.Health() < AfterFirst);
 	return true;
 }
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovThreatDroneObservedAimTest,
+	"ProjectVelkorran.Campaign.Threat.DroneDirectSightSurvivesMissingFocus",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FSovThreatDroneObservedAimTest::RunTest(const FString& Parameters)
+{
+	FThreatAttackWorld F;
+	if (!TestTrue(TEXT("Real NPC perception and GAS fixture"), F.Valid())) { return false; }
+	F.Sight(true);
+	TestTrue(TEXT("Fixture records direct hostile sight"), F.Controller->CanDirectlyTargetThreat(F.Target));
+	TestTrue(TEXT("Fixture exposes a direct sight memory"), F.Controller->GetThreatDebugSnapshot().ContainsByPredicate(
+		[&F](const FNarrativeThreatMemory& Memory)
+		{ return Memory.Target.Get() == F.Target && Memory.bDirectObservation; }));
+	F.Controller->ClearFocus(EAIFocusPriority::Gameplay);
+	F.Controller->SetFocalPoint(FVector(0.f, -500.f, 0.f));
+	TestNull(TEXT("Blueprint-style attack has no actor focus"), F.Controller->GetFocusActor());
+	auto* TargetASC = Cast<USovBotTestASC>(F.Target->GetNarrativeAbilitySystemComponent());
+	if (!TestNotNull(TEXT("Target has a controllable attack-token budget"), TargetASC)) { return false; }
+	TargetASC->TestTokenBudget = 0;
+	auto* Rejected = F.Activate<USovThreatDroneGun>();
+	if (!TestNotNull(TEXT("Direct attack can start its authored windup"), Rejected)) { return false; }
+	Rejected->FireGunBurstFromAim();
+	TestFalse(TEXT("No attack token cancels the direct release"), Rejected->IsActive());
+	TestEqual(TEXT("No token means no shot damage"), F.Health(), 100.f);
+	TargetASC->TestTokenBudget = 1;
+	auto* Gun = F.Activate<USovThreatDroneGun>();
+	if (!TestNotNull(TEXT("Native drone weapon activates without a selector lease"), Gun)) { return false; }
+	Gun->FireGunBurstFromAim();
+	TestTrue(TEXT("Current direct sight aims the shot at the physical hostile target"), F.Health() < 100.f);
+	return true;
+}
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovThreatRocketTrackingTest, "ProjectVelkorran.Campaign.Threat.ReleasedRocketRetiresHoming",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FSovThreatRocketTrackingTest::RunTest(const FString& Parameters)

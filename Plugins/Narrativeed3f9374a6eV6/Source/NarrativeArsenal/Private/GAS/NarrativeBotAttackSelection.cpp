@@ -445,6 +445,12 @@ float UNarrativeAbilitySystemComponent::GetBotAttackFrequency(const FGameplayTag
 	return Candidates.IsEmpty() ? 1.f : FMath::Max(Candidates[0].Frequency, 0.05f);
 }
 
+AActor* UNarrativeAbilitySystemComponent::GetBotAttackTarget(const FGameplayAbilitySpecHandle Handle) const
+{
+	const FNarrativeBotAttackLease* Lease = BotAttackLeases.Find(Handle);
+	return Lease && Lease->Target.IsValid() ? Lease->Target->GetAvatarActor() : nullptr;
+}
+
 bool UNarrativeAbilitySystemComponent::IsBotAttackExecutionValid(AActor* Target, const FGameplayAbilitySpecHandle Handle) const
 {
 	if (!IsBotCombatContextValid(Target, true)) { return false; }

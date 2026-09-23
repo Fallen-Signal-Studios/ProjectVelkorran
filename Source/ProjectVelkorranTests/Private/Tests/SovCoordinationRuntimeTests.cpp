@@ -186,6 +186,39 @@ bool FSovCoordinationThreatSuspensionTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCoordinationActiveReleaseTest,
+	"ProjectVelkorran.Campaign.Encounter.Coordination.ActiveBlueprintReleaseUsesAttackerSlots",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FSovCoordinationActiveReleaseTest::RunTest(const FString& Parameters)
+{
+	FCoordinationWorld Test;
+	auto* First = Test.Add(TEXT("First"), FVector(200.f, 0.f, 0.f));
+	auto* Second = Test.Add(TEXT("Second"), FVector(300.f, 0.f, 0.f));
+	auto* Coordination = Test.Director->GetCoordinationComponent();
+	Coordination->MeleeAttackerSlots = 1;
+	FGameplayAbilitySpecHandle FirstHandle, SecondHandle;
+	auto* FirstAbility = Attack(ASC(First), FirstHandle, true);
+	auto* SecondAbility = Attack(ASC(Second), SecondHandle, true);
+	FSovCoordinationTestAccess::Start(Test.Director, Test.Player);
+	if (!TestTrue(TEXT("First direct GAS attack starts"), ASC(First)->TryActivateAbility(FirstHandle))
+		|| !TestTrue(TEXT("Second direct GAS attack starts"), ASC(Second)->TryActivateAbility(SecondHandle)))
+	{
+		return false;
+	}
+	const FGuid FirstTicket = Coordination->ReserveActiveAttack(ASC(First), Test.Player, FirstAbility, FirstHandle);
+	TestTrue(TEXT("Active attack can reserve its exact release"), FirstTicket.IsValid());
+	TestFalse(TEXT("Second active attack cannot bypass the authored melee slot"),
+		Coordination->ReserveActiveAttack(ASC(Second), Test.Player, SecondAbility, SecondHandle).IsValid());
+	Coordination->ReleaseAttack(FirstTicket);
+	const FGuid SecondTicket = Coordination->ReserveActiveAttack(ASC(Second), Test.Player, SecondAbility, SecondHandle);
+	TestTrue(TEXT("Released slot admits the waiting active attack"), SecondTicket.IsValid());
+	Coordination->ReleaseAttack(SecondTicket);
+	FirstAbility->FinishTestAttack();
+	SecondAbility->FinishTestAttack();
+	TestEqual(TEXT("All direct reservations are released"), FSovCoordinationTestAccess::Reservations(Coordination), 0);
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCoordinationAdmissionTest, "ProjectVelkorran.Campaign.Encounter.Coordination.AttackLeasesWarningsAndRelief",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FSovCoordinationAdmissionTest::RunTest(const FString& Parameters)

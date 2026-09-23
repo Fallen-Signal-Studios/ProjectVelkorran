@@ -97,6 +97,9 @@ public:
 		const UNarrativeCombatAbility* Ability, FGameplayAbilitySpecHandle Handle) const override;
 	virtual FGuid ReserveAttack(UNarrativeAbilitySystemComponent* Source, AActor* Target,
 		const UNarrativeCombatAbility* Ability, FGameplayAbilitySpecHandle Handle) override;
+	/** Admit an already-active Blueprint weapon at its authoritative release frame. */
+	FGuid ReserveActiveAttack(UNarrativeAbilitySystemComponent* Source, AActor* Target,
+		const UNarrativeCombatAbility* Ability, FGameplayAbilitySpecHandle Handle);
 	virtual void ReleaseAttack(FGuid ReservationId) override;
 	virtual bool IsAttackReservationCurrent(FGuid ReservationId, const UNarrativeAbilitySystemComponent* Source,
 		const AActor* Target, FGameplayAbilitySpecHandle Handle) const override;
@@ -105,6 +108,10 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 	virtual void TickComponent(float Delta, ELevelTick TickType, FActorComponentTickFunction* TickFunction) override;
 private:
+	bool CanAdmitAttackInternal(UNarrativeAbilitySystemComponent* Source, AActor* Target,
+		const UNarrativeCombatAbility* Ability, FGameplayAbilitySpecHandle Handle, bool bRequireActive) const;
+	FGuid ReserveAttackInternal(UNarrativeAbilitySystemComponent* Source, AActor* Target,
+		const UNarrativeCombatAbility* Ability, FGameplayAbilitySpecHandle Handle, bool bRequireActive);
 	friend struct FSovCoordinationTestAccess;
 	friend struct FSovCrucibleRuntimeTestAccess;
 	UFUNCTION() void HandleEncounterState(ESovEncounterState Previous, ESovEncounterState Current);

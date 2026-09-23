@@ -170,11 +170,13 @@ bool FSovBotTokenTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Rejected token does not execute payload"), Ability->ActivationCount, 0);
 	TargetASC->TestTokenBudget = 1;
 	TestTrue(TEXT("Available token starts selected attack"), ASC->TryActivateBotAttack(Target, Handle));
+	TestEqual(TEXT("Exact attack lease retains its selected target"), ASC->GetBotAttackTarget(Handle), static_cast<AActor*>(Target));
 	TestTrue(TEXT("Target owns reciprocal reservation"), TargetASC->HasAttackTokenFor(Controller));
 	TestTrue(TEXT("Own Busy state does not cancel active attack"), ASC->IsBotAttackExecutionValid(Target, Handle));
 	ASC->AddLooseGameplayTag(FSovGameplayTags::Get().State_Status_DeviceDisabled);
 	TestFalse(TEXT("Device shutdown invalidates a running generic attack"), ASC->IsBotAttackExecutionValid(Target, Handle));
 	ASC->CancelAbilityHandle(Handle);
+	TestNull(TEXT("Retired attack cannot expose a stale target"), ASC->GetBotAttackTarget(Handle));
 	ASC->RemoveLooseGameplayTag(FSovGameplayTags::Get().State_Status_DeviceDisabled);
 	TestFalse(TEXT("Ending exact attack releases its new token"), TargetASC->HasAttackTokenFor(Controller));
 	// Borrow an existing Behavior Tree-owned token without returning it afterward.

@@ -12,6 +12,9 @@ class ASovReformationDroneGunshotPresentation;
 class ASovReformationDroneRocketProjectile;
 class ASovReformationDroneSelfDestructPresentation;
 class UAbilitySystemComponent;
+class ANarrativeNPCController;
+class UNarrativeAbilitySystemComponent;
+class USovEncounterCoordinationComponent;
 class UAbilityTask_PlayMontageAndWait;
 class UAnimMontage;
 class UGameplayEffect;
@@ -96,7 +99,17 @@ protected:
 	/** Resolves a drone-mesh muzzle socket, then falls back to a local offset. */
 	FTransform ResolveMuzzleTransform(int32 MuzzleIndex) const;
 
-	/** Authority-owned focus/control-rotation aim trace. */
+	/** The hostile target selected at activation, valid only for this weapon action. */
+	AActor* ResolveCommittedAttackTarget() const;
+	/** Uses the controller's authored attack key or direct sight when Blueprint combat bypasses bot selection. */
+	void CaptureObservedAttackTarget();
+	/** Direct Blueprint attacks borrow or reserve the same target token as selected attacks. */
+	bool ReserveDirectEncounterSlot();
+	void ReleaseDirectEncounterSlot();
+	bool ReserveDirectAttackToken();
+	void ReleaseDirectAttackToken();
+
+	/** Authority-owned attack-target/focus aim trace. */
 	FVector ResolveAuthorityAimPoint(float TraceDistance);
 
 	/** Applies one point hit through the shared Sovereign damage execution. */
@@ -213,6 +226,13 @@ private:
 	uint64 WeaponActivationEpoch = 0;
 	TWeakObjectPtr<UAbilitySystemComponent> ActionASC;
 	TWeakObjectPtr<AActor> ActionAvatar;
+	TWeakObjectPtr<AActor> CommittedAttackTarget;
+	TWeakObjectPtr<ANarrativeNPCController> DirectAttackTokenController;
+	TWeakObjectPtr<UNarrativeAbilitySystemComponent> DirectAttackTokenTarget;
+	TWeakObjectPtr<USovEncounterCoordinationComponent> DirectEncounterCoordinator;
+	FGuid DirectEncounterReservation;
+	uint64 DirectAttackTokenSerial = 0;
+	bool bDirectAttackTokenNew = false;
 	TWeakObjectPtr<UWorld> ActionWorld;
 	TWeakObjectPtr<const UNarrativeAttributeSetBase> ActionAttributes;
 	uint64 ActionActorInfoEpoch = 0;
@@ -265,7 +285,7 @@ protected:
 
 	/** Full cone angle applied independently to each authoritative shot. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Reformation Drone|Gunfire|Targeting", meta = (ClampMin = "0.0", ClampMax = "45.0", Units = "deg"))
-	float SpreadDegrees = 1.25f;
+	float SpreadDegrees = 8.0f;
 
 private:
 	UFUNCTION()

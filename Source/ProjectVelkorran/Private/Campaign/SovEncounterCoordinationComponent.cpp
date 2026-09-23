@@ -546,11 +546,18 @@ bool USovEncounterCoordinationComponent::IsSourceOnscreen(const AActor* Source, 
 bool USovEncounterCoordinationComponent::CanAdmitAttack(UNarrativeAbilitySystemComponent* Source, AActor* Target,
 	const UNarrativeCombatAbility* Ability, FGameplayAbilitySpecHandle Handle) const
 {
+	return CanAdmitAttackInternal(Source, Target, Ability, Handle, false);
+}
+
+bool USovEncounterCoordinationComponent::CanAdmitAttackInternal(UNarrativeAbilitySystemComponent* Source, AActor* Target,
+	const UNarrativeCombatAbility* Ability, FGameplayAbilitySpecHandle Handle, bool bRequireActive) const
+{
 	FName Id;
 	if (!IsBoundSource(Source, Id) || !IsValid(Ability) || !Handle.IsValid() || !GetWorld()
 		|| !IsLivingTarget(Target, GetWorld()) || !IsHostileTo(Source->GetAvatarActor(), Target)) { return false; }
 	const auto* Spec = Source->FindAbilitySpecFromHandle(Handle);
-	if (!Spec || Spec->PendingRemove || Spec->IsActive() || (Spec->Ability != Ability && Spec->GetPrimaryInstance() != Ability)) { return false; }
+	if (!Spec || Spec->PendingRemove || Spec->IsActive() != bRequireActive
+		|| (Spec->Ability != Ability && Spec->GetPrimaryInstance() != Ability)) { return false; }
 	const auto Pressure = PressureOf(Ability);
 	if (!IsBoundSource(Source, Id) || !IsValid(Target)) { return false; }
 	const double Now = GetWorld()->GetTimeSeconds();
@@ -580,14 +587,26 @@ bool USovEncounterCoordinationComponent::CanAdmitAttack(UNarrativeAbilitySystemC
 FGuid USovEncounterCoordinationComponent::ReserveAttack(UNarrativeAbilitySystemComponent* Source, AActor* Target,
 	const UNarrativeCombatAbility* Ability, FGameplayAbilitySpecHandle Handle)
 {
+	return ReserveAttackInternal(Source, Target, Ability, Handle, false);
+}
+
+FGuid USovEncounterCoordinationComponent::ReserveActiveAttack(UNarrativeAbilitySystemComponent* Source, AActor* Target,
+	const UNarrativeCombatAbility* Ability, FGameplayAbilitySpecHandle Handle)
+{
+	return ReserveAttackInternal(Source, Target, Ability, Handle, true);
+}
+
+FGuid USovEncounterCoordinationComponent::ReserveAttackInternal(UNarrativeAbilitySystemComponent* Source, AActor* Target,
+	const UNarrativeCombatAbility* Ability, FGameplayAbilitySpecHandle Handle, bool bRequireActive)
+{
 	if (bReserving) { return {}; }
 	TGuardValue<bool> Reserving(bReserving, true);
-	if (!CanAdmitAttack(Source, Target, Ability, Handle)) { return {}; }
+	if (!CanAdmitAttackInternal(Source, Target, Ability, Handle, bRequireActive)) { return {}; }
 	const auto Pressure = PressureOf(Ability);
 	FName Id;
 	if (!IsBoundSource(Source, Id)) { return {}; }
 	const FGameplayAbilitySpec* Spec = Source->FindAbilitySpecFromHandle(Handle);
-	if (!Spec || Spec->PendingRemove || Spec->IsActive() || !IsLivingTarget(Target, GetWorld())
+	if (!Spec || Spec->PendingRemove || Spec->IsActive() != bRequireActive || !IsLivingTarget(Target, GetWorld())
 		|| !IsHostileTo(Source->GetAvatarActor(), Target)) { return {}; }
 	FReservation Reservation; Reservation.ASC = Source; Reservation.Avatar = Source->GetAvatarActor(); Reservation.Target = Target;
 	Reservation.Handle = Handle; Reservation.Role = Member(Id).Role; Reservation.bMelee = Pressure == ESovBotAttackPressure::Melee;
