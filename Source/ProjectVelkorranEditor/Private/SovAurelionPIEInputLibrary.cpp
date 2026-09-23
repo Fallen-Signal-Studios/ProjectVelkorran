@@ -12,8 +12,12 @@
 #include "GenericPlatform/GenericPlatformInputDeviceMapper.h"
 #include "InputCoreTypes.h"
 #include "InputKeyEventArgs.h"
+#include "ImageUtils.h"
 #include "Misc/App.h"
+#include "Misc/Paths.h"
+#include "HAL/FileManager.h"
 #include "UObject/Package.h"
+#include "UnrealClient.h"
 #include "Widgets/SViewport.h"
 
 FSovAurelionPIEMouseInputResult USovAurelionPIEInputLibrary::InjectAurelionPIEMouseDelta(
@@ -141,5 +145,54 @@ FSovAurelionPIEPointerInputResult USovAurelionPIEInputLibrary::InjectAurelionPIE
     Result.Report = Result.bRouted
         ? TEXT("Left press and release routed through Slate at the PIE viewport centre. Observe the actual UI result; handled flags depend on the receiving widget.")
         : TEXT("Viewport ownership changed after release; the click cannot be qualified.");
+    return Result;
+}
+
+FSovAurelionPIEViewportCaptureResult USovAurelionPIEInputLibrary::CaptureAurelionPIEViewport(
+    UWorld* World, const FString& Filename)
+{
+    FSovAurelionPIEViewportCaptureResult Result;
+    if (!IsInGameThread() || !GEditor || !GEngine || !IsValid(World)
+        || World->WorldType != EWorldType::PIE || GEditor->PlayWorld != World
+        || GEditor->IsSimulateInEditorInProgress())
+    { Result.Report = TEXT("Capture requires the current real Aurelion PIE world on the game thread."); return Result; }
+    const FString Package = UWorld::RemovePIEPrefix(World->GetOutermost()->GetName());
+    if (Package != TEXT("/Game/Aurelion/Maps/L_Aurelion_M12") && Package != TEXT("/Game/Aurelion/Maps/L_Aurelion_M13"))
+    { Result.Report = TEXT("Capture is restricted to the exact M12 and M13 Aurelion wrappers."); return Result; }
+    int32 PIEWorldCount = 0;
+    for (const FWorldContext& Context : GEngine->GetWorldContexts())
+    { if (Context.WorldType == EWorldType::PIE && IsValid(Context.World())) { ++PIEWorldCount; } }
+    UGameInstance* const Instance = World->GetGameInstance();
+    if (PIEWorldCount != 1 || !IsValid(Instance) || Instance->GetNumLocalPlayers() != 1)
+    { Result.Report = TEXT("Capture requires one PIE world and one local player."); return Result; }
+    ULocalPlayer* const Player = Instance->GetLocalPlayers()[0];
+    UGameViewportClient* const Client = IsValid(Player) ? Player->ViewportClient.Get() : nullptr;
+    ASovPlayerController* const Controller = IsValid(Player)
+        ? Cast<ASovPlayerController>(Player->GetPlayerController(World)) : nullptr;
+    FViewport* const Viewport = IsValid(Client) ? Client->Viewport : nullptr;
+    if (!IsValid(Controller) || !Controller->IsLocalController() || Controller->GetWorld() != World
+        || !IsValid(Client) || Client->GetWorld() != World || !Viewport)
+    { Result.Report = TEXT("Capture could not resolve the sole local player's game viewport."); return Result; }
+    FString Full = FPaths::ConvertRelativePathToFull(Filename);
+    FString Root = FPaths::ConvertRelativePathToFull(
+        FPaths::Combine(FPaths::ProjectDir(), TEXT("Saved/Validation/Aurelion")));
+    FPaths::NormalizeFilename(Full);
+    FPaths::NormalizeFilename(Root);
+    if (!FPaths::IsUnderDirectory(Full, Root) || !FPaths::GetExtension(Full).Equals(TEXT("png"), ESearchCase::IgnoreCase))
+    { Result.Report = FString::Printf(TEXT("Capture requires a PNG under %s; received %s."), *Root, *Full); return Result; }
+    const FIntPoint Size = Viewport->GetSizeXY();
+    if (Size.X < 16 || Size.Y < 16 || Size.X > 8192 || Size.Y > 8192)
+    { Result.Report = TEXT("The player viewport has no usable back buffer dimensions."); return Result; }
+    TArray<FColor> Pixels;
+    if (!Viewport->ReadPixels(Pixels) || Pixels.Num() != Size.X * Size.Y)
+    { Result.Report = TEXT("The player viewport back buffer could not be read."); return Result; }
+    if (!IFileManager::Get().MakeDirectory(*FPaths::GetPath(Full), true)
+        || !FImageUtils::SaveImageByExtension(*Full, FImageView(Pixels.GetData(), Size.X, Size.Y)))
+    { Result.Report = TEXT("The player viewport PNG could not be saved."); return Result; }
+    Result.bCaptured = true;
+    Result.Filename = Full;
+    Result.Width = Size.X;
+    Result.Height = Size.Y;
+    Result.Report = TEXT("Captured the validated local player's PIE back buffer; Slate HUD may be separate.");
     return Result;
 }

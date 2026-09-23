@@ -39,6 +39,9 @@ public:
 	/** Maximum authority turn rate while executing an attack against a visible target. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Sovereign|Combat Facing", meta=(ClampMin="0.0", Units="deg/s"))
 	float CombatFacingTurnRate = 360.f;
+	/** Optional cosmetic recoil for NPC weapon shots. Driven by the weapon's actual attack timestamp. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Sovereign|Weapon Fire")
+	TObjectPtr<class UAnimMontage> WeaponFireMontage;
 	/** Last directly observed target of the authoritative combat-facing turn. */
 	UFUNCTION(BlueprintPure, Category="Sovereign|Combat Facing")
 	AActor* GetCombatFacingTarget() const { return CombatFacingTarget.Get(); }
@@ -66,6 +69,12 @@ public:
 	class USovStatusComponent* GetStatusComponent() const { return StatusComponent; }
 
 protected:
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastPlayWeaponFireMontage();
+	void MulticastPlayWeaponFireMontage_Implementation();
+	void UpdateWeaponFirePresentation();
+	TWeakObjectPtr<class UWeaponItem> PresentedWeapon;
+	float LastPresentedWeaponAttackTime = 0.f;
 	bool InitializeAuthoredPlacedDefinition(FString& Error);
 	virtual void OnCharacterVisualInitialized() override;
 	UPROPERTY(SaveGame)

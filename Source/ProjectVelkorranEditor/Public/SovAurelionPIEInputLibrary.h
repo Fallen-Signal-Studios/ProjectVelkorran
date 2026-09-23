@@ -31,6 +31,17 @@ struct FSovAurelionPIEPointerInputResult
     UPROPERTY(BlueprintReadOnly) FString Report;
 };
 
+USTRUCT(BlueprintType)
+struct FSovAurelionPIEViewportCaptureResult
+{
+    GENERATED_BODY()
+    UPROPERTY(BlueprintReadOnly) bool bCaptured = false;
+    UPROPERTY(BlueprintReadOnly) FString Filename;
+    UPROPERTY(BlueprintReadOnly) int32 Width = 0;
+    UPROPERTY(BlueprintReadOnly) int32 Height = 0;
+    UPROPERTY(BlueprintReadOnly) FString Report;
+};
+
 /** Editor-only synthetic mouse input for the two exact Aurelion PIE wrappers. */
 UCLASS()
 class PROJECTVELKORRANEDITOR_API USovAurelionPIEInputLibrary : public UBlueprintFunctionLibrary
@@ -53,4 +64,11 @@ public:
      */
     UFUNCTION(BlueprintCallable, Category="Velkorran|Editor|PIE Input")
     static FSovAurelionPIEPointerInputResult InjectAurelionPIELeftClick(UWorld* World);
+
+    /** Save the sole local player's current PIE back buffer under Saved/Validation/Aurelion.
+     * This reads the actual game viewport even when an editor level viewport owns focus.
+     */
+    UFUNCTION(BlueprintCallable, Category="Velkorran|Editor|PIE Validation")
+    static FSovAurelionPIEViewportCaptureResult CaptureAurelionPIEViewport(
+        UWorld* World, const FString& Filename);
 };

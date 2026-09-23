@@ -3,7 +3,8 @@
 The passive drone observer is started by the entry wrapper. This script copies
 the two unmodified checkpoint banks into an isolated user profile, uses the
 public save API and normal retry input, then leaves the player stationary for
-30 seconds. It never writes actor combat state or progression directly.
+30 seconds by default (SOV_E2_PASSIVE_SECONDS may extend the observation).
+It never writes actor combat state or progression directly.
 """
 import hashlib
 import json
@@ -21,6 +22,8 @@ sys.path.insert(0, str(project / 'Scripts/Validation/Aurelion'))
 from aurelion_retry_input import RetryInput
 
 ENCOUNTER = 'M12_E2_RelayOverlook'
+PASSIVE_SECONDS = float(os.environ.get('SOV_E2_PASSIVE_SECONDS', '30'))
+assert 5. <= PASSIVE_SECONDS <= 120., 'Passive observation must be 5–120 seconds'
 
 out = Path(os.environ['SOV_AURELION_RUN_DIRECTORY'])
 source = Path(os.environ.get('SOV_AURELION_E2_SOURCE', str(project /
@@ -33,7 +36,8 @@ assert not level.is_in_play_in_editor()
 assert not unreal.EditorLoadingAndSavingUtils.get_dirty_map_packages()
 assert unreal.SovGameUserSettings.get_game_user_settings().complete_accessibility_setup()
 report = dict(status='running', source=str(source), banks=[], callbacks=[],
-              scope=__doc__, retry_uses_normal_input=True, passive_samples=[])
+              scope=__doc__, retry_uses_normal_input=True,
+              passive_seconds=PASSIVE_SECONDS, passive_samples=[])
 state = dict(phase='bootstrap', start=time.monotonic(), busy=False)
 
 
@@ -141,7 +145,7 @@ def tick(_delta):
                     encounter_state=str(state['director'].get_encounter_state()),
                     player_health=pawn.get_health()))
                 write()
-            if now-state['passive_at'] >= 30.:
+            if now-state['passive_at'] >= PASSIVE_SECONDS:
                 finish(None if state['director'].get_encounter_state() == unreal.SovEncounterState.ACTIVE
                        else 'E2 did not remain active during passive observation')
             return

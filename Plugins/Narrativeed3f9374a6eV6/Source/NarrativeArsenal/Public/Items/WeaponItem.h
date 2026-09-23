@@ -430,6 +430,10 @@ public:
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Weapon")
 	void OnAttack();
 
+	/** World time of the last committed weapon attack, for cosmetic shot presentation. */
+	UFUNCTION(BlueprintPure, Category = "Weapon")
+	float GetLastAttackTime() const { return LastAttackTime; }
+
 	//Return whether the weapon is allowed to attack. 
 	UFUNCTION(BlueprintNativeEvent, Category = "Weapon")
 	bool CanAttack() const;

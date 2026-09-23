@@ -74,7 +74,8 @@ static FSovBlueprintAuthoringResult ConfigureCast(
         !Montage->GetPathName().StartsWith(Root) || !Clip->GetPathName().StartsWith(Root) ||
         Montage->GetSkeleton() != Clip->GetSkeleton() || Clip->IsValidAdditive() ||
         StartTime < 0.f || EndTime <= StartTime || EndTime > Clip->GetPlayLength() ||
-        !FMath::IsFinite(PlayRate) || PlayRate <= 0.f || (SlotName != TEXT("FullBody") && SlotName != TEXT("DefaultSlot")))
+        !FMath::IsFinite(PlayRate) || PlayRate <= 0.f ||
+        (SlotName != TEXT("FullBody") && SlotName != TEXT("DefaultSlot") && SlotName != TEXT("UpperBody")))
     { Result.Report = TEXT("Requires stopped PIE, matching project non-additive clips and valid range/rate."); return Result; }
     Clip->Modify();
     Clip->Notifies.Reset();

@@ -19,6 +19,9 @@
 #include "NarrativeGameplayTags.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
+#include "Items/WeaponItem.h"
 #include "Misc/SecureHash.h"
 #include "AI/NPCDefinition.h"
 #include "Engine/World.h"
@@ -106,6 +109,7 @@ ECapsuleRotationSetting ASovNPCCharacterBase::GetCapsuleRotationSettings_Impleme
 void ASovNPCCharacterBase::Tick(const float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	UpdateWeaponFirePresentation();
 	CombatFacingTarget.Reset();
 	if (!HasAuthority() || !bPermitsHardLock || !IsAlive() || DeltaSeconds <= 0.f
 		|| CombatFacingTurnRate <= 0.f
@@ -173,6 +177,35 @@ void ASovNPCCharacterBase::Tick(const float DeltaSeconds)
 	if (!FMath::IsNearlyEqual(CurrentYaw, TurnedYaw, 0.01f))
 	{
 		SetActorRotation(FRotator(0.f, TurnedYaw, 0.f));
+	}
+}
+
+void ASovNPCCharacterBase::UpdateWeaponFirePresentation()
+{
+	if (!HasAuthority() || !IsValid(WeaponFireMontage) || !IsAlive()) { return; }
+	UWeaponItem* const Weapon = GetWeapon();
+	if (PresentedWeapon.Get() != Weapon)
+	{
+		PresentedWeapon = Weapon;
+		LastPresentedWeaponAttackTime = Weapon ? Weapon->GetLastAttackTime() : 0.f;
+		return;
+	}
+	if (!Weapon || !Weapon->IsWielded()) { return; }
+	const float AttackTime = Weapon->GetLastAttackTime();
+	if (AttackTime <= LastPresentedWeaponAttackTime + KINDA_SMALL_NUMBER) { return; }
+	LastPresentedWeaponAttackTime = AttackTime;
+	MulticastPlayWeaponFireMontage();
+}
+
+void ASovNPCCharacterBase::MulticastPlayWeaponFireMontage_Implementation()
+{
+	if (!IsAlive() || !IsValid(WeaponFireMontage)) { return; }
+	if (USkeletalMeshComponent* CharacterMesh = GetMesh())
+	{
+		if (UAnimInstance* Anim = CharacterMesh->GetAnimInstance())
+		{
+			Anim->Montage_Play(WeaponFireMontage);
+		}
 	}
 }
 
