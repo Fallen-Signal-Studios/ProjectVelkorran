@@ -29,14 +29,14 @@ def optional(call):
         return {'unavailable': str(error)}
 
 
-def bearing_error(actor, target):
+def bearing_error(origin, yaw, target):
     if not target:
         return None
-    delta = target.get_actor_location() - actor.get_actor_location()
+    delta = target.get_actor_location() - origin
     if delta.length() < 1.:
         return None
     angle = math.degrees(math.atan2(delta.y, delta.x))
-    return abs((angle-actor.get_actor_rotation().yaw+180.) % 360. - 180.)
+    return abs((angle-yaw+180.) % 360. - 180.)
 
 
 def write():
@@ -89,6 +89,7 @@ def tick(_delta):
             anim = mesh.get_anim_instance() if mesh else None
             ai = actor.get_controller()
             focus = ai.get_focus_actor() if ai else None
+            facing = actor.get_combat_facing_target()
             activity = actor.get_activity_component()
             attack_time = optional(lambda: weapon.get_editor_property('last_attack_time')) if weapon else None
             ammo = optional(lambda: weapon.get_auth_ammo_in_clip()) if weapon else None
@@ -99,7 +100,20 @@ def tick(_delta):
                 last_attack_time=attack_time,
                 ammo=ammo, weapon_visual=path(actor.get_wielded_weapon_visual()),
                 montage=path(anim.get_current_active_montage()) if anim else None,
-                focus=path(focus), focus_bearing_error=bearing_error(actor, focus),
+                focus=path(focus),
+                facing_target=path(facing),
+                permits_hard_lock=actor.get_editor_property('permits_hard_lock'),
+                facing_turn_rate=actor.get_editor_property('combat_facing_turn_rate'),
+                native_target_bearing_error=bearing_error(actor.get_actor_location(),
+                    actor.get_actor_rotation().yaw, facing),
+                focus_bearing_error=bearing_error(actor.get_actor_location(),
+                    actor.get_actor_rotation().yaw, focus),
+                player_bearing_error=bearing_error(actor.get_actor_location(),
+                    actor.get_actor_rotation().yaw, player),
+                mesh_world_rotation=mesh.get_world_rotation().export_text() if mesh else None,
+                mesh_relative_transform=mesh.get_relative_transform().export_text() if mesh else None,
+                mesh_player_bearing_error=bearing_error(mesh.get_world_location(),
+                    mesh.get_world_rotation().yaw, player) if mesh else None,
                 activity=path(activity.get_current_activity()) if activity else None,
                 goal=path(activity.get_current_activity_goal()) if activity else None,
                 tags=unreal.GameplayTagLibrary.get_owned_gameplay_tags(actor).export_text())
@@ -118,7 +132,10 @@ def tick(_delta):
             if isinstance(attack_time, (float, int)) and attack_time > 0:
                 previous = state['last_attack'].get(ident)
                 if previous is None or attack_time > previous + .0001:
-                    report['attack_events'].append(row.copy())
+                    event = row.copy()
+                    event['direct_player_target'] = optional(lambda: ai.can_directly_target_threat(player)) if ai else None
+                    event['line_of_sight_to_player'] = optional(lambda: ai.line_of_sight_to(player)) if ai else None
+                    report['attack_events'].append(event)
                 state['last_attack'][ident] = attack_time
             if isinstance(ammo, int):
                 previous_ammo = state['last_ammo'].get(ident)

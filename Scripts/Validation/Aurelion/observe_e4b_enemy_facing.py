@@ -1,5 +1,6 @@
 """Read-only E4B attack-facing census during an earned checkpoint replay."""
 import json
+import math
 import os
 import time
 import traceback
@@ -14,6 +15,16 @@ report = dict(status='waiting_for_pie', read_only=True, samples=[], errors=[])
 
 def ref(obj):
     return obj.get_path_name() if obj else None
+
+
+def bearing_error(yaw, origin, target):
+    if not target:
+        return None
+    delta = target.get_actor_location() - origin
+    if delta.length() < 1.:
+        return None
+    bearing = math.degrees(math.atan2(delta.y, delta.x))
+    return abs((bearing-yaw+180.) % 360. - 180.)
 
 
 def write():
@@ -51,6 +62,12 @@ def tick(_delta):
             rows.append(dict(actor=ref(actor), role=actor.get_class().get_name(),
                 location=actor.get_actor_location().export_text(),
                 actor_rotation=actor.get_actor_rotation().export_text(),
+                actor_target_error=bearing_error(actor.get_actor_rotation().yaw,
+                    actor.get_actor_location(), target),
+                mesh_world_rotation=mesh.get_world_rotation().export_text() if mesh else None,
+                mesh_relative_transform=mesh.get_relative_transform().export_text() if mesh else None,
+                mesh_target_error=bearing_error(mesh.get_world_rotation().yaw,
+                    mesh.get_world_location(), target) if mesh else None,
                 turn_rate=actor.get_editor_property('combat_facing_turn_rate'),
                 montage=ref(montage), target=ref(target),
                 target_location=target.get_actor_location().export_text() if target else None,
