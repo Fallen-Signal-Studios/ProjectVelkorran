@@ -44,8 +44,26 @@ void USovBloodFeedbackComponent::BeginPlay()
         TArray<FSoftObjectPath> Paths;
         for (int32 Index = bBlackBlood ? 4 : 0; Index < (bBlackBlood ? 8 : 4); ++Index)
             Paths.Add(Systems[Index].ToSoftObjectPath());
-        LoadHandle = UAssetManager::GetStreamableManager().RequestAsyncLoad(Paths);
+        LoadHandle = UAssetManager::GetStreamableManager().RequestAsyncLoad(Paths,
+            FStreamableDelegate::CreateUObject(this, &ThisClass::OnSystemsLoaded));
     }
+}
+
+void USovBloodFeedbackComponent::OnSystemsLoaded()
+{
+#if WITH_EDITOR
+    // Editor PIE can finish async asset loading with Niagara scripts still
+    // compiling. Do that work at encounter startup, before the first hit.
+    for (int32 Index = bBlackBlood ? 4 : 0; Index < (bBlackBlood ? 8 : 4); ++Index)
+    {
+        UNiagaraSystem* System = Systems[Index].Get();
+        if (!IsValid(System) || System->IsReadyToRun()) { continue; }
+        System->RequestCompile(false);
+        System->WaitForCompilationComplete(true, false);
+        if (!System->IsReadyToRun())
+        { UE_LOG(LogTemp, Warning, TEXT("Blood Niagara system %s is not ready after editor compilation"), *GetNameSafe(System)); }
+    }
+#endif
 }
 
 void USovBloodFeedbackComponent::BindASC()
@@ -86,7 +104,9 @@ void USovBloodFeedbackComponent::MulticastBlood_Implementation(uint8 Kind, FVect
     const auto* Settings = Cast<USovGameUserSettings>(UGameUserSettings::GetGameUserSettings());
     const bool Reduced = Settings && (Settings->IsReducedCombatEffectsEnabled() || Settings->GetVisualEffectQuality() == 0);
     UNiagaraSystem* System = Systems[(bBlackBlood ? 4 : 0) + (Reduced ? 3 : Kind)].Get();
-    if (!IsValid(System) || !System->IsReadyToRun()) { return; }
+    // Niagara components defer activation while their system compiles in PIE.
+    // Dropping the hit here loses the first visible blood burst of an encounter.
+    if (!IsValid(System)) { return; }
     auto* Burst = UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), System, Position,
         FVector(Normal).Rotation(), FVector::OneVector, true, true, ENCPoolMethod::None, true);
     if (!Burst) { return; }

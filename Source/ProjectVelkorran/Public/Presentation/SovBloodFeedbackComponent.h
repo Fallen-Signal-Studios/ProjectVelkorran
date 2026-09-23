@@ -22,6 +22,7 @@ protected:
     virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 private:
     UFUNCTION() void BindASC();
+    void OnSystemsLoaded();
     UFUNCTION() void OnDamage(const FSovDamageResult& Result);
     UFUNCTION(NetMulticast, Unreliable) void MulticastBlood(uint8 Kind, FVector_NetQuantize Position, FVector_NetQuantizeNormal Normal);
     UPROPERTY(Transient) TObjectPtr<UNarrativeAbilitySystemComponent> BoundASC;

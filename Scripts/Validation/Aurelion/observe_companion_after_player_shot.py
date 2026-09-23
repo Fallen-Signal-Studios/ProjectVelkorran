@@ -61,6 +61,7 @@ class Observer:
         self.started = time.monotonic()
         self.aim_started = None
         self.triggered = None
+        self.report['trigger_states'] = []
         self.last = 0.
         self.delegates = []
         for actor, callback in ((self.pawn, self.player_damage), (self.companion, self.companion_damage)):
@@ -101,7 +102,11 @@ class Observer:
                 self.stop('Normal protagonist handoff ended observation'); return
             assert unreal.SystemLibrary.is_valid(self.pawn) and self.pc.get_controlled_pawn() == self.pawn
             assert self.pawn.is_alive() and self.companion.is_alive()
-            if now-self.started > 100 or self.report['companion_damage']:
+            player_hits = [r for r in self.report.get('player_damage_details', [])
+                if r['target'] == self.player_target.get_path_name() and r['health'] + r['shield'] > 0]
+            companion_after_hit = player_hits and any(r['elapsed'] > player_hits[0]['elapsed']
+                for r in self.report.get('companion_damage_details', []))
+            if now-self.started > 100 or (self.passive and self.report['companion_damage']) or companion_after_hit:
                 self.stop('Observation ended'); return
             if not self.passive and not self.selector.done:
                 held, report = self.selector.step(self.world)
@@ -120,21 +125,51 @@ class Observer:
                 focus = self.companion.get_controller().get_focus_actor() if self.companion.get_controller() else None
                 if isinstance(focus, unreal.NarrativeCharacter):
                     self.target = focus
-            elif self.triggered is None:
-                assert now-self.aim_started < 20, 'Aim deadline; no trigger supplied'
-                assert self.player_target.is_alive() and self.pc.line_of_sight_to(self.player_target)
+            elif (not player_hits and len(self.report['trigger_states']) < 4
+                    and now-self.aim_started < 30
+                    and (self.triggered is None or now-self.triggered >= .75)):
                 look, error = common.Run.look(self, self.world, self.pc, self.player_target.get_actor_location())
-                fire = float(error < 1.5)
+                tags = unreal.GameplayTagLibrary.get_owned_gameplay_tags(self.pawn).export_text()
+                blocked = [name for name in ('Narrative.State.Weapon.BlockFiring',
+                    'Narrative.State.Weapon.Equipping', 'Narrative.State.Weapon.Reloading') if name in tags]
+                if blocked:
+                    self.report['pre_fire_blocked_tags'] = blocked
+                fire = float(error < 1.5 and not blocked and self.weapon.get_ammo_in_clip() > 0
+                    and self.player_target.is_alive() and self.pc.line_of_sight_to(self.player_target))
+                camera_probe = None
+                if fire:
+                    camera=unreal.GameplayStatics.get_player_camera_manager(self.world,0)
+                    start=camera.get_camera_location();rotation=camera.get_camera_rotation()
+                    end=start+unreal.MathLibrary.get_forward_vector(rotation)*15000.
+                    impact=unreal.SystemLibrary.line_trace_single(self.world,start,end,
+                        unreal.TraceTypeQuery.TRACE_TYPE_QUERY1,True,[self.pawn,self.companion],
+                        unreal.DrawDebugTrace.NONE,True)
+                    # The normal weapon trace must see the intended living Elite;
+                    # a crossing Linkbound is not a valid contribution shot.
+                    parts=impact.to_tuple() if impact is not None else None
+                    hit_actor=parts[9] if parts and parts[0] else None
+                    camera_probe=dict(location=start.export_text(),rotation=rotation.export_text(),
+                        visibility_hit=bool(parts and parts[0]),
+                        visibility_actor=hit_actor.get_path_name() if hit_actor else None,
+                        visibility_point=parts[5].export_text() if hit_actor else None)
+                    fire=float(hit_actor==self.player_target or
+                        (hit_actor is not None and hit_actor.get_owner()==self.player_target))
+                    if not fire:self.report['last_blocked_camera_ray']=camera_probe
                 if fire:
                     self.triggered = now
                     self.report['trigger_elapsed'] = now-self.started
-                    self.report['trigger_state'] = dict(ammo=self.weapon.get_ammo_in_clip(),
+                    attempt = dict(elapsed=now-self.started, ammo=self.weapon.get_ammo_in_clip(),
                         aim_error_degrees=error, aim_point=self.player_target.get_actor_location().export_text(),
                         control_rotation=self.pc.get_control_rotation().export_text(),
-                        player_tags=unreal.GameplayTagLibrary.get_owned_gameplay_tags(self.pawn).export_text())
+                        player_tags=tags,camera=camera_probe)
+                    self.report['trigger_state'] = attempt
+                    self.report['trigger_states'].append(attempt)
                 self.input(look, fire, 1.)
             else:
-                self.input(fire=float(now-self.triggered < .05 and not self.report['player_damage']))
+                look_at = self.target if player_hits and self.target.is_alive() else self.player_target
+                look, _ = common.Run.look(self, self.world, self.pc, look_at.get_actor_location())
+                self.input(look, float(self.triggered is not None and now-self.triggered < .05
+                    and not player_hits), 1.)
             if now-self.last < .025:
                 return
             self.last = now

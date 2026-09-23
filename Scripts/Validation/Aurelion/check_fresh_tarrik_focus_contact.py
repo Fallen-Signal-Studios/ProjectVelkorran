@@ -20,11 +20,19 @@ report['player_hit_probe']=with_player_hit
 def blood_receipt(result):
     if result.applied_health_damage <= 0 or 'blood_capture' in report:return
     target=result.target_actor
+    capture=out/'native-companion-hit-ui.png'
     report['blood_capture']=dict(receipt=result.export_text(),target=target.get_path_name() if target else None,
-        requested_at=time.monotonic(),image=str(out/'native-companion-hit.png'),
+        requested_at=time.monotonic(),image=str(capture),
         qualification='requires visual review; screenshot request alone does not prove blood')
-    state['capture_task']=unreal.AutomationLibrary.take_high_res_screenshot(1800,1000,str(out/'native-companion-hit.png'))
+    # HighResScreenshot takes the editor level viewport in this retained PIE
+    # route. Shot with showui is the proven live game viewport path here.
+    unreal.SystemLibrary.execute_console_command(probe_world(),
+        'Shot showui -nosuffix filename='+str(capture))
     write()
+def probe_world():
+    contact=sys.modules.get('observe_companion_after_player_shot')
+    assert contact and contact._RUN and contact._RUN.world
+    return contact._RUN.world
 def write(): (out/'fresh-tarrik-focus.json').write_text(json.dumps(report,indent=2))
 def finish(error=None):
     contact=sys.modules.get('observe_companion_after_player_shot')
@@ -45,9 +53,9 @@ def tick(dt):
                 unreal.unregister_slate_post_tick_callback(handle);unreal.SystemLibrary.quit_editor()
             return
         if state['phase']=='blood_capture':
-            task=state.get('capture_task')
-            if task and not task.is_task_done() and time.monotonic()-state['capture_wait']<15:return
-            report['blood_capture_file_exists']=(out/'native-companion-hit.png').exists()
+            capture=out/'native-companion-hit-ui.png'
+            if not capture.exists() and time.monotonic()-state['capture_wait']<15:return
+            report['blood_capture_file_exists']=capture.exists() and capture.stat().st_size>0
             finish(None if report['blood_capture_file_exists'] else 'No native hit screenshot was captured')
             return
         assert time.monotonic()-state['start']<1500,'Bounded route/contact deadline exceeded'
@@ -85,6 +93,8 @@ def tick(dt):
         import observe_companion_after_player_shot as contact
         if contact._RUN.handle is not None:return
         report['damage_receipts']=contact._RUN.report['companion_damage']
+        report['player_trigger_states']=contact._RUN.report.get('trigger_states',[])
+        report['pre_fire_blocked_tags']=contact._RUN.report.get('pre_fire_blocked_tags',[])
         report['player_damage_details']=contact._RUN.report.get('player_damage_details',[])
         report['companion_damage_details']=contact._RUN.report.get('companion_damage_details',[])
         report['observer_errors']=contact._RUN.report['errors']
