@@ -52,6 +52,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Reformation Drone|Weapon")
 	FGameplayTag GetDroneWeaponAbilityTag() const { return AbilityIdentityTag; }
 
+	/** Target actually committed by this active attack, including authored direct activations. */
+	AActor* GetCurrentAttackTarget() const { return ResolveCommittedAttackTarget(); }
+
 protected:
 	virtual void ActivateAbility(
 		const FGameplayAbilitySpecHandle Handle,
@@ -95,6 +98,7 @@ protected:
 
 	/** Lets concrete weapon implementations observe base lifecycle state safely. */
 	bool HasWeaponPayloadFinished() const { return bPayloadFinished; }
+	bool IsWaitingForFacing() const { return bWaitingForFacing; }
 
 	/** Resolves a drone-mesh muzzle socket, then falls back to a local offset. */
 	FTransform ResolveMuzzleTransform(int32 MuzzleIndex) const;
@@ -220,6 +224,8 @@ private:
 	double NextAllowedActivationTime = 0.0;
 	bool bPayloadStarted = false;
 	bool bPayloadFinished = false;
+	bool bWaitingForFacing = false;
+	double FacingWaitStartedAt = 0.0;
 	bool bAbilityStarted = false;
 	bool bEndingAbility = false;
 	bool bEndPending = false;
@@ -266,7 +272,7 @@ protected:
 	TSubclassOf<ASovReformationDroneGunshotPresentation> GunshotPresentationClass;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Reformation Drone|Gunfire|Damage", meta = (ClampMin = "0.0"))
-	float DamagePerShot = 12.0f;
+	float DamagePerShot = 8.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Reformation Drone|Gunfire|Damage", meta = (ClampMin = "0.0"))
 	float PoiseDamagePerShot = 4.0f;
@@ -285,7 +291,7 @@ protected:
 
 	/** Full cone angle applied independently to each authoritative shot. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Reformation Drone|Gunfire|Targeting", meta = (ClampMin = "0.0", ClampMax = "45.0", Units = "deg"))
-	float SpreadDegrees = 8.0f;
+	float SpreadDegrees = 14.0f;
 
 private:
 	UFUNCTION()

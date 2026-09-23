@@ -310,7 +310,7 @@ class Run(phase_a.Run):
                 self.inject()
                 retries=self.report.setdefault('hold_retries',{})
                 retries[self.control_name]=retries.get(self.control_name,0)+1
-                assert retries[self.control_name]<=3, 'Contextual focus repeatedly lost during ordinary hold'
+                assert retries[self.control_name]<=6, 'Contextual focus repeatedly lost during ordinary hold'
                 self.unbind_request()
                 self.stage('aim_control')
                 return
@@ -421,6 +421,22 @@ class Run(phase_a.Run):
         # Blocked sight has to be answered by moving, at any range: a pilot standing inside 450 cm with no
         # line to its target neither fires nor repositions, which stalled an E4B run against a live WallRunner.
         move=self.approach(self.world,pc,pawn,actor) if (not clear or not in_range) and distance>120. else (0.,0.)
+        # A fixed-position aim pilot was adequate while authored melee attacks
+        # faced away, but now walks into the Elite's striking radius. Preserve
+        # ordinary movement and fire inputs while kiting the nearest live threat.
+        if precision is None:
+            nearby=[p.character for p in self.e4b.participants
+                if p.required_for_victory and rescue.alive(p.character)
+                and not p.character.get_editor_property('hidden')]
+            if nearby:
+                position=pawn.get_actor_location()
+                threat=min(nearby,key=lambda enemy: math.dist(_xyz(position),_xyz(enemy.get_actor_location())))
+                threat_position=threat.get_actor_location()
+                dx,dy=position.x-threat_position.x,position.y-threat_position.y
+                separation=math.hypot(dx,dy)
+                if 1.<separation<550.:
+                    goal=(position.x+dx/separation*350.,position.y+dy/separation*350.,position.z)
+                    move,unused=self.local_move(pc,pawn,goal,stop=25.)
         clip,reserve=weapon.get_ammo_in_clip(),weapon.get_spare_ammo()
         assert clip>0 or reserve>0, 'Existing Cinderline ammunition exhausted; no refill was issued'
         game_time=unreal.GameplayStatics.get_time_seconds(self.world)

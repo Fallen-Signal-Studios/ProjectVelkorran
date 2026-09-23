@@ -73,7 +73,9 @@ def _incoming_damage_observer(run, pawn_path):
 
 # The pilot follows the game's own fatal recovery after a death, like a player, within these bounds.
 NATIVE_RETRY_LIMIT = 3
-NATIVE_RECOVERY_SECONDS = 60.
+# The authored checkpoint reconstructs the PIE world and asynchronously
+# initializes its campaign pawn; loaded editor asset work can exceed a minute.
+NATIVE_RECOVERY_SECONDS = 120.
 
 
 def _recovery_state(pawn):

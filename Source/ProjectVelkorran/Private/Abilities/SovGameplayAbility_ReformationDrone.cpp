@@ -221,6 +221,8 @@ void USovGameplayAbility_ReformationDroneWeaponBase::ActivateAbility(
 	bEndPending = false;
 	bPayloadStarted = false;
 	bPayloadFinished = false;
+	bWaitingForFacing = false;
+	FacingWaitStartedAt = 0.0;
 	bAbilityStarted = false;
 	bEndingAbility = false;
 	CharacterOwner = ActorInfo
@@ -262,6 +264,7 @@ void USovGameplayAbility_ReformationDroneWeaponBase::ActivateAbility(
 	{
 		CommittedAttackTarget = TargetASC->GetAvatarActor();
 	}
+	if (!CommittedAttackTarget.IsValid()) { CaptureObservedAttackTarget(); }
 	BindInterruptions();
 	const bool bCommitted = CommitAbility(Handle, ActorInfo, ActivationInfo);
 	if (!ValidateWeaponContinuation(Epoch)) { return; }
@@ -380,6 +383,8 @@ void USovGameplayAbility_ReformationDroneWeaponBase::EndAbility(
 	bAbilityStarted = false;
 	bPayloadStarted = false;
 	bPayloadFinished = false;
+	bWaitingForFacing = false;
+	FacingWaitStartedAt = 0.0;
 	if (bShouldBroadcastEnd)
 	{
 		ReceiveDroneWeaponEnded(bWasCancelled);
@@ -516,6 +521,36 @@ bool USovGameplayAbility_ReformationDroneWeaponBase::
 	}
 
 	if (!ResolveCommittedAttackTarget()) { CaptureObservedAttackTarget(); }
+	// The damage trace can aim at the committed target before the visible drone
+	// has turned. Give its servo a brief, bounded windup instead of releasing a
+	// projectile from a sideways firing pose. This applies to authored manual
+	// releases as well as the native fallback timer.
+	if (AActor* Target = ResolveCommittedAttackTarget())
+	{
+		AActor* Avatar = GetAvatarActorFromActorInfo();
+		UWorld* World = GetWorld();
+		if (IsValid(Avatar) && World)
+		{
+			const FVector Direction = FVector(Target->GetActorLocation() - Avatar->GetActorLocation()).GetSafeNormal2D();
+			if (!Direction.IsNearlyZero()
+				&& FMath::Abs(FMath::FindDeltaAngleDegrees(Avatar->GetActorRotation().Yaw,
+					Direction.Rotation().Yaw)) > 35.f)
+			{
+				if (!bWaitingForFacing) { FacingWaitStartedAt = World->GetTimeSeconds(); }
+				if (World->GetTimeSeconds() - FacingWaitStartedAt < 0.45)
+				{
+					bWaitingForFacing = true;
+					World->GetTimerManager().SetTimer(PayloadReleaseTimerHandle,
+						FTimerDelegate::CreateUObject(this, &ThisClass::HandleAutomaticPayloadRelease, Epoch),
+						0.04f, false);
+					return false;
+				}
+				bWaitingForFacing = false;
+				return false;
+			}
+		}
+	}
+	bWaitingForFacing = false;
 	if (!ReserveDirectEncounterSlot()) { return false; }
 	if (!ReserveDirectAttackToken())
 	{
@@ -975,7 +1010,8 @@ void USovGameplayAbility_ReformationDroneWeaponBase::
 	if (!ValidateWeaponContinuation(ExpectedEpoch)) { return; }
 	if (!TryBeginWeaponPayloadRelease())
 	{
-		if (IsWeaponActivationCurrent(ExpectedEpoch) && !bPayloadFinished) { CancelDroneWeaponAbility(); }
+		if (IsWeaponActivationCurrent(ExpectedEpoch) && !bPayloadFinished && !bWaitingForFacing)
+		{ CancelDroneWeaponAbility(); }
 		return;
 	}
 	if (!ValidateWeaponContinuation(ExpectedEpoch) || bPayloadFinished)
@@ -1102,7 +1138,8 @@ void USovGameplayAbility_ReformationDroneGunfire::FireGunBurstFromAim()
 	if (!HasRequiredPayloadConfiguration()
 		|| !TryBeginWeaponPayloadRelease())
 	{
-		if (IsWeaponActivationCurrent(Epoch) && !HasWeaponPayloadFinished()) { CancelDroneWeaponAbility(); }
+		if (IsWeaponActivationCurrent(Epoch) && !HasWeaponPayloadFinished() && !IsWaitingForFacing())
+		{ CancelDroneWeaponAbility(); }
 		return;
 	}
 	// The release event may itself call this function. Respect that inner call
@@ -1416,7 +1453,8 @@ USovGameplayAbility_ReformationDroneRocketLauncher::LaunchRocketFromAim()
 	if (!HasRequiredPayloadConfiguration()
 		|| !TryBeginWeaponPayloadRelease())
 	{
-		if (IsWeaponActivationCurrent(Epoch) && !HasWeaponPayloadFinished()) { CancelDroneWeaponAbility(); }
+		if (IsWeaponActivationCurrent(Epoch) && !HasWeaponPayloadFinished() && !IsWaitingForFacing())
+		{ CancelDroneWeaponAbility(); }
 		return nullptr;
 	}
 	if (!ValidateWeaponContinuation(Epoch) || HasWeaponPayloadFinished() || bRocketReleaseAttempted)
@@ -1466,7 +1504,8 @@ USovGameplayAbility_ReformationDroneRocketLauncher::LaunchRocket(
 	if (!HasRequiredPayloadConfiguration()
 		|| !TryBeginWeaponPayloadRelease())
 	{
-		if (IsWeaponActivationCurrent(Epoch) && !HasWeaponPayloadFinished()) { CancelDroneWeaponAbility(); }
+		if (IsWeaponActivationCurrent(Epoch) && !HasWeaponPayloadFinished() && !IsWaitingForFacing())
+		{ CancelDroneWeaponAbility(); }
 		return nullptr;
 	}
 	// A Blueprint release event is allowed to launch the rocket. If it did,
@@ -1754,7 +1793,8 @@ void USovGameplayAbility_ReformationDroneSelfDestruct::
 	if (!HasRequiredPayloadConfiguration()
 		|| !TryBeginWeaponPayloadRelease())
 	{
-		if (IsWeaponActivationCurrent(Epoch) && !HasWeaponPayloadFinished()) { CancelDroneWeaponAbility(); }
+		if (IsWeaponActivationCurrent(Epoch) && !HasWeaponPayloadFinished() && !IsWaitingForFacing())
+		{ CancelDroneWeaponAbility(); }
 		return;
 	}
 	// The payload-released Blueprint event may have called this function

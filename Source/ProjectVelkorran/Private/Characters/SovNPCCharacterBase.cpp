@@ -1,7 +1,13 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 
 #include "Characters/SovNPCCharacterBase.h"
+#include "Abilities/SovGameplayAbility_DominionHound.h"
+#include "Abilities/SovGameplayAbility_ReformationDrone.h"
 #include "Presentation/SovBloodFeedbackComponent.h"
+#include "AI/NarrativeNPCController.h"
+#include "AI/SovAurelionEnemyRoles.h"
+#include "ArsenalSettings.h"
+#include "BehaviorTree/BlackboardComponent.h"
 #include "UObject/StrongObjectPtr.h"
 #include "Character/NarrativeCharacterVisual.h"
 
@@ -10,6 +16,8 @@
 #include "Components/SovStatusComponent.h"
 #include "Targeting/SovTargetingComponent.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
+#include "NarrativeGameplayTags.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "Misc/SecureHash.h"
 #include "AI/NPCDefinition.h"
 #include "Engine/World.h"
@@ -58,6 +66,79 @@ void ASovNPCCharacterBase::BeginPlay()
 	if (bInitializePlacedController && IsValid(this) && !IsActorBeingDestroyed())
 	{
 		EnsureEncounterController();
+	}
+}
+
+void ASovNPCCharacterBase::Tick(const float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	CombatFacingTarget.Reset();
+	if (!HasAuthority() || !bPermitsHardLock || !IsAlive() || DeltaSeconds <= 0.f
+		|| CombatFacingTurnRate <= 0.f
+		|| HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_SequencerControlled)) { return; }
+	if (const USovAurelionWallTraversalComponent* WallRun = FindComponentByClass<USovAurelionWallTraversalComponent>();
+		WallRun && WallRun->IsTraversing()) { return; }
+
+	const UNarrativeAbilitySystemComponent* ASC = GetNarrativeAbilitySystemComponent();
+	if (!ASC) { return; }
+	AActor* Target = nullptr;
+	bool bExecutingAttack = false;
+	for (const FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
+	{
+		if (!Spec.IsActive()) { continue; }
+		if (const auto* Drone = Cast<USovGameplayAbility_ReformationDroneWeaponBase>(Spec.GetPrimaryInstance()))
+		{
+			bExecutingAttack = true;
+			Target = Drone->GetCurrentAttackTarget();
+		}
+		else if (const auto* Hound = Cast<USovGameplayAbility_DominionHoundAttackBase>(Spec.GetPrimaryInstance()))
+		{
+			bExecutingAttack = true;
+			Target = Hound->GetCurrentAttackTarget();
+		}
+		else if (AActor* Leased = ASC->GetBotAttackTarget(Spec.Handle))
+		{
+			bExecutingAttack = true;
+			Target = Leased;
+		}
+		if (Target) { break; }
+	}
+	const ANarrativeNPCController* NPCController = Cast<ANarrativeNPCController>(GetController());
+	const bool bAttacking = bExecutingAttack
+		|| HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_NPC_Activity_Attacking);
+	if (!Target && bAttacking && NPCController)
+	{
+		Target = NPCController->GetFocusActor();
+		if (!NPCController->CanDirectlyTargetThreat(Target))
+		{
+			const UBlackboardComponent* Board = NPCController->GetBlackboardComponent();
+			const UArsenalSettings* Settings = GetDefault<UArsenalSettings>();
+			Target = Board && Settings
+				? Cast<AActor>(Board->GetValueAsObject(Settings->BBKey_AttackTarget)) : nullptr;
+		}
+		if (!NPCController->CanDirectlyTargetThreat(Target))
+		{
+			Target = nullptr;
+			float BestScore = -1.f;
+			for (const FNarrativeThreatMemory& Memory : NPCController->GetThreatDebugSnapshot())
+			{
+				AActor* Observed = Memory.Target.Get();
+				if (!Memory.bDirectObservation || !NPCController->CanDirectlyTargetThreat(Observed)) { continue; }
+				const float Score = Memory.Strength * Memory.Confidence;
+				if (Score > BestScore) { BestScore = Score; Target = Observed; }
+			}
+		}
+	}
+	if (!IsValid(Target) || !IsValid(NPCController) || !NPCController->CanDirectlyTargetThreat(Target)) { return; }
+	CombatFacingTarget = Target;
+	const FVector FlatDirection = FVector(Target->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
+	if (FlatDirection.IsNearlyZero()) { return; }
+	const float DesiredYaw = FlatDirection.Rotation().Yaw;
+	const float CurrentYaw = GetActorRotation().Yaw;
+	const float TurnedYaw = FMath::FixedTurn(CurrentYaw, DesiredYaw, CombatFacingTurnRate * DeltaSeconds);
+	if (!FMath::IsNearlyEqual(CurrentYaw, TurnedYaw, 0.01f))
+	{
+		SetActorRotation(FRotator(0.f, TurnedYaw, 0.f));
 	}
 }
 

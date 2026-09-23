@@ -41,6 +41,7 @@ ASovDroneNPCBase::ASovDroneNPCBase(const FObjectInitializer& ObjectInitializer)
 {
 	PrimaryActorTick.bCanEverTick = true;
 	bPermitsHardLock = true;
+	CombatFacingTurnRate = 540.f;
     if (auto* Blood = FindComponentByClass<USovBloodFeedbackComponent>()) { Blood->bEnabled = false; }
 	DeathExplosionDamageEffectClass =
 		USovGameplayEffect_ReformationDroneDamage::StaticClass();

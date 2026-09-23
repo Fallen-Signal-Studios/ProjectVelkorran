@@ -118,6 +118,9 @@ def tick(_delta):
                 asc.get_bot_attack_candidates(player, unreal.GameplayTag())])
             rows.append(dict(actor=ref(actor), location=actor.get_actor_location().export_text(),
                 velocity=actor.get_velocity().export_text(), distance=actor.get_distance_to(player),
+                combat_facing_target=ref(actor.get_combat_facing_target()) if hasattr(actor, 'get_combat_facing_target') else None,
+                combat_facing_target_location=optional(lambda: actor.get_combat_facing_target().get_actor_location().export_text())
+                    if hasattr(actor, 'get_combat_facing_target') and actor.get_combat_facing_target() else None,
                 controller=ref(ai), focus=ref(ai.get_focus_actor()) if ai else None,
                 focal_point=optional(lambda: ai.get_focal_point().export_text()) if ai else None,
                 control_rotation=optional(lambda: ai.get_control_rotation().export_text()) if ai else None,

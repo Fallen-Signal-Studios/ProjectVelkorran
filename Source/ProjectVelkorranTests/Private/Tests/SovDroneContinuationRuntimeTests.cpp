@@ -580,7 +580,10 @@ bool FSovDroneDestructibleTraceTest::RunTest(const FString& Parameters)
     if (!TestNotNull(TEXT("Real drone weapon granted"), Gun)) { return false; }
     TestTrue(TEXT("Real GAS activation"), F.ASC()->TryActivateAbility(Handle, false));
     Gun->FireGunBurstFromAim();
-    TestTrue(TEXT("Real muzzle trace damages scenery without a target ASC"), Cover->IsBroken());
+    TestFalse(TEXT("The first reduced-damage shot leaves cover standing"), Cover->IsBroken());
+    TestEqual(TEXT("The first shot removes eight cover health"), Cover->RemainingHealth, 4.f);
+    F.Tick(.12f);
+    TestTrue(TEXT("The next real muzzle trace breaks scenery without a target ASC"), Cover->IsBroken());
     TestEqual(TEXT("Intercepted shot does not also damage character behind cover"), F.TargetShield(), 100.f);
     TestEqual(TEXT("Trace obstruction removed"), Cover->Obstruction->GetCollisionEnabled(), ECollisionEnabled::NoCollision);
     Gun->RequestEnd();

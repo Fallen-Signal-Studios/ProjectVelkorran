@@ -72,6 +72,41 @@ their next runtime check. A passing build alone does not close any gameplay row.
   checkpoint load, but that branch still needs a completed rerun. The next
   fresh E1 run cleared the wave after one same-world rescue and continued to
   E4B as described above.
+- **Enemy attack facing:** read-only PIE samples exposed a separate presentation
+  defect: active drones could fire while over 90 degrees off Tarrik despite a
+  valid damage target. The combat NPC base now turns toward an active attack's
+  committed target, and direct drone abilities capture their sight target at
+  activation. Drone payloads wait briefly for their visible body to align;
+  an attack that cannot align cancels instead of firing sideways. The final E1
+  normal-input replay `E1AttackFacingPrefireFinal-20260922-205454-c5464e04`
+  passed, with 78 gunshots, 33 rockets and no observer errors; 48 sampled
+  target-bearing firing montages averaged 7 degrees of body-facing error.
+  A later shared-facing build made E1 too lethal: the normal-input pilot
+  exhausted three retries with 74 damaging shots among 143 gunshots. The
+  drone gun now fires 8-point shots in a 14-degree full cone, while rockets
+  retain their authored impact. The final
+  `E1FacingGun8Retest-20260922-214544-8e0ae28e` cleared the wave, opened
+  the pressure gate, completed both holds and handed off after two native
+  checkpoint retries. Its observer saw 35 damaging shots among 129 gunshots,
+  64 rockets, no errors, and 124 target-bearing montage samples averaging
+  0.3 degrees of facing error with none over 90 degrees. The cover regression
+  now verifies that two 8-point shots retire a 12-health cover piece without
+  damaging the character behind it. This is one playable balanced E1 route,
+  not a repeated difficulty or packaged-build acceptance result.
+  In E4B, the authored Elite and WallRunner attack montages usually had no
+  controller focus at all. While attacking, the shared combat turn now uses
+  their authored attack key or strongest directly observed hostile; wall
+  traversal and cinematic control keep their own rotation. Before the change,
+  51/66 Elite and 50/83 WallRunner attack-montage samples faced more than
+  90 degrees away from Tarrik. The final earned-checkpoint replay
+  `E4BEnemyFacingMobilePilot-20260922-211704-1f898a23` completed thermal
+  payoff and conventional victory with Tarrik at 100 health and no observer
+  errors. All 25 sampled Elite attack montages had a target and none were over
+  90 degrees off; 22/25 WallRunner samples had a target, with four large angles
+  while Tarrik crossed around its moving lunge. Two stationary pilot attempts
+  died after enemies began facing and hitting correctly. The read-only pilot
+  now retreats through ordinary movement input during conventional combat;
+  this demonstrates a survivable play route, not final difficulty tuning.
 - **Selene shot after weapon wheel:** the September 21 E4 contact test sent
   fire while BlockFiring, Equipping, and Reloading were present. Ammo stayed at
   one; no player damage receipt was recorded. The diagnostic now waits for those

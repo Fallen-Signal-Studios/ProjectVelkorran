@@ -18,6 +18,7 @@ class PROJECTVELKORRAN_API ASovNPCCharacterBase : public ANarrativeNPCCharacter
 public:
 	ASovNPCCharacterBase(const FObjectInitializer& ObjectInitializer);
 	virtual void BeginPlay() override;
+	virtual void Tick(float DeltaSeconds) override;
 	virtual FGuid GetActorGUID_Implementation() const override;
 	virtual void SetActorGUID_Implementation(const FGuid& SavedGUID) override;
 	virtual bool ShouldRespawn_Implementation() const override;
@@ -34,6 +35,12 @@ public:
 	 * also grant it per Blueprint or per placed instance without touching code. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Sovereign|Targeting")
 	bool bPermitsHardLock = false;
+	/** Maximum authority turn rate while executing an attack against a visible target. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Sovereign|Combat Facing", meta=(ClampMin="0.0", Units="deg/s"))
+	float CombatFacingTurnRate = 360.f;
+	/** Last directly observed target of the authoritative combat-facing turn. */
+	UFUNCTION(BlueprintPure, Category="Sovereign|Combat Facing")
+	AActor* GetCombatFacingTarget() const { return CombatFacingTarget.Get(); }
 
 	/** Called on a deferred replacement before setting its NPC definition. */
 	void PrepareForEncounterRestore(const FNPCSpawnInfo& SavedSpawnInfo, const FGuid& SavedGUID);
@@ -66,6 +73,7 @@ protected:
 	bool bEncounterOwned = false;
 	bool bEncounterRestoreInitialization = false;
 	bool bEncounterSnapshotReady = false;
+	TWeakObjectPtr<AActor> CombatFacingTarget;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sovereign|Components")
 	TObjectPtr<class USovDismembermentComponent> DismembermentComponent;
