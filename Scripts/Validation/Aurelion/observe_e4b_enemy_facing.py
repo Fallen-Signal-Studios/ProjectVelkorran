@@ -51,6 +51,7 @@ def tick(_delta):
             rows.append(dict(actor=ref(actor), role=actor.get_class().get_name(),
                 location=actor.get_actor_location().export_text(),
                 actor_rotation=actor.get_actor_rotation().export_text(),
+                turn_rate=actor.get_editor_property('combat_facing_turn_rate'),
                 montage=ref(montage), target=ref(target),
                 target_location=target.get_actor_location().export_text() if target else None,
                 focus=ref(ai.get_focus_actor()) if ai else None,

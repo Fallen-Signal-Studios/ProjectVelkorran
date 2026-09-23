@@ -647,12 +647,21 @@ ASovAurelionSecurityDrone::ASovAurelionSecurityDrone(const FObjectInitializer& I
 { FormationLink = CreateDefaultSubobject<USovAurelionFreshCommandLink>(TEXT("AurelionFormation")); }
 
 ASovAurelionLinkbound::ASovAurelionLinkbound(const FObjectInitializer& Initializer) : Super(Initializer)
-{ bPermitsHardLock = true; if (auto* Blood = FindComponentByClass<USovBloodFeedbackComponent>()) { Blood->bBlackBlood = true; } }
+{
+    bPermitsHardLock = true;
+    // Parasite attack montages can rotate the root during character movement.
+    // Correct the visible body after movement, before the frame is presented.
+    PrimaryActorTick.TickGroup = TG_PostPhysics;
+    if (auto* Blood = FindComponentByClass<USovBloodFeedbackComponent>()) { Blood->bBlackBlood = true; }
+}
 ASovAurelionWallRunner::ASovAurelionWallRunner(const FObjectInitializer& Initializer) : Super(Initializer)
-{ WallTraversal = CreateDefaultSubobject<USovAurelionWallTraversalComponent>(TEXT("AurelionWallTraversal")); }
+{
+    WallTraversal = CreateDefaultSubobject<USovAurelionWallTraversalComponent>(TEXT("AurelionWallTraversal"));
+}
 ASovAurelionWeaver::ASovAurelionWeaver(const FObjectInitializer& Initializer) : Super(Initializer)
 {
     bPermitsHardLock = true;
+    PrimaryActorTick.TickGroup = TG_PostPhysics;
     AnchorA = CreateDefaultSubobject<USovAurelionWeaverLink>(TEXT("AurelionAnchorA"));
     if (auto* Blood = FindComponentByClass<USovBloodFeedbackComponent>()) { Blood->bBlackBlood = true; }
     AnchorB = CreateDefaultSubobject<USovAurelionWeaverLink>(TEXT("AurelionAnchorB"));

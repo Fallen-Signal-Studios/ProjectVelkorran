@@ -19,6 +19,7 @@ public:
 	ASovNPCCharacterBase(const FObjectInitializer& ObjectInitializer);
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
+	virtual ECapsuleRotationSetting GetCapsuleRotationSettings_Implementation() const override;
 	virtual FGuid GetActorGUID_Implementation() const override;
 	virtual void SetActorGUID_Implementation(const FGuid& SavedGUID) override;
 	virtual bool ShouldRespawn_Implementation() const override;

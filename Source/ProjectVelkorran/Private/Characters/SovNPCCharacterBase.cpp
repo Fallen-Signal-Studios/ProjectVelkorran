@@ -18,6 +18,7 @@
 #include "GAS/NarrativeAbilitySystemComponent.h"
 #include "NarrativeGameplayTags.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Misc/SecureHash.h"
 #include "AI/NPCDefinition.h"
 #include "Engine/World.h"
@@ -67,6 +68,39 @@ void ASovNPCCharacterBase::BeginPlay()
 	{
 		EnsureEncounterController();
 	}
+	if (bPermitsHardLock && PrimaryActorTick.TickGroup == TG_PostPhysics)
+	{
+		// A PostPhysics group alone does not order ticks *within* that group.
+		// Parasite montages can rotate the root after our actor tick unless the
+		// combat-facing turn follows movement's post-physics and mesh updates.
+		if (UCharacterMovementComponent* Movement = GetCharacterMovement())
+		{
+			PrimaryActorTick.AddPrerequisite(Movement, Movement->PrimaryComponentTick);
+			PrimaryActorTick.AddPrerequisite(Movement, Movement->PostPhysicsTickFunction);
+		}
+		if (USkeletalMeshComponent* CharacterMesh = GetMesh())
+		{
+			PrimaryActorTick.AddPrerequisite(CharacterMesh, CharacterMesh->PrimaryComponentTick);
+		}
+	}
+}
+
+ECapsuleRotationSetting ASovNPCCharacterBase::GetCapsuleRotationSettings_Implementation() const
+{
+	// Narrative otherwise re-enables orient-to-movement every tick when an
+	// attack has no actor focus. That counter-rotates the authored parasite
+	// montage while the native combat turn is trying to face its live target.
+	if (HasAuthority() && bPermitsHardLock && PrimaryActorTick.TickGroup == TG_PostPhysics
+		&& CombatFacingTarget.IsValid() && IsAlive()
+		&& !HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_SequencerControlled))
+	{
+		if (const USovAurelionWallTraversalComponent* WallRun = FindComponentByClass<USovAurelionWallTraversalComponent>();
+			!WallRun || !WallRun->IsTraversing())
+		{
+			return ECapsuleRotationSetting::NoRotation;
+		}
+	}
+	return Super::GetCapsuleRotationSettings_Implementation();
 }
 
 void ASovNPCCharacterBase::Tick(const float DeltaSeconds)

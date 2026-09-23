@@ -166,6 +166,28 @@ their next runtime check. A passing build alone does not close any gameplay row.
   died after enemies began facing and hitting correctly. The read-only pilot
   now retreats through ordinary movement input during conventional combat;
   this demonstrates a survivable play route, not final difficulty tuning.
+  On September 23, a second earned-checkpoint replay exposed the remaining
+  montage conflict across the parasite roles: Linkbound attack samples stayed
+  as much as 172 degrees from their target even when the actor had a current
+  combat-facing target. Narrative's orient-to-movement setting was competing
+  with the native turn when Blueprint attacks had no AI actor focus. Linkbound,
+  Elite, WallRunner, and Weaver now resolve their attack turn after movement
+  and mesh ticks, and use the explicit native turn instead of movement-facing
+  while a directly observed combat-facing target is active. The original
+  360-degree/second turn rate remains; wall traversal and sequencer control
+  retain their own rotation. In `E4BExclusiveCombatTurn-20260923-010935-08dca77d`,
+  the public earned-checkpoint load, native frost/heat/Poise payoff, Core break,
+  and conventional E4B victory all passed. Its read-only observer recorded
+  47 Elite, 46 Linkbound, 7 WallRunner, and 6 Weaver target-bearing attack
+  montage samples with zero over 45 degrees; the worst Linkbound sample was
+  40.7 degrees. A second independent earned-checkpoint source,
+  `E4BWallRunnerLongCombatFacing-20260923-011239-db1cd5b7`, also completed
+  thermal payoff and conventional victory; all 18 sampled WallRunner attack
+  montage frames stayed within 8.1 degrees of their current target. These
+  qualify two E4B replays, not fresh wall traversal or every enemy in the
+  campaign. The UE 5.7 editor build and all 14
+  `ProjectVelkorran.Campaign.Threat` native automation tests passed in
+  `EnemyFacingNativeTests-20260923-011705`.
 - **Selene shot after weapon wheel:** the September 21 E4 contact test sent
   fire while BlockFiring, Equipping, and Reloading were present. Ammo stayed at
   one; no player damage receipt was recorded. The diagnostic now waits for those
