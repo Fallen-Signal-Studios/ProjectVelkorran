@@ -120,15 +120,20 @@ TSharedRef<SWidget> USovAccessibilityPresentation::RebuildWidget()
 		CaptionText = WidgetTree->ConstructWidget<UTextBlock>(); CaptionText->SetJustification(ETextJustify::Center); CaptionText->SetAutoWrapText(false);
 		CaptionBackground->AddChild(CaptionText); UCanvasPanelSlot* CanvasSlot = SafeTextCanvas->AddChildToCanvas(CaptionBackground);
 		CanvasSlot->SetAnchors(FAnchors(.5f,.13f)); CanvasSlot->SetAlignment(FVector2D(.5f,0)); CanvasSlot->SetAutoSize(true);
-		ObjectiveBackground = WidgetTree->ConstructWidget<UBorder>(); ObjectiveBackground->SetPadding(FMargin(12, 8));
+		ObjectiveBackground = WidgetTree->ConstructWidget<UBorder>(); ObjectiveBackground->SetPadding(FMargin(14, 10));
 		ObjectiveBackground->SetClipping(EWidgetClipping::ClipToBounds);
 		ObjectiveSize = WidgetTree->ConstructWidget<USizeBox>(); ObjectiveBackground->AddChild(ObjectiveSize);
 		auto* Rows = WidgetTree->ConstructWidget<UVerticalBox>(); ObjectiveSize->AddChild(Rows);
 		for (int32 Index = 0; Index < MaximumObjectiveRows; ++Index)
 		{
+			auto* RowPanel = WidgetTree->ConstructWidget<UVerticalBox>();
+			Rows->AddChildToVerticalBox(RowPanel)->SetPadding(FMargin(0, 0, 0, 8)); ObjectiveRowPanels.Add(RowPanel);
+			auto* Header = WidgetTree->ConstructWidget<UTextBlock>(); Header->SetAutoWrapText(false);
+			Header->SetShadowOffset(FVector2D(1.f)); Header->SetShadowColorAndOpacity(FLinearColor::Black);
+			RowPanel->AddChildToVerticalBox(Header)->SetPadding(FMargin(0, 0, 0, 3)); ObjectiveHeaders.Add(Header);
 			auto* Row = WidgetTree->ConstructWidget<UTextBlock>(); Row->SetAutoWrapText(false); Row->SetJustification(ETextJustify::Left);
 			Row->SetShadowOffset(FVector2D(1.f)); Row->SetShadowColorAndOpacity(FLinearColor::Black);
-			Rows->AddChildToVerticalBox(Row)->SetPadding(FMargin(0, 0, 0, 8)); ObjectiveRows.Add(Row);
+			RowPanel->AddChildToVerticalBox(Row); ObjectiveRows.Add(Row);
 		}
 		ObjectiveText = ObjectiveRows[0];
 		ObjectiveOverflow = WidgetTree->ConstructWidget<UTextBlock>(); ObjectiveOverflow->SetAutoWrapText(false); Rows->AddChild(ObjectiveOverflow);
@@ -341,26 +346,33 @@ void USovAccessibilityPresentation::RefreshObjectiveText()
 	if (!ObjectiveText || !ObjectiveBackground || !ObjectiveSize) { return; }
 	if (Objectives.IsEmpty())
 	{
-		for (const auto& Row : ObjectiveRows) { Row->SetText(FText::GetEmpty()); Row->SetVisibility(ESlateVisibility::Collapsed); }
+		for (int32 Index = 0; Index < ObjectiveRows.Num(); ++Index)
+		{
+			ObjectiveRows[Index]->SetText(FText::GetEmpty());
+			ObjectiveHeaders[Index]->SetText(FText::GetEmpty());
+			ObjectiveRowPanels[Index]->SetVisibility(ESlateVisibility::Collapsed);
+		}
 		ObjectiveOverflow->SetText(FText::GetEmpty()); ObjectiveBackground->SetVisibility(ESlateVisibility::Collapsed); return;
 	}
 	for (int32 Index = 0; Index < ObjectiveRows.Num(); ++Index)
 	{
 		auto* Label = ObjectiveRows[Index].Get();
-		Label->SetVisibility(Objectives.IsValidIndex(Index) ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+		ObjectiveRowPanels[Index]->SetVisibility(Objectives.IsValidIndex(Index) ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
 		Label->SetText(FText::GetEmpty());
+		ObjectiveHeaders[Index]->SetText(FText::GetEmpty());
 		if (!Objectives.IsValidIndex(Index)) { continue; }
 		const FSovObjectivePresentationEntry& Entry = Objectives[Index];
-		const FText Kind = Entry.bOptional ? LOCTEXT("OptionalObjective", "Optional") : LOCTEXT("MainObjective", "Main objective");
-		const FText State = Entry.State == ESovObjectiveState::Active ? LOCTEXT("ActiveObjective", "Active") : LOCTEXT("AvailableObjective", "Available");
-		FText Row = FText::Format(LOCTEXT("ObjectiveRow", "{0} · {1}\n{2}"), Kind, State, Entry.Text);
+		const FText Kind = Entry.bOptional ? LOCTEXT("OptionalObjectiveHUD", "OPTIONAL") : LOCTEXT("MainObjectiveHUD", "OBJECTIVE");
+		const FText State = Entry.State == ESovObjectiveState::Active ? LOCTEXT("ActiveObjectiveHUD", "ACTIVE") : LOCTEXT("AvailableObjectiveHUD", "AVAILABLE");
+		ObjectiveHeaders[Index]->SetText(FText::Format(LOCTEXT("ObjectiveHUDHeader", "{0} / {1}"), Kind, State));
+		FText Row = Entry.Text;
 		if (!Entry.FailureRule.IsEmpty()) { Row = FText::Format(LOCTEXT("ObjectiveRule", "{0}\n{1}"), Row, Entry.FailureRule); }
 		Label->SetText(Row);
 	}
     const auto* Player = GetOwningPlayer() ? Cast<ASovPlayerCharacterBase>(GetOwningPlayer()->GetPawn()) : nullptr;
     const auto Theme = SovHUDStyle::ForProtagonist(Player ? Player->GetProtagonistIdentityTag() : FGameplayTag(), Settings.bHighContrastHUD);
     FLinearColor ObjectiveFill = Theme.Background;
-    ObjectiveFill.A = Settings.bHighContrastHUD ? 1.f : .20f;
+    ObjectiveFill.A = Settings.bHighContrastHUD ? 1.f : .44f;
     ObjectiveBackground->SetBrushColor(ObjectiveFill);
 	const FVector2D Size = SafeTextCanvas ? SafeTextCanvas->GetCachedGeometry().GetLocalSize() : GetCachedGeometry().GetLocalSize();
 	LayoutObjectives(Size.X > 0.f ? float(Size.X) : 1280.f, Size.Y > 0.f ? float(Size.Y) : 720.f);
@@ -380,16 +392,21 @@ void USovAccessibilityPresentation::LayoutObjectives(float SafeWidth, float Safe
 		PriorityPanels.Add(Layout.Radar); PriorityPanels.Add(Layout.Arc);
 	}
 	const auto Font = FCoreStyle::GetDefaultFontStyle("Regular", FMath::RoundToInt(20.f * Settings.UIScale));
-	ObjectiveOverflow->SetFont(Font); ObjectiveOverflow->SetWrapTextAt(Width);
-	ObjectiveOverflow->SetColorAndOpacity(FSlateColor(FLinearColor::White));
+	const auto HeaderFont = FCoreStyle::GetDefaultFontStyle("Bold", FMath::RoundToInt(12.f * Settings.UIScale));
+	const auto* Player = GetOwningPlayer() ? Cast<ASovPlayerCharacterBase>(GetOwningPlayer()->GetPawn()) : nullptr;
+	const auto Theme = SovHUDStyle::ForProtagonist(Player ? Player->GetProtagonistIdentityTag() : FGameplayTag(), Settings.bHighContrastHUD);
+	ObjectiveOverflow->SetFont(HeaderFont); ObjectiveOverflow->SetWrapTextAt(Width);
+	ObjectiveOverflow->SetColorAndOpacity(FSlateColor(Theme.Accent));
 	// Explicit wrapping uses this safe width immediately, not the previous frame's
 	// arranged width. Measure rows even when their parent was collapsed last frame.
 	for (int32 Index = 0; Index < ObjectiveRows.Num(); ++Index)
 	{
 		auto* Label = ObjectiveRows[Index].Get(); Label->SetFont(Font); Label->SetWrapTextAt(Width);
 		Label->SetColorAndOpacity(FSlateColor(FLinearColor::White));
-		Label->SetVisibility(Objectives.IsValidIndex(Index) ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
-		if (Objectives.IsValidIndex(Index)) { Label->ForceLayoutPrepass(); }
+		auto* Header = ObjectiveHeaders[Index].Get(); Header->SetFont(HeaderFont); Header->SetWrapTextAt(Width);
+		Header->SetColorAndOpacity(FSlateColor(Theme.Accent));
+		ObjectiveRowPanels[Index]->SetVisibility(Objectives.IsValidIndex(Index) ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+		if (Objectives.IsValidIndex(Index)) { ObjectiveRowPanels[Index]->ForceLayoutPrepass(); }
 	}
 	const auto MeasurePriorityPanel = [&](UBorder* Panel, UTextBlock* Text, const float WrapWidth)
 	{
@@ -430,7 +447,7 @@ void USovAccessibilityPresentation::LayoutObjectives(float SafeWidth, float Safe
 		float Height = 0.f, ContentWidth = 0.f;
 		for (int32 Index = 0; Index < Count; ++Index)
 		{
-			const FVector2D RowSize = ObjectiveRows[Index]->GetDesiredSize();
+			const FVector2D RowSize = ObjectiveRowPanels[Index]->GetDesiredSize();
 			Height += float(RowSize.Y); ContentWidth = FMath::Max(ContentWidth, float(RowSize.X));
 			if (Index + 1 < Count || Remaining > 0) { Height += RowGap; }
 		}
@@ -447,8 +464,8 @@ void USovAccessibilityPresentation::LayoutObjectives(float SafeWidth, float Safe
 	const int32 Remaining = GetAdditionalObjectiveCount();
 	for (int32 Index = 0; Index < ObjectiveRows.Num(); ++Index)
 	{
-		ObjectiveRows[Index]->SetVisibility(Index < VisibleObjectiveRows ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
-		if (auto* RowSlot = Cast<UVerticalBoxSlot>(ObjectiveRows[Index]->Slot))
+		ObjectiveRowPanels[Index]->SetVisibility(Index < VisibleObjectiveRows ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+		if (auto* RowSlot = Cast<UVerticalBoxSlot>(ObjectiveRowPanels[Index]->Slot))
 		{ RowSlot->SetPadding(FMargin(0.f, 0.f, 0.f, Index + 1 < VisibleObjectiveRows || (Index < VisibleObjectiveRows && Remaining > 0) ? RowGap : 0.f)); }
 	}
 	ObjectiveOverflow->SetVisibility(bFitsContent && Remaining > 0 ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
@@ -740,11 +757,13 @@ int32 USovAccessibilityPresentation::NativePaint(const FPaintArgs& Args, const F
 	auto DrawLabel = [&](const FVector2D& Point,const FText& Text,const FLinearColor& Tint, bool bHolographic = false)
 	{
 		if (!SafeTextCanvas || !FSlateApplication::IsInitialized()) { return; }
+		const FSlateFontInfo LabelFont = bHolographic
+			? FCoreStyle::GetDefaultFontStyle("Regular", FMath::RoundToInt(16.f * Settings.UIScale)) : Font;
 		const FGeometry& SafeGeometry=SafeTextCanvas->GetPaintSpaceGeometry();
 		if (SafeGeometry.GetLocalSize().X <= 0 || SafeGeometry.GetLocalSize().Y <= 0) { return; }
 		const FVector2D SafeMin=Geometry.AbsoluteToLocal(SafeGeometry.LocalToAbsolute(FVector2D::ZeroVector));
 		const FVector2D SafeMax=Geometry.AbsoluteToLocal(SafeGeometry.LocalToAbsolute(SafeGeometry.GetLocalSize()));
-		const FVector2D TextSize=FSlateApplication::Get().GetRenderer()->GetFontMeasureService()->Measure(Text,Font);
+		const FVector2D TextSize=FSlateApplication::Get().GetRenderer()->GetFontMeasureService()->Measure(Text,LabelFont);
 		const FVector2D Padding = bHolographic ? FVector2D(8,5) * Settings.UIScale : FVector2D::ZeroVector;
 		const FVector2D PanelSize = TextSize + Padding * 2. + FVector2D(2,2);
 		FVector2D LabelPoint;
@@ -756,14 +775,18 @@ int32 USovAccessibilityPresentation::NativePaint(const FPaintArgs& Args, const F
 		{
 			static const FSlateColorBrush Glass(FLinearColor::White);
 			FSlateDrawElement::MakeBox(Elements,++Layer,Geometry.ToPaintGeometry(PanelSize,FSlateLayoutTransform(LabelPoint)),
-				&Glass,ESlateDrawEffect::None,Settings.bHighContrastHUD ? FLinearColor::Black : FLinearColor(.008f,.016f,.025f,.78f));
+				&Glass,ESlateDrawEffect::None,Settings.bHighContrastHUD ? FLinearColor::Black : FLinearColor(.008f,.016f,.025f,.52f));
 			TArray<FVector2f> Lip = {FVector2f(LabelPoint+FVector2D(0,PanelSize.Y)),FVector2f(LabelPoint),
 				FVector2f(LabelPoint+FVector2D(PanelSize.X*.65,0))};
 			FSlateDrawElement::MakeLines(Elements,++Layer,Geometry.ToPaintGeometry(),MoveTemp(Lip),ESlateDrawEffect::None,Tint,true,1.f);
+			TArray<FVector2f> Underline = {FVector2f(LabelPoint+FVector2D(PanelSize.X*.38,PanelSize.Y-1)),
+				FVector2f(LabelPoint+FVector2D(PanelSize.X,PanelSize.Y-1))};
+			FLinearColor QuietTint = Tint; QuietTint.A *= .45f;
+			FSlateDrawElement::MakeLines(Elements,++Layer,Geometry.ToPaintGeometry(),MoveTemp(Underline),ESlateDrawEffect::None,QuietTint,true,1.f);
 			LabelPoint += Padding;
 		}
-		FSlateDrawElement::MakeText(Elements,++Layer,Geometry.ToPaintGeometry(FVector2D(1,1),FSlateLayoutTransform(LabelPoint+FVector2D(2,2))),Text,Font,ESlateDrawEffect::None,FLinearColor::Black);
-		FSlateDrawElement::MakeText(Elements,++Layer,Geometry.ToPaintGeometry(FVector2D(1,1),FSlateLayoutTransform(LabelPoint)),Text,Font,ESlateDrawEffect::None,Tint);
+		FSlateDrawElement::MakeText(Elements,++Layer,Geometry.ToPaintGeometry(FVector2D(1,1),FSlateLayoutTransform(LabelPoint+FVector2D(2,2))),Text,LabelFont,ESlateDrawEffect::None,FLinearColor::Black);
+		FSlateDrawElement::MakeText(Elements,++Layer,Geometry.ToPaintGeometry(FVector2D(1,1),FSlateLayoutTransform(LabelPoint)),Text,LabelFont,ESlateDrawEffect::None,Tint);
 		Elements.PopClip();
 	};
     FSovCombatVitalsSnapshot CurrentVitals;
@@ -845,7 +868,8 @@ int32 USovAccessibilityPresentation::NativePaint(const FPaintArgs& Args, const F
                 const FText Label = FText::Format(SovHUDStyle::Text(Key), Distance);
                 if (FSlateApplication::IsInitialized())
                 {
-                    const FVector2D LabelSize = FSlateApplication::Get().GetRenderer()->GetFontMeasureService()->Measure(Label, Font)
+                    const FSlateFontInfo WaypointFont = FCoreStyle::GetDefaultFontStyle("Regular", FMath::RoundToInt(16.f * Settings.UIScale));
+                    const FVector2D LabelSize = FSlateApplication::Get().GetRenderer()->GetFontMeasureService()->Measure(Label, WaypointFont)
                         + FVector2D(16,10)*Settings.UIScale + FVector2D(2,2);
                     const FVector2D Center = (Min + Max) * .5;
                     // Text grows inward, rather than covering the outer threat-indicator band.

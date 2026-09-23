@@ -126,7 +126,16 @@ their next runtime check. A passing build alone does not close any gameplay row.
   established by that capture. The later E4B retry terminal frame still shows
   a plain white, multi-line objective status panel in the top-left of the
   viewport, visually out of step with the amber holographic Tarrik bars and
-  radar. Its style and text hierarchy need an in-engine polish pass.
+  radar. The native panel now separates a small protagonist-colored status
+  line from the readable objective text and uses a stronger dark glass veil;
+  the world marker uses smaller regular type on a lighter translucent plate.
+  All 729 automation tests pass. Tarrik's revised panel was inspected in an
+  E4B PIE terminal frame, and
+  `SeleneGlassMarkerFinalReview-20260922-202941-8565c161` passed the restored
+  checkpoint HUD inspection with four rendered captures and no presentation
+  errors. The Selene frame shows blue status and marker lines clear of the
+  central plate. Full-screen, high-contrast and packaged visual acceptance
+  remain open.
 - **Selene face shading:** an intermittent black face is proven in BaseColor,
   including a held static camera, with identical configured material paths in
   healthy and faulty runs. Root cause remains unknown. Next: compare actual

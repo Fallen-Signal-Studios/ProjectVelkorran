@@ -17,6 +17,7 @@
 #include "Components/CanvasPanelSlot.h"
 #include "Components/SizeBox.h"
 #include "Components/TextBlock.h"
+#include "Components/VerticalBox.h"
 #include "Engine/Engine.h"
 #include "Engine/EngineBaseTypes.h"
 #include "Engine/GameInstance.h"
@@ -81,7 +82,7 @@ struct FSovObjectivePresentationTestAccess
 	{ Presentation.LayoutObjectives(Width, Height); }
 	static int32 VisibleRows(const USovAccessibilityPresentation& Presentation) { return Presentation.VisibleObjectiveRows; }
 	static float HeightBudget(const USovAccessibilityPresentation& Presentation) { return Presentation.ObjectiveSize->GetMaxDesiredHeight(); }
-	static float FirstRowHeight(const USovAccessibilityPresentation& Presentation) { return float(Presentation.ObjectiveRows[0]->GetDesiredSize().Y); }
+	static float FirstRowHeight(const USovAccessibilityPresentation& Presentation) { return float(Presentation.ObjectiveRowPanels[0]->GetDesiredSize().Y); }
 	static float PanelHeight(const USovAccessibilityPresentation& Presentation) { return float(Presentation.ObjectiveBackground->GetDesiredSize().Y); }
 	static float PanelPaddingHeight(const USovAccessibilityPresentation& Presentation)
 	{ const auto Padding = Presentation.ObjectiveBackground->GetPadding(); return Padding.Top + Padding.Bottom; }

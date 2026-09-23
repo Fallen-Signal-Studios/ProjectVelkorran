@@ -12,6 +12,7 @@ class UCanvasPanel;
 class UCanvasPanelSlot;
 class UTextBlock;
 class USizeBox;
+class UVerticalBox;
 class UPlayerInteractionComponent;
 class UNarrativeInteractableComponent;
 class ANarrativeCharacter;
@@ -122,6 +123,8 @@ private:
 	UPROPERTY(Transient) TObjectPtr<UBorder> ObjectiveBackground;
 	UPROPERTY(Transient) TObjectPtr<UTextBlock> ObjectiveText;
 	UPROPERTY(Transient) TObjectPtr<USizeBox> ObjectiveSize;
+	UPROPERTY(Transient) TArray<TObjectPtr<UVerticalBox>> ObjectiveRowPanels;
+	UPROPERTY(Transient) TArray<TObjectPtr<UTextBlock>> ObjectiveHeaders;
 	UPROPERTY(Transient) TArray<TObjectPtr<UTextBlock>> ObjectiveRows;
 	UPROPERTY(Transient) TObjectPtr<UTextBlock> ObjectiveOverflow;
 	UPROPERTY(Transient) TArray<FSovObjectivePresentationEntry> Objectives;
