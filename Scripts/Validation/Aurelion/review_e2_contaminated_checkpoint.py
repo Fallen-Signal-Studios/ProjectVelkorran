@@ -24,6 +24,7 @@ from aurelion_retry_input import RetryInput
 ENCOUNTER = 'M12_E2_RelayOverlook'
 PASSIVE_SECONDS = float(os.environ.get('SOV_E2_PASSIVE_SECONDS', '30'))
 assert 5. <= PASSIVE_SECONDS <= 120., 'Passive observation must be 5–120 seconds'
+CAPTURE_FAILED_HUD = os.environ.get('SOV_E2_CAPTURE_FAILED_HUD') == '1'
 
 out = Path(os.environ['SOV_AURELION_RUN_DIRECTORY'])
 source = Path(os.environ.get('SOV_AURELION_E2_SOURCE', str(project /
@@ -119,6 +120,10 @@ def tick(_delta):
             campaign = unreal.GameplayStatics.get_player_controller(world, 0).get_campaign_state()
             report['restored_journal'] = [str(item.beat_id) for item in campaign.get_journal()]
             if director.get_encounter_state() == unreal.SovEncounterState.FAILED:
+                if CAPTURE_FAILED_HUD:
+                    capture = unreal.SovAurelionPIEInputLibrary.capture_aurelion_pie_viewport_with_ui(
+                        world, str(out / 'e2-failed-retry-hud.png'))
+                    report['failed_retry_hud_capture'] = capture.export_text()
                 state.update(retry=RetryInput(world, director, out / 'RetryInput'), phase='retry')
                 write()
                 return

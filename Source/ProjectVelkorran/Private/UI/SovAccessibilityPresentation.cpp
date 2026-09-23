@@ -4,6 +4,7 @@
 #include "CommonActivatableWidget.h"
 #include "UI/SovCombatVitalsWidget.h"
 #include "UI/SovHUDStyle.h"
+#include "Campaign/SovAurelionRequestActor.h"
 #include "Characters/SovPlayerCharacterBase.h"
 #include "Framework/SovPlayerController.h"
 #include "Components/SceneComponent.h"
@@ -908,8 +909,12 @@ int32 USovAccessibilityPresentation::NativePaint(const FPaintArgs& Args, const F
             }
         }
     }
+	const auto* FocusedRequest = FocusedInteractable.IsValid()
+		? Cast<ASovAurelionRequestActor>(FocusedInteractable->GetOwner()) : nullptr;
+	FText RequestError;
 	if (bLivingPlayer && !IsCinematicControlled(SovPC) && Settings.bInteractableOutlines && FocusedInteractable.IsValid()
-        && Interaction && Interaction->IsInteractableInReach(FocusedInteractable.Get()))
+        && Interaction && Interaction->IsInteractableInReach(FocusedInteractable.Get())
+		&& (!FocusedRequest || FocusedRequest->CanUse(PC->GetPawn(), RequestError)))
 	{
 		const FBox Bounds = FocusedInteractable->GetInteractableBounds(); FVector2D Min(FLT_MAX,FLT_MAX),Max(-FLT_MAX,-FLT_MAX); bool bValid = Bounds.IsValid != 0;
 		for (int32 Index=0; Index<8 && bValid; ++Index)
@@ -939,8 +944,11 @@ int32 USovAccessibilityPresentation::NativePaint(const FPaintArgs& Args, const F
                 }
                 if (!bOccluded) { DrawOutline({At+AlongY, At, At+AlongX}, Tint); }
             }
-            DrawLabel(FVector2D(Min.X,Max.Y+8.*Settings.UIScale),
-                FText::Format(LOCTEXT("InteractLabel","Interact: {0}"),FocusedInteractable->GetInteractableNameText(PC->GetPawn(),Interaction)), Tint, true);
+			const FText Prompt = FocusedRequest
+				? (FocusedRequest->Operation == ESovAurelionRequest::RetryEncounter
+					? LOCTEXT("RetryEncounterPrompt", "Retry encounter") : FocusedRequest->ActionText)
+				: FText::Format(LOCTEXT("InteractLabel","Interact: {0}"),FocusedInteractable->GetInteractableNameText(PC->GetPawn(),Interaction));
+			DrawLabel(FVector2D(Min.X,Max.Y+8.*Settings.UIScale), Prompt, Tint, true);
         }
 	}
 	for (const FMarker& Marker : Markers)
