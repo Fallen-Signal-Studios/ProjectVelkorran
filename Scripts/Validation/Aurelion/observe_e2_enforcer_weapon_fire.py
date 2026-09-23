@@ -12,9 +12,10 @@ import unreal
 out = Path(os.environ['SOV_AURELION_RUN_DIRECTORY']) / 'e2-enforcer-weapon-fire.json'
 state = dict(start=time.monotonic(), next_sample=0., next_write=0., saw_pie=False,
              stopped=False, last_attack={}, last_ammo={}, fire_frames=0,
-             capture_attempts=0, captured=False)
+             capture_attempts=0, captured=False, active_since=None,
+             active_capture_attempted=False)
 report = dict(status='waiting_for_pie', read_only=True, samples=[], attack_events=[],
-              ammo_spend_events=[], player_viewport_captures=[], errors=[])
+              ammo_spend_events=[], player_viewport_captures=[], active_viewport_captures=[], errors=[])
 
 
 def path(value):
@@ -71,6 +72,13 @@ def tick(_delta):
         player = unreal.GameplayStatics.get_player_pawn(world, 0)
         if not isinstance(player, unreal.SovSeleneCharacter) or player.is_character_pending_load():
             return
+        if state['active_since'] is None:
+            state['active_since'] = now
+        if not state['active_capture_attempted'] and now-state['active_since'] >= 5.:
+            state['active_capture_attempted'] = True
+            capture = unreal.SovAurelionPIEInputLibrary.capture_aurelion_pie_viewport_with_ui(
+                world, str(out.parent / 'e2-active-player-with-ui.png'))
+            report['active_viewport_captures'].append(capture.export_text())
         for actor in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.SovNPCCharacterBase):
             if ('BP_AurelionEnforcer_C' not in actor.get_class().get_name()
                     or not actor.is_alive() or actor.get_editor_property('hidden')
@@ -101,8 +109,8 @@ def tick(_delta):
                 if (state['fire_frames'] >= 2 and not state['captured']
                         and state['capture_attempts'] < 3):
                     state['capture_attempts'] += 1
-                    filename = out.parent / ('e2-player-rifle-fire-' + str(state['capture_attempts']) + '.png')
-                    capture = unreal.SovAurelionPIEInputLibrary.capture_aurelion_pie_viewport(
+                    filename = out.parent / ('e2-player-rifle-fire-with-ui-' + str(state['capture_attempts']) + '.png')
+                    capture = unreal.SovAurelionPIEInputLibrary.capture_aurelion_pie_viewport_with_ui(
                         world, str(filename))
                     report['player_viewport_captures'].append(capture.export_text())
                     state['captured'] = bool(capture.captured)

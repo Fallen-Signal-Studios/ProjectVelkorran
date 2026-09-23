@@ -1,4 +1,4 @@
-"""Capture the actual local-player PIE back buffer at a fresh ready M12 start."""
+"""Capture the local player's scene and Slate HUD at a fresh ready M12 start."""
 import json
 import os
 import time
@@ -39,7 +39,10 @@ def tick(_delta):
         capture = unreal.SovAurelionPIEInputLibrary.capture_aurelion_pie_viewport(
             world, str(out / 'm12-player-viewport.png'))
         report['capture'] = capture.export_text()
-        report['status'] = 'passed' if capture.captured else 'failed'
+        with_ui = unreal.SovAurelionPIEInputLibrary.capture_aurelion_pie_viewport_with_ui(
+            world, str(out / 'm12-player-viewport-with-ui.png'))
+        report['capture_with_ui'] = with_ui.export_text()
+        report['status'] = 'passed' if capture.captured and with_ui.captured else 'failed'
         write()
         level.editor_request_end_play()
         state.update(phase='stopping', stopped_at=now)

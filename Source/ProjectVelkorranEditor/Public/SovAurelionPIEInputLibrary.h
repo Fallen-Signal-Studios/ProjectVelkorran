@@ -71,4 +71,9 @@ public:
     UFUNCTION(BlueprintCallable, Category="Velkorran|Editor|PIE Validation")
     static FSovAurelionPIEViewportCaptureResult CaptureAurelionPIEViewport(
         UWorld* World, const FString& Filename);
+
+    /** Capture the same player's PIE viewport after Slate draws its HUD layers. */
+    UFUNCTION(BlueprintCallable, Category="Velkorran|Editor|PIE Validation")
+    static FSovAurelionPIEViewportCaptureResult CaptureAurelionPIEViewportWithUI(
+        UWorld* World, const FString& Filename);
 };

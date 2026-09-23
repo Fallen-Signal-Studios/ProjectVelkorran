@@ -196,3 +196,52 @@ FSovAurelionPIEViewportCaptureResult USovAurelionPIEInputLibrary::CaptureAurelio
     Result.Report = TEXT("Captured the validated local player's PIE back buffer; Slate HUD may be separate.");
     return Result;
 }
+
+FSovAurelionPIEViewportCaptureResult USovAurelionPIEInputLibrary::CaptureAurelionPIEViewportWithUI(
+    UWorld* World, const FString& Filename)
+{
+    FSovAurelionPIEViewportCaptureResult Result;
+    if (!IsInGameThread() || !GEditor || !GEngine || !FSlateApplication::IsInitialized()
+        || !IsValid(World) || World->WorldType != EWorldType::PIE
+        || GEditor->PlayWorld != World || GEditor->IsSimulateInEditorInProgress())
+    { Result.Report = TEXT("Capture requires the current real Aurelion PIE world and Slate on the game thread."); return Result; }
+    const FString Package = UWorld::RemovePIEPrefix(World->GetOutermost()->GetName());
+    if (Package != TEXT("/Game/Aurelion/Maps/L_Aurelion_M12") && Package != TEXT("/Game/Aurelion/Maps/L_Aurelion_M13"))
+    { Result.Report = TEXT("Capture is restricted to the exact M12 and M13 Aurelion wrappers."); return Result; }
+    int32 PIEWorldCount = 0;
+    for (const FWorldContext& Context : GEngine->GetWorldContexts())
+    { if (Context.WorldType == EWorldType::PIE && IsValid(Context.World())) { ++PIEWorldCount; } }
+    UGameInstance* const Instance = World->GetGameInstance();
+    if (PIEWorldCount != 1 || !IsValid(Instance) || Instance->GetNumLocalPlayers() != 1)
+    { Result.Report = TEXT("Capture requires one PIE world and one local player."); return Result; }
+    ULocalPlayer* const Player = Instance->GetLocalPlayers()[0];
+    UGameViewportClient* const Client = IsValid(Player) ? Player->ViewportClient.Get() : nullptr;
+    ASovPlayerController* const Controller = IsValid(Player)
+        ? Cast<ASovPlayerController>(Player->GetPlayerController(World)) : nullptr;
+    TSharedPtr<SViewport> ViewportWidget = IsValid(Client) ? Client->GetGameViewportWidget() : nullptr;
+    if (!IsValid(Controller) || !Controller->IsLocalController() || Controller->GetWorld() != World
+        || !IsValid(Client) || Client->GetWorld() != World || !ViewportWidget.IsValid())
+    { Result.Report = TEXT("Capture could not resolve the sole local player's Slate game viewport."); return Result; }
+    FString Full = FPaths::ConvertRelativePathToFull(Filename);
+    FString Root = FPaths::ConvertRelativePathToFull(
+        FPaths::Combine(FPaths::ProjectDir(), TEXT("Saved/Validation/Aurelion")));
+    FPaths::NormalizeFilename(Full);
+    FPaths::NormalizeFilename(Root);
+    if (!FPaths::IsUnderDirectory(Full, Root) || !FPaths::GetExtension(Full).Equals(TEXT("png"), ESearchCase::IgnoreCase))
+    { Result.Report = FString::Printf(TEXT("Capture requires a PNG under %s; received %s."), *Root, *Full); return Result; }
+    TArray<FColor> Pixels;
+    FIntVector Size = FIntVector::ZeroValue;
+    if (!FSlateApplication::Get().TakeScreenshot(ViewportWidget.ToSharedRef(), Pixels, Size)
+        || Size.X < 16 || Size.Y < 16 || Size.X > 8192 || Size.Y > 8192
+        || Pixels.Num() != Size.X * Size.Y)
+    { Result.Report = TEXT("Slate could not capture a usable player viewport and HUD frame."); return Result; }
+    if (!IFileManager::Get().MakeDirectory(*FPaths::GetPath(Full), true)
+        || !FImageUtils::SaveImageByExtension(*Full, FImageView(Pixels.GetData(), Size.X, Size.Y)))
+    { Result.Report = TEXT("The player viewport HUD PNG could not be saved."); return Result; }
+    Result.bCaptured = true;
+    Result.Filename = Full;
+    Result.Width = Size.X;
+    Result.Height = Size.Y;
+    Result.Report = TEXT("Captured the validated local player's PIE Slate viewport, including HUD layers.");
+    return Result;
+}
