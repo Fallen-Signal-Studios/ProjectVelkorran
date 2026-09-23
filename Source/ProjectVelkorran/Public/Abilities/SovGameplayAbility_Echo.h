@@ -12,6 +12,7 @@ class UAbilitySystemComponent;
 class UNarrativeAttributeSetBase;
 class UWeaponItem;
 class UAnimMontage;
+class UNiagaraSystem;
 
 /** How an Echo ability validates the weapon classes authored on its child. */
 UENUM(BlueprintType)
@@ -178,6 +179,17 @@ protected:
 	/** Cosmetic A/B casts. Exactly two distinct montages; no payload notifies or root motion. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Animation")
 	TArray<TObjectPtr<UAnimMontage>> CastMontages;
+
+	/** Owner-only cosmetic burst played only after an authored cast montage starts. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Presentation")
+	TObjectPtr<UNiagaraSystem> CastNiagaraSystem;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Presentation")
+	FVector CastNiagaraScale = FVector(0.35f);
+
+	/** Empty socket places the cast burst at the avatar's feet (for radial abilities). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Presentation")
+	FName CastNiagaraSocketName = TEXT("hand_r");
 
 	/** Failsafe for a Blueprint child that never ends its montage/task flow. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Echo Ability|Lifecycle", meta = (ClampMin = "0.0"))

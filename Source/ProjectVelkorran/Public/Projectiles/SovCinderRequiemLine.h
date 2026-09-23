@@ -24,6 +24,9 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 	UFUNCTION(BlueprintImplementableEvent, Category="Sovereign|Cinderline Requiem")
 	void ReceiveLineDetonation(FVector Origin, float Radius, int32 NodeIndex);
+	/** Authored one-shot at each replicated line detonation. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Sovereign|Cinderline Requiem|Presentation")
+	TObjectPtr<class UNiagaraSystem> DetonationNiagaraSystem;
 private:
 	void DetonateNext();
 	UFUNCTION() void OnRep_LastDetonatedNode();

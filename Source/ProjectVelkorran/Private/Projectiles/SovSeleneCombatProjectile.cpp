@@ -1,5 +1,7 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Projectiles/SovSeleneCombatProjectile.h"
+#include "NiagaraComponent.h"
+#include "NiagaraFunctionLibrary.h"
 #include "Combat/SovSelenePayloadMath.h"
 #include "Targeting/SovAimAssistPolicy.h"
 #include "Components/SceneComponent.h"
@@ -20,6 +22,11 @@ ASovSeleneCombatProjectile::ASovSeleneCombatProjectile()
 	PresentationMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PresentationMesh"));
 	PresentationMesh->SetupAttachment(RootComponent);
 	PresentationMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+}
+void ASovSeleneCombatProjectile::BeginPlay()
+{
+	Super::BeginPlay();
+	PresentPhase();
 }
 ASovSeleneCombatProjectile* ASovSeleneCombatProjectile::SpawnNativePayload(
 	TSubclassOf<ANarrativeProjectile> AuthoredClass, const FVector& Origin, const FSovSeleneProjectileParameters& Parameters)
@@ -68,7 +75,36 @@ void ASovSeleneCombatProjectile::GetLifetimeReplicatedProps(TArray<FLifetimeProp
 	DOREPLIFETIME(ASovSeleneCombatProjectile, Mode);
 	DOREPLIFETIME(ASovSeleneCombatProjectile, Phase);
 }
-void ASovSeleneCombatProjectile::OnRep_Phase() { ReceivePayloadPhaseChanged(Mode, Phase); }
+void ASovSeleneCombatProjectile::OnRep_Phase()
+{
+	PresentPhase();
+	ReceivePayloadPhaseChanged(Mode, Phase);
+}
+void ASovSeleneCombatProjectile::PresentPhase()
+{
+	if (GetNetMode() == NM_DedicatedServer) { return; }
+	if (ActivePhaseNiagara)
+	{
+		ActivePhaseNiagara->Deactivate();
+		ActivePhaseNiagara = nullptr;
+	}
+	UNiagaraSystem* System = nullptr;
+	if (Phase == ESovSeleneProjectilePhase::Outbound) { System = FlightNiagaraSystem; }
+	else if (Phase == ESovSeleneProjectilePhase::Field) { System = FieldNiagaraSystem; }
+	else if (Phase == ESovSeleneProjectilePhase::Recalling) { System = RecallNiagaraSystem; }
+	if (System && GetWorld())
+	{
+		ActivePhaseNiagara = UNiagaraFunctionLibrary::SpawnSystemAttached(System, RootComponent,
+			NAME_None, FVector::ZeroVector, FRotator::ZeroRotator, EAttachLocation::SnapToTarget, true);
+	}
+}
+void ASovSeleneCombatProjectile::MulticastPayloadHit_Implementation(FVector_NetQuantize Point)
+{
+	if (GetNetMode() != NM_DedicatedServer && HitNiagaraSystem && GetWorld())
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), HitNiagaraSystem, Point);
+	}
+}
 void ASovSeleneCombatProjectile::SetPhase(ESovSeleneProjectilePhase NewPhase)
 {
 	Phase = NewPhase;
@@ -179,9 +215,18 @@ void ASovSeleneCombatProjectile::Advance(float DeltaSeconds)
 	GetWorld()->SweepMultiByObjectType(Hits, Start, End, Velocity.Rotation().Quaternion(),
 		FCollisionObjectQueryParams::AllObjects, Shape, Query);
 	Hits.Sort([](const FHitResult& A, const FHitResult& B) { return A.Time < B.Time; });
+	// A side wall can overlap the wide target lane without blocking the wave's forward path.
+	// Individual targets still need line of sight in HitTarget, so cover remains protective.
+	TArray<FHitResult> CenterHits;
+	if (Mode == ESovSeleneProjectileMode::Wake)
+	{
+		GetWorld()->SweepMultiByObjectType(CenterHits, Start, End, Velocity.Rotation().Quaternion(),
+			FCollisionObjectQueryParams::AllObjects, FCollisionShape::MakeSphere(18.0f), Query);
+	}
+	const TArray<FHitResult>& BlockingHits = Mode == ESovSeleneProjectileMode::Wake ? CenterHits : Hits;
 	float WallTime = 1.0f;
 	bool bWall = false;
-	for (const FHitResult& Hit : Hits)
+	for (const FHitResult& Hit : BlockingHits)
 	{
 		AActor* Actor = Hit.GetActor();
 		if (IsValid(Actor) && !Actor->IsA<ANarrativeProjectile>() && !SovSelenePayload::ResolveTarget(Actor)
@@ -199,7 +244,7 @@ void ASovSeleneCombatProjectile::Advance(float DeltaSeconds)
 	if (bWall && Mode != ESovSeleneProjectileMode::Stillpoint && !bFinished && !IsActorBeingDestroyed()
 		&& SovSelenePayload::ValidSource(Tuning.Context))
 	{
-		const FHitResult* WallHit = Hits.FindByPredicate([WallTime](const FHitResult& Hit)
+		const FHitResult* WallHit = BlockingHits.FindByPredicate([WallTime](const FHitResult& Hit)
 			{ return Hit.Time == WallTime && IsValid(Hit.GetActor()) && Hit.GetActor()->Implements<USovEnvironmentDamageable>(); });
 		if (WallHit && !SceneryTargets.Contains(TWeakObjectPtr<AActor>(WallHit->GetActor())))
 		{
@@ -242,6 +287,7 @@ void ASovSeleneCombatProjectile::ApplyField()
 		if (bFinished || IsActorBeingDestroyed()) { return; }
 		SovSelenePayload::FrostDOT(Tuning.Context, Target, Tuning.DamagePerSecond * (bFrozen ? 1.0f : 0.5f), RemainingDuration, bFrozen);
 		ReceivePayloadHit(Target, false, bFrozen);
+		if (!IsActorBeingDestroyed() && IsValid(Target)) { MulticastPayloadHit(Target->GetActorLocation()); }
 	}
 }
 void ASovSeleneCombatProjectile::HitTarget(AActor* Target, const FHitResult& Hit, const FVector& SegmentStart)
@@ -272,4 +318,5 @@ void ASovSeleneCombatProjectile::HitTarget(AActor* Target, const FHitResult& Hit
 		SovSelenePayload::FrostDOT(Tuning.Context, Target, Tuning.DamagePerSecond, Tuning.ControlDuration, false);
 	}
 	ReceivePayloadHit(Target, bReturn, bFrozen);
+	if (!IsActorBeingDestroyed()) { MulticastPayloadHit(HitPoint); }
 }

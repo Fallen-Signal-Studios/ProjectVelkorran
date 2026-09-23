@@ -142,6 +142,17 @@ void ASovCinderStickyGrenadeProjectile::BeginPlay()
 		CollisionSphere->IgnoreActorWhenMoving(GetOwner(), true);
 		CollisionSphere->IgnoreActorWhenMoving(GetInstigator(), true);
 		CollisionSphere->IgnoreActorWhenMoving(SourceAvatar.Get(), true);
+		// The aim trace ignores attached weapon visuals; the moving grenade must do the same
+		// or a wielded rifle can catch the throw immediately after it leaves the hand.
+		TArray<AActor*> AttachedActors;
+		SourceAvatar->GetAttachedActors(AttachedActors, true, true);
+		TArray<AActor*> ChildActors;
+		SourceAvatar->GetAllChildActors(ChildActors);
+		AttachedActors.Append(ChildActors);
+		for (AActor* AttachedActor : AttachedActors)
+		{
+			if (IsValid(AttachedActor)) { CollisionSphere->IgnoreActorWhenMoving(AttachedActor, true); }
+		}
 
 		StartProjectileMovement();
 

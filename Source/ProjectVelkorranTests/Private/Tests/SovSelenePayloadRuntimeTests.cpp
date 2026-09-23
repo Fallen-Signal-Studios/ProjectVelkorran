@@ -199,6 +199,27 @@ bool FSovSeleneWakeLaneTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovSeleneWakeOverCoverTest, "ProjectVelkorran.Campaign.SelenePayload.WakeOverCoverClearance",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovSeleneWakeOverCoverTest::RunTest(const FString& Parameters)
+{
+	SovSelenePayloadTests::FSeleneTestWorld Fixture;
+	auto* Source = Fixture.Character(FVector::ZeroVector, 0);
+	auto* Target = Fixture.Character(FVector(300.0f, 0.0f, 100.0f));
+	if (!Source || !Target) { AddError(TEXT("Fixture creation failed")); return false; }
+	// M12 has a guard and a full-height wall at the lane's edge; neither crosses its center.
+	Fixture.Wall(FVector(225.0f, -245.0f, 65.0f), FVector(11.0f, 10.0f, 65.0f));
+	Fixture.Wall(FVector(0.0f, -245.0f, 100.0f), FVector(11.0f, 10.0f, 100.0f));
+	FSovSeleneProjectileParameters Data;
+	Data.Context = SovSelenePayloadTests::Context(Source, FSovGameplayTags::Get().Ability_Echo_Selene_VeritysWake);
+	Data.Mode = ESovSeleneProjectileMode::Wake; Data.Radius = 250.0f; Data.Damage = 50.0f; Data.Speed = 2200.0f;
+	auto* Wave = ASovSeleneCombatProjectile::SpawnNativePayload(nullptr, FVector(0.0f, 0.0f, 162.0f), Data);
+	if (!Wave) { AddError(TEXT("Wave creation failed")); return false; }
+	Wave->Tick(0.2f);
+	TestEqual(TEXT("Visible target past lateral cover receives Wake"), Target->ResolvedHitCount, 1);
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovSeleneDispatchLedgerTest, "ProjectVelkorran.Campaign.SelenePayload.DispatchRecallAndCancellation",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FSovSeleneDispatchLedgerTest::RunTest(const FString& Parameters)

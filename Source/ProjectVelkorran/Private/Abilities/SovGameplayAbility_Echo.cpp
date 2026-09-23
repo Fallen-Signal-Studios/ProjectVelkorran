@@ -1,6 +1,9 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 
 #include "Abilities/SovGameplayAbility_Echo.h"
+#include "NiagaraFunctionLibrary.h"
+#include "GameFramework/Character.h"
+#include "Components/SkeletalMeshComponent.h"
 
 #include "Abilities/GameplayAbilityTargetTypes.h"
 #include "Animation/AnimMontage.h"
@@ -419,6 +422,18 @@ void USovGameplayAbility_EchoBase::PlayAlternatingCastMontage()
 	{
 		ActiveCastMontage = Montage;
 		NextCastMontageIndex ^= 1;
+		if (CastNiagaraSystem && CurrentActorInfo->IsLocallyControlled())
+		{
+			const ACharacter* Character = Cast<ACharacter>(GetAvatarActorFromActorInfo());
+			const USkeletalMeshComponent* Mesh = Character ? Character->GetMesh() : nullptr;
+			const FVector Origin = CastNiagaraSocketName.IsNone()
+				? GetAvatarActorFromActorInfo()->GetActorLocation()
+				: Mesh && Mesh->DoesSocketExist(CastNiagaraSocketName)
+					? Mesh->GetSocketLocation(CastNiagaraSocketName)
+					: GetAvatarActorFromActorInfo()->GetActorLocation() + FVector(0.f, 0.f, 70.f);
+			UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), CastNiagaraSystem,
+				Origin, GetAvatarActorFromActorInfo()->GetActorRotation(), CastNiagaraScale);
+		}
 	}
 }
 

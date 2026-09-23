@@ -5,6 +5,9 @@
 #include "Weapons/NarrativeProjectile.h"
 #include "SovSeleneCombatProjectile.generated.h"
 
+class UNiagaraSystem;
+class UNiagaraComponent;
+
 UENUM(BlueprintType)
 enum class ESovSeleneProjectileMode : uint8 { Stillpoint, Wake, Dispatch };
 UENUM(BlueprintType)
@@ -56,6 +59,7 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Sovereign|Selene")
 	ESovSeleneProjectilePhase GetPayloadPhase() const { return Phase; }
 protected:
+	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 	UFUNCTION(BlueprintImplementableEvent, Category = "Sovereign|Selene|Presentation")
 	void ReceivePayloadPhaseChanged(ESovSeleneProjectileMode NewMode, ESovSeleneProjectilePhase NewPhase);
@@ -63,7 +67,18 @@ protected:
 	void ReceivePayloadHit(AActor* Target, bool bReturnLeg, bool bFrozen);
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sovereign|Selene|Presentation")
 	TObjectPtr<class UStaticMeshComponent> PresentationMesh;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Selene|Presentation|Niagara")
+	TObjectPtr<UNiagaraSystem> FlightNiagaraSystem;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Selene|Presentation|Niagara")
+	TObjectPtr<UNiagaraSystem> FieldNiagaraSystem;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Selene|Presentation|Niagara")
+	TObjectPtr<UNiagaraSystem> RecallNiagaraSystem;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Sovereign|Selene|Presentation|Niagara")
+	TObjectPtr<UNiagaraSystem> HitNiagaraSystem;
 private:
+	void PresentPhase();
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastPayloadHit(FVector_NetQuantize Point);
 	friend struct FSovSelenePayloadTestAccess;
 	UFUNCTION()
 	void OnRep_Phase();
@@ -88,4 +103,6 @@ private:
 	float FieldQueryTime = 0.0f;
 	bool bInitialized = false;
 	bool bFinished = false;
+	UPROPERTY(Transient)
+	TObjectPtr<UNiagaraComponent> ActivePhaseNiagara;
 };

@@ -1,5 +1,6 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "Projectiles/SovCinderRequiemLine.h"
+#include "NiagaraFunctionLibrary.h"
 #include "Combat/SovCinderLineMath.h"
 #include "Combat/SovTarrikPayloadSupport.h"
 #include "Sovereign/SovEnvironmentDamage.h"
@@ -104,6 +105,11 @@ void ASovCinderRequiemLine::OnRep_LastDetonatedNode()
 	while (LastPresentedNode < Last)
 	{
 		++LastPresentedNode;
+		if (DetonationNiagaraSystem)
+		{
+			UNiagaraFunctionLibrary::SpawnSystemAtLocation(GetWorld(), DetonationNiagaraSystem,
+				DetonationPoints[LastPresentedNode], FRotator::ZeroRotator, FVector(0.4f));
+		}
 		ReceiveLineDetonation(DetonationPoints[LastPresentedNode], BlastRadius, LastPresentedNode);
 	}
 }
