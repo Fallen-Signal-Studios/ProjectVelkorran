@@ -20,6 +20,8 @@
 #include "Sovereign/SovGameplayTags.h"
 #include "Items/InventoryComponent.h"
 #include "Tests/SovBotAttackTestFixtures.h"
+#include "Serialization/MemoryWriter.h"
+#include "Serialization/ObjectAndNameAsStringProxyArchive.h"
 #if WITH_AUTOMATION_TESTS
 struct FSovResonanceTestAccess
 {
@@ -47,6 +49,9 @@ struct FSovResonanceTestAccess
 struct FSovConvergenceTestAccess
 {
     static const TArray<FSovCompanionKitGrant>& Kit(const ASovProtagonistCompanionCharacter* Proxy) { return Proxy->CopiedGrants; }
+    static bool ResolveSavedKit(const FSovProtagonistSnapshot& Kit, const TArray<TSubclassOf<UGameplayAbility>>& Curated,
+        TArray<FSovCompanionKitGrant>& Grants, FString& Reason)
+    { return USovConvergenceCompanionState::ResolveSavedKitGrants(Kit, Curated, Grants, Reason); }
     static void SeedOwnership(USovConvergenceCompanionState* State, ASovProtagonistCompanionCharacter* Active, ASovProtagonistCompanionCharacter* Staged)
     { State->Active = Active; State->Staged = Staged; }
 };
@@ -74,6 +79,51 @@ struct FResonanceWorld
     ASovProtagonistCompanionCharacter* DeferredProxy(AActor* Owner)
     { return World->SpawnActorDeferred<ASovProtagonistCompanionCharacter>(ASovProtagonistCompanionCharacter::StaticClass(), FTransform::Identity, Owner, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn); }
 };
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovSavedCompanionKitRuntimeTest, "ProjectVelkorran.Campaign.Companion.SavedOwnedWeaponKit",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FSovSavedCompanionKitRuntimeTest::RunTest(const FString& Parameters)
+{
+    FResonanceWorld F; auto* Source = F.Character(); if (!Source) { return false; }
+    auto* Inventory = Source->GetInventoryComponent();
+    if (!TestNotNull(TEXT("Real source inventory exists"), Inventory)) { return false; }
+    Inventory->TryAddItemFromClass(USovSavedKitRuntimeTestWeapon::StaticClass(), 1, false);
+    INarrativeSavableComponent::Execute_PrepareForSave(Inventory);
+    FNarrativeSaveComponent InventoryRecord; InventoryRecord.ComponentName = Inventory->GetFName();
+    InventoryRecord.ComponentClass = Inventory->GetClass();
+    FMemoryWriter Writer(InventoryRecord.ByteData);
+    FObjectAndNameAsStringProxyArchive Archive(Writer, true); Archive.ArIsSaveGame = true; Archive.ArNoDelta = true;
+    Inventory->Serialize(Archive);
+    if (!TestFalse(TEXT("Fixture inventory serialized"), Archive.IsError())) { return false; }
+
+    FSovProtagonistSnapshot Kit; Kit.ProtagonistTag = FSovGameplayTags::Get().Character_Player_Tarrik;
+    Kit.PawnClass = Source->GetClass(); Kit.PlayerDefinition = NewObject<UPlayerDefinition>(Source);
+    Kit.PawnRecord.ActorName = TEXT("SavedTarrik"); Kit.PawnRecord.ActorSoftClass = Source->GetClass();
+    Kit.PawnRecord.SavedComponents.Add(InventoryRecord); Kit.SkillTreeRecord.ComponentName = TEXT("SkillTree");
+    Kit.Resources.Health = 100.f; Kit.Resources.MaxHealth = 100.f;
+    FSovProtagonistAbilitySnapshot Direct; Direct.AbilityClass = USovWeakPointFireTestAbility::StaticClass(); Direct.Level = 3;
+    Kit.GrantedAbilities.Add(Direct);
+    if (!TestTrue(TEXT("Snapshot fixture meets native validation"), Kit.IsValid())) { return false; }
+    TArray<FSovCompanionKitGrant> Grants; FString Reason;
+    const TArray<TSubclassOf<UGameplayAbility>> Curated {
+        USovWeakPointFireTestAbility::StaticClass(), USovBotTestAttackAlpha::StaticClass(), USovWeakPointMeleeTestAbility::StaticClass() };
+    TestTrue(TEXT("Saved inventory proves the owned holstered attack"),
+        FSovConvergenceTestAccess::ResolveSavedKit(Kit, Curated, Grants, Reason));
+    TestEqual(TEXT("Only directly unlocked or owned attacks survive curation"), Grants.Num(), 2);
+    if (Grants.Num() == 2)
+    {
+        TestEqual(TEXT("Direct progression level is retained"), Grants[0].Level, 3);
+        TestFalse(TEXT("Direct grant is not a weapon grant"), Grants[0].bWeaponGrant);
+        TestEqual(TEXT("Owned weapon uses the existing level-one fallback"), Grants[1].Level, 1);
+        TestTrue(TEXT("Owned weapon draw owns its ability lifecycle"), Grants[1].bWeaponGrant);
+    }
+    TestTrue(TEXT("Mission exclusion still blocks an owned attack"),
+        FSovConvergenceTestAccess::ResolveSavedKit(Kit, { USovWeakPointFireTestAbility::StaticClass() }, Grants, Reason));
+    TestEqual(TEXT("Excluded attack is absent"), Grants.Num(), 1);
+    Kit.PawnRecord.SavedComponents[0].ByteData.Reset();
+    TestFalse(TEXT("Missing inventory bytes cannot manufacture an unlock"),
+        FSovConvergenceTestAccess::ResolveSavedKit(Kit, Curated, Grants, Reason));
+    return true;
 }
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovResonanceOwnershipRuntimeTest, "ProjectVelkorran.Campaign.Resonance.PairedOwnershipAndCancellation",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)

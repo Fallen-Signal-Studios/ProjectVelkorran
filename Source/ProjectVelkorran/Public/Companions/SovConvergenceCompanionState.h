@@ -36,6 +36,8 @@ private:
 	friend struct FSovCompanionApproachTestAccess;
 	bool RequiresCompanion(const USovCampaignDefinition* Mission) const;
 	bool SavedMissionRequiresCompanion(const USovCampaignDefinition* Mission, const TArray<uint8>* CampaignBytes, bool& bRequired, FString& Reason) const;
+	static bool ResolveSavedKitGrants(const FSovProtagonistSnapshot& Kit,
+		const TArray<TSubclassOf<UGameplayAbility>>& Curated, TArray<FSovCompanionKitGrant>& Grants, FString& Reason);
 	bool StageSnapshot(const FSovCompanionProxySnapshot& Snapshot, USovCampaignDefinition* Mission, FString& Reason, bool bRestoreRecord = true);
 	void DestroyOwnedProxy(ASovProtagonistCompanionCharacter* Proxy);
 	UPROPERTY(SaveGame) bool bHasSavedCompanion = false;

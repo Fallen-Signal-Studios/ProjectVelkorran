@@ -15,9 +15,12 @@
 #include "EngineUtils.h"
 #include "GameFramework/PlayerController.h"
 #include "GAS/NarrativeAbilitySystemComponent.h"
+#include "Items/InventoryComponent.h"
+#include "Items/WeaponItem.h"
 #include "Serialization/MemoryReader.h"
 #include "Serialization/ObjectAndNameAsStringProxyArchive.h"
 #include "Subsystems/NarrativeSaveSubsystem.h"
+#include "UObject/StrongObjectPtr.h"
 
 namespace
 {
@@ -75,6 +78,58 @@ bool USovConvergenceCompanionState::SavedMissionRequiresCompanion(const USovCamp
 	if (Archive.IsError() || Candidate->GetActiveMission() != Mission)
 	{ Reason = TEXT("The companion restore journal names another mission."); return false; }
 	bRequired = Candidate->IsBeatComplete(Mission->MissionId, Mission->CompanionActivationBeat);
+	return true;
+}
+
+bool USovConvergenceCompanionState::ResolveSavedKitGrants(const FSovProtagonistSnapshot& Kit,
+	const TArray<TSubclassOf<UGameplayAbility>>& Curated, TArray<FSovCompanionKitGrant>& Grants, FString& Reason)
+{
+	Reason.Reset(); Grants.Reset();
+	if (!Kit.IsValid()) { Reason = TEXT("The inactive protagonist's saved kit is invalid."); return false; }
+	TSet<UClass*> OwnedWeaponAbilities;
+	int32 InventoryRecords = 0;
+	for (const FNarrativeSaveComponent& Record : Kit.PawnRecord.SavedComponents)
+	{
+		UClass* RecordClass = Record.ComponentClass.LoadSynchronous();
+		if (!RecordClass || !RecordClass->IsChildOf(UNarrativeInventoryComponent::StaticClass())) { continue; }
+		if (++InventoryRecords != 1 || Record.ByteData.IsEmpty() || Record.ByteData.Num() > 2 * 1024 * 1024)
+		{ Reason = TEXT("The inactive protagonist's saved inventory evidence is ambiguous or invalid."); return false; }
+		// Deserialize into an unattached temporary component. Never Load() it or touch the active player inventory.
+		TStrongObjectPtr<UNarrativeInventoryComponent> Evidence(NewObject<UNarrativeInventoryComponent>(GetTransientPackage()));
+		FMemoryReader Reader(Record.ByteData);
+		FObjectAndNameAsStringProxyArchive Archive(Reader, true); Archive.ArIsSaveGame = true;
+		Evidence->Serialize(Archive);
+		if (Archive.IsError() || Evidence->GetSavedItemRecords().Num() > 100)
+		{ Reason = TEXT("The inactive protagonist's saved inventory could not be read safely."); return false; }
+		for (const FNarrativeSavedItem& Item : Evidence->GetSavedItemRecords())
+		{
+			UClass* ItemClass = Item.ItemClass.Get();
+			if (!ItemClass || Item.Quantity <= 0 || Item.Quantity > 9999)
+			{ Reason = TEXT("The inactive protagonist's saved inventory contains an invalid item."); return false; }
+			if (!ItemClass->IsChildOf(UWeaponItem::StaticClass())) { continue; }
+			const UWeaponItem* Weapon = ItemClass->GetDefaultObject<UWeaponItem>();
+			if (!IsValid(Weapon)) { Reason = TEXT("An owned weapon has no authored kit."); return false; }
+			for (const auto& Ability : Weapon->GetWeaponAbilities())
+			{ if (Ability) { OwnedWeaponAbilities.Add(Ability.Get()); } }
+		}
+	}
+	TSet<UClass*> Seen;
+	for (const auto& Class : Curated)
+	{
+		if (!Class || Class->HasAnyClassFlags(CLASS_Abstract) || Seen.Contains(Class.Get()))
+		{ Reason = TEXT("Curated companion classes must be concrete and unique."); return false; }
+		Seen.Add(Class.Get());
+		const FSovProtagonistAbilitySnapshot* SavedGrant = Kit.GrantedAbilities.FindByPredicate(
+			[Class](const FSovProtagonistAbilitySnapshot& Entry) { return Entry.AbilityClass == Class; });
+		const bool bOwnedWeaponGrant = OwnedWeaponAbilities.Contains(Class.Get());
+		if (!SavedGrant && !bOwnedWeaponGrant) { continue; }
+		if (SavedGrant && (SavedGrant->Level <= 0 || SavedGrant->Level > 100))
+		{ Reason = TEXT("The inactive protagonist's saved ability level is invalid."); return false; }
+		FSovCompanionKitGrant Grant; Grant.Ability = Class;
+		Grant.Level = SavedGrant ? SavedGrant->Level : 1;
+		Grant.bWeaponGrant = bOwnedWeaponGrant;
+		Grants.Add(Grant);
+	}
 	return true;
 }
 
@@ -180,13 +235,32 @@ bool USovConvergenceCompanionState::StageSnapshot(const FSovCompanionProxySnapsh
 		|| Snapshot.ActorRecord.bDestroyed || Snapshot.ActorRecord.Transform.ContainsNaN()
 		|| Snapshot.ActorRecord.ActorSoftClass.ToSoftObjectPath() != Profile->CompanionClass.ToSoftObjectPath())
 	{ Reason = TEXT("The saved companion does not match this mission's explicit native profile."); return false; }
+	FSovCompanionProxySnapshot Reconciled = Snapshot;
+	if (auto* PC = Cast<APlayerController>(GetOwner()))
+	{
+		if (auto* PS = PC->GetPlayerState<ASovPlayerState>())
+		{
+			FSovProtagonistSnapshot Kit;
+			if (PS->FindProtagonistSnapshot(Snapshot.Identity, Kit))
+			{
+				TArray<FSovCompanionKitGrant> CurrentGrants;
+				if (!ResolveSavedKitGrants(Kit, Profile->CuratedCompanionAbilities, CurrentGrants, Reason)) { return false; }
+				for (const FSovCompanionKitGrant& Grant : CurrentGrants)
+				{
+					if (!Reconciled.Grants.ContainsByPredicate([&Grant](const FSovCompanionKitGrant& Existing)
+						{ return Existing.Ability == Grant.Ability; })) { Reconciled.Grants.Add(Grant); }
+				}
+			}
+			else { UE_LOG(LogTemp, Warning, TEXT("Saved companion kit reconciliation skipped: inactive protagonist snapshot is unavailable.")); }
+		}
+	}
 	UClass* Class = Profile->CompanionClass.LoadSynchronous(); UNPCDefinition* Definition = Profile->CompanionDefinition.LoadSynchronous();
 	if (!Class || !Definition || Class->HasAnyClassFlags(CLASS_Abstract)) { Reason = TEXT("Saved companion content is unavailable."); return false; }
 	for (TActorIterator<ASovProtagonistCompanionCharacter> It(GetWorld()); It; ++It)
 	{ if (*It != Active && It->GetCompanionComponent()->CompanionId == Profile->CompanionId) { Reason = TEXT("A duplicate saved companion already exists in the map."); return false; } }
 	Staged = GetWorld()->SpawnActorDeferred<ASovProtagonistCompanionCharacter>(Class, Snapshot.ActorRecord.Transform, GetOwner(), nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
-	if (!Staged || !Staged->PrepareProxyFromSnapshot(Snapshot, Profile->CuratedCompanionAbilities, Reason)) { RollbackStaged(); return false; }
-	PendingSnapshot = Snapshot; StagedMission = Mission; bRestoreActorRecord = bRestoreRecord; bRecordApplied = false;
+	if (!Staged || !Staged->PrepareProxyFromSnapshot(Reconciled, Profile->CuratedCompanionAbilities, Reason)) { RollbackStaged(); return false; }
+	PendingSnapshot = Reconciled; StagedMission = Mission; bRestoreActorRecord = bRestoreRecord; bRecordApplied = false;
 	Staged->GetCompanionComponent()->RecoveryAnchor = ResolveRecoveryAnchor(GetWorld(), Profile->EntryAnchorTag);
 	if (!Staged->GetCompanionComponent()->RecoveryAnchor) { Reason = TEXT("The saved companion recovery anchor is missing or duplicated."); RollbackStaged(); return false; }
 	auto* ExpectedStage = Staged.Get();
@@ -349,8 +423,6 @@ bool USovConvergenceCompanionState::StageInitialCompanion(USovCampaignDefinition
 	FSovProtagonistSnapshot Kit;
 	if (!Profile || Profile->EntryAnchorTag.IsNone() || !PS || !PS->FindProtagonistSnapshot(Profile->Protagonist, Kit))
 	{ Reason = TEXT("Initial convergence requires the inactive protagonist's previously played kit and explicit companion entry anchor."); return false; }
-	if (!Profile->CuratedCompanionAbilities.IsEmpty() && Kit.GrantedAbilities.IsEmpty())
-	{ Reason = TEXT("This older protagonist snapshot has no unlocked-kit evidence; capture that protagonist once before convergence."); return false; }
 	AActor* Anchor = nullptr;
 	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 	{
@@ -362,10 +434,8 @@ bool USovConvergenceCompanionState::StageInitialCompanion(USovCampaignDefinition
 	Snapshot.CompanionId = Profile->CompanionId; Snapshot.Resources = Kit.Resources;
 	Snapshot.ActorRecord.ActorName = Profile->CompanionId; Snapshot.ActorRecord.ActorGUID = FGuid::NewGuid();
 	Snapshot.ActorRecord.ActorSoftClass = Profile->CompanionClass.ToSoftObjectPath(); Snapshot.ActorRecord.Transform = Anchor->GetActorTransform();
-	for (const auto& Class : Profile->CuratedCompanionAbilities)
-	{
-		const auto* Found = Kit.GrantedAbilities.FindByPredicate([Class](const FSovProtagonistAbilitySnapshot& Item) { return Item.AbilityClass == Class; });
-		if (Found) { FSovCompanionKitGrant Grant; Grant.Ability = Found->AbilityClass; Grant.Level = Found->Level; Snapshot.Grants.Add(Grant); }
-	}
+	if (!ResolveSavedKitGrants(Kit, Profile->CuratedCompanionAbilities, Snapshot.Grants, Reason)) { return false; }
+	if (!Profile->CuratedCompanionAbilities.IsEmpty() && Snapshot.Grants.IsEmpty())
+	{ Reason = TEXT("This protagonist snapshot has no unlocked curated kit or owned weapon evidence; capture that protagonist once before convergence."); return false; }
 	return StageSnapshot(Snapshot, Mission, Reason, false);
 }

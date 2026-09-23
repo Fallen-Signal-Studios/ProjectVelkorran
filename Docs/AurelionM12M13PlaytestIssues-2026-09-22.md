@@ -130,6 +130,19 @@ their next runtime check. A passing build alone does not close any gameplay row.
   proves a repeat-attack defect or sustained companion pressure. The test
   harness' optional repeat-hit experiment was discarded; only the saved PIE
   reports remain.
+  An older earned E4A checkpoint had a separate restore defect: its saved
+  companion list omitted the current sword primary even though the inactive
+  Tarrik snapshot still owned Velkorran. Native staging now reconciles only
+  validated saved weapon ownership and direct grants against the mission
+  allowlist, for initial convergence, full load and encounter retry. The full
+  build and 730-test gate passed in `20260922-215944-27bf58cf`.
+  `RestoredGrantReconciliation-20260922-220541-cab59dd6` publicly loaded that
+  original checkpoint and read back Guard, unarmed punch **and**
+  `GA_Tarrik_MeleeLight` on the live proxy; the previous readback had only the
+  first two. `RestoredCompanionKitReplay-20260922-220326-09c97341` passed the
+  ordinary-input E4A route; Tarrik drew Velkorran and played 38 sampled light
+  attack frames. No companion damage hit landed in that short replay, so
+  sustained restored-companion contact remains unqualified.
 - **Archetype and ability coverage:** each mission enemy and each available
   protagonist ability still need the complete input→effect→recovery check under
   normal play. Prior component tests and isolated authoring checks do not cover

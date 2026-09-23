@@ -315,6 +315,8 @@ public:
 	virtual void Load_Implementation();
 
 	bool IsLoading() const;
+	/** Inspect a deserialized save record without loading items into a live inventory. */
+	const TArray<FNarrativeSavedItem>& GetSavedItemRecords() const { return SavedItems; }
 
 protected:
 

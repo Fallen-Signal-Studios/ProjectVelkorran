@@ -127,3 +127,32 @@ No native repair is implemented or approved by this follow-up. It corrects the
 earlier proposal before implementation; native companion approval is still
 pending. The unchanged-source full gate remains `20260920-112236-2f605927`,
 with build, 720 tests, coverage and source integrity passed.
+
+## September 22 resolution
+
+The native restore now reads the inactive protagonist's saved inventory record
+into an unattached temporary component and inspects only owned weapon classes.
+It intersects those classes and saved direct grants with the mission's curated
+companion list. A missing owned weapon ability gets the existing level-one
+fallback and weapon-grant provenance; direct progression levels remain as
+saved. Both initial convergence and full-load/encounter-retry staging use this
+reconciliation. The active player inventory and original checkpoint banks are
+never loaded or rewritten for this query. Empty, duplicate, oversized or
+invalid inventory evidence fails closed.
+
+`Saved/Validation/20260922-215944-27bf58cf` passed the full UE build,
+730 automation tests, coverage and source-integrity gate. The added regression
+serializes a real inventory with an owned holstered test weapon, verifies the
+curated attack returns with weapon provenance while locked and excluded attacks
+stay unavailable, retains a direct level-three grant, and rejects missing
+inventory bytes.
+
+In `RestoredGrantReconciliation-20260922-220541-cab59dd6`, the same original
+earned E4A checkpoint loaded through the public save API, accepted its authored
+retry, and the live Tarrik proxy's curated list now contains Guard, unarmed
+punch and `GA_Tarrik_MeleeLight`; Velkorran remained equipped. Previously that
+exact save yielded only the first two. `RestoredCompanionKitReplay-20260922-220326-09c97341`
+then passed normal-input E4A to the Tarrik handoff. Tarrik drew Velkorran and
+played 38 sampled native light-attack montage frames. No companion damage hit
+was recorded in that brief replay, so sustained contact and attack pressure
+remain open rather than being inferred from montage execution.

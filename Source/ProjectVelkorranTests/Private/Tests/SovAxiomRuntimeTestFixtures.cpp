@@ -11,6 +11,7 @@
 #include "Items/WeaponItem.h"
 #include "NarrativeGameplayTags.h"
 #include "Sovereign/SovGameplayTags.h"
+#include "Tests/SovBotAttackTestFixtures.h"
 
 ASovAxiomRuntimeTestCharacter::ASovAxiomRuntimeTestCharacter(
 	const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
@@ -100,6 +101,11 @@ USovAxiomRuntimeTestCommandLink::USovAxiomRuntimeTestCommandLink()
 USovAxiomRuntimeTestWeapon::USovAxiomRuntimeTestWeapon()
 {
 	WieldedSlot = FNarrativeGameplayTags::Get().Weapon_WieldSlot_Mainhand;
+}
+
+USovSavedKitRuntimeTestWeapon::USovSavedKitRuntimeTestWeapon()
+{
+	SetTestHolsteredKit({ USovBotTestAttackAlpha::StaticClass() });
 }
 
 void ASovAxiomRuntimeTestCharacter::RecordDamage(const FSovDamageResult& Result)

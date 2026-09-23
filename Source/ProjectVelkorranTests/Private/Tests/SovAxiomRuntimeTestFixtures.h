@@ -98,3 +98,12 @@ public:
 	void SetTestHolsteredKit(const TArray<TSubclassOf<UNarrativeGameplayAbility>>& Classes)
 	{ WeaponAbilities = Classes; WieldedSlot = FGameplayTag(); }
 };
+
+/** Fixed class-default grant models an owned weapon in serialized inventory evidence. */
+UCLASS(Transient, NotBlueprintable)
+class USovSavedKitRuntimeTestWeapon : public USovAxiomRuntimeTestWeapon
+{
+	GENERATED_BODY()
+public:
+	USovSavedKitRuntimeTestWeapon();
+};
