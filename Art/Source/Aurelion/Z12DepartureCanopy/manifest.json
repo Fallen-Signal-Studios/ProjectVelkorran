@@ -1,0 +1,156 @@
+{
+  "source": "Blender 4.5 procedural editable kit",
+  "design_reference": "Art/References/Aurelion/Z12DepartureCanopy/Z12-Departure-Canopy-Concept.png",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z12CanopyVaultRib",
+      "triangles": 24816,
+      "nominal_dimensions_m": [
+        27.45,
+        1.14,
+        2.24486
+      ],
+      "materials": [
+        "M_Aurelion_DarkSteel",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_BlackStone"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None: dock floor and any structural map proxies remain authoritative",
+      "design_span_m": 26.4,
+      "design_bearing_height_m": 7.5,
+      "design_crown_height_m": 8.7,
+      "preserve_fallback_geometry": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z12CanopyTerminalRib",
+      "triangles": 26132,
+      "nominal_dimensions_m": [
+        27.45,
+        1.251,
+        2.24486
+      ],
+      "materials": [
+        "M_Aurelion_DarkSteel",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_BlackStone"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None: visual entrance rib; no dock collision change",
+      "design_span_m": 26.4,
+      "design_bearing_height_m": 7.5,
+      "design_crown_height_m": 8.7,
+      "preserve_fallback_geometry": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z12CanopyBearingFoot",
+      "triangles": 18988,
+      "nominal_dimensions_m": [
+        1.56,
+        1.44,
+        7.585
+      ],
+      "materials": [
+        "M_Aurelion_BlackStone",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_DarkSteel",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None: visual foot only, sited outside existing shuttle and route",
+      "preserve_fallback_geometry": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z12CanopyCoffer_4x4",
+      "triangles": 18612,
+      "nominal_dimensions_m": [
+        3.98,
+        4.13,
+        0.395
+      ],
+      "materials": [
+        "M_Aurelion_DarkSteel",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_BlackStone",
+        "M_Aurelion_ChannelShadow"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None: overhead visual cassette, existing dock collision retained",
+      "design_cell_count": 9,
+      "preserve_fallback_geometry": true
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z12CanopyPendant",
+      "triangles": 3572,
+      "nominal_dimensions_m": [
+        0.7,
+        0.49,
+        2.26
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_BlackStone",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_DarkSteel",
+        "M_Aurelion_LumenLens"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None: overhead scenic fixture, no dock collision or gameplay light",
+      "preserve_fallback_geometry": true
+    }
+  ],
+  "dock_assembly": {
+    "berth_m": [
+      28,
+      18
+    ],
+    "rib_stations_y_m": [
+      -8.3,
+      -4.15,
+      0,
+      4.15,
+      8.3
+    ],
+    "foot_x_m": [
+      -13.2,
+      13.2
+    ],
+    "center_clear_lane_m": 5.0,
+    "coffer_x_m": [
+      -12,
+      -8,
+      -4,
+      0,
+      4,
+      8,
+      12
+    ],
+    "coffer_y_m": [
+      -6.225,
+      -2.075,
+      2.075,
+      6.225
+    ],
+    "pendant_x_m": [
+      -12.55,
+      12.55
+    ],
+    "pendant_y_m": [
+      -6.225,
+      -2.075,
+      2.075,
+      6.225
+    ]
+  }
+}

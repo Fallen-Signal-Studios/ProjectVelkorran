@@ -47,5 +47,7 @@ anchors, native collision, navigation and cinematics remain authoritative.
 The image was attached to the [image-guided Higgsfield Z12 canopy study](https://higgsfield.ai/3d-jutsu/d06c9c1f-d8c4-470e-8439-18cfa1d9df2f),
 created as `M13 Z12 Aurelion Departure Canopy Previs`. Its brief requests one
 separable, noninteractive canopy study with a 5 m clear center lane, not a
-replacement room. Generation was still running at handoff. Neither its
-geometry nor an Unreal import has been evaluated or accepted.
+replacement room. On 23 September the camera view still showed primitive
+blocks after 29 minutes, while the scene reported ignored invalid shared edits.
+The generation was stopped and rejected as an Unreal asset source. No export or
+Unreal import was made. Future architecture work uses the custom Blender kit.
