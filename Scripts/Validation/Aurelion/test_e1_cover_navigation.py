@@ -9,7 +9,7 @@ source = Path(__file__).with_name('continue_aurelion_e1_input.py')
 tree = ast.parse(source.read_text(encoding='utf-8-sig'))
 run = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == 'Run')
 run.body = [n for n in run.body if isinstance(n, ast.FunctionDef)
-            and n.name in ('cover_movement', 'local_move')]
+            and n.name in ('cover_movement', 'cover_trace_blocked', 'local_move')]
 scope = dict(math=math, time=NS(monotonic=lambda: 10.),
              _xyz=lambda p: (p.x, p.y, p.z), _path=lambda p: 'enemy')
 exec(compile(ast.fix_missing_locations(ast.Module(body=[run], type_ignores=[])),
@@ -25,7 +25,7 @@ class Vector:
 
 
 class CoverNavigation(unittest.TestCase):
-    def setup_driver(self, exposed=False):
+    def setup_driver(self, exposed=False, tuple_miss_on_arrival=False, head_clear=False):
         shield = NS(is_initialized=lambda: True, get_shield=lambda: 10.,
                     get_max_shield=lambda: 100.)
         pawn = NS(get_actor_location=lambda: Vector(0., 0., 88.),
@@ -37,10 +37,18 @@ class CoverNavigation(unittest.TestCase):
                       get_character_visual=lambda: None)]
 
         class Hit:
+            def __init__(self, blocked=True):
+                self.blocked = blocked
+
             def to_tuple(self):
-                return (True, None, None, None, None, None, None, None, None, object())
+                return (self.blocked, None, None, None, None, None, None, None, None,
+                        object() if self.blocked else None)
 
         def trace(world, start, end, *args):
+            if head_clear and start.z>200. and end.x == 2000.:
+                return (False, Hit(False))
+            if tuple_miss_on_arrival and abs(start.x)<.01 and end.x == 2000.:
+                return (False, Hit(False))
             return None if exposed and end.x == 2000. else Hit()
 
         def path(world, start, goal, *args):
@@ -71,6 +79,12 @@ class CoverNavigation(unittest.TestCase):
         self.assertEqual(len(driver.report['cover_attempts']), 1)
         self.assertEqual(driver.report['cover_attempts'][0]['blocked_enemies'], 2)
 
+    def test_cover_search_rejects_head_exposure_before_moving(self):
+        driver, pawn, pc, enemies = self.setup_driver(head_clear=True)
+        self.assertIsNone(driver.cover_movement(None, pc, pawn, enemies, 10.))
+        self.assertIsNone(driver.cover_goal)
+        self.assertEqual(driver.report['cover_attempts'], [])
+
     def test_cover_path_does_not_skip_a_nearby_corner(self):
         driver, pawn, pc, enemies = self.setup_driver()
         driver.cover_goal = [(0., 40., 0.), (-100., 40., 0.)]
@@ -79,6 +93,21 @@ class CoverNavigation(unittest.TestCase):
         self.assertGreater(movement[0], 0.)
         self.assertAlmostEqual(movement[1], 0.)
         self.assertEqual(len(driver.cover_goal), 2)
+
+    def test_arrived_cover_rejects_nonblocking_unreal_tuple(self):
+        driver, pawn, pc, enemies = self.setup_driver(tuple_miss_on_arrival=True)
+        driver.cover_goal = []
+        driver.cover_until = 20.
+        self.assertIsNone(driver.cover_movement(None, pc, pawn, enemies, 10.))
+        self.assertIsNone(driver.cover_goal)
+        self.assertEqual(len(driver.report['cover_exposures']), 1)
+
+    def test_arrived_cover_keeps_blocked_sightlines(self):
+        driver, pawn, pc, enemies = self.setup_driver()
+        driver.cover_goal = []
+        driver.cover_until = 20.
+        self.assertEqual(driver.cover_movement(None, pc, pawn, enemies, 10.), (0., 0.))
+        self.assertEqual(driver.report['cover_exposures'], [])
 
 
 if __name__ == '__main__':

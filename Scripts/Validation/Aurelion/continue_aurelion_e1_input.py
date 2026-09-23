@@ -427,6 +427,22 @@ class Run:
                 return dict(projectile=_path(rocket), distance=distance, estimated_seconds=distance/closing)
         return None
 
+    def cover_trace_blocked(self, raw):
+        """A trace shelters the pawn only when world geometry blocks the ray.
+
+        Unreal Python can return (blocking, HitResult) rather than a bare hit.
+        A non-None tuple with blocking=False is still an exposed sightline.
+        """
+        if raw is None:
+            return False
+        hits = [v for v in raw if isinstance(v, unreal.HitResult)] if isinstance(raw, tuple) else [raw]
+        for hit in hits:
+            parts = hit.to_tuple()
+            obstacle = parts[9]
+            if parts[0] and obstacle and not isinstance(obstacle, unreal.NarrativeCharacter):
+                return True
+        return False
+
     def cover_movement(self, world, pc, pawn, enemies, phase_time):
         shield = pawn.get_component_by_class(unreal.SovShieldComponent)
         assert shield and shield.is_initialized(), 'Native shield readiness missing'
@@ -447,19 +463,23 @@ class Run:
                     end = path.path_points[-1]
                     if abs(end.z-(location.z-88.))>150. or math.hypot(end.x-goal.x,end.y-goal.y)>150.:
                         continue
+                    # Test the same torso/head heights at selection and arrival.
+                    # A single mid-height ray chose low coffers that exposed the
+                    # head, causing repeated moves to immediately rejected cover.
+                    nav_to_pawn_height = location.z-path.path_points[0].z
+                    if not 0. <= nav_to_pawn_height <= 200.:
+                        continue
                     blocked = 0
                     for enemy in enemies:
                         ignored = [pawn,enemy]+list(pawn.get_attached_actors())
                         ignored += [v for v in (pawn.get_character_visual(),enemy.get_character_visual()) if v]
-                        ray = unreal.SystemLibrary.line_trace_single(world, end+unreal.Vector(0.,0.,140.),
+                        rays = [unreal.SystemLibrary.line_trace_single(world,
+                            end+unreal.Vector(0.,0.,nav_to_pawn_height+height),
                             enemy.get_actor_location(), unreal.TraceTypeQuery.TRACE_TYPE_QUERY1, False,
                             ignored, unreal.DrawDebugTrace.NONE, True)
-                        if ray is not None:
-                            hits = [v for v in ray if isinstance(v,unreal.HitResult)] if isinstance(ray,tuple) else [ray]
-                            parts = hits[0].to_tuple()
-                            obstacle = parts[9]
-                            if parts[0] and obstacle and not isinstance(obstacle,unreal.NarrativeCharacter):
-                                blocked += 1
+                            for height in (50.,150.)]
+                        if all(self.cover_trace_blocked(ray) for ray in rays):
+                            blocked += 1
                     # Recovery waits require shelter from every current enemy,
                     # matching the arrival exposure gate below. Partial shelter
                     # otherwise causes repeated travel to immediately rejected spots.
@@ -490,7 +510,7 @@ class Run:
                         pawn.get_actor_location()+unreal.Vector(0.,0.,height), enemy.get_actor_location(),
                         unreal.TraceTypeQuery.TRACE_TYPE_QUERY1, False, ignored, unreal.DrawDebugTrace.NONE, True)
                         for height in (50., 150.)]
-                    if any(ray is None for ray in rays):
+                    if any(not self.cover_trace_blocked(ray) for ray in rays):
                         exposed.append(_path(enemy))
                 if exposed:
                     self.report['cover_exposures'].append(dict(elapsed=time.monotonic()-self.started,

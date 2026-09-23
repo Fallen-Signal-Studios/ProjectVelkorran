@@ -145,6 +145,15 @@ their next runtime check. A passing build alone does not close any gameplay row.
   exposure and player movement against the successful fresh route before any
   difficulty tuning; the saved E1 route is still playable but repeat
   reliability is not established.
+  The [two-height cover pilot replay](Validation/E1CoverPilotTwoHeight-2026-09-23.md)
+  found a validation defect: cover search used one 140 cm sightline, while
+  arrival required torso and head shelter and misread some non-blocking Unreal
+  trace tuples. After using the same blocking two-height rule at selection and
+  arrival, a fresh ordinary-input E1→Selene handoff passed with two native
+  recoveries and only one of two cover choices rejected, versus three native
+  recoveries and 19 of 21 rejected in the preceding run. Both passive enemy
+  observers completed without error. This corrects validation behavior, not
+  enemy pressure; E1's repeated-death risk remains open.
 - **Enemy attack facing:** read-only PIE samples exposed a separate presentation
   defect: active drones could fire while over 90 degrees off Tarrik despite a
   valid damage target. The combat NPC base now turns toward an active attack's
