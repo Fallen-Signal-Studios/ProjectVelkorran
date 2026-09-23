@@ -131,6 +131,17 @@ their next runtime check. A passing build alone does not close any gameplay row.
   checkpoint load, but that branch still needs a completed rerun. The next
   fresh E1 run cleared the wave after one same-world rescue and continued to
   E4B as described above.
+  A fresh September 23 E1 pressure run,
+  `FreshE1PressureCurrent-20260923-153057-9481f3f9`, showed the remaining
+  consistency risk: three native fatal-recovery retries succeeded, then Tarrik
+  died a fourth time and the bounded ordinary-input driver stopped at 201.6 s.
+  The passive observer completed without error and recorded 192 gunshots and
+  81 rockets; the driver logged 83 player damage receipts and 11 cover
+  attempts. Its first life almost cleared the initial wave, so this one failed
+  pilot is not evidence that enemy damage must be reduced. Compare cover use,
+  exposure and player movement against the successful fresh route before any
+  difficulty tuning; the saved E1 route is still playable but repeat
+  reliability is not established.
 - **Enemy attack facing:** read-only PIE samples exposed a separate presentation
   defect: active drones could fire while over 90 degrees off Tarrik despite a
   valid damage target. The combat NPC base now turns toward an active attack's

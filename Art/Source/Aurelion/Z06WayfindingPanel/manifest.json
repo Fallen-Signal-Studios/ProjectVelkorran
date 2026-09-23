@@ -1,0 +1,26 @@
+{
+  "status": "source authored; Unreal placement acceptance pending",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z06WayfindingPanel",
+      "triangles": 20748,
+      "nominal_dimensions_m": [
+        4.304291248321533,
+        0.26499999314546585,
+        1.204958375543356
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; wall visual only",
+      "position_precision": 10,
+      "preserve_fallback_geometry": true,
+      "native_text": "Existing TextRenderActor_113 should be resized and mounted over the blank field",
+      "design_reference": "Art/References/Aurelion/Z06Wayfinding/Z06-Wayfinding-Panel-Concept.png"
+    }
+  ]
+}
