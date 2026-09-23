@@ -1,0 +1,26 @@
+# Aurelion architecture references — 23 September 2026
+
+These six **generated visual studies** precede the next custom architecture pass. They interpret the [14 August TDD](../../Design/Sovereign_Call_Origins_TDD_v2_2026-08-14.md) §11.3, the 7 September `Aurelion_Level_Layout_Plan.pdf`, and the print-ready *Sovereign Call: Origins* manuscript dated 9 August 2026. The PDFs are local source documents in `C:/Users/msnod/Downloads/`; [the adopted layout contract](../../AurelionLayoutContract-2026-09-07.md) remains the authority for playable dimensions and chronology. The manuscript is the authority for story and the terminal's physical relationships. These paintings are not proof of playable geometry, material quality, collision, or final canon approval.
+
+The original layout PDF already contains four concepts (PDF pages 21–24: Wound overlook, relay route, quarantine cooperation, Fifth Crownmark). This set adds a consistent **architectural** view of those spaces, a Z05 meeting-atrium view, the chapter 26 quiet room, and a proposed modular kit. The accepted Selene image is a corrected version: an initial generation mistakenly showed outdoor mountains; the saved version places the route inside the terminal.
+
+## Scene studies
+
+| Reference | Source anchors | Architectural decision |
+|---|---|---|
+| [Selene relay route](Z03-Z04-Selene-Relay-Route.png) | Layout PDF pp. 7–8, 22; manuscript ch. 24 p. 455; TDD §11.3 | Ice is residual atmosphere over King-era ribs; Reformation sensors are removable later equipment. Maintain a clear lower route and raised service angle. |
+| [Meeting atrium](Z05-Meeting-Atrium.png) | Layout PDF p. 9; manuscript ch. 24 pp. 453, 459–464 | A legible six-meter bridge and surviving meeting platform sit inside a far larger scenic envelope. Broken distant spans can feel disorienting while the near route stays safe. |
+| [Quarantine crucible](Z08-Quarantine-Crucible.png) | Layout PDF pp. 12–13; manuscript ch. 24 pp. 464–465, 471–473 | Localized Eclipse growth follows ancient conduits. Two combat loops and the east balcony remain readable; cover and service partitions can break without collapsing structural ribs or routes. |
+| [Wound gallery](Z09-Wound-Gallery.png) | Layout PDF pp. 14, 21; manuscript ch. 25 pp. 474–477 | The shallow curve transitions from ivory stone to reflective black stone and fine angular gold. The sealed Wound lies between red and white remnants; the overlook is safe and its long geometry is scenic. |
+| [Observation gallery](Z11-Observation-Gallery.png) | Layout PDF p. 15; manuscript ch. 26 pp. 507–508 | Human-scale conversation room, one table and six chairs, with the red remnant left, white right, Wound between. The view serves the relationship rather than a new combat beat. |
+| [Modular kit sheet](Aurelion-Modular-Kit-Sheet.png) | Layout PDF p. 20; TDD §11.3; manuscript chs. 24–26 | Shared wall, floor, rib, bridge, cover, conduit, black-stone transition and localized corruption families. This is a visual family study, not a measured model sheet. |
+
+## Modeling constraints carried forward
+
+- **One ancient substrate:** ivory upper surfaces and polished black lower surfaces use related joints and functional gold conduits. Different scales and angles express a living mechanism, not repeated heraldry or faction ownership.
+- **Gameplay dimensions:** use the adopted layout's 4–6 m primary lanes, 3 m flanks, 3 × 3.5 m ordinary doors, 5 × 4.5 m elite entrance, 1.2/2.2 m cover heights and 2.5 m camera clearance. Art perspective and human figures in these images do not determine measurements.
+- **Destruction boundary:** Chaos candidates are nonstructural cover and service partitions with authored fractured states. Major ribs, bridges, guardrails, route floors, survivor recesses, doors required for progression and the core interaction platform remain authored stable structures unless a scripted state change explicitly replaces them.
+- **Corruption boundary:** black Eclipse tissue grows over a few physical sources and conduits. Adjacent clean surfaces must remain visible. Violet motion signifies intrusion and should not hide targets, paths, or the source/remedy relationship.
+- **Story boundary:** the chapter 25 chamber has two independent assent interfaces and a human-size Crownmark Five integrated in vast machinery; completion stabilizes a still-closed boundary. The chapter 26 gallery is intentionally intimate. No present-day battle is added after the crucible.
+
+The exact accepted generation prompts and the one Selene correction are in [prompts.md](prompts.md). Generated with the built-in image tool and copied into this project; no source PDF or manuscript pages were edited.
