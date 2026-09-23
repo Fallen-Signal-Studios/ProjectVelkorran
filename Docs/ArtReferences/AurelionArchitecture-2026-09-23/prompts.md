@@ -1,6 +1,12 @@
 # Built-in image-generation prompts
 
-The six final images were made with the built-in image tool. Each asset used a separate prompt. The Selene route also used one targeted correction, documented below. All other images are first outputs. No PDF page or manuscript illustration was passed to the generator as an input image; the written sources were read and distilled into these prompts.
+The original six final images were made with the built-in image tool. Each asset used a separate prompt. The Selene route also used one targeted correction, documented below. A later Z08 pylon reference used an additional targeted correction. No PDF page or manuscript illustration was passed to the generator as an input image; the written sources were read and distilled into these prompts.
+
+## Z08 breached containment pylon for Higgsfield
+
+The first generation established the pylon but mistakenly exposed an outdoor mountain skyline. The final saved image is an edit of that generation using this prompt:
+
+> Edit this architectural concept image for the Sovereign Call: Origins Aurelion Z08 Quarantine Crucible. Preserve the entire breached containment pylon on the left, its intricate clean ivory ceramic, black stone and restrained gold mechanical frame, localized black organic Eclipse growth with subtle violet internal glow, the clear stone floor lane and the tiny scale figure. Crucial correction: replace every outdoor mountain, sky, horizon, and exterior opening on the right with a fully enclosed cathedral-scale quarantine terminal interior. The far wall is made of imposing Aurelion ivory ceramic and black stone ribs, sealed machinery, a raised east interior balcony and controlled white-gold artificial illumination. It is an interior combat chamber with no view outside. The right-hand architecture remains clean and intact, showing how the infection is localized to the pylon. Keep the composition a useful highly detailed AAA environment-production reference, realistic material detail, believable built structure, wide 16:9 view, no text, no HUD.
 
 ## Z03–Z04 Selene relay route
 
