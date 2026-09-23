@@ -49,7 +49,7 @@ their next runtime check. A passing build alone does not close any gameplay row.
   without retry, E2, E3 rescue and E4A, then stopped at E4B because the
   moving Elite left no player standing point inside both HeatConfirm and the
   control's reach once modest safety margins were applied. The native heat
-  reach now defaults to 450 cm instead of 350 cm, leaving a practical
+  reach was first raised to 450 cm from 350 cm, leaving a practical
   overlap around the unchanged 300 cm interaction. The 730-test gate
   `20260922-222110-f6ceabc7` passed. From that run's unchanged earned
   ArenaEntry checkpoint, `E4BHeatReachCombatRetest-20260922-222629-3e3332fd`
@@ -69,6 +69,21 @@ their next runtime check. A passing build alone does not close any gameplay row.
   frost retry, including actual heat/Poise/Core proof and conventional victory
   at 100 health with protected people alive. Neither checkpoint replay is a
   current-build uninterrupted M12-to-M13 acceptance pass.
+  The next fresh chain, `FreshM12M13ThermalAcceptance-20260922-225058-f048b5a3`,
+  passed E1 after three native retries, E2, E3, E4A and E4B thermal/Core. It
+  then stalled with one WallRunner at 26 health behind cover: the validation
+  pilot calculated a valid navigation approach for blocked sight but overwrote
+  it with a 550 cm retreat. This is a pilot defect, not proof of failed enemy
+  movement. The pilot now preserves the approach until sight is clear.
+  An earned-checkpoint replay of that same save found the roaming Elite 718 cm
+  from the heat control. The former 450 cm reach left only about 32 cm of
+  native control overlap, so the final authored heat reach is 550 cm. Line of
+  sight, control interaction and the three-second frost window still apply.
+  The full 730-test native gate passed in `20260922-230932-fb3dcf50`, and
+  `E4BMobileEliteWallRunnerRetest-20260922-231119-a6b1d7b4` read 550 cm in
+  PIE, earned the thermal/Core receipts and defeated the whole encounter by
+  ordinary input at 100 health with all protected people alive. Uninterrupted
+  M12-to-M13 proof on this final range and pilot remains pending.
 
 ## Player and enemy combat
 

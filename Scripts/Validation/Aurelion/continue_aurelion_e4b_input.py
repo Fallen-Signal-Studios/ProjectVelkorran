@@ -434,7 +434,9 @@ class Run(phase_a.Run):
                 threat_position=threat.get_actor_location()
                 dx,dy=position.x-threat_position.x,position.y-threat_position.y
                 separation=math.hypot(dx,dy)
-                if 1.<separation<550.:
+                # Keep the nav approach when the target is behind cover; retreating
+                # on blocked sight cancels the path and can orbit forever at 550 cm.
+                if clear and 1.<separation<550.:
                     goal=(position.x+dx/separation*350.,position.y+dy/separation*350.,position.z)
                     move,unused=self.local_move(pc,pawn,goal,stop=25.)
         clip,reserve=weapon.get_ammo_in_clip(),weapon.get_spare_ammo()
