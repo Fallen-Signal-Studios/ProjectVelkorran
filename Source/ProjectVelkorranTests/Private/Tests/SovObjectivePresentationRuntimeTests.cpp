@@ -262,7 +262,10 @@ bool FSovObjectivePresentationSettingsTest::RunTest(const FString&)
 	FSovObjectivePresentationTestAccess::Settings(*F.Presentation, Settings);
 	TestTrue(TEXT("Objective measurement retains the real Slate tree"), F.Presentation->GetCachedWidget().IsValid());
 	TestTrue(TEXT("Overflow text has an actual measured height"), FSovObjectivePresentationTestAccess::OverflowHeight(*F.Presentation) > 0.f);
-	TestEqual(TEXT("Objective font follows UI scale independently of subtitle scale"), FSovObjectivePresentationTestAccess::FontSize(*F.Presentation), 30);
+	TestEqual(TEXT("Compact objective font follows UI scale independently of subtitle scale"), FSovObjectivePresentationTestAccess::FontSize(*F.Presentation), 27);
+	Settings.bHighContrastHUD = true; FSovObjectivePresentationTestAccess::Settings(*F.Presentation, Settings);
+	TestEqual(TEXT("High-contrast objectives keep the larger readable type"), FSovObjectivePresentationTestAccess::FontSize(*F.Presentation), 30);
+	Settings.bHighContrastHUD = false; FSovObjectivePresentationTestAccess::Settings(*F.Presentation, Settings);
 	Settings.bShowObjectiveText = false; FSovObjectivePresentationTestAccess::Settings(*F.Presentation, Settings);
 	TestFalse(TEXT("Player can hide objective text"), FSovObjectivePresentationTestAccess::Visible(*F.Presentation));
 	TestEqual(TEXT("Hiding text never changes campaign state"), F.State->GetObjectiveState(Mission->MissionId, TEXT("ReachSurvivors")), ESovObjectiveState::Available);

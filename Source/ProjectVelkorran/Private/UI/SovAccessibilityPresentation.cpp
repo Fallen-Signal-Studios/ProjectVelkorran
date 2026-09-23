@@ -373,7 +373,7 @@ void USovAccessibilityPresentation::RefreshObjectiveText()
     const auto* Player = GetOwningPlayer() ? Cast<ASovPlayerCharacterBase>(GetOwningPlayer()->GetPawn()) : nullptr;
     const auto Theme = SovHUDStyle::ForProtagonist(Player ? Player->GetProtagonistIdentityTag() : FGameplayTag(), Settings.bHighContrastHUD);
     FLinearColor ObjectiveFill = Theme.Background;
-    ObjectiveFill.A = Settings.bHighContrastHUD ? 1.f : .44f;
+    ObjectiveFill.A = Settings.bHighContrastHUD ? 1.f : .30f;
     ObjectiveBackground->SetBrushColor(ObjectiveFill);
 	const FVector2D Size = SafeTextCanvas ? SafeTextCanvas->GetCachedGeometry().GetLocalSize() : GetCachedGeometry().GetLocalSize();
 	LayoutObjectives(Size.X > 0.f ? float(Size.X) : 1280.f, Size.Y > 0.f ? float(Size.Y) : 720.f);
@@ -392,7 +392,8 @@ void USovAccessibilityPresentation::LayoutObjectives(float SafeWidth, float Safe
 		Width = FMath::Max(1.f, FMath::Min(Width, SovHolographicHUDLayout::TopLeftPanelMaximumWidth(Layout, CornerInset) - 24.f));
 		PriorityPanels.Add(Layout.Radar); PriorityPanels.Add(Layout.Arc);
 	}
-	const auto Font = FCoreStyle::GetDefaultFontStyle("Regular", FMath::RoundToInt(20.f * Settings.UIScale));
+	const auto Font = FCoreStyle::GetDefaultFontStyle("Regular", FMath::RoundToInt(
+		(Settings.bHighContrastHUD ? 20.f : 18.f) * Settings.UIScale));
 	const auto HeaderFont = FCoreStyle::GetDefaultFontStyle("Bold", FMath::RoundToInt(12.f * Settings.UIScale));
 	const auto* Player = GetOwningPlayer() ? Cast<ASovPlayerCharacterBase>(GetOwningPlayer()->GetPawn()) : nullptr;
 	const auto Theme = SovHUDStyle::ForProtagonist(Player ? Player->GetProtagonistIdentityTag() : FGameplayTag(), Settings.bHighContrastHUD);
@@ -804,14 +805,29 @@ int32 USovAccessibilityPresentation::NativePaint(const FPaintArgs& Args, const F
 		{
 			static const FSlateColorBrush Glass(FLinearColor::White);
 			FSlateDrawElement::MakeBox(Elements,++Layer,Geometry.ToPaintGeometry(PanelSize,FSlateLayoutTransform(LabelPoint)),
-				&Glass,ESlateDrawEffect::None,Settings.bHighContrastHUD ? FLinearColor::Black : FLinearColor(.008f,.016f,.025f,.52f));
-			TArray<FVector2f> Lip = {FVector2f(LabelPoint+FVector2D(0,PanelSize.Y)),FVector2f(LabelPoint),
-				FVector2f(LabelPoint+FVector2D(PanelSize.X*.65,0))};
-			FSlateDrawElement::MakeLines(Elements,++Layer,Geometry.ToPaintGeometry(),MoveTemp(Lip),ESlateDrawEffect::None,Tint,true,1.f);
-			TArray<FVector2f> Underline = {FVector2f(LabelPoint+FVector2D(PanelSize.X*.38,PanelSize.Y-1)),
-				FVector2f(LabelPoint+FVector2D(PanelSize.X,PanelSize.Y-1))};
-			FLinearColor QuietTint = Tint; QuietTint.A *= .45f;
-			FSlateDrawElement::MakeLines(Elements,++Layer,Geometry.ToPaintGeometry(),MoveTemp(Underline),ESlateDrawEffect::None,QuietTint,true,1.f);
+				&Glass,ESlateDrawEffect::None,Settings.bHighContrastHUD ? FLinearColor::Black : FLinearColor(.008f,.025f,.034f,.28f));
+			const FVector2D TopLeft = LabelPoint;
+			const FVector2D TopRight = LabelPoint + FVector2D(PanelSize.X, 0);
+			const FVector2D BottomLeft = LabelPoint + FVector2D(0, PanelSize.Y);
+			const FVector2D BottomRight = LabelPoint + PanelSize;
+			const float Corner = FMath::Min(12.f * Settings.UIScale, PanelSize.Y * .45f);
+			const TArray<FVector2f> Frame = {
+				FVector2f(BottomLeft + FVector2D(0, -Corner)), FVector2f(TopLeft + FVector2D(0, Corner)),
+				FVector2f(TopLeft + FVector2D(Corner, 0)), FVector2f(TopRight - FVector2D(Corner, 0)),
+				FVector2f(TopRight), FVector2f(TopRight + FVector2D(0, Corner))};
+			if (!Settings.bHighContrastHUD)
+			{
+				FLinearColor Halo = Tint; Halo.A *= .16f;
+				FSlateDrawElement::MakeLines(Elements,++Layer,Geometry.ToPaintGeometry(),Frame,
+					ESlateDrawEffect::None,Halo,true,5.f * Settings.UIScale);
+			}
+			FSlateDrawElement::MakeLines(Elements,++Layer,Geometry.ToPaintGeometry(),Frame,
+				ESlateDrawEffect::None,Tint,true,Settings.bHighContrastHUD ? 2.f : 1.f);
+			FLinearColor QuietTint = Tint; QuietTint.A *= .55f;
+			FSlateDrawElement::MakeLines(Elements,++Layer,Geometry.ToPaintGeometry(),
+				{FVector2f(BottomLeft + FVector2D(Corner, 0)), FVector2f(BottomRight - FVector2D(Corner, 0)),
+					FVector2f(BottomRight)},
+				ESlateDrawEffect::None,QuietTint,true,1.f);
 			LabelPoint += Padding;
 		}
 		FSlateDrawElement::MakeText(Elements,++Layer,Geometry.ToPaintGeometry(FVector2D(1,1),FSlateLayoutTransform(LabelPoint+FVector2D(2,2))),Text,LabelFont,ESlateDrawEffect::None,FLinearColor::Black);
