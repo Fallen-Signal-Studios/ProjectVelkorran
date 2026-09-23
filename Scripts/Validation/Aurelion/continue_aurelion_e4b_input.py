@@ -43,6 +43,7 @@ class Run(phase_a.Run):
         self.thermal_started=None
         self.last_combat_progress=self.started
         self.last_combat_signature=None
+        self.last_conventional_shot_at=-1000.
         self.report.update(scope='Retained actual E4B entry through ordinary Selene positioning, native frost/heat/Core payoff and conventional encounter victory only',
             pending=['SurvivorsClearAndQuarantine and all later scenes, checkpoints and travel',
                      'Physical keyboard use and rendered quality'],
@@ -402,7 +403,10 @@ class Run(phase_a.Run):
         return points[0]
 
     def fire_at(self,pc,pawn,weapon,actor,point=None,precision=None):
-        location=point or actor.get_actor_location()
+        # The Elite needs a higher aim point at close range. Small enemies use
+        # a visible authored bone or their origin; the same offset can put the
+        # reticle above a wall-running mesh and waste an entire magazine.
+        location=point or actor.get_actor_location()+unreal.Vector(0.,0.,75. if actor==self.elite else 0.)
         look,error=self.look(self.world,pc,location)
         desired_ray=actual_ray=None
         if precision is not None:
@@ -425,7 +429,15 @@ class Run(phase_a.Run):
             eligible=clip>0 and clear and actual_match and in_range
             fire,move,look,input_gate=self.settled_precision_input(pawn,weapon,actor,precision,move,look,error,eligible,actual_ray)
         else:
-            fire=clip>0 and clear and actual_match and in_range and error<1.5 and game_time%.6<.35
+            # One ordinary trigger edge, then allow native weapon spread to
+            # settle before the next shot. Long held bursts exhaust Cinderline
+            # against small mobile targets without demonstrating accuracy.
+            fire=clip>0 and clear and actual_match and in_range and error<1.5 and game_time-self.last_conventional_shot_at>=.8
+            if fire:
+                self.last_conventional_shot_at=game_time
+                self.report.setdefault('conventional_shots',[]).append(dict(
+                    elapsed=time.monotonic()-self.started,target=str(self.e4b.find_participant_id(actor)),
+                    clip=clip,reserve=reserve,spread=weapon.get_weapon_spread(),point=_xyz(location)))
         reload_input=1. if clip<=0 and game_time%1.2<.15 else 0.
         self.report['last_combat']=dict(target=str(self.e4b.find_participant_id(actor)),actor=_path(actor),point=_xyz(location),
             clear=clear,error=error,distance=distance,clip=clip,reserve=reserve,attack=fire,health=actor.get_health(),
@@ -459,7 +471,14 @@ class Run(phase_a.Run):
         if actor!=self.target:
             self.target=actor
             self.report['combat_targets'].append(dict(id=identity,actor=_path(actor),elapsed=time.monotonic()-self.started))
-        self.fire_at(pc,pawn,weapon,actor)
+        body_point=None
+        if actor!=self.elite:
+            for candidate in self.shot_points(actor):
+                exposed,unused=self.precision_ray(pawn,actor,candidate,True)
+                if exposed:
+                    body_point=candidate[3]
+                    break
+        self.fire_at(pc,pawn,weapon,actor,point=body_point)
         signature=tuple((r['id'],r['alive'],r['health']) for r in rows if r['required'])
         if signature!=self.last_combat_signature:
             self.last_combat_signature=signature;self.last_combat_progress=time.monotonic()

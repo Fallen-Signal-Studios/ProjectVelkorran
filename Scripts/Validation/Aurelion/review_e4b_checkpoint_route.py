@@ -12,7 +12,8 @@ sys.path.insert(0,str(project/'Scripts/Validation/Aurelion'))
 import continue_aurelion_e4b_input as pilot
 from aurelion_retry_input import RetryInput
 out=Path(os.environ['SOV_AURELION_RUN_DIRECTORY'])
-source=project/'Saved/Validation/Aurelion/PhaseHaloMissionRoute-20260920-144741-b8a1800f'
+source=Path(os.environ.get('SOV_AURELION_E4B_SOURCE',
+    str(project/'Saved/Validation/Aurelion/PhaseHaloMissionRoute-20260920-144741-b8a1800f'))).resolve()
 prior=json.loads((source/'E1Continuation/route-follow-on/continue_aurelion_e4a_input/e4a-input-continuation.json').read_text())
 assert prior['status']=='passed'
 level=unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)

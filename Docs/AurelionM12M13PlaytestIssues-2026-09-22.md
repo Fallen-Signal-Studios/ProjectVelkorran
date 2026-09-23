@@ -30,7 +30,14 @@ their next runtime check. A passing build alone does not close any gameplay row.
   entry/rescue and E4A. In E4B, frost/heat payoff completed and the Elite died,
   but Tarrik died while cleaning up the remaining hostiles. Native recovery
   restored him about two seconds later; the E4B driver had already stopped on
-  death, so M12 completion and M13 were not retested under this build.
+  death, so M12 completion and M13 were not retested under this build. The
+  earned ArenaEntry checkpoint from that run was replayed in
+  `E4BAuthoredBodyAimRetest-20260922-201008-99c2607f`: the authored retry
+  hold, restored thermal bindings, companion positioning, frost/heat/Core
+  receipts and encounter victory all passed with ordinary input. Tarrik ended
+  at 100 health after 57 spaced trigger presses, 154 reserve rounds remained,
+  and every protected person survived. This proves E4B checkpoint recovery;
+  it does not replace an uninterrupted current-build M12-to-M13 pass.
 - **E4B retry:** `E4BRetryRegression-20260922-180448-2aadb797` loaded an
   older earned ArenaEntry checkpoint into Failed, used the authored retry
   interaction, restored the Elite's thermal bindings, then passed frost,
@@ -116,7 +123,10 @@ their next runtime check. A passing build alone does not close any gameplay row.
   screenshot is the transient `Preparing Niagara System` compile message over
   the objective panel. A read-only PIE probe found one presentation, one
   objective row, and a clean subsequent frame. No gameplay HUD defect is
-  established by this capture.
+  established by that capture. The later E4B retry terminal frame still shows
+  a plain white, multi-line objective status panel in the top-left of the
+  viewport, visually out of step with the amber holographic Tarrik bars and
+  radar. Its style and text hierarchy need an in-engine polish pass.
 - **Selene face shading:** an intermittent black face is proven in BaseColor,
   including a held static camera, with identical configured material paths in
   healthy and faulty runs. Root cause remains unknown. Next: compare actual
