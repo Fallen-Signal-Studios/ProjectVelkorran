@@ -108,6 +108,8 @@ private:
 	float PlayerContribution = 0.f;
 	float CompanionContribution = 0.f;
 	double ContributionScopeOpenedAt = 0.;
+	/** First attackable focus in this scope; travel from the encounter spawn does not consume the opening allowance. */
+	double OpeningCombatAt = -1.;
 	float CommandAttackStarted = 0.f;
 	float NextCommandAttack = 0.f;
 	float NextCommandDefense = 0.f;

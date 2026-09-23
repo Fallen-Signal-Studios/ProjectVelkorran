@@ -29,6 +29,8 @@ if os.environ.get('SOV_TARRIK_AUTONOMOUS') == '1':
     os.environ['SOV_CONTACT_PASSIVE_ONLY'] = '1'
 else:
     os.environ['SOV_CONTACT_COMMAND_ONLY'] = '1'
+if os.environ.get('SOV_TARRIK_SUSTAINED') == '1':
+    os.environ['SOV_CONTACT_CONTINUE_AFTER_FIRST'] = '1'
 
 observe_companion_animation.start('e4a-tarrik-animation.json')
 observe_companion_weapon_hit_path.start('e4a-tarrik-hit-path.json')

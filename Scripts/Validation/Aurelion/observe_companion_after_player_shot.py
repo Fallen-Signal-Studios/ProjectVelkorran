@@ -17,6 +17,7 @@ _RUN = None
 class Observer:
     def __init__(self, output_directory=None, passive=False):
         self.passive = passive
+        self.continue_after_first = passive and os.environ.get('SOV_CONTACT_CONTINUE_AFTER_FIRST') == '1'
         self.out = Path(output_directory or os.environ['SOV_AURELION_RUN_DIRECTORY']) / 'companion-after-shot.json'
         assert not self.out.exists()
         self.world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_game_world()
@@ -52,7 +53,7 @@ class Observer:
         assert all(self.actions.values())
         self.report = dict(diagnostic_only=True, route_qualification=False,
             direct_state_writes=False, player_damage=[], companion_damage=[], samples=[], errors=[],
-            target=self.target.get_path_name())
+            target=self.target.get_path_name(), continue_after_first=self.continue_after_first)
         self.report['opening_contribution_seconds'] = self.companion.get_companion_component().get_editor_property('opening_contribution_seconds')
         companion_mesh = next(m for m in self.companion.get_components_by_class(unreal.SkeletalMeshComponent)
                               if m.get_name() == 'CharacterMesh0')
@@ -101,12 +102,17 @@ class Observer:
             if self.passive and self.pc.get_controlled_pawn() != self.pawn:
                 self.stop('Normal protagonist handoff ended observation'); return
             assert unreal.SystemLibrary.is_valid(self.pawn) and self.pc.get_controlled_pawn() == self.pawn
-            assert self.pawn.is_alive() and self.companion.is_alive()
+            if not self.pawn.is_alive():
+                self.stop('Player died during passive encounter observation'); return
+            if not self.companion.is_alive():
+                self.stop('Companion died during passive encounter observation'); return
             player_hits = [r for r in self.report.get('player_damage_details', [])
                 if r['target'] == self.player_target.get_path_name() and r['health'] + r['shield'] > 0]
             companion_after_hit = player_hits and any(r['elapsed'] > player_hits[0]['elapsed']
                 for r in self.report.get('companion_damage_details', []))
-            if now-self.started > 100 or (self.passive and self.report['companion_damage']) or companion_after_hit:
+            if (now-self.started > 100 or
+                    (not self.continue_after_first and
+                     ((self.passive and self.report['companion_damage']) or companion_after_hit))):
                 self.stop('Observation ended'); return
             if not self.passive and not self.selector.done:
                 held, report = self.selector.step(self.world)
@@ -170,7 +176,7 @@ class Observer:
                 look, _ = common.Run.look(self, self.world, self.pc, look_at.get_actor_location())
                 self.input(look, float(self.triggered is not None and now-self.triggered < .05
                     and not player_hits), 1.)
-            if now-self.last < .025:
+            if now-self.last < (.1 if self.continue_after_first else .025):
                 return
             self.last = now
             mesh = next(m for m in self.companion.get_components_by_class(unreal.SkeletalMeshComponent)

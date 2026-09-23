@@ -192,12 +192,14 @@ void USovCompanionComponent::ResetContribution(bool bStarted)
 	PlayerContribution = 0.f; CompanionContribution = 0.f;
 	// The opening allowance belongs to the scope, so it restarts with the budget it relaxes.
 	ContributionScopeOpenedAt = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.;
+	OpeningCombatAt = -1.;
 }
 
 bool USovCompanionComponent::IsInOpeningContribution() const
 {
 	const UWorld* const World = GetWorld();
-	return World && SovResonancePolicy::WithinOpeningContribution(World->GetTimeSeconds(), ContributionScopeOpenedAt,
+	return World && SovResonancePolicy::WithinOpeningContribution(World->GetTimeSeconds(),
+		OpeningCombatAt >= 0. ? OpeningCombatAt : ContributionScopeOpenedAt,
 		FMath::IsFinite(OpeningContributionSeconds) ? FMath::Clamp(OpeningContributionSeconds, 0.f, 30.f) : 0.f);
 }
 ANarrativeCharacter* USovCompanionComponent::ResolveCommandAttackTarget(ANarrativeCharacter* Character)
@@ -245,11 +247,27 @@ void USovCompanionComponent::TickContextCommand(USovCompanionCommandGoal* Goal)
 	if (!Focus && Goal->Command != ESovCompanionCommand::HoldPosition)
 	{
 		float Best = FMath::Square(1000.f);
+		float DeferredBest = Best;
+		AActor* DeferredFocus = nullptr;
 		for (TActorIterator<ANarrativeNPCCharacter> It(GetWorld()); It; ++It)
 		{
 			const float Dist = FVector::DistSquared(Destination, It->GetActorLocation());
-			if (Dist < Best && HostileCompanionTarget(NPC, *It) && Controller->LineOfSightTo(*It)) { Best = Dist; Focus = *It; }
+			if (Dist >= FMath::Square(1000.f) || !HostileCompanionTarget(NPC, *It) || !Controller->LineOfSightTo(*It)) { continue; }
+			const auto* TargetASC = CompanionASC(*It);
+			const auto* TargetContext = It->FindComponentByClass<USovResonanceTargetComponent>();
+			const bool bDeferred = TargetASC->HasMatchingGameplayTag(Tags.State_Target_Unfinishable)
+				|| TargetASC->HasMatchingGameplayTag(Tags.State_Resonance_ProtectedTarget)
+				|| TargetASC->HasMatchingGameplayTag(Tags.Character_Enemy_Boss)
+				|| (TargetContext && TargetContext->bRequiresPlayerFinish);
+			if (bDeferred)
+			{
+				if (Dist < DeferredBest) { DeferredBest = Dist; DeferredFocus = *It; }
+			}
+			else if (Dist < Best) { Best = Dist; Focus = *It; }
 		}
+		// An encounter-held Elite must not monopolize autonomous focus while an ordinary
+		// hostile is still in the leader's defense area. Retain it as a fallback.
+		if (!Focus) { Focus = DeferredFocus; }
 	}
 	bool bCombatApproach = false;
 	if (IsValid(Focus) && HostileCompanionTarget(NPC, Focus))
@@ -283,6 +301,8 @@ void USovCompanionComponent::TickContextCommand(USovCompanionCommandGoal* Goal)
 		const auto* Context = Focus->FindComponentByClass<USovResonanceTargetComponent>();
 		const bool bProtected = TargetASC->HasMatchingGameplayTag(Tags.State_Resonance_ProtectedTarget)
 			|| TargetASC->HasMatchingGameplayTag(Tags.Character_Enemy_Boss) || (Context && Context->bRequiresPlayerFinish);
+		if (!bProtected && OpeningCombatAt < 0.)
+		{ OpeningCombatAt = GetWorld()->GetTimeSeconds(); }
 		// Only the protagonist proxy gets its copied defense kit. Ordinary allies do not become guard/deflect clones.
 		if (NPC->IsA<ASovProtagonistCompanionCharacter>() && GetWorld()->GetTimeSeconds() >= NextCommandDefense
 			&& TargetASC->HasMatchingGameplayTag(N.State_NPC_Activity_Attacking) && Controller->LineOfSightTo(Focus))

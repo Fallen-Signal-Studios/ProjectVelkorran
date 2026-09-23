@@ -391,6 +391,44 @@ bool FSovCompanionDefenseCadenceTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCompanionEncounterHeldFocusTest,
+    "ProjectVelkorran.Campaign.Companion.EncounterHeldTargetYieldsAutonomousFocus",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FSovCompanionEncounterHeldFocusTest::RunTest(const FString& Parameters)
+{
+    FTerminalWorld F; if (!TestNotNull(TEXT("Ready managed player"), F.ASC)) { return false; }
+    F.Mission->AllowedCompanionIds.Add(TEXT("Tarrik"));
+    auto* NPC = F.World->SpawnActor<ASovCompanionCommandTestProxy>(); NPC->InitializeCommandCombat();
+    NPC->SetActorLocation(F.Player->GetActorLocation() + FVector(0, -400, 0));
+    auto* AI = F.World->SpawnActor<ASovCoActionTestNPCController>(); AI->Possess(NPC);
+    CastChecked<USovCoActionTestActivities>(AI->GetActivityComponent())->InitializeForCoAction();
+    auto* Held = F.World->SpawnActor<ASovCoActionTestNPC>(); Held->InitializeTestCombat(1);
+    Held->SetActorLocation(F.Player->GetActorLocation() + FVector(250, 0, 0));
+    Held->GetNarrativeAbilitySystemComponent()->AddLooseGameplayTag(FSovGameplayTags::Get().State_Target_Unfinishable);
+    auto* Ordinary = F.World->SpawnActor<ASovCoActionTestNPC>(); Ordinary->InitializeTestCombat(1);
+    Ordinary->SetActorLocation(F.Player->GetActorLocation() + FVector(0, 650, 0));
+    auto* Component = NPC->GetCompanionComponent(); Component->CompanionId = TEXT("Tarrik");
+    FString Reason;
+    if (!TestTrue(TEXT("Normal regroup command accepted"), Component->SetLeader(F.Player, Reason)))
+    { AddError(Reason); return false; }
+    auto* Goal = Cast<USovCompanionCommandGoal>(AI->GetActivityComponent()->GetCurrentActivityGoal());
+    if (!TestNotNull(TEXT("Native activity owns regroup"), Goal)) { return false; }
+    F.World->TimeSeconds += Component->OpeningContributionSeconds + 1.f;
+    TestFalse(TEXT("Travel alone exhausts the old scope-start allowance"), Component->IsInOpeningContribution());
+    Component->TickContextCommand(Goal);
+    TestEqual(TEXT("Ordinary hostile wins over nearer encounter-held Elite"),
+        AI->GetFocusActor(), static_cast<AActor*>(Ordinary));
+    TestTrue(TEXT("First combat focus starts an eight-second opening allowance after travel"),
+        Component->IsInOpeningContribution());
+    Ordinary->GetNarrativeAbilitySystemComponent()->AddLooseGameplayTag(FSovGameplayTags::Get().State_Target_Unfinishable);
+    Component->TickContextCommand(Goal);
+    TestEqual(TEXT("Nearest held hostile remains a fallback when both are held"),
+        AI->GetFocusActor(), static_cast<AActor*>(Held));
+    F.World->TimeSeconds += Component->OpeningContributionSeconds + .1f;
+    TestFalse(TEXT("First-focus allowance closes without another scope reset"), Component->IsInOpeningContribution());
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovAurelionPendingHoldTest,
     "ProjectVelkorran.Campaign.Aurelion.Request.AcceptedHoldSurvivesSuspendedActivitySelection",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
