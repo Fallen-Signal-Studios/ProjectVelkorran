@@ -1,0 +1,396 @@
+{
+  "map_hashes": {
+    "L_Aurelion_M12.umap": "23555516889b0078ea29323f375b1e2d43e5edf1132ad903e68989bb51da61f1",
+    "L_Aurelion_M13.umap": "f3e53457363a0aab88ba81225287e39f36f49693798b98873bed9984a539db22"
+  },
+  "vendor_instances": {
+    "Aurelion_Art_M13_Z11_15_1aa4d5": [
+      {
+        "actor": "Aurelion_Art_M13_Z11_15_1aa4d5",
+        "component": "HierarchicalInstancedStaticMesh",
+        "mesh": "/Game/Underground_Base/Meshes/SM_table.SM_table",
+        "index": 0,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=-125.209470,Y=43033.385085,Z=0.585292),Scale3D=(X=0.887509,Y=1.245039,Z=0.759581))",
+        "collision": "<CollisionEnabled.NO_COLLISION: 0>"
+      },
+      {
+        "actor": "Aurelion_Art_M13_Z11_15_1aa4d5",
+        "component": "HierarchicalInstancedStaticMesh",
+        "mesh": "/Game/Underground_Base/Meshes/SM_table.SM_table",
+        "index": 1,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=-125.209470,Y=43100.051752,Z=0.585292),Scale3D=(X=0.887509,Y=1.245039,Z=0.759581))",
+        "collision": "<CollisionEnabled.NO_COLLISION: 0>"
+      },
+      {
+        "actor": "Aurelion_Art_M13_Z11_15_1aa4d5",
+        "component": "HierarchicalInstancedStaticMesh",
+        "mesh": "/Game/Underground_Base/Meshes/SM_table.SM_table",
+        "index": 2,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=-125.209470,Y=43166.718419,Z=0.585292),Scale3D=(X=0.887509,Y=1.245039,Z=0.759581))",
+        "collision": "<CollisionEnabled.NO_COLLISION: 0>"
+      },
+      {
+        "actor": "Aurelion_Art_M13_Z11_15_1aa4d5",
+        "component": "HierarchicalInstancedStaticMesh",
+        "mesh": "/Game/Underground_Base/Meshes/SM_table.SM_table",
+        "index": 3,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=124.790530,Y=43033.385085,Z=0.585292),Scale3D=(X=0.887509,Y=1.245039,Z=0.759581))",
+        "collision": "<CollisionEnabled.NO_COLLISION: 0>"
+      },
+      {
+        "actor": "Aurelion_Art_M13_Z11_15_1aa4d5",
+        "component": "HierarchicalInstancedStaticMesh",
+        "mesh": "/Game/Underground_Base/Meshes/SM_table.SM_table",
+        "index": 4,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=124.790530,Y=43100.051752,Z=0.585292),Scale3D=(X=0.887509,Y=1.245039,Z=0.759581))",
+        "collision": "<CollisionEnabled.NO_COLLISION: 0>"
+      },
+      {
+        "actor": "Aurelion_Art_M13_Z11_15_1aa4d5",
+        "component": "HierarchicalInstancedStaticMesh",
+        "mesh": "/Game/Underground_Base/Meshes/SM_table.SM_table",
+        "index": 5,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=-0.707107,W=0.707107),Translation=(X=124.790530,Y=43166.718419,Z=0.585292),Scale3D=(X=0.887509,Y=1.245039,Z=0.759581))",
+        "collision": "<CollisionEnabled.NO_COLLISION: 0>"
+      }
+    ],
+    "Aurelion_Art_M13_Z11_16_6f459a": [
+      {
+        "actor": "Aurelion_Art_M13_Z11_16_6f459a",
+        "component": "HierarchicalInstancedStaticMesh",
+        "mesh": "/Game/Underground_Base/Meshes/SM_chair.SM_chair",
+        "index": 0,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-242.356522,Y=42880.958724,Z=1.021623),Scale3D=(X=0.888518,Y=1.000851,Z=0.946487))",
+        "collision": "<CollisionEnabled.NO_COLLISION: 0>"
+      },
+      {
+        "actor": "Aurelion_Art_M13_Z11_16_6f459a",
+        "component": "HierarchicalInstancedStaticMesh",
+        "mesh": "/Game/Underground_Base/Meshes/SM_chair.SM_chair",
+        "index": 1,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=7.643478,Y=42880.958724,Z=1.021623),Scale3D=(X=0.888518,Y=1.000851,Z=0.946487))",
+        "collision": "<CollisionEnabled.NO_COLLISION: 0>"
+      },
+      {
+        "actor": "Aurelion_Art_M13_Z11_16_6f459a",
+        "component": "HierarchicalInstancedStaticMesh",
+        "mesh": "/Game/Underground_Base/Meshes/SM_chair.SM_chair",
+        "index": 2,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=257.643478,Y=42880.958724,Z=1.021623),Scale3D=(X=0.888518,Y=1.000851,Z=0.946487))",
+        "collision": "<CollisionEnabled.NO_COLLISION: 0>"
+      },
+      {
+        "actor": "Aurelion_Art_M13_Z11_16_6f459a",
+        "component": "HierarchicalInstancedStaticMesh",
+        "mesh": "/Game/Underground_Base/Meshes/SM_chair.SM_chair",
+        "index": 3,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-242.356522,Y=43320.958724,Z=1.021623),Scale3D=(X=0.888518,Y=1.000851,Z=0.946487))",
+        "collision": "<CollisionEnabled.NO_COLLISION: 0>"
+      },
+      {
+        "actor": "Aurelion_Art_M13_Z11_16_6f459a",
+        "component": "HierarchicalInstancedStaticMesh",
+        "mesh": "/Game/Underground_Base/Meshes/SM_chair.SM_chair",
+        "index": 4,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=7.643478,Y=43320.958724,Z=1.021623),Scale3D=(X=0.888518,Y=1.000851,Z=0.946487))",
+        "collision": "<CollisionEnabled.NO_COLLISION: 0>"
+      },
+      {
+        "actor": "Aurelion_Art_M13_Z11_16_6f459a",
+        "component": "HierarchicalInstancedStaticMesh",
+        "mesh": "/Game/Underground_Base/Meshes/SM_chair.SM_chair",
+        "index": 5,
+        "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=257.643478,Y=43320.958724,Z=1.021623),Scale3D=(X=0.888518,Y=1.000851,Z=0.946487))",
+        "collision": "<CollisionEnabled.NO_COLLISION: 0>"
+      }
+    ]
+  },
+  "native_collision_actors": [
+    {
+      "label": "Z11_Conversation_Table",
+      "class_name": "StaticMeshActor",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=43100.000000,Z=40.000000),Scale3D=(X=5.000000,Y=2.000000,Z=0.800000))",
+      "bounds_origin": "(X=0.000000,Y=43100.000000,Z=40.000000)",
+      "bounds_extent": "(X=250.000000,Y=100.000000,Z=40.000000)",
+      "hidden": false,
+      "collision": true,
+      "components": [
+        {
+          "name": "StaticMeshComponent0",
+          "mesh": "/Engine/BasicShapes/Cube.Cube",
+          "bounds": "(X=50.000000,Y=50.000000,Z=50.000000)",
+          "visible": false,
+          "hidden_in_game": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": [
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=43100.000000,Z=40.000000),Scale3D=(X=5.000000,Y=2.000000,Z=0.800000))"
+          ]
+        }
+      ]
+    },
+    {
+      "label": "Z11_Chair_1_Seat",
+      "class_name": "StaticMeshActor",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-250.000000,Y=42880.000000,Z=45.000000),Scale3D=(X=0.650000,Y=0.650000,Z=0.150000))",
+      "bounds_origin": "(X=-250.000000,Y=42880.000000,Z=45.000000)",
+      "bounds_extent": "(X=32.500000,Y=32.500000,Z=7.500000)",
+      "hidden": false,
+      "collision": true,
+      "components": [
+        {
+          "name": "StaticMeshComponent0",
+          "mesh": "/Engine/BasicShapes/Cube.Cube",
+          "bounds": "(X=50.000000,Y=50.000000,Z=50.000000)",
+          "visible": false,
+          "hidden_in_game": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": [
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-250.000000,Y=42880.000000,Z=45.000000),Scale3D=(X=0.650000,Y=0.650000,Z=0.150000))"
+          ]
+        }
+      ]
+    },
+    {
+      "label": "Z11_Chair_1_Back",
+      "class_name": "StaticMeshActor",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-250.000000,Y=42850.000000,Z=80.000000),Scale3D=(X=0.650000,Y=0.150000,Z=0.800000))",
+      "bounds_origin": "(X=-250.000000,Y=42850.000000,Z=80.000000)",
+      "bounds_extent": "(X=32.500000,Y=7.500000,Z=40.000000)",
+      "hidden": false,
+      "collision": true,
+      "components": [
+        {
+          "name": "StaticMeshComponent0",
+          "mesh": "/Engine/BasicShapes/Cube.Cube",
+          "bounds": "(X=50.000000,Y=50.000000,Z=50.000000)",
+          "visible": false,
+          "hidden_in_game": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": [
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-250.000000,Y=42850.000000,Z=80.000000),Scale3D=(X=0.650000,Y=0.150000,Z=0.800000))"
+          ]
+        }
+      ]
+    },
+    {
+      "label": "Z11_Chair_2_Seat",
+      "class_name": "StaticMeshActor",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=42880.000000,Z=45.000000),Scale3D=(X=0.650000,Y=0.650000,Z=0.150000))",
+      "bounds_origin": "(X=0.000000,Y=42880.000000,Z=45.000000)",
+      "bounds_extent": "(X=32.500000,Y=32.500000,Z=7.500000)",
+      "hidden": false,
+      "collision": true,
+      "components": [
+        {
+          "name": "StaticMeshComponent0",
+          "mesh": "/Engine/BasicShapes/Cube.Cube",
+          "bounds": "(X=50.000000,Y=50.000000,Z=50.000000)",
+          "visible": false,
+          "hidden_in_game": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": [
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=42880.000000,Z=45.000000),Scale3D=(X=0.650000,Y=0.650000,Z=0.150000))"
+          ]
+        }
+      ]
+    },
+    {
+      "label": "Z11_Chair_2_Back",
+      "class_name": "StaticMeshActor",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=42850.000000,Z=80.000000),Scale3D=(X=0.650000,Y=0.150000,Z=0.800000))",
+      "bounds_origin": "(X=0.000000,Y=42850.000000,Z=80.000000)",
+      "bounds_extent": "(X=32.500000,Y=7.500000,Z=40.000000)",
+      "hidden": false,
+      "collision": true,
+      "components": [
+        {
+          "name": "StaticMeshComponent0",
+          "mesh": "/Engine/BasicShapes/Cube.Cube",
+          "bounds": "(X=50.000000,Y=50.000000,Z=50.000000)",
+          "visible": false,
+          "hidden_in_game": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": [
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=42850.000000,Z=80.000000),Scale3D=(X=0.650000,Y=0.150000,Z=0.800000))"
+          ]
+        }
+      ]
+    },
+    {
+      "label": "Z11_Chair_3_Seat",
+      "class_name": "StaticMeshActor",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=250.000000,Y=42880.000000,Z=45.000000),Scale3D=(X=0.650000,Y=0.650000,Z=0.150000))",
+      "bounds_origin": "(X=250.000000,Y=42880.000000,Z=45.000000)",
+      "bounds_extent": "(X=32.500000,Y=32.500000,Z=7.500000)",
+      "hidden": false,
+      "collision": true,
+      "components": [
+        {
+          "name": "StaticMeshComponent0",
+          "mesh": "/Engine/BasicShapes/Cube.Cube",
+          "bounds": "(X=50.000000,Y=50.000000,Z=50.000000)",
+          "visible": false,
+          "hidden_in_game": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": [
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=250.000000,Y=42880.000000,Z=45.000000),Scale3D=(X=0.650000,Y=0.650000,Z=0.150000))"
+          ]
+        }
+      ]
+    },
+    {
+      "label": "Z11_Chair_3_Back",
+      "class_name": "StaticMeshActor",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=250.000000,Y=42850.000000,Z=80.000000),Scale3D=(X=0.650000,Y=0.150000,Z=0.800000))",
+      "bounds_origin": "(X=250.000000,Y=42850.000000,Z=80.000000)",
+      "bounds_extent": "(X=32.500000,Y=7.500000,Z=40.000000)",
+      "hidden": false,
+      "collision": true,
+      "components": [
+        {
+          "name": "StaticMeshComponent0",
+          "mesh": "/Engine/BasicShapes/Cube.Cube",
+          "bounds": "(X=50.000000,Y=50.000000,Z=50.000000)",
+          "visible": false,
+          "hidden_in_game": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": [
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=250.000000,Y=42850.000000,Z=80.000000),Scale3D=(X=0.650000,Y=0.150000,Z=0.800000))"
+          ]
+        }
+      ]
+    },
+    {
+      "label": "Z11_Chair_4_Seat",
+      "class_name": "StaticMeshActor",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-250.000000,Y=43320.000000,Z=45.000000),Scale3D=(X=0.650000,Y=0.650000,Z=0.150000))",
+      "bounds_origin": "(X=-250.000000,Y=43320.000000,Z=45.000000)",
+      "bounds_extent": "(X=32.500000,Y=32.500000,Z=7.500000)",
+      "hidden": false,
+      "collision": true,
+      "components": [
+        {
+          "name": "StaticMeshComponent0",
+          "mesh": "/Engine/BasicShapes/Cube.Cube",
+          "bounds": "(X=50.000000,Y=50.000000,Z=50.000000)",
+          "visible": false,
+          "hidden_in_game": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": [
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-250.000000,Y=43320.000000,Z=45.000000),Scale3D=(X=0.650000,Y=0.650000,Z=0.150000))"
+          ]
+        }
+      ]
+    },
+    {
+      "label": "Z11_Chair_4_Back",
+      "class_name": "StaticMeshActor",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-250.000000,Y=43350.000000,Z=80.000000),Scale3D=(X=0.650000,Y=0.150000,Z=0.800000))",
+      "bounds_origin": "(X=-250.000000,Y=43350.000000,Z=80.000000)",
+      "bounds_extent": "(X=32.500000,Y=7.500000,Z=40.000000)",
+      "hidden": false,
+      "collision": true,
+      "components": [
+        {
+          "name": "StaticMeshComponent0",
+          "mesh": "/Engine/BasicShapes/Cube.Cube",
+          "bounds": "(X=50.000000,Y=50.000000,Z=50.000000)",
+          "visible": false,
+          "hidden_in_game": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": [
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=-250.000000,Y=43350.000000,Z=80.000000),Scale3D=(X=0.650000,Y=0.150000,Z=0.800000))"
+          ]
+        }
+      ]
+    },
+    {
+      "label": "Z11_Chair_5_Seat",
+      "class_name": "StaticMeshActor",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=43320.000000,Z=45.000000),Scale3D=(X=0.650000,Y=0.650000,Z=0.150000))",
+      "bounds_origin": "(X=0.000000,Y=43320.000000,Z=45.000000)",
+      "bounds_extent": "(X=32.500000,Y=32.500000,Z=7.500000)",
+      "hidden": false,
+      "collision": true,
+      "components": [
+        {
+          "name": "StaticMeshComponent0",
+          "mesh": "/Engine/BasicShapes/Cube.Cube",
+          "bounds": "(X=50.000000,Y=50.000000,Z=50.000000)",
+          "visible": false,
+          "hidden_in_game": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": [
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=43320.000000,Z=45.000000),Scale3D=(X=0.650000,Y=0.650000,Z=0.150000))"
+          ]
+        }
+      ]
+    },
+    {
+      "label": "Z11_Chair_5_Back",
+      "class_name": "StaticMeshActor",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=43350.000000,Z=80.000000),Scale3D=(X=0.650000,Y=0.150000,Z=0.800000))",
+      "bounds_origin": "(X=0.000000,Y=43350.000000,Z=80.000000)",
+      "bounds_extent": "(X=32.500000,Y=7.500000,Z=40.000000)",
+      "hidden": false,
+      "collision": true,
+      "components": [
+        {
+          "name": "StaticMeshComponent0",
+          "mesh": "/Engine/BasicShapes/Cube.Cube",
+          "bounds": "(X=50.000000,Y=50.000000,Z=50.000000)",
+          "visible": false,
+          "hidden_in_game": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": [
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=0.000000,Y=43350.000000,Z=80.000000),Scale3D=(X=0.650000,Y=0.150000,Z=0.800000))"
+          ]
+        }
+      ]
+    },
+    {
+      "label": "Z11_Chair_6_Seat",
+      "class_name": "StaticMeshActor",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=250.000000,Y=43320.000000,Z=45.000000),Scale3D=(X=0.650000,Y=0.650000,Z=0.150000))",
+      "bounds_origin": "(X=250.000000,Y=43320.000000,Z=45.000000)",
+      "bounds_extent": "(X=32.500000,Y=32.500000,Z=7.500000)",
+      "hidden": false,
+      "collision": true,
+      "components": [
+        {
+          "name": "StaticMeshComponent0",
+          "mesh": "/Engine/BasicShapes/Cube.Cube",
+          "bounds": "(X=50.000000,Y=50.000000,Z=50.000000)",
+          "visible": false,
+          "hidden_in_game": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": [
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=250.000000,Y=43320.000000,Z=45.000000),Scale3D=(X=0.650000,Y=0.650000,Z=0.150000))"
+          ]
+        }
+      ]
+    },
+    {
+      "label": "Z11_Chair_6_Back",
+      "class_name": "StaticMeshActor",
+      "transform": "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=250.000000,Y=43350.000000,Z=80.000000),Scale3D=(X=0.650000,Y=0.150000,Z=0.800000))",
+      "bounds_origin": "(X=250.000000,Y=43350.000000,Z=80.000000)",
+      "bounds_extent": "(X=32.500000,Y=7.500000,Z=40.000000)",
+      "hidden": false,
+      "collision": true,
+      "components": [
+        {
+          "name": "StaticMeshComponent0",
+          "mesh": "/Engine/BasicShapes/Cube.Cube",
+          "bounds": "(X=50.000000,Y=50.000000,Z=50.000000)",
+          "visible": false,
+          "hidden_in_game": true,
+          "collision": "<CollisionEnabled.QUERY_AND_PHYSICS: 3>",
+          "instances": [
+            "(Rotation=(X=0.000000,Y=0.000000,Z=0.000000,W=1.000000),Translation=(X=250.000000,Y=43350.000000,Z=80.000000),Scale3D=(X=0.650000,Y=0.150000,Z=0.800000))"
+          ]
+        }
+      ]
+    }
+  ]
+}

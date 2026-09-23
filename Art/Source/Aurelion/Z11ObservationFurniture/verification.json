@@ -1,0 +1,24 @@
+{
+  "status": "PASS",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z11ObservationTable",
+      "dimensions_m": [
+        4.940000057220459,
+        1.9119999408721924,
+        0.800000011920929
+      ],
+      "triangles": 8648
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z11ObservationChair",
+      "dimensions_m": [
+        0.6499999761581421,
+        0.7775000333786011,
+        1.1924999952316284
+      ],
+      "triangles": 5828
+    }
+  ],
+  "scope": "FBX geometry, nominal bounds, origin, UV presence, material slots and finite coordinates only"
+}
