@@ -143,11 +143,14 @@ def tick(delta):
             importlib.reload(contact)
             follow_route = os.environ.get('SOV_CONTACT_FOLLOW_E4A') == '1'
             command_only = os.environ.get('SOV_CONTACT_COMMAND_ONLY') == '1'
-            contact.start(OUT, passive=follow_route or command_only)
+            passive_only = os.environ.get('SOV_CONTACT_PASSIVE_ONLY') == '1'
+            contact.start(OUT, passive=follow_route or command_only or passive_only)
             if follow_route:
                 import continue_aurelion_e4a_input as route
                 route.start(OUT / 'E4A')
                 report['input_owner'] = 'Existing normal E4A route driver; contact observer is passive'
+            elif passive_only:
+                report['input_owner'] = 'No player or companion combat input; passive observation of authored autonomous behavior'
             else:
                 companion = contact._RUN.companion.get_companion_component()
                 admitted = companion.request_command(pawn, unreal.SovCompanionCommand.FOCUS_TARGET, contact._RUN.target)
