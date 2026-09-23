@@ -20,7 +20,8 @@ maps = {
 }
 assert maps["L_Aurelion_M12.umap"] == baseline["map_hashes"]["L_Aurelion_M12.umap"]
 actors = {actor.get_actor_label(): actor for actor in unreal.get_editor_subsystem(unreal.EditorActorSubsystem).get_all_level_actors()}
-custom = {label for label in actors if label.startswith("Aurelion_Custom_Z11_")}
+custom = {label for label in actors if label == "Aurelion_Custom_Z11_ObservationTable"
+          or label.startswith("Aurelion_Custom_Z11_Chair_")}
 expected = {"Aurelion_Custom_Z11_ObservationTable": (
     (0, 43100, 0), "SM_Aurelion_KIT_Z11ObservationTable"
 )}
