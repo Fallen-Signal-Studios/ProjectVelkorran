@@ -229,9 +229,19 @@ their next runtime check. A passing build alone does not close any gameplay row.
   PIE, observing A/B cast playback, Echo spend, Niagara, projectile classes where
   applicable, and real target hits in focused replays. Its synthetic Echo refill
   and stationary target make it a focused validation rather than full encounter
-  proof. Interrupted actions, insufficient resources, death during casts,
-  checkpoint/handoff recovery, and each enemy archetype's attack impact still
-  need the broader normal-play matrix.
+  proof. Interrupted actions, death during casts, checkpoint/handoff recovery,
+  and each enemy archetype's attack impact still need the broader normal-play
+  matrix.
+- **Player ability resource gates:** optional live PIE negative-case runs
+  exercised all 12 Tarrik and 14 Selene weapon-context repetitions at zero
+  Echo, followed immediately by their normal A/B casts after refill. The
+  rejected inputs caused no debit, cast montage, projectile, or damage to the
+  aimed validation target; all 26 normal follow-ups met their cast/Echo/FX
+  smoke checks. An earlier Stillpoint field hit other E2 enemies during three
+  Selene negative windows, so those ambient receipts remain recorded and
+  separate. See [the player ability audit](PlayerAbilityLiveAudit-2026-09-23.md).
+  Cast interruption, death, prediction and every combat impact angle remain
+  open.
 
 ## Readability and polish
 

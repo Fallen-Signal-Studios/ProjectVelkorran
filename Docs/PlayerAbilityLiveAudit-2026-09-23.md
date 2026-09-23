@@ -98,3 +98,31 @@ every animation pose/FX combination, or every encounter angle. The Fab
 Fire/Ice/Lightning Niagara packs are local project dependencies excluded by
 the repository's existing ignore rules. This slice does not assign a new
 percentage to the broader M12/M13 90% visual/gameplay goal.
+
+## Zero-Echo rejection and immediate recovery
+
+The same PIE probe now has an optional `SOV_PLAYER_ABILITY_NEGATIVE_ECHO=1`
+phase. It sends each semantic ability input with the ready protagonist at zero
+Echo, observes for 1.5 seconds, then restores 100 Echo and sends the same
+input normally. The zero-Echo check requires no debit, no cast montage, no
+projectile, and no source-damage receipt on the newly spawned aimed target.
+Damage to other encounter actors is recorded separately because an earlier
+Stillpoint field can continue ticking after its successful cast; it is not
+evidence that the new zero-Echo input activated. The ordinary follow-up still
+requires the correct A/B montage, cast Niagara, expected Echo spend, and
+projectile actor where appropriate.
+
+`TarrikFullLowEchoPIE-20260923-140908-ccff051e` passed all 12 repetitions
+across his six weapon contexts. `SeleneFullLowEchoIsolatedPIE-20260923-141606-cd49bd39`
+passed all 14 repetitions across her seven contexts after loading an earned
+E2 checkpoint and using its normal retry. The first Selene run stopped on a
+probe false positive: the previous Stillpoint field damaged two unrelated
+encounter enemies during the next zero-Echo window. The revised run kept
+three such unrelated receipts visible while requiring the newly aimed target
+to remain unharmed; all 14 checks passed. A focused Hunger and Wake run also
+passed before the full matrices. The ability inputs were routed through the
+normal player controller; only the Echo level and stationary validation target
+were fixtures. These runs establish rejection at zero Echo and immediate
+activation after refill for the current roster. They do not establish every
+positive cast's impact, interruption/death behavior, or resource-state
+correctness under client prediction.

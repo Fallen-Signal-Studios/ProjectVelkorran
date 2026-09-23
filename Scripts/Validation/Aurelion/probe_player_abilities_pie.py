@@ -57,6 +57,7 @@ if DISTANCE_OVERRIDE:
     ROSTER[HERO] = [(name, weapon, action, distance, cost, projectile)
                     for name, weapon, action, _, cost, projectile in ROSTER[HERO]]
 CAPTURE = os.environ.get('SOV_PLAYER_ABILITY_CAPTURE') == '1'
+NEGATIVE_ECHO = os.environ.get('SOV_PLAYER_ABILITY_NEGATIVE_ECHO') == '1'
 
 
 def tag(name):
@@ -340,7 +341,50 @@ class Probe:
                     self.row()['aim_rotation'] = control.export_text()
                     self.row()['player_location'] = pawn.get_actor_location().export_text()
                     self.row()['target_location'] = self.target.get_actor_location().export_text()
-                self.row()['routed'] = bool(unreal.SovMeleeValidationLibrary.press_and_release_semantic_input(controller, tag(action)))
+                if NEGATIVE_ECHO:
+                    pawn.get_echo_component().restore_echo_from_checkpoint(0.)
+                    self.row()['insufficient_echo'] = {
+                        'before': round(pawn.get_echo_component().get_echo(), 2),
+                        'input_routed': bool(unreal.SovMeleeValidationLibrary.press_and_release_semantic_input(controller, tag(action)))}
+                    self.stage('observe_insufficient')
+                else:
+                    self.row()['routed'] = bool(unreal.SovMeleeValidationLibrary.press_and_release_semantic_input(controller, tag(action)))
+                    self.sample(world, pawn)
+                    self.stage('observe')
+                return
+            if self.phase == 'observe_insufficient':
+                if time.monotonic() - self.last_sample >= 0.01:
+                    self.sample(world, pawn)
+                    self.last_sample = time.monotonic()
+                if elapsed < 1.5:
+                    return
+                row = self.row()
+                negative = row['insufficient_echo']
+                negative['after'] = round(pawn.get_echo_component().get_echo(), 2)
+                negative['projectiles'] = list(row['projectiles_seen'])
+                negative['cast_montages'] = [name for name in row['montages_seen']
+                                             if name.startswith('AM_' + HERO + '_' + row['name'] + '_')]
+                negative['damage_receipts'] = [receipt for receipt in row.get('damage_receipts', [])
+                                               if receipt['target'] == row['target_name']]
+                negative['other_damage_receipts'] = [receipt for receipt in row.get('damage_receipts', [])
+                                                     if receipt['target'] != row['target_name']]
+                negative['passed'] = negative['input_routed'] and negative['before'] == 0. and negative['after'] == 0. \
+                    and not negative['projectiles'] and not negative['cast_montages'] and not negative['damage_receipts']
+                if not negative['passed']:
+                    self.finish('failed', 'Insufficient-Echo activation produced an effect or did not route: ' + str(negative))
+                    return
+                row['projectiles_seen'].clear()
+                row['projectile_samples'] = []
+                row['montages_seen'].clear()
+                row['niagara_seen'].clear()
+                row.pop('damage_receipts', None)
+                self.preexisting_niagara = {component.get_path_name()
+                                            for component in unreal.ObjectIterator(unreal.NiagaraComponent)
+                                            if component.get_world() == world}
+                pawn.get_echo_component().restore_echo_from_checkpoint(100.)
+                row['echo_before'] = round(pawn.get_echo_component().get_echo(), 2)
+                controller = unreal.GameplayStatics.get_player_controller(world, 0)
+                row['routed'] = bool(unreal.SovMeleeValidationLibrary.press_and_release_semantic_input(controller, tag(action)))
                 self.sample(world, pawn)
                 self.stage('observe')
                 return
@@ -368,6 +412,8 @@ class Probe:
                 row['projectile_seen'] = bool(row['projectiles_seen']) if ROSTER[HERO][self.index][5] else None
                 row['passed_smoke'] = row['routed'] and row['expected_grant_present'] and abs(row['echo_spent'] - cost) < .1 \
                     and row['cast_seen'] and row['cast_fx_seen'] and (row['projectile_seen'] is not False)
+                if NEGATIVE_ECHO:
+                    row['passed_smoke'] = row['passed_smoke'] and row['insufficient_echo']['passed']
                 if self.target:
                     try:
                         self.target.destroy_actor()
