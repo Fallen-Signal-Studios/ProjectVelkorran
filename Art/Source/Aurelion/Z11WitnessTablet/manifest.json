@@ -21,6 +21,7 @@
       "uv_layers": 2,
       "convex_hulls": 0,
       "collision": "None: retained request actor Body owns all physical interaction and collision",
+      "nanite_enabled": false,
       "original_actor_visual_scale": 0.7454,
       "world_max_footprint_m": [
         0.407,

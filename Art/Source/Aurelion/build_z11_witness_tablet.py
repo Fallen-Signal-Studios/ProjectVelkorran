@@ -120,6 +120,7 @@ asset='SM_Aurelion_KIT_Z11WitnessTablet'
 module=export(asset,[.546,.444,1.555])
 manifest[-1].update(
     collision='None: retained request actor Body owns all physical interaction and collision',
+    nanite_enabled=False,
     original_actor_visual_scale=.7454,
     world_max_footprint_m=[round(.546*.7454,4),round(.436*.7454,4)],
     preserve_actor_and_component_transforms=True,

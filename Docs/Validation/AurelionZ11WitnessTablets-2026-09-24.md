@@ -53,6 +53,11 @@ unchanged. Further player-eye movement, scene-prompt focus, packaged
 performance, lighting/material polish and the broader 90% TDD visual target
 need separate qualification.
 
+The later [conversation furniture pass](AurelionZ11ConversationFurniture-2026-09-24.md)
+disabled Nanite on this tablet mesh because its small translucent view-glass
+material is unsupported by Nanite. The saved asset and M13 room were checked
+again after that correction; the five native interaction bodies were unchanged.
+
 The first fresh CP0 route on this exact saved map,
 `Z11WitnessTabletFreshRoute-20260924-0658`, stopped in M12 E1 after a fourth
 player death and three native retries; it never reached the modified gallery.

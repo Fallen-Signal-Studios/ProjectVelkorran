@@ -26,6 +26,21 @@ for x in (-1.64, 0, 1.64):
 for x in (-2.435, 2.435):
     box("Table end stone cap", (x, 0, .744), (.07, 1.86, .075), black, .014)
     box("Narrow cap reveal", (x * .986, 0, .704), (.018, 1.75, .018), gold, .004)
+# The restrained ivory rim gives the conversation surface a cut-stone edge
+# without making the table a glowing altar. All added details remain inside
+# the measured 5 x 2 x .8 m fallback collision envelope.
+for y in (-.951, .951):
+    box("Ivory protective long arris", (0, y, .778), (4.79, .018, .030), stone, .004)
+    for x in (-1.64, 0, 1.64):
+        box("Seating datum key", (x, y * .970, .7995), (.075, .018, .002), gold, 0)
+for x in (-2.452, 2.452):
+    box("Ivory end arris", (x, 0, .777), (.018, 1.84, .030), stone, .004)
+for radius in (.215, .284):
+    bpy.ops.mesh.primitive_torus_add(major_segments=64, minor_segments=8,
+        location=(0, 0, .7965), major_radius=radius, minor_radius=.004)
+    bpy.context.object.name="Inlaid witness circumference"
+    finish(bpy.context.object, gold, 0)
+box("Inlaid contrary line", (0, 0, .7995), (1.10, .006, .002), gold, 0)
 for y in (-.89, .89):
     box("Continuous lower edge", (0, y, .662), (4.77, .065, .044), black, .009)
     box("Edge light channel", (0, y * 1.038, .660), (4.70, .014, .012), gold, .003)
@@ -35,13 +50,18 @@ for x in (-1.56, 1.56):
         box("Pedestal foot stone", (x, y, .050), (.55, .55, .10), black, .014)
         box("Pedestal foot shoe", (x, y, .105), (.43, .46, .020), gold, .004)
         box("Angled pedestal bearer", (x, y, .385), (.32, .31, .54), black, .022)
+        for side in (-1, 1):
+            box("Pedestal dressed side cheek", (x+side*.166, y, .379),
+                (.010, .048, .475), stone, .003)
+        box("Pedestal service contact", (x, y-.160, .493),
+            (.184, .006, .010), gold, .002)
     box("Pedestal cross member", (x, 0, .625), (.39, 1.40, .07), dark, .012)
     for y in (-.68, .68):
         box("Pedestal socket collar", (x, y, .619), (.45, .07, .035), gold, .005)
 for x in (-2.36, 2.36):
     for y in (-.74, .74):
         box("Hand-polished corner pin", (x, y, .797), (.035, .035, .003), gold, .001)
-table = export("SM_Aurelion_KIT_Z11ObservationTable", [4.95, 1.91, .805])
+table = export("SM_Aurelion_KIT_Z11ConversationTable", [4.95, 1.92, .801])
 manifest[-1].update(
     nominal_dimensions_m=[round(v, 6) for v in table.dimensions],
     position_precision=10,
@@ -61,6 +81,11 @@ box("Seat relief bevel", (0, .008, .497), (.590, .605, .027), gold, .008)
 box("Seat polished contact", (0, .011, .516), (.560, .579, .050), black, .024)
 for y in (-.253, .253):
     box("Seat fine horizontal witness", (0, y, .543), (.492, .008, .003), gold, .001)
+for x in (-.309, .309):
+    box("Ivory seat cheek", (x, 0, .472), (.013, .580, .055), stone, .004)
+    for y in (-.226, .226):
+        box("Seat captive gold pin", (x*1.033, y, .465),
+            (.006, .013, .013), gold, .001)
 # Angled back with broad human contact surface and two nested frames.
 back = box("Chair back structural shell", (0, -.340, .831), (.622, .092, .700), black, .015)
 back.rotation_euler.x = math.radians(-9)
@@ -70,12 +95,17 @@ back = box("Chair back contact slab", (0, -.269, .835), (.484, .033, .526), blac
 back.rotation_euler.x = math.radians(-9)
 for x in (-.275, .275):
     box("Back seam upright", (x, -.327, .832), (.019, .022, .605), gold, .004).rotation_euler.x = math.radians(-9)
+for x in (-.310, .310):
+    box("Dressed ivory back cheek", (x, -.350, .828),
+        (.014, .035, .670), stone, .004).rotation_euler.x = math.radians(-9)
 box("Back shoulder cap", (0, -.398, 1.169), (.616, .104, .047), black, .014)
+box("Age-cut ivory shoulder arris", (0, -.399, 1.186), (.570, .030, .012), stone, .003)
 for x in (-.29, .29):
     box("Arm stone root", (x, -.095, .584), (.070, .455, .064), black, .017)
     box("Arm gold separation", (x, -.095, .618), (.041, .400, .011), gold, .003)
     box("Hand contact", (x, -.055, .635), (.055, .365, .029), black, .010)
-chair = export("SM_Aurelion_KIT_Z11ObservationChair", [.65, .76, 1.2])
+    box("Functional arm end pin", (x, .120, .634), (.016, .013, .012), gold, .002)
+chair = export("SM_Aurelion_KIT_Z11ConversationChair", [.65, .78, 1.2])
 manifest[-1].update(
     nominal_dimensions_m=[round(v, 6) for v in chair.dimensions],
     position_precision=10,
@@ -83,7 +113,10 @@ manifest[-1].update(
     collision="None: native hidden Z11_Chair seat/back remain the physical owners",
 )
 
-(ROOT / "manifest.json").write_text(json.dumps(dict(modules=manifest), indent=2))
+(ROOT / "manifest.json").write_text(json.dumps(dict(
+    reference="Docs/ArtReferences/AurelionArchitecture-2026-09-23/Z11-Conversation-Furniture.png",
+    placement_status="Refined versioned visuals for the existing seven Z11 furniture actors; native fallback geometry owns collision",
+    modules=manifest), indent=2))
 
 # Assemble the six-chair arrangement inside the editable source for art review.
 for x in (-2.5, 0, 2.5):

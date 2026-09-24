@@ -98,3 +98,20 @@ the room view is a silhouette and sightline constraint. This follows the
 August TDD's quiet-space rule against cluttered quest kiosks and chapter 26's
 intimate aftermath. No gameplay actor, collision, table, chair or story beat
 should be moved to match the generated image.
+
+## Z11 conversation furniture, 24 September
+
+The built-in image tool edited the *saved post-tablet* player-height Z11 room
+capture into [this furniture refinement reference](Z11-Conversation-Furniture.png)
+before revising the installed custom furniture meshes. The first output accidentally
+rotated the table's long side toward the window and was rejected. A second
+edit used that output for material detail and the saved Unreal frame for exact
+geometry: one 5 × 2 m table running left-to-right, three chairs on its near
+side and three on its far side, with all six existing locations retained.
+The reference requests layered polished black stone, beveled dressed ivory,
+functional gold joinery, a comfortable human-scale seat/back and structurally
+plausible supports. It follows the August TDD's quiet-space rule and the
+chapter-26 room brief, with the red remnant, closed Wound and cold-white
+remnant visible beyond. The inset is a construction/detail cue; the image is
+not dimensional proof and cannot override the saved map's collision or native
+scene staging.
