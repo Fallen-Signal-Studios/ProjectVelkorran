@@ -65,9 +65,12 @@ The rendered captures show no duplicate HUD or cinematic overlay. They also
 show a video-memory-over-budget warning while another Unreal editor remained
 open, so this run does not qualify target-PC performance.
 
-This is a room-scale visual improvement, not 90% TDD visual acceptance. A
-fresh post-fit CP0 interaction route, physical local-player movement around
-the chairs, packaged performance, lighting/material polish and audio remain
-open. The two preceding fresh tablet-route tests stopped at M12 E1 before
-entering this room. No further Higgsfield generation or production mesh was
-used for this pass.
+The later [post-fit fresh route](AurelionZ11PostFitFreshRoute-2026-09-24.md)
+passed from CP0 through separate departures on this exact saved M13 map. Its
+Z11 observation-room requests completed native held-input countdowns without
+focus reposition attempts, and the final journal retained all 35 receipts.
+This qualifies ordinary-input progression around the new visuals. It does not
+replace a physical keyboard/mouse comfort pass around the chairs or qualify
+packaged performance, lighting/material polish, audio or 90% TDD visual
+alignment. The two earlier tablet-route attempts had stopped at M12 E1.
+No further Higgsfield generation or production mesh was used for this pass.

@@ -49,9 +49,11 @@ M12 remained `64a4517bb88719694793a46ae859f0eb6fbc861eef10e956e0574d8962b844a4`.
 
 The tablets reduce the brightest visual clutter in Z11, but some still sit
 close to chair routes because their authored interaction locations are
-unchanged. Further player-eye movement, scene-prompt focus, packaged
-performance, lighting/material polish and the broader 90% TDD visual target
-need separate qualification.
+unchanged. The later [post-fit fresh route](AurelionZ11PostFitFreshRoute-2026-09-24.md)
+passed the full M12–M13 progression with the custom visuals installed; its
+Z11 held-input requests needed no focus reposition. Physical keyboard/mouse
+comfort around the chairs, packaged performance, lighting/material polish and
+the broader 90% TDD visual target still need separate qualification.
 
 The later [conversation furniture pass](AurelionZ11ConversationFurniture-2026-09-24.md)
 disabled Nanite on this tablet mesh because its small translucent view-glass

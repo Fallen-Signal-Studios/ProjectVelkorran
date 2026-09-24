@@ -46,6 +46,16 @@ path. The enemy observer had zero errors; entry and E1 protected asset hashes
 were unchanged. The M12 map still hashes to
 `64a4517bb88719694793a46ae859f0eb6fbc861eef10e956e0574d8962b844a4`.
 This proves the majority-shelter movement executes in live combat and does
-not block the authored victory/handoff. A single pass cannot establish a
-statistical improvement or qualify the later M12-to-M13 route, which remains
-open alongside human play feel and final encounter tuning.
+not block the authored victory/handoff. That first pass alone could not
+establish a statistical improvement or qualify the later M12-to-M13 route.
+
+A second post-change fresh profile,
+`Z11PostFitFreshRoute-20260924-082757-7266edc5`, passed E1 with three
+majority and six full-shelter moves, 1,979 attack frames and one native
+retry. Its eight follow-on drivers then passed all the way through M13
+separate departures on the saved post-fit gallery map. The
+[full-route report](AurelionZ11PostFitFreshRoute-2026-09-24.md) records those
+receipts. This adds a second live pass with majority-shelter movement and one
+full-route pass, while the earlier zero-cover and low-fire failures remain
+evidence that E1 play feel and reliability need a human playtest and further
+sampling before encounter tuning is considered settled.
