@@ -38,3 +38,24 @@ combat/performance test before placement. No 90% TDD alignment credit is
 claimed for this isolated review. All three editor scripts confirmed the
 current M12 map file was unchanged; the latest lit review run is
 `Z08PylonLitReview-20260923-171327-4c7c7c6d`.
+
+## Second authored pass and Unreal review
+
+The source now has carved conductor beds, separate gold and warm circuits
+around the annular instrument, 24 radial index marks, and twelve asymmetric
+attachment branches with fine scar veins. The clean structure is 59,196
+triangles and the removable Eclipse overlay is 6,520 triangles. The dimensions,
+two UV channels, five/four material slots and one/zero collision hulls remain
+as in the first import. A fresh Blender 4.5 export/import round trip passed
+`verify_z08_containment_pylon.py`.
+
+`Z08PylonIterationReview-20260923-174611-56cd8f95` reimported both meshes into
+the existing isolated Unreal art-review map. Its [lit engine capture](AurelionZ08ContainmentPylon-2026-09-23/engine-iteration-review.png)
+shows more legible instrument hierarchy and localized Eclipse attachment than
+the first pass. The stone is still too uniform, the organic mass lacks the
+reference's layered tissue detail, and the dark review setting masks fine
+surface relief. This remains a **candidate, not accepted AAA architecture**.
+The next visual gate is a better material and player-eye review against the
+actual Z08 wall and adjacent modular pieces, then collision/navigation,
+destruction suitability and combat performance. The script asserted the M12
+map SHA-256 remained `64A4517BB88719694793A46AE859F0EB6FBC861EEF10E956E0574D8962B844A4`.

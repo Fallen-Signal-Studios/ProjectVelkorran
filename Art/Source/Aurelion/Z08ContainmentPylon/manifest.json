@@ -9,7 +9,7 @@
   "modules": [
     {
       "asset": "SM_Aurelion_KIT_Z08ContainmentPylon",
-      "triangles": 49476,
+      "triangles": 59196,
       "nominal_dimensions_m": [
         3.94,
         2.215,
@@ -28,7 +28,7 @@
     },
     {
       "asset": "SM_Eclipse_KIT_Z08PylonGrowth",
-      "triangles": 5880,
+      "triangles": 6520,
       "nominal_dimensions_m": [
         1.5546,
         0.46271,

@@ -106,6 +106,35 @@ for i in range(16):
     x, z = .31+math.sin(a)*.96, 4.16+math.cos(a)*.96
     bolt('Bezel radial fastener', x, -1.012, z, .018)
 
+# The instrument grows out of a traced mechanism rather than sitting like a
+# decorative ring on a flat wall. Dark carved beds and separate fine gold
+# conductors fork around its circumference and reconnect at the crown.
+for side in (-1, 1):
+    route = [(.31+side*.33,-.846,.82),
+             (.31+side*.42,-.846,2.40),
+             (.31+side*1.13,-.846,3.28),
+             (.31+side*1.13,-.846,5.04),
+             (.31+side*.42,-.846,5.92),
+             (.31+side*.33,-.846,6.76)]
+    path('Deep instrument conductor bed',route,.115,.035,dark,.004)
+    path('Inset gold conductor',[(x,y-.039,z) for x,y,z in route],.026,.016,gold,.002)
+    path('Warm active conductor',[(x,y-.056,z) for x,y,z in route],.006,.009,light,.001)
+    # Secondary return through the stone flank follows the same engineering
+    # language without mirroring every small mark perfectly.
+    flank=[(.31+side*1.18,-.853,1.06),
+           (.31+side*1.18,-.853,2.70),
+           (.31+side*1.43,-.853,3.12),
+           (.31+side*1.43,-.853,5.18),
+           (.31+side*1.18,-.853,5.62),
+           (.31+side*1.18,-.853,6.86)]
+    path('Outer isolated circuit',flank,.055,.028,dark,.003)
+    path('Outer circuit gold line',[(x,y-.032,z) for x,y,z in flank],.011,.011,gold,.001)
+for i in range(24):
+    angle=i*math.tau/24
+    first=(.31+math.sin(angle)*.998,-1.018,4.16+math.cos(angle)*.998)
+    second=(.31+math.sin(angle)*1.095,-1.018,4.16+math.cos(angle)*1.095)
+    path('Annulus engraved radial index',[first,second],.018,.008,gold,.001)
+
 # Crown is layered, with a restrained central beacon. The outer shoulders are
 # asymmetrical only in their surface damage, not their structural support.
 for z, width, depth, height, mat in (
@@ -210,6 +239,20 @@ for x, y, z, radius in ((-1.58,-1.22,2.14,.055),(-1.32,-1.23,3.98,.047),
                          (-1.75,-1.18,5.61,.063),(-1.15,-1.16,6.47,.039)):
     nodule('Deep violet activity node', x, y, z,
            (radius,radius*.62,radius*1.25), violet)
+
+# Hairline attachment roots bind the broad tissue masses to their host stone.
+# They vary in direction and length, so the silhouette reads as a living breach
+# without spreading the infection across the clean instrument or right pier.
+for index in range(12):
+    z=1.02+index*.51
+    outward=index%3==0
+    root=(-1.54,-1.21,z)
+    mid=(-1.68 if outward else -1.25,-1.185,z+(.16 if index%2 else -.13))
+    tip=(-1.92 if outward else -.94,-1.075,z+(.39 if index%2 else -.31))
+    growth('Eclipse bonded branch '+str(index),[root,mid,tip],.022 if outward else .017)
+    if index in (2,5,8,11):
+        growth('Eclipse branch subdermal vein '+str(index),
+               [(x+.015,y-.016,z) for x,y,z in (root,mid,tip)],.004,scar)
 
 overlay = export('SM_Eclipse_KIT_Z08PylonGrowth', [1.5546, .46271, 7.00023])
 manifest[-1]['collision'] = 'None; visual overlay bonded to structural pylon'
