@@ -1,0 +1,21 @@
+{
+  "status": "round_trip_pass",
+  "asset": "SM_Aurelion_KIT_Z12ServiceRegister",
+  "triangles": 28488,
+  "dimensions_m": [
+    3.99,
+    0.249,
+    2.99
+  ],
+  "uv_channels": 2,
+  "materials": [
+    "M_Aurelion_IvoryStone",
+    "M_Aurelion_BlackStone",
+    "M_Aurelion_ChannelShadow",
+    "M_Aurelion_AncientGold",
+    "M_Aurelion_DarkSteel",
+    "M_Aurelion_LumenLens"
+  ],
+  "convex_hulls": 0,
+  "fbx_bytes": 749852
+}

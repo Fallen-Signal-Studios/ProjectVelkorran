@@ -27,6 +27,8 @@ The [berth bulkhead study](Z12-Berth-Bulkhead.png) guided two Blender service-wa
 
 The [open berth vista study](Z12-Open-Berth-Vistas.png) replaces that solid-wall direction with distant, sparse black-stone spires and ivory bridge fragments. It keeps the Dominion red remnant and Reformation white remnant in separate views with the closed Wound between them. The three custom Blender modules have been imported as reusable Unreal meshes, but their trial placement was too hidden by the shuttle canopy to save. Two restrained, noncolliding scenic remnant plates were saved behind the berths and checked in a fresh M13 load; their visibility and overall finish remain subject to live player and art review. No further Higgsfield generation was used for this pass.
 
+The [armored view module](Z12-Armored-View-Module.png) and [modular kit sheet](Aurelion-Modular-Kit-Sheet.png) also guided a rare custom service register sized to the existing Z12 side-wall coffer envelope. Eight lower visual coffers nearest the berth windows were replaced after an Unreal player-height preview; the native wall collision and open windows were retained. The [source and saved-map review](../Validation/AurelionZ12ServiceRegister-2026-09-23.md) records its current limits.
+
 ## Modeling constraints carried forward
 
 - **One ancient substrate:** ivory upper surfaces and polished black lower surfaces use related joints and functional gold conduits. Different scales and angles express a living mechanism, not repeated heraldry or faction ownership.

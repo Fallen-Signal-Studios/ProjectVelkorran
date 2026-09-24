@@ -1,0 +1,37 @@
+{
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z12ServiceRegister",
+      "triangles": 28488,
+      "nominal_dimensions_m": [
+        3.99,
+        0.249,
+        2.99
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_BlackStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_DarkSteel",
+        "M_Aurelion_LumenLens"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None: visual coffer replacement; native wall collision retained",
+      "preserve_fallback_geometry": true,
+      "wall_group": "Side",
+      "story_role": "Rare ancient berth-side service register; no gameplay interaction"
+    }
+  ],
+  "visual_envelope_m": [
+    3.99,
+    0.249,
+    2.99
+  ],
+  "source_references": [
+    "Docs/ArtReferences/AurelionArchitecture-2026-09-23/Z12-Armored-View-Module.png",
+    "Docs/ArtReferences/AurelionArchitecture-2026-09-23/Aurelion-Modular-Kit-Sheet.png"
+  ],
+  "placement": "Candidate for lower side coffers immediately flanking the two berth windows"
+}
