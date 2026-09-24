@@ -1,0 +1,42 @@
+{
+  "status": "round_trip_pass",
+  "meshes": [
+    {
+      "asset": "SM_Aurelion_KIT_Z08ContainmentPylon",
+      "dimensions_m": [
+        3.94,
+        2.215,
+        7.925
+      ],
+      "triangles": 49476,
+      "uv_layers": 2,
+      "convex_hulls": 1,
+      "materials": [
+        "M_Aurelion_PylonBlackStone",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_PylonWarmConduit"
+      ],
+      "bytes": 1197740
+    },
+    {
+      "asset": "SM_Eclipse_KIT_Z08PylonGrowth",
+      "dimensions_m": [
+        1.5546,
+        0.46271,
+        7.00023
+      ],
+      "triangles": 5880,
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "materials": [
+        "M_Eclipse_PylonTissue",
+        "M_Aurelion_PylonBlackStone",
+        "M_Eclipse_PylonScar",
+        "M_Eclipse_PylonInternalPulse"
+      ],
+      "bytes": 252108
+    }
+  ]
+}

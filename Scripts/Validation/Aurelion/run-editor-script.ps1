@@ -14,7 +14,7 @@ param(
     [switch]$ContinueRoute,
     [switch]$DisableAura,
     [switch]$UseFileSystemCache,
-    [ValidateSet('/Game/Aurelion/Maps/L_Aurelion_M12', '/Game/Aurelion/Maps/L_Aurelion_M13', '/Game/Aurelion/ArtReview/L_Aurelion_ArchitectureKit')]
+    [ValidateSet('/Game/Aurelion/Maps/L_Aurelion_M12', '/Game/Aurelion/Maps/L_Aurelion_M13', '/Game/Aurelion/ArtReview/L_Aurelion_ArchitectureKit', '/Game/Aurelion/ArtReview/L_Aurelion_Z08ContainmentPylon')]
     [string]$Map = '/Game/Aurelion/Maps/L_Aurelion_M12'
 )
 Set-StrictMode -Version Latest

@@ -1,0 +1,48 @@
+{
+  "status": "Source candidate; exported mesh, lighting and live route acceptance pending",
+  "reference": "Docs/ArtReferences/AurelionArchitecture-2026-09-23/Z08-Breached-Containment-Pylon-Higgsfield-Reference.png",
+  "guide_dimensions_m": [
+    3.94,
+    2.04,
+    8.0
+  ],
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z08ContainmentPylon",
+      "triangles": 49476,
+      "nominal_dimensions_m": [
+        3.94,
+        2.215,
+        7.925
+      ],
+      "materials": [
+        "M_Aurelion_PylonBlackStone",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_PylonWarmConduit"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 1,
+      "collision": "One fitted solid UCX envelope"
+    },
+    {
+      "asset": "SM_Eclipse_KIT_Z08PylonGrowth",
+      "triangles": 5880,
+      "nominal_dimensions_m": [
+        1.5546,
+        0.46271,
+        7.00023
+      ],
+      "materials": [
+        "M_Eclipse_PylonTissue",
+        "M_Aurelion_PylonBlackStone",
+        "M_Eclipse_PylonScar",
+        "M_Eclipse_PylonInternalPulse"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None; visual overlay bonded to structural pylon"
+    }
+  ]
+}

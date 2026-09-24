@@ -334,6 +334,12 @@ their next runtime check. A passing build alone does not close any gameplay row.
 - **Environment:** the departure lounge has custom walls, seats, and paving;
   shuttles and open canopy still need an authored fidelity and performance pass.
   Preserve native collision and the current saved-map baselines.
+  A [custom Z08 containment pylon source and isolated Unreal review](Validation/AurelionZ08ContainmentPylon-2026-09-23.md)
+  replace the unusable Higgsfield GLB as the production direction. The clean
+  structure and removable Eclipse growth imported with UVs, material slots,
+  Nanite and separate collision rules; the M12 map was unchanged. The lit
+  engine capture still needs a stronger stone/organic finish and real Z08
+  player-eye, collision, navigation and combat testing before campaign use.
 
 Current worktree contains user or other-session changes to M12, Tarrik's
 grenade, drone appearances, camera assets, and new architecture source. Treat
