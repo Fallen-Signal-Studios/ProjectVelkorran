@@ -31,12 +31,12 @@ M12 and M13 map hashes stayed at `23555516…` and `74db4902…`; no map was sav
 
 The dock screenshots show a coherent canopy around both shuttles and visible
 hanging lenses. They also show the present lighting is too dark for final
-acceptance, and the player-height view from the playable lounge meets the
-existing side wall before it can see the scenic dock. This kit is an authored
-source and imported mesh set, **not yet saved level dressing or a 90% TDD
-visual pass**. Further work should focus on the player-visible lounge and on
-cinematic dock views, with final materials, practical lighting, performance,
-moving-camera, PIE and gameplay clearance reviews before map integration.
+acceptance, and the player-height view from the playable lounge met the
+original full side wall. A later [guarded placement](Validation/AurelionZ12CanopyPlacement-2026-09-23.md)
+re-previewed the kit through the new Z12 viewports, then saved it to M13 and
+verified the 102 visual actors after reload. Practical lighting, performance,
+moving-camera and final art quality remain open; this is not a 90% TDD visual
+pass.
 
 Rebuild the source with Blender 4.5:
 

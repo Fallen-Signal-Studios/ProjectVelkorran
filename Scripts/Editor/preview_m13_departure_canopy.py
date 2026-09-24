@@ -31,15 +31,14 @@ materials = {key: dest + '/Materials/M_AurelionKit_' + name for key, name in {
     'M_Aurelion_LumenLens': 'UplightLens',
 }.items()}
 manifest = json.loads((source / 'manifest.json').read_text())
+placement = runpy.run_path(str(root / 'Scripts/Editor/aurelion_z12_canopy_plan.py'))
+planned = placement['plan'](manifest)
 meshes = {}
 for spec in manifest['modules']:
     assert spec['uv_layers'] == 2 and spec['convex_hulls'] == 0
     mesh = helper['import_owned_mesh'](spec, source, dest + '/Meshes', materials)
     meshes[spec['asset']] = mesh
 
-assembly = manifest['dock_assembly']
-assert assembly['berth_m'] == [28, 18]
-assert assembly['center_clear_lane_m'] >= 5
 created = []
 
 
@@ -54,29 +53,8 @@ def visual(name, mesh, position):
     return actor
 
 
-def height(x):
-    return 7.5 + 1.2 * (1.0 - (x / 13.2) ** 2)
-
-
-for dock, cx in (('Dominion', -3800), ('Reformation', 3800)):
-    for index, y in enumerate(assembly['rib_stations_y_m']):
-        name = 'SM_Aurelion_KIT_Z12CanopyTerminalRib' if index == 0 else 'SM_Aurelion_KIT_Z12CanopyVaultRib'
-        visual('PREVIEW_Z12_%s_Rib_%d' % (dock, index), meshes[name],
-               (cx, 47500 + y * 100, 0))
-        for side, x in enumerate(assembly['foot_x_m']):
-            visual('PREVIEW_Z12_%s_Foot_%d_%d' % (dock, index, side),
-                   meshes['SM_Aurelion_KIT_Z12CanopyBearingFoot'],
-                   (cx + x * 100, 47500 + y * 100, 0))
-    for i, x in enumerate(assembly['coffer_x_m']):
-        for j, y in enumerate(assembly['coffer_y_m']):
-            visual('PREVIEW_Z12_%s_Coffer_%d_%d' % (dock, i, j),
-                   meshes['SM_Aurelion_KIT_Z12CanopyCoffer_4x4'],
-                   (cx + x * 100, 47500 + y * 100, (height(x) + .13) * 100))
-    for i, x in enumerate(assembly['pendant_x_m']):
-        for j, y in enumerate(assembly['pendant_y_m']):
-            visual('PREVIEW_Z12_%s_Pendant_%d_%d' % (dock, i, j),
-                   meshes['SM_Aurelion_KIT_Z12CanopyPendant'],
-                   (cx + x * 100, 47500 + y * 100, (height(x) - .1) * 100))
+for row in planned:
+    visual('PREVIEW_' + row['label'], meshes[row['asset']], row['location'])
 
 assert helper['snapshot_actor_state'](existing) == original
 assert all(p.get_name() == '/Game/Aurelion/Maps/L_Aurelion_M13'
@@ -89,6 +67,9 @@ assert all(a.static_mesh_component.get_collision_enabled() == unreal.CollisionEn
 
 (out / 'canopy-preview.json').write_text(json.dumps(dict(
     status='unsaved_preview', instances=len(created), mesh_paths={k: v.get_path_name() for k, v in meshes.items()},
+    placement_sha256=placement['digest'](planned),
+    source_fbx_sha256={spec['asset']: hashlib.sha256((source / (spec['asset'] + '.fbx')).read_bytes()).hexdigest()
+                       for spec in manifest['modules']},
     map_hashes_before=maps, map_actor_state_preserved=True, no_preview_collision=True,
     design_reference=manifest['design_reference'],
 ), indent=2))
@@ -98,7 +79,11 @@ runpy.run_path(str(root / 'Scripts/Editor/preview_m13_route.py'), init_globals={
         ('dominion-arrival', (-3800, 46250, 200)),
         ('dominion-from-lounge', (-1250, 47600, 185)),
         ('reformation-arrival', (3800, 46250, 200)),
+        ('dominion-through-view', (0, 47500, 180)),
+        ('reformation-through-view', (0, 47500, 180)),
     ],
-    'M13_ROUTE_YAWS': {'dominion-arrival': 90, 'dominion-from-lounge': 180, 'reformation-arrival': 90},
-    'M13_ROUTE_PITCHES': {'dominion-arrival': 8, 'dominion-from-lounge': 7, 'reformation-arrival': 8},
+    'M13_ROUTE_YAWS': {'dominion-arrival': 90, 'dominion-from-lounge': 180, 'reformation-arrival': 90,
+                       'dominion-through-view': 180, 'reformation-through-view': 0},
+    'M13_ROUTE_PITCHES': {'dominion-arrival': 8, 'dominion-from-lounge': 7, 'reformation-arrival': 8,
+                          'dominion-through-view': 5, 'reformation-through-view': 5},
 })

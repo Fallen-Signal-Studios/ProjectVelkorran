@@ -331,9 +331,16 @@ their next runtime check. A passing build alone does not close any gameplay row.
   including a held static camera, with identical configured material paths in
   healthy and faulty runs. Root cause remains unknown. Next: compare actual
   face material inputs/VT sampling during a failing process.
-- **Environment:** the departure lounge has custom walls, seats, and paving;
-  shuttles and open canopy still need an authored fidelity and performance pass.
-  Preserve native collision and the current saved-map baselines.
+- **Environment:** the departure lounge has custom walls, seats, and paving.
+  The M13 map now also has two framed/glazed dock views and the authored Z12
+  canopy kit in both berths. Two warm/cool berth lights make the shuttles and
+  coffers readable through those views. The canopy's 102 visual actors and
+  two lights survived editor save/reload; two public earned CP9 loads after
+  each saved step preserved the 35-entry mission state and a single working
+  HUD. See [the canopy and light evidence](Validation/AurelionZ12CanopyPlacement-2026-09-23.md).
+  The star field, abrupt lounge ceiling, simple shuttle forms, grading and
+  target-hardware performance remain open. Preserve native collision and the
+  current saved-map baselines.
   A [custom Z08 containment pylon source and isolated Unreal review](Validation/AurelionZ08ContainmentPylon-2026-09-23.md)
   replace the unusable Higgsfield GLB as the production direction. The clean
   structure and removable Eclipse growth imported with UVs, material slots,
