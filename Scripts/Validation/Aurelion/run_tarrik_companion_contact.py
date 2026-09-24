@@ -8,6 +8,11 @@ import unreal
 
 here = Path(__file__).resolve().parent
 sys.path.insert(0, str(here))
+contribution = None
+if os.environ.get('SOV_E4A_COMPANION_AUDIT') == '1':
+    import observe_companion_contribution
+    contribution = observe_companion_contribution.start(
+        Path(os.environ['SOV_AURELION_RUN_DIRECTORY']) / 'companion-contribution.json')
 os.environ.setdefault('SOV_EARNED_COMPANION_SAVE_DIRECTORY', str(Path(unreal.Paths.project_dir()) /
     'Saved/Validation/Aurelion/CampaignQualityRoute-20260919-180911-b8ff8cfb/UserData/Saved/SaveGames'))
 os.environ['SOV_CONTACT_BOUNDARY'] = 'M12_E4_QuarantineCrucibleA'
@@ -30,6 +35,8 @@ def monitor(delta):
         if contact._RUN.handle is not None:
             contact._RUN.stop('E4A driver finished; see its separate route outcome')
     if ended is None:
+        if contribution is not None:
+            contribution.stop('Earned E4A review ended')
         ended = time.monotonic()
         unreal.get_editor_subsystem(unreal.LevelEditorSubsystem).editor_request_end_play()
     elif time.monotonic() - ended > 2:

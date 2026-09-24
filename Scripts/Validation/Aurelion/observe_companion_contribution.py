@@ -4,6 +4,7 @@ This observer never requests commands, injects input, changes damage or moves ac
 It rebinds after a native checkpoint-world replacement so retries stay observable.
 """
 import json
+import os
 import time
 import traceback
 import unreal
@@ -24,6 +25,7 @@ class Observer:
         self.pawn = None
         self.companion = None
         self.bindings = []
+        self.attack_capture_requested = False
         self.report = dict(read_only=True, status='observing', worlds=[], damage=[], samples=[], errors=[])
         self.handle = unreal.register_slate_post_tick_callback(self.safe_tick)
 
@@ -104,6 +106,17 @@ class Observer:
             camera_distance_to_companion=round((eye-companion.get_actor_location()).length(),1) if eye else None,
             companion_capsule_camera_response=str(capsule.get_collision_response_to_channel(unreal.CollisionChannel.cast(4))) if capsule else None,
             opening_contribution=companion.get_companion_component().is_in_opening_contribution()))
+        if (os.environ.get('SOV_COMPANION_CAPTURE') == '1'
+                and not self.attack_capture_requested and montage
+                and 'VerityTwin' in montage.get_path_name() and eye
+                and 300. <= (eye-companion.get_actor_location()).length() <= 900.):
+            self.attack_capture_requested = True
+            capture = self.output.parent / 'selene-twin-blade-combat.png'
+            unreal.SystemLibrary.execute_console_command(world,
+                'Shot showui -nosuffix filename=' + str(capture).replace('\\', '/'))
+            self.report['capture_requested'] = dict(path=str(capture),
+                elapsed=round(now-self.started, 3), montage=ref(montage),
+                camera_distance_cm=round((eye-companion.get_actor_location()).length(), 1))
         if now-self.last_write >= 1.:
             self.last_write = now
             self.write()

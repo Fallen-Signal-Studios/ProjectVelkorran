@@ -1,0 +1,43 @@
+{
+  "status": "round_trip_pass",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z12BerthBulkheadPlain",
+      "triangles": 13536,
+      "dimensions_m": [
+        4.15,
+        0.7815,
+        7.57
+      ],
+      "uv_channels": 2,
+      "materials": [
+        "M_Aurelion_BlackStone",
+        "M_Aurelion_DarkSteel",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_LumenLens"
+      ],
+      "bytes": 336540
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z12BerthBulkheadService",
+      "triangles": 22124,
+      "dimensions_m": [
+        4.15,
+        0.7815,
+        7.57
+      ],
+      "uv_channels": 2,
+      "materials": [
+        "M_Aurelion_BlackStone",
+        "M_Aurelion_DarkSteel",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_LumenLens"
+      ],
+      "bytes": 544460
+    }
+  ]
+}
