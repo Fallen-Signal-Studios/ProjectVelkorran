@@ -1,5 +1,13 @@
 # Built-in image-generation prompts
 
+## Z12 departure and armored view briefs (23 September)
+
+These two later images were also generated with the built-in image tool as new bitmap concepts. Their working briefs were based on the local layout PDF pp. 5 and 15, Origins chapter 26 printed pp. 543–545, the existing M13 map and the first earned-CP9 player capture. The briefs below preserve the design request; they are not dimensioned construction drawings.
+
+**Departure concourse:** Show a buildable 42 × 24 m Aurelion common departure concourse from player height, with a clear central route separating the warm western Dominion berth from the cold eastern Reformation berth. Ancient lower polished black stone, ivory structural surfaces and thin functional gold conduits should form one custom architectural family. Frame two distinct, physically protected side views; beyond them imply the red and white remnants and the closed black Wound between. Keep the ending quiet and voluntary, with no new combat, text, HUD or outdoor terrain. Include human scale, restrained faction light and detailed modular joints.
+
+**Armored view module:** Show one close architectural module suitable for modeling as an 8 × 6 m Aurelion Z12 wall insert: a deep load-bearing ivory/black/gold frame, two protected glass panels divided by a substantial central mullion, machined glazing seals, layered coffers, narrow functional luminous contacts, detailed stone courses and credible material thickness. Match the departure-concourse design language, leave its physical boundary legible, and present it as a premium next-generation game environment object study without text or HUD.
+
 The original six final images were made with the built-in image tool. Each asset used a separate prompt. The Selene route also used one targeted correction, documented below. A later Z08 pylon reference used an additional targeted correction. No PDF page or manuscript illustration was passed to the generator as an input image; the written sources were read and distilled into these prompts.
 
 ## Z08 breached containment pylon for Higgsfield

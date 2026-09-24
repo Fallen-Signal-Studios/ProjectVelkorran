@@ -1,0 +1,54 @@
+{
+  "status": "round_trip_pass",
+  "meshes": [
+    {
+      "asset": "SM_Aurelion_KIT_Z12ArmoredViewFrame_8x6",
+      "triangles": 43240,
+      "dimensions_m": [
+        8.0,
+        0.733,
+        6.0
+      ],
+      "materials": [
+        "M_Aurelion_ViewBlackStone",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_ViewWarmConduit"
+      ],
+      "uv_channels": 2,
+      "bytes": 1002092
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z12ArmoredViewPane_8x6",
+      "triangles": 376,
+      "dimensions_m": [
+        6.38,
+        0.035,
+        4.6
+      ],
+      "materials": [
+        "M_Aurelion_ViewGlass"
+      ],
+      "uv_channels": 2,
+      "bytes": 25324
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z12ArmoredViewMullion_6m",
+      "triangles": 10716,
+      "dimensions_m": [
+        1.2,
+        1.61,
+        6.0
+      ],
+      "materials": [
+        "M_Aurelion_ViewBlackStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_channels": 2,
+      "bytes": 267788
+    }
+  ]
+}

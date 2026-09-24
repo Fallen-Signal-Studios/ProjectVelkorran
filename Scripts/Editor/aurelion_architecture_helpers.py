@@ -48,7 +48,8 @@ def import_owned_mesh(spec,source,destination,materials):
     extent=mesh.get_bounds().box_extent
     assert all(abs(a-b*100)<1 for a,b in zip((extent.x*2,extent.y*2,extent.z*2),spec['nominal_dimensions_m']))
     mesh.set_editor_property('light_map_coordinate_index',1)
-    nanite=sm.get_nanite_settings(mesh); nanite.set_editor_property('enabled',True)
+    nanite=sm.get_nanite_settings(mesh)
+    nanite.set_editor_property('enabled',spec.get('nanite_enabled',True))
     if 'position_precision' in spec:
         nanite.set_editor_property('position_precision',spec['position_precision'])
     if spec.get('preserve_fallback_geometry',False):
