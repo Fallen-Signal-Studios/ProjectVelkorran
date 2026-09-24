@@ -1,0 +1,43 @@
+{
+  "status": "round_trip_pass",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z12ConcourseCeiling_A",
+      "triangles": 18612,
+      "dimensions_m": [
+        6.0,
+        6.0,
+        0.8
+      ],
+      "uv_channels": 2,
+      "materials": [
+        "M_Aurelion_ViewBlackStone",
+        "M_Aurelion_ViewIvory",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_CeilingContact"
+      ],
+      "bytes": 439596
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z12ConcourseCeiling_B",
+      "triangles": 18612,
+      "dimensions_m": [
+        6.0,
+        6.0,
+        0.8
+      ],
+      "uv_channels": 2,
+      "materials": [
+        "M_Aurelion_ViewBlackStone",
+        "M_Aurelion_ViewIvory",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_CeilingContact"
+      ],
+      "bytes": 445164
+    }
+  ]
+}

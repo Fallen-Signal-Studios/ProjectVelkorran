@@ -338,9 +338,15 @@ their next runtime check. A passing build alone does not close any gameplay row.
   two lights survived editor save/reload; two public earned CP9 loads after
   each saved step preserved the 35-entry mission state and a single working
   HUD. See [the canopy and light evidence](Validation/AurelionZ12CanopyPlacement-2026-09-23.md).
-  The star field, abrupt lounge ceiling, simple shuttle forms, grading and
-  target-hardware performance remain open. Preserve native collision and the
-  current saved-map baselines.
+  The simple shuttle forms, grading and target-hardware performance remain
+  open. Preserve native collision and the current saved-map baselines.
+  A subsequent [custom concourse ceiling pass](Validation/AurelionZ12ConcourseCeiling-2026-09-23.md)
+  replaced the short 22-panel, noncolliding roof strip with 28 measured 6 m
+  custom bays across the full 42 × 24 m room. Saved editor views show the
+  star-field gap closed without hiding either berth view. The map save and
+  reload retained all other actor transforms and collision. Two earned CP9
+  PIE loads preserved the mission state, player control and one HUD. Final
+  player movement, lighting and performance checks remain open.
   A [custom Z08 containment pylon source and isolated Unreal review](Validation/AurelionZ08ContainmentPylon-2026-09-23.md)
   replace the unusable Higgsfield GLB as the production direction. The clean
   structure and removable Eclipse growth imported with UVs, material slots,

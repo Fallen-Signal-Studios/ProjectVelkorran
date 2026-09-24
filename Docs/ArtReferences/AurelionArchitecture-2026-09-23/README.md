@@ -19,6 +19,8 @@ The original layout PDF already contains four concepts (PDF pages 21–24: Wound
 
 The [armored view module](Z12-Armored-View-Module.png) is a closer 8 × 6 m bay reference derived from the departure study and M13 side-wall fit audit. The in-engine candidate retains the original invisible wall and rib collision while replacing only central visual coffers. Its painted microdetail and distant scenic lighting remain aspirational.
 
+The [concourse ceiling study](Z12-Concourse-Ceiling.png) precedes a measured 7 × 4 grid of 6 m roof bays. A read-only M13 audit found only 22 generic, noncolliding roof panels over a short south strip, leaving the rest of the 42 × 24 m concourse open to the star field. The study proposes a complete interior roof with alternating black-stone coffers, ivory structural beams and restrained functional gold. Its rendered windows and atmospheric finish remain illustrative rather than map evidence.
+
 ## Modeling constraints carried forward
 
 - **One ancient substrate:** ivory upper surfaces and polished black lower surfaces use related joints and functional gold conduits. Different scales and angles express a living mechanism, not repeated heraldry or faction ownership.
