@@ -1,0 +1,19 @@
+{
+  "status": "round_trip_pass",
+  "asset": "SM_Aurelion_KIT_Z11ObservationPierCladding",
+  "triangles": 23500,
+  "uv_channels": 2,
+  "materials": [
+    "M_Aurelion_IvoryStone",
+    "M_Aurelion_ObservationBlackStone",
+    "M_Aurelion_ChannelShadow",
+    "M_Aurelion_AncientGold"
+  ],
+  "dimensions_m": [
+    1.247,
+    1.378,
+    5.935
+  ],
+  "collision_hulls": 0,
+  "fbx_bytes": 541724
+}

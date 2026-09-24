@@ -71,3 +71,15 @@ The built-in image tool generated [this focused reference](Z11-Observation-Ceili
 ## Modular kit sheet
 
 > Use case: stylized-concept. Asset type: AAA modular environment kit architecture reference sheet for Sovereign Call: Origins Aurelion M12–M13, derived from the 7 Sep level layout, Origins chapters 24–26, and August TDD's King-era white stone, functional gold, living responsive geometry. Create a high-end game art design sheet on a quiet charcoal studio background with distinct separated modular OBJECT STUDIES, not a playable scene and not labeled: (1) upper ivory stone straight wall bay with recessed narrow gold information channel and engineered seams, (2) matching angled corner wall bay, (3) soaring load-bearing structural rib/column segment, (4) straight floor tile and angled floor transition tile, (5) wide safe bridge span with integrated guardrail and understructure, (6) low and tall NONSTRUCTURAL breakaway cover units with believable fractured stone sections and internal mechanical cores, (7) gold conduit junction that can turn a corner and change scale, (8) lower polished black-stone wall/floor transition module with very narrow angular gold inlay, (9) one small localized black Eclipse growth overlay following an existing conduit while leaving nearby surfaces clean. Show each piece as premium physically based 3D concept render in consistent three-quarter orthographic-like view, with believable thickness, assembly seams, gold as functional circuitry rather than decoration, subtle age and refined material microtexture. Pieces should clearly look like one original ancient construction system at different scales, architecturally distinctive and feasible to model as a custom kit. No characters, no weapons, no faction heraldry, no gothic arches, no temple reliefs, no text, no measurements, no numerals, no UI, no packaging frames.
+
+## Z11 central observation pier, 24 September
+
+The built-in image tool edited the saved Unreal Z11 ceiling review frame into
+[a focused pier cladding reference](Z11-Observation-Pier.png) before any new
+mesh was authored. It preserves the panoramic red/Wound/white view and the
+existing ceiling. The request was for a narrow, buildable visual shell around
+the retained structural pier: age-polished ivory, a black-stone inset, keyed
+dark-metal joinery, fine functional gold channels, and carefully joined floor
+and roof ends. The isolated close-up is a design study, not a dimensioned
+replacement for measured engine geometry. No new window obstruction, symbols,
+people, HUD or text were requested.

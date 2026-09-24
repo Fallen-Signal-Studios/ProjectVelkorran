@@ -1,0 +1,35 @@
+{
+  "reference": "Docs/ArtReferences/AurelionArchitecture-2026-09-23/Z11-Observation-Pier.png",
+  "survey": "Saved/Validation/Aurelion/Z11PierSurveyWide-20260924-053530-80677523/z11-pier-survey.json",
+  "placement_status": "Source candidate: Unreal fit and player-height review required",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z11ObservationPierCladding",
+      "triangles": 23500,
+      "nominal_dimensions_m": [
+        1.247,
+        1.378,
+        5.935
+      ],
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ObservationBlackStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None: existing Z11_Rib_1_-1 cube remains sole structural collision",
+      "measured_native_envelope_m": [
+        1.0,
+        1.2,
+        6.0
+      ],
+      "authored_max_footprint_m": [
+        1.25,
+        1.38
+      ],
+      "preserve_fallback_geometry": true
+    }
+  ]
+}

@@ -355,6 +355,7 @@ class Run(entry.Run):
         self.hold_seconds = float(component.interaction_time)
         self.hold_started = unreal.GameplayStatics.get_time_seconds(self.world)
         self.saw_countdown, self.request_result = False, None
+        self.hold_input_frames_before = self.report['input_frames'].get('IA_Interact', 0)
         if kind == 'scene':
             beat = self.scene_beat
             def result(accepted, message):
@@ -379,16 +380,29 @@ class Run(entry.Run):
         if 0. < remaining <= self.hold_seconds+.001:
             self.saw_countdown = True
         is_door = self.phase == 'hold_door'
+        # A cinematic can change phase during a hitch without a Python tick in
+        # the 0.35 s hold window. Its phase alone does not prove this request
+        # was activated; require the request's own pending state or result.
         accepted = (self.door.get_transit_state() != unreal.SovWorldTransitState.AT_ORIGIN if is_door else
-                    self.hold_actor.is_request_pending() or self.request_result is not None
-                    or self.scene_component.get_phase() != unreal.SovCinematicPhase.IDLE)
+                    self.hold_actor.is_request_pending() or self.request_result is not None)
         if accepted:
             self.inject()
-            assert self.saw_countdown, 'Native ordinary hold countdown was not observed'
+            input_frames = self.report['input_frames'].get('IA_Interact', 0)-self.hold_input_frames_before
+            held_game_seconds = unreal.GameplayStatics.get_time_seconds(self.world)-self.hold_started
+            # If the native hold finished between Slate samples, its accepted
+            # request, sufficient elapsed game time and our actual input frames
+            # still establish the ordinary held action. Record that distinct
+            # evidence rather than inventing an observed countdown.
+            accepted_after_held_input = (not is_door and self.request_result is not None
+                and self.request_result['accepted'] and input_frames > 0
+                and held_game_seconds >= self.hold_seconds-.02)
+            assert self.saw_countdown or accepted_after_held_input, (
+                'Native ordinary hold lacked countdown and accepted held-input evidence')
             if self.request_result is not None:
                 assert self.request_result['accepted'], 'Scene rejected: '+self.request_result['message']
-            self.report['holds'].append(dict(beat=self.hold_beat, seconds=self.hold_seconds, native_countdown=True,
-                input_game_seconds=unreal.GameplayStatics.get_time_seconds(self.world)-self.hold_started,
+            self.report['holds'].append(dict(beat=self.hold_beat, seconds=self.hold_seconds,
+                native_countdown=bool(self.saw_countdown), accepted_after_held_input=bool(accepted_after_held_input),
+                interact_input_frames=input_frames, input_game_seconds=held_game_seconds,
                 actor=_path(self.hold_actor)))
             self.stage('wait_door' if is_door else 'wait_scene')
         else:
