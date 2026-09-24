@@ -29,6 +29,10 @@ The [open berth vista study](Z12-Open-Berth-Vistas.png) replaces that solid-wall
 
 The [armored view module](Z12-Armored-View-Module.png) and [modular kit sheet](Aurelion-Modular-Kit-Sheet.png) also guided a rare custom service register sized to the existing Z12 side-wall coffer envelope. Eight lower visual coffers nearest the berth windows were replaced after an Unreal player-height preview; the native wall collision and open windows were retained. The [source and saved-map review](../Validation/AurelionZ12ServiceRegister-2026-09-23.md) records its current limits.
 
+The [berth clerestory concept](Z12-Berth-Clerestory-Concept.png) was generated **after** a six-frame Unreal test showed that moving or rotating the shuttles cannot recover the intended remnant views. It uses the current Dominion player-height capture as a geometry anchor and the open-berth study as style direction. The proposed upper glazed band and thin crossbar are **not** present in the map. The image is a visual target for a measured roof/wall audit and custom structural kit, not proof that a new opening fits the existing physical roof or collision. See [the sightline comparison](../Validation/AurelionZ12BerthSightline-2026-09-23.md).
+
+The later roof-edge FBX preview did not deliver that painted opening: the live camera saw a dark upper band. It was rejected and archived outside the shipped content. The measured [sovereign oculus ceiling module](../Validation/AurelionZ12SovereignOculus-2026-09-24.md) instead replaces two visible, noncolliding approach-bay ceiling tiles with custom layered geometry. This is a limited in-engine architectural improvement, not completion of the departure-vista study.
+
 ## Modeling constraints carried forward
 
 - **One ancient substrate:** ivory upper surfaces and polished black lower surfaces use related joints and functional gold conduits. Different scales and angles express a living mechanism, not repeated heraldry or faction ownership.

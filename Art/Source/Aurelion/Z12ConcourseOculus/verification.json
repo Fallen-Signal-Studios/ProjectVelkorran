@@ -1,0 +1,23 @@
+{
+  "status": "round_trip_pass",
+  "asset": "SM_Aurelion_KIT_Z12SovereignOculus_6m",
+  "triangles": 34464,
+  "dimensions_m": [
+    5.99,
+    5.99,
+    0.777
+  ],
+  "min_z_m": 0.023,
+  "max_z_m": 0.8,
+  "uv_channels": 2,
+  "materials": [
+    "M_Aurelion_BlackStone",
+    "M_Aurelion_ChannelShadow",
+    "M_Aurelion_IvoryStone",
+    "M_Aurelion_AncientGold",
+    "M_Aurelion_LumenLens"
+  ],
+  "convex_hulls": 0,
+  "degenerate_polygons": 0,
+  "fbx_bytes": 844972
+}
