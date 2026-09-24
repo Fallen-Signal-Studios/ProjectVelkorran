@@ -1,0 +1,38 @@
+{
+  "source": "Blender 4.5 editable procedural module",
+  "design_reference": "Docs/ArtReferences/AurelionArchitecture-2026-09-24/Z12-Open-Canopy-Reference.png",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z12OpenCanopySideGirder",
+      "triangles": 16356,
+      "nominal_dimensions_m": [
+        1.69,
+        4.217,
+        0.7405
+      ],
+      "materials": [
+        "M_Aurelion_DarkSteel",
+        "M_Aurelion_BlackStone",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None: visual side girder; existing physical dock remains authoritative",
+      "preserve_fallback_geometry": true,
+      "purpose": "Join existing bearing feet and carry existing pendant without covering remnant vista"
+    }
+  ],
+  "placement": {
+    "stations_per_side": 4,
+    "station_span_m": 4.15,
+    "bearing_x_m": [
+      -13.2,
+      13.2
+    ],
+    "pendant_offset_x_m": 0.65,
+    "base_z_m": 7.5,
+    "visual_only": true
+  }
+}

@@ -1,0 +1,5 @@
+# Z12 open-canopy visual target
+
+`Z12-Open-Canopy-Reference.png` is an image-generated architectural direction study based on the actual M13 west/east fixed player-eye captures with the opaque scenic canopy temporarily hidden. It was made before the custom side-girder source. The red Dominion and white Reformation backgrounds follow the August 2026 TDD's M13 convergence/retreat staging and the chapter 26 remnant relationship cited in the [open-vista validation](../../Validation/AurelionZ12OpenVista-2026-09-23.md).
+
+The study is **aspirational**. It enlarges the exterior spires, flying bridges and upper exposure well beyond current M13 geometry; it is not a render of implemented gameplay. The approved scope of the first pass is the sparse side support for existing canopy feet and pendant lights, preserving the two visible remnant plates and the saved shuttles. Compare the actual before/after in [sparse-canopy validation](../../Validation/AurelionZ12SparseCanopy-2026-09-24.md) before claiming visual alignment.

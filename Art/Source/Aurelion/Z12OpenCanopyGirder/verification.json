@@ -1,0 +1,23 @@
+{
+  "status": "round_trip_pass",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z12OpenCanopySideGirder",
+      "triangles": 16356,
+      "dimensions_m": [
+        1.69,
+        4.217,
+        0.7405
+      ],
+      "uv_channels": 2,
+      "materials": [
+        "M_Aurelion_DarkSteel",
+        "M_Aurelion_BlackStone",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow"
+      ],
+      "bytes": 409116
+    }
+  ]
+}
