@@ -21,6 +21,8 @@ The [armored view module](Z12-Armored-View-Module.png) is a closer 8 × 6 m bay 
 
 The [concourse ceiling study](Z12-Concourse-Ceiling.png) precedes a measured 7 × 4 grid of 6 m roof bays. A read-only M13 audit found only 22 generic, noncolliding roof panels over a short south strip, leaving the rest of the 42 × 24 m concourse open to the star field. The study proposes a complete interior roof with alternating black-stone coffers, ivory structural beams and restrained functional gold. Its rendered windows and atmospheric finish remain illustrative rather than map evidence.
 
+The [paired departure shuttle detail study](Z12-Departure-Shuttles-Detail.png) establishes separate Dominion and Reformation silhouettes, mechanically layered skins, landing gear and hatch/nacelle detail before revising the first-pass scenic shuttle exteriors. It is a concept reference only; ramps and interior glimpses are outside the static M13 dressing scope, and the real 28 × 18 m dock fit remains controlling.
+
 ## Modeling constraints carried forward
 
 - **One ancient substrate:** ivory upper surfaces and polished black lower surfaces use related joints and functional gold conduits. Different scales and angles express a living mechanism, not repeated heraldry or faction ownership.

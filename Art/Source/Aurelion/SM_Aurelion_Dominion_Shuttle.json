@@ -1,9 +1,9 @@
 {
   "asset": "SM_Aurelion_Dominion_Shuttle",
-  "triangles": 5124,
+  "triangles": 37884,
   "dimensions_metres": [
     16.600000381469727,
-    14.02750015258789,
+    14.732999801635742,
     4.924999713897705
   ],
   "pivot": "bottom centre",
@@ -12,12 +12,12 @@
   "materials": {
     "M_Dominion_Armor": {
       "rgb": [
-        0.22,
-        0.032,
-        0.024
+        0.095,
+        0.015,
+        0.02
       ],
       "metal": 0.65,
-      "rough": 0.32,
+      "rough": 0.39,
       "emission": 0
     },
     "M_Dominion_Trim": {
@@ -61,5 +61,5 @@
       "emission": 2
     }
   },
-  "fbx_sha256": "671d2b63537d97b5981fd52dbdf1864c2ebbe6609f8a6b83e2f560d9dd0739a7"
+  "fbx_sha256": "0cfb595b6cb10f4a242c4dd9cc89a6eb0a94168d3f4962b41f5aed97e2e2ea2b"
 }

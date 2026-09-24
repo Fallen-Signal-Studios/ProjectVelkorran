@@ -1,9 +1,9 @@
 {
   "asset": "SM_Aurelion_Reformation_Shuttle",
-  "triangles": 5532,
+  "triangles": 38748,
   "dimensions_metres": [
     15.388686180114746,
-    13.600000381469727,
+    14.152999877929688,
     4.625
   ],
   "pivot": "bottom centre",
@@ -12,12 +12,12 @@
   "materials": {
     "M_Reformation_Armor": {
       "rgb": [
-        0.032,
-        0.065,
-        0.105
+        0.023,
+        0.039,
+        0.064
       ],
       "metal": 0.65,
-      "rough": 0.32,
+      "rough": 0.39,
       "emission": 0
     },
     "M_Reformation_Trim": {
@@ -61,5 +61,5 @@
       "emission": 2
     }
   },
-  "fbx_sha256": "23d8a7746641537220b61c0a9910aff493d6d97bf8828187b221eb948266b287"
+  "fbx_sha256": "f4e875ce1cfb6826d6cdbad2a22cb912935a19253d3e9b1ad9ffe147133edfba"
 }

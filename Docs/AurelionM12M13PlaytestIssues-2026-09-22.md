@@ -353,6 +353,18 @@ their next runtime check. A passing build alone does not close any gameplay row.
   Nanite and separate collision rules; the M12 map was unchanged. The lit
   engine capture still needs a stronger stone/organic finish and real Z08
   player-eye, collision, navigation and combat testing before campaign use.
+  The [paired shuttle refinement](Validation/AurelionM13ShuttleRefinement-2026-09-23.md)
+  adds tapered prows, forward glazing and panel/mechanical detail to both
+  static scenic exteriors after a new image reference. It reimported the two
+  meshes and corrected two shuttle-only armor palettes without saving M13.
+  Close player-eye and dock captures were reviewed; from the concourse the
+  protected mullion and berth distance still hide most detail, so the ships
+  remain short of hero-asset quality. The full visible CP0→separate-departures
+  route `FreshM12M13PostZ12Roof-20260923-194506-6461e714` passed all eight
+  continuation stages on the saved roof map. After the shuttle revision,
+  `PostRoofShuttleEarnedCP9-20260923-203111-696c1276` passed two public loads
+  from that exact route's earned banks, preserving 35 receipts and one HUD.
+  A full post-shuttle route and target-PC combat performance remain open.
 
 Current worktree contains user or other-session changes to M12, Tarrik's
 grenade, drone appearances, camera assets, and new architecture source. Treat

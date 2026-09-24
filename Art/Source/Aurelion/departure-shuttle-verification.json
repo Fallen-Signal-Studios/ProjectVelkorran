@@ -1,0 +1,40 @@
+{
+  "status": "PASS",
+  "fresh_fbx_import": true,
+  "shuttles": [
+    {
+      "asset": "SM_Aurelion_Dominion_Shuttle",
+      "dimensions_metres": [
+        16.600000381469727,
+        14.732999801635742,
+        4.924999713897705
+      ],
+      "triangles": 37884,
+      "material_slots": [
+        "M_Dominion_Armor",
+        "M_Dominion_Glass",
+        "M_Dominion_Signal",
+        "M_Dominion_Structure",
+        "M_Dominion_Trim"
+      ],
+      "uv_channels": 2
+    },
+    {
+      "asset": "SM_Aurelion_Reformation_Shuttle",
+      "dimensions_metres": [
+        15.388686180114746,
+        14.152999877929688,
+        4.625
+      ],
+      "triangles": 38748,
+      "material_slots": [
+        "M_Reformation_Armor",
+        "M_Reformation_Glass",
+        "M_Reformation_Signal",
+        "M_Reformation_Structure",
+        "M_Reformation_Trim"
+      ],
+      "uv_channels": 2
+    }
+  ]
+}

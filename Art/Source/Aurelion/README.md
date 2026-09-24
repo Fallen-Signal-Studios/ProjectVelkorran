@@ -47,6 +47,8 @@ material slots. Placement preserves the original physical actors and hides only
 the isolated 112-instance old ship dressing component; the adjacent 60-instance
 stone component remains visible. Original hidden cube actors are retained.
 
+The September 23 detail revision follows the [paired generated reference](../../../Docs/ArtReferences/AurelionArchitecture-2026-09-23/Z12-Departure-Shuttles-Detail.png): both source hulls gained tapered prows, forward glazing, layered armor and landing/nacelle fittings while retaining their dock envelopes and zero collision. `verify_departure_shuttles.py` round-trips both current FBXs through fresh Blender import and checks the two UV channels, five material slots, dimensions and triangle counts. The [engine review](../../../Docs/Validation/AurelionM13ShuttleRefinement-2026-09-23.md) distinguishes this incremental improvement from final hero quality.
+
 These are first-pass exterior assets, not final hero-asset acceptance. Cockpit,
 surface detail, rear lighting, central approach composition, boarding/flight
 animation and earned-route cinematic review remain open. See
