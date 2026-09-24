@@ -420,12 +420,54 @@ bool FSovCompanionEncounterHeldFocusTest::RunTest(const FString& Parameters)
         AI->GetFocusActor(), static_cast<AActor*>(Ordinary));
     TestTrue(TEXT("First combat focus starts an eight-second opening allowance after travel"),
         Component->IsInOpeningContribution());
+    Held->GetNarrativeAbilitySystemComponent()->RemoveLooseGameplayTag(FSovGameplayTags::Get().State_Target_Unfinishable);
+    Held->GetNarrativeAbilitySystemComponent()->AddLooseGameplayTag(FNarrativeGameplayTags::Get().State_Invulnerable);
+    Component->TickContextCommand(Goal);
+    TestEqual(TEXT("Narrative invulnerability also yields autonomous focus to the ordinary hostile"),
+        AI->GetFocusActor(), static_cast<AActor*>(Ordinary));
     Ordinary->GetNarrativeAbilitySystemComponent()->AddLooseGameplayTag(FSovGameplayTags::Get().State_Target_Unfinishable);
     Component->TickContextCommand(Goal);
     TestEqual(TEXT("Nearest held hostile remains a fallback when both are held"),
         AI->GetFocusActor(), static_cast<AActor*>(Held));
     F.World->TimeSeconds += Component->OpeningContributionSeconds + .1f;
     TestFalse(TEXT("First-focus allowance closes without another scope reset"), Component->IsInOpeningContribution());
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSovCompanionInvulnerableAttackTest,
+    "ProjectVelkorran.Campaign.Companion.InvulnerableFallbackNeverConsumesAttack",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FSovCompanionInvulnerableAttackTest::RunTest(const FString& Parameters)
+{
+    FTerminalWorld F; if (!TestNotNull(TEXT("Ready managed player"), F.ASC)) { return false; }
+    F.Mission->AllowedCompanionIds.Add(TEXT("Tarrik"));
+    auto* NPC = F.World->SpawnActor<ASovCompanionCommandTestProxy>(); NPC->InitializeCommandCombat();
+    NPC->SetActorLocation(F.Player->GetActorLocation() + FVector(0, -400, 0));
+    auto* AI = F.World->SpawnActor<ASovCoActionTestNPCController>(); AI->Possess(NPC);
+    CastChecked<USovCoActionTestActivities>(AI->GetActivityComponent())->InitializeForCoAction();
+    auto* Target = F.World->SpawnActor<ASovCoActionTestNPC>(); Target->InitializeTestCombat(1);
+    Target->SetActorLocation(NPC->GetActorLocation() + FVector(300, 0, 0));
+    auto* TargetASC = Target->GetNarrativeAbilitySystemComponent();
+    TargetASC->AddLooseGameplayTag(FNarrativeGameplayTags::Get().State_Invulnerable);
+    auto* Component = NPC->GetCompanionComponent(); Component->CompanionId = TEXT("Tarrik");
+    Component->CuratedAbilities = {USovBotTestAttackAlpha::StaticClass()};
+    auto* ASC = NPC->GetNarrativeAbilitySystemComponent();
+    const auto AttackHandle = ASC->GiveAbility(FGameplayAbilitySpec(USovBotTestAttackAlpha::StaticClass(), 1));
+    auto* Attack = CastChecked<USovBotTestAttackAlpha>(ASC->FindAbilitySpecFromHandle(AttackHandle)->GetPrimaryInstance());
+    FString Reason;
+    if (!TestTrue(TEXT("Normal regroup command accepted"), Component->SetLeader(F.Player, Reason)))
+    { AddError(Reason); return false; }
+    auto* Goal = Cast<USovCompanionCommandGoal>(AI->GetActivityComponent()->GetCurrentActivityGoal());
+    if (!TestNotNull(TEXT("Native activity owns regroup"), Goal)) { return false; }
+    FNarrativeBotAttackCandidate Candidate;
+    TestTrue(TEXT("The same enemy is a valid native bot attack candidate"), ASC->SelectBotAttack(Target, FGameplayTag(), Candidate));
+    Component->TickContextCommand(Goal);
+    TestEqual(TEXT("Invulnerable hostile remains a defensive fallback focus"), AI->GetFocusActor(), static_cast<AActor*>(Target));
+    TestEqual(TEXT("Companion does not waste an authored attack on the invulnerable focus"), Attack->ActivationCount, 0);
+    TargetASC->RemoveLooseGameplayTag(FNarrativeGameplayTags::Get().State_Invulnerable);
+    Component->TickContextCommand(Goal);
+    TestEqual(TEXT("Removing invulnerability lets the same curated attack start"), Attack->ActivationCount, 1);
+    Attack->FinishTestAttack();
     return true;
 }
 

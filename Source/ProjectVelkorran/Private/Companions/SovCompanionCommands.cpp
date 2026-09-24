@@ -46,6 +46,17 @@ bool HostileCompanionTarget(AActor* NPC, AActor* Target)
 	return Team && ASC && ASC->GetNumericAttribute(UNarrativeAttributeSetBase::GetHealthAttribute()) > 0.f
 		&& Team->GetTeamAttitudeTowards(*Target) == ETeamAttitude::Hostile;
 }
+bool CompanionTargetDamageBlocked(const UNarrativeAbilitySystemComponent* ASC, const USovResonanceTargetComponent* Context)
+{
+	const auto& Tags = FSovGameplayTags::Get();
+	return ASC->HasMatchingGameplayTag(Tags.State_Resonance_ProtectedTarget)
+		|| ASC->HasMatchingGameplayTag(Tags.Character_Enemy_Boss)
+		|| ASC->HasMatchingGameplayTag(Tags.State_Invulnerable)
+		|| ASC->HasMatchingGameplayTag(Tags.State_Damage_Immune)
+		|| ASC->HasMatchingGameplayTag(Tags.Damage_Immunity_All)
+		|| ASC->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_Invulnerable)
+		|| (Context && Context->bRequiresPlayerFinish);
+}
 }
 bool USovCompanionComponent::HasMissionPermission(ASovPlayerCharacterBase* Player) const
 {
@@ -256,9 +267,7 @@ void USovCompanionComponent::TickContextCommand(USovCompanionCommandGoal* Goal)
 			const auto* TargetASC = CompanionASC(*It);
 			const auto* TargetContext = It->FindComponentByClass<USovResonanceTargetComponent>();
 			const bool bDeferred = TargetASC->HasMatchingGameplayTag(Tags.State_Target_Unfinishable)
-				|| TargetASC->HasMatchingGameplayTag(Tags.State_Resonance_ProtectedTarget)
-				|| TargetASC->HasMatchingGameplayTag(Tags.Character_Enemy_Boss)
-				|| (TargetContext && TargetContext->bRequiresPlayerFinish);
+				|| CompanionTargetDamageBlocked(TargetASC, TargetContext);
 			if (bDeferred)
 			{
 				if (Dist < DeferredBest) { DeferredBest = Dist; DeferredFocus = *It; }
@@ -299,8 +308,7 @@ void USovCompanionComponent::TickContextCommand(USovCompanionCommandGoal* Goal)
 		auto* TargetASC = CompanionASC(Focus);
 		// Curated AI may neither finish a protected interaction target nor spend an unlisted ability.
 		const auto* Context = Focus->FindComponentByClass<USovResonanceTargetComponent>();
-		const bool bProtected = TargetASC->HasMatchingGameplayTag(Tags.State_Resonance_ProtectedTarget)
-			|| TargetASC->HasMatchingGameplayTag(Tags.Character_Enemy_Boss) || (Context && Context->bRequiresPlayerFinish);
+		const bool bProtected = CompanionTargetDamageBlocked(TargetASC, Context);
 		if (!bProtected && OpeningCombatAt < 0.)
 		{ OpeningCombatAt = GetWorld()->GetTimeSeconds(); }
 		// Only the protagonist proxy gets its copied defense kit. Ordinary allies do not become guard/deflect clones.
