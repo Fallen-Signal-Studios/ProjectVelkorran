@@ -74,6 +74,18 @@ class CoverNavigation(unittest.TestCase):
         self.assertIsNone(driver.cover_goal)
         self.assertEqual(driver.report['cover_attempts'], [])
 
+    def test_majority_shelter_is_used_for_movement_without_waiting_exposed(self):
+        driver, pawn, pc, enemies = self.setup_driver(exposed=True)
+        enemies.extend([NS(get_actor_location=lambda x=x: Vector(x, 0., 88.),
+                           get_character_visual=lambda: None) for x in (3000., 4000.)])
+        self.assertIsNotNone(driver.cover_movement(None, pc, pawn, enemies, 10.))
+        self.assertEqual(driver.report['cover_attempts'][0]['blocked_enemies'], 3)
+        self.assertEqual(driver.report['cover_attempts'][0]['shelter'], 'majority')
+        driver.cover_goal = []
+        self.assertIsNone(driver.cover_movement(None, pc, pawn, enemies, 11.))
+        self.assertIsNone(driver.cover_goal)
+        self.assertEqual(driver.next_cover_search, 14.)
+
     def test_fully_sheltered_reachable_point_is_selected(self):
         driver, pawn, pc, enemies = self.setup_driver()
         self.assertIsNotNone(driver.cover_movement(None, pc, pawn, enemies, 10.))

@@ -107,6 +107,7 @@ class Run:
         self.target = None
         self.occluded_since = None
         self.last_sample = 0.
+        self.last_decision_sample = 0.
         self.last_write = 0.
         self.last_path = 0.
         self.path_points = []
@@ -122,6 +123,7 @@ class Run:
         self.last_evade_request = -1000.
         self.evade_until = -1000.
         self.cover_goal = None
+        self.cover_goal_majority = False
         self.cover_until = -1000.
         self.next_cover_search = -1000.
         self.last_pickup = None
@@ -137,6 +139,8 @@ class Run:
                            driver_source_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
                            samples=[], stages=[], holds=[], targets=[], input_frames={}, rocket_reactions=[],
                            cover_attempts=[], cover_exposures=[], occluded_target_switches=[],
+                           cover_searches=[],
+                           combat_decision_counts={}, combat_decision_samples=[],
                            pickup_approaches=[], native_retries=[],
                            incoming_damage=[], pressure_observation='Read-only native damage receipts and coordination relief state',
                            assets_before=self.before)
@@ -290,6 +294,7 @@ class Run:
                    health=pawn.get_health(), position=_xyz(pawn.get_actor_location()))
         self.attempt = attempt
         self.target = self.cover_goal = self.last_pickup = self.path_target = None
+        self.cover_goal_majority = False
         self.occluded_since = None
         self.path_points = []
         self.cover_until = self.next_cover_search = -1000.
@@ -468,10 +473,14 @@ class Run:
         value = shield.get_shield()
         if self.cover_goal is not None and (value >= shield.get_max_shield()*.85 or phase_time > self.cover_until):
             self.cover_goal = None
+            self.cover_goal_majority = False
         if self.cover_goal is None and value < shield.get_max_shield()*.35 and phase_time > self.next_cover_search:
             self.next_cover_search = phase_time+2.
             location = pawn.get_actor_location()
-            choices = []
+            full_choices = []
+            majority_choices = []
+            reachable = 0
+            maximum_blocked = 0
             for radius in (450., 850.):
                 for index in range(8):
                     angle = index*math.pi/4.
@@ -488,6 +497,7 @@ class Run:
                     nav_to_pawn_height = location.z-path.path_points[0].z
                     if not 0. <= nav_to_pawn_height <= 200.:
                         continue
+                    reachable += 1
                     blocked = 0
                     for enemy in enemies:
                         ignored = [pawn,enemy]+list(pawn.get_attached_actors())
@@ -499,17 +509,26 @@ class Run:
                             for height in sample_offsets]
                         if all(self.cover_trace_blocked(ray) for ray in rays):
                             blocked += 1
-                    # Recovery waits require shelter from every current enemy,
-                    # matching the arrival exposure gate below. Partial shelter
-                    # otherwise causes repeated travel to immediately rejected spots.
+                    maximum_blocked = max(maximum_blocked, blocked)
                     if blocked == len(enemies) and blocked:
-                        choices.append((-blocked, radius, [_xyz(p) for p in path.path_points[1:]]))
+                        full_choices.append((-blocked, radius, [_xyz(p) for p in path.path_points[1:]]))
+                    elif blocked >= max(1, math.ceil(len(enemies)*.75)):
+                        # Most drones blocked is useful while moving, but cannot
+                        # be treated as a safe stationary shield-recovery spot.
+                        majority_choices.append((-blocked, radius, [_xyz(p) for p in path.path_points[1:]]))
+            self.report.setdefault('cover_searches', []).append(dict(elapsed=time.monotonic()-self.started,
+                shield=value, enemies=len(enemies), reachable=reachable,
+                maximum_blocked=maximum_blocked, fully_sheltered=len(full_choices),
+                majority_sheltered=len(majority_choices)))
+            choices = full_choices if full_choices else majority_choices
             if choices:
                 _, _, points = min(choices, key=lambda c:(c[0],c[1]))
                 self.cover_goal = points
-                self.cover_until = phase_time+10.
+                self.cover_goal_majority = not bool(full_choices)
+                self.cover_until = phase_time+(6. if self.cover_goal_majority else 10.)
                 self.report['cover_attempts'].append(dict(elapsed=time.monotonic()-self.started,
-                    shield=value, blocked_enemies=-min(c[0] for c in choices), points=points.copy()))
+                    shield=value, blocked_enemies=-min(c[0] for c in choices),
+                    shelter='majority' if self.cover_goal_majority else 'full', points=points.copy()))
         if self.cover_goal is not None:
             while self.cover_goal:
                 movement, reached = self.local_move(pc,pawn,self.cover_goal[0],stop=25.)
@@ -535,7 +554,10 @@ class Run:
                     self.report['cover_exposures'].append(dict(elapsed=time.monotonic()-self.started,
                         enemies=exposed, shield=value))
                     self.cover_goal = None
-                    self.next_cover_search = phase_time+.5
+                    # Do not bounce immediately between partial shelters; move,
+                    # then resume ordinary fire and lateral evasion.
+                    self.next_cover_search = phase_time+(3. if getattr(self, 'cover_goal_majority', False) else .5)
+                    self.cover_goal_majority = False
                     return None
                 return (0.,0.)
         return None
@@ -788,6 +810,34 @@ class Run:
         moving_to_cover = cover_move is not None and math.hypot(*cover_move) > .01
         can_fire = cover_move is None or moving_to_cover
         attack = 1. if can_fire and not reloading and clear and in_range and error < 1.2 and phase_time % .6 < .4 else 0.
+        # Read-only reason telemetry for intermittent E1 zero-damage runs. The
+        # normal input decision above and injected values remain unchanged.
+        decision = self.report['combat_decision_counts']
+        for label, active in (('frames', True), ('sight_blocked', not clear),
+                              ('out_of_range', not in_range), ('reloading', reloading),
+                              ('cover_hold', not can_fire), ('evading', bool(evade_input)),
+                              ('pulse_closed', phase_time % .6 >= .4),
+                              ('aim_under_1_2', error < 1.2),
+                              ('aim_1_2_to_3', 1.2 <= error < 3.),
+                              ('aim_3_to_6', 3. <= error < 6.),
+                              ('aim_6_to_12', 6. <= error < 12.),
+                              ('aim_over_12', error >= 12.),
+                              ('attack_qualified', bool(attack)),
+                              ('attack_injected', bool(attack and not evade_input))):
+            if active:
+                decision[label] = decision.get(label, 0) + 1
+        if now-self.last_decision_sample >= .5:
+            self.last_decision_sample = now
+            camera = unreal.GameplayStatics.get_player_camera_manager(world, 0)
+            self.report['combat_decision_samples'].append(dict(
+                elapsed=now-self.started, attempt=self.e1.get_attempt_id().export_text(),
+                target=str(self.e1.find_participant_id(target)), target_health=target.get_health(),
+                distance=distance, angle_error=error, look=look,
+                camera_rotation=str(camera.get_camera_rotation()),
+                control_rotation=str(pc.get_control_rotation()),
+                visible_line=clear, in_range=in_range, clip=clip, shield=pawn.get_component_by_class(unreal.SovShieldComponent).get_shield(),
+                seeking_cover=cover_move is not None, evade_requested=bool(evade_input),
+                primary_pressed=bool(attack and not evade_input)))
         self.report['last_combat'] = dict(target=str(self.e1.find_participant_id(target)), distance=distance,
             angle_error=error, clip=clip, reserve=reserve, visible_line=clear, in_range=in_range,
             primary_pressed=bool(attack), target_health=target.get_health(), movement=movement,
