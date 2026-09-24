@@ -1,0 +1,38 @@
+{
+  "status": "round_trip_pass",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z12UpperSidelightFrame_4x3",
+      "triangles": 37224,
+      "dimensions_m": [
+        3.995,
+        0.746,
+        2.99
+      ],
+      "uv_channels": 2,
+      "materials": [
+        "M_Aurelion_ViewBlackStone",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_DarkSteel",
+        "M_Aurelion_ViewWarmConduit"
+      ],
+      "bytes": 825324
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z12UpperSidelightPane_4x3",
+      "triangles": 188,
+      "dimensions_m": [
+        3.28,
+        0.025,
+        2.3
+      ],
+      "uv_channels": 2,
+      "materials": [
+        "M_Aurelion_ViewGlass"
+      ],
+      "bytes": 20716
+    }
+  ]
+}

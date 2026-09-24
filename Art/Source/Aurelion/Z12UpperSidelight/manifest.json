@@ -1,0 +1,62 @@
+{
+  "source": "Blender 4.5 editable procedural kit",
+  "design_reference": "Docs/ArtReferences/AurelionArchitecture-2026-09-24/Z12-Upper-Sidelight.png",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z12UpperSidelightFrame_4x3",
+      "triangles": 37224,
+      "nominal_dimensions_m": [
+        3.995,
+        0.746,
+        2.99
+      ],
+      "materials": [
+        "M_Aurelion_ViewBlackStone",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_DarkSteel",
+        "M_Aurelion_ViewWarmConduit"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None: visual ring over retained native wall collision",
+      "preserve_fallback_geometry": true,
+      "position_precision": 10
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z12UpperSidelightPane_4x3",
+      "triangles": 188,
+      "nominal_dimensions_m": [
+        3.28,
+        0.025,
+        2.3
+      ],
+      "materials": [
+        "M_Aurelion_ViewGlass"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None: transparent visual over retained native wall",
+      "nanite_enabled": false
+    }
+  ],
+  "placement": {
+    "cell_size_m": [
+      3.99,
+      0.5,
+      2.99
+    ],
+    "upper_cell_centers_y": [
+      46900,
+      48100
+    ],
+    "wall_x": [
+      -2100,
+      2100
+    ],
+    "center_z": 450,
+    "lower_service_registers_unchanged": true,
+    "native_wall_collision_unchanged": true
+  }
+}

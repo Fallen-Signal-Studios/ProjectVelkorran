@@ -206,7 +206,7 @@ class Run:
         self.last_write = 0.
         self.report = dict(status='initializing', qualified=False, scope='Actual earned final M13 CP9 public reload only',
             mutations=['one public SovSaveSubsystem.load_slot(CHECKPOINT, 0) request'],
-            gameplay_inputs=False, manufactured_progress=False, samples=[], callbacks=[],
+            gameplay_inputs=False, manufactured_progress=False, samples=[], settling_samples=[], callbacks=[],
             required_stable_seconds=STABLE_SECONDS, timeout_seconds=TIMEOUT_SECONDS,
             tolerances=dict(position_cm=LOCATION_TOLERANCE_CM, angle_degrees=ROTATION_TOLERANCE_DEGREES,
                 resources=.01, scale=.001),
@@ -347,7 +347,6 @@ class Run:
             for a, b in zip(restored['transform']['rotation'], original['transform']['rotation']):
                 assert abs((a-b+180.)%360.-180.) <= ROTATION_TOLERANCE_DEGREES, 'Separate exit rotation changed: '+who
             assert max(abs(a-b) for a, b in zip(restored['transform']['scale'], original['transform']['scale'])) <= .001
-            assert math.dist(restored['transform']['velocity'], [0.,0.,0.]) < 5., 'Departure is not settled: '+who
         assert math.dist(actual['player']['transform']['location'], actual['companion']['transform']['location']) > 2400.
         assert actual['lift']['guid'] == expected['lift']['guid'] and actual['lift']['state'] == expected['lift']['state']
         assert math.dist(actual['lift']['body'], expected['lift']['body']) <= LOCATION_TOLERANCE_CM
@@ -377,6 +376,19 @@ class Run:
             actual = snapshot(world, pc, pawn)
             token = self.verify(actual)
             now = time.monotonic()
+            velocities = {who: actual[who]['transform']['velocity'] for who in ('player', 'companion')}
+            if any(math.dist(value, [0.,0.,0.]) >= 5. for value in velocities.values()):
+                # Character movement may tick once after the load callback. Do
+                # not qualify a moving exit, but allow it to settle before the
+                # four-second stability window. The overall deadline still fails
+                # a companion that keeps moving or never returns to the exit.
+                self.stable_since = None
+                if now-self.last_write > .5:
+                    self.last_write = now
+                    self.report['settling_samples'].append(dict(elapsed=elapsed, velocities=velocities,
+                        positions={who: actual[who]['transform']['location'] for who in velocities}))
+                    self.write()
+                return
             if self.stable_since is None: self.stable_since = now
             if now-self.last_write > .5:
                 self.last_write = now

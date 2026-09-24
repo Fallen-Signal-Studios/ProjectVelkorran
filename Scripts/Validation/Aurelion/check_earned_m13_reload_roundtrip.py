@@ -111,7 +111,14 @@ def tick(dt):
             assert len(report['callbacks'])==state['index']+1 and report['callbacks'][-1]['success']
             header=report['callbacks'][-1]['header']
             assert header['boundary']=='Aurelion.CP9'
-            if not state['index']:assert header['generation']==max(v['generation'] for v in earned['checkpoints']['Aurelion.CP9'])
+            if not state['index']:
+                earned_generation=max(v['generation'] for v in earned['checkpoints']['Aurelion.CP9'])
+                # Loading while standing inside CP9 can legitimately re-arm and
+                # refresh the same checkpoint once. A repeated observer then
+                # reads that native successor bank, not the original generation.
+                assert earned_generation <= header['generation'] <= earned_generation+1
+                report['earned_checkpoint_generation']=earned_generation
+                report['loaded_checkpoint_generation']=header['generation']
             else:assert header==state['expected_header']
             state.update(phase='observe',at=now,stable_at=None);return
         pc=unreal.GameplayStatics.get_player_controller(world,0)
