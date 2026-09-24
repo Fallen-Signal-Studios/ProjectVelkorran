@@ -1,0 +1,41 @@
+{
+  "status": "round_trip_pass",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z11ObservationCeiling_A",
+      "triangles": 16544,
+      "dimensions_m": [
+        4.0,
+        4.0,
+        0.4135
+      ],
+      "uv_channels": 2,
+      "materials": [
+        "M_Aurelion_ObservationBlackStone",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_ObservationContact"
+      ],
+      "bytes": 390012
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z11ObservationCeiling_B",
+      "triangles": 25380,
+      "dimensions_m": [
+        4.0,
+        4.0,
+        0.4135
+      ],
+      "uv_channels": 2,
+      "materials": [
+        "M_Aurelion_ObservationBlackStone",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_ObservationContact"
+      ],
+      "bytes": 615580
+    }
+  ]
+}

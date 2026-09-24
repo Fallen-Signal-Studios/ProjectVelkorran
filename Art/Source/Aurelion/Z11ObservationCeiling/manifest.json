@@ -1,0 +1,61 @@
+{
+  "source": "Editable Blender 4.5 procedural source",
+  "design_reference": "Docs/ArtReferences/AurelionArchitecture-2026-09-23/Z11-Observation-Ceiling.png",
+  "narrative_reference": "Origins chapter 26; Aurelion layout page 15; August TDD section 11.3",
+  "layout": [
+    6,
+    4
+  ],
+  "room_dimensions_m": [
+    24,
+    16
+  ],
+  "lowest_z_m": 5.6,
+  "placement_status": "Source candidate: Unreal player-height fit required",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z11ObservationCeiling_A",
+      "triangles": 16544,
+      "nominal_dimensions_m": [
+        4.0,
+        4.0,
+        0.4135
+      ],
+      "materials": [
+        "M_Aurelion_ObservationBlackStone",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_ObservationContact"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None: visual-only tile replacing noncolliding stock roof art",
+      "preserve_fallback_geometry": true,
+      "design_clearance_m": 5.6,
+      "variation": "A"
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z11ObservationCeiling_B",
+      "triangles": 25380,
+      "nominal_dimensions_m": [
+        4.0,
+        4.0,
+        0.4135
+      ],
+      "materials": [
+        "M_Aurelion_ObservationBlackStone",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_ObservationContact"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None: visual-only tile replacing noncolliding stock roof art",
+      "preserve_fallback_geometry": true,
+      "design_clearance_m": 5.6,
+      "variation": "B"
+    }
+  ]
+}
