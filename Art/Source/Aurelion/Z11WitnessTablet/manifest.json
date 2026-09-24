@@ -1,0 +1,33 @@
+{
+  "reference": "Docs/ArtReferences/AurelionArchitecture-2026-09-23/Z11-Witness-Tablet.png",
+  "survey": "Saved/Validation/Aurelion/Z11WitnessTabletSurvey-20260924-0620/z11-witness-tablet-survey.json",
+  "placement_status": "Fitted to five M13 Z11 request visuals; guarded editor save/reload and player-height render review passed. A fresh post-fit end-to-end interaction run remains open.",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z11WitnessTablet",
+      "triangles": 13088,
+      "nominal_dimensions_m": [
+        0.546,
+        0.444,
+        1.555
+      ],
+      "materials": [
+        "M_Aurelion_ChannelShadow",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_ObservationBlackStone",
+        "M_Aurelion_QuietDisplay"
+      ],
+      "uv_layers": 2,
+      "convex_hulls": 0,
+      "collision": "None: retained request actor Body owns all physical interaction and collision",
+      "original_actor_visual_scale": 0.7454,
+      "world_max_footprint_m": [
+        0.407,
+        0.325
+      ],
+      "preserve_actor_and_component_transforms": true,
+      "protected_request_actor_count": 5
+    }
+  ]
+}

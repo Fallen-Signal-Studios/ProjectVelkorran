@@ -1,0 +1,20 @@
+{
+  "status": "round_trip_pass",
+  "asset": "SM_Aurelion_KIT_Z11WitnessTablet",
+  "triangles": 13088,
+  "uv_channels": 2,
+  "materials": [
+    "M_Aurelion_ChannelShadow",
+    "M_Aurelion_IvoryStone",
+    "M_Aurelion_AncientGold",
+    "M_Aurelion_ObservationBlackStone",
+    "M_Aurelion_QuietDisplay"
+  ],
+  "dimensions_m": [
+    0.546,
+    0.44352,
+    1.555
+  ],
+  "collision_hulls": 0,
+  "fbx_bytes": 343740
+}

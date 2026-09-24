@@ -83,3 +83,18 @@ dark-metal joinery, fine functional gold channels, and carefully joined floor
 and roof ends. The isolated close-up is a design study, not a dimensioned
 replacement for measured engine geometry. No new window obstruction, symbols,
 people, HUD or text were requested.
+
+## Z11 witness tablet prop family, 24 September
+
+The built-in image tool edited the saved Unreal Z11 gallery room view into
+[this focused reference](Z11-Witness-Tablet.png) before any replacement mesh
+was authored. The request preserved the single table, exactly six chairs,
+sealed red/Wound/white panorama and existing placement of the five native
+scene-request actors. Their freestanding bright retail-console visuals were
+reimagined as compact Aurelion witness tablets: a black-stone core, age-polished
+ivory edge, narrow functional gold traces and a small readable recessed
+interaction face. The lower-right close-up is a material/construction study;
+the room view is a silhouette and sightline constraint. This follows the
+August TDD's quiet-space rule against cluttered quest kiosks and chapter 26's
+intimate aftermath. No gameplay actor, collision, table, chair or story beat
+should be moved to match the generated image.
