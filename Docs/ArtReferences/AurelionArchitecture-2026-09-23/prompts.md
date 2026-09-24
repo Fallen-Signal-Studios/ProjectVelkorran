@@ -1,5 +1,11 @@
 # Built-in image-generation prompts
 
+## Z12 open berth vistas (23 September)
+
+Built-in imagegen produced [Z12-Open-Berth-Vistas.png](Z12-Open-Berth-Vistas.png) before the Blender open-vista kit. The verbatim service payload was not retained in the engineering handoff; this is the generation brief and constraints recorded at the time, rather than an exact byte-for-byte prompt.
+
+Create a production reference sheet for the M13 departure berths in *Sovereign Call: Origins*, derived from the August TDD, 7 September level layout and chapter 26 manuscript. Show two separate wide views: the Dominion berth against the red stellar remnant, and the Reformation berth against the smaller cold-white remnant, with the closed dark Wound lying between the two views. Preserve a genuinely open distant sightline beyond each 28 × 18 m berth: at least 60 percent of the background should remain visible rather than blocked by a rear wall. Frame it with only two or three tapering ancient black-stone spires, keyed ivory collars and a few fractured but stable, narrow flying-bridge fragments. Use small human or shuttle scale cues, layered machined stone, dark steel, and restrained functional gold channels. Include close architectural detail views for modeling. Keep the two factions' color readings distinct without putting modern faction branding on Aurelion's ancient structure. High-detail, physically plausible 3D game-environment reference, clear construction and silhouettes, no sealed bulkhead, cathedral or throne imagery, neon panels, HUD, labels or text. This sheet is a modeling guide, not an approved camera angle or playable layout.
+
 ## Z12 berth bulkhead study (23 September)
 
 Built-in imagegen produced [Z12-Berth-Bulkhead.png](Z12-Berth-Bulkhead.png) as a modelable service-wall reference before Blender construction. The full rear-wall placement was later rejected in Unreal because it closes the remnant/Wound vista; this prompt records exploration, not accepted story architecture.

@@ -1,0 +1,57 @@
+{
+  "status": "round_trip_pass",
+  "modules": [
+    {
+      "asset": "SM_Aurelion_KIT_Z12VistaSpireTall",
+      "triangles": 7256,
+      "dimensions_m": [
+        4.45,
+        3.96,
+        23.5
+      ],
+      "uv_channels": 2,
+      "materials": [
+        "M_Aurelion_BlackStone",
+        "M_Aurelion_DarkSteel",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold"
+      ],
+      "bytes": 198684
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z12VistaSpireShort",
+      "triangles": 7256,
+      "dimensions_m": [
+        4.45,
+        3.96,
+        18.5
+      ],
+      "uv_channels": 2,
+      "materials": [
+        "M_Aurelion_BlackStone",
+        "M_Aurelion_DarkSteel",
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_AncientGold"
+      ],
+      "bytes": 198844
+    },
+    {
+      "asset": "SM_Aurelion_KIT_Z12VistaFlyingBridge",
+      "triangles": 21432,
+      "dimensions_m": [
+        12.39032,
+        1.3215,
+        2.32013
+      ],
+      "uv_channels": 2,
+      "materials": [
+        "M_Aurelion_IvoryStone",
+        "M_Aurelion_DarkSteel",
+        "M_Aurelion_BlackStone",
+        "M_Aurelion_AncientGold",
+        "M_Aurelion_LumenLens"
+      ],
+      "bytes": 652604
+    }
+  ]
+}

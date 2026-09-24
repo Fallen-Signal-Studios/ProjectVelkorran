@@ -25,6 +25,8 @@ The [paired departure shuttle detail study](Z12-Departure-Shuttles-Detail.png) e
 
 The [berth bulkhead study](Z12-Berth-Bulkhead.png) guided two Blender service-wall bay prototypes. Its solid rear enclosure proved inconsistent with the established open remnant/Wound vista when reviewed behind the saved shuttles in Unreal, so that placement was rejected. The bay source remains a candidate for side returns or protected interiors; the generated image is not an approved M13 layout.
 
+The [open berth vista study](Z12-Open-Berth-Vistas.png) replaces that solid-wall direction with distant, sparse black-stone spires and ivory bridge fragments. It keeps the Dominion red remnant and Reformation white remnant in separate views with the closed Wound between them. The three custom Blender modules have been imported as reusable Unreal meshes, but their trial placement was too hidden by the shuttle canopy to save. Two restrained, noncolliding scenic remnant plates were saved behind the berths and checked in a fresh M13 load; their visibility and overall finish remain subject to live player and art review. No further Higgsfield generation was used for this pass.
+
 ## Modeling constraints carried forward
 
 - **One ancient substrate:** ivory upper surfaces and polished black lower surfaces use related joints and functional gold conduits. Different scales and angles express a living mechanism, not repeated heraldry or faction ownership.
@@ -34,4 +36,4 @@ The [berth bulkhead study](Z12-Berth-Bulkhead.png) guided two Blender service-wa
 - **Story boundary:** the chapter 25 chamber has two independent assent interfaces and a human-size Crownmark Five integrated in vast machinery; completion stabilizes a still-closed boundary. The chapter 26 gallery is intentionally intimate. No present-day battle is added after the crucible.
 - **Wayfinding boundary:** use small, wall-integrated terminal signs or restrained holographic markers at route decisions. A live E3 player capture still shows a large white floating `BREACH RESCUE`/`AHEAD: CAPTURE GALLERY` text actor over combat, competing with the HUD. Replace these graybox route labels as each area receives its kit; keep the native objective and interaction information legible.
 
-The exact accepted generation prompts and the one Selene correction are in [prompts.md](prompts.md). Generated with the built-in image tool and copied into this project; no source PDF or manuscript pages were edited.
+The generation prompts and the one Selene correction are in [prompts.md](prompts.md). The later open-vista brief is recorded there from the generation context; its verbatim service payload was not retained. Generated with the built-in image tool and copied into this project; no source PDF or manuscript pages were edited.
