@@ -1,0 +1,18 @@
+{
+  "status": "round_trip_pass",
+  "asset": "SM_Aurelion_KIT_Z11QuietWall_4p5x6",
+  "triangles": 25380,
+  "dimensions_m": [
+    4.49,
+    0.5,
+    5.992
+  ],
+  "uv_channels": 2,
+  "materials": [
+    "M_Aurelion_IvoryStone",
+    "M_Aurelion_ChannelShadow",
+    "M_Aurelion_BlackStone",
+    "M_Aurelion_AncientGold"
+  ],
+  "bytes": 582972
+}
