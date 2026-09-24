@@ -154,6 +154,15 @@ their next runtime check. A passing build alone does not close any gameplay row.
   recoveries and 19 of 21 rejected in the preceding run. Both passive enemy
   observers completed without error. This corrects validation behavior, not
   enemy pressure; E1's repeated-death risk remains open.
+  The [capsule and return-fire follow-up](Validation/E1CoverPilotCapsuleReturnFire-2026-09-23.md)
+  measured Tarrik's actual 88 cm half-height, moved cover samples inside his
+  capsule, and let the input pilot traverse reachable partial nav paths. A
+  fresh replay still failed on its fourth death; its pilot had stopped firing
+  during exposed travel to cover. After returning fire during those moves,
+  another visible E1-to-Selene replay passed with one native recovery, 41
+  incoming damage receipts and a zero-error enemy observer. No gameplay
+  pressure settings changed. Repeat reliability and physical-control feel
+  remain open.
 - **Enemy attack facing:** read-only PIE samples exposed a separate presentation
   defect: active drones could fire while over 90 degrees off Tarrik despite a
   valid damage target. The combat NPC base now turns toward an active attack's

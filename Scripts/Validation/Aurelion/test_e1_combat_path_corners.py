@@ -42,9 +42,18 @@ class PathCorners(unittest.TestCase):
         self.assertLess(movement[1], 0.)
         self.assertEqual(len(driver.path_points), 2)
 
-    def test_partial_path_does_not_drive_through_obstruction(self):
-        movement, _ = self.drive((0.,0.), [(0.,0.),(100.,100.)], partial=True)
+    def test_partial_path_follows_reachable_prefix(self):
+        movement, driver = self.drive((0.,0.), [(0.,0.),(0.,150.),(270.,150.)], partial=True)
+        self.assertGreater(movement[0], 0.)
+        self.assertAlmostEqual(movement[1], 0.)
+        self.assertTrue(driver.report['last_combat_path']['partial'])
+        self.assertFalse(driver.report['last_combat_path']['complete'])
+        self.assertEqual(len(driver.path_points), 2)
+
+    def test_partial_path_with_no_advance_stops(self):
+        movement, driver = self.drive((0.,0.), [(0.,0.),(40.,0.)], partial=True)
         self.assertEqual(movement, (0.,0.))
+        self.assertEqual(driver.path_points, [])
 
 if __name__ == '__main__':
     unittest.main()

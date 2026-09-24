@@ -397,10 +397,19 @@ class Run:
             self.last_path, self.path_target = now, target
             path = unreal.SovAurelionNavigationLibrary.find_path_to_location_synchronously(
                 world, pawn.get_actor_location(), target.get_actor_location(), pawn, None)
-            valid = path is not None and path.is_valid() and not path.is_partial()
-            self.report['last_combat_path'] = dict(target=_path(target), complete=valid,
-                                                  points=[_xyz(p) for p in path.path_points] if path else [])
-            self.path_points = list(path.path_points)[1:] if valid else []
+            valid = path is not None and path.is_valid()
+            points = list(path.path_points) if valid else []
+            partial = valid and path.is_partial()
+            origin = pawn.get_actor_location()
+            advance = math.hypot(points[-1].x-origin.x, points[-1].y-origin.y) if len(points) >= 2 else 0.
+            # A partial Recast path ends on reachable navmesh before an
+            # obstruction. Follow that prefix, then request a fresh path;
+            # never steer directly toward the blocked target beyond it.
+            usable = valid and len(points) >= 2 and (not partial or advance >= 100.)
+            self.report['last_combat_path'] = dict(target=_path(target), complete=valid and not partial,
+                                                  partial=partial, advance_cm=round(advance, 1),
+                                                  points=[_xyz(p) for p in points])
+            self.path_points = points[1:] if usable else []
         while self.path_points:
             # Recast can place adjacent corners less than 80 cm apart around
             # railings. Skipping both cuts across their collision instead of
@@ -443,9 +452,19 @@ class Run:
                 return True
         return False
 
+    def cover_sample_offsets(self, pawn):
+        capsule = pawn.get_component_by_class(unreal.CapsuleComponent)
+        assert capsule, 'E1 cover check needs the live player capsule'
+        half_height = float(capsule.get_scaled_capsule_half_height())
+        assert 60. <= half_height <= 140., 'Unexpected E1 player capsule height'
+        # The actor origin is the capsule centre. A +150 cm ray was above
+        # Tarrik's measured 88 cm half-height and rejected valid body cover.
+        return (0., min(75., half_height-10.))
+
     def cover_movement(self, world, pc, pawn, enemies, phase_time):
         shield = pawn.get_component_by_class(unreal.SovShieldComponent)
         assert shield and shield.is_initialized(), 'Native shield readiness missing'
+        sample_offsets = self.cover_sample_offsets(pawn)
         value = shield.get_shield()
         if self.cover_goal is not None and (value >= shield.get_max_shield()*.85 or phase_time > self.cover_until):
             self.cover_goal = None
@@ -463,7 +482,7 @@ class Run:
                     end = path.path_points[-1]
                     if abs(end.z-(location.z-88.))>150. or math.hypot(end.x-goal.x,end.y-goal.y)>150.:
                         continue
-                    # Test the same torso/head heights at selection and arrival.
+                    # Test the same capsule-centre/upper-body heights at selection and arrival.
                     # A single mid-height ray chose low coffers that exposed the
                     # head, causing repeated moves to immediately rejected cover.
                     nav_to_pawn_height = location.z-path.path_points[0].z
@@ -477,7 +496,7 @@ class Run:
                             end+unreal.Vector(0.,0.,nav_to_pawn_height+height),
                             enemy.get_actor_location(), unreal.TraceTypeQuery.TRACE_TYPE_QUERY1, False,
                             ignored, unreal.DrawDebugTrace.NONE, True)
-                            for height in (50.,150.)]
+                            for height in sample_offsets]
                         if all(self.cover_trace_blocked(ray) for ray in rays):
                             blocked += 1
                     # Recovery waits require shelter from every current enemy,
@@ -504,12 +523,12 @@ class Run:
                 for enemy in enemies:
                     ignored = [pawn, enemy] + list(pawn.get_attached_actors())
                     ignored += [v for v in (pawn.get_character_visual(), enemy.get_character_visual()) if v]
-                    # A low coffer can hide the torso while leaving the camera/head
-                    # exposed to flying drones. Both heights must actually be sheltered.
+                    # A low coffer can hide the centre while leaving the upper
+                    # capsule exposed to flying drones. Both samples need shelter.
                     rays = [unreal.SystemLibrary.line_trace_single(world,
                         pawn.get_actor_location()+unreal.Vector(0.,0.,height), enemy.get_actor_location(),
                         unreal.TraceTypeQuery.TRACE_TYPE_QUERY1, False, ignored, unreal.DrawDebugTrace.NONE, True)
-                        for height in (50., 150.)]
+                        for height in sample_offsets]
                     if any(not self.cover_trace_blocked(ray) for ray in rays):
                         exposed.append(_path(enemy))
                 if exposed:
@@ -763,13 +782,18 @@ class Run:
         velocity = pawn.get_velocity()
         speed = math.sqrt(velocity.x**2 + velocity.y**2 + velocity.z**2)
         assert math.isfinite(spread) and spread >= 0. and math.isfinite(speed)
-        attack = 1. if cover_move is None and not reloading and clear and in_range and error < 1.2 and phase_time % .6 < .4 else 0.
+        # Keep returning fire while running toward shelter. The old pilot
+        # dropped its weapon for the whole approach (up to ten seconds), even
+        # when it had a clear shot; a player can move and fire together.
+        moving_to_cover = cover_move is not None and math.hypot(*cover_move) > .01
+        can_fire = cover_move is None or moving_to_cover
+        attack = 1. if can_fire and not reloading and clear and in_range and error < 1.2 and phase_time % .6 < .4 else 0.
         self.report['last_combat'] = dict(target=str(self.e1.find_participant_id(target)), distance=distance,
             angle_error=error, clip=clip, reserve=reserve, visible_line=clear, in_range=in_range,
             primary_pressed=bool(attack), target_health=target.get_health(), movement=movement,
             evade_requested=bool(evade_input), seeking_cover=cover_move is not None, seeking_ammo=pickup_move is not None,
             native_spread_degrees=spread, native_speed_cm_s=speed)
-        self.inject(move=movement, look=look, aim=0. if reloading or evade_input or cover_move is not None else 1.,
+        self.inject(move=movement, look=look, aim=0. if reloading or evade_input or not can_fire else 1.,
                     attack=0. if evade_input else attack, reload=reload_input, evade=evade_input)
 
     def tick(self, delta):

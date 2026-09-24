@@ -9,7 +9,7 @@ source = Path(__file__).with_name('continue_aurelion_e1_input.py')
 tree = ast.parse(source.read_text(encoding='utf-8-sig'))
 run = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == 'Run')
 run.body = [n for n in run.body if isinstance(n, ast.FunctionDef)
-            and n.name in ('cover_movement', 'cover_trace_blocked', 'local_move')]
+            and n.name in ('cover_movement', 'cover_trace_blocked', 'cover_sample_offsets', 'local_move')]
 scope = dict(math=math, time=NS(monotonic=lambda: 10.),
              _xyz=lambda p: (p.x, p.y, p.z), _path=lambda p: 'enemy')
 exec(compile(ast.fix_missing_locations(ast.Module(body=[run], type_ignores=[])),
@@ -29,7 +29,8 @@ class CoverNavigation(unittest.TestCase):
         shield = NS(is_initialized=lambda: True, get_shield=lambda: 10.,
                     get_max_shield=lambda: 100.)
         pawn = NS(get_actor_location=lambda: Vector(0., 0., 88.),
-                  get_component_by_class=lambda cls: shield,
+                  get_component_by_class=lambda cls: NS(get_scaled_capsule_half_height=lambda: 88.)
+                      if cls is scope['unreal'].CapsuleComponent else shield,
                   get_attached_actors=lambda: [], get_character_visual=lambda: None)
         enemies = [NS(get_actor_location=lambda: Vector(1000., 0., 88.),
                       get_character_visual=lambda: None),
@@ -45,7 +46,7 @@ class CoverNavigation(unittest.TestCase):
                         object() if self.blocked else None)
 
         def trace(world, start, end, *args):
-            if head_clear and start.z>200. and end.x == 2000.:
+            if head_clear and start.z>160. and end.x == 2000.:
                 return (False, Hit(False))
             if tuple_miss_on_arrival and abs(start.x)<.01 and end.x == 2000.:
                 return (False, Hit(False))
@@ -55,7 +56,7 @@ class CoverNavigation(unittest.TestCase):
             return NS(is_valid=lambda: True, is_partial=lambda: False,
                       path_points=[Vector(0., 0., 0.), Vector(goal.x, goal.y, 0.)])
 
-        scope['unreal'] = NS(Vector=Vector, SovShieldComponent=object,
+        scope['unreal'] = NS(Vector=Vector, SovShieldComponent=object, CapsuleComponent=type('Capsule',(),{}),
             NarrativeCharacter=type('Character', (), {}), HitResult=Hit,
             SovAurelionNavigationLibrary=NS(find_path_to_location_synchronously=path),
             SystemLibrary=NS(line_trace_single=trace),
@@ -84,6 +85,10 @@ class CoverNavigation(unittest.TestCase):
         self.assertIsNone(driver.cover_movement(None, pc, pawn, enemies, 10.))
         self.assertIsNone(driver.cover_goal)
         self.assertEqual(driver.report['cover_attempts'], [])
+
+    def test_cover_rays_stay_inside_live_capsule(self):
+        driver, pawn, pc, enemies = self.setup_driver()
+        self.assertEqual(driver.cover_sample_offsets(pawn), (0.,75.))
 
     def test_cover_path_does_not_skip_a_nearby_corner(self):
         driver, pawn, pc, enemies = self.setup_driver()
