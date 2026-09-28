@@ -28,4 +28,5 @@ private:
     void UpdatePlacement(UUserWidget* Menu);
     FBox2D PlacedWheel = FBox2D(ForceInit);
     SovHUDStyle::FTheme Theme;
+    bool bSwitchLockedByCast = false;
 };

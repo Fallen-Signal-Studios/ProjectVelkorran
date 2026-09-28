@@ -1,5 +1,7 @@
 // Copyright Fallen Signal Studios. All Rights Reserved.
 #include "UI/SovWeaponWheelGlass.h"
+#include "AbilitySystemBlueprintLibrary.h"
+#include "AbilitySystemComponent.h"
 #include "Blueprint/WidgetTree.h"
 #include "CommonLazyImage.h"
 #include "CommonActivatableWidget.h"
@@ -14,6 +16,7 @@
 #include "Framework/Application/SlateApplication.h"
 #include "Framework/SovPlayerController.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "NarrativeGameplayTags.h"
 #include "Rendering/DrawElements.h"
 #include "Rendering/DrawElementTypes.h"
 #include "Rendering/SlateRenderer.h"
@@ -91,6 +94,10 @@ void USovWeaponWheelGlass::UpdatePlacement(UUserWidget* Menu)
 void USovWeaponWheelGlass::NativeTick(const FGeometry& Geometry, float DeltaSeconds)
 {
     Super::NativeTick(Geometry, DeltaSeconds);
+    const UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwningPlayerPawn());
+    // Narrative's wield ability rejects a weapon change during Busy. Keep the
+    // authored radial selection intact, but show that its release cannot equip.
+    bSwitchLockedByCast = ASC && ASC->HasMatchingGameplayTag(FNarrativeGameplayTags::Get().State_Busy);
     FSovCombatVitalsSnapshot Vitals;
     USovCombatVitalsWidget::ReadCurrentVitals(Cast<ASovPlayerController>(GetOwningPlayer()), Vitals);
     const auto* Settings = USovGameUserSettings::Get();
@@ -153,5 +160,24 @@ int32 USovWeaponWheelGlass::NativePaint(const FPaintArgs& Args, const FGeometry&
     FSlateDrawElement::MakeText(Elements, ++Layer,
         Geometry.ToPaintGeometry(TextSize, FSlateLayoutTransform(FVector2D((Size.X-TextSize.X)*.5,Size.Y-18))),
         Theme.Identity, Font, ESlateDrawEffect::None, Theme.Accent);
+    if (bSwitchLockedByCast)
+    {
+        const FString LockText(TEXT("CASTING  /  SWITCH LOCKED"));
+        const FSlateFontInfo LockFont = FCoreStyle::GetDefaultFontStyle("Regular", 22);
+        const FVector2D LockSize = FSlateApplication::Get().GetRenderer()->GetFontMeasureService()->Measure(LockText, LockFont);
+        const FVector2D PlateSize(FMath::Min(Size.X - 90.f, LockSize.X + 34.f), LockSize.Y + 14.f);
+        const FVector2D PlateOrigin((Size.X - PlateSize.X) * .5f, Size.Y - 64.f - PlateSize.Y);
+        FLinearColor PlateColor = FMath::Lerp(FLinearColor::Black, Theme.Accent, .08f);
+        PlateColor.A = .82f;
+        FSlateDrawElement::MakeBox(Elements, ++Layer,
+            Geometry.ToPaintGeometry(PlateSize, FSlateLayoutTransform(PlateOrigin)),
+            FCoreStyle::Get().GetBrush("WhiteBrush"), ESlateDrawEffect::None, PlateColor);
+        FLinearColor LockColor = FMath::Lerp(Theme.Accent, FLinearColor::White, .48f);
+        LockColor.A = 1.f;
+        FSlateDrawElement::MakeText(Elements, ++Layer,
+            Geometry.ToPaintGeometry(LockSize, FSlateLayoutTransform(FVector2D((Size.X-LockSize.X)*.5,
+                PlateOrigin.Y + (PlateSize.Y-LockSize.Y)*.5f))),
+            LockText, LockFont, ESlateDrawEffect::None, LockColor);
+    }
     return Layer;
 }
